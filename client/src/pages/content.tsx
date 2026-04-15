@@ -1,0 +1,1670 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useLoadingMessages } from "@/hooks/use-loading-messages";
+import { TestModeBadge } from "@/components/TestModeBadge";
+import PageHeader from "@/components/PageHeader";
+import { Loader2, FileText, HelpCircle, Lightbulb, Target, BookOpen, Star, Search, Plus, TrendingUp, Clock, Save, Check, Shield, RefreshCw, CheckCircle, AlertCircle, FolderOpen, X, Copy } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { Link, useSearch } from "wouter";
+import { Progress } from "@/components/ui/progress";
+import { nanoid } from "nanoid";
+
+interface ContentDraft {
+  id: string;
+  keywords: string;
+  industry: string;
+  type: string;
+  brandId: string;
+  generatedContent: string;
+  targetCustomers: string;
+  geography: string;
+  contentStyle: string;
+  humanScore: number | null;
+  passesAiDetection: boolean | null;
+  aiIssues: string[];
+  aiStrengths: string[];
+  aiRecommendation: string;
+  aiVocabularyFound: string[];
+  savedArticleId: string | null;
+  showTargetingOptions: boolean;
+  updatedAt: number;
+  label: string;
+}
+
+const DRAFTS_KEY = "venturecite_content_drafts";
+const ACTIVE_DRAFT_KEY = "venturecite_active_draft";
+
+function loadDrafts(): ContentDraft[] {
+  try {
+    const raw = localStorage.getItem(DRAFTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveDrafts(drafts: ContentDraft[]) {
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+}
+
+function getActiveDraftId(): string | null {
+  return localStorage.getItem(ACTIVE_DRAFT_KEY);
+}
+
+function setActiveDraftId(id: string) {
+  localStorage.setItem(ACTIVE_DRAFT_KEY, id);
+}
+
+function createEmptyDraft(): ContentDraft {
+  return {
+    id: nanoid(8),
+    keywords: "",
+    industry: "",
+    type: "article",
+    brandId: "none",
+    generatedContent: "",
+    targetCustomers: "",
+    geography: "",
+    contentStyle: "b2c",
+    humanScore: null,
+    passesAiDetection: null,
+    aiIssues: [],
+    aiStrengths: [],
+    aiRecommendation: "",
+    aiVocabularyFound: [],
+    savedArticleId: null,
+    showTargetingOptions: false,
+    updatedAt: Date.now(),
+    label: "",
+  };
+}
+
+function getDraftLabel(d: ContentDraft): string {
+  if (d.label) return d.label;
+  if (d.keywords) return d.keywords.slice(0, 40) + (d.keywords.length > 40 ? "..." : "");
+  return "Untitled Draft";
+}
+
+const industries = [
+  { value: "Technology", group: "Technology & Digital" },
+  { value: "Software & SaaS", group: "Technology & Digital" },
+  { value: "Artificial Intelligence & Machine Learning", group: "Technology & Digital" },
+  { value: "Cybersecurity", group: "Technology & Digital" },
+  { value: "Telecommunications", group: "Technology & Digital" },
+  { value: "E-commerce", group: "Technology & Digital" },
+  { value: "Gaming & Esports", group: "Technology & Digital" },
+  { value: "Healthcare", group: "Healthcare & Life Sciences" },
+  { value: "Pharmaceuticals", group: "Healthcare & Life Sciences" },
+  { value: "Biotechnology", group: "Healthcare & Life Sciences" },
+  { value: "Medical Devices", group: "Healthcare & Life Sciences" },
+  { value: "Mental Health & Wellness", group: "Healthcare & Life Sciences" },
+  { value: "Finance & Banking", group: "Finance & Business" },
+  { value: "Insurance", group: "Finance & Business" },
+  { value: "Fintech", group: "Finance & Business" },
+  { value: "Accounting & Tax", group: "Finance & Business" },
+  { value: "Real Estate", group: "Finance & Business" },
+  { value: "Venture Capital & Private Equity", group: "Finance & Business" },
+  { value: "Consulting & Professional Services", group: "Finance & Business" },
+  { value: "Legal Services", group: "Finance & Business" },
+  { value: "Marketing & Advertising", group: "Marketing & Media" },
+  { value: "Public Relations", group: "Marketing & Media" },
+  { value: "Media & Entertainment", group: "Marketing & Media" },
+  { value: "Publishing", group: "Marketing & Media" },
+  { value: "Social Media & Influencer", group: "Marketing & Media" },
+  { value: "Education & EdTech", group: "Education & Nonprofit" },
+  { value: "Higher Education", group: "Education & Nonprofit" },
+  { value: "Nonprofit & NGO", group: "Education & Nonprofit" },
+  { value: "Government & Public Sector", group: "Education & Nonprofit" },
+  { value: "Manufacturing", group: "Industrial & Engineering" },
+  { value: "Construction & Engineering", group: "Industrial & Engineering" },
+  { value: "Automotive", group: "Industrial & Engineering" },
+  { value: "Aerospace & Defense", group: "Industrial & Engineering" },
+  { value: "Energy & Utilities", group: "Industrial & Engineering" },
+  { value: "Oil & Gas", group: "Industrial & Engineering" },
+  { value: "Renewable Energy & CleanTech", group: "Industrial & Engineering" },
+  { value: "Retail", group: "Consumer & Lifestyle" },
+  { value: "Consumer Goods (CPG)", group: "Consumer & Lifestyle" },
+  { value: "Food & Beverage", group: "Consumer & Lifestyle" },
+  { value: "Hospitality & Tourism", group: "Consumer & Lifestyle" },
+  { value: "Fashion & Apparel", group: "Consumer & Lifestyle" },
+  { value: "Beauty & Personal Care", group: "Consumer & Lifestyle" },
+  { value: "Fitness & Sports", group: "Consumer & Lifestyle" },
+  { value: "Home & Interior Design", group: "Consumer & Lifestyle" },
+  { value: "Pets & Animal Care", group: "Consumer & Lifestyle" },
+  { value: "Agriculture & AgTech", group: "Specialized" },
+  { value: "Logistics & Supply Chain", group: "Specialized" },
+  { value: "Transportation", group: "Specialized" },
+  { value: "Human Resources & Recruiting", group: "Specialized" },
+  { value: "Environmental & Sustainability", group: "Specialized" },
+  { value: "Cannabis & Hemp", group: "Specialized" },
+  { value: "Crypto & Blockchain", group: "Specialized" },
+  { value: "Other", group: "Specialized" },
+];
+
+const industryGroups = Array.from(new Set(industries.map(i => i.group)));
+
+const getIndustryTemplate = (industry: string, type: string) => {
+  const baseTemplates: Record<string, { structure: string; examples: string[] }> = {
+    article: {
+      structure: "Introduction → Problem/Opportunity → Solution → Benefits → Case Studies → Future Outlook → Conclusion",
+      examples: ["industry trends", "best practices", "expert analysis"]
+    },
+    "blog post": {
+      structure: "Hook → Problem → Solution → How-to Steps → Results → Call-to-Action",
+      examples: ["practical tips", "how-to guides", "industry updates"]
+    },
+    "product description": {
+      structure: "Headline → Key Benefits → Features → Use Cases → Social Proof → Clear CTA",
+      examples: ["product overview", "feature highlights", "comparison guides"]
+    },
+    "social media post": {
+      structure: "Hook → Key Point → Value/Benefit → Call-to-Action → Relevant Hashtags",
+      examples: ["quick tips", "industry insights", "engagement posts"]
+    }
+  };
+  const template = baseTemplates[type] || baseTemplates.article;
+  return {
+    title: `${industry} ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+    description: `${type.charAt(0).toUpperCase() + type.slice(1)} content tailored for the ${industry} industry`,
+    ...template
+  };
+};
+
+function computeInitialState(urlParams: URLSearchParams): { drafts: ContentDraft[]; activeId: string } {
+  const existing = loadDrafts();
+  const hasUrlParams = urlParams.get("keyword") || urlParams.get("industry");
+
+  if (hasUrlParams) {
+    const newDraft = createEmptyDraft();
+    newDraft.keywords = urlParams.get("keyword") || "";
+    newDraft.industry = urlParams.get("industry") || "";
+    newDraft.type = urlParams.get("type") || "article";
+    newDraft.brandId = urlParams.get("brandId") || "none";
+    const merged = [...existing, newDraft];
+    saveDrafts(merged);
+    setActiveDraftId(newDraft.id);
+    return { drafts: merged, activeId: newDraft.id };
+  }
+
+  if (existing.length > 0) {
+    const savedActiveId = getActiveDraftId();
+    const found = savedActiveId ? existing.find(d => d.id === savedActiveId) : null;
+    const activeId = found ? found.id : existing[0].id;
+    setActiveDraftId(activeId);
+    return { drafts: existing, activeId };
+  }
+
+  const first = createEmptyDraft();
+  saveDrafts([first]);
+  setActiveDraftId(first.id);
+  return { drafts: [first], activeId: first.id };
+}
+
+export default function Content() {
+  const searchString = useSearch();
+  const urlParams = new URLSearchParams(searchString);
+  const { toast } = useToast();
+
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [initialState] = useState(() => computeInitialState(urlParams));
+  const [drafts, setDrafts] = useState<ContentDraft[]>(initialState.drafts);
+  const [activeDraftIdState, setActiveDraftIdLocal] = useState<string>(initialState.activeId);
+  const activeDraftIdRef = useRef<string>(initialState.activeId);
+  const draftsRef = useRef<ContentDraft[]>(initialState.drafts);
+  useEffect(() => { draftsRef.current = drafts; }, [drafts]);
+  const [showDraftsPanel, setShowDraftsPanel] = useState(false);
+
+  const activeDraft = drafts.find(d => d.id === activeDraftIdState) || drafts[0] || createEmptyDraft();
+
+  const [keywords, setKeywords] = useState(activeDraft.keywords);
+  const [industry, setIndustry] = useState(activeDraft.industry);
+  const [type, setType] = useState(activeDraft.type);
+  const [brandId, setBrandId] = useState(activeDraft.brandId);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [generatedContent, setGeneratedContent] = useState(activeDraft.generatedContent);
+  const [keywordSuggestions, setKeywordSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [popularTopics, setPopularTopics] = useState<any[]>([]);
+  const [topicsLoading, setTopicsLoading] = useState(false);
+  const [savedArticleId, setSavedArticleId] = useState<string | null>(activeDraft.savedArticleId);
+  // Background job id — set when we enqueue a generation. The effect below
+  // polls /api/content-jobs/:jobId until the job completes, so generation
+  // survives page navigation / logout / refresh.
+  const [currentJobId, setCurrentJobId] = useState<string | null>(() => {
+    return localStorage.getItem("venturecite-current-job-id");
+  });
+  const [humanScore, setHumanScore] = useState<number | null>(activeDraft.humanScore);
+  const [scoreBeforeImprove, setScoreBeforeImprove] = useState<number | null>(null);
+  const [passesAiDetection, setPassesAiDetection] = useState<boolean | null>(activeDraft.passesAiDetection);
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [aiIssues, setAiIssues] = useState<string[]>(activeDraft.aiIssues);
+  const [aiStrengths, setAiStrengths] = useState<string[]>(activeDraft.aiStrengths);
+  const [aiRecommendation, setAiRecommendation] = useState<string>(activeDraft.aiRecommendation || "");
+  const [aiVocabularyFound, setAiVocabularyFound] = useState<string[]>(activeDraft.aiVocabularyFound || []);
+  const [targetCustomers, setTargetCustomers] = useState(activeDraft.targetCustomers);
+  const [geography, setGeography] = useState(activeDraft.geography);
+  const [contentStyle, setContentStyle] = useState(activeDraft.contentStyle);
+  const [showTargetingOptions, setShowTargetingOptions] = useState(activeDraft.showTargetingOptions);
+
+  const currentFieldsRef = useRef({
+    keywords, industry, type, brandId, generatedContent,
+    targetCustomers, geography, contentStyle, humanScore,
+    passesAiDetection, aiIssues, aiStrengths, aiRecommendation, aiVocabularyFound, savedArticleId, showTargetingOptions
+  });
+  useEffect(() => {
+    currentFieldsRef.current = {
+      keywords, industry, type, brandId, generatedContent,
+      targetCustomers, geography, contentStyle, humanScore,
+      passesAiDetection, aiIssues, aiStrengths, aiRecommendation, aiVocabularyFound, savedArticleId, showTargetingOptions
+    };
+  });
+
+  const persistDraftById = useCallback((draftId: string) => {
+    const f = currentFieldsRef.current;
+    setDrafts(prev => {
+      const updated: ContentDraft = {
+        id: draftId,
+        keywords: f.keywords,
+        industry: f.industry,
+        type: f.type,
+        brandId: f.brandId,
+        generatedContent: f.generatedContent,
+        targetCustomers: f.targetCustomers,
+        geography: f.geography,
+        contentStyle: f.contentStyle,
+        humanScore: f.humanScore,
+        passesAiDetection: f.passesAiDetection,
+        aiIssues: f.aiIssues,
+        aiStrengths: f.aiStrengths,
+        aiRecommendation: f.aiRecommendation,
+        aiVocabularyFound: f.aiVocabularyFound,
+        savedArticleId: f.savedArticleId,
+        showTargetingOptions: f.showTargetingOptions,
+        updatedAt: Date.now(),
+        label: prev.find(d => d.id === draftId)?.label || "",
+      };
+      const exists = prev.some(d => d.id === draftId);
+      const next = exists
+        ? prev.map(d => d.id === draftId ? updated : d)
+        : [...prev, updated];
+      saveDrafts(next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      const f = currentFieldsRef.current;
+      if (f.keywords || f.industry || f.generatedContent || f.targetCustomers || f.geography) {
+        persistDraftById(activeDraftIdRef.current);
+      }
+    }, 800);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [keywords, industry, type, brandId, generatedContent, targetCustomers, geography, contentStyle, humanScore, passesAiDetection, aiRecommendation, aiVocabularyFound, savedArticleId, showTargetingOptions, persistDraftById]);
+
+  const loadDraftFields = (target: ContentDraft) => {
+    setKeywords(target.keywords);
+    setIndustry(target.industry);
+    setType(target.type);
+    setBrandId(target.brandId);
+    setGeneratedContent(target.generatedContent);
+    setTargetCustomers(target.targetCustomers);
+    setGeography(target.geography);
+    setContentStyle(target.contentStyle);
+    setHumanScore(target.humanScore);
+    setPassesAiDetection(target.passesAiDetection);
+    setAiIssues(target.aiIssues || []);
+    setAiStrengths(target.aiStrengths || []);
+    setAiRecommendation(target.aiRecommendation || "");
+    setAiVocabularyFound(target.aiVocabularyFound || []);
+    setSavedArticleId(target.savedArticleId);
+    setShowTargetingOptions(target.showTargetingOptions);
+  };
+
+  const setActiveId = (id: string) => {
+    activeDraftIdRef.current = id;
+    setActiveDraftIdLocal(id);
+    setActiveDraftId(id);
+  };
+
+  const switchToDraft = useCallback((draftId: string) => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    persistDraftById(activeDraftIdRef.current);
+
+    const target = draftsRef.current.find(d => d.id === draftId);
+    if (target) {
+      setActiveId(draftId);
+      loadDraftFields(target);
+    }
+    setShowDraftsPanel(false);
+  }, [persistDraftById]);
+
+  const createNewDraft = useCallback(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    persistDraftById(activeDraftIdRef.current);
+
+    const newDraft = createEmptyDraft();
+    setDrafts(prev => {
+      const next = [...prev, newDraft];
+      saveDrafts(next);
+      return next;
+    });
+
+    setActiveId(newDraft.id);
+    loadDraftFields(newDraft);
+    setShowDraftsPanel(false);
+    toast({ title: "New Draft Created", description: "You can now work on a new article in parallel." });
+  }, [persistDraftById, toast]);
+
+  const deleteDraft = useCallback((draftId: string) => {
+    setDrafts(prev => {
+      if (prev.length <= 1) {
+        toast({ title: "Cannot Delete", description: "You need at least one draft.", variant: "destructive" });
+        return prev;
+      }
+      const next = prev.filter(d => d.id !== draftId);
+      saveDrafts(next);
+
+      if (draftId === activeDraftIdRef.current && next.length > 0) {
+        const fallback = next[0];
+        setActiveId(fallback.id);
+        loadDraftFields(fallback);
+      }
+      toast({ title: "Draft Deleted" });
+      return next;
+    });
+  }, [toast]);
+
+  const sortedDrafts = [...drafts].sort((a, b) => b.updatedAt - a.updatedAt);
+
+  const hasProcessedInitialUrl = useRef(false);
+  useEffect(() => {
+    if (!hasProcessedInitialUrl.current) {
+      hasProcessedInitialUrl.current = true;
+      return;
+    }
+    const keyword = urlParams.get("keyword");
+    const industryParam = urlParams.get("industry");
+    if (keyword || industryParam) {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      persistDraftById(activeDraftIdRef.current);
+
+      const newDraft = createEmptyDraft();
+      newDraft.keywords = keyword || "";
+      newDraft.industry = industryParam || "";
+      newDraft.type = urlParams.get("type") || "article";
+      newDraft.brandId = urlParams.get("brandId") || "none";
+
+      setDrafts(prev => {
+        const next = [...prev, newDraft];
+        saveDrafts(next);
+        return next;
+      });
+      setActiveId(newDraft.id);
+      loadDraftFields(newDraft);
+      toast({
+        title: "Keyword loaded from research",
+        description: `Ready to generate content for: "${keyword}"`
+      });
+    }
+  }, [searchString]);
+
+  // Fetch brands for selector
+  const { data: brandsData } = useQuery<{ success: boolean; data: any[] }>({
+    queryKey: ['/api/brands'],
+  });
+
+  // Fetch usage data
+  const { data: usageData, refetch: refetchUsage } = useQuery<{
+    success: boolean;
+    data: {
+      articlesUsed: number;
+      articlesLimit: number;
+      articlesRemaining: number;
+      brandsUsed: number;
+      brandsLimit: number;
+      brandsRemaining: number;
+      resetDate: string | null;
+      tier: string;
+    };
+  }>({
+    queryKey: ['/api/usage'],
+  });
+
+  // Generate content now enqueues a background job server-side and returns
+  // a jobId. The effect further down polls until the job completes, so
+  // navigation away from this page / logout / refresh don't abort the work.
+  const generateContentMutation = useMutation({
+    mutationFn: async (data: { keywords: string; industry: string; type: string; brandId?: string; targetCustomers?: string; geography?: string; contentStyle?: string }) => {
+      const response = await apiRequest('POST', '/api/generate-content', { ...data, humanize: true });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success && data.data?.jobId) {
+        setCurrentJobId(data.data.jobId);
+        localStorage.setItem("venturecite-current-job-id", data.data.jobId);
+        toast({
+          title: "Generation started",
+          description: "Writing your article in the background. You can leave this page — it will save automatically.",
+        });
+      } else if (data.limitReached) {
+        toast({
+          title: "Usage Limit Reached",
+          description: data.error || "You've reached your monthly article limit. Upgrade your plan for more.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Generation Failed",
+          description: data.error || data.message || "Unable to start content generation. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to start content generation. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Poll the background job until it completes. Resumes automatically on
+  // mount if localStorage has a lingering job id from a previous session.
+  useEffect(() => {
+    if (!currentJobId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const resp = await apiRequest('GET', `/api/content-jobs/${currentJobId}`);
+        const data = await resp.json();
+        if (cancelled) return;
+        if (!data.success) {
+          // 404 / auth error — clear the id so we stop polling forever.
+          setCurrentJobId(null);
+          localStorage.removeItem("venturecite-current-job-id");
+          return;
+        }
+        const job = data.data;
+        if (job.status === "succeeded" && job.articleId) {
+          setCurrentJobId(null);
+          localStorage.removeItem("venturecite-current-job-id");
+          // Fetch the persisted article and show it in the editor.
+          try {
+            const articleResp = await apiRequest('GET', `/api/articles/${job.articleId}`);
+            const articleJson = await articleResp.json();
+            const article = articleJson.data || articleJson.article;
+            if (article) {
+              setGeneratedContent(article.content || "");
+              setSavedArticleId(article.id);
+              const meta = article.seoData || {};
+              if (typeof meta.humanScore === "number") setHumanScore(meta.humanScore);
+              if (typeof meta.passesAiDetection === "boolean") setPassesAiDetection(meta.passesAiDetection);
+            }
+          } catch {}
+          refetchUsage();
+          queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
+          toast({
+            title: "Article generated",
+            description: "Saved as a draft. Check the Articles page anytime.",
+          });
+        } else if (job.status === "failed") {
+          setCurrentJobId(null);
+          localStorage.removeItem("venturecite-current-job-id");
+          toast({
+            title: "Generation failed",
+            description: job.errorMessage || "The background worker couldn't finish this job.",
+            variant: "destructive",
+          });
+        }
+      } catch {
+        // Transient network error — the next tick will retry.
+      }
+    };
+    // Poll immediately on mount, then every 3s while the job id is set.
+    poll();
+    const interval = setInterval(poll, 3_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [currentJobId]);
+
+  const contentLoadingMessage = useLoadingMessages(generateContentMutation.isPending, [
+    "Analyzing your brand...",
+    "Researching your industry...",
+    "Structuring the content outline...",
+    "Applying your brand voice...",
+    "Writing the first draft...",
+    "Optimizing for AI search engines...",
+    "Humanizing the writing...",
+    "Running AI detection checks...",
+    "Finalizing your article...",
+  ]);
+
+  // Rewrite content mutation for improving human score
+  const rewriteContentMutation = useMutation({
+    mutationFn: async (data: { content: string; industry: string; articleId?: string }) => {
+      const response = await apiRequest('POST', '/api/rewrite-content', data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setIsRewriting(false);
+      if (data.success) {
+        // Use ?? not || so a literal score of 0 isn't coerced to null.
+        const newScore: number | null = typeof data.humanScore === "number" ? data.humanScore : null;
+        setGeneratedContent(data.content);
+        setHumanScore(newScore);
+        setPassesAiDetection(data.passesAiDetection || false);
+        setAiIssues(data.aiIssues || []);
+        setAiStrengths(data.aiStrengths || []);
+
+        // Build score delta description
+        let description = "";
+        if (newScore !== null && scoreBeforeImprove !== null) {
+          const delta = newScore - scoreBeforeImprove;
+          if (delta > 0) {
+            description = `Score: ${scoreBeforeImprove}% → ${newScore}% (+${delta}) — ${data.passesAiDetection ? 'Now passes AI detection!' : 'Keep improving for best results.'}`;
+          } else if (delta === 0) {
+            description = `Score unchanged at ${newScore}%. Try editing the content manually before improving again.`;
+          } else {
+            description = `Score: ${newScore}% (best pass was ${scoreBeforeImprove}%) — content returned to highest-scoring version.`;
+          }
+        } else {
+          description = data.passesAiDetection
+            ? `Score: ${newScore}% — passes AI detection!`
+            : `Score: ${newScore}% after ${data.attempts} passes.`;
+        }
+
+        // Improved version saved as a new draft — refresh the Articles list
+        // and let the user know they can compare both versions there.
+        if (data.improvedArticleId) {
+          queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
+          description += " Improved version saved as a new draft on the Articles page.";
+        }
+
+        toast({ title: "Content Improved", description });
+        setScoreBeforeImprove(null);
+      } else {
+        setScoreBeforeImprove(null);
+        toast({
+          title: "Rewrite Failed",
+          description: data.message || "Could not rewrite content.",
+          variant: "destructive"
+        });
+      }
+    },
+    onError: () => {
+      setIsRewriting(false);
+      toast({
+        title: "Error",
+        description: "Failed to rewrite content. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const analyzeContentMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const response = await apiRequest('POST', '/api/analyze-content', { content });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setHumanScore(data.score || null);
+        setPassesAiDetection(data.passesAiDetection || false);
+        setAiIssues(data.issues || []);
+        setAiStrengths(data.strengths || []);
+        setAiRecommendation(data.recommendation || "");
+        setAiVocabularyFound(data.ai_vocabulary_found || []);
+        toast({
+          title: "Analysis Complete",
+          description: `Human score: ${data.score}% - ${data.passesAiDetection ? 'Likely to pass AI detection' : 'May be flagged as AI-generated'}`
+        });
+      }
+    }
+  });
+
+  const handleRewriteContent = () => {
+    if (!generatedContent || !industry) return;
+    setIsRewriting(true);
+    setScoreBeforeImprove(humanScore);
+    rewriteContentMutation.mutate({
+      content: generatedContent,
+      industry,
+      articleId: savedArticleId || undefined,
+    });
+  };
+
+  // Keyword suggestions mutation
+  const keywordSuggestionsMutation = useMutation({
+    mutationFn: async (data: { input: string; industry: string }) => {
+      const response = await apiRequest('POST', '/api/keyword-suggestions', data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setKeywordSuggestions(data.suggestions || []);
+        setShowSuggestions(data.suggestions?.length > 0);
+      }
+      setSuggestionsLoading(false);
+    },
+    onError: () => {
+      setSuggestionsLoading(false);
+      setKeywordSuggestions([]);
+      setShowSuggestions(false);
+    }
+  });
+
+  // Popular topics query
+  const popularTopicsQuery = useQuery({
+    queryKey: ['/api/popular-topics', industry],
+    queryFn: async () => {
+      if (!industry) return { success: false, topics: [] };
+      const response = await apiRequest('GET', `/api/popular-topics?industry=${encodeURIComponent(industry)}`);
+      return response.json();
+    },
+    enabled: !!industry,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Save article mutation
+  const saveArticleMutation = useMutation({
+    mutationFn: async (articleData: any) => {
+      const response = await apiRequest('POST', '/api/articles', articleData);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setSavedArticleId(data.article.id);
+        queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
+        toast({
+          title: "Article Saved",
+          description: "Your article has been saved successfully. You can publish it later.",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to save article. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Update popular topics when query succeeds
+  useEffect(() => {
+    if (popularTopicsQuery.data?.success) {
+      setPopularTopics(popularTopicsQuery.data.topics || []);
+    } else {
+      setPopularTopics([]);
+    }
+    setTopicsLoading(popularTopicsQuery.isLoading);
+  }, [popularTopicsQuery.data, popularTopicsQuery.isLoading]);
+
+  // Debounced keyword suggestions
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (keywords.trim().length >= 2 && industry) {
+        setSuggestionsLoading(true);
+        keywordSuggestionsMutation.mutate({
+          input: keywords.trim(),
+          industry
+        });
+      } else {
+        setShowSuggestions(false);
+        setKeywordSuggestions([]);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [keywords, industry]);
+
+  const updateSelectedTemplate = () => {
+    if (industry && type) {
+      setSelectedTemplate(getIndustryTemplate(industry, type));
+    } else {
+      setSelectedTemplate(null);
+    }
+  };
+
+  const handleGenerateContent = () => {
+    if (!keywords.trim()) {
+      toast({
+        title: "Keywords Required",
+        description: "Please enter keywords for content generation.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!industry) {
+      toast({
+        title: "Industry Required", 
+        description: "Please select an industry.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavedArticleId(null);
+    generateContentMutation.mutate({
+      keywords: keywords.trim(),
+      industry,
+      type,
+      brandId: brandId && brandId !== "none" ? brandId : undefined,
+      targetCustomers: targetCustomers.trim() || undefined,
+      geography: geography.trim() || undefined,
+      contentStyle,
+    });
+  };
+
+  const handleSaveArticle = () => {
+    if (!generatedContent) return;
+
+    // Extract title from content (first line or first heading)
+    const lines = generatedContent.split('\n').filter(Boolean);
+    const title = lines[0]?.replace(/^#+ /, '').trim() || keywords;
+    
+    // Create slug from title
+    const slug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    // Extract excerpt (first paragraph)
+    const firstParagraph = lines.find(line => !line.startsWith('#') && line.trim().length > 50);
+    const excerpt = firstParagraph ? `${firstParagraph.slice(0, 150)}…` : '';
+
+    const articleData = {
+      title,
+      slug,
+      content: generatedContent,
+      excerpt,
+      metaDescription: excerpt.slice(0, 160),
+      keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
+      status: 'draft',
+      industry,
+      contentType: type,
+      brandId: brandId && brandId !== "none" ? brandId : undefined,
+    };
+
+    saveArticleMutation.mutate(articleData);
+  };
+
+  // Update template when industry or type changes
+  useEffect(() => {
+    updateSelectedTemplate();
+  }, [industry, type]);
+
+  return (
+    <TooltipProvider>
+      <div className="space-y-8">
+        <PageHeader
+          title="AI Content Generation"
+          description="Generate SEO-optimized content for AI search engines"
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDraftsPanel(!showDraftsPanel)}
+                className="gap-2"
+                data-testid="button-toggle-drafts"
+              >
+                <FolderOpen className="w-4 h-4" />
+                Drafts
+                {drafts.length > 1 && (
+                  <Badge variant="secondary" className="ml-1 text-xs" data-testid="badge-draft-count">{drafts.length}</Badge>
+                )}
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={createNewDraft}
+                className="gap-2"
+                data-testid="button-new-draft"
+              >
+                <Plus className="w-4 h-4" />
+                New Draft
+              </Button>
+            </>
+          }
+        />
+
+          {showDraftsPanel && (
+            <Card className="mt-4 border-primary/20" data-testid="panel-drafts">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4" />
+                    Your Drafts ({drafts.length})
+                  </span>
+                  <span className="text-xs text-muted-foreground font-normal">Auto-saved as you type</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {sortedDrafts.map((draft) => (
+                    <div
+                      key={draft.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                        draft.id === activeDraftIdState
+                          ? "bg-primary/5 border-primary/30"
+                          : "hover:bg-muted/50"
+                      }`}
+                      onClick={() => draft.id !== activeDraftIdState && switchToDraft(draft.id)}
+                      data-testid={`draft-item-${draft.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm truncate">{getDraftLabel(draft)}</span>
+                          {draft.id === activeDraftIdState && <Badge className="text-xs">Active</Badge>}
+                          {draft.generatedContent && (
+                            <Badge variant="outline" className="text-xs text-foreground border-border">Generated</Badge>
+                          )}
+                          {draft.savedArticleId && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground border-border">Saved</Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                          {draft.industry && <span>{draft.industry}</span>}
+                          {draft.industry && draft.type && <span>·</span>}
+                          {draft.type && <span className="capitalize">{draft.type}</span>}
+                          <span>·</span>
+                          <span>{new Date(draft.updatedAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      {draft.id !== activeDraftIdState && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
+                          onClick={(e) => { e.stopPropagation(); deleteDraft(draft.id); }}
+                          data-testid={`button-delete-draft-${draft.id}`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Beginner Tips */}
+          <div className="mt-4 p-4 bg-muted border border-border rounded-lg">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="w-5 h-5 text-muted-foreground mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-foreground text-sm">💡 Content Tips for Beginners</h3>
+                <ul className="text-muted-foreground text-sm mt-2 space-y-1 list-disc list-inside">
+                  <li>Use specific keywords your customers search for</li>
+                  <li>Choose your industry to get targeted content</li>
+                  <li>Articles work best for building authority and getting citations</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+          {/* Usage Dashboard Widget */}
+          {usageData?.success && usageData.data && (
+            <Card className="mt-4 bg-card border border-border" data-testid="card-usage-widget">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between gap-6">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${
+                      usageData.data.articlesRemaining === 0 ? 'bg-red-500' : 
+                      usageData.data.articlesRemaining <= 5 ? 'bg-yellow-500' : 'bg-green-500'
+                    }`} />
+                    <span className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground" data-testid="text-usage-count">
+                        {usageData.data.articlesUsed}
+                      </span>
+                      {" / "}
+                      <span data-testid="text-usage-limit">
+                        {usageData.data.articlesLimit === -1 ? 'Unlimited' : usageData.data.articlesLimit}
+                      </span>
+                      {" articles this month"}
+                    </span>
+                    <span className="text-xs text-muted-foreground capitalize px-2 py-0.5 bg-muted rounded" data-testid="text-usage-tier">
+                      {usageData.data.tier} Plan
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    {usageData.data.articlesLimit !== -1 && (
+                      <div className="w-32">
+                        <Progress 
+                          value={(usageData.data.articlesUsed / usageData.data.articlesLimit) * 100} 
+                          className="h-2"
+                          data-testid="progress-usage"
+                        />
+                      </div>
+                    )}
+                    {usageData.data.articlesRemaining === 0 && (
+                      <Link href="/pricing">
+                        <Button size="sm" variant="default" className="bg-primary hover:bg-primary/90" data-testid="button-upgrade-plan">
+                          Upgrade Plan
+                        </Button>
+                      </Link>
+                    )}
+                    {usageData.data.articlesRemaining > 0 && usageData.data.articlesRemaining <= 5 && usageData.data.articlesLimit !== -1 && (
+                      <span className="text-xs text-yellow-500 font-medium" data-testid="text-usage-warning">
+                        {usageData.data.articlesRemaining} remaining
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Content Generator
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="industry">Industry</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">Choose the industry that best describes your business. This helps create content that's relevant to your field and uses appropriate terminology that AI systems understand.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select value={industry} onValueChange={setIndustry}>
+                  <SelectTrigger data-testid="select-industry">
+                    <SelectValue placeholder="Select industry" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    {industryGroups.map((group) => (
+                      <div key={group}>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group}</div>
+                        {industries.filter(i => i.group === group).map((ind) => (
+                          <SelectItem key={ind.value} value={ind.value}>{ind.value}</SelectItem>
+                        ))}
+                      </div>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="keywords">Keywords</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">Enter words and phrases your customers search for. Use 3-5 keywords that describe your business, product, or service. Examples: "digital marketing", "small business loans", "healthy recipes"</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  id="keywords"
+                  placeholder={industry ? "Enter keywords (e.g., artificial intelligence, machine learning)" : "Select an industry first"}
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                  disabled={!industry}
+                  data-testid="input-keywords"
+                />
+
+                {/* Keyword Suggestions */}
+                {industry && (suggestionsLoading || showSuggestions) && (
+                  <div className="mt-2">
+                    {suggestionsLoading ? (
+                      <div className="flex items-center text-sm text-muted-foreground" data-testid="status-suggestions-loading">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Finding keyword suggestions...
+                      </div>
+                    ) : (
+                      <div className="border rounded-md bg-background shadow-sm divide-y" data-testid="list-keyword-suggestions">
+                        {keywordSuggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent text-left"
+                            onClick={() => {
+                              const parts = keywords.split(',').map(p => p.trim()).filter(Boolean);
+                              if (!parts.includes(s)) parts.push(s);
+                              setKeywords(parts.join(', '));
+                              setShowSuggestions(false);
+                            }}
+                            data-testid={`item-suggestion-${i}`}
+                          >
+                            <Search className="w-4 h-4 text-muted-foreground" />
+                            <span>{s}</span>
+                            <Plus className="w-4 h-4 ml-auto text-muted-foreground" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="type">Content Type</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">Different content types work better for different goals. Articles are great for building authority, blog posts for regular updates, product descriptions for e-commerce, and social media posts for engagement.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select value={type} onValueChange={setType}>
+                  <SelectTrigger data-testid="select-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="article">Article</SelectItem>
+                    <SelectItem value="blog post">Blog Post</SelectItem>
+                    <SelectItem value="product description">Product Description</SelectItem>
+                    <SelectItem value="social media post">Social Media Post</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label>Content Style</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">B2C content is conversational, lifestyle-focused, and speaks directly to everyday consumers. B2B content is professional, data-driven, and targets business decision-makers.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setContentStyle("b2c")}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all text-left ${
+                      contentStyle === "b2c"
+                        ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                        : "border-muted hover:border-muted-foreground/30"
+                    }`}
+                    data-testid="button-style-b2c"
+                  >
+                    <span className="text-sm font-semibold">B2C — Consumer</span>
+                    <span className="text-xs text-muted-foreground text-center">Conversational, lifestyle-focused, relatable</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setContentStyle("b2b")}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all text-left ${
+                      contentStyle === "b2b"
+                        ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                        : "border-muted hover:border-muted-foreground/30"
+                    }`}
+                    data-testid="button-style-b2b"
+                  >
+                    <span className="text-sm font-semibold">B2B — Business</span>
+                    <span className="text-xs text-muted-foreground text-center">Professional, data-driven, industry authority</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="brand">Brand (Optional)</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">Select a brand profile to personalize the content with your company's voice, values, and unique positioning. Content will align with your brand's tone and messaging.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select value={brandId} onValueChange={setBrandId}>
+                  <SelectTrigger data-testid="select-brand">
+                    <SelectValue placeholder="No brand (generic content)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No brand (generic content)</SelectItem>
+                    {brandsData?.data?.map((brand: any) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        {brand.name} ({brand.companyName})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-between"
+                  onClick={() => setShowTargetingOptions(!showTargetingOptions)}
+                  data-testid="button-toggle-targeting"
+                >
+                  <span className="flex items-center gap-2">
+                    <Target className="w-4 h-4" />
+                    Target Audience & Geography
+                  </span>
+                  <span className="text-xs text-muted-foreground">{showTargetingOptions ? "Hide" : "Show"} options</span>
+                </Button>
+                
+                {showTargetingOptions && (
+                  <div className="mt-3 space-y-3 p-4 border rounded-lg bg-muted/30">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Label htmlFor="targetCustomers">Target Customers / Demographics</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">Describe who your ideal readers are. This helps the AI write content that speaks directly to them. Examples: "CTOs at mid-size companies", "first-time homebuyers aged 25-35", "small business owners"</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Textarea
+                        id="targetCustomers"
+                        placeholder="e.g., CTOs and engineering leaders at mid-size SaaS companies, startup founders, enterprise IT decision-makers"
+                        value={targetCustomers}
+                        onChange={(e) => setTargetCustomers(e.target.value)}
+                        className="min-h-[60px]"
+                        data-testid="input-target-customers"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Label htmlFor="geography">Geography / Region</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">Specify the geographic focus for your content. This helps tailor language, examples, and references. Examples: "United States", "UK and Europe", "Southeast Asia", "Global"</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="geography"
+                        placeholder="e.g., United States, North America, Global"
+                        value={geography}
+                        onChange={(e) => setGeography(e.target.value)}
+                        data-testid="input-geography"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Template Preview */}
+              {selectedTemplate && (
+                <div className="p-4 bg-muted border border-border rounded-lg" data-testid="template-preview">
+                  <div className="flex items-start gap-3">
+                    <BookOpen className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-foreground text-sm mb-1">
+                        📝 Template: {selectedTemplate.title}
+                      </h4>
+                      <p className="text-muted-foreground text-sm mb-2">
+                        {selectedTemplate.description}
+                      </p>
+
+                      <div className="mb-3">
+                        <p className="text-xs font-medium text-foreground mb-1">Structure:</p>
+                        <p className="text-xs text-muted-foreground bg-background p-2 rounded border border-border">
+                          {selectedTemplate.structure}
+                        </p>
+                      </div>
+
+                      {selectedTemplate.examples && (
+                        <div>
+                          <p className="text-xs font-medium text-foreground mb-1">Example keywords (click to use):</p>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedTemplate.examples.map((example: string, index: number) => (
+                              <span
+                                key={index}
+                                className="text-xs bg-background text-muted-foreground border border-border px-2 py-1 rounded cursor-pointer hover:bg-muted transition-colors"
+                                onClick={() => setKeywords(example)}
+                                data-testid={`template-example-${index}`}
+                              >
+                                {example}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end mb-2">
+                <TestModeBadge />
+              </div>
+              <Button
+                onClick={handleGenerateContent}
+                disabled={
+                  generateContentMutation.isPending ||
+                  !!currentJobId ||
+                  (usageData?.data && usageData.data.articlesLimit !== -1 && usageData.data.articlesRemaining === 0)
+                }
+                className="w-full"
+                data-testid="button-generate-content"
+                title={
+                  usageData?.data && usageData.data.articlesLimit !== -1 && usageData.data.articlesRemaining === 0
+                    ? "Monthly limit reached — upgrade to continue."
+                    : undefined
+                }
+              >
+                {(generateContentMutation.isPending || currentJobId) ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {contentLoadingMessage}
+                  </>
+                ) : usageData?.data && usageData.data.articlesLimit !== -1 && usageData.data.articlesRemaining === 0 ? (
+                  "Monthly limit reached"
+                ) : (
+                  selectedTemplate ? `Generate ${selectedTemplate.title}` : "Generate Content"
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Popular Topics Section */}
+          {industry && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Popular Topics in {industry}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {topicsLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading trending topics...</span>
+                  </div>
+                ) : popularTopics.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      💡 Click any topic below to use it as keywords for your content
+                    </p>
+                    <div className="grid gap-2">
+                      {popularTopics.map((topic, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setKeywords(topic.topic);
+                            toast({
+                              title: "Topic Selected",
+                              description: `Using "${topic.topic}" as your keywords.`
+                            });
+                          }}
+                          className="flex items-start gap-3 p-3 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors group"
+                          data-testid={`popular-topic-${index}`}
+                        >
+                          <Clock className="w-4 h-4 text-muted-foreground mt-0.5 group-hover:text-foreground transition-colors" />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
+                              {topic.topic}
+                            </h4>
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              {topic.description}
+                            </p>
+                            {topic.category && (
+                              <span className="inline-block mt-2 px-2 py-1 text-xs bg-muted text-muted-foreground rounded">
+                                {topic.category}
+                              </span>
+                            )}
+                          </div>
+                          <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors opacity-0 group-hover:opacity-100" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : industry ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No popular topics available for this industry yet.</p>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Generated Content</span>
+                <div className="flex items-center gap-2">
+                  {generatedContent && (
+                    <>
+                      <Button
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedContent);
+                          toast({ title: "Copied", description: "Content copied to clipboard" });
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5"
+                        data-testid="button-copy-content"
+                      >
+                        <Copy className="w-4 h-4" />
+                        Copy
+                      </Button>
+                      <Button
+                        onClick={handleSaveArticle}
+                        disabled={saveArticleMutation.isPending || !!savedArticleId}
+                        size="sm"
+                        variant={savedArticleId ? "outline" : "default"}
+                        data-testid="button-save-article"
+                      >
+                        {saveArticleMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : savedArticleId ? (
+                          <>
+                            <Check className="w-4 h-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Article
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {generatedContent ? (
+                <div className="space-y-4">
+                  <Textarea
+                    value={generatedContent}
+                    onChange={(e) => {
+                      setGeneratedContent(e.target.value);
+                      setHumanScore(null);
+                      setPassesAiDetection(null);
+                    }}
+                    className="min-h-[400px] font-mono text-sm leading-relaxed"
+                    data-testid="textarea-generated-content"
+                  />
+
+                  <p className="text-xs text-muted-foreground">
+                    You can edit the content directly above. Make changes then re-check the AI score below.
+                  </p>
+
+                  <div className={`p-4 rounded-lg border ${
+                    humanScore === null
+                      ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800'
+                      : passesAiDetection 
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                        : humanScore >= 50
+                          ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                          : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                  }`} data-testid="ai-detection-score">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${
+                          humanScore === null
+                            ? 'bg-slate-100 dark:bg-slate-800'
+                            : passesAiDetection 
+                              ? 'bg-green-100 dark:bg-green-800' 
+                              : 'bg-amber-100 dark:bg-amber-800'
+                        }`}>
+                          {humanScore === null 
+                            ? <Shield className="w-5 h-5 text-slate-500" />
+                            : passesAiDetection 
+                              ? <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                              : <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                          }
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">AI Detection Score</span>
+                          </div>
+                          {humanScore !== null ? (
+                            <>
+                              <div className="flex items-center gap-3 mt-1">
+                                <Progress value={humanScore} className="w-32 h-2" />
+                                <span className={`text-sm font-bold ${
+                                  passesAiDetection
+                                    ? 'text-green-700 dark:text-green-300'
+                                    : humanScore >= 50
+                                      ? 'text-amber-700 dark:text-amber-300'
+                                      : 'text-red-700 dark:text-red-300'
+                                }`}>
+                                  {humanScore}%
+                                </span>
+                                {scoreBeforeImprove !== null && scoreBeforeImprove !== humanScore && (
+                                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                                    humanScore > scoreBeforeImprove
+                                      ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                                      : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                                  }`}>
+                                    {humanScore > scoreBeforeImprove ? `+${humanScore - scoreBeforeImprove}` : `${humanScore - scoreBeforeImprove}`}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {passesAiDetection 
+                                  ? 'Looking good! Content should pass most AI detection tools.' 
+                                  : 'Content may be flagged as AI-generated. Edit below and re-check.'
+                                }
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Check how human your content sounds. Edit it, then re-check to see the score improve.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {!passesAiDetection && humanScore !== null && (
+                          <Button
+                            onClick={handleRewriteContent}
+                            disabled={isRewriting || rewriteContentMutation.isPending}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            data-testid="button-rewrite-content"
+                          >
+                            {isRewriting || rewriteContentMutation.isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Auto-Improving...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-4 h-4" />
+                                Auto-Improve
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => analyzeContentMutation.mutate(generatedContent)}
+                          disabled={analyzeContentMutation.isPending}
+                          size="sm"
+                          className={`gap-2 ${humanScore === null ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : ''}`}
+                          variant={humanScore === null ? "default" : "outline"}
+                          data-testid="button-check-ai-score"
+                        >
+                          {analyzeContentMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Checking...
+                            </>
+                          ) : (
+                            <>
+                              <Shield className="w-4 h-4" />
+                              {humanScore === null ? "Check AI Score" : "Re-Check Score"}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {!passesAiDetection && (aiIssues.length > 0 || aiVocabularyFound.length > 0 || aiRecommendation) && (
+                    <div className="p-4 rounded-lg border border-border bg-muted" data-testid="humanization-tips">
+                      <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-muted-foreground" />
+                        How to Improve Your Score
+                      </h4>
+
+                      {aiRecommendation && (
+                        <p className="text-sm text-foreground mb-3 p-2 bg-background rounded border border-border">
+                          {aiRecommendation}
+                        </p>
+                      )}
+
+                      {aiVocabularyFound.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1.5">AI buzzwords to replace (find these in your text and swap them out):</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {aiVocabularyFound.map((word, idx) => (
+                              <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-200 dark:border-amber-700" data-testid={`ai-word-${idx}`}>
+                                "{word}"
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <p className="text-xs font-medium text-foreground mb-1">Quick editing tips:</p>
+                        <ul className="space-y-1.5">
+                          <li className="flex items-start gap-2 text-xs">
+                            <span className="text-blue-500 mt-0.5 flex-shrink-0">1.</span>
+                            <span>Use contractions: change "do not" to "don't", "it is" to "it's", "they are" to "they're"</span>
+                          </li>
+                          <li className="flex items-start gap-2 text-xs">
+                            <span className="text-blue-500 mt-0.5 flex-shrink-0">2.</span>
+                            <span>Add a personal touch: insert "I've seen...", "In my experience...", or "Here's what I think..."</span>
+                          </li>
+                          <li className="flex items-start gap-2 text-xs">
+                            <span className="text-blue-500 mt-0.5 flex-shrink-0">3.</span>
+                            <span>Break up uniform sentences: make some very short. Then write a longer, more detailed one right after.</span>
+                          </li>
+                          <li className="flex items-start gap-2 text-xs">
+                            <span className="text-blue-500 mt-0.5 flex-shrink-0">4.</span>
+                            <span>Replace formal words: "utilize" → "use", "implement" → "set up", "leverage" → "take advantage of"</span>
+                          </li>
+                          <li className="flex items-start gap-2 text-xs">
+                            <span className="text-blue-500 mt-0.5 flex-shrink-0">5.</span>
+                            <span>Start some sentences with "But", "And", "So", or "Look," — real people do this</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-3 font-medium">
+                        Make a few edits in the content above, then click "Re-Check Score" to see your improvement.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {(aiIssues.length > 0 || aiStrengths.length > 0) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border bg-slate-50 dark:bg-slate-900/50" data-testid="ai-analysis-details">
+                      {aiIssues.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            Patterns that may trigger AI detection:
+                          </h4>
+                          <ul className="space-y-1">
+                            {aiIssues.map((issue, idx) => (
+                              <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                                <span className="text-amber-500 mt-1">•</span>
+                                <span>{issue}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {aiStrengths.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            Human-like qualities detected:
+                          </h4>
+                          <ul className="space-y-1">
+                            {aiStrengths.map((strength, idx) => (
+                              <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                                <span className="text-green-500 mt-1">•</span>
+                                <span>{strength}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {savedArticleId && (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg" data-testid="status-article-saved">
+                      <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-green-900 dark:text-green-100">Article saved successfully!</p>
+                        <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">View and manage your articles in the Articles page.</p>
+                      </div>
+                      <Link href="/articles">
+                        <Button variant="outline" size="sm" data-testid="link-view-articles">
+                          View Articles
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[400px] text-muted-foreground">
+                  <div className="text-center">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Generated content will appear here</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+}
