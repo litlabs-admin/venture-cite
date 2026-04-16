@@ -1,5 +1,0 @@
-﻿Fix distribute empty content guard and brand limit toast
-
-- Parse server error in brand creation toasts (show "Brand limit reached" instead of generic error)
-- Add empty-content guard in distribute endpoint (no more blank cards)
-- Server brand limit message updated to suggest deleting or upgrading

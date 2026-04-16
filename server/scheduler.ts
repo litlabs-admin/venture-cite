@@ -1,8 +1,9 @@
 import cron from "node-cron";
 import { db } from "./db";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, ne, isNull, lte, or } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { runBrandPrompts } from "./citationChecker";
+import { generateBrandPrompts } from "./lib/promptGenerator";
 import { storage } from "./storage";
 import { sendWeeklyVisibilityReport, isEmailConfigured, type BrandReport } from "./emailService";
 
@@ -65,7 +66,8 @@ export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: num
         }
 
         // Actually re-run the prompts against every platform this week.
-        const { totalChecks, totalCited, rankings } = await runBrandPrompts(brand.id);
+        // Pass triggeredBy: "cron" so the run is tagged in citation_runs history.
+        const { totalChecks, totalCited, rankings } = await runBrandPrompts(brand.id, undefined, { triggeredBy: "cron" });
 
         const platformMap = new Map<string, { cited: number; checks: number }>();
         for (const r of rankings) {
@@ -131,9 +133,88 @@ export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: num
   return { sent, skipped };
 }
 
+// Per-brand auto-citation: runs daily at 6 AM UTC, checks each brand's
+// individual schedule (off/weekly/biweekly/monthly) and preferred day.
+// Each run regenerates 10 fresh prompts before checking citations.
+const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 6 * * *"; // daily check
+
+function isBrandDueForCitation(brand: {
+  autoCitationSchedule: string;
+  autoCitationDay: number;
+  lastAutoCitationAt: Date | null;
+}): boolean {
+  if (brand.autoCitationSchedule === "off") return false;
+
+  const now = new Date();
+  const todayDow = now.getUTCDay(); // 0=Sun ... 6=Sat
+
+  // Only run on the user's chosen day of week
+  if (todayDow !== brand.autoCitationDay) return false;
+
+  if (!brand.lastAutoCitationAt) return true; // never run before
+
+  const daysSinceLast = (now.getTime() - brand.lastAutoCitationAt.getTime()) / (24 * 60 * 60 * 1000);
+
+  switch (brand.autoCitationSchedule) {
+    case "weekly": return daysSinceLast >= 6; // at least ~1 week
+    case "biweekly": return daysSinceLast >= 13;
+    case "monthly": return daysSinceLast >= 27;
+    default: return false;
+  }
+}
+
+async function runAutoCitationJob(): Promise<void> {
+  console.log("[scheduler] auto-citation job starting...");
+
+  // Fetch all brands that have auto-citation enabled (not "off")
+  const scheduledBrands = await db
+    .select()
+    .from(schema.brands)
+    .where(ne(schema.brands.autoCitationSchedule, "off"));
+
+  let ranCount = 0;
+  for (const brand of scheduledBrands) {
+    if (!isBrandDueForCitation(brand)) continue;
+
+    try {
+      // Step 1: Generate 10 fresh prompts
+      console.log(`[scheduler] regenerating prompts for brand ${brand.name}...`);
+      const { saved, error } = await generateBrandPrompts(brand);
+      if (error || saved.length === 0) {
+        console.warn(`[scheduler] prompt generation failed for brand ${brand.name}: ${error || "no prompts"}`);
+        continue;
+      }
+
+      // Step 2: Run citation checks with the new prompts
+      await runBrandPrompts(brand.id, undefined, { triggeredBy: "cron" });
+
+      // Step 3: Update lastAutoCitationAt
+      await db
+        .update(schema.brands)
+        .set({ lastAutoCitationAt: new Date() })
+        .where(eq(schema.brands.id, brand.id));
+
+      ranCount += 1;
+      console.log(`[scheduler] auto-citation done for brand ${brand.name}`);
+    } catch (err) {
+      console.error(`[scheduler] auto-citation failed for brand ${brand.id}:`, err);
+    }
+  }
+  console.log(`[scheduler] auto-citation job complete — ${ranCount} brands checked`);
+}
+
 export function initScheduler(): void {
+  // Auto-citation cron — always active, no RESEND_API_KEY needed.
+  if (cron.validate(AUTO_CITATION_CRON)) {
+    cron.schedule(AUTO_CITATION_CRON, () => {
+      runAutoCitationJob().catch((err) => console.error("[scheduler] Auto-citation job crashed:", err));
+    });
+    console.log(`[scheduler] Auto-citation job scheduled (${AUTO_CITATION_CRON})`);
+  }
+
+  // Weekly email report — only if Resend is configured.
   if (!isEmailConfigured()) {
-    console.log("[scheduler] RESEND_API_KEY not set — weekly reports disabled");
+    console.log("[scheduler] RESEND_API_KEY not set — weekly email reports disabled");
     return;
   }
   if (!cron.validate(WEEKLY_CRON)) {

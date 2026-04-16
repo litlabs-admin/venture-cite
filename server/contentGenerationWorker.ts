@@ -50,14 +50,18 @@ async function humanizeContent(
   content: string,
   industry: string,
   maxAttempts = 3,
+  baselineScore?: number, // rewrites must beat this to replace the content
 ): Promise<{ humanizedContent: string; humanScore: number; attempts: number; issues: string[]; strengths: string[] }> {
   let currentContent = content;
   let humanScore = 0;
   let attempts = 0;
   let issues: string[] = [];
   let strengths: string[] = [];
+  // Start bestContent as the original and bestScore as the baseline (or 0 for
+  // first-time generation). A rewrite is only kept when it strictly beats the
+  // best seen so far — this prevents auto-improve from returning worse content.
   let bestContent = content;
-  let bestScore = 0;
+  let bestScore = baselineScore ?? 0;
   let bestIssues: string[] = [];
   let bestStrengths: string[] = [];
 
@@ -122,7 +126,7 @@ async function humanizeContent(
   };
 }
 
-async function generateArticleForJob(job: ContentGenerationJob): Promise<{ articleId: string }> {
+async function generateArticleForJob(job: ContentGenerationJob): Promise<{ articleId: string; humanScore: number; passesAiDetection: boolean; generatedContent: string }> {
   const payload = job.requestPayload as unknown as GenerationPayload;
   const { keywords, industry, type, brandId, humanize = true, targetCustomers, geography, contentStyle = "b2c" } = payload;
 
@@ -202,7 +206,12 @@ async function generateArticleForJob(job: ContentGenerationJob): Promise<{ artic
   // Increment usage only on successful persistence.
   await storage.incrementArticleUsage(job.userId);
 
-  return { articleId: article.id };
+  return {
+    articleId: article.id,
+    humanScore,
+    passesAiDetection: humanScore >= 70,
+    generatedContent: finalContent,
+  };
 }
 
 let workerInterval: NodeJS.Timeout | null = null;
@@ -213,13 +222,30 @@ async function tick(): Promise<void> {
     if (!job) return;
     console.log(`[contentWorker] claimed job ${job.id} for user ${job.userId}`);
     try {
-      const { articleId } = await generateArticleForJob(job);
+      const { articleId, humanScore, passesAiDetection, generatedContent } = await generateArticleForJob(job);
       await storage.updateContentJob(job.id, {
         status: "succeeded",
         articleId,
         completedAt: new Date(),
       });
       console.log(`[contentWorker] job ${job.id} succeeded → article ${articleId}`);
+
+      // Update the linked draft (if any) with the finished article so the
+      // content page can restore state without fetching the job separately.
+      try {
+        const draft = await storage.getContentDraftByJobId(job.id, job.userId);
+        if (draft) {
+          await storage.updateContentDraft(draft.id, job.userId, {
+            generatedContent,
+            articleId,
+            jobId: null, // job is done — clear the pointer
+            humanScore: humanScore ?? null,
+            passesAiDetection: passesAiDetection ? 1 : 0,
+          });
+        }
+      } catch (draftErr) {
+        console.warn(`[contentWorker] could not update draft for job ${job.id}:`, draftErr);
+      }
     } catch (err: any) {
       const message = err instanceof Error ? err.message : String(err);
       await storage.updateContentJob(job.id, {
@@ -227,6 +253,11 @@ async function tick(): Promise<void> {
         errorMessage: message.slice(0, 500),
         completedAt: new Date(),
       });
+      // Clear the jobId on the draft so the UI stops polling
+      try {
+        const draft = await storage.getContentDraftByJobId(job.id, job.userId);
+        if (draft) await storage.updateContentDraft(draft.id, job.userId, { jobId: null });
+      } catch {}
       console.error(`[contentWorker] job ${job.id} failed:`, message);
     }
   } catch (pollErr) {

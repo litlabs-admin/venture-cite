@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
@@ -47,7 +48,7 @@ import {
 
 export default function Outreach() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_outreach_brandId", "");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -73,6 +74,12 @@ export default function Outreach() {
 
   const brands = brandsData?.data || [];
   const selectedBrand = brands.find(b => b.id === selectedBrandId);
+
+  useEffect(() => {
+    if (brands.length > 0 && (!selectedBrandId || !brands.find(b => b.id === selectedBrandId))) {
+      setSelectedBrandId(brands[0].id);
+    }
+  }, [brands, selectedBrandId]);
 
   const { data: campaignsData, isLoading } = useQuery<{ data: OutreachCampaign[] }>({
     queryKey: ["/api/outreach-campaigns", selectedBrandId],

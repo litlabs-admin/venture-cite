@@ -165,7 +165,8 @@ export async function runPlatformCitationCheck(
 export async function runBrandPrompts(
   brandId: string,
   platforms: string[] = [...DEFAULT_CITATION_PLATFORMS],
-): Promise<{ totalChecks: number; totalCited: number; rankings: GeoRanking[] }> {
+  options: { triggeredBy?: "manual" | "cron"; runId?: string } = {},
+): Promise<{ totalChecks: number; totalCited: number; rankings: GeoRanking[]; runId: string | null }> {
   const brand = await storage.getBrandById(brandId);
   if (!brand) throw new Error("Brand not found");
   const brandName = brand.companyName || brand.name || '';
@@ -178,7 +179,17 @@ export async function runBrandPrompts(
     ...(Array.isArray(brand.nameVariations) ? brand.nameVariations : []),
   ].filter((s) => typeof s === 'string' && s.trim().length > 0);
   const prompts = await storage.getBrandPromptsByBrandId(brandId);
-  if (prompts.length === 0) return { totalChecks: 0, totalCited: 0, rankings: [] };
+  if (prompts.length === 0) return { totalChecks: 0, totalCited: 0, rankings: [], runId: null };
+
+  // Create a citation_runs row upfront so every geo_ranking can reference it.
+  const triggeredBy = options.triggeredBy ?? "manual";
+  const citationRun = await storage.createCitationRun({
+    brandId,
+    triggeredBy,
+    totalChecks: 0,
+    totalCited: 0,
+    citationRate: 0,
+  });
 
   const cappedPlatforms = platforms.slice(0, 5);
   const rankings: GeoRanking[] = [];
@@ -232,6 +243,7 @@ export async function runBrandPrompts(
       const row = await storage.createGeoRanking({
         articleId: null,
         brandPromptId: bp.id,
+        runId: citationRun.id,
         aiPlatform: platform,
         prompt: bp.prompt,
         rank,
@@ -259,5 +271,28 @@ export async function runBrandPrompts(
     Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()),
   );
 
-  return { totalChecks: rankings.length, totalCited, rankings };
+  // Finalize the run row with aggregate totals + per-platform breakdown.
+  const totalChecks = rankings.length;
+  const citationRate = totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0;
+  const platformMap = new Map<string, { cited: number; checks: number }>();
+  for (const r of rankings) {
+    const entry = platformMap.get(r.aiPlatform) || { cited: 0, checks: 0 };
+    entry.checks += 1;
+    if (r.isCited === 1) entry.cited += 1;
+    platformMap.set(r.aiPlatform, entry);
+  }
+  const platformBreakdown = Object.fromEntries(
+    Array.from(platformMap.entries()).map(([p, s]) => [p, { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 }]),
+  );
+  await storage.updateCitationRun(citationRun.id, {
+    totalChecks,
+    totalCited,
+    citationRate,
+    completedAt: new Date(),
+    platformBreakdown,
+  });
+
+  console.log(`[citationChecker] run ${citationRun.id} complete — ${totalCited}/${totalChecks} cited (${citationRate}%)`);
+
+  return { totalChecks, totalCited, rankings, runId: citationRun.id };
 }

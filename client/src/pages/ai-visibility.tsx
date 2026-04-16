@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -633,8 +634,8 @@ const aiEngines: AIEngine[] = [
 
 export default function AIVisibility() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
-  const [selectedEngineId, setSelectedEngineId] = useState<string>(aiEngines[0].id);
+  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_visibility_brandId", "");
+  const [selectedEngineId, setSelectedEngineId] = usePersistedState<string>("vc_visibility_engine", aiEngines[0].id);
   const [completedSteps, setCompletedSteps] = useState<Record<string, string[]>>({});
 
   const queryClient = useQueryClient();
@@ -645,10 +646,11 @@ export default function AIVisibility() {
 
   const brands = brandsResponse?.data || [];
 
-  // Auto-select the only brand the user owns — common case right after
-  // creating their first brand. Multi-brand users still see the placeholder.
+  // Auto-select a brand: pick the first if no valid selection exists (covers
+  // first brand creation, deleted brand, returning users). Multi-brand users
+  // keep their last-used brand via usePersistedState.
   useEffect(() => {
-    if (!selectedBrandId && brands.length === 1) {
+    if (brands.length > 0 && (!selectedBrandId || !brands.find(b => b.id === selectedBrandId))) {
       setSelectedBrandId(brands[0].id);
     }
   }, [brands, selectedBrandId]);

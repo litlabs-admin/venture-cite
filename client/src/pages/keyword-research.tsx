@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,8 +47,8 @@ const contentTypeLabels: Record<string, string> = {
 export default function KeywordResearchPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_keywords_brandId", "");
+  const [statusFilter, setStatusFilter] = usePersistedState<string>("vc_keywords_filter", "all");
 
   const { data: brandsData, isLoading: brandsLoading } = useQuery<{ data: Brand[] }>({
     queryKey: ["/api/brands"],
@@ -56,10 +57,11 @@ export default function KeywordResearchPage() {
   const brands = brandsData?.data || [];
   const selectedBrand = brands.find(b => b.id === selectedBrandId);
 
-  // Auto-select the only brand the user owns — common case right after
-  // creating their first brand. Multi-brand users still see the placeholder.
+  // Auto-select a brand: pick the first if no valid selection exists (covers
+  // first brand creation, deleted brand, returning users). Multi-brand users
+  // keep their last-used brand via usePersistedState.
   useEffect(() => {
-    if (!selectedBrandId && brands.length === 1) {
+    if (brands.length > 0 && (!selectedBrandId || !brands.find(b => b.id === selectedBrandId))) {
       setSelectedBrandId(brands[0].id);
     }
   }, [brands, selectedBrandId]);
@@ -82,7 +84,12 @@ export default function KeywordResearchPage() {
     onSuccess: (data) => {
       if (data.success) {
         toast({ title: `Discovered ${data.count} keywords!` });
-        queryClient.invalidateQueries({ queryKey: [`/api/keyword-research/${selectedBrandId}`] });
+        // Instant update: append new keywords to cache
+        const qk = [`/api/keyword-research/${selectedBrandId}`];
+        queryClient.setQueryData<{ success: boolean; data: KeywordResearch[] }>(qk, (old) => {
+          if (!old) return { success: true, data: data.data };
+          return { ...old, data: [...old.data, ...data.data] };
+        });
       } else {
         toast({ title: data.error || "Failed to discover keywords", variant: "destructive" });
       }
@@ -103,9 +110,14 @@ export default function KeywordResearchPage() {
       const response = await apiRequest("DELETE", `/api/keyword-research/${id}`);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, deletedId) => {
       toast({ title: "Keyword deleted" });
-      queryClient.invalidateQueries({ queryKey: [`/api/keyword-research/${selectedBrandId}`] });
+      // Instant update: remove keyword from cache
+      const qk = [`/api/keyword-research/${selectedBrandId}`];
+      queryClient.setQueryData<{ success: boolean; data: KeywordResearch[] }>(qk, (old) => {
+        if (!old) return old;
+        return { ...old, data: old.data.filter((k) => k.id !== deletedId) };
+      });
     },
     onError: () => toast({ title: "Failed to delete keyword", variant: "destructive" }),
   });
@@ -115,8 +127,13 @@ export default function KeywordResearchPage() {
       const response = await apiRequest("PATCH", `/api/keyword-research/${id}`, { status });
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/keyword-research/${selectedBrandId}`] });
+    onSuccess: (_data, { id, status }) => {
+      // Instant update: update status in cache
+      const qk = [`/api/keyword-research/${selectedBrandId}`];
+      queryClient.setQueryData<{ success: boolean; data: KeywordResearch[] }>(qk, (old) => {
+        if (!old) return old;
+        return { ...old, data: old.data.map((k) => k.id === id ? { ...k, status } : k) };
+      });
     },
   });
 

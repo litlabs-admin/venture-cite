@@ -11,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import PageHeader from "@/components/PageHeader";
 import { Input } from "@/components/ui/input";
-import { Loader2, FileText, Eye, Calendar, Tag, Share2, Clock, Pencil, Send, Link2 } from "lucide-react";
+import { Loader2, FileText, Eye, Calendar, Tag, Share2, Clock, Pencil, Send, Link2, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 
@@ -34,7 +35,7 @@ function DistributeDialog({ articleId }: { articleId: string }) {
     queryKey: [`/api/distributions/${articleId}`],
     enabled: open,
   });
-  const history = (historyData?.data || []).filter((d: any) => d.status === 'success' && d.metadata?.content);
+  const history = (historyData?.data || []).filter((d: any) => d.status === 'success' && d.metadata?.content?.trim());
 
   // Buffer profiles — only loaded when the dialog is open
   const { data: bufferData } = useQuery<{ success: boolean; connected: boolean; data: Array<{ id: string; service: string; formattedService: string; username: string }> }>({
@@ -63,11 +64,11 @@ function DistributeDialog({ articleId }: { articleId: string }) {
       const response = await apiRequest('POST', `/api/distribute/${articleId}`, { platforms: selectedPlatforms });
       return await response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const successCount = data.data.filter((r: any) => r.status === 'success').length;
       setGeneratedContent(data.data);
       setView('results');
-      refetchHistory();
+      await refetchHistory();
       toast({ title: "Content Generated", description: `Platform-ready content created for ${successCount} platform(s). Copy and post!` });
     },
     onError: () => {
@@ -141,7 +142,7 @@ function DistributeDialog({ articleId }: { articleId: string }) {
           })()}
         </div>
       </div>
-      {editingId === id ? (
+      {id && editingId === id ? (
         <div className="space-y-2">
           <Textarea value={editText} onChange={(e) => setEditText(e.target.value)} className="min-h-[160px] text-sm font-mono" />
           <div className="flex gap-2 justify-end">
@@ -176,6 +177,11 @@ function DistributeDialog({ articleId }: { articleId: string }) {
           <Button variant={view === 'generate' ? 'default' : 'ghost'} size="sm" onClick={() => setView('generate')}>
             <Share2 className="w-3 h-3 mr-1" /> Generate New
           </Button>
+          {generatedContent.length > 0 && (
+            <Button variant={view === 'results' ? 'default' : 'ghost'} size="sm" onClick={() => setView('results')} data-testid="button-view-results">
+              <FileText className="w-3 h-3 mr-1" /> Results ({generatedContent.filter(c => c.content).length})
+            </Button>
+          )}
           <Button variant={view === 'history' ? 'default' : 'ghost'} size="sm" onClick={() => setView('history')} data-testid="button-view-history">
             <Clock className="w-3 h-3 mr-1" /> History {history.length > 0 && `(${history.length})`}
           </Button>
@@ -240,7 +246,7 @@ function DistributeDialog({ articleId }: { articleId: string }) {
                 ? platformCard(null, item.platform, item.content)
                 : <div key={item.platform} className="border rounded-lg p-4"><Badge variant="destructive">{item.platform}</Badge><p className="text-sm text-destructive mt-2">Failed to generate content for this platform.</p></div>
             )}
-            <Button variant="outline" className="w-full" onClick={() => { setView('generate'); setGeneratedContent([]); setSelectedPlatforms([]); }} data-testid="button-distribute-more">
+            <Button variant="outline" className="w-full" onClick={() => { setView('generate'); setSelectedPlatforms([]); }} data-testid="button-distribute-more">
               Generate for more platforms
             </Button>
           </div>
@@ -276,7 +282,11 @@ function ViewEditDialog({ article }: { article: any }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
+      // Instant update: update article in cache
+      queryClient.setQueryData<{ success: boolean; data: any[] }>(['/api/articles'], (old) => {
+        if (!old) return old;
+        return { ...old, data: old.data.map((a: any) => a.id === article.id ? { ...a, title, content } : a) };
+      });
       setEditing(false);
       toast({ title: "Saved", description: "Article updated." });
     },
@@ -326,11 +336,29 @@ function ViewEditDialog({ article }: { article: any }) {
 }
 
 export default function Articles() {
+  const { toast } = useToast();
+
   const { data: articlesData, isLoading } = useQuery({
     queryKey: ['/api/articles'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/articles');
       return response.json();
+    },
+  });
+
+  const deleteArticleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/articles/${id}`);
+    },
+    onSuccess: (_data, deletedId) => {
+      queryClient.setQueryData<{ success: boolean; data: any[] }>(['/api/articles'], (old) => {
+        if (!old) return old;
+        return { ...old, data: old.data.filter((a: any) => a.id !== deletedId) };
+      });
+      toast({ title: "Article deleted", description: "The article has been permanently removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete article.", variant: "destructive" });
     },
   });
 
@@ -413,6 +441,30 @@ export default function Articles() {
                   <div className="flex gap-2 flex-wrap">
                     <ViewEditDialog article={article} />
                     <DistributeDialog articleId={article.id} />
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                          <Trash2 className="w-4 h-4 mr-2" /> Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete article?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete "{article.title}" and all its distribution history. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteArticleMutation.mutate(article.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete permanently
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </CardContent>
               </Card>

@@ -105,6 +105,9 @@ export const brands = pgTable(
     brandVoice: text("brand_voice"),
     sampleContent: text("sample_content"),
     nameVariations: text("name_variations").array(),
+    autoCitationSchedule: text("auto_citation_schedule").default("off").notNull(), // off | weekly | biweekly | monthly
+    autoCitationDay: integer("auto_citation_day").default(0).notNull(), // 0=Sun, 1=Mon, ... 6=Sat
+    lastAutoCitationAt: timestamp("last_auto_citation_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -213,17 +216,73 @@ export const insertContentGenerationJobSchema = createInsertSchema(contentGenera
 export type ContentGenerationJob = typeof contentGenerationJobs.$inferSelect;
 export type InsertContentGenerationJob = z.infer<typeof insertContentGenerationJobSchema>;
 
+// Multi-draft persistence for the content generation page. Each draft stores
+// the full form state and is auto-saved on field change. Linked to a
+// background job (jobId) while generating, then updated with the finished
+// article when the job completes.
+export const contentDrafts = pgTable(
+  "content_drafts",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    title: text("title"),
+    keywords: text("keywords").notNull().default(""),
+    industry: text("industry").notNull().default(""),
+    type: text("type").notNull().default("article"),
+    brandId: varchar("brand_id"),
+    targetCustomers: text("target_customers"),
+    geography: text("geography"),
+    contentStyle: text("content_style").default("b2c"),
+    generatedContent: text("generated_content"),
+    articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
+    jobId: varchar("job_id"), // references content_generation_jobs(id) — nullable FK (no cascade needed)
+    humanScore: integer("human_score"),
+    passesAiDetection: integer("passes_ai_detection"), // NULL=unchecked, 0=fails, 1=passes
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("content_drafts_user_id_idx").on(table.userId),
+    index("content_drafts_job_id_idx").on(table.jobId),
+  ],
+);
+
+export type ContentDraft = typeof contentDrafts.$inferSelect;
+export type InsertContentDraft = typeof contentDrafts.$inferInsert;
+
+// Tracks each batch of 10 prompts generated for a brand. Enables prompt
+// versioning so users can see which prompts were used in historical runs.
+export const promptGenerations = pgTable(
+  "prompt_generations",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    generationNumber: integer("generation_number").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("prompt_generations_brand_id_idx").on(table.brandId)],
+);
+
+export const insertPromptGenerationSchema = createInsertSchema(promptGenerations).omit({ id: true, createdAt: true });
+export type PromptGeneration = typeof promptGenerations.$inferSelect;
+export type InsertPromptGeneration = z.infer<typeof insertPromptGenerationSchema>;
+
 export const brandPrompts = pgTable(
   "brand_prompts",
   {
     id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    generationId: varchar("generation_id").references(() => promptGenerations.id, { onDelete: "set null" }),
     prompt: text("prompt").notNull(),
     rationale: text("rationale"),
     orderIndex: integer("order_index").default(0).notNull(),
+    isActive: integer("is_active").default(1).notNull(), // 1 = current, 0 = archived
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("brand_prompts_brand_id_idx").on(table.brandId)],
+  (table) => [
+    index("brand_prompts_brand_id_idx").on(table.brandId),
+    index("brand_prompts_generation_id_idx").on(table.generationId),
+  ],
 );
 
 export const insertBrandPromptSchema = createInsertSchema(brandPrompts).omit({ id: true, createdAt: true });
@@ -251,12 +310,41 @@ export const insertVisibilityProgressSchema = createInsertSchema(visibilityProgr
 export type VisibilityProgress = typeof visibilityProgress.$inferSelect;
 export type InsertVisibilityProgress = z.infer<typeof insertVisibilityProgressSchema>;
 
+// One row per "Run Citation Check" click or weekly cron run. Stores the
+// aggregate totals so the trend chart can render without re-aggregating
+// every geo_rankings row.
+export const citationRuns = pgTable(
+  "citation_runs",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    totalChecks: integer("total_checks").default(0).notNull(),
+    totalCited: integer("total_cited").default(0).notNull(),
+    citationRate: integer("citation_rate").default(0).notNull(),
+    triggeredBy: text("triggered_by").notNull().default("manual"), // manual | cron
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+    // Per-platform breakdown snapshot so the history endpoint doesn't
+    // need to re-join geo_rankings for every run.
+    platformBreakdown: jsonb("platform_breakdown"),
+  },
+  (table) => [
+    index("citation_runs_brand_id_idx").on(table.brandId),
+    index("citation_runs_started_at_idx").on(table.startedAt),
+  ],
+);
+
+export const insertCitationRunSchema = createInsertSchema(citationRuns).omit({ id: true, startedAt: true });
+export type CitationRun = typeof citationRuns.$inferSelect;
+export type InsertCitationRun = z.infer<typeof insertCitationRunSchema>;
+
 export const geoRankings = pgTable(
   "geo_rankings",
   {
     id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "cascade" }),
     brandPromptId: varchar("brand_prompt_id").references(() => brandPrompts.id, { onDelete: "set null" }),
+    runId: varchar("run_id").references(() => citationRuns.id, { onDelete: "set null" }),
     aiPlatform: text("ai_platform").notNull(),
     prompt: text("prompt").notNull(),
     rank: integer("rank"),
@@ -272,6 +360,7 @@ export const geoRankings = pgTable(
   (table) => [
     index("geo_rankings_article_id_idx").on(table.articleId),
     index("geo_rankings_brand_prompt_id_idx").on(table.brandPromptId),
+    index("geo_rankings_run_id_idx").on(table.runId),
     index("geo_rankings_ai_platform_idx").on(table.aiPlatform),
   ],
 );

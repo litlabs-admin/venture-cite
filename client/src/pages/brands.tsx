@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type Brand } from "@shared/schema";
 import { z } from "zod";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Building2, Plus, Pencil, Trash2, Globe, Target, Megaphone, Briefcase, Sparkles, Loader2, CheckCircle2, ArrowRight, Shield } from "lucide-react";
 import { Link } from "wouter";
 
@@ -231,9 +232,7 @@ export default function Brands() {
   }
 
   function handleDelete(id: string) {
-    if (confirm("Are you sure you want to delete this brand? This action cannot be undone.")) {
-      deleteMutation.mutate(id);
-    }
+    deleteMutation.mutate(id);
   }
 
   function handleCreateFromWebsite() {
@@ -373,14 +372,34 @@ export default function Brands() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(brand.id)}
-                        data-testid={`button-delete-${brand.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-testid={`button-delete-${brand.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete "{brand.name}"?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete this brand and <strong>all related data</strong> including articles, keywords, citations, prompts, AI visibility progress, and distribution history. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(brand.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete brand and all data
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 </CardHeader>

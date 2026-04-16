@@ -7,6 +7,7 @@ import { runBrandPrompts, DEFAULT_CITATION_PLATFORMS } from "./citationChecker";
 import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS } from "./lib/modelConfig";
 import { enqueueContentGenerationJob, type GenerationPayload } from "./contentGenerationWorker";
+import { generateBrandPrompts } from "./lib/promptGenerator";
 import { z } from "zod";
 import OpenAI from "openai";
 import { setupAuth, attachUserIfPresent, requireAuthForApi, enforceBrandOwnership, brandIdParamHandler, isAdmin } from "./auth";
@@ -651,7 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const existing = latestByKey.get(key);
           if (!existing || r.checkedAt > existing.checkedAt) latestByKey.set(key, r);
         }
-        for (const r of latestByKey.values()) {
+        for (const r of Array.from(latestByKey.values())) {
           totalChecks += 1;
           if (r.isCited === 1) totalCitations += 1;
         }
@@ -786,17 +787,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tokens are roughly 0.75 words; we cap `max_tokens` to ~1.5× the input
   // token count (capped at 4500) so a 200-word article doesn't spend the
   // full 4500-token budget three times over.
-  async function humanizeContent(content: string, industry: string, maxAttempts: number = 3): Promise<{ humanizedContent: string; humanScore: number; attempts: number; issues: string[]; strengths: string[] }> {
+  async function humanizeContent(content: string, industry: string, maxAttempts: number = 3, baselineScore?: number): Promise<{ humanizedContent: string; humanScore: number; attempts: number; issues: string[]; strengths: string[] }> {
     let currentContent = content;
     let humanScore = 0;
     let attempts = 0;
     let issues: string[] = [];
     let strengths: string[] = [];
 
-    // Track the best result seen across all passes so we never return a
-    // version that scores lower than an earlier pass.
+    // Start bestScore at the baseline so rewrites must beat the current score.
+    // This prevents auto-improve from returning worse content than the original.
     let bestContent = content;
-    let bestScore = 0;
+    let bestScore = baselineScore ?? 0;
     let bestIssues: string[] = [];
     let bestStrengths: string[] = [];
 
@@ -937,11 +938,99 @@ Return ONLY a JSON object:
     return { humanizedContent: bestContent, humanScore: bestScore, attempts, issues: bestIssues, strengths: bestStrengths };
   }
 
+  // ── Content Draft CRUD ─────────────────────────────────────────────────────
+  // Drafts persist form state across navigations and enable multiple concurrent
+  // drafts per user. Auto-saved from the client on field change (debounced).
+
+  // List all drafts for the authenticated user (newest-first).
+  app.get("/api/content-drafts", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const drafts = await storage.getContentDraftsByUserId(user.id);
+      res.json({ success: true, data: drafts });
+    } catch (error) {
+      sendError(res, error, "Failed to fetch content drafts");
+    }
+  });
+
+  // Create a new draft.
+  app.post("/api/content-drafts", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const { keywords, industry, type, brandId, targetCustomers, geography, contentStyle, title } = req.body ?? {};
+      const draft = await storage.createContentDraft(user.id, {
+        keywords: keywords ?? "",
+        industry: industry ?? "",
+        type: type ?? "article",
+        brandId: brandId ?? null,
+        targetCustomers: targetCustomers ?? null,
+        geography: geography ?? null,
+        contentStyle: contentStyle ?? "b2c",
+        title: title ?? null,
+      });
+      res.json({ success: true, data: draft });
+    } catch (error) {
+      sendError(res, error, "Failed to create content draft");
+    }
+  });
+
+  // Get a single draft by id (owner-scoped).
+  app.get("/api/content-drafts/:id", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const draft = await storage.getContentDraftById(req.params.id, user.id);
+      if (!draft) return res.status(404).json({ success: false, error: "Draft not found" });
+      res.json({ success: true, data: draft });
+    } catch (error) {
+      sendError(res, error, "Failed to fetch content draft");
+    }
+  });
+
+  // Auto-save: update an existing draft (partial fields allowed).
+  app.patch("/api/content-drafts/:id", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const { keywords, industry, type, brandId, targetCustomers, geography, contentStyle, title, generatedContent, articleId, jobId, humanScore, passesAiDetection } = req.body ?? {};
+      const update: Record<string, any> = {};
+      if (keywords !== undefined) update.keywords = keywords;
+      if (industry !== undefined) update.industry = industry;
+      if (type !== undefined) update.type = type;
+      if (brandId !== undefined) update.brandId = brandId;
+      if (targetCustomers !== undefined) update.targetCustomers = targetCustomers;
+      if (geography !== undefined) update.geography = geography;
+      if (contentStyle !== undefined) update.contentStyle = contentStyle;
+      if (title !== undefined) update.title = title;
+      if (generatedContent !== undefined) update.generatedContent = generatedContent;
+      if (articleId !== undefined) update.articleId = articleId;
+      if (jobId !== undefined) update.jobId = jobId;
+      if (humanScore !== undefined) update.humanScore = humanScore;
+      if (passesAiDetection !== undefined) update.passesAiDetection = passesAiDetection;
+      const draft = await storage.updateContentDraft(req.params.id, user.id, update);
+      if (!draft) return res.status(404).json({ success: false, error: "Draft not found" });
+      res.json({ success: true, data: draft });
+    } catch (error) {
+      sendError(res, error, "Failed to update content draft");
+    }
+  });
+
+  // Delete a draft (owner-scoped).
+  app.delete("/api/content-drafts/:id", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      await storage.deleteContentDraft(req.params.id, user.id);
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, "Failed to delete content draft");
+    }
+  });
+
+  // ── Content Generation ─────────────────────────────────────────────────────
+
   // Generate content — enqueues a background job so long-running GPT calls
   // survive page navigation, logout, and browser refresh. Returns the job
   // id immediately; client polls GET /api/content-jobs/:jobId for status.
   app.post("/api/generate-content", aiLimitMiddleware, async (req, res) => {
-    const { keywords, industry, type, brandId, humanize = true, targetCustomers, geography, contentStyle = "b2c" } = req.body ?? {};
+    const { keywords, industry, type, brandId, humanize = true, targetCustomers, geography, contentStyle = "b2c", draftId } = req.body ?? {};
 
     const user = (req as any).user;
     if (!user) {
@@ -984,6 +1073,12 @@ Return ONLY a JSON object:
         contentStyle,
       };
       const jobId = await enqueueContentGenerationJob(user.id, brandId || null, payload);
+
+      // Link the job to the active draft so the worker can update it on completion.
+      if (draftId && typeof draftId === "string") {
+        await storage.updateContentDraft(draftId, user.id, { jobId });
+      }
+
       return res.json({
         success: true,
         data: { jobId, status: "pending" },
@@ -994,6 +1089,25 @@ Return ONLY a JSON object:
   });
 
   // Poll a content generation job (owner-scoped).
+  // Return the user's active (in-progress) or most recent completed job
+  // so the content page can resume where the user left off.
+  app.get("/api/content-jobs/active", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const active = await storage.getActiveContentJob(user.id);
+      if (active) {
+        return res.json({ success: true, data: { ...active, type: "active" } });
+      }
+      const recent = await storage.getRecentCompletedContentJob(user.id);
+      if (recent) {
+        return res.json({ success: true, data: { ...recent, type: "completed" } });
+      }
+      res.json({ success: true, data: null });
+    } catch (error) {
+      sendError(res, error, "Failed to fetch active job");
+    }
+  });
+
   app.get("/api/content-jobs/:jobId", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -1006,6 +1120,7 @@ Return ONLY a JSON object:
           status: job.status,
           articleId: job.articleId,
           errorMessage: job.errorMessage,
+          requestPayload: job.requestPayload,
           createdAt: job.createdAt,
           completedAt: job.completedAt,
         },
@@ -1108,7 +1223,7 @@ Return a JSON object with:
       return res.status(401).json({ success: false, error: "Authentication required" });
     }
 
-    const { content, industry = "general", articleId } = req.body;
+    const { content, industry = "general", articleId, currentScore } = req.body;
 
     if (!content || typeof content !== "string") {
       return res.status(400).json({ success: false, error: "Content is required" });
@@ -1124,8 +1239,14 @@ Return a JSON object with:
       });
     }
 
+    // Pass the current score as the baseline — the humanizer will only replace
+    // content if a rewrite scores higher. This prevents the "auto-improve made
+    // it worse" bug where all rewrites scored below the already-humanized content.
+    const baselineScore = typeof currentScore === "number" ? currentScore : undefined;
+
     try {
-      const result = await humanizeContent(content, industry, 3);
+      const result = await humanizeContent(content, industry, 3, baselineScore);
+      const improved = result.humanScore > (baselineScore ?? 0);
 
       // If the user passed an articleId, persist the improved version as a
       // new draft article and tag its seoData so the UI can surface the
@@ -1168,6 +1289,7 @@ Return a JSON object with:
         aiIssues: result.issues,
         aiStrengths: result.strengths,
         improvedArticleId,
+        improved, // false when no rewrite beat the baseline
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -1665,6 +1787,19 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     }
   });
 
+  // Delete article — ownership-scoped.
+  app.delete("/api/articles/:id", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      await requireArticle(req.params.id, user.id);
+      const deleted = await storage.deleteArticle(req.params.id);
+      if (!deleted) return res.status(404).json({ success: false, error: "Article not found" });
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, "Failed to delete article");
+    }
+  });
+
   // Get article by slug (for public viewing)
   app.get("/api/articles/slug/:slug", async (req, res) => {
     try {
@@ -1942,75 +2077,9 @@ Content: ${articleContent}`
       const user = requireUser(req);
       const brand = await requireBrand(req.params.brandId, user.id);
 
-      if (!process.env.OPENAI_API_KEY) {
-        return res.status(503).json({ success: false, error: "AI prompt generation is not configured." });
-      }
-
-      const recentArticles = await storage.getRecentArticlesByBrandId(brand.id, 10);
-      const articleSummaries = recentArticles.map((a) => ({
-        title: a.title,
-        keywords: Array.isArray(a.keywords) ? a.keywords.slice(0, 5) : [],
-      }));
-
-      let completion;
-      try {
-        completion = await openai.chat.completions.create({
-          model: MODELS.brandPromptGeneration,
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: `You are a GEO (Generative Engine Optimization) expert. Your job is to generate EXACTLY 10 user questions where the given brand is most likely to be cited if those questions were asked to ChatGPT, Claude, or Gemini.
-
-Rules:
-- Mix query types: direct ("best X tools"), comparison ("X vs Y"), how-to, and buyer-intent.
-- Each question should be natural — something a real user would type.
-- For each question, include a 1-sentence rationale explaining why THIS brand would rank well for it.
-- Ground the questions in the brand's industry, products, and published articles.
-- Do NOT use the brand name in the questions themselves — users rarely search by brand.
-
-Return JSON: { "prompts": [{ "prompt": "...", "rationale": "..." }, ... 10 items total] }`,
-            },
-            {
-              role: "user",
-              content: `Brand: ${brand.name}
-Company: ${brand.companyName}
-Industry: ${brand.industry}
-Description: ${brand.description || 'N/A'}
-Target audience: ${brand.targetAudience || 'N/A'}
-Products/services: ${Array.isArray(brand.products) ? brand.products.join(', ') : 'N/A'}
-Unique selling points: ${Array.isArray(brand.uniqueSellingPoints) ? brand.uniqueSellingPoints.join(', ') : 'N/A'}
-
-Published articles:
-${articleSummaries.length === 0 ? '(no articles published yet — base prompts on brand profile only)' : articleSummaries.map((a, i) => `${i + 1}. "${a.title}" — keywords: ${a.keywords.join(', ') || 'none'}`).join('\n')}`,
-            },
-          ],
-          max_tokens: 2000,
-        }, { signal: AbortSignal.timeout(45_000) });
-      } catch (aiErr: any) {
-        if (aiErr?.status === 429) return res.status(429).json({ success: false, error: "AI is busy right now. Please wait a moment and try again." });
-        if (aiErr?.name === "AbortError" || aiErr?.name === "TimeoutError") return res.status(504).json({ success: false, error: "Prompt generation timed out. Please try again." });
-        return res.status(502).json({ success: false, error: "AI service error. Please try again shortly." });
-      }
-
-      const parsed = safeParseJson<{ prompts?: Array<{ prompt: string; rationale?: string }> }>(completion.choices[0].message.content);
-      const promptList = Array.isArray(parsed?.prompts) ? parsed!.prompts : [];
-      const valid = promptList.filter((p) => p && typeof p.prompt === 'string' && p.prompt.trim().length > 0).slice(0, 10);
-      if (valid.length === 0) {
-        return res.status(502).json({ success: false, error: "AI returned no usable prompts. Please try again." });
-      }
-
-      // Replace any existing prompts for this brand.
-      await storage.deleteBrandPromptsByBrandId(brand.id);
-      const saved = [];
-      for (let i = 0; i < valid.length; i += 1) {
-        const row = await storage.createBrandPrompt({
-          brandId: brand.id,
-          prompt: valid[i].prompt.trim(),
-          rationale: valid[i].rationale?.trim() || null,
-          orderIndex: i,
-        } as any);
-        saved.push(row);
+      const { saved, error } = await generateBrandPrompts(brand);
+      if (error || saved.length === 0) {
+        return res.status(502).json({ success: false, error: error || "AI returned no usable prompts. Please try again." });
       }
 
       res.json({ success: true, data: saved });
@@ -2108,7 +2177,96 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
     }
   });
 
+  // Update auto-citation schedule for a brand.
+  app.patch("/api/brands/:brandId/citation-schedule", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const { schedule, day } = req.body || {};
+      const validSchedules = ["off", "weekly", "biweekly", "monthly"];
+      if (schedule && !validSchedules.includes(schedule)) {
+        return res.status(400).json({ success: false, error: "Invalid schedule. Must be one of: off, weekly, biweekly, monthly." });
+      }
+      const update: Record<string, any> = {};
+      if (schedule !== undefined) update.autoCitationSchedule = schedule;
+      if (day !== undefined) update.autoCitationDay = Math.max(0, Math.min(6, Number(day) || 0));
+      await storage.updateBrand(brand.id, update);
+      const updated = await storage.getBrandById(brand.id);
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      sendError(res, error, "Failed to update citation schedule");
+    }
+  });
+
   // Aggregated results for a brand's prompt runs.
+  // Citation run history — returns all runs for the trend chart, newest first.
+  app.get("/api/brand-prompts/:brandId/history", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const limit = Math.min(Number(req.query.limit) || 50, 200);
+      const runs = await storage.getCitationRunsByBrandId(brand.id, limit);
+      res.json({ success: true, data: runs });
+    } catch (error) {
+      sendError(res, error, "Failed to fetch citation history");
+    }
+  });
+
+  // Drill-down into a specific citation run — returns per-prompt × per-platform results.
+  app.get("/api/brand-prompts/:brandId/run/:runId/details", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
+      const rankings = await storage.getGeoRankingsByRunId(req.params.runId);
+
+      // Group by prompt text (since prompts may have been deleted/archived)
+      const byPrompt = new Map<string, { prompt: string; platforms: Array<{ platform: string; isCited: boolean; snippet: string | null; fullResponse: string | null; checkedAt: string }> }>();
+      for (const r of rankings) {
+        const key = r.prompt;
+        if (!byPrompt.has(key)) {
+          byPrompt.set(key, { prompt: key, platforms: [] });
+        }
+        const ctx = r.citationContext || '';
+        const delimIdx = ctx.indexOf('||| RAW_RESPONSE |||');
+        const oldDelimIdx = ctx.indexOf('--- RAW RESPONSE ---');
+        let snippet: string | null = null;
+        let fullResponse: string | null = null;
+        if (delimIdx !== -1) {
+          snippet = ctx.substring(0, delimIdx).trim();
+          fullResponse = ctx.substring(delimIdx + 20).trim();
+        } else if (oldDelimIdx !== -1) {
+          snippet = ctx.substring(0, oldDelimIdx).trim();
+          fullResponse = ctx.substring(oldDelimIdx + 20).trim();
+        } else if (ctx) {
+          snippet = ctx;
+        }
+        byPrompt.get(key)!.platforms.push({
+          platform: r.aiPlatform,
+          isCited: r.isCited === 1,
+          snippet,
+          fullResponse,
+          checkedAt: r.checkedAt?.toISOString() || new Date().toISOString(),
+        });
+      }
+
+      res.json({ success: true, data: { byPrompt: Array.from(byPrompt.values()) } });
+    } catch (error) {
+      sendError(res, error, "Failed to fetch run details");
+    }
+  });
+
+  // Prompt generation history for a brand.
+  app.get("/api/brand-prompts/:brandId/generations", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const generations = await storage.getPromptGenerationsByBrandId(brand.id);
+      res.json({ success: true, data: generations });
+    } catch (error) {
+      sendError(res, error, "Failed to fetch prompt generations");
+    }
+  });
+
   app.get("/api/brand-prompts/:brandId/results", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -2506,6 +2664,9 @@ Be specific and accurate based on the content. If you can't determine something,
       if (!existing) {
         return res.status(404).json({ success: false, error: "Brand not found" });
       }
+      // Delete content drafts tied to this brand (no FK cascade on this table)
+      await storage.deleteContentDraftsByBrandId(req.params.id);
+      // Delete the brand — all other related data cascades via DB foreign keys
       const success = await storage.deleteBrand(req.params.id);
       if (!success) {
         return res.status(404).json({ success: false, error: "Brand not found" });

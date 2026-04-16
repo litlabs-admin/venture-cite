@@ -44,6 +44,8 @@ import {
   type AutomationExecution, type InsertAutomationExecution,
   type KeywordResearch, type InsertKeywordResearch,
   type CommunityPost, type InsertCommunityPost,
+  type CitationRun, type InsertCitationRun,
+  type ContentDraft, type InsertContentDraft,
 } from "@shared/schema";
 
 export class DatabaseStorage implements IStorage {
@@ -220,6 +222,11 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async deleteArticle(id: string): Promise<boolean> {
+    const result = await db.delete(schema.articles).where(eq(schema.articles.id, id)).returning();
+    return result.length > 0;
+  }
+
   async incrementArticleViews(id: string): Promise<void> {
     await db.update(schema.articles)
       .set({ viewCount: sql`${schema.articles.viewCount} + 1` })
@@ -318,12 +325,50 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(schema.brandPrompts)
-      .where(eq(schema.brandPrompts.brandId, brandId))
+      .where(and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.isActive, 1)))
       .orderBy(asc(schema.brandPrompts.orderIndex));
   }
 
   async deleteBrandPromptsByBrandId(brandId: string): Promise<void> {
     await db.delete(schema.brandPrompts).where(eq(schema.brandPrompts.brandId, brandId));
+  }
+
+  async archiveBrandPrompts(brandId: string): Promise<void> {
+    await db
+      .update(schema.brandPrompts)
+      .set({ isActive: 0 })
+      .where(and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.isActive, 1)));
+  }
+
+  async createPromptGeneration(brandId: string): Promise<schema.PromptGeneration> {
+    // Count existing generations for this brand to determine the next number
+    const existing = await db
+      .select({ id: schema.promptGenerations.id })
+      .from(schema.promptGenerations)
+      .where(eq(schema.promptGenerations.brandId, brandId));
+    const generationNumber = existing.length + 1;
+
+    const [row] = await db
+      .insert(schema.promptGenerations)
+      .values({ brandId, generationNumber })
+      .returning();
+    return row;
+  }
+
+  async getPromptGenerationsByBrandId(brandId: string): Promise<schema.PromptGeneration[]> {
+    return await db
+      .select()
+      .from(schema.promptGenerations)
+      .where(eq(schema.promptGenerations.brandId, brandId))
+      .orderBy(desc(schema.promptGenerations.createdAt));
+  }
+
+  async getGeoRankingsByRunId(runId: string): Promise<GeoRanking[]> {
+    return await db
+      .select()
+      .from(schema.geoRankings)
+      .where(eq(schema.geoRankings.runId, runId))
+      .orderBy(asc(schema.geoRankings.prompt), asc(schema.geoRankings.aiPlatform));
   }
 
   async getRecentArticlesByBrandId(brandId: string, limit: number): Promise<Article[]> {
@@ -359,6 +404,29 @@ export class DatabaseStorage implements IStorage {
           eq(schema.visibilityProgress.stepId, stepId),
         ),
       );
+  }
+
+  async createCitationRun(run: InsertCitationRun): Promise<CitationRun> {
+    const [row] = await db.insert(schema.citationRuns).values(run).returning();
+    return row;
+  }
+
+  async updateCitationRun(id: string, update: Partial<CitationRun>): Promise<CitationRun | undefined> {
+    const [row] = await db
+      .update(schema.citationRuns)
+      .set(update)
+      .where(eq(schema.citationRuns.id, id))
+      .returning();
+    return row;
+  }
+
+  async getCitationRunsByBrandId(brandId: string, limit = 50): Promise<CitationRun[]> {
+    return await db
+      .select()
+      .from(schema.citationRuns)
+      .where(eq(schema.citationRuns.brandId, brandId))
+      .orderBy(desc(schema.citationRuns.startedAt))
+      .limit(limit);
   }
 
   async enqueueContentJob(job: InsertContentGenerationJob): Promise<ContentGenerationJob> {
@@ -408,6 +476,41 @@ export class DatabaseStorage implements IStorage {
           eq(schema.contentGenerationJobs.userId, userId),
         ),
       )
+      .limit(1);
+    return row;
+  }
+
+  async getActiveContentJob(userId: string): Promise<ContentGenerationJob | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.contentGenerationJobs)
+      .where(
+        and(
+          eq(schema.contentGenerationJobs.userId, userId),
+          or(
+            eq(schema.contentGenerationJobs.status, "pending"),
+            eq(schema.contentGenerationJobs.status, "running"),
+          ),
+        ),
+      )
+      .orderBy(desc(schema.contentGenerationJobs.createdAt))
+      .limit(1);
+    return row;
+  }
+
+  async getRecentCompletedContentJob(userId: string): Promise<ContentGenerationJob | undefined> {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [row] = await db
+      .select()
+      .from(schema.contentGenerationJobs)
+      .where(
+        and(
+          eq(schema.contentGenerationJobs.userId, userId),
+          eq(schema.contentGenerationJobs.status, "succeeded"),
+          gte(schema.contentGenerationJobs.completedAt, oneDayAgo),
+        ),
+      )
+      .orderBy(desc(schema.contentGenerationJobs.completedAt))
       .limit(1);
     return row;
   }
@@ -1936,5 +2039,63 @@ export class DatabaseStorage implements IStorage {
   async deleteCommunityPost(id: string): Promise<boolean> {
     const result = await db.delete(schema.communityPosts).where(eq(schema.communityPosts.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ── Content Draft methods ──────────────────────────────────────────────────
+
+  async createContentDraft(userId: string, data: Partial<InsertContentDraft>): Promise<ContentDraft> {
+    const result = await db.insert(schema.contentDrafts).values({
+      userId,
+      keywords: data.keywords ?? "",
+      industry: data.industry ?? "",
+      type: data.type ?? "article",
+      brandId: data.brandId ?? null,
+      targetCustomers: data.targetCustomers ?? null,
+      geography: data.geography ?? null,
+      contentStyle: data.contentStyle ?? "b2c",
+      title: data.title ?? null,
+      generatedContent: data.generatedContent ?? null,
+      articleId: data.articleId ?? null,
+      jobId: data.jobId ?? null,
+      humanScore: data.humanScore ?? null,
+      passesAiDetection: data.passesAiDetection ?? null,
+    }).returning();
+    return result[0];
+  }
+
+  async getContentDraftsByUserId(userId: string): Promise<ContentDraft[]> {
+    return db.select().from(schema.contentDrafts)
+      .where(eq(schema.contentDrafts.userId, userId))
+      .orderBy(desc(schema.contentDrafts.updatedAt));
+  }
+
+  async getContentDraftById(id: string, userId: string): Promise<ContentDraft | null> {
+    const result = await db.select().from(schema.contentDrafts)
+      .where(and(eq(schema.contentDrafts.id, id), eq(schema.contentDrafts.userId, userId)));
+    return result[0] ?? null;
+  }
+
+  async getContentDraftByJobId(jobId: string, userId: string): Promise<ContentDraft | null> {
+    const result = await db.select().from(schema.contentDrafts)
+      .where(and(eq(schema.contentDrafts.jobId, jobId), eq(schema.contentDrafts.userId, userId)));
+    return result[0] ?? null;
+  }
+
+  async updateContentDraft(id: string, userId: string, data: Partial<InsertContentDraft>): Promise<ContentDraft | null> {
+    const result = await db.update(schema.contentDrafts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(schema.contentDrafts.id, id), eq(schema.contentDrafts.userId, userId)))
+      .returning();
+    return result[0] ?? null;
+  }
+
+  async deleteContentDraft(id: string, userId: string): Promise<void> {
+    await db.delete(schema.contentDrafts)
+      .where(and(eq(schema.contentDrafts.id, id), eq(schema.contentDrafts.userId, userId)));
+  }
+
+  async deleteContentDraftsByBrandId(brandId: string): Promise<void> {
+    await db.delete(schema.contentDrafts)
+      .where(eq(schema.contentDrafts.brandId, brandId));
   }
 }

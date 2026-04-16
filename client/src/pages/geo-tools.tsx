@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
@@ -44,7 +45,7 @@ const SiLinkedin = Linkedin;
 
 export default function GeoTools() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_geotools_brandId", "");
   const [activeTab, setActiveTab] = useState("listicles");
   const [bofuType, setBofuType] = useState<string>("comparison");
   const [bofuCompetitor, setBofuCompetitor] = useState("");
@@ -58,6 +59,12 @@ export default function GeoTools() {
 
   const brands = brandsData?.data || [];
   const selectedBrand = brands.find(b => b.id === selectedBrandId);
+
+  useEffect(() => {
+    if (brands.length > 0 && (!selectedBrandId || !brands.find(b => b.id === selectedBrandId))) {
+      setSelectedBrandId(brands[0].id);
+    }
+  }, [brands, selectedBrandId]);
 
   // Listicle queries
   const { data: listiclesData, isLoading: listiclesLoading } = useQuery({
