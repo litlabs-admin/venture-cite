@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -636,6 +637,8 @@ export default function AIVisibility() {
   const [selectedEngineId, setSelectedEngineId] = useState<string>(aiEngines[0].id);
   const [completedSteps, setCompletedSteps] = useState<Record<string, string[]>>({});
 
+  const queryClient = useQueryClient();
+
   const { data: brandsResponse, isLoading: brandsLoading } = useQuery<{ success: boolean; data: Brand[] }>({
     queryKey: ["/api/brands"],
   });
@@ -650,30 +653,42 @@ export default function AIVisibility() {
     }
   }, [brands, selectedBrandId]);
 
-  useEffect(() => {
-    localStorage.setItem("venturecite-visibility-visited", "true");
-  }, []);
+  // Server-side per-brand checklist progress.
+  const progressQueryKey = [`/api/visibility-progress/${selectedBrandId}`];
+  const { data: progressResponse } = useQuery<{ success: boolean; data: Record<string, string[]> }>({
+    queryKey: progressQueryKey,
+    enabled: !!selectedBrandId,
+  });
 
   useEffect(() => {
-    const key = `ai-visibility-progress-${selectedBrandId || 'default'}`;
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          setCompletedSteps(parsed);
-        } else {
-          localStorage.removeItem(key);
-          setCompletedSteps({});
-        }
-      } catch {
-        localStorage.removeItem(key);
-        setCompletedSteps({});
-      }
-    } else {
-      setCompletedSteps({});
-    }
-  }, [selectedBrandId]);
+    setCompletedSteps(progressResponse?.data ?? {});
+  }, [progressResponse, selectedBrandId]);
+
+  const toggleStepMutation = useMutation({
+    mutationFn: async ({ engineId, stepId, completed }: { engineId: string; stepId: string; completed: boolean }) => {
+      const method = completed ? "POST" : "DELETE";
+      const response = await apiRequest(method, `/api/visibility-progress/${selectedBrandId}`, { engineId, stepId });
+      return response.json();
+    },
+    onError: (_err, vars) => {
+      // Roll back the optimistic update on failure.
+      setCompletedSteps(prev => {
+        const engineSteps = prev[vars.engineId] || [];
+        const next = vars.completed
+          ? engineSteps.filter(id => id !== vars.stepId)
+          : [...engineSteps, vars.stepId];
+        return { ...prev, [vars.engineId]: next };
+      });
+      toast({
+        title: "Could not save progress",
+        description: "Your change wasn't saved. Please try again.",
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: progressQueryKey });
+    },
+  });
 
   const toggleStep = (engineId: string, stepId: string) => {
     if (!selectedBrandId) {
@@ -684,16 +699,15 @@ export default function AIVisibility() {
       });
       return;
     }
+    const engineSteps = completedSteps[engineId] || [];
+    const isCompleting = !engineSteps.includes(stepId);
+    // Optimistic update — server call follows.
     setCompletedSteps(prev => {
-      const engineSteps = prev[engineId] || [];
-      const newEngineSteps = engineSteps.includes(stepId)
-        ? engineSteps.filter(id => id !== stepId)
-        : [...engineSteps, stepId];
-
-      const newState = { ...prev, [engineId]: newEngineSteps };
-      localStorage.setItem(`ai-visibility-progress-${selectedBrandId}`, JSON.stringify(newState));
-      return newState;
+      const cur = prev[engineId] || [];
+      const next = isCompleting ? [...cur, stepId] : cur.filter(id => id !== stepId);
+      return { ...prev, [engineId]: next };
     });
+    toggleStepMutation.mutate({ engineId, stepId, completed: isCompleting });
   };
 
   const getEngineProgress = (engine: AIEngine) => {

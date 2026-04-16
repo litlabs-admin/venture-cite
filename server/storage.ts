@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Citation, type InsertCitation, type Analytics, type InsertAnalytics, type Article, type InsertArticle, type Distribution, type InsertDistribution, type GeoRanking, type InsertGeoRanking, type BrandPrompt, type InsertBrandPrompt, type ContentGenerationJob, type InsertContentGenerationJob, type Brand, type InsertBrand, type CommerceSession, type InsertCommerceSession, type PurchaseEvent, type InsertPurchaseEvent, type PublicationReference, type InsertPublicationReference, type PublicationMetric, type InsertPublicationMetric, type Competitor, type InsertCompetitor, type CompetitorCitationSnapshot, type InsertCompetitorCitationSnapshot, type BrandVisibilitySnapshot, type InsertBrandVisibilitySnapshot, type Listicle, type InsertListicle, type WikipediaMention, type InsertWikipediaMention, type BofuContent, type InsertBofuContent, type FaqItem, type InsertFaqItem, type BrandMention, type InsertBrandMention, type PromptPortfolio, type InsertPromptPortfolio, type CitationQuality, type InsertCitationQuality, type BrandHallucination, type InsertBrandHallucination, type BrandFactSheet, type InsertBrandFactSheet, type MetricsHistory, type InsertMetricsHistory, type AlertSettings, type InsertAlertSettings, type AlertHistory, type InsertAlertHistory, type AiSource, type InsertAiSource, type AiTrafficSession, type InsertAiTrafficSession, type PromptTestRun, type InsertPromptTestRun, type AgentTask, type InsertAgentTask, type OutreachCampaign, type InsertOutreachCampaign, type PublicationTarget, type InsertPublicationTarget, type OutreachEmail, type InsertOutreachEmail, type AutomationRule, type InsertAutomationRule, type AutomationExecution, type InsertAutomationExecution, type BetaInviteCode, type InsertBetaInviteCode, type KeywordResearch, type InsertKeywordResearch, type CommunityPost, type InsertCommunityPost } from "@shared/schema";
+import { type User, type InsertUser, type Citation, type InsertCitation, type Analytics, type InsertAnalytics, type Article, type InsertArticle, type Distribution, type InsertDistribution, type GeoRanking, type InsertGeoRanking, type BrandPrompt, type InsertBrandPrompt, type VisibilityProgress, type ContentGenerationJob, type InsertContentGenerationJob, type Brand, type InsertBrand, type CommerceSession, type InsertCommerceSession, type PurchaseEvent, type InsertPurchaseEvent, type PublicationReference, type InsertPublicationReference, type PublicationMetric, type InsertPublicationMetric, type Competitor, type InsertCompetitor, type CompetitorCitationSnapshot, type InsertCompetitorCitationSnapshot, type BrandVisibilitySnapshot, type InsertBrandVisibilitySnapshot, type Listicle, type InsertListicle, type WikipediaMention, type InsertWikipediaMention, type BofuContent, type InsertBofuContent, type FaqItem, type InsertFaqItem, type BrandMention, type InsertBrandMention, type PromptPortfolio, type InsertPromptPortfolio, type CitationQuality, type InsertCitationQuality, type BrandHallucination, type InsertBrandHallucination, type BrandFactSheet, type InsertBrandFactSheet, type MetricsHistory, type InsertMetricsHistory, type AlertSettings, type InsertAlertSettings, type AlertHistory, type InsertAlertHistory, type AiSource, type InsertAiSource, type AiTrafficSession, type InsertAiTrafficSession, type PromptTestRun, type InsertPromptTestRun, type AgentTask, type InsertAgentTask, type OutreachCampaign, type InsertOutreachCampaign, type PublicationTarget, type InsertPublicationTarget, type OutreachEmail, type InsertOutreachEmail, type AutomationRule, type InsertAutomationRule, type AutomationExecution, type InsertAutomationExecution, type BetaInviteCode, type InsertBetaInviteCode, type KeywordResearch, type InsertKeywordResearch, type CommunityPost, type InsertCommunityPost } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -24,11 +24,10 @@ export interface IStorage {
   
   // Article methods
   createArticle(article: InsertArticle): Promise<Article>;
-  getArticles(status?: string): Promise<Article[]>;
+  getArticles(): Promise<Article[]>;
   getArticleById(id: string): Promise<Article | undefined>;
   getArticleBySlug(slug: string): Promise<Article | undefined>;
   updateArticle(id: string, article: Partial<InsertArticle>): Promise<Article | undefined>;
-  publishArticle(id: string): Promise<Article | undefined>;
   incrementArticleViews(id: string): Promise<void>;
   incrementArticleCitations(id: string): Promise<void>;
   
@@ -49,7 +48,12 @@ export interface IStorage {
   createBrandPrompt(p: InsertBrandPrompt): Promise<BrandPrompt>;
   getBrandPromptsByBrandId(brandId: string): Promise<BrandPrompt[]>;
   deleteBrandPromptsByBrandId(brandId: string): Promise<void>;
-  getPublishedArticlesByBrandId(brandId: string, limit: number): Promise<Article[]>;
+  getRecentArticlesByBrandId(brandId: string, limit: number): Promise<Article[]>;
+
+  // AI Visibility Checklist progress
+  getVisibilityProgress(brandId: string): Promise<VisibilityProgress[]>;
+  setVisibilityStep(brandId: string, engineId: string, stepId: string): Promise<void>;
+  unsetVisibilityStep(brandId: string, engineId: string, stepId: string): Promise<void>;
 
   // Content generation job queue
   enqueueContentJob(job: InsertContentGenerationJob): Promise<ContentGenerationJob>;

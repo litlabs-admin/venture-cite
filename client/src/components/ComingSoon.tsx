@@ -18,8 +18,8 @@ export default function ComingSoon({ featureName }: ComingSoonProps) {
         </span>
         <h1 className="text-2xl font-bold text-foreground mb-3">{featureName}</h1>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          This feature is part of Phase 2 and is currently in development.
-          Head back to the dashboard to use the Phase 1 features available now.
+          This feature is currently under development and will be available soon.
+          Please return to the dashboard to access the Phase 1 features that are available now.
         </p>
       </div>
     </div>

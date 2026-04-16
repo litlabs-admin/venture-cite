@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
-import { TestModeBadge } from "@/components/TestModeBadge";
 import PageHeader from "@/components/PageHeader";
-import { Loader2, FileText, Eye, Calendar, Tag, Globe, CheckCircle, Share2, TrendingUp, Clock, Pencil, Send, Link2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, FileText, Eye, Calendar, Tag, Share2, Clock, Pencil, Send, Link2 } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 
@@ -167,13 +167,8 @@ function DistributeDialog({ articleId }: { articleId: string }) {
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <DialogTitle>Platform-Optimized Content</DialogTitle>
-              <DialogDescription>AI rewrites your article for each platform — copy and post manually.</DialogDescription>
-            </div>
-            <TestModeBadge />
-          </div>
+          <DialogTitle>Platform-Optimized Content</DialogTitle>
+          <DialogDescription>AI rewrites your article for each platform — copy and post manually.</DialogDescription>
         </DialogHeader>
 
         {/* Tab bar */}
@@ -268,9 +263,69 @@ function DistributeDialog({ articleId }: { articleId: string }) {
   );
 }
 
-export default function Articles() {
+function ViewEditDialog({ article }: { article: any }) {
   const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(article.title || '');
+  const [content, setContent] = useState(article.content || '');
 
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('PUT', `/api/articles/${article.id}`, { title, content });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
+      setEditing(false);
+      toast({ title: "Saved", description: "Article updated." });
+    },
+    onError: () => toast({ title: "Error", description: "Could not save changes.", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(false); setTitle(article.title || ''); setContent(article.content || ''); } }}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" data-testid={`button-view-${article.id}`}>
+          <Eye className="w-4 h-4 mr-2" /> View / Edit
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{editing ? 'Edit Article' : article.title}</DialogTitle>
+          <DialogDescription>{editing ? 'Update your article content.' : 'Review your generated article.'}</DialogDescription>
+        </DialogHeader>
+        {editing ? (
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Title</label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Content</label>
+              <Textarea value={content} onChange={(e) => setContent(e.target.value)} className="min-h-[400px] font-mono text-sm" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => { setEditing(false); setTitle(article.title || ''); setContent(article.content || ''); }}>Cancel</Button>
+              <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <Button size="sm" onClick={() => setEditing(true)}><Pencil className="w-3 h-3 mr-1" /> Edit</Button>
+            </div>
+            <pre className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-md font-sans">{article.content}</pre>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function Articles() {
   const { data: articlesData, isLoading } = useQuery({
     queryKey: ['/api/articles'],
     queryFn: async () => {
@@ -279,34 +334,13 @@ export default function Articles() {
     },
   });
 
-  const publishMutation = useMutation({
-    mutationFn: async (articleId: string) => {
-      const response = await apiRequest('POST', `/api/articles/${articleId}/publish`, {});
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
-      toast({
-        title: "Article Published",
-        description: "Your article is now live and discoverable by AI search engines.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to publish article. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
   const articles = articlesData?.data || [];
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Your Articles"
-        description="Manage and publish your GEO-optimized content"
+        description="Manage your GEO-optimized content"
       />
 
         {isLoading ? (
@@ -335,25 +369,13 @@ export default function Articles() {
             {articles.map((article: any) => (
               <Card key={article.id} data-testid={`card-article-${article.id}`}>
                 <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <CardTitle className="text-xl mb-2" data-testid={`title-${article.id}`}>
-                        {article.title}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {article.excerpt}
-                      </p>
-                    </div>
-                    <Badge 
-                      variant={article.status === 'published' ? 'default' : 'secondary'}
-                      data-testid={`status-${article.id}`}
-                    >
-                      {article.status === 'published' ? (
-                        <><CheckCircle className="w-3 h-3 mr-1" /> Published</>
-                      ) : (
-                        'Draft'
-                      )}
-                    </Badge>
+                  <div className="flex-1">
+                    <CardTitle className="text-xl mb-2" data-testid={`title-${article.id}`}>
+                      {article.title}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {article.excerpt}
+                    </p>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -361,10 +383,7 @@ export default function Articles() {
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       <span data-testid={`date-${article.id}`}>
-                        {article.publishedAt 
-                          ? formatDistanceToNow(new Date(article.publishedAt), { addSuffix: true })
-                          : formatDistanceToNow(new Date(article.createdAt), { addSuffix: true })
-                        }
+                        {formatDistanceToNow(new Date(article.createdAt), { addSuffix: true })}
                       </span>
                     </div>
                     {article.views > 0 && (
@@ -392,43 +411,8 @@ export default function Articles() {
                   )}
 
                   <div className="flex gap-2 flex-wrap">
-                    {article.status === 'draft' ? (
-                      <Button
-                        onClick={() => publishMutation.mutate(article.id)}
-                        disabled={publishMutation.isPending}
-                        size="sm"
-                        data-testid={`button-publish-${article.id}`}
-                      >
-                        {publishMutation.isPending ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Publishing...
-                          </>
-                        ) : (
-                          <>
-                            <Globe className="w-4 h-4 mr-2" />
-                            Publish Article
-                          </>
-                        )}
-                      </Button>
-                    ) : (
-                      <>
-                        {article.canonicalUrl && (
-                          <a 
-                            href={article.canonicalUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            data-testid={`link-view-${article.id}`}
-                          >
-                            <Button variant="outline" size="sm">
-                              <Globe className="w-4 h-4 mr-2" />
-                              View Published
-                            </Button>
-                          </a>
-                        )}
-                        <DistributeDialog articleId={article.id} />
-                      </>
-                    )}
+                    <ViewEditDialog article={article} />
+                    <DistributeDialog articleId={article.id} />
                   </div>
                 </CardContent>
               </Card>

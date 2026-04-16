@@ -1,188 +1,162 @@
 import OpenAI from "openai";
 import { storage } from "./storage";
 import type { GeoRanking, Brand } from "@shared/schema";
-import { pickModel } from "./lib/modelConfig";
 import { attachAiLogger } from "./lib/aiLogger";
-import { attachTestModeFallback } from "./lib/testModeClient";
+import { MODELS, OPENROUTER_BASE_URL } from "./lib/modelConfig";
 
+// ChatGPT citation checks go through the direct OpenAI client.
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   timeout: 45_000,
   maxRetries: 1,
 });
 attachAiLogger(openai);
-attachTestModeFallback(openai);
+
+// Claude / Gemini / Perplexity / DeepSeek all route through OpenRouter so we
+// don't have to maintain four separate provider SDKs. OpenRouter is OpenAI
+// SDK-compatible — same chat.completions.create shape, just a different
+// baseURL and API key.
+const openrouter = process.env.OPENROUTER_API_KEY
+  ? (() => {
+      const client = new OpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: OPENROUTER_BASE_URL,
+        timeout: 45_000,
+        maxRetries: 1,
+      });
+      attachAiLogger(client);
+      return client;
+    })()
+  : null;
 
 export const DEFAULT_CITATION_PLATFORMS = ['ChatGPT', 'Perplexity', 'DeepSeek', 'Claude', 'Gemini'] as const;
 
+const COMPANY_SUFFIX_RE = /\b(inc|inc\.|llc|ltd|ltd\.|co|co\.|corp|corporation|company|gmbh|s\.?a\.?|plc|pty|limited|labs|technologies|technology|software|holdings|group)\b/gi;
+
+// Strip legal suffixes and normalize whitespace/punctuation so "Notion Labs,
+// Inc." also matches responses that just say "Notion".
+function normalizeBrandName(name: string): string {
+  return name
+    .replace(COMPANY_SUFFIX_RE, "")
+    .replace(/[,.]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Build the set of name variants we should search for in a response. Order
+// matters — the longest variant is tried first so the match snippet is as
+// specific as possible.
+export function buildBrandNameVariants(
+  brandName: string,
+  extraVariations: string[] = [],
+): string[] {
+  const raw = [brandName, ...extraVariations].filter((s) => typeof s === "string" && s.trim().length > 0);
+  const set = new Set<string>();
+  for (const r of raw) {
+    const trimmed = r.trim();
+    if (trimmed.length >= 3) set.add(trimmed.toLowerCase());
+    const normalized = normalizeBrandName(trimmed).toLowerCase();
+    if (normalized.length >= 3) set.add(normalized);
+    // Also index each individual word ≥ 4 chars — so "Notion Labs" also
+    // matches a response that only mentions "Notion".
+    for (const word of normalized.split(/\s+/)) {
+      if (word.length >= 4) set.add(word);
+    }
+  }
+  // Sort longest → shortest so the most specific match wins.
+  return Array.from(set).sort((a, b) => b.length - a.length);
+}
+
 // Heuristic brand-mention detector used by every platform's response parser.
+// Pure binary — either the brand name (or one of its variants) appears in the
+// response or it doesn't. No context snippet, no fuzzy keyword matching.
 export function checkForCitation(
   responseText: string,
   brandName: string,
-  keywords: string,
-  articleTitle: string,
-): { isCited: boolean; context: string | null; rank: number | null } {
+  extraVariations: string[] = [],
+): { isCited: boolean; rank: number | null } {
+  if (!brandName) return { isCited: false, rank: null };
+
   const lowerResponse = responseText.toLowerCase();
-  const lowerBrand = brandName.toLowerCase();
-  const lowerTitle = articleTitle.toLowerCase();
+  const variants = buildBrandNameVariants(brandName, extraVariations);
 
-  if (!brandName && !articleTitle) {
-    return { isCited: false, context: null, rank: null };
-  }
-
-  let isCited = false;
-  let context: string | null = null;
-  let rank: number | null = null;
-
-  if (brandName && brandName.length > 2 && lowerResponse.includes(lowerBrand)) {
-    isCited = true;
-    const idx = lowerResponse.indexOf(lowerBrand);
-    const start = Math.max(0, idx - 100);
-    const end = Math.min(responseText.length, idx + brandName.length + 100);
-    context = `Brand mentioned: "...${responseText.substring(start, end)}..."`;
-
-    const beforeMention = lowerResponse.substring(0, idx);
-    const mentionNumber = (beforeMention.match(new RegExp(lowerBrand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length + 1;
-    rank = mentionNumber;
-  }
-
-  if (!isCited && articleTitle && articleTitle.length > 10) {
-    const titleWords = lowerTitle.split(/\s+/).filter((w) => w.length > 4);
-    const matchedWords = titleWords.filter((w) => lowerResponse.includes(w));
-    if (matchedWords.length >= Math.ceil(titleWords.length * 0.6)) {
-      isCited = true;
-      context = `Content topic strongly referenced. Matched keywords: ${matchedWords.join(', ')}`;
-      rank = 3;
+  for (const variant of variants) {
+    // Word-boundary match so "co" doesn't match "companies". Escape regex
+    // specials, then wrap in \b to require token boundaries.
+    const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`\\b${escaped}\\b`, "i");
+    const match = re.exec(responseText);
+    if (match && match.index !== undefined) {
+      const beforeMention = lowerResponse.substring(0, match.index);
+      const rank = (beforeMention.match(new RegExp(`\\b${escaped}\\b`, "gi")) || []).length + 1;
+      return { isCited: true, rank };
     }
   }
 
-  if (!isCited && keywords) {
-    const keywordList = keywords.split(',').map((k) => k.trim().toLowerCase()).filter((k) => k.length > 3);
-    const matchedKeywords = keywordList.filter((k) => lowerResponse.includes(k));
-    if (matchedKeywords.length >= Math.ceil(keywordList.length * 0.5) && matchedKeywords.length >= 2) {
-      context = `Related keywords found: ${matchedKeywords.join(', ')} (indirect reference)`;
-    }
-  }
-
-  return { isCited, context, rank };
+  return { isCited: false, rank: null };
 }
 
-// Per-platform query. Real APIs used where keys are configured, otherwise a
-// simulated fallback that makes the limitation visible in the citationContext.
+// Maps each non-ChatGPT citation platform to its OpenRouter model slug.
+const OPENROUTER_MODEL_BY_PLATFORM: Record<string, string> = {
+  Claude: MODELS.citationClaude,
+  Gemini: MODELS.citationGemini,
+  Perplexity: MODELS.citationPerplexity,
+  DeepSeek: MODELS.citationDeepSeek,
+};
+
+// Per-platform query. ChatGPT hits OpenAI directly; the other four go through
+// OpenRouter. No simulation fallbacks — if OPENROUTER_API_KEY is missing the
+// caller gets a clear context string so the UI can surface it.
 export async function runPlatformCitationCheck(
   platform: string,
   prompt: string,
-  brand: Brand | null,
+  _brand: Brand | null,
   brandName: string,
-  articleKeywords: string,
-  articleTitle: string,
-): Promise<{ isCited: boolean; citationContext: string | null; rank: number | null }> {
-  const systemChatgpt = "You are a helpful assistant. Answer the question thoroughly, citing specific sources, brands, companies, or products when relevant.";
-  const toResult = (r: { isCited: boolean; context: string | null; rank: number | null }) =>
-    ({ isCited: r.isCited, citationContext: r.context, rank: r.rank });
+  brandNameVariations: string[] = [],
+): Promise<{ isCited: boolean; rank: number | null; responseText: string; error?: string }> {
+  const systemMsg = "You are a helpful assistant. Answer the question thoroughly, citing specific sources, brands, companies, or products when relevant.";
 
   if (platform === 'ChatGPT' || platform === 'GPT-4') {
     const chatResponse = await openai.chat.completions.create({
-      model: pickModel("gpt-4o-mini"),
+      model: MODELS.citationChatGPT,
       messages: [
-        { role: "system", content: systemChatgpt },
+        { role: "system", content: systemMsg },
         { role: "user", content: prompt },
       ],
       max_tokens: 1500,
       temperature: 0.7,
     });
     const responseText = chatResponse.choices[0].message.content || '';
-    return toResult(checkForCitation(responseText, brandName, articleKeywords, articleTitle));
+    const r = checkForCitation(responseText, brandName, brandNameVariations);
+    return { isCited: r.isCited, rank: r.rank, responseText };
   }
 
-  if (platform === 'Perplexity') {
-    if (!process.env.PERPLEXITY_API_KEY) {
-      return { isCited: false, citationContext: "Perplexity not configured (missing PERPLEXITY_API_KEY)", rank: null };
-    }
-    const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-sonar-small-128k-online',
-        messages: [
-          { role: "system", content: "Be thorough and cite specific sources, brands, and companies when relevant." },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 1500,
-        temperature: 0.2,
-      }),
-    });
-    if (!perplexityResponse.ok) {
-      const errText = await perplexityResponse.text().catch(() => "");
-      throw new Error(`Perplexity API ${perplexityResponse.status}: ${errText.slice(0, 200)}`);
-    }
-    const perplexityData = (await perplexityResponse.json()) as any;
-    const responseText = perplexityData.choices?.[0]?.message?.content || '';
-    const citations: string[] = Array.isArray(perplexityData.citations) ? perplexityData.citations : [];
-    const citationCheck = checkForCitation(responseText, brandName, articleKeywords, articleTitle);
+  const openrouterModel = OPENROUTER_MODEL_BY_PLATFORM[platform];
+  if (!openrouterModel) {
+    return { isCited: false, rank: null, responseText: '', error: `Unknown citation platform: ${platform}` };
+  }
 
-    const brandUrl = brand?.website?.replace(/https?:\/\//, '').replace(/\/$/, '') || '';
-    const urlCited = brandUrl && citations.some((c) => typeof c === 'string' && c.includes(brandUrl));
-    const citationContext = citationCheck.context || (urlCited
-      ? `Brand URL found in Perplexity citations: ${citations.filter((c) => typeof c === 'string' && c.includes(brandUrl)).join(', ')}`
-      : null);
+  if (!openrouter) {
     return {
-      isCited: citationCheck.isCited || Boolean(urlCited),
-      citationContext,
-      rank: citationCheck.rank,
+      isCited: false,
+      rank: null,
+      responseText: '',
+      error: `${platform} check skipped — OPENROUTER_API_KEY is not configured.`,
     };
   }
 
-  if (platform === 'DeepSeek') {
-    if (!process.env.DEEPSEEK_API_KEY) {
-      return { isCited: false, citationContext: "DeepSeek not configured (missing DEEPSEEK_API_KEY)", rank: null };
-    }
-    const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [
-          { role: "system", content: systemChatgpt },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 1500,
-        temperature: 0.7,
-      }),
-    });
-    if (!deepseekResponse.ok) {
-      const errText = await deepseekResponse.text().catch(() => "");
-      throw new Error(`DeepSeek API ${deepseekResponse.status}: ${errText.slice(0, 200)}`);
-    }
-    const deepseekData = (await deepseekResponse.json()) as any;
-    const responseText = deepseekData.choices?.[0]?.message?.content || '';
-    return toResult(checkForCitation(responseText, brandName, articleKeywords, articleTitle));
-  }
-
-  // Simulated fallback for platforms without real API integration (Claude,
-  // Gemini, Grok, etc.). citationContext is tagged so the UI can label it.
-  const chatResponse = await openai.chat.completions.create({
-    model: pickModel("gpt-4o-mini"),
+  const chatResponse = await openrouter.chat.completions.create({
+    model: openrouterModel,
     messages: [
-      { role: "system", content: `You are ${platform}, a helpful AI assistant. Answer the question thoroughly, citing specific sources, brands, companies, or products when relevant.` },
+      { role: "system", content: `You are ${platform}, a helpful AI assistant. ${systemMsg}` },
       { role: "user", content: prompt },
     ],
     max_tokens: 1500,
     temperature: 0.7,
   });
-  const responseText = chatResponse.choices[0].message.content || '';
-  const base = checkForCitation(responseText, brandName, articleKeywords, articleTitle);
-  return {
-    isCited: base.isCited,
-    citationContext: base.context ? `[simulated via OpenAI] ${base.context}` : `[simulated via OpenAI — no ${platform} API configured]`,
-    rank: base.rank,
-  };
+  const responseText = chatResponse.choices[0]?.message?.content || '';
+  const r = checkForCitation(responseText, brandName, brandNameVariations);
+  return { isCited: r.isCited, rank: r.rank, responseText };
 }
 
 // Runs every stored prompt for a brand across each platform and persists a
@@ -195,6 +169,14 @@ export async function runBrandPrompts(
   const brand = await storage.getBrandById(brandId);
   if (!brand) throw new Error("Brand not found");
   const brandName = brand.companyName || brand.name || '';
+  // Pass every name we know about — short name, company name, and any
+  // stored variations — into the detector so "Notion Labs, Inc." also
+  // matches a response that just says "Notion".
+  const brandNameVariations = [
+    brand.name || '',
+    brand.companyName || '',
+    ...(Array.isArray(brand.nameVariations) ? brand.nameVariations : []),
+  ].filter((s) => typeof s === 'string' && s.trim().length > 0);
   const prompts = await storage.getBrandPromptsByBrandId(brandId);
   if (prompts.length === 0) return { totalChecks: 0, totalCited: 0, rankings: [] };
 
@@ -202,19 +184,51 @@ export async function runBrandPrompts(
   const rankings: GeoRanking[] = [];
   let totalCited = 0;
 
-  for (const bp of prompts) {
+  // Flatten all (prompt × platform) pairs into one queue and run them with a
+  // fixed concurrency ceiling. As soon as one task finishes (AI call + DB
+  // insert) the next one starts — no per-prompt batching, no waiting for the
+  // slowest sibling. Concurrency = 5 keeps the burst size predictable and
+  // well under every platform's rate limit.
+  const CONCURRENCY = 5;
+
+  type Task = { bp: typeof prompts[number]; promptIdx: number; platform: string };
+  const queue: Task[] = [];
+  prompts.forEach((bp, i) => {
     for (const platform of cappedPlatforms) {
-      let isCited = false;
-      let citationContext: string | null = null;
-      let rank: number | null = null;
-      try {
-        const result = await runPlatformCitationCheck(platform, bp.prompt, brand, brandName, '', '');
-        isCited = result.isCited;
-        citationContext = result.citationContext;
-        rank = result.rank;
-      } catch (apiError) {
-        citationContext = `Check failed: ${apiError instanceof Error ? apiError.message : 'API error'}`;
+      queue.push({ bp, promptIdx: i + 1, platform });
+    }
+  });
+
+  console.log(`[citationChecker] starting ${prompts.length} prompts × ${cappedPlatforms.length} platforms = ${queue.length} checks (concurrency=${CONCURRENCY})`);
+
+  let cursor = 0;
+  const runOne = async (task: Task): Promise<void> => {
+    const { bp, promptIdx, platform } = task;
+    let isCited = false;
+    let citationContext: string | null = null;
+    let rank: number | null = null;
+    const started = Date.now();
+    try {
+      const result = await runPlatformCitationCheck(platform, bp.prompt, brand, brandName, brandNameVariations);
+      isCited = result.isCited;
+      rank = result.rank;
+      if (result.error) {
+        citationContext = result.error;
+      } else {
+        // Persist the full AI response so the UI can render it as markdown.
+        // Status line + `||| RAW_RESPONSE |||` delimiter so the API can split
+        // the two back out on the way to the client.
+        const statusLine = isCited ? "Cited" : "Not cited";
+        citationContext = `${statusLine}\n\n||| RAW_RESPONSE |||\n${result.responseText}`;
       }
+      console.log(`[citationChecker] prompt ${promptIdx} ${platform} ok in ${Date.now() - started}ms — cited=${isCited}`);
+    } catch (apiError) {
+      const msg = apiError instanceof Error ? apiError.message : 'API error';
+      citationContext = `Check failed: ${msg}`;
+      console.error(`[citationChecker] prompt ${promptIdx} ${platform} FAILED in ${Date.now() - started}ms —`, msg);
+    }
+
+    try {
       const row = await storage.createGeoRanking({
         articleId: null,
         brandPromptId: bp.id,
@@ -227,7 +241,23 @@ export async function runBrandPrompts(
       } as any);
       rankings.push(row);
       if (isCited) totalCited += 1;
+      console.log(`[citationChecker] prompt ${promptIdx} ${platform} saved at ${Date.now() - started}ms`);
+    } catch (dbErr) {
+      console.error(`[citationChecker] prompt ${promptIdx} ${platform} DB insert failed —`, dbErr instanceof Error ? dbErr.message : dbErr);
     }
-  }
+  };
+
+  const worker = async (): Promise<void> => {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= queue.length) return;
+      await runOne(queue[idx]);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()),
+  );
+
   return { totalChecks: rankings.length, totalCited, rankings };
 }

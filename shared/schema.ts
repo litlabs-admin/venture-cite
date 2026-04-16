@@ -124,20 +124,16 @@ export const articles = pgTable(
     keywords: text("keywords").array(),
     industry: text("industry"),
     contentType: text("content_type"),
-    status: text("status").notNull().default("draft"),
-    canonicalUrl: text("canonical_url"),
     featuredImage: text("featured_image"),
     author: text("author").default("GEO Platform"),
     viewCount: integer("view_count").default(0).notNull(),
     citationCount: integer("citation_count").default(0).notNull(),
-    publishedAt: timestamp("published_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     seoData: jsonb("seo_data"),
   },
   (table) => [
     index("articles_brand_id_idx").on(table.brandId),
-    index("articles_status_idx").on(table.status),
     uniqueIndex("articles_brand_slug_idx").on(table.brandId, table.slug),
   ],
 );
@@ -233,6 +229,27 @@ export const brandPrompts = pgTable(
 export const insertBrandPromptSchema = createInsertSchema(brandPrompts).omit({ id: true, createdAt: true });
 export type BrandPrompt = typeof brandPrompts.$inferSelect;
 export type InsertBrandPrompt = z.infer<typeof insertBrandPromptSchema>;
+
+// Per-brand AI Visibility Checklist progress. One row per completed step so
+// toggling is a simple insert/delete instead of a JSON read-modify-write.
+export const visibilityProgress = pgTable(
+  "visibility_progress",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    engineId: text("engine_id").notNull(),
+    stepId: text("step_id").notNull(),
+    completedAt: timestamp("completed_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("visibility_progress_brand_id_idx").on(table.brandId),
+    uniqueIndex("visibility_progress_brand_engine_step_idx").on(table.brandId, table.engineId, table.stepId),
+  ],
+);
+
+export const insertVisibilityProgressSchema = createInsertSchema(visibilityProgress).omit({ id: true, completedAt: true });
+export type VisibilityProgress = typeof visibilityProgress.$inferSelect;
+export type InsertVisibilityProgress = z.infer<typeof insertVisibilityProgressSchema>;
 
 export const geoRankings = pgTable(
   "geo_rankings",

@@ -3,7 +3,6 @@ import { useState } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
-import { TestModeBadge } from "@/components/TestModeBadge";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
 import { Input } from "@/components/ui/input";
@@ -250,14 +249,11 @@ export default function Brands() {
               <Sparkles className="w-6 h-6 text-foreground" />
             </div>
             <div className="flex-1 space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold mb-1" data-testid="text-add-brand-heading">Add Your Brand</h2>
-                  <p className="text-muted-foreground">
-                    Just enter your website and our AI will analyze it to create your brand profile automatically. It takes about 5 seconds.
-                  </p>
-                </div>
-                <TestModeBadge />
+              <div>
+                <h2 className="text-xl font-semibold mb-1" data-testid="text-add-brand-heading">Add Your Brand</h2>
+                <p className="text-muted-foreground">
+                  Just enter your website and our AI will analyze it to create your brand profile automatically. It takes about 5 seconds.
+                </p>
               </div>
               <div className="flex gap-3 max-w-xl">
                 <Input

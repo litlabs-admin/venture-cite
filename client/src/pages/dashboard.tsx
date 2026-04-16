@@ -341,15 +341,10 @@ export default function Dashboard() {
                   <span className="text-lg font-semibold">+{metrics?.data?.content?.articlesThisMonth || 0}</span>
                 </div>
                 <div className="pt-2 border-t">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-muted-foreground">Published vs Draft</span>
-                    <span>{metrics?.data?.content?.publishedArticles || 0} / {metrics?.data?.content?.draftArticles || 0}</span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Articles</span>
+                    <span>{metrics?.data?.content?.totalArticles || 0}</span>
                   </div>
-                  <Progress 
-                    value={metrics?.data?.content?.totalArticles ? 
-                      (metrics?.data?.content?.publishedArticles / metrics?.data?.content?.totalArticles) * 100 : 0} 
-                    className="h-2"
-                  />
                 </div>
               </div>
             </CardContent>

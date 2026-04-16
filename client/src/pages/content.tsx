@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,88 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
-import { TestModeBadge } from "@/components/TestModeBadge";
 import PageHeader from "@/components/PageHeader";
-import { Loader2, FileText, HelpCircle, Lightbulb, Target, BookOpen, Star, Search, Plus, TrendingUp, Clock, Save, Check, Shield, RefreshCw, CheckCircle, AlertCircle, FolderOpen, X, Copy } from "lucide-react";
+import { Loader2, FileText, HelpCircle, Lightbulb, Target, BookOpen, Star, Search, Plus, TrendingUp, Clock, Save, Check, Shield, RefreshCw, CheckCircle, AlertCircle, Copy, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Link, useSearch } from "wouter";
 import { Progress } from "@/components/ui/progress";
-import { nanoid } from "nanoid";
-
-interface ContentDraft {
-  id: string;
-  keywords: string;
-  industry: string;
-  type: string;
-  brandId: string;
-  generatedContent: string;
-  targetCustomers: string;
-  geography: string;
-  contentStyle: string;
-  humanScore: number | null;
-  passesAiDetection: boolean | null;
-  aiIssues: string[];
-  aiStrengths: string[];
-  aiRecommendation: string;
-  aiVocabularyFound: string[];
-  savedArticleId: string | null;
-  showTargetingOptions: boolean;
-  updatedAt: number;
-  label: string;
-}
-
-const DRAFTS_KEY = "venturecite_content_drafts";
-const ACTIVE_DRAFT_KEY = "venturecite_active_draft";
-
-function loadDrafts(): ContentDraft[] {
-  try {
-    const raw = localStorage.getItem(DRAFTS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function saveDrafts(drafts: ContentDraft[]) {
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
-}
-
-function getActiveDraftId(): string | null {
-  return localStorage.getItem(ACTIVE_DRAFT_KEY);
-}
-
-function setActiveDraftId(id: string) {
-  localStorage.setItem(ACTIVE_DRAFT_KEY, id);
-}
-
-function createEmptyDraft(): ContentDraft {
-  return {
-    id: nanoid(8),
-    keywords: "",
-    industry: "",
-    type: "article",
-    brandId: "none",
-    generatedContent: "",
-    targetCustomers: "",
-    geography: "",
-    contentStyle: "b2c",
-    humanScore: null,
-    passesAiDetection: null,
-    aiIssues: [],
-    aiStrengths: [],
-    aiRecommendation: "",
-    aiVocabularyFound: [],
-    savedArticleId: null,
-    showTargetingOptions: false,
-    updatedAt: Date.now(),
-    label: "",
-  };
-}
-
-function getDraftLabel(d: ContentDraft): string {
-  if (d.label) return d.label;
-  if (d.keywords) return d.keywords.slice(0, 40) + (d.keywords.length > 40 ? "..." : "");
-  return "Untitled Draft";
-}
 
 const industries = [
   { value: "Technology", group: "Technology & Digital" },
@@ -177,249 +101,43 @@ const getIndustryTemplate = (industry: string, type: string) => {
   };
 };
 
-function computeInitialState(urlParams: URLSearchParams): { drafts: ContentDraft[]; activeId: string } {
-  const existing = loadDrafts();
-  const hasUrlParams = urlParams.get("keyword") || urlParams.get("industry");
-
-  if (hasUrlParams) {
-    const newDraft = createEmptyDraft();
-    newDraft.keywords = urlParams.get("keyword") || "";
-    newDraft.industry = urlParams.get("industry") || "";
-    newDraft.type = urlParams.get("type") || "article";
-    newDraft.brandId = urlParams.get("brandId") || "none";
-    const merged = [...existing, newDraft];
-    saveDrafts(merged);
-    setActiveDraftId(newDraft.id);
-    return { drafts: merged, activeId: newDraft.id };
-  }
-
-  if (existing.length > 0) {
-    const savedActiveId = getActiveDraftId();
-    const found = savedActiveId ? existing.find(d => d.id === savedActiveId) : null;
-    const activeId = found ? found.id : existing[0].id;
-    setActiveDraftId(activeId);
-    return { drafts: existing, activeId };
-  }
-
-  const first = createEmptyDraft();
-  saveDrafts([first]);
-  setActiveDraftId(first.id);
-  return { drafts: [first], activeId: first.id };
-}
-
 export default function Content() {
   const searchString = useSearch();
-  const urlParams = new URLSearchParams(searchString);
   const { toast } = useToast();
 
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const [initialState] = useState(() => computeInitialState(urlParams));
-  const [drafts, setDrafts] = useState<ContentDraft[]>(initialState.drafts);
-  const [activeDraftIdState, setActiveDraftIdLocal] = useState<string>(initialState.activeId);
-  const activeDraftIdRef = useRef<string>(initialState.activeId);
-  const draftsRef = useRef<ContentDraft[]>(initialState.drafts);
-  useEffect(() => { draftsRef.current = drafts; }, [drafts]);
-  const [showDraftsPanel, setShowDraftsPanel] = useState(false);
-
-  const activeDraft = drafts.find(d => d.id === activeDraftIdState) || drafts[0] || createEmptyDraft();
-
-  const [keywords, setKeywords] = useState(activeDraft.keywords);
-  const [industry, setIndustry] = useState(activeDraft.industry);
-  const [type, setType] = useState(activeDraft.type);
-  const [brandId, setBrandId] = useState(activeDraft.brandId);
+  // Start clean every time. If the user arrives via the Keyword Research
+  // "Generate Content" link, we seed the fields from URL params once.
+  const initialParams = new URLSearchParams(searchString);
+  const [keywords, setKeywords] = useState(initialParams.get("keyword") || "");
+  const [industry, setIndustry] = useState(initialParams.get("industry") || "");
+  const [type, setType] = useState(initialParams.get("type") || "article");
+  const [brandId, setBrandId] = useState(initialParams.get("brandId") || "none");
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
-  const [generatedContent, setGeneratedContent] = useState(activeDraft.generatedContent);
+  const [generatedContent, setGeneratedContent] = useState("");
   const [keywordSuggestions, setKeywordSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [popularTopics, setPopularTopics] = useState<any[]>([]);
   const [topicsLoading, setTopicsLoading] = useState(false);
-  const [savedArticleId, setSavedArticleId] = useState<string | null>(activeDraft.savedArticleId);
+  const [savedArticleId, setSavedArticleId] = useState<string | null>(null);
   // Background job id — set when we enqueue a generation. The effect below
   // polls /api/content-jobs/:jobId until the job completes, so generation
   // survives page navigation / logout / refresh.
   const [currentJobId, setCurrentJobId] = useState<string | null>(() => {
     return localStorage.getItem("venturecite-current-job-id");
   });
-  const [humanScore, setHumanScore] = useState<number | null>(activeDraft.humanScore);
+  const [humanScore, setHumanScore] = useState<number | null>(null);
   const [scoreBeforeImprove, setScoreBeforeImprove] = useState<number | null>(null);
-  const [passesAiDetection, setPassesAiDetection] = useState<boolean | null>(activeDraft.passesAiDetection);
+  const [passesAiDetection, setPassesAiDetection] = useState<boolean | null>(null);
   const [isRewriting, setIsRewriting] = useState(false);
-  const [aiIssues, setAiIssues] = useState<string[]>(activeDraft.aiIssues);
-  const [aiStrengths, setAiStrengths] = useState<string[]>(activeDraft.aiStrengths);
-  const [aiRecommendation, setAiRecommendation] = useState<string>(activeDraft.aiRecommendation || "");
-  const [aiVocabularyFound, setAiVocabularyFound] = useState<string[]>(activeDraft.aiVocabularyFound || []);
-  const [targetCustomers, setTargetCustomers] = useState(activeDraft.targetCustomers);
-  const [geography, setGeography] = useState(activeDraft.geography);
-  const [contentStyle, setContentStyle] = useState(activeDraft.contentStyle);
-  const [showTargetingOptions, setShowTargetingOptions] = useState(activeDraft.showTargetingOptions);
-
-  const currentFieldsRef = useRef({
-    keywords, industry, type, brandId, generatedContent,
-    targetCustomers, geography, contentStyle, humanScore,
-    passesAiDetection, aiIssues, aiStrengths, aiRecommendation, aiVocabularyFound, savedArticleId, showTargetingOptions
-  });
-  useEffect(() => {
-    currentFieldsRef.current = {
-      keywords, industry, type, brandId, generatedContent,
-      targetCustomers, geography, contentStyle, humanScore,
-      passesAiDetection, aiIssues, aiStrengths, aiRecommendation, aiVocabularyFound, savedArticleId, showTargetingOptions
-    };
-  });
-
-  const persistDraftById = useCallback((draftId: string) => {
-    const f = currentFieldsRef.current;
-    setDrafts(prev => {
-      const updated: ContentDraft = {
-        id: draftId,
-        keywords: f.keywords,
-        industry: f.industry,
-        type: f.type,
-        brandId: f.brandId,
-        generatedContent: f.generatedContent,
-        targetCustomers: f.targetCustomers,
-        geography: f.geography,
-        contentStyle: f.contentStyle,
-        humanScore: f.humanScore,
-        passesAiDetection: f.passesAiDetection,
-        aiIssues: f.aiIssues,
-        aiStrengths: f.aiStrengths,
-        aiRecommendation: f.aiRecommendation,
-        aiVocabularyFound: f.aiVocabularyFound,
-        savedArticleId: f.savedArticleId,
-        showTargetingOptions: f.showTargetingOptions,
-        updatedAt: Date.now(),
-        label: prev.find(d => d.id === draftId)?.label || "",
-      };
-      const exists = prev.some(d => d.id === draftId);
-      const next = exists
-        ? prev.map(d => d.id === draftId ? updated : d)
-        : [...prev, updated];
-      saveDrafts(next);
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(() => {
-      const f = currentFieldsRef.current;
-      if (f.keywords || f.industry || f.generatedContent || f.targetCustomers || f.geography) {
-        persistDraftById(activeDraftIdRef.current);
-      }
-    }, 800);
-    return () => {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
-  }, [keywords, industry, type, brandId, generatedContent, targetCustomers, geography, contentStyle, humanScore, passesAiDetection, aiRecommendation, aiVocabularyFound, savedArticleId, showTargetingOptions, persistDraftById]);
-
-  const loadDraftFields = (target: ContentDraft) => {
-    setKeywords(target.keywords);
-    setIndustry(target.industry);
-    setType(target.type);
-    setBrandId(target.brandId);
-    setGeneratedContent(target.generatedContent);
-    setTargetCustomers(target.targetCustomers);
-    setGeography(target.geography);
-    setContentStyle(target.contentStyle);
-    setHumanScore(target.humanScore);
-    setPassesAiDetection(target.passesAiDetection);
-    setAiIssues(target.aiIssues || []);
-    setAiStrengths(target.aiStrengths || []);
-    setAiRecommendation(target.aiRecommendation || "");
-    setAiVocabularyFound(target.aiVocabularyFound || []);
-    setSavedArticleId(target.savedArticleId);
-    setShowTargetingOptions(target.showTargetingOptions);
-  };
-
-  const setActiveId = (id: string) => {
-    activeDraftIdRef.current = id;
-    setActiveDraftIdLocal(id);
-    setActiveDraftId(id);
-  };
-
-  const switchToDraft = useCallback((draftId: string) => {
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    persistDraftById(activeDraftIdRef.current);
-
-    const target = draftsRef.current.find(d => d.id === draftId);
-    if (target) {
-      setActiveId(draftId);
-      loadDraftFields(target);
-    }
-    setShowDraftsPanel(false);
-  }, [persistDraftById]);
-
-  const createNewDraft = useCallback(() => {
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    persistDraftById(activeDraftIdRef.current);
-
-    const newDraft = createEmptyDraft();
-    setDrafts(prev => {
-      const next = [...prev, newDraft];
-      saveDrafts(next);
-      return next;
-    });
-
-    setActiveId(newDraft.id);
-    loadDraftFields(newDraft);
-    setShowDraftsPanel(false);
-    toast({ title: "New Draft Created", description: "You can now work on a new article in parallel." });
-  }, [persistDraftById, toast]);
-
-  const deleteDraft = useCallback((draftId: string) => {
-    setDrafts(prev => {
-      if (prev.length <= 1) {
-        toast({ title: "Cannot Delete", description: "You need at least one draft.", variant: "destructive" });
-        return prev;
-      }
-      const next = prev.filter(d => d.id !== draftId);
-      saveDrafts(next);
-
-      if (draftId === activeDraftIdRef.current && next.length > 0) {
-        const fallback = next[0];
-        setActiveId(fallback.id);
-        loadDraftFields(fallback);
-      }
-      toast({ title: "Draft Deleted" });
-      return next;
-    });
-  }, [toast]);
-
-  const sortedDrafts = [...drafts].sort((a, b) => b.updatedAt - a.updatedAt);
-
-  const hasProcessedInitialUrl = useRef(false);
-  useEffect(() => {
-    if (!hasProcessedInitialUrl.current) {
-      hasProcessedInitialUrl.current = true;
-      return;
-    }
-    const keyword = urlParams.get("keyword");
-    const industryParam = urlParams.get("industry");
-    if (keyword || industryParam) {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-      persistDraftById(activeDraftIdRef.current);
-
-      const newDraft = createEmptyDraft();
-      newDraft.keywords = keyword || "";
-      newDraft.industry = industryParam || "";
-      newDraft.type = urlParams.get("type") || "article";
-      newDraft.brandId = urlParams.get("brandId") || "none";
-
-      setDrafts(prev => {
-        const next = [...prev, newDraft];
-        saveDrafts(next);
-        return next;
-      });
-      setActiveId(newDraft.id);
-      loadDraftFields(newDraft);
-      toast({
-        title: "Keyword loaded from research",
-        description: `Ready to generate content for: "${keyword}"`
-      });
-    }
-  }, [searchString]);
+  const [aiIssues, setAiIssues] = useState<string[]>([]);
+  const [aiStrengths, setAiStrengths] = useState<string[]>([]);
+  const [aiRecommendation, setAiRecommendation] = useState<string>("");
+  const [aiVocabularyFound, setAiVocabularyFound] = useState<string[]>([]);
+  const [targetCustomers, setTargetCustomers] = useState("");
+  const [geography, setGeography] = useState("");
+  const [contentStyle, setContentStyle] = useState("b2c");
+  const [showTargetingOptions, setShowTargetingOptions] = useState(false);
 
   // Fetch brands for selector
   const { data: brandsData } = useQuery<{ success: boolean; data: any[] }>({
@@ -519,7 +237,7 @@ export default function Content() {
           queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
           toast({
             title: "Article generated",
-            description: "Saved as a draft. Check the Articles page anytime.",
+            description: "Saved to your Articles page.",
           });
         } else if (job.status === "failed") {
           setCurrentJobId(null);
@@ -589,11 +307,11 @@ export default function Content() {
             : `Score: ${newScore}% after ${data.attempts} passes.`;
         }
 
-        // Improved version saved as a new draft — refresh the Articles list
+        // Improved version saved as a new article — refresh the Articles list
         // and let the user know they can compare both versions there.
         if (data.improvedArticleId) {
           queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
-          description += " Improved version saved as a new draft on the Articles page.";
+          description += " Improved version saved to your Articles page.";
         }
 
         toast({ title: "Content Improved", description });
@@ -693,7 +411,7 @@ export default function Content() {
         queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
         toast({
           title: "Article Saved",
-          description: "Your article has been saved successfully. You can publish it later.",
+          description: "Your article has been saved to your Articles list.",
         });
       }
     },
@@ -716,23 +434,22 @@ export default function Content() {
     setTopicsLoading(popularTopicsQuery.isLoading);
   }, [popularTopicsQuery.data, popularTopicsQuery.isLoading]);
 
-  // Debounced keyword suggestions
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (keywords.trim().length >= 2 && industry) {
-        setSuggestionsLoading(true);
-        keywordSuggestionsMutation.mutate({
-          input: keywords.trim(),
-          industry
-        });
-      } else {
-        setShowSuggestions(false);
-        setKeywordSuggestions([]);
-      }
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timer);
-  }, [keywords, industry]);
+  // Manual keyword suggestions — user clicks the "Suggest" button.
+  const handleGetSuggestions = () => {
+    if (!industry) {
+      toast({
+        title: "Select an industry first",
+        description: "Pick an industry so suggestions are relevant to your field.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSuggestionsLoading(true);
+    keywordSuggestionsMutation.mutate({
+      input: keywords.trim(),
+      industry,
+    });
+  };
 
   const updateSelectedTemplate = () => {
     if (industry && type) {
@@ -797,7 +514,6 @@ export default function Content() {
       excerpt,
       metaDescription: excerpt.slice(0, 160),
       keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
-      status: 'draft',
       industry,
       contentType: type,
       brandId: brandId && brandId !== "none" ? brandId : undefined,
@@ -817,96 +533,8 @@ export default function Content() {
         <PageHeader
           title="AI Content Generation"
           description="Generate SEO-optimized content for AI search engines"
-          actions={
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDraftsPanel(!showDraftsPanel)}
-                className="gap-2"
-                data-testid="button-toggle-drafts"
-              >
-                <FolderOpen className="w-4 h-4" />
-                Drafts
-                {drafts.length > 1 && (
-                  <Badge variant="secondary" className="ml-1 text-xs" data-testid="badge-draft-count">{drafts.length}</Badge>
-                )}
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={createNewDraft}
-                className="gap-2"
-                data-testid="button-new-draft"
-              >
-                <Plus className="w-4 h-4" />
-                New Draft
-              </Button>
-            </>
-          }
         />
 
-          {showDraftsPanel && (
-            <Card className="mt-4 border-primary/20" data-testid="panel-drafts">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4" />
-                    Your Drafts ({drafts.length})
-                  </span>
-                  <span className="text-xs text-muted-foreground font-normal">Auto-saved as you type</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {sortedDrafts.map((draft) => (
-                    <div
-                      key={draft.id}
-                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                        draft.id === activeDraftIdState
-                          ? "bg-primary/5 border-primary/30"
-                          : "hover:bg-muted/50"
-                      }`}
-                      onClick={() => draft.id !== activeDraftIdState && switchToDraft(draft.id)}
-                      data-testid={`draft-item-${draft.id}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate">{getDraftLabel(draft)}</span>
-                          {draft.id === activeDraftIdState && <Badge className="text-xs">Active</Badge>}
-                          {draft.generatedContent && (
-                            <Badge variant="outline" className="text-xs text-foreground border-border">Generated</Badge>
-                          )}
-                          {draft.savedArticleId && (
-                            <Badge variant="outline" className="text-xs text-muted-foreground border-border">Saved</Badge>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
-                          {draft.industry && <span>{draft.industry}</span>}
-                          {draft.industry && draft.type && <span>·</span>}
-                          {draft.type && <span className="capitalize">{draft.type}</span>}
-                          <span>·</span>
-                          <span>{new Date(draft.updatedAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                      {draft.id !== activeDraftIdState && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
-                          onClick={(e) => { e.stopPropagation(); deleteDraft(draft.id); }}
-                          data-testid={`button-delete-draft-${draft.id}`}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
           {/* Beginner Tips */}
           <div className="mt-4 p-4 bg-muted border border-border rounded-lg">
             <div className="flex items-start gap-3">
@@ -1025,14 +653,29 @@ export default function Content() {
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <Input
-                  id="keywords"
-                  placeholder={industry ? "Enter keywords (e.g., artificial intelligence, machine learning)" : "Select an industry first"}
-                  value={keywords}
-                  onChange={(e) => setKeywords(e.target.value)}
-                  disabled={!industry}
-                  data-testid="input-keywords"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="keywords"
+                    placeholder={industry ? "Enter keywords (e.g., artificial intelligence, machine learning)" : "Select an industry first"}
+                    value={keywords}
+                    onChange={(e) => setKeywords(e.target.value)}
+                    disabled={!industry}
+                    data-testid="input-keywords"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleGetSuggestions}
+                    disabled={!industry || suggestionsLoading}
+                    data-testid="button-suggest-keywords"
+                  >
+                    {suggestionsLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <><Sparkles className="w-4 h-4 mr-1" />Suggest</>
+                    )}
+                  </Button>
+                </div>
 
                 {/* Keyword Suggestions */}
                 {industry && (suggestionsLoading || showSuggestions) && (
@@ -1267,9 +910,6 @@ export default function Content() {
                 </div>
               )}
 
-              <div className="flex justify-end mb-2">
-                <TestModeBadge />
-              </div>
               <Button
                 onClick={handleGenerateContent}
                 disabled={

@@ -109,16 +109,14 @@ export class DatabaseStorage implements IStorage {
 
     const row = analyticsRows[0];
 
-    const publishedArticles = await db.select().from(schema.articles).where(eq(schema.articles.status, "published"));
+    const allArticles = await db.select().from(schema.articles);
 
-    const totalCitations = publishedArticles.reduce((sum, article) => sum + (article.citationCount || 0), 0);
-    const totalViews = publishedArticles.reduce((sum, article) => sum + (article.viewCount || 0), 0);
+    const totalCitations = allArticles.reduce((sum, article) => sum + (article.citationCount || 0), 0);
+    const totalViews = allArticles.reduce((sum, article) => sum + (article.viewCount || 0), 0);
 
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const recentArticles = publishedArticles.filter(a =>
-      a.publishedAt && new Date(a.publishedAt) > oneWeekAgo
-    );
-    const weeklyGrowth = recentArticles.length > 0 ? Math.round((recentArticles.length / Math.max(publishedArticles.length, 1)) * 100) : 0;
+    const recentArticles = allArticles.filter(a => new Date(a.createdAt) > oneWeekAgo);
+    const weeklyGrowth = recentArticles.length > 0 ? Math.round((recentArticles.length / Math.max(allArticles.length, 1)) * 100) : 0;
 
     return {
       id: row.id,
@@ -193,7 +191,6 @@ export class DatabaseStorage implements IStorage {
     const result = await db.insert(schema.articles).values({
       ...insertArticle,
       slug,
-      status: insertArticle.status ?? "draft",
       author: insertArticle.author ?? "GEO Platform",
       viewCount: 0,
       citationCount: 0,
@@ -201,10 +198,7 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getArticles(status?: string): Promise<Article[]> {
-    if (status) {
-      return await db.select().from(schema.articles).where(eq(schema.articles.status, status));
-    }
+  async getArticles(): Promise<Article[]> {
     return await db.select().from(schema.articles);
   }
 
@@ -221,22 +215,6 @@ export class DatabaseStorage implements IStorage {
   async updateArticle(id: string, articleUpdate: Partial<InsertArticle>): Promise<Article | undefined> {
     const result = await db.update(schema.articles)
       .set({ ...articleUpdate, updatedAt: new Date() })
-      .where(eq(schema.articles.id, id))
-      .returning();
-    return result[0];
-  }
-
-  async publishArticle(id: string): Promise<Article | undefined> {
-    const article = await this.getArticleById(id);
-    if (!article) return undefined;
-
-    const result = await db.update(schema.articles)
-      .set({
-        status: "published",
-        publishedAt: new Date(),
-        canonicalUrl: article.canonicalUrl || `${process.env.APP_URL || 'https://geoplatform.app'}/articles/${article.slug}`,
-        updatedAt: new Date(),
-      })
       .where(eq(schema.articles.id, id))
       .returning();
     return result[0];
@@ -348,13 +326,39 @@ export class DatabaseStorage implements IStorage {
     await db.delete(schema.brandPrompts).where(eq(schema.brandPrompts.brandId, brandId));
   }
 
-  async getPublishedArticlesByBrandId(brandId: string, limit: number): Promise<Article[]> {
+  async getRecentArticlesByBrandId(brandId: string, limit: number): Promise<Article[]> {
     return await db
       .select()
       .from(schema.articles)
-      .where(and(eq(schema.articles.brandId, brandId), eq(schema.articles.status, "published")))
-      .orderBy(desc(schema.articles.publishedAt))
+      .where(eq(schema.articles.brandId, brandId))
+      .orderBy(desc(schema.articles.createdAt))
       .limit(limit);
+  }
+
+  async getVisibilityProgress(brandId: string) {
+    return await db
+      .select()
+      .from(schema.visibilityProgress)
+      .where(eq(schema.visibilityProgress.brandId, brandId));
+  }
+
+  async setVisibilityStep(brandId: string, engineId: string, stepId: string): Promise<void> {
+    await db
+      .insert(schema.visibilityProgress)
+      .values({ brandId, engineId, stepId })
+      .onConflictDoNothing();
+  }
+
+  async unsetVisibilityStep(brandId: string, engineId: string, stepId: string): Promise<void> {
+    await db
+      .delete(schema.visibilityProgress)
+      .where(
+        and(
+          eq(schema.visibilityProgress.brandId, brandId),
+          eq(schema.visibilityProgress.engineId, engineId),
+          eq(schema.visibilityProgress.stepId, stepId),
+        ),
+      );
   }
 
   async enqueueContentJob(job: InsertContentGenerationJob): Promise<ContentGenerationJob> {

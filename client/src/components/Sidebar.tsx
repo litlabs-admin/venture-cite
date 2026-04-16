@@ -172,7 +172,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           className="flex items-center w-full px-5 pt-5 pb-1.5 gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
           aria-expanded={phase2Open}
         >
-          Phase 2
+          Upcoming
           <ChevronRight
             className={`w-3 h-3 ml-auto transition-transform duration-200 ${phase2Open ? "rotate-90" : ""}`}
           />

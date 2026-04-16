@@ -246,27 +246,10 @@ export default function Home() {
   const primaryBrand = brands[0];
   const hasBrands = brands.length > 0;
 
-  const { data: soaStats } = useQuery<{ success: boolean; data: any }>({
-    queryKey: [`/api/prompt-portfolio/stats/${primaryBrand?.id}`],
-    enabled: !!primaryBrand?.id,
-  });
-
-  const { data: cqStats } = useQuery<{ success: boolean; data: any }>({
-    queryKey: [`/api/citation-quality/stats/${primaryBrand?.id}`],
-    enabled: !!primaryBrand?.id,
-  });
-
-  const { data: halStats } = useQuery<{ success: boolean; data: any }>({
-    queryKey: [`/api/hallucinations/stats/${primaryBrand?.id}`],
-    enabled: !!primaryBrand?.id,
-  });
-
   const totalArticles = articlesData?.data?.length || 0;
-  const publishedArticles = articlesData?.data?.filter((a: any) => a.status === 'published').length || 0;
   const totalCitations = analytics?.data?.totalCitations || 0;
-  const shareOfAnswer = soaStats?.data?.shareOfAnswer || 0;
-  const citationQuality = cqStats?.data?.avgQualityScore || 0;
-  const unresolvedHallucinations = (halStats?.data?.total || 0) - (halStats?.data?.resolved || 0);
+  const totalChecks = analytics?.data?.totalChecks || 0;
+  const citationRate = analytics?.data?.citationRate || 0;
 
   const primaryAction = !hasBrands ? (
     <Link href="/brands">
@@ -313,23 +296,23 @@ export default function Home() {
         <KpiCard
           label="Articles"
           value={totalArticles}
-          hint={`${publishedArticles} published`}
+          hint={totalArticles === 1 ? "1 article" : `${totalArticles} articles`}
           icon={FileText}
           href="/articles"
         />
         <KpiCard
           label="Citations"
           value={formatNumber(totalCitations)}
-          hint={primaryBrand ? `Share of Answer ${shareOfAnswer.toFixed(1)}%` : "Connect a brand to track"}
+          hint={totalChecks > 0 ? `across ${totalChecks} AI checks` : "Run a citation check"}
           icon={Target}
           href="/citations"
         />
         <KpiCard
-          label="Citation Quality"
-          value={primaryBrand ? citationQuality.toFixed(0) : "—"}
-          hint={unresolvedHallucinations > 0 ? `${unresolvedHallucinations} hallucination${unresolvedHallucinations === 1 ? "" : "s"} to review` : "No issues flagged"}
+          label="Citation Rate"
+          value={totalChecks > 0 ? `${citationRate}%` : "—"}
+          hint={totalChecks > 0 ? `${totalCitations}/${totalChecks} cited` : "No checks yet"}
           icon={Sparkles}
-          href="/ai-intelligence"
+          href="/citations"
         />
       </section>
 

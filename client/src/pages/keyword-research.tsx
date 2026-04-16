@@ -11,7 +11,6 @@ import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet";
 import PageHeader from "@/components/PageHeader";
-import { TestModeBadge } from "@/components/TestModeBadge";
 import { useLocation } from "wouter";
 import type { Brand, KeywordResearch } from "@shared/schema";
 import {
@@ -202,12 +201,9 @@ export default function KeywordResearchPage() {
 
           <Card className="lg:col-span-2">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-muted-foreground flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  AI Discovery
-                </span>
-                <TestModeBadge />
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                AI Discovery
               </CardTitle>
             </CardHeader>
             <CardContent>

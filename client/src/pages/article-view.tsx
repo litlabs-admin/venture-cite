@@ -66,9 +66,6 @@ export default function ArticleView() {
         <meta name="twitter:title" content={article.title} />
         <meta name="twitter:description" content={article.metaDescription || article.excerpt || article.title} />
         {article.featuredImage && <meta name="twitter:image" content={article.featuredImage} />}
-        
-        {/* Canonical URL */}
-        {article.canonicalUrl && <link rel="canonical" href={article.canonicalUrl} />}
       </Helmet>
 
       <div className="min-h-screen bg-background">
@@ -103,11 +100,11 @@ export default function ArticleView() {
                 </div>
               )}
               
-              {article.publishedAt && (
+              {article.createdAt && (
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  <time dateTime={article.publishedAt} data-testid="article-date">
-                    {new Date(article.publishedAt).toLocaleDateString('en-US', {
+                  <time dateTime={article.createdAt} data-testid="article-date">
+                    {new Date(article.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'

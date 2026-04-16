@@ -1,12 +1,11 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { insertBrandSchema, insertCompetitorSchema, insertCompetitorCitationSnapshotSchema, usageLimits } from "@shared/schema";
-import { runPlatformCitationCheck, runBrandPrompts, DEFAULT_CITATION_PLATFORMS } from "./citationChecker";
-import { pickModel, isTestMode, logAiCall } from "./lib/modelConfig";
+import { runBrandPrompts, DEFAULT_CITATION_PLATFORMS } from "./citationChecker";
 import { attachAiLogger } from "./lib/aiLogger";
-import { attachTestModeFallback } from "./lib/testModeClient";
+import { MODELS } from "./lib/modelConfig";
 import { enqueueContentGenerationJob, type GenerationPayload } from "./contentGenerationWorker";
 import { z } from "zod";
 import OpenAI from "openai";
@@ -50,7 +49,6 @@ const openai = new OpenAI({
   maxRetries: 1,
 });
 attachAiLogger(openai);
-attachTestModeFallback(openai);
 
 // Maximum accepted length for user-supplied content on AI endpoints. Caps
 // worst-case OpenAI token consumption so a hostile request can't drain the
@@ -67,7 +65,7 @@ const aiRateKey = (req: Request) => {
   return `ip:${req.ip ?? "unknown"}`;
 };
 
-const aiRateLimit = rateLimit({
+const aiLimitMiddleware = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   standardHeaders: true,
@@ -76,62 +74,11 @@ const aiRateLimit = rateLimit({
   message: { success: false, error: "Too many requests. Please wait a moment before trying again." },
 });
 
-// Test-mode guardrails — only applied when USE_TEST_MODEL=true. Stricter
-// than production (3 req/min + 50 req/day per user) so the cheap test model
-// can't be abused into a big bill even with weak credentials.
-const aiTestRateLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 3,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: aiRateKey,
-  message: { success: false, error: "Test mode limit: 3 requests per minute. Wait a moment before trying again." },
-});
-
-const aiTestDailyLimit = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000,
-  max: 50,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: aiRateKey,
-  message: { success: false, error: "Test mode daily limit: 50 requests per day. Quota resets in ~24 hours." },
-});
-
-// Middleware chooser: in test mode, both test limiters run first and then
-// the normal aiRateLimit. In production (flag off), only aiRateLimit runs —
-// behavior matches today exactly. Also emits a single structured log line
-// per incoming AI request so we can audit which feature hit which model.
-const aiLimitMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const user = (req as any).user;
-  logAiCall(req.path, user?.id, isTestMode() ? "gpt-5-nano" : "production");
-  if (!isTestMode()) return aiRateLimit(req, res, next);
-  aiTestRateLimit(req, res, (err?: any) => {
-    if (err) return next(err);
-    if (res.headersSent) return;
-    aiTestDailyLimit(req, res, (err2?: any) => {
-      if (err2) return next(err2);
-      if (res.headersSent) return;
-      aiRateLimit(req, res, next);
-    });
-  });
-};
-
 // Shared error-response helper: prefers OwnershipError (401/404) when present,
 // otherwise returns a generic 500 and logs the underlying error server-side.
 // This keeps stack traces and internal messages out of production responses.
 function sendError(res: Response, err: unknown, fallback: string, status = 500): void {
   if (sendOwnershipError(res, err)) return;
-  // Test-mode: surface "model not found" upstream errors as a clear, actionable
-  // 502 instead of leaking the raw OpenAI error. Fires only when the flag is on
-  // so production error handling is untouched.
-  if (isTestMode() && err instanceof Error && /model.*not.*found|does not exist|model_not_found/i.test(err.message)) {
-    console.error("[routes] test-model unavailable", err);
-    res.status(502).json({
-      success: false,
-      error: "Test model (gpt-5-nano) is unavailable. Disable USE_TEST_MODEL in .env to use production models.",
-    });
-    return;
-  }
   const isProd = process.env.NODE_ENV === "production";
   const message = isProd ? fallback : (err instanceof Error ? err.message : fallback);
   if (err) console.error("[routes]", fallback, err);
@@ -162,13 +109,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register /api/auth/* routes (Supabase Auth backed).
   // These must be registered before requireAuthForApi so they aren't gated.
   setupAuth(app);
-
-  // Public config endpoint — surfaces runtime flags the client needs before
-  // auth (e.g. whether USE_TEST_MODEL is on so we can show the test-mode
-  // badge). Registered before requireAuthForApi so it stays reachable.
-  app.get("/api/config", (_req, res) => {
-    res.json({ success: true, data: { testMode: isTestMode() } });
-  });
 
   // Global guard: every /api/* route not in the PUBLIC_API_ROUTES allowlist
   // requires a valid Bearer token. Single source of truth for auth.
@@ -689,19 +629,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = requireUser(req);
       const brands = await storage.getBrandsByUserId(user.id);
       const brandIds = new Set(brands.map((b) => b.id));
-      const citations = await storage.getCitationsByUserId(user.id);
       const allArticles = await storage.getArticles();
       const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
-      const totalCitations = citations.length;
       const totalArticles = articles.length;
-      const publishedArticles = articles.filter((a) => a.status === "published").length;
+
+      // Real Phase 1 citation metrics come from geo_rankings rows tied to the
+      // user's brand_prompts. Aggregate across every brand the user owns and
+      // keep only the latest row per (prompt, platform) pair so re-runs don't
+      // double-count.
+      const promptIdsByBrand = await Promise.all(
+        Array.from(brandIds).map((bid) => storage.getBrandPromptsByBrandId(bid)),
+      );
+      const allPromptIds = promptIdsByBrand.flat().map((p) => p.id);
+      let totalCitations = 0;
+      let totalChecks = 0;
+      if (allPromptIds.length > 0) {
+        const rankings = await storage.getGeoRankingsByBrandPromptIds(allPromptIds);
+        const latestByKey = new Map<string, typeof rankings[number]>();
+        for (const r of rankings) {
+          const key = `${r.brandPromptId}__${r.aiPlatform}`;
+          const existing = latestByKey.get(key);
+          if (!existing || r.checkedAt > existing.checkedAt) latestByKey.set(key, r);
+        }
+        for (const r of latestByKey.values()) {
+          totalChecks += 1;
+          if (r.isCited === 1) totalCitations += 1;
+        }
+      }
+      const citationRate = totalChecks > 0 ? Math.round((totalCitations / totalChecks) * 100) : 0;
 
       res.json({
         success: true,
         data: {
           totalCitations,
+          totalChecks,
+          citationRate,
           totalArticles,
-          publishedArticles,
           totalBrands: brands.length,
           weeklyGrowth: 0,
           avgPosition: 0,
@@ -763,8 +726,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const articlesThisWeek = articles.filter(a => new Date(a.createdAt) >= oneWeekAgo).length;
       const articlesThisMonth = articles.filter(a => new Date(a.createdAt) >= oneMonthAgo).length;
-      const publishedArticles = articles.filter(a => a.status === 'published').length;
-      const draftArticles = articles.filter(a => a.status === 'draft').length;
 
       // Calculate task stats
       const completedTasks = tasks.filter(t => t.status === 'completed').length;
@@ -788,8 +749,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalArticles: articles.length,
             articlesThisWeek,
             articlesThisMonth,
-            publishedArticles,
-            draftArticles,
             avgWordsPerArticle: articles.length > 0 
               ? Math.round(articles.reduce((sum, a) => sum + (a.content?.split(/\s+/).length || 0), 0) / articles.length)
               : 0
@@ -904,7 +863,7 @@ OUTPUT: Return ONLY the final content in markdown format.`
       attempts++;
       
       const humanizeResponse = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.contentHumanize,
         messages: [
           { role: "system", content: humanizationPassPrompts[i] },
           {
@@ -920,7 +879,7 @@ OUTPUT: Return ONLY the final content in markdown format.`
 
       // Use a strict, adversarial scorer (separate model call to avoid self-bias)
       const analysisResponse = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.contentAnalyze,
         messages: [
           {
             role: "system",
@@ -1082,7 +1041,7 @@ Return ONLY a JSON object:
 
     try {
       const analysisResponse = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.contentAnalyze,
         messages: [
           {
             role: "system",
@@ -1186,7 +1145,6 @@ Return a JSON object with:
             industry: original.industry ?? industry,
             contentType: original.contentType,
             keywords: original.keywords,
-            status: "draft",
             author: original.author ?? "GEO Platform",
             seoData: {
               humanScore: result.humanScore,
@@ -1238,7 +1196,7 @@ Return a JSON object with:
 
     try {
       const response = await openai.chat.completions.create({
-        model: pickModel("gpt-4"),
+        model: MODELS.keywordSuggestions,
         response_format: { type: "json_object" },
         messages: [
           {
@@ -1294,7 +1252,7 @@ Return a JSON object with:
 
     try {
       const response = await openai.chat.completions.create({
-        model: pickModel("gpt-4"),
+        model: MODELS.popularTopics,
         response_format: { type: "json_object" },
         messages: [
           {
@@ -1415,7 +1373,7 @@ Return a JSON object with:
       let response;
       try {
         response = await openai.chat.completions.create({
-          model: pickModel("gpt-4"),
+          model: MODELS.keywordResearch,
           response_format: { type: "json_object" },
           messages: [
             {
@@ -1615,8 +1573,8 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
 
   const ARTICLE_WRITE_FIELDS = [
     "title", "slug", "content", "excerpt", "metaDescription", "keywords",
-    "industry", "contentType", "status", "canonicalUrl", "featuredImage",
-    "author", "seoData", "publishedAt", "brandId",
+    "industry", "contentType", "featuredImage",
+    "author", "seoData", "brandId",
   ] as const;
 
   // Create/save article. brandId is verified to belong to the caller; all
@@ -1643,9 +1601,8 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
   app.get("/api/articles", async (req, res) => {
     try {
       const user = requireUser(req);
-      const { status } = req.query;
       const brandIds = await getUserBrandIds(user.id);
-      const all = await storage.getArticles(status as string);
+      const all = await storage.getArticles();
       const articles = all.filter((a) => a.brandId && brandIds.has(a.brandId));
       res.json({ success: true, data: articles });
     } catch (error) {
@@ -1708,21 +1665,6 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     }
   });
 
-  // Publish article — ownership-scoped.
-  app.post("/api/articles/:id/publish", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      await requireArticle(req.params.id, user.id);
-      const article = await storage.publishArticle(req.params.id);
-      if (!article) {
-        return res.status(404).json({ success: false, error: "Article not found" });
-      }
-      res.json({ success: true, article, message: "Article published successfully" });
-    } catch (error) {
-      sendError(res, error, "Failed to publish article");
-    }
-  });
-
   // Get article by slug (for public viewing)
   app.get("/api/articles/slug/:slug", async (req, res) => {
     try {
@@ -1746,76 +1688,6 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
         success: false,
         error: "Failed to fetch article"
       });
-    }
-  });
-
-  // XML escaping utility
-  const escapeXml = (str: string): string => {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-  };
-
-  // Sitemap.xml for SEO and AI crawler discoverability
-  app.get("/sitemap.xml", async (req, res) => {
-    try {
-      const articles = await storage.getArticles("published");
-      const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
-      
-      const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${escapeXml(baseUrl)}/</loc>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  ${articles.map(article => `<url>
-    <loc>${escapeXml(article.canonicalUrl || `${baseUrl}/articles/${article.slug}`)}</loc>
-    <lastmod>${article.publishedAt ? new Date(article.publishedAt).toISOString() : new Date(article.updatedAt).toISOString()}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`).join('\n  ')}
-</urlset>`;
-
-      res.setHeader('Content-Type', 'application/xml');
-      res.send(sitemap);
-    } catch (error) {
-      res.status(500).send('Error generating sitemap');
-    }
-  });
-
-  // RSS feed for content syndication and AI crawler access
-  app.get("/rss.xml", async (req, res) => {
-    try {
-      const articles = await storage.getArticles("published");
-      const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
-      
-      const rss = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>GEO Platform - AI-Optimized Content</title>
-    <link>${escapeXml(baseUrl)}</link>
-    <description>Discover our AI-optimized content designed for maximum visibility on AI search engines</description>
-    <language>en-us</language>
-    <atom:link href="${escapeXml(baseUrl)}/rss.xml" rel="self" type="application/rss+xml" />
-    ${articles.map(article => `<item>
-      <title><![CDATA[${article.title}]]></title>
-      <link>${escapeXml(article.canonicalUrl || `${baseUrl}/articles/${article.slug}`)}</link>
-      <guid isPermaLink="true">${escapeXml(article.canonicalUrl || `${baseUrl}/articles/${article.slug}`)}</guid>
-      <pubDate>${article.publishedAt ? new Date(article.publishedAt).toUTCString() : new Date(article.createdAt).toUTCString()}</pubDate>
-      <description><![CDATA[${article.excerpt || article.metaDescription}]]></description>
-      ${article.keywords && article.keywords.length > 0 ? article.keywords.map(k => `<category><![CDATA[${k}]]></category>`).join('\n      ') : ''}
-    </item>`).join('\n    ')}
-  </channel>
-</rss>`;
-
-      res.setHeader('Content-Type', 'application/rss+xml');
-      res.send(rss);
-    } catch (error) {
-      res.status(500).send('Error generating RSS feed');
     }
   });
 
@@ -1957,7 +1829,7 @@ Content: ${articleContent}`
           const promptContent = platformPrompts[platform] || platformPrompts['LinkedIn'];
 
           const formatResponse = await openai.chat.completions.create({
-            model: pickModel("gpt-4o-mini"),
+            model: MODELS.distribution,
             messages: [
               { role: "system", content: `You are a social media content expert who adapts long-form content for specific platforms. Create engaging, platform-native content that drives engagement.` },
               { role: "user", content: promptContent }
@@ -2067,8 +1939,8 @@ Content: ${articleContent}`
         return res.status(503).json({ success: false, error: "AI prompt generation is not configured." });
       }
 
-      const publishedArticles = await storage.getPublishedArticlesByBrandId(brand.id, 10);
-      const articleSummaries = publishedArticles.map((a) => ({
+      const recentArticles = await storage.getRecentArticlesByBrandId(brand.id, 10);
+      const articleSummaries = recentArticles.map((a) => ({
         title: a.title,
         keywords: Array.isArray(a.keywords) ? a.keywords.slice(0, 5) : [],
       }));
@@ -2076,7 +1948,7 @@ Content: ${articleContent}`
       let completion;
       try {
         completion = await openai.chat.completions.create({
-          model: pickModel("gpt-4"),
+          model: MODELS.brandPromptGeneration,
           response_format: { type: "json_object" },
           messages: [
             {
@@ -2152,11 +2024,64 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
     }
   });
 
+  // AI Visibility Checklist progress — server-side persistence so it
+  // survives device switches and browser data clears.
+  app.get("/api/visibility-progress/:brandId", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const rows = await storage.getVisibilityProgress(brand.id);
+      // Reshape to { engineId: string[] } for the client.
+      const grouped: Record<string, string[]> = {};
+      for (const row of rows) {
+        if (!grouped[row.engineId]) grouped[row.engineId] = [];
+        grouped[row.engineId].push(row.stepId);
+      }
+      res.json({ success: true, data: grouped });
+    } catch (error) {
+      sendError(res, error, "Failed to fetch visibility progress");
+    }
+  });
+
+  app.post("/api/visibility-progress/:brandId", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const { engineId, stepId } = req.body ?? {};
+      if (typeof engineId !== "string" || typeof stepId !== "string" || !engineId || !stepId) {
+        return res.status(400).json({ success: false, error: "engineId and stepId are required" });
+      }
+      await storage.setVisibilityStep(brand.id, engineId, stepId);
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, "Failed to save visibility progress");
+    }
+  });
+
+  app.delete("/api/visibility-progress/:brandId", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const { engineId, stepId } = req.body ?? {};
+      if (typeof engineId !== "string" || typeof stepId !== "string" || !engineId || !stepId) {
+        return res.status(400).json({ success: false, error: "engineId and stepId are required" });
+      }
+      await storage.unsetVisibilityStep(brand.id, engineId, stepId);
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, "Failed to clear visibility progress");
+    }
+  });
+
   // Run all 10 stored prompts against each platform and persist results.
   app.post("/api/brand-prompts/:brandId/run", aiLimitMiddleware, async (req, res) => {
     try {
       const user = requireUser(req);
       const brand = await requireBrand(req.params.brandId, user.id);
+
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(503).json({ success: false, error: "AI citation checks are not configured." });
+      }
 
       const existing = await storage.getBrandPromptsByBrandId(brand.id);
       if (existing.length === 0) {
@@ -2203,8 +2128,34 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
       const latest = Array.from(latestByKey.values());
 
       const platformMap = new Map<string, { platform: string; cited: number; checks: number; lastRun: Date | null }>();
-      const promptMap = new Map<string, { promptId: string; prompt: string; rationale: string | null; platforms: Array<{ platform: string; isCited: boolean; context: string | null; checkedAt: Date }> }>();
+      type PlatformEntry = {
+        platform: string;
+        isCited: boolean;
+        snippet: string | null;
+        fullResponse: string | null;
+        checkedAt: Date;
+      };
+      const promptMap = new Map<string, { promptId: string; prompt: string; rationale: string | null; platforms: PlatformEntry[] }>();
       for (const p of prompts) promptMap.set(p.id, { promptId: p.id, prompt: p.prompt, rationale: p.rationale, platforms: [] });
+
+      // citationContext is stored as "{snippet}\n\n||| RAW_RESPONSE |||\n{full}"
+      // (current format) or "{snippet}\n\n--- RAW RESPONSE ---\n{full}" (older
+      // format written before 2026-04-16). Support both so existing rows
+      // render correctly without requiring a re-run.
+      const splitContext = (ctx: string | null): { snippet: string | null; fullResponse: string | null } => {
+        if (!ctx) return { snippet: null, fullResponse: null };
+        const markers = ["\n\n||| RAW_RESPONSE |||\n", "\n\n--- RAW RESPONSE ---\n"];
+        for (const marker of markers) {
+          const idx = ctx.indexOf(marker);
+          if (idx !== -1) {
+            return {
+              snippet: ctx.slice(0, idx).trim() || null,
+              fullResponse: ctx.slice(idx + marker.length).trim() || null,
+            };
+          }
+        }
+        return { snippet: ctx, fullResponse: null };
+      };
 
       let totalCited = 0;
       for (const r of latest) {
@@ -2217,10 +2168,12 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
         if (r.brandPromptId) {
           const promptRow = promptMap.get(r.brandPromptId);
           if (promptRow) {
+            const { snippet, fullResponse } = splitContext(r.citationContext);
             promptRow.platforms.push({
               platform: r.aiPlatform,
               isCited: r.isCited === 1,
-              context: r.citationContext,
+              snippet,
+              fullResponse,
               checkedAt: r.checkedAt,
             });
           }
@@ -2290,7 +2243,7 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
       }
 
       const completion = await openai.chat.completions.create({
-        model: pickModel("gpt-4o-mini"),
+        model: MODELS.brandAutofill,
         messages: [
           {
             role: "system",
@@ -2413,7 +2366,7 @@ Be specific and accurate based on the content. If you can't determine something,
       let analysisQuality: "full" | "partial" = "full";
       try {
         const completion = await openai.chat.completions.create({
-          model: pickModel("gpt-4o-mini"),
+          model: MODELS.brandAutofill,
           messages: [
             {
               role: "system",
@@ -2553,34 +2506,6 @@ Be specific and accurate based on the content. If you can't determine something,
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ success: false, error: "Failed to delete brand" });
-    }
-  });
-
-  // Generate sitemap.xml for SEO and AI crawlers
-  app.get("/sitemap.xml", async (req, res) => {
-    try {
-      const articles = await storage.getArticles("published");
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      
-      const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${baseUrl}/</loc>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-${articles.map(article => `  <url>
-    <loc>${baseUrl}/article/${article.slug}</loc>
-    <lastmod>${article.updatedAt ? new Date(article.updatedAt).toISOString() : new Date(article.publishedAt || article.createdAt).toISOString()}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`).join('\n')}
-</urlset>`;
-
-      res.header('Content-Type', 'application/xml');
-      res.send(sitemap);
-    } catch (error) {
-      res.status(500).send('Error generating sitemap');
     }
   });
 
@@ -3204,7 +3129,7 @@ Sitemap: ${baseUrl}/sitemap.xml`;
 
       // Get brand's articles (all statuses; the brand-ownership guard
       // already ensured the caller owns this brand).
-      const allArticles = await storage.getArticles('published');
+      const allArticles = await storage.getArticles();
       const brandArticles = allArticles.filter(a => a.brandId === brand.id);
       const articleIds = brandArticles.map(a => a.id);
 
@@ -3336,7 +3261,7 @@ Sitemap: ${baseUrl}/sitemap.xml`;
       }
 
       // Get brand's articles
-      const allArticles = await storage.getArticles('published');
+      const allArticles = await storage.getArticles();
       const brandArticles = allArticles.filter(a => a.brandId === brand.id);
       const articleIds = brandArticles.map(a => a.id);
 
@@ -3459,7 +3384,7 @@ Sitemap: ${baseUrl}/sitemap.xml`;
       }
 
       const response = await openai.chat.completions.create({
-        model: pickModel("gpt-4o-mini"),
+        model: MODELS.misc,
         messages: [
           {
             role: "system",
@@ -3972,7 +3897,7 @@ Return a JSON array of 10 listicle opportunities with a good mix of the above ty
 Return ONLY the JSON array, no other text.`;
 
       const response = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.misc,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
       });
@@ -4066,7 +3991,7 @@ Return a JSON object with:
 Return ONLY valid JSON.`;
 
       const response = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.misc,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
       });
@@ -4242,7 +4167,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
       }
 
       const response = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.misc,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 4000,
@@ -4405,7 +4330,7 @@ Return JSON:
 Return ONLY valid JSON.`;
 
       const response = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.misc,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
       });
@@ -4464,7 +4389,7 @@ Return JSON array:
 Return ONLY the JSON array.`;
 
       const response = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.misc,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
       });
@@ -5539,7 +5464,7 @@ Return ONLY the JSON array.`;
           case 'content_generation': {
             const brand = task.brandId ? await storage.getBrandById(task.brandId) : null;
             const response = await openai.chat.completions.create({
-              model: pickModel("gpt-4o"),
+              model: MODELS.misc,
               messages: [
                 {
                   role: "system",
@@ -5559,7 +5484,7 @@ Return ONLY the JSON array.`;
           case 'outreach': {
             const brand = task.brandId ? await storage.getBrandById(task.brandId) : null;
             const response = await openai.chat.completions.create({
-              model: pickModel("gpt-4o"),
+              model: MODELS.misc,
               messages: [
                 {
                   role: "system",
@@ -5578,7 +5503,7 @@ Return ONLY the JSON array.`;
           }
           case 'source_analysis': {
             const response = await openai.chat.completions.create({
-              model: pickModel("gpt-4o"),
+              model: MODELS.misc,
               messages: [
                 {
                   role: "system",
@@ -5598,7 +5523,7 @@ Return ONLY the JSON array.`;
           case 'hallucination_remediation': {
             const brand = task.brandId ? await storage.getBrandById(task.brandId) : null;
             const response = await openai.chat.completions.create({
-              model: pickModel("gpt-4o"),
+              model: MODELS.misc,
               messages: [
                 {
                   role: "system",
@@ -5617,7 +5542,7 @@ Return ONLY the JSON array.`;
           }
           case 'prompt_test': {
             const response = await openai.chat.completions.create({
-              model: pickModel("gpt-4o"),
+              model: MODELS.misc,
               messages: [
                 {
                   role: "system",
@@ -6314,7 +6239,7 @@ Return ONLY the JSON array.`;
       }
 
       const response = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.misc,
         messages: [
           {
             role: "system",
@@ -6595,7 +6520,7 @@ Return a JSON array of 10-15 community groups with this structure:
 Only return the JSON array, no other text.`;
 
       const completion = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.misc,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         temperature: 0.7,
@@ -6658,7 +6583,7 @@ Return a JSON object with:
 Only return the JSON object, no other text.`;
 
       const completion = await openai.chat.completions.create({
-        model: pickModel("gpt-4o"),
+        model: MODELS.misc,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         temperature: 0.8,

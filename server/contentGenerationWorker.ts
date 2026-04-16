@@ -9,9 +9,8 @@
 
 import OpenAI from "openai";
 import { storage } from "./storage";
-import { pickModel } from "./lib/modelConfig";
 import { attachAiLogger } from "./lib/aiLogger";
-import { attachTestModeFallback } from "./lib/testModeClient";
+import { MODELS } from "./lib/modelConfig";
 import type { ContentGenerationJob, InsertContentGenerationJob } from "@shared/schema";
 
 const openai = new OpenAI({
@@ -20,7 +19,6 @@ const openai = new OpenAI({
   maxRetries: 1,
 });
 attachAiLogger(openai);
-attachTestModeFallback(openai);
 
 const POLL_INTERVAL_MS = 5_000;
 const STUCK_JOB_RECOVERY_MINUTES = 10;
@@ -75,7 +73,7 @@ async function humanizeContent(
   for (let i = 0; i < Math.min(maxAttempts, passes.length); i += 1) {
     attempts += 1;
     const rewrite = await openai.chat.completions.create({
-      model: pickModel("gpt-4o"),
+      model: MODELS.contentHumanize,
       messages: [
         { role: "system", content: passes[i] },
         { role: "user", content: `Rewrite this to sound naturally human, keeping all info + markdown:\n\n${currentContent}` },
@@ -86,7 +84,7 @@ async function humanizeContent(
     currentContent = rewrite.choices[0].message.content || currentContent;
 
     const analysis = await openai.chat.completions.create({
-      model: pickModel("gpt-4o"),
+      model: MODELS.contentAnalyze,
       response_format: { type: "json_object" },
       messages: [
         {
@@ -154,7 +152,7 @@ async function generateArticleForJob(job: ContentGenerationJob): Promise<{ artic
     : `\n\nSTYLE: B2B — professional, data-driven, ROI-focused, industry terminology, business impact framing.`;
 
   const response = await openai.chat.completions.create({
-    model: pickModel("gpt-4"),
+    model: MODELS.contentGeneration,
     messages: [
       {
         role: "system",
@@ -192,7 +190,6 @@ async function generateArticleForJob(job: ContentGenerationJob): Promise<{ artic
     industry,
     contentType: type,
     keywords: keywords ? keywords.split(",").map((k) => k.trim()).filter(Boolean) : [],
-    status: "draft",
     author: "GEO Platform",
     seoData: {
       humanScore,

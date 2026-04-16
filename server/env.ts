@@ -23,8 +23,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
 
   // Optional — features degrade if absent, but shouldn't block boot.
-  DEEPSEEK_API_KEY: z.string().optional(),
-  PERPLEXITY_API_KEY: z.string().optional(),
+  OPENROUTER_API_KEY: z.string().optional(),
   PUBLIC_BASE_URL: z.string().url().optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   VITE_STRIPE_PUBLISHABLE_KEY: z.string().optional(),

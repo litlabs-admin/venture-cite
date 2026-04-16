@@ -10,9 +10,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import PageHeader from "@/components/PageHeader";
-import { TestModeBadge } from "@/components/TestModeBadge";
-import { Sparkles, Play, RefreshCw, Target, TrendingUp, CheckCircle2, XCircle, Loader2, AlertCircle } from "lucide-react";
+import { Sparkles, Play, RefreshCw, Target, TrendingUp, CheckCircle2, XCircle, Loader2, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import ReactMarkdown from "react-markdown";
 import type { Brand } from "@shared/schema";
 
 type BrandPrompt = {
@@ -27,9 +27,75 @@ type BrandPrompt = {
 type PlatformResult = {
   platform: string;
   isCited: boolean;
-  context: string | null;
+  snippet: string | null;
+  fullResponse: string | null;
   checkedAt: string;
 };
+
+const PLATFORM_COLORS: Record<string, string> = {
+  ChatGPT: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
+  Claude: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
+  Gemini: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
+  Perplexity: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
+  DeepSeek: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20",
+};
+
+// One card per platform result inside the by-prompt accordion. Shows a clear
+// status pill, a short snippet, and an expand control to reveal the full
+// markdown-rendered AI response.
+function PlatformResultCard({ result }: { result: PlatformResult }) {
+  const [expanded, setExpanded] = useState(false);
+  const colorClass = PLATFORM_COLORS[result.platform] || "bg-muted text-muted-foreground border-border";
+
+  return (
+    <div className="border rounded-lg overflow-hidden" data-testid={`platform-result-${result.platform.toLowerCase()}`}>
+      <div className="flex items-center gap-3 p-3 bg-muted/30">
+        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${colorClass}`}>
+          <span>{result.platform}</span>
+        </div>
+        {result.isCited ? (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20">
+            <CheckCircle2 className="h-3 w-3" />
+            Cited
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
+            <XCircle className="h-3 w-3" />
+            Not cited
+          </div>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">
+          {formatDistanceToNow(new Date(result.checkedAt), { addSuffix: true })}
+        </span>
+      </div>
+
+      {result.fullResponse ? (
+        <div className="border-t">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/40 transition-colors"
+            data-testid={`toggle-response-${result.platform.toLowerCase()}`}
+          >
+            {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {expanded ? "Hide full response" : "Show full response"}
+          </button>
+          {expanded && (
+            <div className="px-4 py-3 bg-muted/20 border-t max-h-[480px] overflow-y-auto">
+              <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-pre:text-xs">
+                <ReactMarkdown>{result.fullResponse}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="px-3 py-2 border-t text-xs text-muted-foreground italic">
+          No response captured. Re-run the check to populate.
+        </div>
+      )}
+    </div>
+  );
+}
 
 type PromptRow = {
   promptId: string;
@@ -212,25 +278,22 @@ export default function Citations() {
                     {promptsAgeLabel && <span className="ml-2 text-xs">Generated {promptsAgeLabel}.</span>}
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                  <TestModeBadge />
-                  {hasPrompts && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm("Regenerate will replace your existing 10 prompts. Continue?")) {
-                          generateMutation.mutate();
-                        }
-                      }}
-                      disabled={generateMutation.isPending}
-                      data-testid="button-regenerate-prompts"
-                    >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${generateMutation.isPending ? "animate-spin" : ""}`} />
-                      Regenerate
-                    </Button>
-                  )}
-                </div>
+                {hasPrompts && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm("Regenerate will replace your existing 10 prompts. Continue?")) {
+                        generateMutation.mutate();
+                      }
+                    }}
+                    disabled={generateMutation.isPending}
+                    data-testid="button-regenerate-prompts"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${generateMutation.isPending ? "animate-spin" : ""}`} />
+                    Regenerate
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -412,7 +475,7 @@ export default function Citations() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Results by Prompt</CardTitle>
-                    <CardDescription>Click a prompt to see which platforms cited your brand and the context.</CardDescription>
+                    <CardDescription>Click a prompt to see each AI's full answer and whether your brand was cited.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Accordion type="single" collapsible className="w-full">
@@ -430,24 +493,15 @@ export default function Citations() {
                               </div>
                             </AccordionTrigger>
                             <AccordionContent>
+                              {row.rationale && (
+                                <p className="text-xs text-muted-foreground italic mb-3 px-1">Why this prompt: {row.rationale}</p>
+                              )}
                               {row.platforms.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">No results yet — run a citation check.</p>
                               ) : (
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                   {row.platforms.map((plat, j) => (
-                                    <div key={j} className="flex items-start gap-3 p-3 bg-muted/50 rounded-md">
-                                      {plat.isCited ? (
-                                        <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                                      ) : (
-                                        <XCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                                      )}
-                                      <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-sm">{plat.platform}</p>
-                                        {plat.context && (
-                                          <p className="text-xs text-muted-foreground mt-1 italic">{plat.context}</p>
-                                        )}
-                                      </div>
-                                    </div>
+                                    <PlatformResultCard key={`${plat.platform}-${j}`} result={plat} />
                                   ))}
                                 </div>
                               )}
