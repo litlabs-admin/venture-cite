@@ -1840,9 +1840,16 @@ Content: ${articleContent}`
 
           const formattedContent = formatResponse.choices[0].message.content || '';
 
-          // Generated content lives in `metadata.content`, NOT `platformUrl`.
-          // `platformUrl` is reserved for a real published-post URL once
-          // actual distribution is wired (it's null until then).
+          if (!formattedContent.trim()) {
+            console.error(`[distribute] ${platform} returned empty content for article ${article.id}`);
+            await storage.updateDistribution(distribution.id, {
+              status: "failed",
+              error: "AI returned empty content",
+            });
+            results.push({ platform, status: "failed", error: "AI returned empty content — try again" });
+            continue;
+          }
+
           await storage.updateDistribution(distribution.id, {
             status: "success",
             distributedAt: new Date(),
@@ -2309,7 +2316,7 @@ Be specific and accurate based on the content. If you can't determine something,
       if (tierLimit !== -1) {
         const existingBrands = await storage.getBrandsByUserId(user.id);
         if (existingBrands.length >= tierLimit) {
-          return res.status(403).json({ success: false, error: `Your ${tier} plan allows ${tierLimit} brand${tierLimit === 1 ? '' : 's'}. Upgrade to add more.` });
+          return res.status(403).json({ success: false, error: `Brand limit reached — your ${tier} plan allows ${tierLimit}. Delete an existing brand or upgrade for more.`, limitReached: true });
         }
       }
 
@@ -2451,7 +2458,7 @@ Be specific and accurate based on the content. If you can't determine something,
       const tierLimit = (usageLimits[tier] || usageLimits.free).maxBrands;
       const existingBrands = await storage.getBrandsByUserId(user.id);
       if (tierLimit !== -1 && existingBrands.length >= tierLimit) {
-        return res.status(403).json({ success: false, error: `Your ${tier} plan allows ${tierLimit} brand${tierLimit === 1 ? '' : 's'}. Upgrade to add more.` });
+        return res.status(403).json({ success: false, error: `Brand limit reached — your ${tier} plan allows ${tierLimit}. Delete an existing brand or upgrade for more.`, limitReached: true });
       }
       const nameLower = validatedData.name.toLowerCase();
       if (!req.body?.force && existingBrands.some(b => b.name.toLowerCase() === nameLower)) {

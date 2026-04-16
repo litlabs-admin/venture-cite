@@ -91,11 +91,21 @@ export default function Brands() {
       }
     },
     onError: (error: Error) => {
-      toast({
-        title: "Couldn't create brand",
-        description: error.message.includes("401") ? "Please log in again and try." : "Something went wrong. You can try again or add your brand manually below.",
-        variant: "destructive",
-      });
+      let title = "Couldn't create brand";
+      let description = "Something went wrong. You can try again or add your brand manually below.";
+      try {
+        const body = JSON.parse(error.message.replace(/^\d+:\s*/, ""));
+        if (body.limitReached) {
+          title = "Brand limit reached";
+          description = body.error;
+        } else if (body.error) {
+          description = body.error;
+        }
+      } catch {}
+      if (error.message.includes("401")) {
+        description = "Please log in again and try.";
+      }
+      toast({ title, description, variant: "destructive" });
     },
   });
 
@@ -127,12 +137,19 @@ export default function Brands() {
         description: "Your brand profile has been created successfully.",
       });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create brand. Please try again.",
-        variant: "destructive",
-      });
+    onError: (error: Error) => {
+      let title = "Error";
+      let description = "Failed to create brand. Please try again.";
+      try {
+        const body = JSON.parse(error.message.replace(/^\d+:\s*/, ""));
+        if (body.limitReached) {
+          title = "Brand limit reached";
+          description = body.error;
+        } else if (body.error) {
+          description = body.error;
+        }
+      } catch {}
+      toast({ title, description, variant: "destructive" });
     },
   });
 
