@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   emailVerified: integer("email_verified").default(0).notNull(),
   weeklyReportEnabled: integer("weekly_report_enabled").default(1).notNull(),
   lastWeeklyReportSentAt: timestamp("last_weekly_report_sent_at"),
+  visibilityGuideVisitedAt: timestamp("visibility_guide_visited_at"),
   bufferAccessToken: text("buffer_access_token"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -276,7 +277,8 @@ export const brandPrompts = pgTable(
     prompt: text("prompt").notNull(),
     rationale: text("rationale"),
     orderIndex: integer("order_index").default(0).notNull(),
-    isActive: integer("is_active").default(1).notNull(), // 1 = current, 0 = archived
+    isActive: integer("is_active").default(1).notNull(), // legacy — use `status` instead
+    status: text("status").default("tracked").notNull(), // "tracked" | "suggested" | "archived"
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

@@ -3,11 +3,13 @@ import { createServer, type Server } from "http";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { insertBrandSchema, insertCompetitorSchema, insertCompetitorCitationSnapshotSchema, usageLimits } from "@shared/schema";
-import { runBrandPrompts, DEFAULT_CITATION_PLATFORMS } from "./citationChecker";
+import { runBrandPrompts, DEFAULT_CITATION_PLATFORMS, checkForCitation } from "./citationChecker";
+import { judgeCitation } from "./citationJudge";
 import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS } from "./lib/modelConfig";
 import { enqueueContentGenerationJob, type GenerationPayload } from "./contentGenerationWorker";
 import { generateBrandPrompts } from "./lib/promptGenerator";
+import { generateSuggestedPrompts } from "./lib/suggestionGenerator";
 import { z } from "zod";
 import OpenAI from "openai";
 import { setupAuth, attachUserIfPresent, requireAuthForApi, enforceBrandOwnership, brandIdParamHandler, isAdmin } from "./auth";
@@ -628,8 +630,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard", async (req, res) => {
     try {
       const user = requireUser(req);
-      const brands = await storage.getBrandsByUserId(user.id);
-      const brandIds = new Set(brands.map((b) => b.id));
+      const allBrands = await storage.getBrandsByUserId(user.id);
+      // Optional ?brandId= filter — when provided, every metric below is
+      // scoped to that single brand. Without it, metrics aggregate across
+      // every brand the user owns (legacy behaviour).
+      const brandIdFilter = typeof req.query.brandId === "string" ? req.query.brandId : "";
+      const scopedBrands = brandIdFilter
+        ? allBrands.filter((b) => b.id === brandIdFilter)
+        : allBrands;
+      const brandIds = new Set(scopedBrands.map((b) => b.id));
       const allArticles = await storage.getArticles();
       const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
       const totalArticles = articles.length;
@@ -666,7 +675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalChecks,
           citationRate,
           totalArticles,
-          totalBrands: brands.length,
+          totalBrands: allBrands.length,
           weeklyGrowth: 0,
           avgPosition: 0,
           monthlyTraffic: 0,
@@ -687,17 +696,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
       const citations = await storage.getCitationsByUserId(user.id);
 
+      // Also count any cited geo_rankings — the automated Phase 1 flow
+      // writes there instead of the legacy `citations` table, so without
+      // this check users who've run prompt checks would never see the
+      // "Track your first citation" step flip to done.
+      let citedRankingsCount = 0;
+      let citationRunsCount = 0;
+      if (brandIds.size > 0) {
+        const promptIdsByBrand = await Promise.all(
+          Array.from(brandIds).map((bid) => storage.getBrandPromptsByBrandId(bid)),
+        );
+        const promptIds = promptIdsByBrand.flat().map((p) => p.id);
+        if (promptIds.length > 0) {
+          const rankings = await storage.getGeoRankingsByBrandPromptIds(promptIds);
+          citedRankingsCount = rankings.filter((r) => r.isCited === 1).length;
+        }
+        // Count citation runs across all brands — completing the step
+        // when the user *runs* their first check, not only when something
+        // is actually cited.
+        const runsByBrand = await Promise.all(
+          Array.from(brandIds).map((bid) => storage.getCitationRunsByBrandId(bid, 1)),
+        );
+        citationRunsCount = runsByBrand.reduce((acc, rs) => acc + rs.length, 0);
+      }
+
+      // Server-side onboarding flags — persisted on the users row so they
+      // sync across browsers/devices (localStorage doesn't).
+      const userRow = await storage.getUser(user.id);
+
       res.json({
         success: true,
         data: {
           brands,
           articles,
           citations,
+          citedRankingsCount,
+          citationRunsCount,
+          hasArticles: articles.length > 0,
+          visibilityVisited: Boolean(userRow?.visibilityGuideVisitedAt),
+          visibilityVisitedAt: userRow?.visibilityGuideVisitedAt ?? null,
           visibilityStarted: false,
         },
       });
     } catch (error) {
       sendError(res, error, "Failed to fetch onboarding status");
+    }
+  });
+
+  // Mark the "View the AI Visibility Guide" onboarding step as complete
+  // server-side. Idempotent — first call stamps the timestamp, subsequent
+  // calls are no-ops. Synced across devices via the users table.
+  app.post("/api/onboarding/visibility-visited", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const current = await storage.getUser(user.id);
+      if (!current?.visibilityGuideVisitedAt) {
+        const { eq } = await import("drizzle-orm");
+        const { db } = await import("./db");
+        const schema = await import("@shared/schema");
+        await db
+          .update(schema.users)
+          .set({ visibilityGuideVisitedAt: new Date() })
+          .where(eq(schema.users.id, user.id));
+      }
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, "Failed to mark visibility visited");
     }
   });
 
@@ -2071,11 +2135,20 @@ Content: ${articleContent}`
 
   // ============ BRAND-LEVEL CITATION PROMPT PORTFOLIO ============
 
-  // Generate 10 citation prompts for a brand using GPT-4.
+  // Seed the initial 10 tracked prompts for a brand. Refuses if tracked
+  // prompts already exist — callers must use /reset for a destructive redo.
   app.post("/api/brand-prompts/:brandId/generate", aiLimitMiddleware, async (req, res) => {
     try {
       const user = requireUser(req);
       const brand = await requireBrand(req.params.brandId, user.id);
+
+      const existing = await storage.getBrandPromptsByBrandId(brand.id, { status: "tracked" });
+      if (existing.length > 0) {
+        return res.status(409).json({
+          success: false,
+          error: "Tracked prompts are already set. Use suggestions to evolve them, or reset to start over.",
+        });
+      }
 
       const { saved, error } = await generateBrandPrompts(brand);
       if (error || saved.length === 0) {
@@ -2085,6 +2158,133 @@ Content: ${articleContent}`
       res.json({ success: true, data: saved });
     } catch (error) {
       sendError(res, error, "Failed to generate brand prompts");
+    }
+  });
+
+  // Reset: archive every tracked prompt + suggestion, then seed a fresh 10.
+  // Destructive — requires { confirm: true } in the body.
+  app.post("/api/brand-prompts/:brandId/reset", aiLimitMiddleware, async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      if (req.body?.confirm !== true) {
+        return res.status(400).json({ success: false, error: "confirm: true required" });
+      }
+      await storage.archiveBrandPrompts(brand.id);
+      await storage.archiveSuggestedPrompts(brand.id);
+      const { saved, error } = await generateBrandPrompts(brand);
+      if (error || saved.length === 0) {
+        return res.status(502).json({ success: false, error: error || "AI returned no usable prompts." });
+      }
+      res.json({ success: true, data: saved });
+    } catch (error) {
+      sendError(res, error, "Failed to reset brand prompts");
+    }
+  });
+
+  // List suggested prompts awaiting user review.
+  app.get("/api/brand-prompts/:brandId/suggestions", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const suggestions = await storage.getBrandPromptsByBrandId(brand.id, { status: "suggested" });
+      res.json({ success: true, data: suggestions });
+    } catch (error) {
+      sendError(res, error, "Failed to fetch suggestions");
+    }
+  });
+
+  // Force-refresh suggestions now (also called after each weekly auto run).
+  app.post("/api/brand-prompts/:brandId/suggestions/refresh", aiLimitMiddleware, async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const result = await generateSuggestedPrompts(brand.id, { replaceExisting: true });
+      if (result.error && result.saved.length === 0) {
+        return res.status(502).json({ success: false, error: result.error });
+      }
+      res.json({ success: true, data: result.saved });
+    } catch (error) {
+      sendError(res, error, "Failed to refresh suggestions");
+    }
+  });
+
+  // Accept a suggestion by swapping it in for a specific tracked prompt.
+  app.post("/api/brand-prompts/:brandId/suggestions/:suggestionId/accept", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const replaceTrackedId = typeof req.body?.replaceTrackedId === "string" ? req.body.replaceTrackedId : "";
+      if (!replaceTrackedId) {
+        return res.status(400).json({ success: false, error: "replaceTrackedId is required" });
+      }
+
+      const all = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
+      const suggestion = all.find((p) => p.id === req.params.suggestionId && p.status === "suggested");
+      const tracked = all.find((p) => p.id === replaceTrackedId && p.status === "tracked");
+      if (!suggestion || !tracked) {
+        return res.status(404).json({ success: false, error: "Suggestion or tracked prompt not found on this brand" });
+      }
+
+      await storage.promoteSuggestionToTracked(suggestion.id, tracked.id);
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, "Failed to accept suggestion");
+    }
+  });
+
+  // Dismiss a suggestion.
+  app.delete("/api/brand-prompts/:brandId/suggestions/:suggestionId", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const all = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
+      const suggestion = all.find((p) => p.id === req.params.suggestionId && p.status === "suggested");
+      if (!suggestion) {
+        return res.status(404).json({ success: false, error: "Suggestion not found" });
+      }
+      await storage.archiveBrandPrompt(suggestion.id);
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, "Failed to dismiss suggestion");
+    }
+  });
+
+  // Inline-edit the text of a tracked prompt.
+  app.patch("/api/brand-prompts/:brandId/prompts/:promptId", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const newText = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
+      if (!newText) {
+        return res.status(400).json({ success: false, error: "prompt text required" });
+      }
+      const all = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
+      const row = all.find((p) => p.id === req.params.promptId && p.status === "tracked");
+      if (!row) return res.status(404).json({ success: false, error: "Tracked prompt not found" });
+      const updated = await storage.updateBrandPromptText(row.id, newText);
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      sendError(res, error, "Failed to update prompt");
+    }
+  });
+
+  // Archive a tracked prompt (drops it from weekly checks).
+  app.delete("/api/brand-prompts/:brandId/prompts/:promptId", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+      const all = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
+      const row = all.find((p) => p.id === req.params.promptId && p.status === "tracked");
+      if (!row) return res.status(404).json({ success: false, error: "Tracked prompt not found" });
+      const trackedCount = all.filter((p) => p.status === "tracked").length;
+      if (trackedCount <= 1) {
+        return res.status(400).json({ success: false, error: "Keep at least one tracked prompt — accept a suggestion first" });
+      }
+      await storage.archiveBrandPrompt(row.id);
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, "Failed to archive prompt");
     }
   });
 
@@ -2252,6 +2452,133 @@ Content: ${articleContent}`
       res.json({ success: true, data: { byPrompt: Array.from(byPrompt.values()) } });
     } catch (error) {
       sendError(res, error, "Failed to fetch run details");
+    }
+  });
+
+  // Re-run brand-mention detection on stored response text for every
+  // geo_ranking of this brand. No AI calls — uses the full response already
+  // embedded in `citationContext` after the "||| RAW_RESPONSE |||" delimiter.
+  // Updates isCited/rank in place and re-aggregates affected citation_runs.
+  app.post("/api/brand-prompts/:brandId/backfill-detection", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await requireBrand(req.params.brandId, user.id);
+
+      const brandName = brand.companyName || brand.name || "";
+      const brandNameVariations = [
+        brand.name || "",
+        brand.companyName || "",
+        ...(Array.isArray(brand.nameVariations) ? brand.nameVariations : []),
+      ].filter((s) => typeof s === "string" && s.trim().length > 0);
+
+      const prompts = await storage.getBrandPromptsByBrandId(brand.id);
+      if (prompts.length === 0) {
+        return res.json({ success: true, data: { scanned: 0, updated: 0, flippedToFalse: 0, flippedToTrue: 0 } });
+      }
+
+      const rankings = await storage.getGeoRankingsByBrandPromptIds(prompts.map((p) => p.id));
+      let updated = 0;
+      let flippedToFalse = 0;
+      let flippedToTrue = 0;
+      const affectedRunIds = new Set<string>();
+
+      const brandContext = {
+        website: brand.website || null,
+        companyName: brand.companyName || null,
+        description: brand.description || null,
+        industry: brand.industry || null,
+      };
+
+      // Parse rows and drop ones without a stored response body upfront.
+      type Task = { row: typeof rankings[number]; responseText: string };
+      const tasks: Task[] = [];
+      for (const r of rankings) {
+        const ctx = r.citationContext || "";
+        const delimIdx = ctx.indexOf("||| RAW_RESPONSE |||");
+        const oldDelimIdx = ctx.indexOf("--- RAW RESPONSE ---");
+        let responseText: string | null = null;
+        if (delimIdx !== -1) {
+          responseText = ctx.substring(delimIdx + "||| RAW_RESPONSE |||".length).trim();
+        } else if (oldDelimIdx !== -1) {
+          responseText = ctx.substring(oldDelimIdx + "--- RAW RESPONSE ---".length).trim();
+        }
+        if (!responseText) continue;
+        tasks.push({ row: r, responseText });
+      }
+
+      // Cap concurrent gpt-4o-mini judge calls so backfilling 100 rows
+      // doesn't fan out 100 parallel OpenAI requests.
+      const CONCURRENCY = 5;
+      let cursor = 0;
+      const runOne = async (task: Task): Promise<void> => {
+        const { row: r, responseText } = task;
+        // Re-check: call the LLM judge unconditionally (no pre-filter).
+        // The user wants every stored row re-evaluated on every backfill.
+        const verdict = await judgeCitation({
+          responseText,
+          brand: {
+            name: brandName,
+            companyName: brandContext.companyName,
+            website: brandContext.website,
+            description: brandContext.description,
+            industry: brandContext.industry,
+            nameVariations: brandNameVariations,
+          },
+        });
+        const newIsCited = verdict.cited ? 1 : 0;
+        const newRank = verdict.cited ? verdict.rank : null;
+
+        if (newIsCited !== r.isCited || newRank !== r.rank) {
+          const newStatusLine = verdict.cited ? "Cited" : "Not cited";
+          const newContext = `${newStatusLine}\n\n||| RAW_RESPONSE |||\n${responseText}`;
+          await storage.updateGeoRanking(r.id, {
+            isCited: newIsCited,
+            rank: newRank,
+            citationContext: newContext,
+          });
+          updated += 1;
+          if (newIsCited === 1 && r.isCited === 0) flippedToTrue += 1;
+          if (newIsCited === 0 && r.isCited === 1) flippedToFalse += 1;
+          if (r.runId) affectedRunIds.add(r.runId);
+        }
+      };
+      const worker = async (): Promise<void> => {
+        while (true) {
+          const idx = cursor++;
+          if (idx >= tasks.length) return;
+          await runOne(tasks[idx]);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, () => worker()));
+
+      // Re-aggregate affected citation_runs (totalCited, citationRate, platformBreakdown).
+      for (const runId of Array.from(affectedRunIds)) {
+        const runRows = await storage.getGeoRankingsByRunId(runId);
+        const totalChecks = runRows.length;
+        const totalCited = runRows.filter((x) => x.isCited === 1).length;
+        const citationRate = totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0;
+        const platformMap = new Map<string, { cited: number; checks: number }>();
+        for (const x of runRows) {
+          const e = platformMap.get(x.aiPlatform) || { cited: 0, checks: 0 };
+          e.checks += 1;
+          if (x.isCited === 1) e.cited += 1;
+          platformMap.set(x.aiPlatform, e);
+        }
+        const platformBreakdown = Object.fromEntries(
+          Array.from(platformMap.entries()).map(([p, s]) => [
+            p,
+            { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 },
+          ]),
+        );
+        await storage.updateCitationRun(runId, { totalChecks, totalCited, citationRate, platformBreakdown });
+      }
+
+      res.json({
+        success: true,
+        data: { scanned: rankings.length, updated, flippedToFalse, flippedToTrue },
+      });
+    } catch (error) {
+      sendError(res, error, "Failed to backfill citation detection");
     }
   });
 

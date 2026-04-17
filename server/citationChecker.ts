@@ -3,6 +3,7 @@ import { storage } from "./storage";
 import type { GeoRanking, Brand } from "@shared/schema";
 import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS, OPENROUTER_BASE_URL } from "./lib/modelConfig";
+import { judgeCitation, type JudgeBrand } from "./citationJudge";
 
 // ChatGPT citation checks go through the direct OpenAI client.
 const openai = new OpenAI({
@@ -43,57 +44,140 @@ function normalizeBrandName(name: string): string {
     .trim();
 }
 
+// Fold accents so "Nestlé" also matches "Nestle" in responses.
+function foldDiacritics(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+// 3–5 letter tokens that look like acronyms but are either English words or
+// ubiquitous abbreviations. Auto-acronyms matching these are NOT indexed —
+// prevents "Cool Auto Repair" from matching every mention of a "CAR".
+const COMMON_ACRONYM_WORDS = new Set([
+  "CAR", "SUN", "CAT", "DOG", "BIG", "TOP", "NEW", "OLD", "FAR", "WAY",
+  "AIR", "OIL", "GAS", "RUN", "FUN", "LOG", "LAB", "NET", "WEB", "APP",
+  "API", "CEO", "CFO", "COO", "CTO", "HR", "PR", "IT", "FAQ", "PDF",
+  "URL", "HTML", "CSS", "JSON", "AJAX", "REST", "HTTP", "HTTPS", "USA",
+  "EU", "UK", "USD", "EUR", "GBP",
+]);
+
+// Generic domain prefixes that shouldn't be indexed as a standalone brand
+// name even if they're the bare subdomain of the user's website.
+const COMMON_DOMAIN_WORDS = new Set([
+  "store", "shop", "blog", "news", "media", "group", "online", "global",
+  "cloud", "world", "daily", "inc", "company", "corp", "home", "app", "apps",
+  "web", "site", "pro", "team",
+]);
+
+// Single-word brand names that share a spelling with a common English word.
+// Matches for these variants must appear near a "signal token" (see
+// SIGNAL_TOKEN_RE below) — otherwise a blog post about apple pie would
+// falsely cite Apple Inc.
+const AMBIGUOUS_GENERIC_WORDS = new Set([
+  "apple", "target", "square", "stripe", "amazon", "meta", "twitter",
+  "pinterest", "snap", "discord", "notion", "chrome", "mint", "slack",
+  "dropbox", "oracle", "shell", "mars", "coach", "gap", "hermes",
+  "shopify", "patch", "block", "ring", "nest", "echo", "basecamp",
+]);
+
+// Words that, when they appear near an ambiguous brand name, indicate the
+// mention is about the company (not the generic word).
+const SIGNAL_TOKEN_RE = /\b(platform|company|app|service|tool|product|startup|brand|software|website|site|founder|launched|acquired|announced|subscribe|subscription|saas|ceo|cfo|coo|cto|headquartered|\.com|\.io|\.ai|\.co|founded|developer|ipo|shares|stock|investors)\b/i;
+
 // Build the set of name variants we should search for in a response. Order
 // matters — the longest variant is tried first so the match snippet is as
 // specific as possible.
 export function buildBrandNameVariants(
   brandName: string,
   extraVariations: string[] = [],
+  website?: string,
 ): string[] {
   const raw = [brandName, ...extraVariations].filter((s) => typeof s === "string" && s.trim().length > 0);
   const set = new Set<string>();
+
   for (const r of raw) {
     const trimmed = r.trim();
     if (trimmed.length >= 3) set.add(trimmed.toLowerCase());
+
+    // Legal suffix stripped + punctuation normalized
     const normalized = normalizeBrandName(trimmed).toLowerCase();
     if (normalized.length >= 3) set.add(normalized);
-    // Also index each individual word ≥ 4 chars — so "Notion Labs" also
-    // matches a response that only mentions "Notion".
-    for (const word of normalized.split(/\s+/)) {
-      if (word.length >= 4) set.add(word);
+
+    // Diacritic-folded and de-hyphenated forms
+    const folded = foldDiacritics(trimmed.replace(/[-_]/g, " ").replace(/\s+/g, " ").trim()).toLowerCase();
+    if (folded.length >= 3) set.add(folded);
+    const foldedNorm = foldDiacritics(normalized).toLowerCase();
+    if (foldedNorm.length >= 3) set.add(foldedNorm);
+
+    // Auto-acronym from multi-word names with 3+ words
+    const words = normalized.split(/\s+/).filter((w) => w.length > 0);
+    if (words.length >= 3) {
+      const acronym = words.map((w) => w[0]).join("").toUpperCase();
+      if (acronym.length >= 3 && acronym.length <= 5 && !COMMON_ACRONYM_WORDS.has(acronym)) {
+        set.add(acronym.toLowerCase());
+      }
     }
   }
+
+  // Website-derived variants — "https://stripe.com" → "stripe.com" + "stripe".
+  if (website) {
+    try {
+      const rawHost = website.startsWith("http") ? website : `https://${website}`;
+      const host = new URL(rawHost).hostname.replace(/^www\./i, "");
+      if (host.length >= 4) set.add(host.toLowerCase());
+      const bare = host.split(".")[0];
+      if (bare && bare.length >= 4 && !COMMON_DOMAIN_WORDS.has(bare.toLowerCase())) {
+        set.add(bare.toLowerCase());
+      }
+    } catch {
+      // malformed URL — skip
+    }
+  }
+
   // Sort longest → shortest so the most specific match wins.
   return Array.from(set).sort((a, b) => b.length - a.length);
 }
 
-// Heuristic brand-mention detector used by every platform's response parser.
-// Pure binary — either the brand name (or one of its variants) appears in the
-// response or it doesn't. No context snippet, no fuzzy keyword matching.
-export function checkForCitation(
+// LLM-judged citation detector. The string matcher is only a cheap pre-filter:
+// if NO brand variant appears anywhere in the response, skip the LLM call
+// (definitely not cited). Otherwise gpt-4o-mini decides, because it can tell
+// "venture capital" apart from "Venture PR" using surrounding context.
+export async function checkForCitation(
   responseText: string,
   brandName: string,
   extraVariations: string[] = [],
-): { isCited: boolean; rank: number | null } {
-  if (!brandName) return { isCited: false, rank: null };
+  brandContext?: {
+    website?: string | null;
+    companyName?: string | null;
+    description?: string | null;
+    industry?: string | null;
+  },
+): Promise<{ isCited: boolean; rank: number | null; reasoning?: string }> {
+  if (!brandName || !responseText) return { isCited: false, rank: null };
 
-  const lowerResponse = responseText.toLowerCase();
-  const variants = buildBrandNameVariants(brandName, extraVariations);
+  const variants = buildBrandNameVariants(brandName, extraVariations, brandContext?.website || undefined);
+  const lower = responseText.toLowerCase();
+  const anyHit = variants.some((v) => lower.includes(v));
+  if (!anyHit) return { isCited: false, rank: null, reasoning: "No brand variant found in response" };
 
-  for (const variant of variants) {
-    // Word-boundary match so "co" doesn't match "companies". Escape regex
-    // specials, then wrap in \b to require token boundaries.
-    const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`\\b${escaped}\\b`, "i");
-    const match = re.exec(responseText);
-    if (match && match.index !== undefined) {
-      const beforeMention = lowerResponse.substring(0, match.index);
-      const rank = (beforeMention.match(new RegExp(`\\b${escaped}\\b`, "gi")) || []).length + 1;
-      return { isCited: true, rank };
-    }
+  const judgeBrand: JudgeBrand = {
+    name: brandName,
+    companyName: brandContext?.companyName,
+    website: brandContext?.website,
+    description: brandContext?.description,
+    industry: brandContext?.industry,
+    nameVariations: extraVariations,
+  };
+
+  try {
+    const verdict = await judgeCitation({ responseText, brand: judgeBrand });
+    return { isCited: verdict.cited, rank: verdict.cited ? verdict.rank : null, reasoning: verdict.reasoning };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[citationChecker] judge call failed —`, msg);
+    // Fail closed: if the judge is unreachable, report not cited so we don't
+    // leave stale string-matcher false positives behind.
+    return { isCited: false, rank: null, reasoning: `Judge error: ${msg}` };
   }
-
-  return { isCited: false, rank: null };
 }
 
 // Maps each non-ChatGPT citation platform to its OpenRouter model slug.
@@ -110,10 +194,17 @@ const OPENROUTER_MODEL_BY_PLATFORM: Record<string, string> = {
 export async function runPlatformCitationCheck(
   platform: string,
   prompt: string,
-  _brand: Brand | null,
+  brand: Brand | null,
   brandName: string,
   brandNameVariations: string[] = [],
+  website?: string,
 ): Promise<{ isCited: boolean; rank: number | null; responseText: string; error?: string }> {
+  const brandContext = {
+    website: website || brand?.website || null,
+    companyName: brand?.companyName || null,
+    description: brand?.description || null,
+    industry: brand?.industry || null,
+  };
   const systemMsg = "You are a helpful assistant. Answer the question thoroughly, citing specific sources, brands, companies, or products when relevant.";
 
   if (platform === 'ChatGPT' || platform === 'GPT-4') {
@@ -127,7 +218,7 @@ export async function runPlatformCitationCheck(
       temperature: 0.7,
     });
     const responseText = chatResponse.choices[0].message.content || '';
-    const r = checkForCitation(responseText, brandName, brandNameVariations);
+    const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
     return { isCited: r.isCited, rank: r.rank, responseText };
   }
 
@@ -155,7 +246,7 @@ export async function runPlatformCitationCheck(
     temperature: 0.7,
   });
   const responseText = chatResponse.choices[0]?.message?.content || '';
-  const r = checkForCitation(responseText, brandName, brandNameVariations);
+  const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
   return { isCited: r.isCited, rank: r.rank, responseText };
 }
 
@@ -220,7 +311,7 @@ export async function runBrandPrompts(
     let rank: number | null = null;
     const started = Date.now();
     try {
-      const result = await runPlatformCitationCheck(platform, bp.prompt, brand, brandName, brandNameVariations);
+      const result = await runPlatformCitationCheck(platform, bp.prompt, brand, brandName, brandNameVariations, brand.website || undefined);
       isCited = result.isCited;
       rank = result.rank;
       if (result.error) {

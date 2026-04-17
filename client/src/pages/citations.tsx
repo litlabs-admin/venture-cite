@@ -11,7 +11,27 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import PageHeader from "@/components/PageHeader";
-import { Sparkles, Play, RefreshCw, Target, TrendingUp, CheckCircle2, XCircle, Loader2, AlertCircle, ChevronDown, ChevronRight, Calendar } from "lucide-react";
+import { Sparkles, Play, RefreshCw, Target, TrendingUp, CheckCircle2, XCircle, Loader2, AlertCircle, ChevronDown, ChevronRight, Calendar, Pencil, Trash2, Check, X, Lightbulb } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { formatDistanceToNow, format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
@@ -147,6 +167,12 @@ export default function Citations() {
   });
   const prompts = promptsData?.data || [];
 
+  const { data: suggestionsData } = useQuery<{ success: boolean; data: BrandPrompt[] }>({
+    queryKey: [`/api/brand-prompts/${selectedBrandId}/suggestions`],
+    enabled: !!selectedBrandId,
+  });
+  const suggestions = suggestionsData?.data || [];
+
   const { data: resultsData, isLoading: resultsLoading } = useQuery<{ success: boolean; data: ResultsData }>({
     queryKey: [`/api/brand-prompts/${selectedBrandId}/results`],
     enabled: !!selectedBrandId,
@@ -198,6 +224,7 @@ export default function Citations() {
         // that the server computes, so we can't build them client-side from the run response.
         queryClient.invalidateQueries({ queryKey: [`/api/brand-prompts/${selectedBrandId}/results`] });
         queryClient.invalidateQueries({ queryKey: [`/api/brand-prompts/${selectedBrandId}/history`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/onboarding-status"] });
         toast({
           title: "Citation check complete",
           description: `${data.data.totalCited} of ${data.data.totalChecks} checks cited your brand (${data.data.citationRate}%).`,
@@ -207,6 +234,107 @@ export default function Citations() {
       }
     },
     onError: (err: Error) => toast({ title: "Check failed", description: err.message, variant: "destructive" }),
+  });
+
+  // Re-score stored responses with the current detector. Free (no AI calls).
+  const backfillMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/backfill-detection`, {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: [`/api/brand-prompts/${selectedBrandId}/results`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/brand-prompts/${selectedBrandId}/history`] });
+        const { scanned, updated, flippedToFalse, flippedToTrue } = data.data;
+        const changesLabel = updated === 0
+          ? "No changes — all stored results already match the current detection logic."
+          : `Updated ${updated} of ${scanned} rows (${flippedToFalse} false→true fixes corrected to Not Cited, ${flippedToTrue} newly detected).`;
+        toast({ title: "Re-check complete", description: changesLabel });
+      } else {
+        toast({ title: "Re-check failed", description: data.error || "Please try again.", variant: "destructive" });
+      }
+    },
+    onError: (err: Error) => toast({ title: "Re-check failed", description: err.message, variant: "destructive" }),
+  });
+
+  const invalidatePromptQueries = () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/brand-prompts/${selectedBrandId}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/brand-prompts/${selectedBrandId}/suggestions`] });
+  };
+
+  const refreshSuggestionsMutation = useMutation({
+    mutationFn: async () => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/suggestions/refresh`, {});
+      return r.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.setQueryData([`/api/brand-prompts/${selectedBrandId}/suggestions`], { success: true, data: data.data });
+        toast({ title: "Suggestions refreshed", description: `${data.data.length} new ideas ready to review.` });
+      } else {
+        toast({ title: "Couldn't refresh", description: data.error || "Try again", variant: "destructive" });
+      }
+    },
+    onError: (err: Error) => toast({ title: "Couldn't refresh", description: err.message, variant: "destructive" }),
+  });
+
+  const acceptSuggestionMutation = useMutation({
+    mutationFn: async ({ suggestionId, replaceTrackedId }: { suggestionId: string; replaceTrackedId: string }) => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/suggestions/${suggestionId}/accept`, { replaceTrackedId });
+      return r.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        invalidatePromptQueries();
+        toast({ title: "Suggestion accepted", description: "Tracked set updated." });
+      } else {
+        toast({ title: "Couldn't accept", description: data.error || "Try again", variant: "destructive" });
+      }
+    },
+    onError: (err: Error) => toast({ title: "Couldn't accept", description: err.message, variant: "destructive" }),
+  });
+
+  const dismissSuggestionMutation = useMutation({
+    mutationFn: async (suggestionId: string) => {
+      const r = await apiRequest("DELETE", `/api/brand-prompts/${selectedBrandId}/suggestions/${suggestionId}`);
+      return r.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: [`/api/brand-prompts/${selectedBrandId}/suggestions`] });
+      }
+    },
+  });
+
+  const editPromptMutation = useMutation({
+    mutationFn: async ({ promptId, text }: { promptId: string; text: string }) => {
+      const r = await apiRequest("PATCH", `/api/brand-prompts/${selectedBrandId}/prompts/${promptId}`, { prompt: text });
+      return r.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        invalidatePromptQueries();
+        toast({ title: "Prompt updated" });
+      } else {
+        toast({ title: "Update failed", description: data.error || "Try again", variant: "destructive" });
+      }
+    },
+  });
+
+  const archivePromptMutation = useMutation({
+    mutationFn: async (promptId: string) => {
+      const r = await apiRequest("DELETE", `/api/brand-prompts/${selectedBrandId}/prompts/${promptId}`);
+      return r.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        invalidatePromptQueries();
+        toast({ title: "Prompt archived" });
+      } else {
+        toast({ title: "Couldn't archive", description: data.error || "Try again", variant: "destructive" });
+      }
+    },
   });
 
   const generateLoadingMessage = useLoadingMessages(generateMutation.isPending, [
@@ -244,6 +372,10 @@ export default function Citations() {
 
   const [activeTab, setActiveTab] = usePersistedState<string>("vc_citations_tab", "prompts");
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [acceptingSuggestion, setAcceptingSuggestion] = useState<BrandPrompt | null>(null);
+  const [acceptReplaceId, setAcceptReplaceId] = useState<string>("");
 
   // Drill-down for a specific run
   const { data: runDetailData, isLoading: runDetailLoading } = useQuery<{ success: boolean; data: { byPrompt: Array<{ prompt: string; platforms: PlatformResult[] }> } }>({
@@ -259,8 +391,8 @@ export default function Citations() {
     : null;
   const bestPrompt = results?.byPrompt?.length
     ? [...results.byPrompt]
-        .map((p) => ({ ...p, citedCount: p.platforms.filter((pl) => pl.isCited).length }))
-        .sort((a, b) => b.citedCount - a.citedCount)[0]
+      .map((p) => ({ ...p, citedCount: p.platforms.filter((pl) => pl.isCited).length }))
+      .sort((a, b) => b.citedCount - a.citedCount)[0]
     : null;
 
   const TABS = [
@@ -300,24 +432,40 @@ export default function Citations() {
                 </SelectContent>
               </Select>
               {hasPrompts && (
-                <Button
-                  onClick={() => runMutation.mutate()}
-                  disabled={runMutation.isPending}
-                  className="bg-red-600 hover:bg-red-700 shrink-0"
-                  data-testid="button-run-check"
-                >
-                  {runMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {runLoadingMessage}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run Check
-                    </>
-                  )}
-                </Button>
+                <>
+                  <Button
+                    onClick={() => runMutation.mutate()}
+                    disabled={runMutation.isPending}
+                    className="bg-red-600 hover:bg-red-700 shrink-0"
+                    data-testid="button-run-check"
+                  >
+                    {runMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {runLoadingMessage}
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" />
+                        Run Check
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => backfillMutation.mutate()}
+                    disabled={backfillMutation.isPending}
+                    className="shrink-0"
+                    title="Re-apply the current brand-detection logic to stored responses. Free — no AI calls."
+                    data-testid="button-backfill-detection"
+                  >
+                    {backfillMutation.isPending ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Re-checking…</>
+                    ) : (
+                      "Re-check stored"
+                    )}
+                  </Button>
+                </>
               )}
             </div>
           )}
@@ -346,11 +494,10 @@ export default function Citations() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                    isActive
-                      ? "border-red-500 text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                  }`}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${isActive
+                    ? "border-red-500 text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                    }`}
                 >
                   <Icon className="h-4 w-4" />
                   {tab.label}
@@ -361,85 +508,296 @@ export default function Citations() {
 
           {/* PROMPTS TAB */}
           {activeTab === "prompts" && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-red-500" />
-                      Prompt Portfolio
-                    </CardTitle>
-                    <CardDescription>
-                      10 strategic questions where {selectedBrand?.name} is most likely to be cited by AI engines.
-                      {promptsAgeLabel && <span className="ml-2 text-xs">Generated {promptsAgeLabel}.</span>}
-                    </CardDescription>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-red-500" />
+                        Tracked prompts {hasPrompts && <span className="text-sm text-muted-foreground font-normal">({prompts.length} of 10)</span>}
+                      </CardTitle>
+                      <CardDescription>
+                        These are the fixed questions re-checked every week so you can compare citation trends over time. Edit them to refine what's tracked.
+                        {promptsAgeLabel && <span className="ml-2 text-xs">Seeded {promptsAgeLabel}.</span>}
+                      </CardDescription>
+                    </div>
+                    {hasPrompts && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm" data-testid="button-reset-prompts">
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Reset all
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Reset tracked prompts?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This archives all 10 tracked prompts and all pending suggestions, then generates a fresh set of 10. Past citation history is preserved but week-over-week trends will restart.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={async () => {
+                                const r = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/reset`, { confirm: true });
+                                const data = await r.json();
+                                if (data.success) {
+                                  invalidatePromptQueries();
+                                  toast({ title: "Prompts reset" });
+                                } else {
+                                  toast({ title: "Reset failed", description: data.error, variant: "destructive" });
+                                }
+                              }}
+                            >
+                              Reset
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
-                  {hasPrompts && (
+                </CardHeader>
+                <CardContent>
+                  {promptsLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+                    </div>
+                  ) : !hasPrompts ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        No prompts yet. Generate 10 citation prompts tailored to your brand profile and published articles — these become the locked set we track weekly.
+                      </p>
+                      <Button
+                        onClick={() => generateMutation.mutate()}
+                        disabled={generateMutation.isPending}
+                        className="bg-red-600 hover:bg-red-700"
+                        data-testid="button-generate-prompts"
+                      >
+                        {generateMutation.isPending ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{generateLoadingMessage}</>
+                        ) : (
+                          <><Sparkles className="h-4 w-4 mr-2" />Generate 10 Citation Prompts</>
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {prompts.map((p, i) => {
+                        const isEditing = editingPromptId === p.id;
+                        return (
+                          <div key={p.id} className="border border-border rounded-lg p-4" data-testid={`prompt-row-${i}`}>
+                            <div className="flex items-start gap-3">
+                              <Badge variant="outline" className="mt-0.5 shrink-0">{i + 1}</Badge>
+                              <div className="flex-1 min-w-0">
+                                {isEditing ? (
+                                  <div className="space-y-2">
+                                    <Textarea
+                                      value={editingText}
+                                      onChange={(e) => setEditingText(e.target.value)}
+                                      className="min-h-[60px]"
+                                      autoFocus
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => {
+                                          if (editingText.trim() && editingText.trim() !== p.prompt) {
+                                            editPromptMutation.mutate({ promptId: p.id, text: editingText.trim() });
+                                          }
+                                          setEditingPromptId(null);
+                                        }}
+                                      >
+                                        <Check className="h-3.5 w-3.5 mr-1" />Save
+                                      </Button>
+                                      <Button size="sm" variant="ghost" onClick={() => setEditingPromptId(null)}>
+                                        <X className="h-3.5 w-3.5 mr-1" />Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="font-medium text-foreground">{p.prompt}</p>
+                                    {p.rationale && (
+                                      <p className="text-sm text-muted-foreground mt-1 italic">{p.rationale}</p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                              {!isEditing && (
+                                <div className="flex gap-1 shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingPromptId(p.id);
+                                      setEditingText(p.prompt);
+                                    }}
+                                    data-testid={`button-edit-prompt-${i}`}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="sm" data-testid={`button-archive-prompt-${i}`}>
+                                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Remove this tracked prompt?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Future weekly runs won't include it. Past citation history stays intact. You can accept a suggestion later to backfill the slot.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => archivePromptMutation.mutate(p.id)}>Remove</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* SUGGESTIONS */}
+              {hasPrompts && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Lightbulb className="h-5 w-5 text-amber-500" />
+                          Suggested prompts {suggestions.length > 0 && <span className="text-sm text-muted-foreground font-normal">({suggestions.length})</span>}
+                        </CardTitle>
+                        <CardDescription>
+                          After each weekly run we propose 5 new questions that cover angles your tracked set misses. Accept one to swap it in for a tracked prompt you want to retire.
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => refreshSuggestionsMutation.mutate()}
+                        disabled={refreshSuggestionsMutation.isPending}
+                        data-testid="button-refresh-suggestions"
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${refreshSuggestionsMutation.isPending ? "animate-spin" : ""}`} />
+                        {suggestions.length === 0 ? "Generate suggestions" : "Refresh"}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {suggestions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">
+                        No suggestions yet. They'll appear after the next weekly run — or click Refresh to generate now.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {suggestions.map((s) => (
+                          <div key={s.id} className="border border-border rounded-lg p-4 bg-amber-50/40 dark:bg-amber-900/10" data-testid={`suggestion-${s.id}`}>
+                            <div className="flex items-start gap-3">
+                              <Lightbulb className="h-4 w-4 text-amber-500 mt-1 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-foreground">{s.prompt}</p>
+                                {s.rationale && (
+                                  <p className="text-sm text-muted-foreground mt-1 italic">{s.rationale}</p>
+                                )}
+                              </div>
+                              <div className="flex gap-1 shrink-0">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setAcceptingSuggestion(s);
+                                    setAcceptReplaceId(prompts[0]?.id || "");
+                                  }}
+                                  data-testid={`button-accept-suggestion-${s.id}`}
+                                >
+                                  <Check className="h-3.5 w-3.5 mr-1" />Accept
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => dismissSuggestionMutation.mutate(s.id)}
+                                  data-testid={`button-dismiss-suggestion-${s.id}`}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* ACCEPT MODAL */}
+              <Dialog open={!!acceptingSuggestion} onOpenChange={(open) => { if (!open) setAcceptingSuggestion(null); }}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Replace which tracked prompt?</DialogTitle>
+                    <DialogDescription>
+                      The suggestion below will become tracked. Pick an existing tracked prompt to archive in its place so the set stays at {prompts.length}.
+                    </DialogDescription>
+                  </DialogHeader>
+                  {acceptingSuggestion && (
+                    <div className="space-y-3">
+                      <div className="text-sm p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded">
+                        <span className="text-amber-700 dark:text-amber-300 font-medium">New:</span>{" "}
+                        <span className="text-foreground">{acceptingSuggestion.prompt}</span>
+                      </div>
+                      <div className="space-y-2 max-h-[320px] overflow-y-auto">
+                        {prompts.map((p, i) => (
+                          <label
+                            key={p.id}
+                            className={`flex items-start gap-2 p-2 rounded border cursor-pointer hover:bg-muted/40 ${acceptReplaceId === p.id ? "border-red-500 bg-red-50 dark:bg-red-900/20" : "border-border"}`}
+                          >
+                            <input
+                              type="radio"
+                              name="replaceTracked"
+                              value={p.id}
+                              checked={acceptReplaceId === p.id}
+                              onChange={() => setAcceptReplaceId(p.id)}
+                              className="mt-1"
+                            />
+                            <div className="text-sm">
+                              <span className="text-muted-foreground mr-2">#{i + 1}</span>
+                              <span className="text-foreground">{p.prompt}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <DialogFooter>
+                    <Button variant="ghost" onClick={() => setAcceptingSuggestion(null)}>Cancel</Button>
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => {
-                        if (confirm("Regenerate will replace your existing 10 prompts. Continue?")) {
-                          generateMutation.mutate();
+                        if (acceptingSuggestion && acceptReplaceId) {
+                          acceptSuggestionMutation.mutate({
+                            suggestionId: acceptingSuggestion.id,
+                            replaceTrackedId: acceptReplaceId,
+                          });
+                          setAcceptingSuggestion(null);
                         }
                       }}
-                      disabled={generateMutation.isPending}
-                      data-testid="button-regenerate-prompts"
+                      disabled={!acceptReplaceId}
                     >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${generateMutation.isPending ? "animate-spin" : ""}`} />
-                      Regenerate
+                      Confirm swap
                     </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {promptsLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
-                  </div>
-                ) : !hasPrompts ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                      No prompts yet. Generate 10 citation prompts tailored to your brand profile and published articles.
-                    </p>
-                    <Button
-                      onClick={() => generateMutation.mutate()}
-                      disabled={generateMutation.isPending}
-                      className="bg-red-600 hover:bg-red-700"
-                      data-testid="button-generate-prompts"
-                    >
-                      {generateMutation.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {generateLoadingMessage}
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Generate 10 Citation Prompts
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {prompts.map((p, i) => (
-                      <div key={p.id} className="border border-border rounded-lg p-4" data-testid={`prompt-row-${i}`}>
-                        <div className="flex items-start gap-3">
-                          <Badge variant="outline" className="mt-0.5 shrink-0">{i + 1}</Badge>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground">{p.prompt}</p>
-                            {p.rationale && (
-                              <p className="text-sm text-muted-foreground mt-1 italic">{p.rationale}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
 
           {/* RESULTS TAB */}
@@ -787,7 +1145,7 @@ export default function Citations() {
                   Auto-Citation Schedule
                 </CardTitle>
                 <CardDescription>
-                  Automatically regenerate prompts and run citation checks on a schedule. Each run generates 10 fresh prompts.
+                  Automatically re-check your tracked prompts.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -830,7 +1188,7 @@ export default function Citations() {
                 </div>
                 {currentSchedule !== "off" && (
                   <p className="text-xs text-muted-foreground mt-3">
-                    Runs every {currentSchedule === "weekly" ? "week" : currentSchedule === "biweekly" ? "2 weeks" : "month"} on {DAY_NAMES[currentDay]}. Generates 10 new prompts and checks all 5 platforms automatically.
+                    Runs every {currentSchedule === "weekly" ? "week" : currentSchedule === "biweekly" ? "2 weeks" : "month"} on {DAY_NAMES[currentDay]}. Re-checks your tracked prompts across all 5 platforms.
                     {selectedBrand?.lastAutoCitationAt && (
                       <span className="ml-1">Last run: {formatDistanceToNow(new Date(selectedBrand.lastAutoCitationAt), { addSuffix: true })}.</span>
                     )}

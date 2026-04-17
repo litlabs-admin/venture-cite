@@ -316,16 +316,32 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(schema.geoRankings.checkedAt));
   }
 
+  async updateGeoRanking(id: string, update: Partial<GeoRanking>): Promise<GeoRanking | undefined> {
+    const [row] = await db
+      .update(schema.geoRankings)
+      .set(update)
+      .where(eq(schema.geoRankings.id, id))
+      .returning();
+    return row;
+  }
+
   async createBrandPrompt(p: InsertBrandPrompt): Promise<BrandPrompt> {
     const [row] = await db.insert(schema.brandPrompts).values(p).returning();
     return row;
   }
 
-  async getBrandPromptsByBrandId(brandId: string): Promise<BrandPrompt[]> {
+  async getBrandPromptsByBrandId(
+    brandId: string,
+    opts: { status?: "tracked" | "suggested" | "archived" | "all" } = {},
+  ): Promise<BrandPrompt[]> {
+    const status = opts.status ?? "tracked";
+    const where = status === "all"
+      ? eq(schema.brandPrompts.brandId, brandId)
+      : and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.status, status));
     return await db
       .select()
       .from(schema.brandPrompts)
-      .where(and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.isActive, 1)))
+      .where(where)
       .orderBy(asc(schema.brandPrompts.orderIndex));
   }
 
@@ -334,10 +350,49 @@ export class DatabaseStorage implements IStorage {
   }
 
   async archiveBrandPrompts(brandId: string): Promise<void> {
+    // Archive every tracked prompt for this brand. Does not touch
+    // suggestions — call archiveSuggestedPrompts for those.
     await db
       .update(schema.brandPrompts)
-      .set({ isActive: 0 })
-      .where(and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.isActive, 1)));
+      .set({ isActive: 0, status: "archived" })
+      .where(and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.status, "tracked")));
+  }
+
+  async archiveSuggestedPrompts(brandId: string): Promise<void> {
+    await db
+      .update(schema.brandPrompts)
+      .set({ isActive: 0, status: "archived" })
+      .where(and(eq(schema.brandPrompts.brandId, brandId), eq(schema.brandPrompts.status, "suggested")));
+  }
+
+  async updateBrandPromptText(id: string, prompt: string): Promise<BrandPrompt | undefined> {
+    const [row] = await db
+      .update(schema.brandPrompts)
+      .set({ prompt })
+      .where(eq(schema.brandPrompts.id, id))
+      .returning();
+    return row;
+  }
+
+  async archiveBrandPrompt(id: string): Promise<void> {
+    await db
+      .update(schema.brandPrompts)
+      .set({ isActive: 0, status: "archived" })
+      .where(eq(schema.brandPrompts.id, id));
+  }
+
+  async promoteSuggestionToTracked(suggestionId: string, replaceTrackedId: string): Promise<void> {
+    // Two-step swap: archive the tracked row, promote the suggestion. Drizzle
+    // doesn't expose transactions uniformly here so we do best-effort sequential
+    // updates — routes.ts validates ownership + brand match up front.
+    await db
+      .update(schema.brandPrompts)
+      .set({ isActive: 0, status: "archived" })
+      .where(eq(schema.brandPrompts.id, replaceTrackedId));
+    await db
+      .update(schema.brandPrompts)
+      .set({ isActive: 1, status: "tracked" })
+      .where(eq(schema.brandPrompts.id, suggestionId));
   }
 
   async createPromptGeneration(brandId: string): Promise<schema.PromptGeneration> {

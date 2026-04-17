@@ -3,7 +3,7 @@ import { db } from "./db";
 import { and, eq, gte, ne, isNull, lte, or } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { runBrandPrompts } from "./citationChecker";
-import { generateBrandPrompts } from "./lib/promptGenerator";
+import { generateSuggestedPrompts } from "./lib/suggestionGenerator";
 import { storage } from "./storage";
 import { sendWeeklyVisibilityReport, isEmailConfigured, type BrandReport } from "./emailService";
 
@@ -135,7 +135,7 @@ export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: num
 
 // Per-brand auto-citation: runs daily at 6 AM UTC, checks each brand's
 // individual schedule (off/weekly/biweekly/monthly) and preferred day.
-// Each run regenerates 10 fresh prompts before checking citations.
+// Re-runs the locked tracked-prompt set and refreshes suggestions.
 const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 6 * * *"; // daily check
 
 function isBrandDueForCitation(brand: {
@@ -177,16 +177,22 @@ async function runAutoCitationJob(): Promise<void> {
     if (!isBrandDueForCitation(brand)) continue;
 
     try {
-      // Step 1: Generate 10 fresh prompts
-      console.log(`[scheduler] regenerating prompts for brand ${brand.name}...`);
-      const { saved, error } = await generateBrandPrompts(brand);
-      if (error || saved.length === 0) {
-        console.warn(`[scheduler] prompt generation failed for brand ${brand.name}: ${error || "no prompts"}`);
+      // Skip brands that never seeded tracked prompts — weekly cron should
+      // not auto-create the initial 10; that's a user-initiated action.
+      const tracked = await storage.getBrandPromptsByBrandId(brand.id, { status: "tracked" });
+      if (tracked.length === 0) {
+        console.log(`[scheduler] brand ${brand.name} has no tracked prompts — skipping weekly run`);
         continue;
       }
 
-      // Step 2: Run citation checks with the new prompts
+      // Step 1: Re-check citations on the locked tracked set.
       await runBrandPrompts(brand.id, undefined, { triggeredBy: "cron" });
+
+      // Step 2: Refresh suggestions for the user to review.
+      const suggestionResult = await generateSuggestedPrompts(brand.id, { replaceExisting: true });
+      if (suggestionResult.error) {
+        console.warn(`[scheduler] suggestion refresh for ${brand.name} failed: ${suggestionResult.error}`);
+      }
 
       // Step 3: Update lastAutoCitationAt
       await db

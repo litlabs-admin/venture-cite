@@ -655,6 +655,21 @@ export default function AIVisibility() {
     }
   }, [brands, selectedBrandId]);
 
+  // Mark the AI Visibility Guide as visited server-side on mount so the
+  // onboarding step syncs across browsers/devices. Best-effort — failures
+  // don't block the page. Also keep the localStorage key for back-compat.
+  useEffect(() => {
+    localStorage.setItem("venturecite-visibility-visited", "true");
+    (async () => {
+      try {
+        await apiRequest("POST", "/api/onboarding/visibility-visited");
+        queryClient.invalidateQueries({ queryKey: ["/api/onboarding-status"] });
+      } catch {
+        /* non-fatal */
+      }
+    })();
+  }, []);
+
   // Server-side per-brand checklist progress.
   const progressQueryKey = [`/api/visibility-progress/${selectedBrandId}`];
   const { data: progressResponse } = useQuery<{ success: boolean; data: Record<string, string[]> }>({

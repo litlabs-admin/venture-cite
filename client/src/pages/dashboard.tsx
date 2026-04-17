@@ -9,7 +9,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Zap, TrendingUp, Target, Users, HelpCircle, Info, Lightbulb, FileText, CheckCircle, Clock, BarChart3 } from "lucide-react";
 import { Link } from "wouter";
-import OnboardingChecklist from "@/components/OnboardingChecklist";
 
 const formatNumber = (num: number) => {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -110,9 +109,6 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Onboarding Checklist */}
-        <OnboardingChecklist />
-
         {/* Stats Grid */}
         <div className="grid md:grid-cols-4 gap-4 mb-8">
           <Card className="bg-gradient-to-r from-blue-500 to-purple-600 text-white" data-testid="card-total-citations">

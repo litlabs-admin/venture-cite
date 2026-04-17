@@ -1,8 +1,13 @@
+import { useEffect } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import {
   FileText,
   TrendingUp,
@@ -228,28 +233,62 @@ function KpiCard({ label, value, hint, icon: Icon, href }: KpiProps) {
 }
 
 export default function Home() {
+  const { user } = useAuth();
+  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_home_brandId", "");
+
+  const { data: brandsData, error: brandsError } = useQuery<{ success: boolean; data: Brand[] }>({
+    queryKey: ['/api/brands'],
+  });
+  const brands = brandsData?.data || [];
+  const hasBrands = brands.length > 0;
+
+  // Auto-select the first brand if none is persisted yet, or if the stored
+  // brandId no longer belongs to this user (e.g. after a brand deletion).
+  useEffect(() => {
+    if (!hasBrands) return;
+    if (!selectedBrandId || !brands.find((b) => b.id === selectedBrandId)) {
+      setSelectedBrandId(brands[0].id);
+    }
+  }, [brands, hasBrands, selectedBrandId, setSelectedBrandId]);
+
+  const activeBrand = brands.find((b) => b.id === selectedBrandId) || null;
+
+  // Dashboard metrics are scoped to the currently selected brand. The query
+  // key includes brandId so switching brands refetches rather than showing
+  // stale totals from the previous brand.
+  const dashboardQueryKey = selectedBrandId
+    ? ['/api/dashboard', selectedBrandId]
+    : ['/api/dashboard'];
   const { data: analytics, error: analyticsError } = useQuery<{ success: boolean; data: any }>({
-    queryKey: ['/api/dashboard'],
+    queryKey: dashboardQueryKey,
+    queryFn: async () => {
+      const url = selectedBrandId
+        ? `/api/dashboard?brandId=${encodeURIComponent(selectedBrandId)}`
+        : '/api/dashboard';
+      const res = await apiRequest('GET', url);
+      return res.json();
+    },
+    enabled: !hasBrands || !!selectedBrandId,
   });
 
   const { data: articlesData, error: articlesError } = useQuery<{ success: boolean; data: any[] }>({
     queryKey: ['/api/articles'],
   });
 
-  const { data: brandsData, error: brandsError } = useQuery<{ success: boolean; data: Brand[] }>({
-    queryKey: ['/api/brands'],
-  });
+  // Only surface the banner when the user actually has brands to show but
+  // we couldn't load them. First-render 401 races and brand-new accounts
+  // shouldn't be framed as errors — empty KPIs communicate that state.
+  const loadError = hasBrands && (analyticsError || articlesError || brandsError);
 
-  const loadError = analyticsError || articlesError || brandsError;
-
-  const brands = brandsData?.data || [];
-  const primaryBrand = brands[0];
-  const hasBrands = brands.length > 0;
-
-  const totalArticles = articlesData?.data?.length || 0;
+  const scopedArticles = selectedBrandId
+    ? (articlesData?.data || []).filter((a: any) => a.brandId === selectedBrandId)
+    : (articlesData?.data || []);
+  const totalArticles = scopedArticles.length;
   const totalCitations = analytics?.data?.totalCitations || 0;
   const totalChecks = analytics?.data?.totalChecks || 0;
   const citationRate = analytics?.data?.citationRate || 0;
+
+  const welcomeName = user?.firstName?.trim() || null;
 
   const primaryAction = !hasBrands ? (
     <Link href="/brands">
@@ -259,19 +298,40 @@ export default function Home() {
       </Button>
     </Link>
   ) : (
-    <Link href="/content">
-      <Button variant="default" size="sm" className="bg-primary hover:bg-primary/90" data-testid="button-create-content">
-        <PenTool className="w-4 h-4 mr-2" />
-        Create Content
-      </Button>
-    </Link>
+    <div className="flex items-center gap-2">
+      {brands.length > 1 && (
+        <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
+          <SelectTrigger className="w-[200px]" data-testid="select-home-brand">
+            <SelectValue placeholder="Select brand" />
+          </SelectTrigger>
+          <SelectContent>
+            {brands.map((b) => (
+              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      <Link href="/content">
+        <Button variant="default" size="sm" className="bg-primary hover:bg-primary/90" data-testid="button-create-content">
+          <PenTool className="w-4 h-4 mr-2" />
+          Create Content
+        </Button>
+      </Link>
+    </div>
   );
+
+  const welcomeTitle = welcomeName
+    ? `Welcome back, ${welcomeName}`
+    : (hasBrands ? "Welcome back" : "VentureCite");
+  const welcomeDescription = activeBrand
+    ? `Showing metrics for ${activeBrand.name}. Get your brand cited by AI search engines.`
+    : "Get your brand cited by AI search engines.";
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title={hasBrands && primaryBrand ? `Welcome back${primaryBrand.name ? `, ${primaryBrand.name}` : ""}` : "VentureCite"}
-        description="Get your brand cited by AI search engines."
+        title={welcomeTitle}
+        description={welcomeDescription}
         actions={primaryAction}
       />
 

@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import logoPath from "@assets/logo.png";
+import SidebarOnboarding from "@/components/SidebarOnboarding";
 
 // ─── Nav definitions ─────────────────────────────────────────────────────────
 
@@ -191,6 +192,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <span>Pricing</span>
           </div>
         </Link>
+
+        <div className="px-1 pt-1">
+          <SidebarOnboarding onNavigate={onNavigate} />
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

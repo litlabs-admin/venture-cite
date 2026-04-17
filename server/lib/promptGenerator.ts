@@ -98,6 +98,7 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
       rationale: valid[i].rationale?.trim() || null,
       orderIndex: i,
       isActive: 1,
+      status: "tracked",
     } as any);
     saved.push(row);
   }

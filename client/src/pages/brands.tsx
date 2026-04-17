@@ -691,9 +691,11 @@ export default function Brands() {
                   <FormItem>
                     <FormLabel>Name Variations (for GEO Tracking)</FormLabel>
                     <FormControl>
-                      <Input placeholder="venturepr, venture pr, venture public relations" {...field} data-testid="input-name-variations" />
+                      <Input placeholder="e.g. Facebook, FB, the blue app" {...field} data-testid="input-name-variations" />
                     </FormControl>
-                    <FormDescription>Comma-separated list of brand name variations to track in AI citations</FormDescription>
+                    <FormDescription>
+                      Comma-separated list of extra ways your brand gets referenced — former names (Facebook → Meta), nicknames, common misspellings. Legal suffixes ("Inc.", "LLC"), acronyms of 3+ word company names, and your website domain are detected automatically; you don't need to list them here.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -924,9 +926,11 @@ export default function Brands() {
                   <FormItem>
                     <FormLabel>Name Variations (for GEO Tracking)</FormLabel>
                     <FormControl>
-                      <Input placeholder="venturepr, venture pr, venture public relations" {...field} data-testid="input-name-variations" />
+                      <Input placeholder="e.g. Facebook, FB, the blue app" {...field} data-testid="input-name-variations" />
                     </FormControl>
-                    <FormDescription>Comma-separated list of brand name variations to track in AI citations</FormDescription>
+                    <FormDescription>
+                      Comma-separated list of extra ways your brand gets referenced — former names (Facebook → Meta), nicknames, common misspellings. Legal suffixes ("Inc.", "LLC"), acronyms of 3+ word company names, and your website domain are detected automatically; you don't need to list them here.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

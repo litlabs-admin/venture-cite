@@ -44,12 +44,17 @@ export interface IStorage {
   getGeoRankingsByPlatform(platform: string): Promise<GeoRanking[]>;
   countCitedRankingsForArticle(articleId: string): Promise<number>;
   getGeoRankingsByBrandPromptIds(ids: string[], sinceDate?: Date): Promise<GeoRanking[]>;
+  updateGeoRanking(id: string, update: Partial<GeoRanking>): Promise<GeoRanking | undefined>;
 
   // Brand Prompt methods
   createBrandPrompt(p: InsertBrandPrompt): Promise<BrandPrompt>;
-  getBrandPromptsByBrandId(brandId: string): Promise<BrandPrompt[]>;
+  getBrandPromptsByBrandId(brandId: string, opts?: { status?: "tracked" | "suggested" | "archived" | "all" }): Promise<BrandPrompt[]>;
   deleteBrandPromptsByBrandId(brandId: string): Promise<void>;
   archiveBrandPrompts(brandId: string): Promise<void>;
+  archiveSuggestedPrompts(brandId: string): Promise<void>;
+  updateBrandPromptText(id: string, prompt: string): Promise<BrandPrompt | undefined>;
+  archiveBrandPrompt(id: string): Promise<void>;
+  promoteSuggestionToTracked(suggestionId: string, replaceTrackedId: string): Promise<void>;
   createPromptGeneration(brandId: string): Promise<PromptGeneration>;
   getPromptGenerationsByBrandId(brandId: string): Promise<PromptGeneration[]>;
   getGeoRankingsByRunId(runId: string): Promise<GeoRanking[]>;
