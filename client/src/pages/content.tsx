@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getActiveDraftId, setActiveDraftId as persistActiveDraftId, clearActiveDraftId } from "@/lib/draftStore";
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import PageHeader from "@/components/PageHeader";
@@ -156,12 +158,17 @@ function relativeTime(iso: string): string {
 export default function Content() {
   const searchString = useSearch();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const initialParams = new URLSearchParams(searchString);
 
-  // ── Active draft ID — persisted in localStorage for fast mount ─────────────
-  const [activeDraftId, setActiveDraftId] = useState<string | null>(() =>
-    localStorage.getItem("venturecite-active-draft-id")
-  );
+  // ── Active draft ID — persisted in localStorage, keyed by user.id ─────────
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  // Hydrate once the authed user is known so drafts never leak across accounts.
+  useEffect(() => {
+    if (!userId) return;
+    setActiveDraftId((prev) => prev ?? getActiveDraftId(userId));
+  }, [userId]);
   // Flag: has the draft list been loaded and the active draft applied once?
   const [draftLoaded, setDraftLoaded] = useState(false);
 
@@ -210,7 +217,11 @@ export default function Content() {
   }, [showDraftPanel]);
 
   // ── Auto-save refs ─────────────────────────────────────────────────────────
+  // Two separate timers: one for form-field changes, one for the generated
+  // content textarea. They used to share a single ref, which caused either
+  // side's debounce to silently cancel the other.
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftCreating = useRef(false);
   // Track whether the last auto-save was triggered by loading (not typing)
   const suppressAutoSave = useRef(false);
@@ -269,7 +280,7 @@ export default function Content() {
     setAiIssues([]); setAiStrengths([]); setAiRecommendation(""); setAiVocabularyFound([]);
     setCurrentJobId(draft.jobId || null);
     setActiveDraftId(draft.id);
-    localStorage.setItem("venturecite-active-draft-id", draft.id);
+    persistActiveDraftId(userId, draft.id);
     // Allow auto-save again after React has re-rendered with new values
     requestAnimationFrame(() => { suppressAutoSave.current = false; });
   }, []);
@@ -319,7 +330,7 @@ export default function Content() {
           const json = await resp.json();
           if (json.data?.id) {
             setActiveDraftId(json.data.id);
-            localStorage.setItem("venturecite-active-draft-id", json.data.id);
+            persistActiveDraftId(userId, json.data.id);
             refetchDrafts();
           }
           draftCreating.current = false;
@@ -343,7 +354,7 @@ export default function Content() {
       if (json.data?.id) {
         suppressAutoSave.current = true;
         setActiveDraftId(json.data.id);
-        localStorage.setItem("venturecite-active-draft-id", json.data.id);
+        persistActiveDraftId(userId, json.data.id);
         setKeywords(""); setIndustry(""); setType("article"); setBrandId("none");
         setTargetCustomers(""); setGeography(""); setContentStyle("b2c");
         setGeneratedContent(""); setSavedArticleId(null); setCurrentJobId(null);
@@ -370,7 +381,7 @@ export default function Content() {
       } else {
         suppressAutoSave.current = true;
         setActiveDraftId(null);
-        localStorage.removeItem("venturecite-active-draft-id");
+        clearActiveDraftId(userId);
         setKeywords(""); setIndustry(""); setType("article"); setBrandId("none");
         setGeneratedContent(""); setSavedArticleId(null); setCurrentJobId(null);
         setHumanScore(null); setPassesAiDetection(null);
@@ -381,24 +392,47 @@ export default function Content() {
   };
 
   // ── Job polling ────────────────────────────────────────────────────────────
+  // Self-scheduling loop (no setInterval): each tick schedules the next via
+  // setTimeout, so a slow/hanging request never stacks overlapping requests.
+  // Exponential backoff on consecutive failures, capped; pauses while the
+  // tab is hidden; aborts outstanding fetches on unmount / jobId change.
 
   useEffect(() => {
     if (!currentJobId) return;
+    const controller = new AbortController();
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let failures = 0;
+    const MAX_FAILURES = 10;
+    const BASE_MS = 3_000;
+    const MAX_MS = 30_000;
 
-    const poll = async () => {
+    const schedule = (ms: number) => {
+      if (cancelled) return;
+      timer = setTimeout(tick, ms);
+    };
+
+    const tick = async () => {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        // Tab hidden — check again shortly without hitting the API.
+        schedule(5_000);
+        return;
+      }
       try {
-        const resp = await apiRequest('GET', `/api/content-jobs/${currentJobId}`);
+        const resp = await apiRequest('GET', `/api/content-jobs/${currentJobId}`, undefined, { signal: controller.signal });
         const data = await resp.json();
         if (cancelled) return;
         if (!data.success) { setCurrentJobId(null); return; }
 
+        failures = 0;
         const job = data.data;
         if (job.status === "succeeded" && job.articleId) {
           setCurrentJobId(null);
           try {
-            const articleResp = await apiRequest('GET', `/api/articles/${job.articleId}`);
+            const articleResp = await apiRequest('GET', `/api/articles/${job.articleId}`, undefined, { signal: controller.signal });
             const articleJson = await articleResp.json();
+            if (cancelled) return;
             const article = articleJson.data || articleJson.article;
             if (article) {
               setGeneratedContent(article.content || "");
@@ -406,7 +440,6 @@ export default function Content() {
               const meta = article.seoData || {};
               if (typeof meta.humanScore === "number") setHumanScore(meta.humanScore);
               if (typeof meta.passesAiDetection === "boolean") setPassesAiDetection(meta.passesAiDetection);
-              // Sync scores to draft
               if (activeDraftId) {
                 apiRequest('PATCH', `/api/content-drafts/${activeDraftId}`, {
                   generatedContent: article.content,
@@ -422,9 +455,10 @@ export default function Content() {
           refetchUsage();
           queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
           toast({ title: "Article generated", description: "Saved to your Articles page." });
-        } else if (job.status === "failed") {
+          return;
+        }
+        if (job.status === "failed") {
           setCurrentJobId(null);
-          // Clear jobId on draft
           if (activeDraftId) {
             apiRequest('PATCH', `/api/content-drafts/${activeDraftId}`, { jobId: null }).catch(() => {});
             refetchDrafts();
@@ -434,13 +468,32 @@ export default function Content() {
             description: job.errorMessage || "The background worker couldn't finish this job.",
             variant: "destructive",
           });
+          return;
         }
-      } catch { /* transient — retry next tick */ }
+        schedule(BASE_MS);
+      } catch (err) {
+        if (cancelled || (err as any)?.name === "AbortError") return;
+        failures += 1;
+        if (failures >= MAX_FAILURES) {
+          setCurrentJobId(null);
+          toast({
+            title: "Lost connection to generator",
+            description: "Could not fetch job status. Refresh the page to check on your article.",
+            variant: "destructive",
+          });
+          return;
+        }
+        const delay = Math.min(MAX_MS, BASE_MS * 2 ** (failures - 1));
+        schedule(delay);
+      }
     };
 
-    poll();
-    const interval = setInterval(poll, 3_000);
-    return () => { cancelled = true; clearInterval(interval); };
+    tick();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      controller.abort();
+    };
   }, [currentJobId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -1157,10 +1210,12 @@ export default function Content() {
                       setGeneratedContent(e.target.value);
                       setHumanScore(null);
                       setPassesAiDetection(null);
-                      // Auto-save content changes to draft (debounced)
+                      // Auto-save content changes to draft (debounced).
+                      // Uses its own timer ref so it never cancels the
+                      // form-field auto-save timer.
                       if (activeDraftId) {
-                        if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-                        autoSaveTimer.current = setTimeout(() => {
+                        if (contentSaveTimer.current) clearTimeout(contentSaveTimer.current);
+                        contentSaveTimer.current = setTimeout(() => {
                           apiRequest('PATCH', `/api/content-drafts/${activeDraftId}`, {
                             generatedContent: e.target.value,
                             humanScore: null,

@@ -279,6 +279,11 @@ export const brandPrompts = pgTable(
     orderIndex: integer("order_index").default(0).notNull(),
     isActive: integer("is_active").default(1).notNull(), // legacy — use `status` instead
     status: text("status").default("tracked").notNull(), // "tracked" | "suggested" | "archived"
+    // Richer classification promoted from the deprecated prompt_portfolio
+    // table so every tracked prompt carries funnel + category dimensions.
+    category: text("category"),
+    funnelStage: text("funnel_stage"), // "TOFU" | "MOFU" | "BOFU"
+    region: text("region").default("global").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -356,6 +361,13 @@ export const geoRankings = pgTable(
     citingOutletName: text("citing_outlet_name"),
     sentiment: text("sentiment").default("neutral"),
     sentimentScore: numeric("sentiment_score", { precision: 3, scale: 2 }).default("0"),
+    // Richer quality signals promoted from deprecated citation_quality table.
+    // source_type: community/reference/video/web based on citingOutletUrl domain.
+    // authority_score: 0-100, derived at write time from domain occurrence history.
+    // relevance_score: 0-100, returned by the citation judge LLM call (null if judge not invoked).
+    sourceType: text("source_type"),
+    authorityScore: integer("authority_score"),
+    relevanceScore: integer("relevance_score"),
     checkedAt: timestamp("checked_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
   },
@@ -519,6 +531,7 @@ export const competitors = pgTable(
     domain: text("domain").notNull(),
     industry: text("industry"),
     description: text("description"),
+    discoveredBy: text("discovered_by").default("manual").notNull(), // "manual" | "ai" | "citation_mining"
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("competitors_brand_id_idx").on(table.brandId)],
@@ -771,6 +784,7 @@ export const brandFactSheet = pgTable(
     factKey: text("fact_key").notNull(),
     factValue: text("fact_value").notNull(),
     sourceUrl: text("source_url"),
+    source: text("source").default("manual").notNull(), // "manual" | "scraped"
     lastVerified: timestamp("last_verified").defaultNow().notNull(),
     isActive: integer("is_active").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

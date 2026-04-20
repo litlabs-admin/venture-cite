@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, isApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,19 @@ import { z } from "zod";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Building2, Plus, Pencil, Trash2, Globe, Target, Megaphone, Briefcase, Sparkles, Loader2, CheckCircle2, ArrowRight, Shield } from "lucide-react";
 import { Link } from "wouter";
+import { normalizeWebsite, safeExternalHref } from "@/lib/urlSafety";
+import BrandFormFields from "@/components/BrandFormFields";
+import DeleteBrandDialog from "@/components/DeleteBrandDialog";
 
 const formSchema = z.object({
   name: z.string().min(1, "Brand name is required"),
   companyName: z.string().min(1, "Company name is required"),
   industry: z.string().min(1, "Industry is required"),
   description: z.string().optional().transform(v => v || undefined),
-  website: z.string().optional().transform(v => v || undefined),
+  website: z.string().optional().transform(v => v || undefined).refine(
+    (v) => !v || normalizeWebsite(v) !== null,
+    "Enter a valid http(s) URL",
+  ),
   tone: z.enum(["professional", "casual", "friendly", "formal", "conversational", "authoritative"]).default("professional"),
   targetAudience: z.string().optional().transform(v => v || undefined),
   products: z.string().optional().transform(v => v || undefined),
@@ -94,17 +100,15 @@ export default function Brands() {
     onError: (error: Error) => {
       let title = "Couldn't create brand";
       let description = "Something went wrong. You can try again or add your brand manually below.";
-      try {
-        const body = JSON.parse(error.message.replace(/^\d+:\s*/, ""));
-        if (body.limitReached) {
+      if (isApiError(error)) {
+        const body = error.body as { error?: string; limitReached?: boolean } | null;
+        if (body?.limitReached) {
           title = "Brand limit reached";
-          description = body.error;
-        } else if (body.error) {
+          if (body.error) description = body.error;
+        } else if (body?.error) {
           description = body.error;
         }
-      } catch {}
-      if (error.message.includes("401")) {
-        description = "Please log in again and try.";
+        if (error.status === 401) description = "Please log in again and try.";
       }
       toast({ title, description, variant: "destructive" });
     },
@@ -141,15 +145,15 @@ export default function Brands() {
     onError: (error: Error) => {
       let title = "Error";
       let description = "Failed to create brand. Please try again.";
-      try {
-        const body = JSON.parse(error.message.replace(/^\d+:\s*/, ""));
-        if (body.limitReached) {
+      if (isApiError(error)) {
+        const body = error.body as { error?: string; limitReached?: boolean } | null;
+        if (body?.limitReached) {
           title = "Brand limit reached";
-          description = body.error;
-        } else if (body.error) {
+          if (body.error) description = body.error;
+        } else if (body?.error) {
           description = body.error;
         }
-      } catch {}
+      }
       toast({ title, description, variant: "destructive" });
     },
   });
@@ -244,9 +248,14 @@ export default function Brands() {
       });
       return;
     }
-    let url = websiteUrl.trim();
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      url = "https://" + url;
+    const url = normalizeWebsite(websiteUrl);
+    if (!url) {
+      toast({
+        title: "Invalid website",
+        description: "Enter a valid URL like https://yourcompany.com.",
+        variant: "destructive",
+      });
+      return;
     }
     createFromWebsiteMutation.mutate(url);
   }
@@ -372,34 +381,12 @@ export default function Brands() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            data-testid={`button-delete-${brand.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete "{brand.name}"?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete this brand and <strong>all related data</strong> including articles, keywords, citations, prompts, AI visibility progress, and distribution history. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(brand.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Delete brand and all data
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <DeleteBrandDialog
+                        brandId={brand.id}
+                        brandName={brand.name}
+                        isPending={deleteMutation.isPending}
+                        onConfirm={handleDelete}
+                      />
                     </div>
                   </div>
                 </CardHeader>
@@ -411,7 +398,7 @@ export default function Brands() {
                   {brand.website && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Globe className="h-4 w-4" />
-                      <a href={brand.website} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">
+                      <a href={safeExternalHref(brand.website)} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">
                         {brand.website}
                       </a>
                     </div>
@@ -497,210 +484,7 @@ export default function Brands() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Brand Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Acme Inc" {...field} data-testid="input-brand-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="companyName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Company Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Acme Corporation" {...field} data-testid="input-company-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="industry"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Industry *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Technology" {...field} data-testid="input-industry" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="website"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Website</FormLabel>
-                      <FormControl>
-                        <Input placeholder="www.yourcompany.com" {...field} data-testid="input-website" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Brand Description</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Brief description of your brand..." {...field} data-testid="input-description" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="tone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Brand Tone</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-tone">
-                            <SelectValue placeholder="Select tone" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="professional">Professional</SelectItem>
-                          <SelectItem value="casual">Casual</SelectItem>
-                          <SelectItem value="friendly">Friendly</SelectItem>
-                          <SelectItem value="formal">Formal</SelectItem>
-                          <SelectItem value="conversational">Conversational</SelectItem>
-                          <SelectItem value="authoritative">Authoritative</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="targetAudience"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Target Audience</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., B2B SaaS companies" {...field} data-testid="input-target-audience" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="products"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Products/Services</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Comma-separated (e.g., Product A, Service B)" {...field} data-testid="input-products" />
-                    </FormControl>
-                    <FormDescription>List your main products or services, separated by commas</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="keyValues"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Key Values</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Comma-separated (e.g., Innovation, Trust)" {...field} data-testid="input-key-values" />
-                    </FormControl>
-                    <FormDescription>Core values that define your brand</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="uniqueSellingPoints"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unique Selling Points</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Comma-separated (e.g., AI-powered, 24/7 support)" {...field} data-testid="input-usp" />
-                    </FormControl>
-                    <FormDescription>What makes your brand unique</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="brandVoice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Brand Voice Guidelines</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Describe your brand's voice and communication style..." {...field} data-testid="input-brand-voice" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="sampleContent"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sample Content</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Paste example content that represents your brand..." {...field} data-testid="input-sample-content" />
-                    </FormControl>
-                    <FormDescription>Sample text that represents your brand's writing style</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="nameVariations"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name Variations (for GEO Tracking)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Facebook, FB, the blue app" {...field} data-testid="input-name-variations" />
-                    </FormControl>
-                    <FormDescription>
-                      Comma-separated list of extra ways your brand gets referenced — former names (Facebook → Meta), nicknames, common misspellings. Legal suffixes ("Inc.", "LLC"), acronyms of 3+ word company names, and your website domain are detected automatically; you don't need to list them here.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
+              <BrandFormFields form={form} />
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
@@ -732,210 +516,7 @@ export default function Brands() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Brand Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Acme Inc" {...field} data-testid="input-brand-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="companyName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Company Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Acme Corporation" {...field} data-testid="input-company-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="industry"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Industry *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Technology" {...field} data-testid="input-industry" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="website"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Website</FormLabel>
-                      <FormControl>
-                        <Input placeholder="www.yourcompany.com" {...field} data-testid="input-website-edit" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Brand Description</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Brief description of your brand..." {...field} data-testid="input-description" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="tone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Brand Tone</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-tone-edit">
-                            <SelectValue placeholder="Select tone" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="professional">Professional</SelectItem>
-                          <SelectItem value="casual">Casual</SelectItem>
-                          <SelectItem value="friendly">Friendly</SelectItem>
-                          <SelectItem value="formal">Formal</SelectItem>
-                          <SelectItem value="conversational">Conversational</SelectItem>
-                          <SelectItem value="authoritative">Authoritative</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="targetAudience"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Target Audience</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., B2B SaaS companies" {...field} data-testid="input-target-audience" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="products"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Products/Services</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Comma-separated (e.g., Product A, Service B)" {...field} data-testid="input-products" />
-                    </FormControl>
-                    <FormDescription>List your main products or services, separated by commas</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="keyValues"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Key Values</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Comma-separated (e.g., Innovation, Trust)" {...field} data-testid="input-key-values" />
-                    </FormControl>
-                    <FormDescription>Core values that define your brand</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="uniqueSellingPoints"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unique Selling Points</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Comma-separated (e.g., AI-powered, 24/7 support)" {...field} data-testid="input-usp" />
-                    </FormControl>
-                    <FormDescription>What makes your brand unique</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="brandVoice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Brand Voice Guidelines</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Describe your brand's voice and communication style..." {...field} data-testid="input-brand-voice" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="sampleContent"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sample Content</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Paste example content that represents your brand..." {...field} data-testid="input-sample-content" />
-                    </FormControl>
-                    <FormDescription>Sample text that represents your brand's writing style</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="nameVariations"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name Variations (for GEO Tracking)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Facebook, FB, the blue app" {...field} data-testid="input-name-variations" />
-                    </FormControl>
-                    <FormDescription>
-                      Comma-separated list of extra ways your brand gets referenced — former names (Facebook → Meta), nicknames, common misspellings. Legal suffixes ("Inc.", "LLC"), acronyms of 3+ word company names, and your website domain are detected automatically; you don't need to list them here.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
+              <BrandFormFields form={form} idSuffix="-edit" />
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"

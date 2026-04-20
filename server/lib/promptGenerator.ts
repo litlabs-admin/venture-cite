@@ -55,8 +55,11 @@ Rules:
 - For each question, include a 1-sentence rationale explaining why THIS brand would rank well for it.
 - Ground the questions in the brand's industry, products, and published articles.
 - Do NOT use the brand name in the questions themselves — users rarely search by brand.
+- Classify each prompt on TWO dimensions:
+  - category: a short topic cluster (2-4 words, lowercase), e.g. "pricing comparison", "getting started", "use case guide"
+  - funnelStage: EXACTLY one of "TOFU" (awareness: "what is X"), "MOFU" (consideration: "best X for Y"), or "BOFU" (decision: "X vs Y", "X pricing", "X alternatives")
 
-Return JSON: { "prompts": [{ "prompt": "...", "rationale": "..." }, ... 10 items total] }`,
+Return JSON: { "prompts": [{ "prompt": "...", "rationale": "...", "category": "...", "funnelStage": "TOFU"|"MOFU"|"BOFU" }, ... 10 items total] }`,
         },
         {
           role: "user",
@@ -78,7 +81,7 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
     return { saved: [], error: err?.message || "AI call failed" };
   }
 
-  const parsed = safeParseJson<{ prompts?: Array<{ prompt: string; rationale?: string }> }>(completion.choices[0].message.content);
+  const parsed = safeParseJson<{ prompts?: Array<{ prompt: string; rationale?: string; category?: string; funnelStage?: string }> }>(completion.choices[0].message.content);
   const promptList = Array.isArray(parsed?.prompts) ? parsed!.prompts : [];
   const valid = promptList.filter((p) => p && typeof p.prompt === 'string' && p.prompt.trim().length > 0).slice(0, 10);
   if (valid.length === 0) {
@@ -91,6 +94,9 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
 
   const saved = [];
   for (let i = 0; i < valid.length; i += 1) {
+    const rawStage = (valid[i].funnelStage || "").toString().toUpperCase();
+    const funnelStage = rawStage === "TOFU" || rawStage === "MOFU" || rawStage === "BOFU" ? rawStage : null;
+    const category = valid[i].category?.toString().trim().slice(0, 64) || null;
     const row = await storage.createBrandPrompt({
       brandId: brand.id,
       generationId: generation.id,
@@ -99,6 +105,9 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
       orderIndex: i,
       isActive: 1,
       status: "tracked",
+      category,
+      funnelStage,
+      region: "global",
     } as any);
     saved.push(row);
   }

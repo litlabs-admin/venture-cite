@@ -12,12 +12,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Helmet } from "react-helmet";
 import { Link } from "wouter";
-import type { Brand, FaqItem } from "@shared/schema";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
+import type { FaqItem } from "@shared/schema";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 import {
   HelpCircle,
-  ArrowLeft,
   Sparkles,
   Plus,
   Trash2,
@@ -40,7 +42,7 @@ import {
 
 export default function FaqManager() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
   const [activeTab, setActiveTab] = useState("manage");
   const [generateTopic, setGenerateTopic] = useState("");
   const [generateCount, setGenerateCount] = useState("5");
@@ -51,13 +53,6 @@ export default function FaqManager() {
   const [newAnswer, setNewAnswer] = useState("");
   const [newCategory, setNewCategory] = useState("general");
   const [filterCategory, setFilterCategory] = useState<string>("all");
-
-  const { data: brandsData } = useQuery<{ data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsData?.data || [];
-  const selectedBrand = brands.find(b => b.id === selectedBrandId);
 
   const { data: faqsData, isLoading: faqsLoading } = useQuery<{ data: FaqItem[] }>({
     queryKey: [`/api/faqs?brandId=${selectedBrandId}`],
@@ -183,60 +178,23 @@ export default function FaqManager() {
 
   return (
     <>
-      <Helmet>
-        <title>Intelligent FAQ Manager - AI-Optimized Q&A | VentureCite</title>
-        <meta name="description" content="Create and manage AI-optimized FAQs with citation scoring, schema markup generation, and intelligent optimization for AI search visibility." />
-      </Helmet>
-
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <Link href="/">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                Intelligent FAQ Manager
-              </h1>
-              <p className="text-muted-foreground">
-                Create AI-optimized FAQs that get cited by ChatGPT, Claude, and other AI engines
-              </p>
-            </div>
-          </div>
-
-          {/* Brand Selector */}
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Select Brand</label>
-                  <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-                    <SelectTrigger data-testid="select-brand">
-                      <SelectValue placeholder="Choose a brand to manage FAQs" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {brands.map((brand) => (
-                        <SelectItem key={brand.id} value={brand.id}>
-                          {brand.name} - {brand.industry}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {!brands.length && (
-                  <Link href="/brands">
-                    <Button data-testid="button-create-brand">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Brand First
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+      <Helmet><title>FAQ Manager - VentureCite</title></Helmet>
+      <div className="space-y-8">
+        <PageHeader
+          title="FAQ Manager"
+          description="Create AI-optimized FAQs that get cited by ChatGPT, Claude, and other AI engines"
+          actions={
+            brands.length > 0 ? (
+              <BrandSelector showIndustry />
+            ) : (
+              <Link href="/brands">
+                <Button data-testid="button-create-brand">
+                  <Plus className="h-4 w-4 mr-2" /> Create Brand First
+                </Button>
+              </Link>
+            )
+          }
+        />
 
           {selectedBrandId && (
             <>
@@ -790,7 +748,6 @@ export default function FaqManager() {
               </Tabs>
             </>
           )}
-        </div>
       </div>
     </>
   );

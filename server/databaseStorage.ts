@@ -1226,6 +1226,42 @@ export class DatabaseStorage implements IStorage {
     volatilityDistribution: { stable: number; moderate: number; volatile: number };
   }> {
     const prompts = await this.getPromptPortfolio(brandId);
+
+    // Fallback: if the user has never populated prompt_portfolio (the Phase 2
+    // table), derive share-of-answer from Phase 1 data — brand_prompts joined
+    // against geo_rankings — so the page shows real numbers instead of zeros.
+    if (prompts.length === 0) {
+      const brandPrompts = await this.getBrandPromptsByBrandId(brandId);
+      const rankings = brandPrompts.length > 0
+        ? await this.getGeoRankingsByBrandPromptIds(brandPrompts.map(p => p.id))
+        : [];
+      const totalPrompts = rankings.length;
+      const citedPrompts = rankings.filter(r => r.isCited === 1).length;
+      const shareOfAnswer = totalPrompts > 0 ? (citedPrompts / totalPrompts) * 100 : 0;
+
+      // Bucket by AI platform since Phase 1 has no category/funnel metadata.
+      const byCategory: Record<string, { total: number; cited: number }> = {};
+      const byFunnel: Record<string, { total: number; cited: number }> = {};
+      rankings.forEach(r => {
+        const plat = r.aiPlatform;
+        if (!byCategory[plat]) byCategory[plat] = { total: 0, cited: 0 };
+        byCategory[plat].total++;
+        if (r.isCited === 1) byCategory[plat].cited++;
+      });
+
+      return {
+        totalPrompts,
+        citedPrompts,
+        shareOfAnswer,
+        byCategory,
+        byFunnel,
+        byCompetitor: {},
+        avgVolatility: 0,
+        avgConsensus: 0,
+        volatilityDistribution: { stable: totalPrompts, moderate: 0, volatile: 0 },
+      };
+    }
+
     const totalPrompts = prompts.length;
     const citedPrompts = prompts.filter(p => p.isBrandCited === 1).length;
     const shareOfAnswer = totalPrompts > 0 ? (citedPrompts / totalPrompts) * 100 : 0;
@@ -1321,6 +1357,42 @@ export class DatabaseStorage implements IStorage {
 
   async getCitationQualityStats(brandId: string): Promise<{ avgQualityScore: number; primaryCitations: number; secondaryCitations: number; bySourceType: Record<string, number> }> {
     const qualities = await this.getCitationQualities(brandId);
+
+    // Fallback to Phase 1 data if Phase 2 citation_quality table is empty.
+    // Compute a proxy "quality score" from rank (better rank → higher score)
+    // and group citations by whether the citing outlet is the brand's own
+    // site vs Reddit/Quora/Wikipedia/other.
+    if (qualities.length === 0) {
+      const brandPrompts = await this.getBrandPromptsByBrandId(brandId);
+      const rankings = brandPrompts.length > 0
+        ? (await this.getGeoRankingsByBrandPromptIds(brandPrompts.map(p => p.id))).filter(r => r.isCited === 1)
+        : [];
+      if (rankings.length === 0) {
+        return { avgQualityScore: 0, primaryCitations: 0, secondaryCitations: 0, bySourceType: {} };
+      }
+      // rank 1-3 → primary, rank 4+ or null → secondary
+      const primaryCitations = rankings.filter(r => r.rank !== null && r.rank <= 3).length;
+      const secondaryCitations = rankings.length - primaryCitations;
+      // Average score: top rank = 100, rank 10 = 10, no rank = 50 baseline.
+      const avgQualityScore = rankings.reduce((sum, r) => {
+        if (r.rank === null || r.rank === undefined) return sum + 50;
+        return sum + Math.max(0, 100 - (r.rank - 1) * 10);
+      }, 0) / rankings.length;
+      const bySourceType: Record<string, number> = {};
+      rankings.forEach(r => {
+        const url = r.citingOutletUrl || "";
+        let type = "other";
+        if (url.includes("reddit.com")) type = "reddit";
+        else if (url.includes("quora.com")) type = "quora";
+        else if (url.includes("wikipedia.org")) type = "wikipedia";
+        else if (url.includes("youtube.com")) type = "youtube";
+        else if (url.includes("linkedin.com")) type = "linkedin";
+        else if (url.includes("medium.com")) type = "medium";
+        bySourceType[type] = (bySourceType[type] || 0) + 1;
+      });
+      return { avgQualityScore, primaryCitations, secondaryCitations, bySourceType };
+    }
+
     const avgQualityScore = qualities.length > 0 ? qualities.reduce((sum, q) => sum + q.totalQualityScore, 0) / qualities.length : 0;
     const primaryCitations = qualities.filter(q => q.isPrimaryCitation === 1).length;
     const secondaryCitations = qualities.filter(q => q.isPrimaryCitation === 0).length;
@@ -1552,10 +1624,75 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTopAiSources(brandId: string, limit: number = 10): Promise<AiSource[]> {
-    return await db.select().from(schema.aiSources)
+    const phase2 = await db.select().from(schema.aiSources)
       .where(eq(schema.aiSources.brandId, brandId))
       .orderBy(desc(schema.aiSources.authorityScore))
       .limit(limit);
+    if (phase2.length > 0) return phase2;
+
+    // Fallback: synthesise AiSource-shaped rows from Phase 1 geo_rankings
+    // citations. This is a read-only projection — nothing gets persisted —
+    // so users see real source data before any ai_sources rows are ingested.
+    const brandPrompts = await this.getBrandPromptsByBrandId(brandId);
+    const rankings = brandPrompts.length > 0
+      ? (await this.getGeoRankingsByBrandPromptIds(brandPrompts.map(p => p.id))).filter(r => r.isCited === 1 && r.citingOutletUrl)
+      : [];
+    const grouped = new Map<string, { platforms: Set<string>; count: number; latestUrl: string; latestContext: string | null; latestAt: Date; name: string }>();
+    for (const r of rankings) {
+      const url = r.citingOutletUrl!;
+      let domain = url;
+      try { domain = new URL(url).hostname.replace(/^www\./, "").toLowerCase(); }
+      catch { /* keep raw */ }
+      const key = `${domain}::${r.aiPlatform}`;
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.count++;
+        if (r.checkedAt && new Date(r.checkedAt) > existing.latestAt) {
+          existing.latestUrl = url;
+          existing.latestContext = r.citationContext;
+          existing.latestAt = new Date(r.checkedAt);
+        }
+      } else {
+        grouped.set(key, {
+          platforms: new Set([r.aiPlatform]),
+          count: 1,
+          latestUrl: url,
+          latestContext: r.citationContext,
+          latestAt: r.checkedAt ? new Date(r.checkedAt) : new Date(),
+          name: r.citingOutletName || domain,
+        });
+      }
+    }
+    const nowIso = new Date();
+    const synthetic: AiSource[] = Array.from(grouped.entries())
+      .map(([key, v]) => {
+        const [domain, aiPlatform] = key.split("::");
+        return {
+          id: `synthetic-${key}`,
+          brandId,
+          aiPlatform,
+          sourceUrl: v.latestUrl,
+          sourceDomain: domain,
+          sourceName: v.name,
+          sourceType: domain.includes("reddit.com") ? "community"
+            : domain.includes("quora.com") ? "community"
+            : domain.includes("wikipedia.org") ? "reference"
+            : domain.includes("youtube.com") ? "video"
+            : "web",
+          prompt: null,
+          citationContext: v.latestContext,
+          authorityScore: Math.min(100, v.count * 10),
+          isBrandMentioned: 1,
+          sentiment: "neutral",
+          discoveredAt: v.latestAt,
+          lastSeenAt: v.latestAt,
+          occurrenceCount: v.count,
+          metadata: { synthetic: true, derivedFrom: "geo_rankings" },
+        } as AiSource;
+      })
+      .sort((a, b) => (b.authorityScore ?? 0) - (a.authorityScore ?? 0))
+      .slice(0, limit);
+    return synthetic;
   }
 
   async createAiTrafficSession(insertSession: InsertAiTrafficSession): Promise<AiTrafficSession> {

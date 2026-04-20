@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Link2, Search, BarChart3, Globe, ExternalLink, CheckCircle, AlertCircle, Settings, BookOpen } from "lucide-react";
-import { Link } from "wouter";
+import { Link2, Search, BarChart3, Globe, ExternalLink, CheckCircle, AlertCircle, Settings, BookOpen } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
 import { SiGoogle } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,25 +46,18 @@ export default function AnalyticsIntegrations() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
-      <div className="mb-8">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="mb-4" data-testid="link-back-dashboard">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </Link>
-        <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="text-page-title">Analytics Integrations</h1>
-        <p className="text-muted-foreground">Step-by-step setup guide to connect YOUR Google Analytics and Search Console accounts to track AI-driven traffic</p>
-        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-blue-800 dark:text-blue-300">
-              <strong>This is a setup guide</strong> — it walks you through configuring your own Google Analytics 4 and Search Console accounts to track visitors coming from AI engines. Save your property IDs here for quick reference. All analytics data lives in your Google accounts, not in VentureCite.
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-8">
+      <Helmet><title>Analytics Integrations - VentureCite</title></Helmet>
+      <PageHeader title="Analytics Integrations" description="Step-by-step setup guide to connect your Google Analytics and Search Console accounts" />
+
+      <Card>
+        <CardContent className="p-4 flex items-start gap-3">
+          <AlertCircle className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">This is a setup guide</span> — it walks you through configuring your own Google Analytics 4 and Search Console accounts to track visitors coming from AI engines. Save your property IDs here for quick reference. All analytics data lives in your Google accounts, not in VentureCite.
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2 mb-8">
         <Card className={ga4Saved ? "border-green-500/50" : ""} data-testid="card-ga4-integration">
@@ -270,7 +264,7 @@ export default function AnalyticsIntegrations() {
               { name: "Perplexity", domain: "perplexity.ai", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400" },
               { name: "Gemini", domain: "gemini.google.com", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
               { name: "Microsoft Copilot", domain: "copilot.microsoft.com", color: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400" },
-              { name: "Grok", domain: "grok.x.ai", color: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400" },
+              { name: "Grok", domain: "grok.x.ai", color: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-muted-foreground" },
               { name: "Manus AI", domain: "manus.im", color: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400" },
               { name: "You.com", domain: "you.com", color: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400" },
               { name: "Meta AI", domain: "meta.ai", color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400" },

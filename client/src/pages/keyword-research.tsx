@@ -10,10 +10,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
 import { useLocation } from "wouter";
-import type { Brand, KeywordResearch } from "@shared/schema";
+import type { KeywordResearch } from "@shared/schema";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 import {
   Search,
   Sparkles,
@@ -47,24 +49,8 @@ const contentTypeLabels: Record<string, string> = {
 export default function KeywordResearchPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_keywords_brandId", "");
+  const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
   const [statusFilter, setStatusFilter] = usePersistedState<string>("vc_keywords_filter", "all");
-
-  const { data: brandsData, isLoading: brandsLoading } = useQuery<{ data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsData?.data || [];
-  const selectedBrand = brands.find(b => b.id === selectedBrandId);
-
-  // Auto-select a brand: pick the first if no valid selection exists (covers
-  // first brand creation, deleted brand, returning users). Multi-brand users
-  // keep their last-used brand via usePersistedState.
-  useEffect(() => {
-    if (brands.length > 0 && (!selectedBrandId || !brands.find(b => b.id === selectedBrandId))) {
-      setSelectedBrandId(brands[0].id);
-    }
-  }, [brands, selectedBrandId]);
 
   const { data: keywordsData, isLoading: keywordsLoading } = useQuery<{ success: boolean; data: KeywordResearch[] }>({
     queryKey: [`/api/keyword-research/${selectedBrandId}`],
@@ -175,22 +161,7 @@ export default function KeywordResearchPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {brandsLoading ? (
-                <Skeleton className="h-10 w-full" />
-              ) : (
-                <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-                  <SelectTrigger data-testid="select-brand">
-                    <SelectValue placeholder="Choose a brand..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {brands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id} data-testid={`select-brand-${brand.id}`}>
-                        {brand.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              {brandsLoading ? <Skeleton className="h-10 w-full" /> : <BrandSelector className="w-full" />}
             </CardContent>
           </Card>
 

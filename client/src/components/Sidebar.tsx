@@ -1,9 +1,11 @@
 import { Link, useLocation } from "wouter";
 import {
   Home, Building2, FileText, PenLine, Link2, Search, ScanEye,
-  CreditCard, LogOut, ChevronRight, Settings,
+  CreditCard, LogOut, Settings,
+  TrendingUp, BarChart3, Brain, Lightbulb, Mail, Users,
+  Bot, DollarSign, BookOpen, Swords, Bug, Wrench,
+  Radio, Activity, Plug, HelpCircle, ClipboardList, Shield,
 } from "lucide-react";
-import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -20,9 +22,9 @@ import SidebarOnboarding from "@/components/SidebarOnboarding";
 // ─── Nav definitions ─────────────────────────────────────────────────────────
 
 const NAV_MAIN = [
-  { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/brands",    label: "Brands",    icon: Building2 },
-  { href: "/articles",  label: "Articles",  icon: FileText },
+  { href: "/dashboard",       label: "Dashboard",  icon: Home      },
+  { href: "/brands",          label: "Brands",     icon: Building2 },
+  { href: "/articles",        label: "Articles",   icon: FileText  },
 ];
 
 const NAV_TOOLS = [
@@ -32,25 +34,31 @@ const NAV_TOOLS = [
   { href: "/ai-visibility",    label: "AI Visibility", icon: ScanEye  },
 ];
 
-const NAV_PHASE2 = [
-  { href: "/geo-rankings",           label: "GEO Rankings"     },
-  { href: "/geo-analytics",          label: "Analytics"        },
-  { href: "/ai-intelligence",        label: "AI Intelligence"  },
-  { href: "/opportunities",          label: "Opportunities"    },
-  { href: "/outreach",               label: "Outreach"         },
-  { href: "/community",              label: "Community"        },
-  { href: "/agent",                  label: "AI Agent"         },
-  { href: "/revenue-analytics",      label: "Revenue"          },
-  { href: "/publications",           label: "Publications"     },
-  { href: "/competitors",            label: "Competitors"      },
-  { href: "/crawler-check",          label: "Crawler"          },
-  { href: "/geo-tools",              label: "GEO Tools"        },
-  { href: "/geo-signals",            label: "Signals"          },
-  { href: "/ai-traffic",             label: "AI Traffic"       },
-  { href: "/analytics-integrations", label: "Integrations"     },
-  { href: "/faq-manager",            label: "FAQ Manager"      },
-  { href: "/client-reports",         label: "Reports"          },
-  { href: "/brand-fact-sheet",       label: "Fact Sheet"       },
+const NAV_ANALYTICS = [
+  { href: "/geo-rankings",      label: "GEO Rankings",  icon: TrendingUp  },
+  { href: "/geo-analytics",     label: "GEO Analytics", icon: BarChart3   },
+  { href: "/ai-intelligence",   label: "AI Intelligence", icon: Brain     },
+  { href: "/ai-traffic",        label: "AI Traffic",    icon: Activity    },
+  { href: "/client-reports",    label: "Reports",       icon: ClipboardList },
+  { href: "/revenue-analytics", label: "Revenue",       icon: DollarSign  },
+];
+
+const NAV_GROWTH = [
+  { href: "/opportunities",          label: "Opportunities",  icon: Lightbulb },
+  { href: "/outreach",               label: "Outreach",       icon: Mail      },
+  { href: "/community",              label: "Community",      icon: Users     },
+  { href: "/competitors",            label: "Competitors",    icon: Swords    },
+  { href: "/publications",           label: "Publications",   icon: BookOpen  },
+];
+
+const NAV_OPTIMIZE = [
+  { href: "/geo-tools",              label: "GEO Tools",      icon: Wrench    },
+  { href: "/geo-signals",            label: "Signals",        icon: Radio     },
+  { href: "/crawler-check",          label: "Crawler Check",  icon: Bug       },
+  { href: "/faq-manager",            label: "FAQ Manager",    icon: HelpCircle },
+  { href: "/brand-fact-sheet",       label: "Fact Sheet",     icon: Shield    },
+  { href: "/analytics-integrations", label: "Integrations",   icon: Plug      },
+  { href: "/agent",                  label: "AI Agent",       icon: Bot       },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -98,44 +106,11 @@ function NavItem({
   );
 }
 
-function Phase2Item({
-  href,
-  label,
-  active,
-  onNavigate,
-}: {
-  href: string;
-  label: string;
-  active: boolean;
-  onNavigate?: () => void;
-}) {
-  return (
-    <Link href={href} onClick={onNavigate}>
-      <div
-        className={[
-          "group flex items-center justify-between gap-3 mx-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          active
-            ? "bg-sidebar-primary text-sidebar-primary-foreground"
-            : "text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
-        ].join(" ")}
-        tabIndex={0}
-      >
-        <span className="truncate pl-7">{label}</span>
-        <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 group-hover:text-muted-foreground">
-          Soon
-        </span>
-      </div>
-    </Link>
-  );
-}
-
 // ─── Shared content (used in both desktop aside and mobile Sheet) ────────────
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
-  const [phase2Open, setPhase2Open] = useState(false);
 
   const getInitials = () => {
     if (user?.firstName && user?.lastName) {
@@ -168,19 +143,19 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <NavItem key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
         ))}
 
-        <button
-          onClick={() => setPhase2Open((v) => !v)}
-          className="flex items-center w-full px-5 pt-5 pb-1.5 gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-          aria-expanded={phase2Open}
-        >
-          Upcoming
-          <ChevronRight
-            className={`w-3 h-3 ml-auto transition-transform duration-200 ${phase2Open ? "rotate-90" : ""}`}
-          />
-        </button>
+        <SectionLabel label="Analytics" />
+        {NAV_ANALYTICS.map((item) => (
+          <NavItem key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
+        ))}
 
-        {phase2Open && NAV_PHASE2.map((item) => (
-          <Phase2Item key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
+        <SectionLabel label="Growth" />
+        {NAV_GROWTH.map((item) => (
+          <NavItem key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
+        ))}
+
+        <SectionLabel label="Optimize" />
+        {NAV_OPTIMIZE.map((item) => (
+          <NavItem key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
         ))}
       </nav>
 

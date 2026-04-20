@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { insertBrandSchema, insertCompetitorSchema, insertCompetitorCitationSnapshotSchema, usageLimits } from "@shared/schema";
+import { AI_PLATFORMS as SHARED_AI_PLATFORMS, CITATION_SCORING, ANALYTICS_WINDOWS, MS_PER_DAY } from "@shared/constants";
 import { runBrandPrompts, DEFAULT_CITATION_PLATFORMS, checkForCitation } from "./citationChecker";
 import { judgeCitation } from "./citationJudge";
 import { attachAiLogger } from "./lib/aiLogger";
@@ -786,8 +787,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate content production stats
       const now = new Date();
-      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const oneWeekAgo = new Date(now.getTime() - ANALYTICS_WINDOWS.week * MS_PER_DAY);
+      const oneMonthAgo = new Date(now.getTime() - ANALYTICS_WINDOWS.month * MS_PER_DAY);
 
       const articlesThisWeek = articles.filter(a => new Date(a.createdAt) >= oneWeekAgo).length;
       const articlesThisMonth = articles.filter(a => new Date(a.createdAt) >= oneMonthAgo).length;
@@ -2951,12 +2952,83 @@ Be specific and accurate based on the content. If you can't determine something,
       }
 
       const brand = await storage.createBrand({ ...validatedData, userId: user.id });
+
+      // Kick off async automations: fact-sheet scrape + competitor discovery.
+      // These are best-effort — failures log but don't block the response.
+      // Use setImmediate so the HTTP response fires first.
+      setImmediate(async () => {
+        try {
+          const { scrapeBrandFacts } = await import("./lib/factExtractor");
+          await scrapeBrandFacts(brand.id);
+        } catch (err) {
+          console.warn(`[brand-create] fact scrape failed for ${brand.id}:`, err instanceof Error ? err.message : err);
+        }
+      });
+      setImmediate(async () => {
+        try {
+          const { discoverCompetitors } = await import("./lib/competitorDiscovery");
+          await discoverCompetitors(brand.id);
+        } catch (err) {
+          console.warn(`[brand-create] competitor discovery failed for ${brand.id}:`, err instanceof Error ? err.message : err);
+        }
+      });
+
       res.json({ success: true, data: brand });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ success: false, error: "Invalid brand data", details: error.errors });
       }
       res.status(500).json({ success: false, error: "Failed to create brand" });
+    }
+  });
+
+  // Manual triggers for weekly automations — useful for dev/testing and for
+  // a "Run now" button on the UI. All require ownership.
+  app.post("/api/competitors/discover/:brandId", aiLimitMiddleware, async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await storage.getBrandById(req.params.brandId);
+      if (!brand || brand.userId !== user.id) {
+        return res.status(404).json({ success: false, error: "Brand not found" });
+      }
+      const { discoverCompetitors } = await import("./lib/competitorDiscovery");
+      const inserted = await discoverCompetitors(brand.id);
+      const competitors = await storage.getCompetitors(brand.id);
+      res.json({ success: true, data: { inserted, competitors } });
+    } catch (error) {
+      sendError(res, error, "Failed to discover competitors");
+    }
+  });
+
+  app.post("/api/brand-facts/scrape/:brandId", aiLimitMiddleware, async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await storage.getBrandById(req.params.brandId);
+      if (!brand || brand.userId !== user.id) {
+        return res.status(404).json({ success: false, error: "Brand not found" });
+      }
+      const { scrapeBrandFacts } = await import("./lib/factExtractor");
+      const inserted = await scrapeBrandFacts(brand.id);
+      const facts = await storage.getBrandFacts(brand.id);
+      res.json({ success: true, data: { inserted, facts } });
+    } catch (error) {
+      sendError(res, error, "Failed to scrape brand facts");
+    }
+  });
+
+  app.post("/api/brand-mentions/scan/:brandId", aiLimitMiddleware, async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const brand = await storage.getBrandById(req.params.brandId);
+      if (!brand || brand.userId !== user.id) {
+        return res.status(404).json({ success: false, error: "Brand not found" });
+      }
+      const { scanBrandMentions } = await import("./lib/mentionScanner");
+      const inserted = await scanBrandMentions(brand.id);
+      const mentions = await storage.getBrandMentions(brand.id);
+      res.json({ success: true, data: { inserted, mentions } });
+    } catch (error) {
+      sendError(res, error, "Failed to scan brand mentions");
     }
   });
 
@@ -3611,7 +3683,7 @@ Sitemap: ${baseUrl}/sitemap.xml`;
 
   // ========== GEO ANALYTICS (Share of Voice, AI Visibility Score, Sentiment) ==========
 
-  const AI_PLATFORMS = ['ChatGPT', 'Claude', 'Grok', 'Gemini', 'Perplexity', 'Microsoft Copilot', 'Meta AI', 'DeepSeek', 'Bing AI'];
+  const AI_PLATFORMS = SHARED_AI_PLATFORMS;
 
   // Get comprehensive GEO analytics for a brand — :brandId is ownership-
   // checked via app.param before this handler runs.
@@ -3626,11 +3698,20 @@ Sitemap: ${baseUrl}/sitemap.xml`;
       // already ensured the caller owns this brand).
       const allArticles = await storage.getArticles();
       const brandArticles = allArticles.filter(a => a.brandId === brand.id);
-      const articleIds = brandArticles.map(a => a.id);
+      const articleIds = new Set(brandArticles.map(a => a.id));
 
-      // Get all GEO rankings for this brand's articles
+      // citationChecker writes rankings with articleId=null + brandPromptId=<bp.id>,
+      // so filtering by articleId alone drops every brand-prompt citation.
+      // Widen the filter: keep rows tied to either this brand's articles OR
+      // this brand's prompts.
+      const brandPrompts = await storage.getBrandPromptsByBrandId(brand.id);
+      const brandPromptIds = new Set(brandPrompts.map(p => p.id));
+
       const allRankings = await storage.getGeoRankings();
-      const brandRankings = allRankings.filter(r => r.articleId && articleIds.includes(r.articleId));
+      const brandRankings = allRankings.filter(r =>
+        (r.articleId && articleIds.has(r.articleId)) ||
+        (r.brandPromptId && brandPromptIds.has(r.brandPromptId)),
+      );
 
       // Calculate metrics by platform
       const platformMetrics: Record<string, {
@@ -3659,11 +3740,11 @@ Sitemap: ${baseUrl}/sitemap.xml`;
           sentimentCounts[sentiment]++;
         }
 
-        // Calculate visibility score (0-100)
-        // Based on: citations (40%), mentions (30%), average rank position (30%)
-        const citationScore = Math.min(citations * 10, 40);
-        const mentionScore = Math.min(mentions * 5, 30);
-        const rankScore = avgRank > 0 ? Math.max(30 - (avgRank * 3), 0) : 0;
+        // Visibility score (0-100) = citations + mentions + rank components.
+        // Weights/multipliers centralized in @shared/constants CITATION_SCORING.
+        const citationScore = Math.min(citations * CITATION_SCORING.citationMultiplier, CITATION_SCORING.citationWeight);
+        const mentionScore = Math.min(mentions * CITATION_SCORING.mentionMultiplier, CITATION_SCORING.mentionWeight);
+        const rankScore = avgRank > 0 ? Math.max(CITATION_SCORING.rankWeight - (avgRank * CITATION_SCORING.rankMultiplier), 0) : 0;
         const visibilityScore = Math.round(citationScore + mentionScore + rankScore);
 
         platformMetrics[platform] = {
@@ -3749,58 +3830,89 @@ Sitemap: ${baseUrl}/sitemap.xml`;
       const { brandId } = req.params;
       const { period = "30" } = req.query;
       const daysAgo = parseInt(period as string) || 30;
-      
+
       const brand = await storage.getBrandById(brandId);
       if (!brand) {
         return res.status(404).json({ success: false, error: 'Brand not found' });
       }
 
-      // Get brand's articles
+      // Load everything brand-scoped once; we aggregate twice (current window
+      // + prior window) from the same in-memory set.
       const allArticles = await storage.getArticles();
       const brandArticles = allArticles.filter(a => a.brandId === brand.id);
-      const articleIds = brandArticles.map(a => a.id);
+      const articleIds = new Set(brandArticles.map(a => a.id));
 
-      // Get all GEO rankings for this brand's articles
+      // citationChecker writes rankings with articleId=null + brandPromptId=<bp.id>,
+      // so filtering by articleId alone drops every brand-prompt citation.
+      const brandPrompts = await storage.getBrandPromptsByBrandId(brandId);
+      const brandPromptIds = new Set(brandPrompts.map(p => p.id));
+
       const allRankings = await storage.getGeoRankings();
-      const brandRankings = allRankings.filter(r => r.articleId && articleIds.includes(r.articleId));
+      const brandRankings = allRankings.filter(r =>
+        (r.articleId && articleIds.has(r.articleId)) ||
+        (r.brandPromptId && brandPromptIds.has(r.brandPromptId)),
+      );
 
-      // Get prompt portfolio data
-      const prompts = await storage.getPromptPortfolio(brandId);
-
-      // Calculate platform breakdown
-      const platformBreakdown: { platform: string; citations: number; mentions: number; trend: number }[] = [];
-      for (const platform of AI_PLATFORMS) {
-        const platformRankings = brandRankings.filter(r => r.aiPlatform === platform);
-        const citations = platformRankings.filter(r => r.isCited === 1).length;
-        const mentions = platformRankings.length;
-        
-        if (mentions > 0 || citations > 0) {
-          platformBreakdown.push({
-            platform,
-            citations,
-            mentions,
-            trend: 0 // Would need historical data to calculate real trend
-          });
-        }
-      }
-
-      // Calculate metrics
-      const totalMentions = platformBreakdown.reduce((sum, p) => sum + p.mentions, 0);
-      const totalCitations = platformBreakdown.reduce((sum, p) => sum + p.citations, 0);
-      const citationRate = totalMentions > 0 ? Math.round((totalCitations / totalMentions) * 100) : 0;
-      const promptCoverage = prompts.filter(p => p.isBrandCited === 1).length;
-
-      // Get competitor data for Share of Voice
       const leaderboard = await storage.getCompetitorLeaderboard(brandId);
       const totalMarketCitations = leaderboard.reduce((sum, entry) => sum + entry.totalCitations, 0);
-      const shareOfVoice = totalMarketCitations > 0 
-        ? Math.round((totalCitations / totalMarketCitations) * 1000) / 10
-        : 0;
 
-      // Top performing content
+      const now = Date.now();
+      const currentStart = new Date(now - daysAgo * 24 * 60 * 60 * 1000);
+      const prevStart = new Date(now - 2 * daysAgo * 24 * 60 * 60 * 1000);
+      const prevEnd = currentStart;
+
+      type Agg = {
+        totalMentions: number;
+        totalCitations: number;
+        citationRate: number;
+        shareOfVoice: number;
+        promptCoverage: number;
+        platformBreakdown: { platform: string; citations: number; mentions: number; trend: number }[];
+      };
+
+      const aggregate = (start: Date, end: Date): Agg => {
+        const windowRankings = brandRankings.filter(r => {
+          const t = r.checkedAt ? new Date(r.checkedAt).getTime() : 0;
+          return t >= start.getTime() && t < end.getTime();
+        });
+
+        const platformBreakdown: Agg["platformBreakdown"] = [];
+        for (const platform of AI_PLATFORMS) {
+          const platformRankings = windowRankings.filter(r => r.aiPlatform === platform);
+          const citations = platformRankings.filter(r => r.isCited === 1).length;
+          const mentions = platformRankings.length;
+          if (mentions > 0 || citations > 0) {
+            platformBreakdown.push({ platform, citations, mentions, trend: 0 });
+          }
+        }
+        const totalMentions = platformBreakdown.reduce((sum, p) => sum + p.mentions, 0);
+        const totalCitations = platformBreakdown.reduce((sum, p) => sum + p.citations, 0);
+        const citationRate = totalMentions > 0 ? Math.round((totalCitations / totalMentions) * 100) : 0;
+        const shareOfVoice = totalMarketCitations > 0
+          ? Math.round((totalCitations / totalMarketCitations) * 1000) / 10
+          : 0;
+        // Prompt coverage = unique brandPromptIds that had any cited ranking in this window.
+        const citedPromptIds = new Set(
+          windowRankings
+            .filter(r => r.isCited === 1 && r.brandPromptId)
+            .map(r => r.brandPromptId!),
+        );
+        const promptCoverage = citedPromptIds.size;
+        return { totalMentions, totalCitations, citationRate, shareOfVoice, promptCoverage, platformBreakdown };
+      };
+
+      const current = aggregate(currentStart, new Date(now + 1)); // +1ms to include right-edge
+      const previous = aggregate(prevStart, prevEnd);
+
+      // Top performing content from the current window (article-tied rankings).
       const articleCitations: { title: string; citations: number; platform: string }[] = [];
       for (const article of brandArticles) {
-        const articleRankings = brandRankings.filter(r => r.articleId === article.id && r.isCited === 1);
+        const articleRankings = brandRankings.filter(r =>
+          r.articleId === article.id &&
+          r.isCited === 1 &&
+          r.checkedAt &&
+          new Date(r.checkedAt).getTime() >= currentStart.getTime(),
+        );
         if (articleRankings.length > 0) {
           const topPlatform = articleRankings.reduce((acc, r) => {
             acc[r.aiPlatform] = (acc[r.aiPlatform] || 0) + 1;
@@ -3810,24 +3922,23 @@ Sitemap: ${baseUrl}/sitemap.xml`;
           articleCitations.push({
             title: article.title,
             citations: articleRankings.length,
-            platform: bestPlatform
+            platform: bestPlatform,
           });
         }
       }
       const topPerformingContent = articleCitations.sort((a, b) => b.citations - a.citations).slice(0, 5);
 
-      // Generate recommendations based on data
       const recommendations: string[] = [];
-      if (totalCitations === 0) {
+      if (current.totalCitations === 0) {
         recommendations.push("Start tracking your content across AI platforms to measure citations");
       }
-      if (promptCoverage === 0 && prompts.length > 0) {
-        recommendations.push("Your prompts aren't generating citations yet - optimize content for AI discoverability");
+      if (current.promptCoverage === 0 && brandPrompts.length > 0) {
+        recommendations.push("Your prompts aren't generating citations yet — optimize content for AI discoverability");
       }
-      if (shareOfVoice < 10 && totalMarketCitations > 0) {
+      if (current.shareOfVoice < 10 && totalMarketCitations > 0) {
         recommendations.push("Increase content volume to improve share of voice against competitors");
       }
-      if (platformBreakdown.length < 3) {
+      if (current.platformBreakdown.length < 3) {
         recommendations.push("Expand tracking to more AI platforms for comprehensive coverage");
       }
       if (recommendations.length === 0) {
@@ -3837,18 +3948,18 @@ Sitemap: ${baseUrl}/sitemap.xml`;
       res.json({
         success: true,
         data: {
-          brandMentionFrequency: totalMentions,
-          previousBMF: 0, // Would need historical data
-          shareOfVoice,
-          previousSOV: 0, // Would need historical data
-          citationRate,
-          previousCitationRate: 0, // Would need historical data
-          promptCoverage,
-          previousPromptCoverage: 0, // Would need historical data
-          platformBreakdown,
+          brandMentionFrequency: current.totalMentions,
+          previousBMF: previous.totalMentions,
+          shareOfVoice: current.shareOfVoice,
+          previousSOV: previous.shareOfVoice,
+          citationRate: current.citationRate,
+          previousCitationRate: previous.citationRate,
+          promptCoverage: current.promptCoverage,
+          previousPromptCoverage: previous.promptCoverage,
+          platformBreakdown: current.platformBreakdown,
           topPerformingContent,
-          recommendations
-        }
+          recommendations,
+        },
       });
     } catch (error) {
       console.error('Client reports error:', error);
@@ -4140,6 +4251,52 @@ Consider:
       const subreddits = INDUSTRY_SUBREDDITS[industry] || INDUSTRY_SUBREDDITS['default'];
       const quoraTopics = INDUSTRY_QUORA_TOPICS[industry] || INDUSTRY_QUORA_TOPICS['default'];
 
+      // Compute real citation-share breakdown from the brand's geo_rankings.
+      // Every cited ranking carries `citingOutletUrl` / `citingOutletName`;
+      // aggregate by domain, then bucket into Reddit / Quora / own-site /
+      // everything-else ("third-party") to replace the hardcoded defaults.
+      const brandDomain = (brand.website || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+      const brandPrompts = await storage.getBrandPromptsByBrandId(brand.id);
+      const rankings = brandPrompts.length
+        ? await storage.getGeoRankingsByBrandPromptIds(brandPrompts.map(p => p.id))
+        : [];
+      const articles = (await storage.getArticles()).filter(a => a.brandId === brand.id);
+      const articleRankings = articles.length
+        ? (await storage.getGeoRankings()).filter(r => r.articleId && articles.some(a => a.id === r.articleId))
+        : [];
+      const cited = [...rankings, ...articleRankings].filter(r => r.isCited === 1);
+      const totalCited = cited.length;
+      const extractDomain = (url: string | null | undefined) => {
+        if (!url) return "";
+        try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); }
+        catch { return (url || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]; }
+      };
+      let reddit = 0, quora = 0, ownSite = 0, thirdParty = 0;
+      for (const r of cited) {
+        const domain = extractDomain(r.citingOutletUrl);
+        if (!domain) continue;
+        if (domain.includes("reddit.com")) reddit++;
+        else if (domain.includes("quora.com")) quora++;
+        else if (brandDomain && domain.includes(brandDomain)) ownSite++;
+        else thirdParty++;
+      }
+      const pct = (n: number) => totalCited > 0 ? Math.round((n / totalCited) * 1000) / 10 : 0;
+      const keyStats = totalCited > 0
+        ? {
+            thirdPartyCitationShare: pct(reddit + quora + thirdParty),
+            redditCitationShare: pct(reddit),
+            quoraCitationShare: pct(quora),
+            brandWebsiteCitationShare: pct(ownSite),
+          }
+        : {
+            // No citation data yet — surface zeros so the user sees "run a
+            // citation check first" rather than misleading industry averages.
+            thirdPartyCitationShare: 0,
+            redditCitationShare: 0,
+            quoraCitationShare: 0,
+            brandWebsiteCitationShare: 0,
+          };
+
       // Generate content ideas based on brand
       const contentIdeas = [];
       
@@ -4190,16 +4347,37 @@ Consider:
             name: brand.name,
             industry: brand.industry
           },
-          platforms: Object.values(GEO_PLATFORMS).sort((a, b) => b.citationShare - a.citationShare),
           subreddits,
           quoraTopics,
           contentIdeas,
-          keyStats: {
-            thirdPartyCitationShare: 91,
-            redditCitationShare: 21,
-            quoraCitationShare: 14.3,
-            brandWebsiteCitationShare: 9
-          },
+          keyStats,
+          totalCitedRankings: totalCited,
+          // Real per-brand platform breakdown: override each GEO_PLATFORMS
+          // entry's industry-benchmark citationShare with this brand's actual
+          // share from cited geo_rankings. Platforms the brand hasn't been
+          // cited on fall to 0, so the list reflects reality not averages.
+          platforms: (() => {
+            const perPlatform: Record<string, number> = {};
+            for (const r of cited) {
+              const d = extractDomain(r.citingOutletUrl);
+              if (!d) continue;
+              let key: string | null = null;
+              if (d.includes("reddit.com")) key = "reddit";
+              else if (d.includes("quora.com")) key = "quora";
+              else if (d.includes("youtube.com")) key = "youtube";
+              else if (d.includes("linkedin.com")) key = "linkedin";
+              else if (d.includes("medium.com")) key = "medium";
+              else if (d.includes("news.ycombinator.com")) key = "hackernews";
+              else if (d.includes("producthunt.com")) key = "producthunt";
+              else if (d.includes("wikipedia.org")) key = "wikipedia";
+              if (key) perPlatform[key] = (perPlatform[key] || 0) + 1;
+            }
+            return Object.entries(GEO_PLATFORMS).map(([key, p]) => ({
+              ...p,
+              citationShare: totalCited > 0 ? Math.round(((perPlatform[key] || 0) / totalCited) * 1000) / 10 : 0,
+              citationCount: perPlatform[key] || 0,
+            })).sort((a, b) => b.citationShare - a.citationShare);
+          })(),
           strategyTips: [
             'AI systems cite 91% from third-party sources - focus on Reddit, Quora, YouTube',
             'Build karma/reputation before adding brand mentions',
@@ -4338,80 +4516,30 @@ Consider:
   });
 
   // Discover listicles for a brand using AI
-  app.post("/api/listicles/discover/:brandId", async (req, res) => {
+  app.post("/api/listicles/discover/:brandId", aiLimitMiddleware, async (req, res) => {
     try {
+      const user = requireUser(req);
       const brand = await storage.getBrandById(req.params.brandId);
-      if (!brand) {
+      if (!brand || brand.userId !== user.id) {
         return res.status(404).json({ success: false, error: 'Brand not found' });
       }
 
-      const competitors = await storage.getCompetitors(brand.id);
-      const competitorNames = competitors.map(c => c.name);
-
-      const brandProducts = (brand as any).products?.join(', ') || '';
-      const brandAudience = (brand as any).targetAudience || '';
-      const brandValues = (brand as any).keyValues?.join(', ') || '';
-
-      const prompt = `You are a GEO (Generative Engine Optimization) expert. Identify high-value listicle and "best of" article opportunities for ${brand.name} in the ${brand.industry} industry.
-
-BRAND CONTEXT:
-- Products/Services: ${brandProducts || 'Not specified'}
-- Target Audience: ${brandAudience || 'Not specified'}
-- Brand Values: ${brandValues || 'Not specified'}
-- Competitors: ${competitorNames.join(', ') || 'industry leaders'}
-
-IMPORTANT: Generate a DIVERSE mix of listicle types that will help this brand reach ALL relevant audiences:
-
-1. CONSUMER/LIFESTYLE listicles (B2C): "Best [product] for [use case]", "Top [products] of 2025", "Best [products] for Kids", "Best Budget [products]", "Best [products] for Beginners", etc. Think about real consumer search queries.
-
-2. PROFESSIONAL/INDUSTRY listicles (B2B): "Best [tools/services] for [industry]", "Top [solutions] for Small Business", "Best Enterprise [solutions]", etc.
-
-3. COMPARISON/REVIEW listicles: "[Brand] vs [Competitor]", "Best Alternatives to [Competitor]", "[Product] Reviews & Rankings"
-
-4. NICHE/AUDIENCE-SPECIFIC listicles: target specific demographics, use cases, price points, geographies, or lifestyles relevant to this brand's actual customers.
-
-5. PARTNER/INVESTOR-RELEVANT listicles: "Fastest Growing [industry] Companies", "Most Innovative [industry] Startups", "Top [industry] Companies to Watch"
-
-The goal is to find listicles that:
-- Get cited by AI search engines (ChatGPT, Claude, Perplexity, Google AI)
-- Match how REAL people search for products/services like this brand offers
-- Cover both broad popular searches AND specific niche queries
-- Include lifestyle and consumer angles, not just professional/industry ones
-
-Return a JSON array of 10 listicle opportunities with a good mix of the above types:
-[{
-  "title": "Suggested listicle title",
-  "keyword": "Target search keyword",
-  "audienceType": "consumer" | "professional" | "investor" | "partner",
-  "searchVolume": estimated monthly search volume (number),
-  "domainAuthority": suggested minimum DA to target (number 1-100),
-  "strategy": "Specific action steps to get included in this listicle",
-  "priorityScore": 1-10 rating based on GEO value and reach
-}]
-
-Return ONLY the JSON array, no other text.`;
-
-      const response = await openai.chat.completions.create({
-        model: MODELS.misc,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-      });
-
-      const parsed = safeParseJson<any[]>(response.choices[0].message.content);
-      const opportunities = Array.isArray(parsed) ? parsed : [];
+      const { scanBrandListicles } = await import("./lib/listicleScanner");
+      const inserted = await scanBrandListicles(brand.id);
+      const listicles = await storage.getListicles(brand.id);
 
       res.json({
         success: true,
         data: {
           brand: { id: brand.id, name: brand.name },
-          opportunities,
+          inserted,
+          listicles,
           tips: [
-            'Focus on listicles with DA 40+ for stronger AI citation signal',
-            'Reach out to authors directly with unique value propositions',
-            'Offer exclusive data or case studies for inclusion',
-            'Monitor for new listicles in your space monthly'
-          ]
-        }
+            "Listicles where you're not yet listed are outreach targets",
+            "Focus on listicles from high-domain-authority publications",
+            "Re-scan weekly — new listicles appear regularly in active categories",
+          ],
+        },
       });
     } catch (error) {
       sendError(res, error, "Failed to discover listicles");
@@ -5637,11 +5765,11 @@ Return ONLY the JSON array.`;
   app.get("/api/ai-sources/:brandId", async (req, res) => {
     try {
       const { brandId } = req.params;
-      const { aiPlatform, sourceType } = req.query;
-      const filters: { aiPlatform?: string; sourceType?: string } = {};
-      if (aiPlatform) filters.aiPlatform = aiPlatform as string;
-      if (sourceType) filters.sourceType = sourceType as string;
-      const sources = await storage.getAiSources(brandId, filters);
+      // Route to getTopAiSources which synthesises from geo_rankings when the
+      // (mostly empty) ai_sources table has no rows. getAiSources() reads only
+      // the Phase 2 table and returns [] for every user.
+      const limit = parseInt((req.query.limit as string) || "25");
+      const sources = await storage.getTopAiSources(brandId, limit);
       res.json({ success: true, data: sources });
     } catch (error) {
       res.status(500).json({ success: false, error: 'Failed to fetch AI sources' });

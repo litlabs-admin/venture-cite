@@ -15,9 +15,9 @@ import { Loader2, FileText, Eye, Calendar, Tag, Share2, Clock, Pencil, Send, Lin
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
+import { AI_PLATFORMS } from "@shared/constants";
 
 const DISTRIBUTION_PLATFORMS = ['LinkedIn', 'Medium', 'Reddit', 'Quora'];
-const AI_PLATFORMS = ['ChatGPT', 'Claude', 'Grok', 'Perplexity', 'Google AI', 'Gemini', 'Microsoft Copilot', 'Meta AI', 'DeepSeek'];
 
 type DistributeView = 'generate' | 'results' | 'history';
 

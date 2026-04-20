@@ -3,8 +3,8 @@ import { useRoute, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Calendar, User, Tag, Building2 } from "lucide-react";
-import { Helmet } from "react-helmet";
-import ReactMarkdown from "react-markdown";
+import { Helmet } from "react-helmet-async";
+import SafeMarkdown from "@/components/SafeMarkdown";
 
 export default function ArticleView() {
   const [, params] = useRoute("/article/:slug");
@@ -150,9 +150,9 @@ export default function ArticleView() {
 
           <Card>
             <CardContent className="prose prose-lg dark:prose-invert max-w-none pt-6">
-              <ReactMarkdown data-testid="article-content">
+              <SafeMarkdown>
                 {article.content}
-              </ReactMarkdown>
+              </SafeMarkdown>
             </CardContent>
           </Card>
 

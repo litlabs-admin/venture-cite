@@ -25,6 +25,13 @@ export interface JudgeBrand {
 export interface JudgeVerdict {
   cited: boolean;
   rank: number | null;
+  /**
+   * 0-100 score for how directly the response answers the user's question.
+   * Independent of whether the brand was cited — a high-relevance response
+   * that doesn't cite the brand still hurts us (AI found a better answer
+   * elsewhere). Null if the judge didn't return a usable number.
+   */
+  relevance: number | null;
   reasoning: string;
 }
 
@@ -59,9 +66,11 @@ export async function judgeCitation(params: {
 A "citation" means the response explicitly refers to THIS brand — by its name, a known variation, its website/domain, or an unambiguous description. Generic English words that happen to overlap with the brand name do NOT count (e.g., "venture capital" is not a citation of a brand called "Venture PR"). Industry-generic terms (e.g., "PR agency", "CRM software") do NOT count unless the specific brand is named.
 
 Return JSON only, exactly in this shape:
-{"cited": boolean, "rank": number | null, "reasoning": "short sentence"}
+{"cited": boolean, "rank": number | null, "relevance": number, "reasoning": "short sentence"}
 
-"rank" is the 1-indexed position of the brand's first mention inside an ordered/numbered list or ranked recommendation in the response. If the brand is mentioned but not inside such a list, return null.`;
+"rank" is the 1-indexed position of the brand's first mention inside an ordered/numbered list or ranked recommendation in the response. If the brand is mentioned but not inside such a list, return null.
+
+"relevance" is 0-100 — how directly the response answers the user's underlying question overall (independent of whether the brand was cited). 100 = fully answers, 50 = partially answers, 0 = off-topic.`;
 
   const userMsg = `Brand profile:
 ${profile}
@@ -89,9 +98,12 @@ Respond with JSON only.`;
     const parsed = JSON.parse(raw);
     const cited = Boolean(parsed.cited);
     const rank = typeof parsed.rank === "number" && parsed.rank > 0 ? Math.round(parsed.rank) : null;
+    const relevance = typeof parsed.relevance === "number"
+      ? Math.max(0, Math.min(100, Math.round(parsed.relevance)))
+      : null;
     const reasoning = typeof parsed.reasoning === "string" ? parsed.reasoning : "";
-    return { cited, rank: cited ? rank : null, reasoning };
+    return { cited, rank: cited ? rank : null, relevance, reasoning };
   } catch {
-    return { cited: false, rank: null, reasoning: "Judge returned malformed JSON" };
+    return { cited: false, rank: null, relevance: null, reasoning: "Judge returned malformed JSON" };
   }
 }

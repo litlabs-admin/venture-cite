@@ -4,9 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { 
   MessageSquare, 
   HelpCircle, 
@@ -22,7 +24,6 @@ import {
   BarChart3
 } from "lucide-react";
 import { SiReddit, SiQuora, SiWikipedia, SiYcombinator, SiProducthunt } from "react-icons/si";
-import type { Brand } from "@shared/schema";
 
 interface Platform {
   name: string;
@@ -62,6 +63,7 @@ interface OpportunitiesData {
     quoraCitationShare: number;
     brandWebsiteCitationShare: number;
   };
+  totalCitedRankings?: number;
   strategyTips: string[];
 }
 
@@ -77,13 +79,7 @@ const platformIcons: Record<string, JSX.Element> = {
 };
 
 export default function GeoOpportunities() {
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
-
-  const { data: brandsResponse, isLoading: brandsLoading } = useQuery<{ success: boolean; data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsResponse?.data || [];
+  const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
 
   const { data: opportunitiesResponse, isLoading: oppsLoading } = useQuery<{ success: boolean; data: OpportunitiesData }>({
     queryKey: selectedBrandId ? ["/api/geo-opportunities", selectedBrandId] : ["/api/geo-opportunities"],
@@ -94,35 +90,13 @@ export default function GeoOpportunities() {
   const isLoading = brandsLoading || oppsLoading;
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2" data-testid="page-title">GEO Opportunity Finder</h1>
-        <p className="text-muted-foreground">
-          Discover where to post content for maximum AI visibility
-        </p>
-      </div>
-
-      {brands.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Select Brand for Personalized Recommendations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-              <SelectTrigger className="w-full md:w-[300px]" data-testid="select-brand">
-                <SelectValue placeholder="Select a brand..." />
-              </SelectTrigger>
-              <SelectContent>
-                {brands.map((brand) => (
-                  <SelectItem key={brand.id} value={brand.id}>
-                    {brand.name} - {brand.industry}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-      )}
+    <div className="space-y-8">
+      <Helmet><title>GEO Opportunities - VentureCite</title></Helmet>
+      <PageHeader
+        title="GEO Opportunities"
+        description="Discover where to post content for maximum AI visibility"
+        actions={brands.length > 0 ? <BrandSelector showIndustry /> : null}
+      />
 
       {isLoading ? (
         <div className="space-y-4">
@@ -132,57 +106,75 @@ export default function GeoOpportunities() {
         </div>
       ) : opportunities ? (
         <div className="space-y-6">
+          {!opportunities.brand && (
+            <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+              <CardContent className="p-4 flex items-start gap-3">
+                <Lightbulb className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Industry benchmarks — select a brand to see your data</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    The figures below are category-wide AI citation benchmarks, not your brand's results. Pick a brand above to replace them with your actual per-platform citation share.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {opportunities.brand && (opportunities.totalCitedRankings ?? 0) === 0 && (
+            <Card>
+              <CardContent className="p-4 flex items-start gap-3">
+                <Lightbulb className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">No citation data yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Run a citation check from the Citations page to populate this breakdown with real per-platform data for {opportunities.brand.name}. Until then, the numbers below are zeros, not industry averages.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <MessageSquare className="h-8 w-8 text-orange-500" />
-                  <div>
-                    <div className="text-3xl font-bold text-orange-600" data-testid="stat-third-party">
-                      {opportunities.keyStats.thirdPartyCitationShare}%
-                    </div>
-                    <p className="text-sm text-muted-foreground">Third-Party Citations</p>
-                  </div>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Third-Party Citations</span>
+                  <MessageSquare className="w-4 h-4 text-muted-foreground" />
                 </div>
+                <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-third-party">
+                  {opportunities.keyStats.thirdPartyCitationShare}%
+                </p>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-red-200">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <SiReddit className="h-8 w-8 text-orange-500" />
-                  <div>
-                    <div className="text-3xl font-bold text-red-600" data-testid="stat-reddit">
-                      {opportunities.keyStats.redditCitationShare}%
-                    </div>
-                    <p className="text-sm text-muted-foreground">Reddit Citations</p>
-                  </div>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reddit Citations</span>
+                  <SiReddit className="w-4 h-4 text-muted-foreground" />
                 </div>
+                <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-reddit">
+                  {opportunities.keyStats.redditCitationShare}%
+                </p>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <SiQuora className="h-8 w-8 text-red-600" />
-                  <div>
-                    <div className="text-3xl font-bold text-purple-600" data-testid="stat-quora">
-                      {opportunities.keyStats.quoraCitationShare}%
-                    </div>
-                    <p className="text-sm text-muted-foreground">Quora Citations</p>
-                  </div>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quora Citations</span>
+                  <SiQuora className="w-4 h-4 text-muted-foreground" />
                 </div>
+                <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-quora">
+                  {opportunities.keyStats.quoraCitationShare}%
+                </p>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <Target className="h-8 w-8 text-blue-500" />
-                  <div>
-                    <div className="text-3xl font-bold text-blue-600" data-testid="stat-brand">
-                      {opportunities.keyStats.brandWebsiteCitationShare}%
-                    </div>
-                    <p className="text-sm text-muted-foreground">Brand Site Citations</p>
-                  </div>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Brand Site Citations</span>
+                  <Target className="w-4 h-4 text-muted-foreground" />
                 </div>
+                <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-brand">
+                  {opportunities.keyStats.brandWebsiteCitationShare}%
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -196,8 +188,8 @@ export default function GeoOpportunities() {
             </CardHeader>
             <CardContent>
               <p className="text-lg">
-                <strong>91% of AI citations come from third-party sources</strong> like Reddit and Quora. 
-                Your brand website only accounts for 9% of citations. 
+                <strong>{opportunities.keyStats.thirdPartyCitationShare}% of AI citations come from third-party sources</strong> like Reddit and Quora.
+                {opportunities.brand ? " Your" : " Brand"} website{opportunities.brand ? "" : "s"} account{opportunities.brand ? "s" : ""} for {opportunities.keyStats.brandWebsiteCitationShare}% of citations.
                 <span className="text-amber-600 font-medium"> Focus your content strategy on community platforms!</span>
               </p>
             </CardContent>

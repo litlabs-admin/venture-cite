@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -23,7 +25,8 @@ import {
   Zap
 } from "lucide-react";
 import { SiOpenai, SiGoogle } from "react-icons/si";
-import type { Brand } from "@shared/schema";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 
 interface PlatformMetrics {
   mentions: number;
@@ -98,13 +101,7 @@ function getSentimentIcon(label: string) {
 }
 
 export default function GeoAnalytics() {
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
-
-  const { data: brandsResponse, isLoading: brandsLoading } = useQuery<{ success: boolean; data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsResponse?.data || [];
+  const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
 
   const { data: analyticsResponse, isLoading: analyticsLoading, error } = useQuery<{ success: boolean; data: GeoAnalyticsData }>({
     queryKey: ["/api/geo-analytics", selectedBrandId],
@@ -114,42 +111,19 @@ export default function GeoAnalytics() {
   const analytics = analyticsResponse?.data;
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2" data-testid="page-title">GEO Analytics Dashboard</h1>
-        <p className="text-muted-foreground">
-          AI Visibility Score, Share of Voice, and Sentiment Analysis
-        </p>
-      </div>
+    <div className="space-y-8">
+      <Helmet><title>GEO Analytics - VentureCite</title></Helmet>
+      <PageHeader
+        title="GEO Analytics"
+        description="AI Visibility Score, Share of Voice, and Sentiment Analysis"
+        actions={brands.length > 0 ? <BrandSelector showIndustry /> : null}
+      />
 
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Select Brand to Analyze
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {brandsLoading ? (
-            <Skeleton className="h-10 w-[300px]" />
-          ) : brands.length === 0 ? (
-            <p className="text-muted-foreground">No brands found. Create a brand first to see analytics.</p>
-          ) : (
-            <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-              <SelectTrigger className="w-full md:w-[300px]" data-testid="select-brand">
-                <SelectValue placeholder="Select a brand..." />
-              </SelectTrigger>
-              <SelectContent>
-                {brands.map((brand) => (
-                  <SelectItem key={brand.id} value={brand.id}>
-                    {brand.name} - {brand.industry}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </CardContent>
-      </Card>
+      {brandsLoading && brands.length === 0 ? (
+        <Skeleton className="h-10 w-[300px]" />
+      ) : brands.length === 0 ? (
+        <Card><CardContent className="p-6"><p className="text-muted-foreground">No brands found. Create a brand first to see analytics.</p></CardContent></Card>
+      ) : null}
 
       {!selectedBrandId ? (
         <Card>

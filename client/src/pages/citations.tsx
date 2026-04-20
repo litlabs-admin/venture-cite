@@ -1,5 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -33,7 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDistanceToNow, format } from "date-fns";
-import ReactMarkdown from "react-markdown";
+import SafeMarkdown from "@/components/SafeMarkdown";
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import type { Brand } from "@shared/schema";
 
@@ -105,7 +107,7 @@ function PlatformResultCard({ result }: { result: PlatformResult }) {
           {expanded && (
             <div className="px-4 py-3 bg-muted/20 border-t max-h-[480px] overflow-y-auto">
               <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-pre:text-xs">
-                <ReactMarkdown>{result.fullResponse}</ReactMarkdown>
+                <SafeMarkdown>{result.fullResponse}</SafeMarkdown>
               </div>
             </div>
           )}
@@ -144,22 +146,7 @@ type ResultsData = {
 
 export default function Citations() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_citations_brandId", "");
-
-  const { data: brandsData, isLoading: brandsLoading } = useQuery<{ success: boolean; data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-  const brands = brandsData?.data || [];
-  const selectedBrand = brands.find((b) => b.id === selectedBrandId);
-
-  // Auto-select a brand: pick the first if no valid selection exists (covers
-  // first brand creation, deleted brand, returning users). Multi-brand users
-  // keep their last-used brand via usePersistedState.
-  useEffect(() => {
-    if (brands.length > 0 && (!selectedBrandId || !brands.find(b => b.id === selectedBrandId))) {
-      setSelectedBrandId(brands[0].id);
-    }
-  }, [brands, selectedBrandId]);
+  const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
 
   const { data: promptsData, isLoading: promptsLoading } = useQuery<{ success: boolean; data: BrandPrompt[] }>({
     queryKey: [`/api/brand-prompts/${selectedBrandId}`],
@@ -234,6 +221,22 @@ export default function Citations() {
       }
     },
     onError: (err: Error) => toast({ title: "Check failed", description: err.message, variant: "destructive" }),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/reset`, { confirm: true });
+      return r.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        invalidatePromptQueries();
+        toast({ title: "Prompts reset" });
+      } else {
+        toast({ title: "Reset failed", description: data.error, variant: "destructive" });
+      }
+    },
+    onError: (err: Error) => toast({ title: "Reset failed", description: err.message, variant: "destructive" }),
   });
 
   // Re-score stored responses with the current detector. Free (no AI calls).
@@ -386,14 +389,16 @@ export default function Citations() {
   const hasPrompts = prompts.length > 0;
   const promptsAgeLabel = hasPrompts ? formatDistanceToNow(new Date(prompts[0].createdAt), { addSuffix: true }) : null;
 
-  const bestPlatform = results?.byPlatform?.length
-    ? [...results.byPlatform].sort((a, b) => b.citationRate - a.citationRate)[0]
-    : null;
-  const bestPrompt = results?.byPrompt?.length
-    ? [...results.byPrompt]
+  const bestPlatform = useMemo(() => {
+    if (!results?.byPlatform?.length) return null;
+    return [...results.byPlatform].sort((a, b) => b.citationRate - a.citationRate)[0];
+  }, [results?.byPlatform]);
+  const bestPrompt = useMemo(() => {
+    if (!results?.byPrompt?.length) return null;
+    return [...results.byPrompt]
       .map((p) => ({ ...p, citedCount: p.platforms.filter((pl) => pl.isCited).length }))
-      .sort((a, b) => b.citedCount - a.citedCount)[0]
-    : null;
+      .sort((a, b) => b.citedCount - a.citedCount)[0];
+  }, [results?.byPrompt]);
 
   const TABS = [
     { id: "prompts", label: "Prompts", icon: Sparkles },
@@ -419,23 +424,15 @@ export default function Citations() {
           ) : (
             <div className="flex items-center gap-3">
               <Target className="h-4 w-4 text-muted-foreground shrink-0" />
-              <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-                <SelectTrigger data-testid="select-brand" className="flex-1">
-                  <SelectValue placeholder="Choose a brand..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map((brand) => (
-                    <SelectItem key={brand.id} value={brand.id}>
-                      {brand.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <BrandSelector className="flex-1" />
               {hasPrompts && (
                 <>
                   <Button
-                    onClick={() => runMutation.mutate()}
-                    disabled={runMutation.isPending}
+                    onClick={() => {
+                      if (runMutation.isPending || !selectedBrandId) return;
+                      runMutation.mutate();
+                    }}
+                    disabled={runMutation.isPending || !selectedBrandId}
                     className="bg-red-600 hover:bg-red-700 shrink-0"
                     data-testid="button-run-check"
                   >
@@ -540,18 +537,16 @@ export default function Citations() {
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={async () => {
-                                const r = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/reset`, { confirm: true });
-                                const data = await r.json();
-                                if (data.success) {
-                                  invalidatePromptQueries();
-                                  toast({ title: "Prompts reset" });
-                                } else {
-                                  toast({ title: "Reset failed", description: data.error, variant: "destructive" });
+                              disabled={resetMutation.isPending}
+                              onClick={(e) => {
+                                if (resetMutation.isPending) {
+                                  e.preventDefault();
+                                  return;
                                 }
+                                resetMutation.mutate();
                               }}
                             >
-                              Reset
+                              {resetMutation.isPending ? "Resetting…" : "Reset"}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -570,8 +565,11 @@ export default function Citations() {
                         No prompts yet. Generate 10 citation prompts tailored to your brand profile and published articles — these become the locked set we track weekly.
                       </p>
                       <Button
-                        onClick={() => generateMutation.mutate()}
-                        disabled={generateMutation.isPending}
+                        onClick={() => {
+                          if (generateMutation.isPending || !selectedBrandId) return;
+                          generateMutation.mutate();
+                        }}
+                        disabled={generateMutation.isPending || !selectedBrandId}
                         className="bg-red-600 hover:bg-red-700"
                         data-testid="button-generate-prompts"
                       >

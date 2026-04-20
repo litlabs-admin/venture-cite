@@ -1,8 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, ShoppingCart, TrendingUp, Sparkles } from "lucide-react";
+import { DollarSign, ShoppingCart, TrendingUp, Sparkles, Loader2 } from "lucide-react";
 import { useState } from "react";
 import type { Brand, PurchaseEvent } from "@shared/schema";
 
@@ -27,7 +30,7 @@ export default function RevenueAnalytics() {
       const url = selectedBrand !== "all" 
         ? `/api/revenue/analytics?brandId=${selectedBrand}`
         : "/api/revenue/analytics";
-      const res = await fetch(url);
+      const res = await apiRequest("GET", url);
       return res.json();
     },
   });
@@ -47,33 +50,29 @@ export default function RevenueAnalytics() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-      <div className="container mx-auto p-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold mb-2" data-testid="title-revenue">Revenue Analytics</h1>
-            <p className="text-muted-foreground">Track AI-driven purchases from ChatGPT, Claude & more</p>
-          </div>
-
+    <div className="space-y-8">
+      <Helmet><title>Revenue Analytics - VentureCite</title></Helmet>
+      <PageHeader
+        title="Revenue Analytics"
+        description="Track AI-driven purchases from ChatGPT, Claude & more"
+        actions={
           <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-            <SelectTrigger className="w-[240px]" data-testid="select-brand-filter">
+            <SelectTrigger className="w-[200px]" data-testid="select-brand-filter">
               <SelectValue placeholder="All Brands" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Brands</SelectItem>
               {brands.map((brand) => (
-                <SelectItem key={brand.id} value={brand.id}>
-                  {brand.name}
-                </SelectItem>
+                <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
+        }
+      />
 
         {isLoading ? (
-          <div className="text-center py-12">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
-            <p className="mt-4 text-muted-foreground">Loading revenue data...</p>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <>
@@ -264,7 +263,6 @@ export default function RevenueAnalytics() {
             </Card>
           </>
         )}
-      </div>
     </div>
   );
 }

@@ -12,16 +12,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
-import type { Brand, Listicle, BofuContent, FaqItem, BrandMention } from "@shared/schema";
+import PageHeader from "@/components/PageHeader";
+import type { Listicle, BofuContent, FaqItem, BrandMention } from "@shared/schema";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 import {
   List,
   BookOpen,
   FileText,
   HelpCircle,
   Bell,
-  ArrowLeft,
   Sparkles,
   ExternalLink,
   TrendingUp,
@@ -45,26 +47,13 @@ const SiLinkedin = Linkedin;
 
 export default function GeoTools() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_geotools_brandId", "");
+  const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
   const [activeTab, setActiveTab] = useState("listicles");
   const [bofuType, setBofuType] = useState<string>("comparison");
   const [bofuCompetitor, setBofuCompetitor] = useState("");
   const [bofuKeyword, setBofuKeyword] = useState("");
   const [faqTopic, setFaqTopic] = useState("");
   const [listicleOpportunities, setListicleOpportunities] = useState<any[]>([]);
-
-  const { data: brandsData } = useQuery<{ data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsData?.data || [];
-  const selectedBrand = brands.find(b => b.id === selectedBrandId);
-
-  useEffect(() => {
-    if (brands.length > 0 && (!selectedBrandId || !brands.find(b => b.id === selectedBrandId))) {
-      setSelectedBrandId(brands[0].id);
-    }
-  }, [brands, selectedBrandId]);
 
   // Listicle queries
   const { data: listiclesData, isLoading: listiclesLoading } = useQuery({
@@ -156,89 +145,30 @@ export default function GeoTools() {
 
   return (
     <>
-      <Helmet>
-        <title>GEO Tools - Listicles, Wikipedia, BOFU, FAQs, Mentions | VenturePR</title>
-        <meta name="description" content="Advanced GEO tools for AI visibility: listicle tracking, Wikipedia monitoring, BOFU content generator, FAQ optimizer, and brand mention alerts." />
-      </Helmet>
-
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <Link href="/">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                GEO Tools
-              </h1>
-              <p className="text-muted-foreground">
-                Advanced tools to boost your AI visibility
-              </p>
-            </div>
-            <Link href="/geo-signals">
-              <Button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700" data-testid="button-geo-signals">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Google AI Signal Suite
-              </Button>
-            </Link>
-          </div>
-
-          {/* Google AI Signal Optimization Banner */}
-          <Card className="mb-6 bg-gradient-to-r from-violet-900/20 to-purple-900/20 border-violet-600/30">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-violet-400" />
-                    NEW: GEO Signal Optimization Suite
-                  </h2>
-                  <p className="text-muted-foreground mt-1">
-                    Optimize for Google's 7 AI ranking signals - Base Ranking, Gecko Score, Jetstream, BM25, PCTR, Freshness, and Boost/Bury rules
-                  </p>
-                </div>
-                <Link href="/geo-signals">
-                  <Button variant="outline" className="border-violet-600 text-violet-400 hover:bg-violet-600 hover:text-white" data-testid="button-open-signals">
-                    Open Suite
-                    <ExternalLink className="h-4 w-4 ml-2" />
+      <Helmet><title>GEO Tools - VentureCite</title></Helmet>
+      <div className="space-y-8">
+        <PageHeader
+          title="GEO Tools"
+          description="Advanced tools to boost your AI visibility"
+          actions={
+            <div className="flex items-center gap-2">
+              {brands.length > 0 ? (
+                <BrandSelector showIndustry />
+              ) : (
+                <Link href="/brands">
+                  <Button size="sm" data-testid="button-create-brand">
+                    <Plus className="h-4 w-4 mr-2" /> Create Brand
                   </Button>
                 </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Brand Selector */}
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Select Brand</label>
-                  <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-                    <SelectTrigger data-testid="select-brand">
-                      <SelectValue placeholder="Choose a brand to analyze" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {brands.map((brand) => (
-                        <SelectItem key={brand.id} value={brand.id}>
-                          {brand.name} - {brand.industry}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {!brands.length && (
-                  <Link href="/brands">
-                    <Button data-testid="button-create-brand">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Brand
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+              )}
+              <Link href="/geo-signals">
+                <Button variant="outline" size="sm" data-testid="button-geo-signals">
+                  <Sparkles className="h-4 w-4 mr-2" /> GEO Signals
+                </Button>
+              </Link>
+            </div>
+          }
+        />
 
           {selectedBrandId ? (
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -720,28 +650,32 @@ export default function GeoTools() {
                         <div className="text-center py-8">
                           <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
                         </div>
-                      ) : (mentionsData as any)?.data ? (
+                      ) : (() => {
+                        const md = mentionsData as any;
+                        const stats = md?.stats || { total: 0, byPlatform: {}, bySentiment: { positive: 0, neutral: 0, negative: 0 } };
+                        const mentions = Array.isArray(md?.data) ? md.data : [];
+                        return stats ? (
                         <div className="space-y-6">
                           {/* Stats */}
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <Card>
                               <CardContent className="pt-4">
-                                <div className="text-2xl font-bold">{(mentionsData as any).data.stats.total}</div>
+                                <div className="text-2xl font-bold">{stats.total}</div>
                                 <p className="text-sm text-muted-foreground">Total Mentions</p>
                               </CardContent>
                             </Card>
                             <Card>
                               <CardContent className="pt-4">
                                 <div className="text-2xl font-bold text-green-600">
-                                  {(mentionsData as any).data.stats.bySentiment.positive}
+                                  {stats.bySentiment.positive}
                                 </div>
                                 <p className="text-sm text-muted-foreground">Positive</p>
                               </CardContent>
                             </Card>
                             <Card>
                               <CardContent className="pt-4">
-                                <div className="text-2xl font-bold text-gray-600">
-                                  {(mentionsData as any).data.stats.bySentiment.neutral}
+                                <div className="text-2xl font-bold text-muted-foreground">
+                                  {stats.bySentiment.neutral}
                                 </div>
                                 <p className="text-sm text-muted-foreground">Neutral</p>
                               </CardContent>
@@ -749,7 +683,7 @@ export default function GeoTools() {
                             <Card>
                               <CardContent className="pt-4">
                                 <div className="text-2xl font-bold text-red-600">
-                                  {(mentionsData as any).data.stats.bySentiment.negative}
+                                  {stats.bySentiment.negative}
                                 </div>
                                 <p className="text-sm text-muted-foreground">Negative</p>
                               </CardContent>
@@ -757,11 +691,11 @@ export default function GeoTools() {
                           </div>
 
                           {/* Platform breakdown */}
-                          {Object.keys((mentionsData as any).data.stats.byPlatform).length > 0 && (
+                          {Object.keys(stats.byPlatform).length > 0 && (
                             <div>
                               <h3 className="font-semibold mb-3">By Platform</h3>
                               <div className="flex flex-wrap gap-2">
-                                {Object.entries((mentionsData as any).data.stats.byPlatform).map(([platform, count]) => {
+                                {Object.entries(stats.byPlatform).map(([platform, count]) => {
                                   const Icon = platformIcons[platform] || Globe;
                                   return (
                                     <Badge key={platform} variant="outline" className="flex items-center gap-1 py-1">
@@ -775,11 +709,11 @@ export default function GeoTools() {
                           )}
 
                           {/* Recent mentions */}
-                          {(mentionsData as any).data.mentions?.length > 0 ? (
+                          {mentions.length > 0 ? (
                             <div>
                               <h3 className="font-semibold mb-3">Recent Mentions</h3>
                               <div className="space-y-3">
-                                {(mentionsData as any).data.mentions.slice(0, 10).map((mention: BrandMention) => {
+                                {mentions.slice(0, 10).map((mention: BrandMention) => {
                                   const Icon = platformIcons[mention.platform] || Globe;
                                   return (
                                     <Card key={mention.id}>
@@ -839,7 +773,8 @@ export default function GeoTools() {
                           <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
                           <p>Select a brand to view mentions</p>
                         </div>
-                      )}
+                      );
+                      })()}
                     </CardContent>
                   </Card>
                 </div>
@@ -862,7 +797,6 @@ export default function GeoTools() {
               </CardContent>
             </Card>
           )}
-        </div>
       </div>
     </>
   );

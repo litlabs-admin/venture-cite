@@ -12,9 +12,12 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
-import type { Brand, AgentTask, AutomationRule, OutreachCampaign, AutomationExecution } from "@shared/schema";
+import PageHeader from "@/components/PageHeader";
+import type { AgentTask, AutomationRule, OutreachCampaign, AutomationExecution } from "@shared/schema";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 import {
   Bot,
   Zap,
@@ -44,18 +47,11 @@ import {
 
 export default function AgentDashboard() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
   const [activeTab, setActiveTab] = useState("tasks");
   const [taskFilter, setTaskFilter] = useState<string>("all");
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateRule, setShowCreateRule] = useState(false);
-
-  const { data: brandsData } = useQuery<{ data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsData?.data || [];
-  const selectedBrand = brands.find(b => b.id === selectedBrandId);
 
   const { data: tasksData, isLoading: tasksLoading } = useQuery<{ data: AgentTask[] }>({
     queryKey: ["/api/agent-tasks", { brandId: selectedBrandId, status: taskFilter !== "all" ? taskFilter : undefined }],
@@ -245,32 +241,12 @@ export default function AgentDashboard() {
         <meta name="description" content="Manage automated GEO optimization tasks, outreach campaigns, and AI-powered workflows." />
       </Helmet>
       
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-8">
-            <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4" data-testid="link-back-home">
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back to Home
-            </Link>
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold flex items-center gap-3" data-testid="text-page-title">
-                  <Bot className="w-8 h-8 text-purple-600" />
-                  GEO AI Agent
-                </h1>
-                <p className="text-muted-foreground mt-1">Autonomous GEO optimization with intelligent automation</p>
-              </div>
-              <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-                <SelectTrigger className="w-64" data-testid="select-brand">
-                  <SelectValue placeholder="Select a brand" />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map(brand => (
-                    <SelectItem key={brand.id} value={brand.id} data-testid={`select-brand-${brand.id}`}>{brand.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      <div className="space-y-8">
+        <PageHeader
+          title="AI Agent"
+          description="Autonomous GEO optimization with intelligent automation"
+          actions={brands.length > 0 ? <BrandSelector /> : null}
+        />
 
           {!selectedBrandId ? (
             <Card className="text-center py-12">
@@ -283,51 +259,43 @@ export default function AgentDashboard() {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-blue-100 text-sm">Queued Tasks</p>
-                        <p className="text-3xl font-bold" data-testid="stat-queued">{taskStats?.queued || 0}</p>
-                      </div>
-                      <Clock className="w-8 h-8 text-blue-200" />
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Queued Tasks</span>
+                      <Clock className="w-4 h-4 text-muted-foreground" />
                     </div>
+                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-queued">{taskStats?.queued || 0}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-yellow-500 to-orange-500 text-white">
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-yellow-100 text-sm">In Progress</p>
-                        <p className="text-3xl font-bold" data-testid="stat-in-progress">{taskStats?.inProgress || 0}</p>
-                      </div>
-                      <Activity className="w-8 h-8 text-yellow-200" />
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">In Progress</span>
+                      <Activity className="w-4 h-4 text-muted-foreground" />
                     </div>
+                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-in-progress">{taskStats?.inProgress || 0}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-green-500 to-emerald-500 text-white">
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-green-100 text-sm">Completed</p>
-                        <p className="text-3xl font-bold" data-testid="stat-completed">{taskStats?.completed || 0}</p>
-                      </div>
-                      <CheckCircle className="w-8 h-8 text-green-200" />
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Completed</span>
+                      <CheckCircle className="w-4 h-4 text-muted-foreground" />
                     </div>
+                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-completed">{taskStats?.completed || 0}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-purple-500 to-violet-500 text-white">
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-purple-100 text-sm">Tokens Used</p>
-                        <p className="text-3xl font-bold" data-testid="stat-tokens">{(taskStats?.totalTokensUsed || 0).toLocaleString()}</p>
-                      </div>
-                      <Sparkles className="w-8 h-8 text-purple-200" />
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tokens Used</span>
+                      <Sparkles className="w-4 h-4 text-muted-foreground" />
                     </div>
+                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-tokens">{(taskStats?.totalTokensUsed || 0).toLocaleString()}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -374,11 +342,11 @@ export default function AgentDashboard() {
                     </CardHeader>
                     <CardContent>
                       {showCreateTask && (
-                        <Card className="mb-6 border-2 border-purple-200 bg-purple-50/50">
+                        <Card className="mb-6 border-2 border-primary/20 bg-primary/5">
                           <CardHeader className="pb-3">
                             <div className="flex justify-between items-center">
                               <CardTitle className="text-lg flex items-center gap-2">
-                                <Sparkles className="w-5 h-5 text-purple-600" />
+                                <Sparkles className="w-5 h-5 text-primary" />
                                 Choose a Task for the AI Agent
                               </CardTitle>
                               <Button variant="ghost" size="sm" onClick={() => { setShowCreateTask(false); setSelectedTaskType(null); }} data-testid="button-cancel-task">
@@ -394,17 +362,17 @@ export default function AgentDashboard() {
                                   <button
                                     key={key}
                                     onClick={() => setSelectedTaskType(key)}
-                                    className="text-left p-4 rounded-lg border-2 border-transparent bg-white hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                    className="text-left p-4 rounded-lg border-2 border-transparent bg-card hover:border-primary/50 hover:bg-primary/5 transition-all"
                                     data-testid={`task-option-${key}`}
                                   >
                                     <div className="flex items-start gap-3">
-                                      <div className="p-2 rounded-lg bg-purple-100 text-purple-600">
+                                      <div className="p-2 rounded-lg bg-primary/10 text-primary">
                                         {getTaskTypeIcon(key)}
                                       </div>
                                       <div>
-                                        <h4 className="font-medium text-slate-900">{info.title}</h4>
-                                        <p className="text-sm text-slate-600 mt-0.5">{info.description}</p>
-                                        <p className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                                        <h4 className="font-medium text-foreground">{info.title}</h4>
+                                        <p className="text-sm text-muted-foreground mt-0.5">{info.description}</p>
+                                        <p className="text-xs text-primary mt-1 flex items-center gap-1">
                                           <Clock className="w-3 h-3" /> ~{info.timeEstimate}
                                         </p>
                                       </div>
@@ -414,16 +382,16 @@ export default function AgentDashboard() {
                               </div>
                             ) : (
                               <div className="space-y-4">
-                                <div className="p-4 bg-white rounded-lg border">
+                                <div className="p-4 bg-card rounded-lg border">
                                   <div className="flex items-start gap-3">
-                                    <div className="p-3 rounded-lg bg-purple-100 text-purple-600">
+                                    <div className="p-3 rounded-lg bg-primary/10 text-primary">
                                       {getTaskTypeIcon(selectedTaskType)}
                                     </div>
                                     <div className="flex-1">
                                       <h4 className="font-semibold text-lg">{taskTypeInfo[selectedTaskType].title}</h4>
-                                      <p className="text-sm text-slate-600 mt-1">{taskTypeInfo[selectedTaskType].whatItDoes}</p>
+                                      <p className="text-sm text-muted-foreground mt-1">{taskTypeInfo[selectedTaskType].whatItDoes}</p>
                                       <div className="flex items-center gap-4 mt-3 text-sm">
-                                        <span className="flex items-center gap-1 text-purple-600">
+                                        <span className="flex items-center gap-1 text-primary">
                                           <Clock className="w-4 h-4" /> Estimated time: {taskTypeInfo[selectedTaskType].timeEstimate}
                                         </span>
                                       </div>
@@ -450,7 +418,7 @@ export default function AgentDashboard() {
                                       setSelectedTaskType(null);
                                     }}
                                     disabled={createTaskMutation.isPending || !!executingTaskId}
-                                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                                    className="flex-1 bg-primary hover:bg-primary/90"
                                     data-testid="button-confirm-task"
                                   >
                                     {createTaskMutation.isPending || !!executingTaskId ? (
@@ -473,7 +441,7 @@ export default function AgentDashboard() {
                       ) : tasks.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                           <Bot className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                          <h3 className="text-lg font-medium text-slate-700 mb-2">No Tasks Yet</h3>
+                          <h3 className="text-lg font-medium text-foreground mb-2">No Tasks Yet</h3>
                           <p className="text-sm mb-4">Click "Create Task" above to assign work to the AI agent</p>
                           <Button onClick={() => setShowCreateTask(true)} variant="outline" data-testid="button-create-task-empty">
                             <Plus className="w-4 h-4 mr-2" /> Create Your First Task
@@ -504,7 +472,7 @@ export default function AgentDashboard() {
                                         task.status === "in_progress" ? "bg-yellow-100 text-yellow-700" :
                                         task.status === "completed" ? "bg-green-100 text-green-700" :
                                         task.status === "failed" ? "bg-red-100 text-red-700" :
-                                        "bg-purple-100 text-purple-600"
+                                        "bg-primary/10 text-primary"
                                       }`}>
                                         {task.status === "in_progress" ? (
                                           <Loader2 className="w-5 h-5 animate-spin" />
@@ -513,8 +481,8 @@ export default function AgentDashboard() {
                                         )}
                                       </div>
                                       <div>
-                                        <p className="font-medium text-slate-900">{task.taskTitle}</p>
-                                        <p className="text-sm text-slate-600 mt-0.5">{task.taskDescription || info?.description || task.taskType}</p>
+                                        <p className="font-medium text-foreground">{task.taskTitle}</p>
+                                        <p className="text-sm text-muted-foreground mt-0.5">{task.taskDescription || info?.description || task.taskType}</p>
                                         {task.status === "in_progress" && (
                                           <div className="mt-2 flex items-center gap-2 text-sm text-yellow-700">
                                             <Loader2 className="w-3 h-3 animate-spin" />
@@ -537,10 +505,10 @@ export default function AgentDashboard() {
                                             </div>
                                             {(task as any).outputData?.output && (
                                               <details className="group">
-                                                <summary className="cursor-pointer text-sm font-medium text-purple-700 hover:text-purple-900 flex items-center gap-1">
+                                                <summary className="cursor-pointer text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1">
                                                   <FileText className="w-3 h-3" /> View Results
                                                 </summary>
-                                                <div className="mt-2 p-3 bg-white border rounded-lg text-sm text-slate-700 whitespace-pre-wrap max-h-60 overflow-y-auto">
+                                                <div className="mt-2 p-3 bg-card border rounded-lg text-sm text-foreground whitespace-pre-wrap max-h-60 overflow-y-auto">
                                                   {(task as any).outputData.output}
                                                 </div>
                                               </details>
@@ -562,7 +530,7 @@ export default function AgentDashboard() {
                                             size="sm" 
                                             onClick={() => executeTaskMutation.mutate(task.id)} 
                                             disabled={executingTaskId === task.id}
-                                            className="bg-purple-600 hover:bg-purple-700"
+                                            className="bg-primary hover:bg-primary/90"
                                             data-testid={`button-start-${task.id}`}
                                           >
                                             {executingTaskId === task.id ? (
@@ -575,7 +543,7 @@ export default function AgentDashboard() {
                                         <Button 
                                           size="sm" 
                                           variant="ghost" 
-                                          className="text-slate-400 hover:text-red-600" 
+                                          className="text-muted-foreground hover:text-red-600" 
                                           onClick={() => deleteTaskMutation.mutate(task.id)} 
                                           data-testid={`button-delete-${task.id}`}
                                         >
@@ -731,7 +699,6 @@ export default function AgentDashboard() {
               </Tabs>
             </>
           )}
-        </div>
       </div>
     </>
   );

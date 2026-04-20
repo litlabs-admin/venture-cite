@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { Link, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { isAllowedStripeRedirect } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
 import {
   Check,
@@ -36,9 +37,10 @@ interface StripeProduct {
 export default function Pricing() {
   const { toast } = useToast();
   const [betaCode, setBetaCode] = useState("");
-  const searchString = window.location.search;
-  const success = searchString.includes("success=true");
-  const canceled = searchString.includes("canceled=true");
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const success = searchParams.get("success") === "true";
+  const canceled = searchParams.get("canceled") === "true";
 
   const { data: productsData, isLoading } = useQuery<{ success: boolean; data: StripeProduct[] }>({
     queryKey: ["/api/stripe/products"],
@@ -52,8 +54,14 @@ export default function Pricing() {
       return response.json();
     },
     onSuccess: (data) => {
-      if (data.url) {
+      if (data?.url && isAllowedStripeRedirect(data.url)) {
         window.location.href = data.url;
+      } else {
+        toast({
+          title: "Could not start checkout",
+          description: "Received an unexpected redirect URL from the server.",
+          variant: "destructive",
+        });
       }
     },
     onError: () => {

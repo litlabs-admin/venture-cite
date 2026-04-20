@@ -10,6 +10,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
 import { Bot, CheckCircle2, XCircle, AlertTriangle, Search, Globe, FileText, Copy, ExternalLink } from "lucide-react";
 import type { Brand } from "@shared/schema";
 
@@ -56,8 +58,8 @@ export default function CrawlerCheck() {
 
   const checkMutation = useMutation({
     mutationFn: async (checkUrl: string) => {
-      const response = await apiRequest("/api/check-crawler-permissions", "POST", { url: checkUrl });
-      return response as unknown as CrawlerCheckResponse;
+      const res = await apiRequest("POST", "/api/check-crawler-permissions", { url: checkUrl });
+      return res.json() as unknown as CrawlerCheckResponse;
     },
     onSuccess: (response) => {
       if (response.success) {
@@ -112,22 +114,18 @@ export default function CrawlerCheck() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'allowed':
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">Allowed</Badge>;
+        return <Badge variant="outline" className="border-green-500/30 text-green-600 dark:text-green-400">Allowed</Badge>;
       case 'blocked':
-        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100">Blocked</Badge>;
+        return <Badge variant="outline" className="border-red-500/30 text-red-600 dark:text-red-400">Blocked</Badge>;
       default:
-        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100">Unknown</Badge>;
+        return <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 dark:text-yellow-400">Unknown</Badge>;
     }
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2" data-testid="page-title">AI Crawler Permission Checker</h1>
-        <p className="text-muted-foreground">
-          Verify if AI platforms can crawl your website for GEO visibility
-        </p>
-      </div>
+    <div className="space-y-8">
+      <Helmet><title>Crawler Check - VentureCite</title></Helmet>
+      <PageHeader title="Crawler Check" description="Verify if AI platforms can crawl your website for GEO visibility" />
 
       <Card className="mb-8">
         <CardHeader>

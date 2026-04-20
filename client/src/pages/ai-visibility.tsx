@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -634,26 +636,11 @@ const aiEngines: AIEngine[] = [
 
 export default function AIVisibility() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_visibility_brandId", "");
+  const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
   const [selectedEngineId, setSelectedEngineId] = usePersistedState<string>("vc_visibility_engine", aiEngines[0].id);
   const [completedSteps, setCompletedSteps] = useState<Record<string, string[]>>({});
 
   const queryClient = useQueryClient();
-
-  const { data: brandsResponse, isLoading: brandsLoading } = useQuery<{ success: boolean; data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsResponse?.data || [];
-
-  // Auto-select a brand: pick the first if no valid selection exists (covers
-  // first brand creation, deleted brand, returning users). Multi-brand users
-  // keep their last-used brand via usePersistedState.
-  useEffect(() => {
-    if (brands.length > 0 && (!selectedBrandId || !brands.find(b => b.id === selectedBrandId))) {
-      setSelectedBrandId(brands[0].id);
-    }
-  }, [brands, selectedBrandId]);
 
   // Mark the AI Visibility Guide as visited server-side on mount so the
   // onboarding step syncs across browsers/devices. Best-effort — failures
@@ -730,7 +717,8 @@ export default function AIVisibility() {
   const getEngineProgress = (engine: AIEngine) => {
     const completed = (completedSteps[engine.id] || []).length;
     const total = engine.steps.length;
-    return { completed, total, percentage: Math.round((completed / total) * 100) };
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { completed, total, percentage };
   };
 
   const getTotalProgress = () => {
@@ -740,7 +728,8 @@ export default function AIVisibility() {
       completed += (completedSteps[engine.id] || []).length;
       total += engine.steps.length;
     });
-    return { completed, total, percentage: Math.round((completed / total) * 100) };
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { completed, total, percentage };
   };
 
   const getPriorityBadge = (priority: string) => {
@@ -758,6 +747,16 @@ export default function AIVisibility() {
 
   const totalProgress = getTotalProgress();
 
+  // Quick-wins list: one outstanding high-priority step per engine. Memoized
+  // so switching engines/tabs doesn't re-walk every engine + step.
+  const quickWins = useMemo(() => {
+    return aiEngines.flatMap((engine) => {
+      const done = completedSteps[engine.id] || [];
+      const first = engine.steps.find((s) => s.priority === "high" && !done.includes(s.id));
+      return first ? [{ engine, step: first }] : [];
+    });
+  }, [completedSteps]);
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -766,16 +765,7 @@ export default function AIVisibility() {
       />
 
       <div className="flex flex-wrap gap-4 mb-8 items-center justify-between">
-        <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-          <SelectTrigger className="w-64" data-testid="select-brand">
-            <SelectValue placeholder="Select a brand..." />
-          </SelectTrigger>
-          <SelectContent>
-            {brands.map(brand => (
-              <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <BrandSelector className="w-64" />
 
         <Card className="bg-card border border-border">
           <CardContent className="py-4 px-6">
@@ -928,38 +918,33 @@ export default function AIVisibility() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {aiEngines.flatMap(engine => 
-              engine.steps
-                .filter(step => step.priority === "high" && !(completedSteps[engine.id] || []).includes(step.id))
-                .slice(0, 1)
-                .map(step => (
-                  <Card key={step.id} className="bg-card">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={engine.color}>{engine.icon}</span>
-                        <span className="text-sm font-medium">{engine.name}</span>
-                      </div>
-                      <h4 className="font-medium mb-2">{step.title}</h4>
-                      <p className="text-sm text-muted-foreground mb-3">{step.description}</p>
-                      <div className="flex items-center gap-2">
-                        <Checkbox 
-                          checked={(completedSteps[engine.id] || []).includes(step.id)}
-                          onCheckedChange={() => toggleStep(engine.id, step.id)}
-                          data-testid={`quick-checkbox-${step.id}`}
-                        />
-                        <span className="text-sm">Mark as done</span>
-                        {step.quickAction && (
-                          <Link href={step.quickAction.link}>
-                            <Button size="sm" variant="ghost" className="ml-auto" data-testid={`quick-action-${step.id}`}>
-                              <ArrowRight className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-            )}
+            {quickWins.map(({ engine, step }) => (
+              <Card key={`${engine.id}-${step.id}`} className="bg-card">
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={engine.color}>{engine.icon}</span>
+                    <span className="text-sm font-medium">{engine.name}</span>
+                  </div>
+                  <h4 className="font-medium mb-2">{step.title}</h4>
+                  <p className="text-sm text-muted-foreground mb-3">{step.description}</p>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={(completedSteps[engine.id] || []).includes(step.id)}
+                      onCheckedChange={() => toggleStep(engine.id, step.id)}
+                      data-testid={`quick-checkbox-${step.id}`}
+                    />
+                    <span className="text-sm">Mark as done</span>
+                    {step.quickAction && (
+                      <Link href={step.quickAction.link}>
+                        <Button size="sm" variant="ghost" className="ml-auto" data-testid={`quick-action-${step.id}`}>
+                          <ArrowRight className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </CardContent>
       </Card>

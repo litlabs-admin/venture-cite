@@ -10,14 +10,12 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit2, Trash2, CheckCircle, FileText, Building2, DollarSign, Users, BarChart3, Settings, ExternalLink, ArrowLeft, Shield, Globe, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, CheckCircle, FileText, Building2, DollarSign, Users, BarChart3, Settings, ExternalLink, Shield, Globe, Loader2 } from "lucide-react";
 import { Link } from "wouter";
-
-interface Brand {
-  id: string;
-  name: string;
-  companyName: string;
-}
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 
 interface BrandFact {
   id: string;
@@ -74,7 +72,7 @@ const SUGGESTED_FACTS: Record<string, { key: string; label: string }[]> = {
 
 export default function BrandFactSheet() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingFact, setEditingFact] = useState<BrandFact | null>(null);
   const [autofillUrl, setAutofillUrl] = useState("");
@@ -84,13 +82,6 @@ export default function BrandFactSheet() {
     factValue: "",
     sourceUrl: "",
   });
-
-  const { data: brandsData } = useQuery<{ data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsData?.data || [];
-  const selectedBrand = brands.find(b => b.id === selectedBrandId);
 
   const { data: factsData, isLoading: factsLoading } = useQuery<{ data: BrandFact[] }>({
     queryKey: ["/api/brand-facts", selectedBrandId],
@@ -206,22 +197,9 @@ export default function BrandFactSheet() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      <div className="mb-8">
-        <Link href="/ai-intelligence">
-          <Button variant="ghost" size="sm" className="mb-4" data-testid="link-back-ai-intelligence">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to AI Intelligence
-          </Button>
-        </Link>
-        <div className="flex items-center gap-3 mb-2">
-          <Shield className="w-8 h-8 text-violet-600" />
-          <h1 className="text-3xl font-bold text-foreground">Brand Fact Sheet</h1>
-        </div>
-        <p className="text-muted-foreground">
-          Define verified facts about your brand. These are used to detect AI hallucinations and ensure accurate information.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <Helmet><title>Brand Fact Sheet - VentureCite</title></Helmet>
+      <PageHeader title="Brand Fact Sheet" description="Define verified facts about your brand to detect AI hallucinations and ensure accurate information." />
 
       <Card className="mb-6">
         <CardHeader>
@@ -229,21 +207,10 @@ export default function BrandFactSheet() {
           <CardDescription>Choose which brand to manage facts for</CardDescription>
         </CardHeader>
         <CardContent>
-          <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-            <SelectTrigger className="w-full max-w-md" data-testid="select-brand">
-              <SelectValue placeholder="Select a brand..." />
-            </SelectTrigger>
-            <SelectContent>
-              {brands.map(brand => (
-                <SelectItem key={brand.id} value={brand.id} data-testid={`select-brand-${brand.id}`}>
-                  {brand.name} - {brand.companyName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <BrandSelector className="w-full max-w-md" />
           {brands.length === 0 && (
             <p className="text-sm text-muted-foreground mt-2">
-              No brands found. <Link href="/brands" className="text-violet-600 hover:underline">Create a brand first</Link>.
+              No brands found. <Link href="/brands" className="text-primary hover:underline">Create a brand first</Link>.
             </p>
           )}
         </CardContent>

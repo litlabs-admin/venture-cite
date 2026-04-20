@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -251,7 +251,10 @@ export default function Home() {
     }
   }, [brands, hasBrands, selectedBrandId, setSelectedBrandId]);
 
-  const activeBrand = brands.find((b) => b.id === selectedBrandId) || null;
+  const activeBrand = useMemo(
+    () => brands.find((b) => b.id === selectedBrandId) || null,
+    [brands, selectedBrandId],
+  );
 
   // Dashboard metrics are scoped to the currently selected brand. The query
   // key includes brandId so switching brands refetches rather than showing
@@ -280,9 +283,10 @@ export default function Home() {
   // shouldn't be framed as errors — empty KPIs communicate that state.
   const loadError = hasBrands && (analyticsError || articlesError || brandsError);
 
-  const scopedArticles = selectedBrandId
-    ? (articlesData?.data || []).filter((a: any) => a.brandId === selectedBrandId)
-    : (articlesData?.data || []);
+  const scopedArticles = useMemo(() => {
+    const all = articlesData?.data || [];
+    return selectedBrandId ? all.filter((a: any) => a.brandId === selectedBrandId) : all;
+  }, [articlesData, selectedBrandId]);
   const totalArticles = scopedArticles.length;
   const totalCitations = analytics?.data?.totalCitations || 0;
   const totalChecks = analytics?.data?.totalChecks || 0;

@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
 import { Bot, TrendingUp, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 
 interface GeoRanking {
@@ -70,37 +72,27 @@ export default function GeoRankingsPage() {
   const citationRate = totalRankings > 0 ? ((totalCitations / totalRankings) * 100).toFixed(1) : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-950 dark:to-blue-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-            GEO Rankings
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Track your content performance across AI platforms
-          </p>
-        </div>
+    <div className="space-y-8">
+      <Helmet><title>GEO Rankings - VentureCite</title></Helmet>
+      <PageHeader title="GEO Rankings" description="Track your content performance across AI platforms" />
 
-        <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6" data-testid="banner-live-mode">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
+        <Card data-testid="banner-live-mode">
+          <CardContent className="p-4 flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium text-green-800 dark:text-green-200" data-testid="text-live-title">Live Citation Monitoring</p>
-              <p className="text-green-700 dark:text-green-300 text-sm mt-1">
+              <p className="text-sm font-medium text-foreground" data-testid="text-live-title">Live Citation Monitoring</p>
+              <p className="text-sm text-muted-foreground mt-1">
                 Citation checks query real AI engines (ChatGPT, Perplexity, and others) to detect if your brand and content are being referenced. Run checks from the Articles page to track your visibility.
               </p>
-              <p className="text-green-600 dark:text-green-400 text-xs mt-2">
-                Tip: Use the AI Visibility Guide to optimize your content for better AI engine citations.
-              </p>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Platform Stats Overview */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Total Checks
               </CardTitle>
             </CardHeader>
@@ -111,7 +103,7 @@ export default function GeoRankingsPage() {
           
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Citations
               </CardTitle>
             </CardHeader>
@@ -122,7 +114,7 @@ export default function GeoRankingsPage() {
           
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Citation Rate
               </CardTitle>
             </CardHeader>
@@ -133,7 +125,7 @@ export default function GeoRankingsPage() {
           
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Platforms
               </CardTitle>
             </CardHeader>
@@ -169,13 +161,13 @@ export default function GeoRankingsPage() {
                         <Badge className={platformColors[platform] || "bg-slate-100 text-slate-800"}>
                           {platform}
                         </Badge>
-                        <div className="text-sm text-slate-600 dark:text-slate-400">
+                        <div className="text-sm text-muted-foreground">
                           {stats.cited} / {stats.total} citations ({citationRate}%)
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-sm">
-                          <span className="text-slate-600 dark:text-slate-400">Avg Rank: </span>
+                          <span className="text-muted-foreground">Avg Rank: </span>
                           <span className="font-semibold">{avgRank}</span>
                         </div>
                       </div>
@@ -184,7 +176,7 @@ export default function GeoRankingsPage() {
                 })}
               </div>
             ) : (
-              <p className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <p className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
                 No platform data yet. Check rankings to start tracking performance.
               </p>
             )}
@@ -216,7 +208,7 @@ export default function GeoRankingsPage() {
                   return (
                     <div 
                       key={ranking.id} 
-                      className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-muted/50 transition-colors"
                       data-testid={`ranking-${ranking.id}`}
                     >
                       <div className="flex-1">
@@ -224,7 +216,7 @@ export default function GeoRankingsPage() {
                           {ranking.isCited ? (
                             <CheckCircle2 className="h-4 w-4 text-green-500" />
                           ) : (
-                            <XCircle className="h-4 w-4 text-slate-400" />
+                            <XCircle className="h-4 w-4 text-muted-foreground" />
                           )}
                           <Badge className={platformColors[ranking.aiPlatform] || "bg-slate-100 text-slate-800"}>
                             {ranking.aiPlatform}
@@ -234,15 +226,15 @@ export default function GeoRankingsPage() {
                           )}
                         </div>
                         <h3 className="font-medium mb-1">{article?.title || 'Unknown Article'}</h3>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                        <p className="text-sm text-muted-foreground mb-2">
                           Prompt: "{ranking.prompt}"
                         </p>
                         {ranking.citationContext && (
-                          <p className="text-sm text-slate-500 dark:text-slate-500 italic">
+                          <p className="text-sm text-muted-foreground dark:text-muted-foreground italic">
                             {ranking.citationContext}
                           </p>
                         )}
-                        <p className="text-xs text-slate-400 dark:text-slate-600 mt-2">
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
                           Checked: {new Date(ranking.checkedAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -259,16 +251,15 @@ export default function GeoRankingsPage() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <Bot className="h-12 w-12 mx-auto mb-4 text-slate-400" />
-                <p className="text-slate-600 dark:text-slate-400 mb-2">No rankings yet</p>
-                <p className="text-sm text-slate-500 dark:text-slate-500">
+                <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground mb-2">No rankings yet</p>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                   Rankings will appear here when you check your articles for AI platform citations
                 </p>
               </div>
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

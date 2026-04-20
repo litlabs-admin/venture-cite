@@ -6,6 +6,10 @@ import { runBrandPrompts } from "./citationChecker";
 import { generateSuggestedPrompts } from "./lib/suggestionGenerator";
 import { storage } from "./storage";
 import { sendWeeklyVisibilityReport, isEmailConfigured, type BrandReport } from "./emailService";
+import { discoverCompetitors } from "./lib/competitorDiscovery";
+import { refreshScrapedFacts } from "./lib/factExtractor";
+import { scanBrandMentions } from "./lib/mentionScanner";
+import { scanBrandListicles } from "./lib/listicleScanner";
 
 const WEEKLY_CRON = process.env.WEEKLY_REPORT_CRON || "0 8 * * 0";
 const MAX_BRANDS_PER_USER = Number(process.env.WEEKLY_MAX_BRANDS_PER_USER || 3);
@@ -209,6 +213,41 @@ async function runAutoCitationJob(): Promise<void> {
   console.log(`[scheduler] auto-citation job complete — ${ranCount} brands checked`);
 }
 
+// Weekly automation crons. Each iterates every brand in serial with a
+// try/catch per brand so one brand's failure doesn't stop the run.
+const COMPETITOR_DISCOVERY_CRON = process.env.COMPETITOR_DISCOVERY_CRON || "0 7 * * 1"; // Monday 7 AM UTC
+const MENTION_SCAN_CRON = process.env.MENTION_SCAN_CRON || "0 9 * * 1";                 // Monday 9 AM UTC
+const LISTICLE_SCAN_CRON = process.env.LISTICLE_SCAN_CRON || "0 11 * * 1";              // Monday 11 AM UTC
+const FACT_REFRESH_CRON = process.env.FACT_REFRESH_CRON || "0 10 1 * *";                // 1st of month 10 AM UTC
+
+async function runForEveryBrand(label: string, fn: (brandId: string) => Promise<number | void | { updated: number; checked: number }>): Promise<void> {
+  console.log(`[scheduler] ${label} job starting...`);
+  const brands = await db.select({ id: schema.brands.id, name: schema.brands.name }).from(schema.brands);
+  let ok = 0;
+  for (const b of brands) {
+    try {
+      await fn(b.id);
+      ok += 1;
+    } catch (err) {
+      console.error(`[scheduler] ${label} failed for brand ${b.id}:`, err instanceof Error ? err.message : err);
+    }
+  }
+  console.log(`[scheduler] ${label} job complete — ${ok}/${brands.length} brands processed`);
+}
+
+export function runCompetitorDiscoveryJob(): Promise<void> {
+  return runForEveryBrand("competitor-discovery", (bid) => discoverCompetitors(bid));
+}
+export function runMentionScanJob(): Promise<void> {
+  return runForEveryBrand("mention-scan", (bid) => scanBrandMentions(bid));
+}
+export function runListicleScanJob(): Promise<void> {
+  return runForEveryBrand("listicle-scan", (bid) => scanBrandListicles(bid));
+}
+export function runFactRefreshJob(): Promise<void> {
+  return runForEveryBrand("fact-refresh", (bid) => refreshScrapedFacts(bid));
+}
+
 export function initScheduler(): void {
   // Auto-citation cron — always active, no RESEND_API_KEY needed.
   if (cron.validate(AUTO_CITATION_CRON)) {
@@ -216,6 +255,32 @@ export function initScheduler(): void {
       runAutoCitationJob().catch((err) => console.error("[scheduler] Auto-citation job crashed:", err));
     });
     console.log(`[scheduler] Auto-citation job scheduled (${AUTO_CITATION_CRON})`);
+  }
+
+  // Phase 2 automation crons — run independent of email config.
+  if (cron.validate(COMPETITOR_DISCOVERY_CRON)) {
+    cron.schedule(COMPETITOR_DISCOVERY_CRON, () => {
+      runCompetitorDiscoveryJob().catch((err) => console.error("[scheduler] competitor-discovery crashed:", err));
+    });
+    console.log(`[scheduler] Competitor discovery scheduled (${COMPETITOR_DISCOVERY_CRON})`);
+  }
+  if (cron.validate(MENTION_SCAN_CRON)) {
+    cron.schedule(MENTION_SCAN_CRON, () => {
+      runMentionScanJob().catch((err) => console.error("[scheduler] mention-scan crashed:", err));
+    });
+    console.log(`[scheduler] Mention scan scheduled (${MENTION_SCAN_CRON})`);
+  }
+  if (cron.validate(LISTICLE_SCAN_CRON)) {
+    cron.schedule(LISTICLE_SCAN_CRON, () => {
+      runListicleScanJob().catch((err) => console.error("[scheduler] listicle-scan crashed:", err));
+    });
+    console.log(`[scheduler] Listicle scan scheduled (${LISTICLE_SCAN_CRON})`);
+  }
+  if (cron.validate(FACT_REFRESH_CRON)) {
+    cron.schedule(FACT_REFRESH_CRON, () => {
+      runFactRefreshJob().catch((err) => console.error("[scheduler] fact-refresh crashed:", err));
+    });
+    console.log(`[scheduler] Fact refresh scheduled (${FACT_REFRESH_CRON})`);
   }
 
   // Weekly email report — only if Resend is configured.

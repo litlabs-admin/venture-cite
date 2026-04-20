@@ -14,12 +14,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Helmet } from "react-helmet";
-import { Link } from "wouter";
-import type { Brand, OutreachCampaign, PublicationTarget, OutreachEmail } from "@shared/schema";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
+import type { OutreachCampaign, PublicationTarget, OutreachEmail } from "@shared/schema";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 import {
   Mail,
-  ArrowLeft,
   Plus,
   Send,
   Clock,
@@ -48,7 +49,7 @@ import {
 
 export default function Outreach() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = usePersistedState<string>("vc_outreach_brandId", "");
+  const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -67,19 +68,6 @@ export default function Outreach() {
     body: "",
     emailType: "initial" as string,
   });
-
-  const { data: brandsData } = useQuery<{ data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsData?.data || [];
-  const selectedBrand = brands.find(b => b.id === selectedBrandId);
-
-  useEffect(() => {
-    if (brands.length > 0 && (!selectedBrandId || !brands.find(b => b.id === selectedBrandId))) {
-      setSelectedBrandId(brands[0].id);
-    }
-  }, [brands, selectedBrandId]);
 
   const { data: campaignsData, isLoading } = useQuery<{ data: OutreachCampaign[] }>({
     queryKey: ["/api/outreach-campaigns", selectedBrandId],
@@ -304,37 +292,13 @@ export default function Outreach() {
 
   return (
     <>
-      <Helmet>
-        <title>Outreach Management | GEO Platform</title>
-        <meta name="description" content="Discover publications, find contacts, and manage outreach campaigns for citation building." />
-      </Helmet>
-      
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-8">
-            <Link href="/agent" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4" data-testid="link-back">
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back to Agent Dashboard
-            </Link>
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold flex items-center gap-3" data-testid="text-page-title">
-                  <Mail className="w-8 h-8 text-blue-600" />
-                  Outreach Management
-                </h1>
-                <p className="text-muted-foreground mt-1">Discover publications, find contacts, and automate outreach</p>
-              </div>
-              <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-                <SelectTrigger className="w-64" data-testid="select-brand">
-                  <SelectValue placeholder="Select a brand" />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map(brand => (
-                    <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      <Helmet><title>Outreach - VentureCite</title></Helmet>
+      <div className="space-y-8">
+        <PageHeader
+          title="Outreach"
+          description="Discover publications, find contacts, and manage outreach campaigns"
+          actions={brands.length > 0 ? <BrandSelector /> : null}
+        />
 
           {!selectedBrandId ? (
             <Card className="text-center py-12">
@@ -909,7 +873,6 @@ export default function Outreach() {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
       </div>
     </>
   );

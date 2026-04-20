@@ -6,12 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Helmet } from "react-helmet";
-import { Link } from "wouter";
-import type { Brand, AiTrafficSession, AiSource } from "@shared/schema";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
+import type { AiTrafficSession, AiSource } from "@shared/schema";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { apiRequest } from "@/lib/queryClient";
 import {
   BarChart3,
-  ArrowLeft,
   TrendingUp,
   Users,
   MousePointerClick,
@@ -26,14 +28,8 @@ import {
 import { SiOpenai, SiGoogle } from "react-icons/si";
 
 export default function AiTraffic() {
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const { selectedBrandId, brands } = useBrandSelection();
   const [platformFilter, setPlatformFilter] = useState<string>("all");
-
-  const { data: brandsData } = useQuery<{ data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsData?.data || [];
 
   const { data: trafficData, isLoading: trafficLoading } = useQuery<{ data: AiTrafficSession[] }>({
     queryKey: ["/api/ai-traffic", selectedBrandId, platformFilter],
@@ -41,8 +37,7 @@ export default function AiTraffic() {
       const params = new URLSearchParams();
       if (platformFilter !== "all") params.set("aiPlatform", platformFilter);
       const url = `/api/ai-traffic/${selectedBrandId}${params.toString() ? `?${params}` : ""}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch traffic data");
+      const res = await apiRequest("GET", url);
       return res.json();
     },
     enabled: !!selectedBrandId,
@@ -90,37 +85,13 @@ export default function AiTraffic() {
 
   return (
     <>
-      <Helmet>
-        <title>AI Traffic Analytics | GEO Platform</title>
-        <meta name="description" content="Track referral traffic from AI platforms like ChatGPT, Perplexity, and Claude." />
-      </Helmet>
-      
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-8">
-            <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4" data-testid="link-back">
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back to Home
-            </Link>
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold flex items-center gap-3" data-testid="text-page-title">
-                  <BarChart3 className="w-8 h-8 text-blue-600" />
-                  AI Traffic Analytics
-                </h1>
-                <p className="text-muted-foreground mt-1">Track referral traffic from AI platforms</p>
-              </div>
-              <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-                <SelectTrigger className="w-64" data-testid="select-brand">
-                  <SelectValue placeholder="Select a brand" />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map(brand => (
-                    <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      <Helmet><title>AI Traffic - VentureCite</title></Helmet>
+      <div className="space-y-8">
+        <PageHeader
+          title="AI Traffic"
+          description="Track referral traffic from AI platforms"
+          actions={brands.length > 0 ? <BrandSelector /> : null}
+        />
 
           {!selectedBrandId ? (
             <Card className="text-center py-12">
@@ -133,51 +104,43 @@ export default function AiTraffic() {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-blue-100 text-sm">Total Sessions</p>
-                        <p className="text-3xl font-bold" data-testid="stat-sessions">{stats?.totalSessions || 0}</p>
-                      </div>
-                      <Users className="w-8 h-8 text-blue-200" />
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Sessions</span>
+                      <Users className="w-4 h-4 text-muted-foreground" />
                     </div>
+                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-sessions">{stats?.totalSessions || 0}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-purple-500 to-violet-500 text-white">
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-purple-100 text-sm">Page Views</p>
-                        <p className="text-3xl font-bold" data-testid="stat-pageviews">{stats?.totalPageViews || 0}</p>
-                      </div>
-                      <MousePointerClick className="w-8 h-8 text-purple-200" />
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Page Views</span>
+                      <MousePointerClick className="w-4 h-4 text-muted-foreground" />
                     </div>
+                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-pageviews">{stats?.totalPageViews || 0}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-green-500 to-emerald-500 text-white">
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-green-100 text-sm">Conversions</p>
-                        <p className="text-3xl font-bold" data-testid="stat-conversions">{stats?.conversions || 0}</p>
-                      </div>
-                      <Target className="w-8 h-8 text-green-200" />
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Conversions</span>
+                      <Target className="w-4 h-4 text-muted-foreground" />
                     </div>
+                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-conversions">{stats?.conversions || 0}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-orange-500 to-amber-500 text-white">
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-orange-100 text-sm">Conversion Rate</p>
-                        <p className="text-3xl font-bold" data-testid="stat-rate">{((stats?.conversionRate || 0) * 100).toFixed(1)}%</p>
-                      </div>
-                      <TrendingUp className="w-8 h-8 text-orange-200" />
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Conversion Rate</span>
+                      <TrendingUp className="w-4 h-4 text-muted-foreground" />
                     </div>
+                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-rate">{((stats?.conversionRate || 0) * 100).toFixed(1)}%</p>
                   </CardContent>
                 </Card>
               </div>
@@ -345,7 +308,6 @@ export default function AiTraffic() {
               </Card>
             </>
           )}
-        </div>
       </div>
     </>
   );

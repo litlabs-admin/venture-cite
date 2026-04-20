@@ -151,13 +151,13 @@ export async function checkForCitation(
     description?: string | null;
     industry?: string | null;
   },
-): Promise<{ isCited: boolean; rank: number | null; reasoning?: string }> {
-  if (!brandName || !responseText) return { isCited: false, rank: null };
+): Promise<{ isCited: boolean; rank: number | null; relevance: number | null; reasoning?: string }> {
+  if (!brandName || !responseText) return { isCited: false, rank: null, relevance: null };
 
   const variants = buildBrandNameVariants(brandName, extraVariations, brandContext?.website || undefined);
   const lower = responseText.toLowerCase();
   const anyHit = variants.some((v) => lower.includes(v));
-  if (!anyHit) return { isCited: false, rank: null, reasoning: "No brand variant found in response" };
+  if (!anyHit) return { isCited: false, rank: null, relevance: null, reasoning: "No brand variant found in response" };
 
   const judgeBrand: JudgeBrand = {
     name: brandName,
@@ -170,14 +170,70 @@ export async function checkForCitation(
 
   try {
     const verdict = await judgeCitation({ responseText, brand: judgeBrand });
-    return { isCited: verdict.cited, rank: verdict.cited ? verdict.rank : null, reasoning: verdict.reasoning };
+    return {
+      isCited: verdict.cited,
+      rank: verdict.cited ? verdict.rank : null,
+      relevance: verdict.relevance,
+      reasoning: verdict.reasoning,
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[citationChecker] judge call failed —`, msg);
     // Fail closed: if the judge is unreachable, report not cited so we don't
     // leave stale string-matcher false positives behind.
-    return { isCited: false, rank: null, reasoning: `Judge error: ${msg}` };
+    return { isCited: false, rank: null, relevance: null, reasoning: `Judge error: ${msg}` };
   }
+}
+
+// Extract the first URL in a response. Used to populate geo_rankings.citingOutletUrl
+// so downstream analytics (opportunities bucketing, top-sources aggregation,
+// authority-score derivation) have something to work with.
+export function extractFirstUrl(responseText: string): string | null {
+  if (!responseText) return null;
+  const match = responseText.match(/https?:\/\/[^\s<>()"']+/i);
+  if (!match) return null;
+  // Strip trailing punctuation
+  return match[0].replace(/[.,;:!?)\]]+$/, "");
+}
+
+// Classify the origin type from a URL's domain. Powers the "community vs
+// reference vs video vs web" breakdown on the Citation Quality dashboard.
+export function classifySourceType(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+  if (/(^|\.)reddit\.com$|(^|\.)quora\.com$|(^|\.)ycombinator\.com$|stackexchange\.com$|stackoverflow\.com$/.test(host)) {
+    return "community";
+  }
+  if (/(^|\.)wikipedia\.org$|(^|\.)britannica\.com$|\.gov$|\.edu$/.test(host)) {
+    return "reference";
+  }
+  if (/(^|\.)youtube\.com$|youtu\.be$|vimeo\.com$|tiktok\.com$/.test(host)) {
+    return "video";
+  }
+  return "web";
+}
+
+// Authority score: how often this domain appears in the brand's cited history.
+// Capped at 100. Map is built once per run from prior geo_rankings so we don't
+// have to query per-task. Unknown domains get a floor of 10 (single occurrence).
+export function computeAuthorityScore(
+  citingOutletUrl: string | null,
+  domainOccurrenceMap: Map<string, number>,
+): number | null {
+  if (!citingOutletUrl) return null;
+  let host = "";
+  try {
+    host = new URL(citingOutletUrl).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+  const prior = domainOccurrenceMap.get(host) || 0;
+  return Math.min(100, (prior * 10) + 10);
 }
 
 // Maps each non-ChatGPT citation platform to its OpenRouter model slug.
@@ -198,7 +254,7 @@ export async function runPlatformCitationCheck(
   brandName: string,
   brandNameVariations: string[] = [],
   website?: string,
-): Promise<{ isCited: boolean; rank: number | null; responseText: string; error?: string }> {
+): Promise<{ isCited: boolean; rank: number | null; relevance: number | null; responseText: string; error?: string }> {
   const brandContext = {
     website: website || brand?.website || null,
     companyName: brand?.companyName || null,
@@ -219,18 +275,19 @@ export async function runPlatformCitationCheck(
     });
     const responseText = chatResponse.choices[0].message.content || '';
     const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
-    return { isCited: r.isCited, rank: r.rank, responseText };
+    return { isCited: r.isCited, rank: r.rank, relevance: r.relevance, responseText };
   }
 
   const openrouterModel = OPENROUTER_MODEL_BY_PLATFORM[platform];
   if (!openrouterModel) {
-    return { isCited: false, rank: null, responseText: '', error: `Unknown citation platform: ${platform}` };
+    return { isCited: false, rank: null, relevance: null, responseText: '', error: `Unknown citation platform: ${platform}` };
   }
 
   if (!openrouter) {
     return {
       isCited: false,
       rank: null,
+      relevance: null,
       responseText: '',
       error: `${platform} check skipped — OPENROUTER_API_KEY is not configured.`,
     };
@@ -247,7 +304,7 @@ export async function runPlatformCitationCheck(
   });
   const responseText = chatResponse.choices[0]?.message?.content || '';
   const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
-  return { isCited: r.isCited, rank: r.rank, responseText };
+  return { isCited: r.isCited, rank: r.rank, relevance: r.relevance, responseText };
 }
 
 // Runs every stored prompt for a brand across each platform and persists a
@@ -286,6 +343,28 @@ export async function runBrandPrompts(
   const rankings: GeoRanking[] = [];
   let totalCited = 0;
 
+  // Build the domain-occurrence map once per run. Used to compute per-ranking
+  // authority_score at insert time. Scans all prior cited geo_rankings for
+  // any of this brand's prompts.
+  const domainOccurrenceMap = new Map<string, number>();
+  try {
+    const promptIds = prompts.map((p) => p.id);
+    const priorRankings = await storage.getGeoRankingsByBrandPromptIds(promptIds);
+    for (const r of priorRankings) {
+      if (r.isCited !== 1 || !r.citingOutletUrl) continue;
+      try {
+        const host = new URL(r.citingOutletUrl).hostname.toLowerCase().replace(/^www\./, "");
+        if (host) domainOccurrenceMap.set(host, (domainOccurrenceMap.get(host) || 0) + 1);
+      } catch { /* skip malformed URLs */ }
+    }
+  } catch (err) {
+    console.warn(`[citationChecker] failed to build domain occurrence map:`, err instanceof Error ? err.message : err);
+  }
+
+  // Load competitors once so every task can pre-filter responses against them.
+  const competitors = await storage.getCompetitors(brandId).catch(() => []);
+  const competitorDetections = new Map<string, Map<string, number>>(); // competitorId → platform → cited count
+
   // Flatten all (prompt × platform) pairs into one queue and run them with a
   // fixed concurrency ceiling. As soon as one task finishes (AI call + DB
   // insert) the next one starts — no per-prompt batching, no waiting for the
@@ -309,11 +388,15 @@ export async function runBrandPrompts(
     let isCited = false;
     let citationContext: string | null = null;
     let rank: number | null = null;
+    let relevance: number | null = null;
+    let responseText = '';
     const started = Date.now();
     try {
       const result = await runPlatformCitationCheck(platform, bp.prompt, brand, brandName, brandNameVariations, brand.website || undefined);
       isCited = result.isCited;
       rank = result.rank;
+      relevance = result.relevance;
+      responseText = result.responseText || '';
       if (result.error) {
         citationContext = result.error;
       } else {
@@ -321,13 +404,46 @@ export async function runBrandPrompts(
         // Status line + `||| RAW_RESPONSE |||` delimiter so the API can split
         // the two back out on the way to the client.
         const statusLine = isCited ? "Cited" : "Not cited";
-        citationContext = `${statusLine}\n\n||| RAW_RESPONSE |||\n${result.responseText}`;
+        citationContext = `${statusLine}\n\n||| RAW_RESPONSE |||\n${responseText}`;
       }
       console.log(`[citationChecker] prompt ${promptIdx} ${platform} ok in ${Date.now() - started}ms — cited=${isCited}`);
     } catch (apiError) {
       const msg = apiError instanceof Error ? apiError.message : 'API error';
       citationContext = `Check failed: ${msg}`;
       console.error(`[citationChecker] prompt ${promptIdx} ${platform} FAILED in ${Date.now() - started}ms —`, msg);
+    }
+
+    // Enrichment: extract URL, classify source, compute authority.
+    const citingOutletUrl = extractFirstUrl(responseText);
+    const sourceType = classifySourceType(citingOutletUrl);
+    const authorityScore = computeAuthorityScore(citingOutletUrl, domainOccurrenceMap);
+
+    // Update the in-run map so subsequent tasks see fresh counts.
+    if (citingOutletUrl) {
+      try {
+        const host = new URL(citingOutletUrl).hostname.toLowerCase().replace(/^www\./, "");
+        if (host) domainOccurrenceMap.set(host, (domainOccurrenceMap.get(host) || 0) + 1);
+      } catch { /* skip */ }
+    }
+
+    // Competitor detection: cheap string pre-filter against every competitor's
+    // name variants. No LLM call per competitor — the brand is already judged;
+    // competitor mentions are tracked as raw name hits in the response text.
+    if (isCited && responseText && competitors.length > 0) {
+      const respLower = responseText.toLowerCase();
+      for (const comp of competitors) {
+        const variants = buildBrandNameVariants(
+          comp.name,
+          [],
+          comp.domain || undefined,
+        );
+        const hit = variants.some((v) => respLower.includes(v));
+        if (hit) {
+          const perPlatform = competitorDetections.get(comp.id) || new Map<string, number>();
+          perPlatform.set(platform, (perPlatform.get(platform) || 0) + 1);
+          competitorDetections.set(comp.id, perPlatform);
+        }
+      }
     }
 
     try {
@@ -340,6 +456,10 @@ export async function runBrandPrompts(
         rank,
         isCited: isCited ? 1 : 0,
         citationContext,
+        citingOutletUrl,
+        sourceType,
+        authorityScore,
+        relevanceScore: relevance,
         checkedAt: new Date(),
       } as any);
       rankings.push(row);
@@ -384,6 +504,42 @@ export async function runBrandPrompts(
   });
 
   console.log(`[citationChecker] run ${citationRun.id} complete — ${totalCited}/${totalChecks} cited (${citationRate}%)`);
+
+  // Post-processing stage. All three are best-effort — a failure here must
+  // never revert the rankings we already saved.
+
+  // 1. Competitor citation snapshots — one row per (competitor, platform).
+  for (const [competitorId, perPlatform] of Array.from(competitorDetections.entries())) {
+    for (const [platform, count] of Array.from(perPlatform.entries())) {
+      try {
+        await storage.createCompetitorCitationSnapshot({
+          competitorId,
+          aiPlatform: platform,
+          citationCount: count,
+        } as any);
+      } catch (err) {
+        console.warn(`[citationChecker] competitor snapshot insert failed:`, err instanceof Error ? err.message : err);
+      }
+    }
+  }
+
+  // 2. Metrics history — one row per tracked metric so the trend chart has
+  // a real data point from this run.
+  try {
+    const { recordCurrentMetrics } = await import("./lib/metricsSnapshot");
+    await recordCurrentMetrics(brandId, { citationRate, totalChecks, totalCited });
+  } catch (err) {
+    console.warn(`[citationChecker] metrics snapshot failed:`, err instanceof Error ? err.message : err);
+  }
+
+  // 3. Hallucination detection — compare each cited response against the
+  // brand fact sheet. Skipped if the fact sheet is empty.
+  try {
+    const { detectHallucinationsForRun } = await import("./lib/hallucinationDetector");
+    await detectHallucinationsForRun(brandId, rankings);
+  } catch (err) {
+    console.warn(`[citationChecker] hallucination detection failed:`, err instanceof Error ? err.message : err);
+  }
 
   return { totalChecks, totalCited, rankings, runId: citationRun.id };
 }

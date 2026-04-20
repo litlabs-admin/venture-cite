@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,20 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Trophy, TrendingUp, Users, Trash2, ExternalLink, Crown, Award, Medal } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 import { SiOpenai } from "react-icons/si";
 import type { Competitor, Brand } from "@shared/schema";
-
-const AI_PLATFORMS = [
-  "ChatGPT",
-  "Claude",
-  "Grok",
-  "Perplexity",
-  "Google AI",
-  "Gemini",
-  "Microsoft Copilot",
-  "Meta AI",
-  "DeepSeek"
-];
+import { AI_PLATFORMS } from "@shared/constants";
 
 interface LeaderboardEntry {
   name: string;
@@ -115,26 +105,21 @@ export default function CompetitorsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Helmet>
-        <title>Competitor Intelligence | GEO Platform</title>
-        <meta name="description" content="Track and compare AI citations for your brand vs competitors across ChatGPT, Claude, Grok, and other AI platforms." />
-      </Helmet>
-
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Competitor Intelligence</h1>
-          <p className="text-muted-foreground mt-1">
-            Track how your brand ranks against competitors in AI platform citations
-          </p>
-        </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-competitor">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Competitor
-            </Button>
-          </DialogTrigger>
+    <div className="space-y-8">
+      <Helmet><title>Competitors - VentureCite</title></Helmet>
+      <PageHeader
+        title="Competitor Intelligence"
+        description="Track how your brand ranks against competitors in AI platform citations"
+        actions={
+          <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-competitor">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Competitor
+          </Button>
+        }
+      />
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogTrigger asChild>
+          <span className="hidden" /></DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add Competitor</DialogTitle>
@@ -195,7 +180,6 @@ export default function CompetitorsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,19 +23,14 @@ import {
   Plus, RefreshCw, FileText, Award, AlertCircle, Users, History, Calendar,
   Bell, Mail, Trash2, Send
 } from "lucide-react";
-import type { Brand, Competitor, PromptPortfolio, CitationQuality, BrandHallucination, BrandFactSheet, MetricsHistory, AlertSettings, AlertHistory } from "@shared/schema";
+import type { Competitor, PromptPortfolio, CitationQuality, BrandHallucination, BrandFactSheet, MetricsHistory, AlertSettings, AlertHistory } from "@shared/schema";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 
 export default function AIIntelligence() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
   const [activeTab, setActiveTab] = useState("share-of-answer");
-
-  const { data: brandsData } = useQuery<{ success: boolean; data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-
-  const brands = brandsData?.data || [];
-  const selectedBrand = brands.find(b => b.id === selectedBrandId);
 
   const { data: shareOfAnswerStats, isLoading: soaLoading } = useQuery<{ success: boolean; data: any }>({
     queryKey: [`/api/prompt-portfolio/stats/${selectedBrandId}`],
@@ -322,35 +319,13 @@ export default function AIIntelligence() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6 max-w-7xl">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="page-title">
-              <Brain className="w-8 h-8 text-primary" />
-              AI Intelligence
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Advanced analytics for Share-of-Answer, Citation Quality, and Hallucination Detection
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <Label htmlFor="brand-select">Select Brand</Label>
-          <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-            <SelectTrigger className="w-[300px] mt-1" data-testid="select-brand">
-              <SelectValue placeholder="Choose a brand to analyze" />
-            </SelectTrigger>
-            <SelectContent>
-              {brands.map((brand) => (
-                <SelectItem key={brand.id} value={brand.id}>
-                  {brand.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="space-y-8">
+      <Helmet><title>AI Intelligence - VentureCite</title></Helmet>
+      <PageHeader
+        title="AI Intelligence"
+        description="Share-of-Answer, Citation Quality, and Hallucination Detection"
+        actions={brands.length > 0 ? <BrandSelector /> : null}
+      />
 
         {!selectedBrandId ? (
           <Card className="p-12 text-center">
@@ -1989,7 +1964,6 @@ export default function AIIntelligence() {
             </TabsContent>
           </Tabs>
         )}
-      </div>
     </div>
   );
 }

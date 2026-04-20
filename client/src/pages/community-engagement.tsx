@@ -11,7 +11,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Brand, CommunityPost } from "@shared/schema";
+import { Helmet } from "react-helmet-async";
+import PageHeader from "@/components/PageHeader";
+import type { CommunityPost } from "@shared/schema";
+import BrandSelector from "@/components/BrandSelector";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 import {
   Search,
   Plus,
@@ -80,7 +84,7 @@ const statusColors: Record<string, string> = {
 
 export default function CommunityEngagement() {
   const { toast } = useToast();
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
   const [discoveredGroups, setDiscoveredGroups] = useState<DiscoveredGroup[]>([]);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
@@ -92,16 +96,10 @@ export default function CommunityEngagement() {
     tone: "helpful and authentic",
   });
 
-  const { data: brandsResponse, isLoading: brandsLoading } = useQuery<{ success: boolean; data: Brand[] }>({
-    queryKey: ["/api/brands"],
-  });
-  const brands = brandsResponse?.data || [];
-  const selectedBrand = brands.find(b => b.id === selectedBrandId);
-
   const postsQueryKey = selectedBrandId ? `/api/community-posts?brandId=${selectedBrandId}` : "/api/community-posts";
   const { data: postsResponse, isLoading: postsLoading } = useQuery<{ success: boolean; data: CommunityPost[] }>({
     queryKey: ["/api/community-posts", selectedBrandId],
-    queryFn: () => fetch(postsQueryKey, { credentials: "include" }).then(r => r.json()),
+    queryFn: () => apiRequest("GET", postsQueryKey).then(r => r.json()),
   });
   const posts = postsResponse?.data || [];
 
@@ -230,30 +228,15 @@ export default function CommunityEngagement() {
   const postedPosts = posts.filter(p => p.status === "posted");
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white" data-testid="text-page-title">
-            Community Engagement
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Find and engage with Reddit, Quora, and forum communities to build brand citations for AI search engines
-          </p>
-        </div>
+    <div className="space-y-8">
+      <Helmet><title>Community Engagement - VentureCite</title></Helmet>
+      <PageHeader
+        title="Community Engagement"
+        description="Find and engage with Reddit, Quora, and forum communities to build brand citations"
+        actions={brands.length > 0 ? <BrandSelector className="w-64" /> : null}
+      />
 
         <div className="flex flex-wrap items-center gap-4 mb-6">
-          <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
-            <SelectTrigger className="w-64" data-testid="select-brand">
-              <SelectValue placeholder="Select a brand" />
-            </SelectTrigger>
-            <SelectContent>
-              {brands.map(brand => (
-                <SelectItem key={brand.id} value={brand.id} data-testid={`brand-option-${brand.id}`}>
-                  {brand.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           <Button
             onClick={handleDiscover}
@@ -747,7 +730,6 @@ export default function CommunityEngagement() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
