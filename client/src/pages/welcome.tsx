@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getAccessToken } from "@/lib/authStore";
 import { validateDomain } from "@shared/validateDomain";
 
@@ -290,6 +290,12 @@ export default function Welcome() {
       };
       const res = await apiRequest("POST", "/api/onboarding/confirm", body);
       const json = (await res.json()) as { brandId: string };
+      // The FirstRunGate on /dashboard reads the cached /api/brands query to
+      // decide whether to redirect back here. Without invalidating, the cache
+      // still shows zero brands and bounces the user back to /welcome.
+      // Await the refetch so FirstRunGate sees the new brand on arrival.
+      await queryClient.invalidateQueries({ queryKey: ["/api/brands"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/brands"] });
       setLocation(`/dashboard?brandId=${json.brandId}`);
     } catch (err: any) {
       toast({
