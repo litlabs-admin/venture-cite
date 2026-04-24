@@ -23,6 +23,7 @@ logs/
 # ─── Documentation / notes — kept local, never pushed ──────────
 *.md
 !README.md
+!docs/privacy-policy.md
 
 # ─── Editor / IDE ────────────────────────────────────────────────
 .vscode
