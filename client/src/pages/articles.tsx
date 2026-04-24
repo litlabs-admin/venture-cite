@@ -1,9 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearch, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -11,35 +19,77 @@ import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import PageHeader from "@/components/PageHeader";
 import { Input } from "@/components/ui/input";
-import { Loader2, FileText, Eye, Calendar, Tag, Share2, Clock, Pencil, Send, Link2, Trash2 } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Loader2,
+  FileText,
+  Eye,
+  Calendar,
+  Tag,
+  Share2,
+  Clock,
+  Pencil,
+  Send,
+  Link2,
+  Trash2,
+  Search,
+} from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { AI_PLATFORMS } from "@shared/constants";
+import type { Brand } from "@shared/schema";
 
-const DISTRIBUTION_PLATFORMS = ['LinkedIn', 'Medium', 'Reddit', 'Quora'];
+const DISTRIBUTION_PLATFORMS = ["LinkedIn", "Medium", "Reddit", "Quora"];
 
-type DistributeView = 'generate' | 'results' | 'history';
+type DistributeView = "generate" | "results" | "history";
 
 function DistributeDialog({ articleId }: { articleId: string }) {
   const { toast } = useToast();
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<DistributeView>('generate');
-  const [generatedContent, setGeneratedContent] = useState<Array<{platform: string; status: string; content?: string}>>([]);
+  const [view, setView] = useState<DistributeView>("generate");
+  const [generatedContent, setGeneratedContent] = useState<
+    Array<{ platform: string; status: string; content?: string }>
+  >([]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState('');
+  const [editText, setEditText] = useState("");
 
   // Fetch history of past distributions whenever dialog opens
-  const { data: historyData, refetch: refetchHistory } = useQuery<{ success: boolean; data: any[] }>({
+  const { data: historyData, refetch: refetchHistory } = useQuery<{
+    success: boolean;
+    data: any[];
+  }>({
     queryKey: [`/api/distributions/${articleId}`],
     enabled: open,
   });
-  const history = (historyData?.data || []).filter((d: any) => d.status === 'success' && d.metadata?.content?.trim());
+  const history = (historyData?.data || []).filter(
+    (d: any) => d.status === "success" && d.metadata?.content?.trim(),
+  );
 
   // Buffer profiles — only loaded when the dialog is open
-  const { data: bufferData } = useQuery<{ success: boolean; connected: boolean; data: Array<{ id: string; service: string; formattedService: string; username: string }> }>({
-    queryKey: ['/api/buffer/profiles'],
+  const { data: bufferData } = useQuery<{
+    success: boolean;
+    connected: boolean;
+    data: Array<{ id: string; service: string; formattedService: string; username: string }>;
+  }>({
+    queryKey: ["/api/buffer/profiles"],
     enabled: open,
   });
   const bufferConnected = bufferData?.connected ?? false;
@@ -47,38 +97,59 @@ function DistributeDialog({ articleId }: { articleId: string }) {
 
   const postToBufferMutation = useMutation({
     mutationFn: async ({ text, profileIds }: { text: string; profileIds: string[] }) => {
-      const response = await apiRequest('POST', '/api/buffer/post', { text, profileIds });
+      const response = await apiRequest("POST", "/api/buffer/post", { text, profileIds });
       return await response.json();
     },
-    onSuccess: () => toast({ title: "Queued in Buffer!", description: "Your post has been added to the Buffer queue." }),
-    onError: () => toast({ title: "Buffer post failed", description: "Could not post to Buffer. Check your connection.", variant: "destructive" }),
+    onSuccess: () =>
+      toast({
+        title: "Queued in Buffer!",
+        description: "Your post has been added to the Buffer queue.",
+      }),
+    onError: () =>
+      toast({
+        title: "Buffer post failed",
+        description: "Could not post to Buffer. Check your connection.",
+        variant: "destructive",
+      }),
   });
 
   const matchBufferProfile = (platform: string) => {
     const p = platform.toLowerCase();
-    return bufferProfiles.find((bp) => bp.service?.toLowerCase().includes(p) || bp.formattedService?.toLowerCase().includes(p));
+    return bufferProfiles.find(
+      (bp) =>
+        bp.service?.toLowerCase().includes(p) || bp.formattedService?.toLowerCase().includes(p),
+    );
   };
 
   const distributeMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/distribute/${articleId}`, { platforms: selectedPlatforms });
+      const response = await apiRequest("POST", `/api/distribute/${articleId}`, {
+        platforms: selectedPlatforms,
+      });
       return await response.json();
     },
     onSuccess: async (data) => {
-      const successCount = data.data.filter((r: any) => r.status === 'success').length;
+      const successCount = data.data.filter((r: any) => r.status === "success").length;
       setGeneratedContent(data.data);
-      setView('results');
+      setView("results");
       await refetchHistory();
-      toast({ title: "Content Generated", description: `Platform-ready content created for ${successCount} platform(s). Copy and post!` });
+      toast({
+        title: "Content Generated",
+        description: `Platform-ready content created for ${successCount} platform(s). Copy and post!`,
+      });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to generate platform content. Please try again.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to generate platform content. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
   const saveEditMutation = useMutation({
     mutationFn: async ({ id, content }: { id: string; content: string }) => {
-      const response = await apiRequest('PATCH', `/api/distribute/entry/${id}`, { content });
+      const response = await apiRequest("PATCH", `/api/distribute/entry/${id}`, { content });
       return await response.json();
     },
     onSuccess: () => {
@@ -86,7 +157,8 @@ function DistributeDialog({ articleId }: { articleId: string }) {
       refetchHistory();
       toast({ title: "Saved", description: "Your edits have been saved." });
     },
-    onError: () => toast({ title: "Error", description: "Could not save edits.", variant: "destructive" }),
+    onError: () =>
+      toast({ title: "Error", description: "Could not save edits.", variant: "destructive" }),
   });
 
   const distributeLoadingMessage = useLoadingMessages(distributeMutation.isPending, [
@@ -105,55 +177,101 @@ function DistributeDialog({ articleId }: { articleId: string }) {
 
   const handleClose = (isOpen: boolean) => {
     setOpen(isOpen);
-    if (!isOpen) { setView('generate'); setGeneratedContent([]); setSelectedPlatforms([]); setEditingId(null); }
+    if (!isOpen) {
+      setView("generate");
+      setGeneratedContent([]);
+      setSelectedPlatforms([]);
+      setEditingId(null);
+    }
   };
 
-  const platformCard = (id: string | null, platform: string, content: string, timestamp?: string) => (
-    <div key={id ?? platform} className="border rounded-lg p-4" data-testid={`distribution-result-${platform.toLowerCase()}`}>
+  const platformCard = (
+    id: string | null,
+    platform: string,
+    content: string,
+    timestamp?: string,
+  ) => (
+    <div
+      key={id ?? platform}
+      className="border rounded-lg p-4"
+      data-testid={`distribution-result-${platform.toLowerCase()}`}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Badge>{platform}</Badge>
-          {timestamp && <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(timestamp), { addSuffix: true })}</span>}
+          {timestamp && (
+            <span className="text-xs text-muted-foreground">
+              {formatDistanceToNow(new Date(timestamp), { addSuffix: true })}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {id && (
-            <Button variant="ghost" size="sm" onClick={() => { setEditingId(id); setEditText(content); }} className="gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditingId(id);
+                setEditText(content);
+              }}
+              className="gap-1"
+            >
               <Pencil className="w-3 h-3" /> Edit
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => copyToClipboard(content, platform)} data-testid={`button-copy-${platform.toLowerCase()}`}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => copyToClipboard(content, platform)}
+            data-testid={`button-copy-${platform.toLowerCase()}`}
+          >
             Copy
           </Button>
-          {bufferConnected && (() => {
-            const match = matchBufferProfile(platform);
-            if (!match) return null;
-            return (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => postToBufferMutation.mutate({ text: content, profileIds: [match.id] })}
-                disabled={postToBufferMutation.isPending}
-                data-testid={`button-buffer-${platform.toLowerCase()}`}
-              >
-                <Send className="w-3 h-3 mr-1" />
-                Post to Buffer
-              </Button>
-            );
-          })()}
+          {bufferConnected &&
+            (() => {
+              const match = matchBufferProfile(platform);
+              if (!match) return null;
+              return (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() =>
+                    postToBufferMutation.mutate({ text: content, profileIds: [match.id] })
+                  }
+                  disabled={postToBufferMutation.isPending}
+                  data-testid={`button-buffer-${platform.toLowerCase()}`}
+                >
+                  <Send className="w-3 h-3 mr-1" />
+                  Post to Buffer
+                </Button>
+              );
+            })()}
         </div>
       </div>
       {id && editingId === id ? (
         <div className="space-y-2">
-          <Textarea value={editText} onChange={(e) => setEditText(e.target.value)} className="min-h-[160px] text-sm font-mono" />
+          <Textarea
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            className="min-h-[160px] text-sm font-mono"
+          />
           <div className="flex gap-2 justify-end">
-            <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
-            <Button size="sm" onClick={() => saveEditMutation.mutate({ id: id!, content: editText })} disabled={saveEditMutation.isPending}>
+            <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => saveEditMutation.mutate({ id: id!, content: editText })}
+              disabled={saveEditMutation.isPending}
+            >
               {saveEditMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
             </Button>
           </div>
         </div>
       ) : (
-        <pre className="text-sm whitespace-pre-wrap bg-muted p-3 rounded-md max-h-60 overflow-y-auto font-sans">{content}</pre>
+        <pre className="text-sm whitespace-pre-wrap bg-muted p-3 rounded-md max-h-60 overflow-y-auto font-sans">
+          {content}
+        </pre>
       )}
     </div>
   );
@@ -169,20 +287,37 @@ function DistributeDialog({ articleId }: { articleId: string }) {
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Platform-Optimized Content</DialogTitle>
-          <DialogDescription>AI rewrites your article for each platform — copy and post manually.</DialogDescription>
+          <DialogDescription>
+            AI rewrites your article for each platform — copy and post manually.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Tab bar */}
         <div className="flex gap-1 border-b pb-2 mb-2">
-          <Button variant={view === 'generate' ? 'default' : 'ghost'} size="sm" onClick={() => setView('generate')}>
+          <Button
+            variant={view === "generate" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setView("generate")}
+          >
             <Share2 className="w-3 h-3 mr-1" /> Generate New
           </Button>
           {generatedContent.length > 0 && (
-            <Button variant={view === 'results' ? 'default' : 'ghost'} size="sm" onClick={() => setView('results')} data-testid="button-view-results">
-              <FileText className="w-3 h-3 mr-1" /> Results ({generatedContent.filter(c => c.content).length})
+            <Button
+              variant={view === "results" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setView("results")}
+              data-testid="button-view-results"
+            >
+              <FileText className="w-3 h-3 mr-1" /> Results (
+              {generatedContent.filter((c) => c.content).length})
             </Button>
           )}
-          <Button variant={view === 'history' ? 'default' : 'ghost'} size="sm" onClick={() => setView('history')} data-testid="button-view-history">
+          <Button
+            variant={view === "history" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setView("history")}
+            data-testid="button-view-history"
+          >
             <Clock className="w-3 h-3 mr-1" /> History {history.length > 0 && `(${history.length})`}
           </Button>
         </div>
@@ -199,29 +334,39 @@ function DistributeDialog({ articleId }: { articleId: string }) {
           </div>
         )}
 
-        {view === 'generate' && (
+        {view === "generate" && (
           <div className="space-y-4">
-            <div className="bg-muted border border-border rounded-lg p-3" data-testid="banner-distribution-info">
+            <div
+              className="bg-muted border border-border rounded-lg p-3"
+              data-testid="banner-distribution-info"
+            >
               <div className="flex items-start gap-2">
                 <Share2 className="w-4 h-4 text-muted-foreground mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-foreground" data-testid="text-distribution-info">Smart Distribution</p>
-                  <p className="text-muted-foreground text-xs mt-1">AI reformats your article for each platform with optimized hooks, hashtags, and formatting.</p>
+                  <p className="font-medium text-foreground" data-testid="text-distribution-info">
+                    Smart Distribution
+                  </p>
+                  <p className="text-muted-foreground text-xs mt-1">
+                    AI reformats your article for each platform with optimized hooks, hashtags, and
+                    formatting.
+                  </p>
                 </div>
               </div>
             </div>
-            {DISTRIBUTION_PLATFORMS.map(platform => (
+            {DISTRIBUTION_PLATFORMS.map((platform) => (
               <div key={platform} className="flex items-center space-x-2">
                 <Checkbox
                   id={`platform-${platform}`}
                   checked={selectedPlatforms.includes(platform)}
                   onCheckedChange={(checked) => {
                     if (checked) setSelectedPlatforms([...selectedPlatforms, platform]);
-                    else setSelectedPlatforms(selectedPlatforms.filter(p => p !== platform));
+                    else setSelectedPlatforms(selectedPlatforms.filter((p) => p !== platform));
                   }}
                   data-testid={`checkbox-platform-${platform.toLowerCase()}`}
                 />
-                <label htmlFor={`platform-${platform}`} className="text-sm font-medium">{platform}</label>
+                <label htmlFor={`platform-${platform}`} className="text-sm font-medium">
+                  {platform}
+                </label>
               </div>
             ))}
             <Button
@@ -231,7 +376,10 @@ function DistributeDialog({ articleId }: { articleId: string }) {
               data-testid="button-generate-distribution"
             >
               {distributeMutation.isPending ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{distributeLoadingMessage}</>
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {distributeLoadingMessage}
+                </>
               ) : (
                 `Generate content for ${selectedPlatforms.length} platform(s)`
               )}
@@ -239,20 +387,35 @@ function DistributeDialog({ articleId }: { articleId: string }) {
           </div>
         )}
 
-        {view === 'results' && (
+        {view === "results" && (
           <div className="space-y-4">
             {generatedContent.map((item) =>
-              item.content
-                ? platformCard(null, item.platform, item.content)
-                : <div key={item.platform} className="border rounded-lg p-4"><Badge variant="destructive">{item.platform}</Badge><p className="text-sm text-destructive mt-2">Failed to generate content for this platform.</p></div>
+              item.content ? (
+                platformCard(null, item.platform, item.content)
+              ) : (
+                <div key={item.platform} className="border rounded-lg p-4">
+                  <Badge variant="destructive">{item.platform}</Badge>
+                  <p className="text-sm text-destructive mt-2">
+                    Failed to generate content for this platform.
+                  </p>
+                </div>
+              ),
             )}
-            <Button variant="outline" className="w-full" onClick={() => { setView('generate'); setSelectedPlatforms([]); }} data-testid="button-distribute-more">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setView("generate");
+                setSelectedPlatforms([]);
+              }}
+              data-testid="button-distribute-more"
+            >
               Generate for more platforms
             </Button>
           </div>
         )}
 
-        {view === 'history' && (
+        {view === "history" && (
           <div className="space-y-4">
             {history.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground text-sm">
@@ -260,7 +423,9 @@ function DistributeDialog({ articleId }: { articleId: string }) {
                 No past distributions yet. Generate content and it will appear here.
               </div>
             ) : (
-              history.map((d: any) => platformCard(d.id, d.platform, d.metadata.content, d.distributedAt))
+              history.map((d: any) =>
+                platformCard(d.id, d.platform, d.metadata.content, d.distributedAt),
+              )
             )}
           </div>
         )}
@@ -269,32 +434,63 @@ function DistributeDialog({ articleId }: { articleId: string }) {
   );
 }
 
-function ViewEditDialog({ article }: { article: any }) {
+function ViewEditDialog({
+  article,
+  autoOpen = false,
+  onAutoOpenHandled,
+}: {
+  article: any;
+  autoOpen?: boolean;
+  onAutoOpenHandled?: () => void;
+}) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(article.title || '');
-  const [content, setContent] = useState(article.content || '');
+  const [title, setTitle] = useState(article.title || "");
+  const [content, setContent] = useState(article.content || "");
+
+  useEffect(() => {
+    if (autoOpen && !open) {
+      setOpen(true);
+      setEditing(true);
+      onAutoOpenHandled?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen]);
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('PUT', `/api/articles/${article.id}`, { title, content });
+      const response = await apiRequest("PUT", `/api/articles/${article.id}`, { title, content });
       return response.json();
     },
     onSuccess: () => {
       // Instant update: update article in cache
-      queryClient.setQueryData<{ success: boolean; data: any[] }>(['/api/articles'], (old) => {
+      queryClient.setQueryData<{ success: boolean; data: any[] }>(["/api/articles"], (old) => {
         if (!old) return old;
-        return { ...old, data: old.data.map((a: any) => a.id === article.id ? { ...a, title, content } : a) };
+        return {
+          ...old,
+          data: old.data.map((a: any) => (a.id === article.id ? { ...a, title, content } : a)),
+        };
       });
       setEditing(false);
       toast({ title: "Saved", description: "Article updated." });
     },
-    onError: () => toast({ title: "Error", description: "Could not save changes.", variant: "destructive" }),
+    onError: () =>
+      toast({ title: "Error", description: "Could not save changes.", variant: "destructive" }),
   });
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(false); setTitle(article.title || ''); setContent(article.content || ''); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) {
+          setEditing(false);
+          setTitle(article.title || "");
+          setContent(article.content || "");
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" data-testid={`button-view-${article.id}`}>
           <Eye className="w-4 h-4 mr-2" /> View / Edit
@@ -302,8 +498,10 @@ function ViewEditDialog({ article }: { article: any }) {
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing ? 'Edit Article' : article.title}</DialogTitle>
-          <DialogDescription>{editing ? 'Update your article content.' : 'Review your generated article.'}</DialogDescription>
+          <DialogTitle>{editing ? "Edit Article" : article.title}</DialogTitle>
+          <DialogDescription>
+            {editing ? "Update your article content." : "Review your generated article."}
+          </DialogDescription>
         </DialogHeader>
         {editing ? (
           <div className="space-y-3">
@@ -313,21 +511,45 @@ function ViewEditDialog({ article }: { article: any }) {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Content</label>
-              <Textarea value={content} onChange={(e) => setContent(e.target.value)} className="min-h-[400px] font-mono text-sm" />
+              <Textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="min-h-[400px] font-mono text-sm"
+              />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => { setEditing(false); setTitle(article.title || ''); setContent(article.content || ''); }}>Cancel</Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setEditing(false);
+                  setTitle(article.title || "");
+                  setContent(article.content || "");
+                }}
+              >
+                Cancel
+              </Button>
               <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Save Changes'}
+                {updateMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
               </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="flex justify-end">
-              <Button size="sm" onClick={() => setEditing(true)}><Pencil className="w-3 h-3 mr-1" /> Edit</Button>
+              <Button size="sm" onClick={() => setEditing(true)}>
+                <Pencil className="w-3 h-3 mr-1" /> Edit
+              </Button>
             </div>
-            <pre className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-md font-sans">{article.content}</pre>
+            <pre className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-md font-sans">
+              {article.content}
+            </pre>
           </div>
         )}
       </DialogContent>
@@ -337,21 +559,29 @@ function ViewEditDialog({ article }: { article: any }) {
 
 export default function Articles() {
   const { toast } = useToast();
+  const searchString = useSearch();
+  const [, setLocation] = useLocation();
+  const editId = new URLSearchParams(searchString).get("edit");
 
   const { data: articlesData, isLoading } = useQuery({
-    queryKey: ['/api/articles'],
+    queryKey: ["/api/articles"],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/articles');
+      const response = await apiRequest("GET", "/api/articles");
       return response.json();
     },
   });
 
+  const { data: brandsData } = useQuery<{ success: boolean; data: Brand[] }>({
+    queryKey: ["/api/brands"],
+  });
+  const brands = brandsData?.data || [];
+
   const deleteArticleMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest('DELETE', `/api/articles/${id}`);
+      return apiRequest("DELETE", `/api/articles/${id}`);
     },
     onSuccess: (_data, deletedId) => {
-      queryClient.setQueryData<{ success: boolean; data: any[] }>(['/api/articles'], (old) => {
+      queryClient.setQueryData<{ success: boolean; data: any[] }>(["/api/articles"], (old) => {
         if (!old) return old;
         return { ...old, data: old.data.filter((a: any) => a.id !== deletedId) };
       });
@@ -364,46 +594,137 @@ export default function Articles() {
 
   const articles = articlesData?.data || [];
 
+  // Wave 6.7: client-side search + sort + pagination on articles list.
+  // Server returns up to 100 (see storage.getArticlesByUserId default limit)
+  // — paging client-side is sufficient at current scale.
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "title">("newest");
+  // Brand filter: "all" shows every article (the default), or a specific
+  // brand id narrows the list. Distinct from the global brand selector
+  // because Articles is intentionally cross-brand by default.
+  const [brandFilter, setBrandFilter] = useState<string>("all");
+  const PAGE_SIZE = 12;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  const filteredArticles = (() => {
+    const q = search.trim().toLowerCase();
+    const byBrand =
+      brandFilter === "all" ? articles : articles.filter((a: any) => a.brandId === brandFilter);
+    const list = q
+      ? byBrand.filter((a: any) => {
+          const t = (a.title || "").toLowerCase();
+          const ex = (a.excerpt || "").toLowerCase();
+          const kw = (a.keywords || []).join(" ").toLowerCase();
+          return t.includes(q) || ex.includes(q) || kw.includes(q);
+        })
+      : byBrand;
+    const sorted = [...list];
+    if (sortBy === "newest") {
+      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortBy === "oldest") {
+      sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else if (sortBy === "title") {
+      sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+    }
+    return sorted;
+  })();
+
+  const visibleArticles = filteredArticles.slice(0, visibleCount);
+  const hasMore = filteredArticles.length > visibleCount;
+
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Your Articles"
-        description="Manage your GEO-optimized content"
-      />
+      <PageHeader title="Your Articles" description="Manage your GEO-optimized content" />
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : articles.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
+              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">No articles yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Generate and save content to see your articles here
+              </p>
+              <Link href="/content">
+                <Button data-testid="link-create-content">Create Your First Article</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setVisibleCount(PAGE_SIZE);
+                }}
+                placeholder="Search by title, excerpt, or keyword…"
+                className="pl-9"
+                data-testid="input-articles-search"
+              />
+            </div>
+            {brands.length > 1 && (
+              <Select
+                value={brandFilter}
+                onValueChange={(v) => {
+                  setBrandFilter(v);
+                  setVisibleCount(PAGE_SIZE);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-articles-brand">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All brands</SelectItem>
+                  {brands.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select
+              value={sortBy}
+              onValueChange={(v) => {
+                setSortBy(v as typeof sortBy);
+                setVisibleCount(PAGE_SIZE);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-articles-sort">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
+                <SelectItem value="title">Title (A–Z)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        ) : articles.length === 0 ? (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center">
-                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">No articles yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Generate and save content to see your articles here
-                </p>
-                <Link href="/content">
-                  <Button data-testid="link-create-content">
-                    Create Your First Article
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
+          {filteredArticles.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                No articles match &ldquo;{search}&rdquo;.
+              </CardContent>
+            </Card>
+          ) : null}
           <div className="grid gap-4">
-            {articles.map((article: any) => (
+            {visibleArticles.map((article: any) => (
               <Card key={article.id} data-testid={`card-article-${article.id}`}>
                 <CardHeader>
                   <div className="flex-1">
                     <CardTitle className="text-xl mb-2" data-testid={`title-${article.id}`}>
                       {article.title}
                     </CardTitle>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {article.excerpt}
-                    </p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{article.excerpt}</p>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -439,11 +760,19 @@ export default function Articles() {
                   )}
 
                   <div className="flex gap-2 flex-wrap">
-                    <ViewEditDialog article={article} />
+                    <ViewEditDialog
+                      article={article}
+                      autoOpen={editId === article.id}
+                      onAutoOpenHandled={() => setLocation("/articles", { replace: true })}
+                    />
                     <DistributeDialog articleId={article.id} />
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
                           <Trash2 className="w-4 h-4 mr-2" /> Delete
                         </Button>
                       </AlertDialogTrigger>
@@ -451,7 +780,8 @@ export default function Articles() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete article?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This will permanently delete "{article.title}" and all its distribution history. This action cannot be undone.
+                            This will permanently delete "{article.title}" and all its distribution
+                            history. This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -470,7 +800,24 @@ export default function Articles() {
               </Card>
             ))}
           </div>
-        )}
+          {hasMore && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+                className="text-sm text-primary hover:underline"
+                data-testid="button-load-more-articles"
+              >
+                Load {Math.min(PAGE_SIZE, filteredArticles.length - visibleCount)} more
+                {" · "}
+                <span className="text-muted-foreground">
+                  showing {visibleCount} of {filteredArticles.length}
+                </span>
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

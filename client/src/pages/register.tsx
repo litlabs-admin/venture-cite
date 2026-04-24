@@ -4,11 +4,19 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, Check, X } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
 import { setSession } from "@/lib/authStore";
+import { Helmet } from "react-helmet-async";
 
 export default function Register() {
   const [, setLocation] = useLocation();
@@ -28,17 +36,24 @@ export default function Register() {
   ];
 
   const passwordsMatch = password === confirmPassword && password.length > 0;
-  const allRequirementsMet = passwordRequirements.every(r => r.met);
+  const allRequirementsMet = passwordRequirements.every((r) => r.met);
 
   const registerMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; firstName: string; lastName: string }) => {
+    mutationFn: async (data: {
+      email: string;
+      password: string;
+      firstName: string;
+      lastName: string;
+    }) => {
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
       let result: any = {};
-      try { result = await response.json(); } catch {}
+      try {
+        result = await response.json();
+      } catch {}
       if (!response.ok || !result.success) {
         throw new Error(result.error || `Registration failed (${response.status})`);
       }
@@ -70,6 +85,10 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+      <Helmet>
+        <title>Create Account - VentureCite</title>
+        <meta name="robots" content="noindex" />
+      </Helmet>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -141,7 +160,10 @@ export default function Register() {
               {password && (
                 <ul className="text-xs space-y-1 mt-2">
                   {passwordRequirements.map((req, i) => (
-                    <li key={i} className={`flex items-center gap-1 ${req.met ? "text-green-600" : "text-slate-500"}`}>
+                    <li
+                      key={i}
+                      className={`flex items-center gap-1 ${req.met ? "text-green-600" : "text-slate-500"}`}
+                    >
                       {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                       {req.label}
                     </li>
@@ -189,7 +211,11 @@ export default function Register() {
         <CardFooter className="justify-center">
           <p className="text-sm text-slate-600">
             Already have an account?{" "}
-            <a href="/login" className="text-red-600 hover:text-red-700 font-medium" data-testid="link-login">
+            <a
+              href="/login"
+              className="text-red-600 hover:text-red-700 font-medium"
+              data-testid="link-login"
+            >
               Sign in
             </a>
           </p>

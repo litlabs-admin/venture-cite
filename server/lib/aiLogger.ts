@@ -26,19 +26,25 @@ export function attachAiLogger(openai: OpenAI): void {
     const started = Date.now();
     const tag = `[ai ${body?.model ?? "?"}]`;
     try {
-      console.log(`${tag} → request`, truncate({
-        model: body?.model,
-        messages: body?.messages,
-        response_format: body?.response_format,
-        max_tokens: body?.max_tokens,
-        temperature: body?.temperature,
-      }));
+      console.log(
+        `${tag} → request`,
+        truncate({
+          model: body?.model,
+          messages: body?.messages,
+          response_format: body?.response_format,
+          max_tokens: body?.max_tokens,
+          temperature: body?.temperature,
+        }),
+      );
       const result = await original(body, options);
       const content = result?.choices?.[0]?.message?.content ?? "";
       console.log(`${tag} ← response (${Date.now() - started}ms)`, truncate(content));
       return result;
     } catch (err) {
-      console.error(`${tag} ✗ error (${Date.now() - started}ms)`, err instanceof Error ? err.message : err);
+      console.error(
+        `${tag} ✗ error (${Date.now() - started}ms)`,
+        err instanceof Error ? err.message : err,
+      );
       throw err;
     }
   };

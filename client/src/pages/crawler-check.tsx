@@ -5,22 +5,38 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
-import { Bot, CheckCircle2, XCircle, AlertTriangle, Search, Globe, FileText, Copy, ExternalLink } from "lucide-react";
+import {
+  Bot,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Search,
+  Globe,
+  FileText,
+  Copy,
+  ExternalLink,
+} from "lucide-react";
 import type { Brand } from "@shared/schema";
 
 interface CrawlerResult {
   name: string;
   agent: string;
   platform: string;
+  category: string;
   description: string;
-  status: 'allowed' | 'blocked' | 'unknown';
+  status: "allowed" | "blocked" | "unknown";
   reason: string;
   recommendation: string | null;
 }
@@ -102,9 +118,9 @@ export default function CrawlerCheck() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'allowed':
+      case "allowed":
         return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case 'blocked':
+      case "blocked":
         return <XCircle className="h-5 w-5 text-red-500" />;
       default:
         return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
@@ -113,19 +129,42 @@ export default function CrawlerCheck() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'allowed':
-        return <Badge variant="outline" className="border-green-500/30 text-green-600 dark:text-green-400">Allowed</Badge>;
-      case 'blocked':
-        return <Badge variant="outline" className="border-red-500/30 text-red-600 dark:text-red-400">Blocked</Badge>;
+      case "allowed":
+        return (
+          <Badge
+            variant="outline"
+            className="border-green-500/30 text-green-600 dark:text-green-400"
+          >
+            Allowed
+          </Badge>
+        );
+      case "blocked":
+        return (
+          <Badge variant="outline" className="border-red-500/30 text-red-600 dark:text-red-400">
+            Blocked
+          </Badge>
+        );
       default:
-        return <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 dark:text-yellow-400">Unknown</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="border-yellow-500/30 text-yellow-600 dark:text-yellow-400"
+          >
+            Unknown
+          </Badge>
+        );
     }
   };
 
   return (
     <div className="space-y-8">
-      <Helmet><title>Crawler Check - VentureCite</title></Helmet>
-      <PageHeader title="Crawler Check" description="Verify if AI platforms can crawl your website for GEO visibility" />
+      <Helmet>
+        <title>Crawler Check - VentureCite</title>
+      </Helmet>
+      <PageHeader
+        title="Crawler Check"
+        description="Verify if AI platforms can crawl your website for GEO visibility"
+      />
 
       <Card className="mb-8">
         <CardHeader>
@@ -143,11 +182,11 @@ export default function CrawlerCheck() {
               placeholder="Enter website URL (e.g., venturepr.com)"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
+              onKeyDown={(e) => e.key === "Enter" && handleCheck()}
               data-testid="input-url"
             />
-            <Button 
-              onClick={handleCheck} 
+            <Button
+              onClick={handleCheck}
               disabled={checkMutation.isPending}
               data-testid="button-check"
             >
@@ -159,19 +198,21 @@ export default function CrawlerCheck() {
             <div className="mt-4">
               <p className="text-sm text-muted-foreground mb-2">Quick check your brands:</p>
               <div className="flex flex-wrap gap-2">
-                {brands.filter(b => b.website).map((brand) => (
-                  <Button
-                    key={brand.id}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleQuickCheck(brand.website!)}
-                    disabled={checkMutation.isPending}
-                    data-testid={`button-quick-check-${brand.id}`}
-                  >
-                    <Globe className="h-4 w-4 mr-1" />
-                    {brand.name}
-                  </Button>
-                ))}
+                {brands
+                  .filter((b) => b.website)
+                  .map((brand) => (
+                    <Button
+                      key={brand.id}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleQuickCheck(brand.website!)}
+                      disabled={checkMutation.isPending}
+                      data-testid={`button-quick-check-${brand.id}`}
+                    >
+                      <Globe className="h-4 w-4 mr-1" />
+                      {brand.name}
+                    </Button>
+                  ))}
               </div>
             </div>
           )}
@@ -199,9 +240,9 @@ export default function CrawlerCheck() {
                   <Globe className="h-5 w-5" />
                   Results for {checkResult.url}
                 </span>
-                <a 
-                  href={checkResult.robotsTxtUrl} 
-                  target="_blank" 
+                <a
+                  href={checkResult.robotsTxtUrl}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-blue-500 hover:underline flex items-center gap-1"
                 >
@@ -245,18 +286,15 @@ export default function CrawlerCheck() {
                 </Card>
               </div>
 
-              <Progress 
-                value={checkResult.summary.geoScore} 
-                className="h-3 mb-4"
-              />
+              <Progress value={checkResult.summary.geoScore} className="h-3 mb-4" />
 
               {!checkResult.robotsTxtExists && !checkResult.fetchError && (
                 <Alert className="mb-4">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>No robots.txt Found</AlertTitle>
                   <AlertDescription>
-                    This website doesn't have a robots.txt file. All crawlers are allowed by default, 
-                    but we recommend adding one for better control over AI crawler access.
+                    This website doesn't have a robots.txt file. All crawlers are allowed by
+                    default, but we recommend adding one for better control over AI crawler access.
                   </AlertDescription>
                 </Alert>
               )}
@@ -286,10 +324,10 @@ export default function CrawlerCheck() {
                   {checkResult.recommendations.map((rec, index) => (
                     <div key={index} className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
                       <pre className="whitespace-pre-wrap text-sm font-mono">{rec}</pre>
-                      {rec.includes('User-agent:') && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                      {rec.includes("User-agent:") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="mt-2"
                           onClick={() => copyToClipboard(rec)}
                         >
@@ -311,49 +349,115 @@ export default function CrawlerCheck() {
                 AI Crawler Details
               </CardTitle>
               <CardDescription>
-                Detailed status for each AI platform crawler
+                Detailed status for each AI platform crawler, grouped by vendor
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Accordion type="single" collapsible className="w-full">
-                {checkResult.crawlers.map((crawler, index) => (
-                  <AccordionItem key={index} value={`crawler-${index}`}>
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex items-center gap-3 w-full">
-                        {getStatusIcon(crawler.status)}
-                        <span className="font-medium">{crawler.platform}</span>
-                        <span className="text-muted-foreground text-sm">({crawler.agent})</span>
-                        <div className="ml-auto mr-4">
-                          {getStatusBadge(crawler.status)}
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="pl-8 space-y-3">
-                        <p className="text-sm text-muted-foreground">{crawler.description}</p>
-                        <div className="p-3 bg-muted rounded-lg">
-                          <p className="text-sm"><strong>Status:</strong> {crawler.reason}</p>
-                        </div>
-                        {crawler.recommendation && (
-                          <div className="p-3 bg-orange-50 dark:bg-orange-950 rounded-lg">
-                            <p className="text-sm font-medium mb-2">Recommendation:</p>
-                            <pre className="text-sm font-mono whitespace-pre-wrap">{crawler.recommendation}</pre>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="mt-2"
-                              onClick={() => copyToClipboard(crawler.recommendation!)}
-                            >
-                              <Copy className="h-4 w-4 mr-1" />
-                              Copy robots.txt Rule
-                            </Button>
+              {(() => {
+                // Group crawlers by vendor category for a cleaner UI than
+                // a flat 15-row accordion. Category order matches the
+                // backend's AI_CRAWLERS array so "OpenAI" / "Anthropic" /
+                // "Perplexity" appear at the top.
+                const grouped: Record<string, CrawlerResult[]> = {};
+                for (const c of checkResult.crawlers) {
+                  const key = c.category || "Other";
+                  if (!grouped[key]) grouped[key] = [];
+                  grouped[key].push(c);
+                }
+                const categoryOrder = [
+                  "OpenAI",
+                  "Anthropic",
+                  "Perplexity",
+                  "Google",
+                  "Microsoft",
+                  "Meta",
+                  "ByteDance",
+                  "Apple",
+                  "Common Crawl",
+                ];
+                const entries = Object.entries(grouped).sort((a, b) => {
+                  const ai = categoryOrder.indexOf(a[0]);
+                  const bi = categoryOrder.indexOf(b[0]);
+                  return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                });
+                return (
+                  <div className="space-y-6">
+                    {entries.map(([category, crawlers]) => {
+                      const blocked = crawlers.filter((c) => c.status === "blocked").length;
+                      return (
+                        <div key={category}>
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-sm font-semibold">
+                              {category}{" "}
+                              <span className="text-muted-foreground font-normal">
+                                ({crawlers.length} bot{crawlers.length === 1 ? "" : "s"})
+                              </span>
+                            </h3>
+                            {blocked > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="border-red-500/30 text-red-600 dark:text-red-400"
+                              >
+                                {blocked} blocked
+                              </Badge>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
+                          <Accordion type="multiple" className="w-full">
+                            {crawlers.map((crawler, index) => (
+                              <AccordionItem
+                                key={`${category}-${index}`}
+                                value={`${category}-${index}`}
+                              >
+                                <AccordionTrigger className="hover:no-underline">
+                                  <div className="flex items-center gap-3 w-full">
+                                    {getStatusIcon(crawler.status)}
+                                    <span className="font-medium">{crawler.platform}</span>
+                                    <span className="text-muted-foreground text-sm">
+                                      ({crawler.agent})
+                                    </span>
+                                    <div className="ml-auto mr-4">
+                                      {getStatusBadge(crawler.status)}
+                                    </div>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="pl-8 space-y-3">
+                                    <p className="text-sm text-muted-foreground">
+                                      {crawler.description}
+                                    </p>
+                                    <div className="p-3 bg-muted rounded-lg">
+                                      <p className="text-sm">
+                                        <strong>Status:</strong> {crawler.reason}
+                                      </p>
+                                    </div>
+                                    {crawler.recommendation && (
+                                      <div className="p-3 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                                        <p className="text-sm font-medium mb-2">Recommendation:</p>
+                                        <pre className="text-sm font-mono whitespace-pre-wrap">
+                                          {crawler.recommendation}
+                                        </pre>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="mt-2"
+                                          onClick={() => copyToClipboard(crawler.recommendation!)}
+                                        >
+                                          <Copy className="h-4 w-4 mr-1" />
+                                          Copy robots.txt Rule
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            ))}
+                          </Accordion>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
@@ -370,9 +474,9 @@ export default function CrawlerCheck() {
                   <pre className="p-4 bg-muted rounded-lg text-sm font-mono overflow-x-auto max-h-96 overflow-y-auto">
                     {checkResult.rawRobotsTxt}
                   </pre>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="absolute top-2 right-2"
                     onClick={() => copyToClipboard(checkResult.rawRobotsTxt!)}
                   >

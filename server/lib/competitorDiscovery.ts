@@ -1,7 +1,10 @@
 import OpenAI from "openai";
+import { z } from "zod";
 import { storage } from "../storage";
 import { attachAiLogger } from "./aiLogger";
 import { MODELS } from "./modelConfig";
+import { parseLLMJson, LLMParseError } from "./llmParse";
+import { logger } from "./logger";
 import type { Brand } from "@shared/schema";
 
 const openai = new OpenAI({
@@ -14,87 +17,194 @@ attachAiLogger(openai);
 const RAW_DELIM = "||| RAW_RESPONSE |||";
 const MAX_CITATION_SCAN = 50; // how many recent cited responses to mine
 
-function safeParseJson<T = any>(raw: string | null | undefined): T | null {
-  if (!raw) return null;
-  const stripped = raw.replace(/```json\s*|\s*```/g, "").trim();
-  const match = stripped.match(/[\[{][\s\S]*[\]}]/);
-  const candidate = match ? match[0] : stripped;
-  try { return JSON.parse(candidate) as T; } catch { return null; }
-}
+const discoveredCompetitorSchema = z.object({
+  name: z.string().min(2).max(120),
+  domain: z.string().max(255).optional().default(""),
+  reason: z.string().max(500).optional(),
+});
+const competitorListSchema = z.object({
+  competitors: z.array(discoveredCompetitorSchema).max(20),
+});
 
-interface DiscoveredCompetitor {
-  name: string;
-  domain: string;
-  reason?: string;
+type DiscoveredCompetitor = z.infer<typeof discoveredCompetitorSchema> & {
   source: "ai" | "citation_mining";
+};
+
+function normalizeDomain(raw: string | null | undefined): string {
+  if (!raw) return "";
+  return raw
+    .toLowerCase()
+    .trim()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .split("/")[0];
 }
 
 /**
  * Discover competitors for a brand from two sources:
  *   1. OpenAI inference from the brand profile (cheap baseline)
  *   2. Citation-context mining — extract brand names that AI engines mention
- *      alongside the user's brand in real citation results, then have an LLM
- *      judge filter out generic terms
+ *      alongside the user's brand in real citation results
  *
- * Dedupes against existing `competitors` rows (case-insensitive name + domain).
- * Returns the count of rows actually inserted. Idempotent — safe to re-run.
+ * Dedup is handled at the DB level via the unique index on
+ * (brand_id, lower(name), lower(coalesce(domain,''))) — createCompetitor
+ * upserts, so there's no race window between parallel callers. Ignored /
+ * soft-deleted rows stay tombstoned (lastSeenAt bumps, no revive).
+ *
+ * Returns the number of rows touched (inserts + revives + last_seen bumps).
  */
 export async function discoverCompetitors(brandId: string): Promise<number> {
   const brand = await storage.getBrandById(brandId);
-  if (!brand) throw new Error("Brand not found");
+  if (!brand) {
+    logger.warn({ brandId }, "competitorDiscovery: brand not found — skipping");
+    return 0;
+  }
+  if ((brand as any).deletedAt) {
+    logger.info({ brandId }, "competitorDiscovery: brand is soft-deleted — skipping");
+    return 0;
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    logger.warn({ brandId }, "competitorDiscovery: OPENAI_API_KEY missing — skipping");
+    return 0;
+  }
 
-  const existing = await storage.getCompetitors(brandId);
-  const existingLowerNames = new Set(existing.map((c) => c.name.toLowerCase()));
-  const existingDomains = new Set(
-    existing
-      .map((c) => (c.domain || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0])
-      .filter(Boolean),
+  // Only used to skip LLM calls that'd just produce ignored rows. DB
+  // uniqueness still enforces correctness regardless.
+  const existing = await storage.getCompetitors(brandId, { includeDeleted: true });
+  const ignoredNameKeys = new Set(
+    existing.filter((c) => (c as any).isIgnored === 1).map((c) => c.name.toLowerCase().trim()),
   );
 
   const candidates: DiscoveredCompetitor[] = [];
 
-  // Source 1 — AI inference from brand profile.
   try {
     const aiCompetitors = await inferCompetitorsFromProfile(brand);
     candidates.push(...aiCompetitors.map((c) => ({ ...c, source: "ai" as const })));
   } catch (err) {
-    console.warn(`[competitorDiscovery] AI inference failed:`, err instanceof Error ? err.message : err);
+    logger.warn({ err, brandId }, "competitorDiscovery: AI inference failed");
   }
 
-  // Source 2 — citation context mining.
   try {
     const mined = await mineCompetitorsFromCitations(brand);
     candidates.push(...mined.map((c) => ({ ...c, source: "citation_mining" as const })));
   } catch (err) {
-    console.warn(`[competitorDiscovery] citation mining failed:`, err instanceof Error ? err.message : err);
+    logger.warn({ err, brandId }, "competitorDiscovery: citation mining failed");
   }
 
-  let inserted = 0;
+  let touched = 0;
   const seenInBatch = new Set<string>();
   for (const cand of candidates) {
     const nameKey = cand.name.toLowerCase().trim();
-    const domainKey = (cand.domain || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
     if (!nameKey || nameKey.length < 2) continue;
-    if (existingLowerNames.has(nameKey) || (domainKey && existingDomains.has(domainKey))) continue;
     if (seenInBatch.has(nameKey)) continue;
     seenInBatch.add(nameKey);
+    if (ignoredNameKeys.has(nameKey)) continue;
 
     try {
       await storage.createCompetitor({
         brandId,
         name: cand.name.slice(0, 120),
-        domain: domainKey || cand.domain || "",
+        domain: normalizeDomain(cand.domain) || cand.domain || "",
         industry: brand.industry || null,
-        description: cand.reason ? `[auto-discovered] ${cand.reason}`.slice(0, 500) : "[auto-discovered]",
+        description: cand.reason
+          ? `[auto-discovered] ${cand.reason}`.slice(0, 500)
+          : "[auto-discovered]",
         discoveredBy: cand.source,
       } as any);
-      inserted += 1;
+      touched += 1;
     } catch (err) {
-      console.warn(`[competitorDiscovery] insert failed for "${cand.name}":`, err instanceof Error ? err.message : err);
+      logger.warn({ err, brandId, name: cand.name }, "competitorDiscovery: upsert failed");
     }
   }
 
-  console.log(`[competitorDiscovery] brand=${brandId} candidates=${candidates.length} inserted=${inserted}`);
+  logger.info({ brandId, candidates: candidates.length, touched }, "competitorDiscovery: done");
+  return touched;
+}
+
+/**
+ * Single-response auto-discovery. Called from the citation run once per
+ * (runId, platform): scans the response for companies that AREN'T already
+ * in the brand's competitor list, validates them as real competitors, and
+ * upserts the survivors with discoveredBy='citation_auto'.
+ *
+ * Return value = number of NEW rows inserted (upsert returns touched > 0
+ * includes re-seen, which isn't what we want to report).
+ */
+export async function discoverCompetitorsFromResponse(params: {
+  brandId: string;
+  brand: Brand;
+  responseText: string;
+  existingCompetitorNames: string[];
+}): Promise<number> {
+  const { brandId, brand, responseText, existingCompetitorNames } = params;
+  if (!process.env.OPENAI_API_KEY) return 0;
+  if (!responseText || responseText.length < 80) return 0;
+
+  const existingLower = new Set(existingCompetitorNames.map((n) => n.toLowerCase().trim()));
+
+  const snippet = responseText.slice(0, 6000);
+  let parsed;
+  try {
+    const completion = await openai.chat.completions.create({
+      model: MODELS.misc,
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      max_tokens: 400,
+      messages: [
+        {
+          role: "system",
+          content: `You extract REAL competitor companies from one AI-generated response that mentions a target brand. Rules:
+- Only return real, currently-operating companies (no fictional, no defunct, no publishers/media outlets).
+- Exclude the target brand itself.
+- Exclude generic category terms ("CRM software", "PR agency", "retailers").
+- Return at most 6 competitors.
+- For each, provide name and primary domain if derivable.
+Return JSON: {"competitors": [{"name": "...", "domain": "example.com"}]}`,
+        },
+        {
+          role: "user",
+          content: `Target brand: ${brand.name} (${brand.industry})
+${brand.description ? `Description: ${brand.description}\n` : ""}
+Response to mine:
+${snippet}`,
+        },
+      ],
+    });
+    parsed = parseLLMJson(completion.choices[0]?.message?.content, competitorListSchema);
+  } catch (err) {
+    if (err instanceof LLMParseError) {
+      logger.warn(
+        { err: err.message, raw: err.raw.slice(0, 200), brandId },
+        "competitorDiscovery: response-mining JSON malformed",
+      );
+      return 0;
+    }
+    throw err;
+  }
+
+  let inserted = 0;
+  for (const cand of parsed.competitors) {
+    const nameKey = cand.name.toLowerCase().trim();
+    if (!nameKey || nameKey.length < 2) continue;
+    if (existingLower.has(nameKey)) continue;
+    existingLower.add(nameKey); // prevent within-batch dupes
+    try {
+      await storage.createCompetitor({
+        brandId,
+        name: cand.name.slice(0, 120),
+        domain: normalizeDomain(cand.domain) || cand.domain || "",
+        industry: brand.industry || null,
+        description: "[auto-discovered from citation run]",
+        discoveredBy: "citation_auto",
+      } as any);
+      inserted += 1;
+    } catch (err) {
+      logger.warn(
+        { err, brandId, name: cand.name },
+        "competitorDiscovery: response-mining upsert failed",
+      );
+    }
+  }
   return inserted;
 }
 
@@ -127,11 +237,24 @@ Website: ${brand.website || "N/A"}`,
     ],
   });
 
-  const parsed = safeParseJson<{ competitors?: DiscoveredCompetitor[] }>(completion.choices[0]?.message?.content);
-  if (!parsed || !Array.isArray(parsed.competitors)) return [];
-  return parsed.competitors
-    .filter((c) => c && typeof c.name === "string" && typeof c.domain === "string")
-    .slice(0, 10);
+  try {
+    const parsed = parseLLMJson(completion.choices[0]?.message?.content, competitorListSchema);
+    return parsed.competitors.map((c) => ({
+      name: c.name,
+      domain: c.domain ?? "",
+      reason: c.reason,
+      source: "ai" as const,
+    }));
+  } catch (err) {
+    if (err instanceof LLMParseError) {
+      logger.warn(
+        { err: err.message, raw: err.raw.slice(0, 300), brandId: brand.id },
+        "competitorDiscovery: AI inference JSON malformed",
+      );
+      return [];
+    }
+    throw err;
+  }
 }
 
 async function mineCompetitorsFromCitations(brand: Brand): Promise<DiscoveredCompetitor[]> {
@@ -186,10 +309,22 @@ ${responseBlob}`,
     ],
   });
 
-  const parsed = safeParseJson<{ competitors?: DiscoveredCompetitor[] }>(completion.choices[0]?.message?.content);
-  if (!parsed || !Array.isArray(parsed.competitors)) return [];
-  return parsed.competitors
-    .filter((c) => c && typeof c.name === "string")
-    .map((c) => ({ name: c.name, domain: c.domain || "", reason: c.reason, source: "citation_mining" as const }))
-    .slice(0, 10);
+  try {
+    const parsed = parseLLMJson(completion.choices[0]?.message?.content, competitorListSchema);
+    return parsed.competitors.map((c) => ({
+      name: c.name,
+      domain: c.domain ?? "",
+      reason: c.reason,
+      source: "citation_mining" as const,
+    }));
+  } catch (err) {
+    if (err instanceof LLMParseError) {
+      logger.warn(
+        { err: err.message, raw: err.raw.slice(0, 300), brandId: brand.id },
+        "competitorDiscovery: citation-mining JSON malformed",
+      );
+      return [];
+    }
+    throw err;
+  }
 }

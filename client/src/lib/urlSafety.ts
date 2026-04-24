@@ -26,10 +26,7 @@ export function normalizeWebsite(raw: string): string | null {
 }
 
 // Stripe redirects: only Checkout + Billing Portal domains.
-const STRIPE_ALLOWED_HOSTS = new Set([
-  "checkout.stripe.com",
-  "billing.stripe.com",
-]);
+const STRIPE_ALLOWED_HOSTS = new Set(["checkout.stripe.com", "billing.stripe.com"]);
 
 export function isAllowedStripeRedirect(raw: string): boolean {
   const url = parseSafeUrl(raw);

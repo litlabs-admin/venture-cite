@@ -1,4 +1,10 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 
 interface BrandSelectorProps {
@@ -43,7 +49,9 @@ export default function BrandSelector({
       <SelectContent>
         {brands.map((brand) => (
           <SelectItem key={brand.id} value={brand.id} data-testid={`select-brand-${brand.id}`}>
-            {showIndustry ? `${brand.name}${brand.industry ? ` — ${brand.industry}` : ""}` : brand.name}
+            {showIndustry
+              ? `${brand.name}${brand.industry ? ` — ${brand.industry}` : ""}`
+              : brand.name}
           </SelectItem>
         ))}
       </SelectContent>

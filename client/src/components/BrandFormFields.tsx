@@ -1,7 +1,20 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
 // `form` is the react-hook-form instance. Typed as `any` on purpose so this
 // component stays decoupled from brands.tsx's z.infer'd FormValues — the
@@ -40,7 +53,11 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
             <FormItem>
               <FormLabel>Company Name *</FormLabel>
               <FormControl>
-                <Input placeholder="Acme Corporation" {...field} data-testid={testid("company-name")} />
+                <Input
+                  placeholder="Acme Corporation"
+                  {...field}
+                  data-testid={testid("company-name")}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -69,7 +86,11 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
             <FormItem>
               <FormLabel>Website</FormLabel>
               <FormControl>
-                <Input placeholder="www.yourcompany.com" {...field} data-testid={testid("website")} />
+                <Input
+                  placeholder="www.yourcompany.com"
+                  {...field}
+                  data-testid={testid("website")}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -84,7 +105,11 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
           <FormItem>
             <FormLabel>Brand Description</FormLabel>
             <FormControl>
-              <Textarea placeholder="Brief description of your brand..." {...field} data-testid={testid("description")} />
+              <Textarea
+                placeholder="Brief description of your brand..."
+                {...field}
+                data-testid={testid("description")}
+              />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -124,7 +149,11 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
             <FormItem>
               <FormLabel>Target Audience</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., B2B SaaS companies" {...field} data-testid={testid("target-audience")} />
+                <Input
+                  placeholder="e.g., B2B SaaS companies"
+                  {...field}
+                  data-testid={testid("target-audience")}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -139,9 +168,15 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
           <FormItem>
             <FormLabel>Products/Services</FormLabel>
             <FormControl>
-              <Input placeholder="Comma-separated (e.g., Product A, Service B)" {...field} data-testid={testid("products")} />
+              <Input
+                placeholder="Comma-separated (e.g., Product A, Service B)"
+                {...field}
+                data-testid={testid("products")}
+              />
             </FormControl>
-            <FormDescription>List your main products or services, separated by commas</FormDescription>
+            <FormDescription>
+              List your main products or services, separated by commas
+            </FormDescription>
             <FormMessage />
           </FormItem>
         )}
@@ -154,7 +189,11 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
           <FormItem>
             <FormLabel>Key Values</FormLabel>
             <FormControl>
-              <Input placeholder="Comma-separated (e.g., Innovation, Trust)" {...field} data-testid={testid("key-values")} />
+              <Input
+                placeholder="Comma-separated (e.g., Innovation, Trust)"
+                {...field}
+                data-testid={testid("key-values")}
+              />
             </FormControl>
             <FormDescription>Core values that define your brand</FormDescription>
             <FormMessage />
@@ -169,7 +208,11 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
           <FormItem>
             <FormLabel>Unique Selling Points</FormLabel>
             <FormControl>
-              <Input placeholder="Comma-separated (e.g., AI-powered, 24/7 support)" {...field} data-testid={testid("usp")} />
+              <Input
+                placeholder="Comma-separated (e.g., AI-powered, 24/7 support)"
+                {...field}
+                data-testid={testid("usp")}
+              />
             </FormControl>
             <FormDescription>What makes your brand unique</FormDescription>
             <FormMessage />
@@ -184,7 +227,11 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
           <FormItem>
             <FormLabel>Brand Voice Guidelines</FormLabel>
             <FormControl>
-              <Textarea placeholder="Describe your brand's voice and communication style..." {...field} data-testid={testid("brand-voice")} />
+              <Textarea
+                placeholder="Describe your brand's voice and communication style..."
+                {...field}
+                data-testid={testid("brand-voice")}
+              />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -198,9 +245,15 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
           <FormItem>
             <FormLabel>Sample Content</FormLabel>
             <FormControl>
-              <Textarea placeholder="Paste example content that represents your brand..." {...field} data-testid={testid("sample-content")} />
+              <Textarea
+                placeholder="Paste example content that represents your brand..."
+                {...field}
+                data-testid={testid("sample-content")}
+              />
             </FormControl>
-            <FormDescription>Sample text that represents your brand's writing style</FormDescription>
+            <FormDescription>
+              Sample text that represents your brand's writing style
+            </FormDescription>
             <FormMessage />
           </FormItem>
         )}
@@ -213,10 +266,17 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
           <FormItem>
             <FormLabel>Name Variations (for GEO Tracking)</FormLabel>
             <FormControl>
-              <Input placeholder="e.g. Facebook, FB, the blue app" {...field} data-testid={testid("name-variations")} />
+              <Input
+                placeholder="e.g. Facebook, FB, the blue app"
+                {...field}
+                data-testid={testid("name-variations")}
+              />
             </FormControl>
             <FormDescription>
-              Comma-separated list of extra ways your brand gets referenced — former names (Facebook → Meta), nicknames, common misspellings. Legal suffixes ("Inc.", "LLC"), acronyms of 3+ word company names, and your website domain are detected automatically; you don't need to list them here.
+              Comma-separated list of extra ways your brand gets referenced — former names (Facebook
+              → Meta), nicknames, common misspellings. Legal suffixes ("Inc.", "LLC"), acronyms of
+              3+ word company names, and your website domain are detected automatically; you don't
+              need to list them here.
             </FormDescription>
             <FormMessage />
           </FormItem>

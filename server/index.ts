@@ -1,10 +1,15 @@
 import "dotenv/config";
 import "./env";
+// Sentry must be imported before any module that throws or makes network
+// calls so its instrumentation is active for the whole process. No-op if
+// SENTRY_DSN isn't set.
+import { Sentry } from "./instrument";
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import fs from "fs/promises";
 import path from "path";
+import { v4 as uuidv4 } from "uuid";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -12,13 +17,25 @@ import { setupStripeProducts } from "./setupProducts";
 import { pool } from "./db";
 import { initScheduler } from "./scheduler";
 import { initContentGenerationWorker } from "./contentGenerationWorker";
+import { logger, requestContext, sanitizeLogBody } from "./lib/logger";
 
 const app = express();
+
+// Trust the first proxy hop (load balancer / Cloudflare / Render / etc.)
+// so `req.protocol` and `req.ip` reflect the original client. Required for
+// the HTTPS redirect below and for accurate rate-limiting keys.
+app.set("trust proxy", 1);
 
 // Security headers
 const supabaseUrl = process.env.SUPABASE_URL;
 const connectSrc = ["'self'", "api.stripe.com"];
 if (supabaseUrl) connectSrc.push(supabaseUrl);
+
+// Brand logos are mirrored into Supabase Storage at scrape time and served
+// via the bucket's public URL (<SUPABASE_URL>/storage/...), so img-src has
+// to allow the Supabase hostname.
+const imgSrc = ["'self'", "data:", "blob:"];
+if (supabaseUrl) imgSrc.push(supabaseUrl);
 
 // CSP: scriptSrc is strict ('self' + Stripe only — no 'unsafe-inline').
 // Vite's dev HMR uses inline <script type="module"> blocks, so in development
@@ -29,20 +46,49 @@ const scriptSrc = isProd
   ? ["'self'", "js.stripe.com"]
   : ["'self'", "'unsafe-inline'", "js.stripe.com"];
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc,
-      frameSrc: ["js.stripe.com"],
-      connectSrc,
-      imgSrc: ["'self'", "data:", "blob:"],
-      // styleSrc keeps 'unsafe-inline' because shadcn/ui + Tailwind JIT
-      // generate runtime-inlined styles that can't be hashed at build time.
-      styleSrc: ["'self'", "'unsafe-inline'"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc,
+        frameSrc: ["js.stripe.com"],
+        connectSrc,
+        imgSrc,
+        // styleSrc keeps 'unsafe-inline' because shadcn/ui + Tailwind JIT
+        // generate runtime-inlined styles that can't be hashed at build time.
+        // Google Fonts stylesheets are served from fonts.googleapis.com and
+        // font files from fonts.gstatic.com.
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+      },
     },
-  },
-}));
+    // HSTS: tell browsers to refuse HTTP for this origin for 1 year.
+    // includeSubDomains + preload enable submission to the HSTS preload
+    // list (https://hstspreload.org), which bakes the rule into the
+    // browser binary — no first-visit MITM window. Only active in prod;
+    // in dev we serve over HTTP so HSTS would lock you out of localhost.
+    hsts: isProd ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false,
+  }),
+);
+
+// HTTPS redirect: in production, any plain-HTTP request that wasn't
+// terminated as HTTPS upstream gets a 301 to its https:// equivalent.
+// Bearer tokens in cleartext over HTTP would be a session-takeover
+// vector, so we never serve real responses on HTTP in prod.
+//
+// `req.secure` already honors `X-Forwarded-Proto` because of the
+// `trust proxy` setting above. /health is exempt so load balancer
+// probes can stay on HTTP if needed.
+if (isProd) {
+  app.use((req, res, next) => {
+    if (req.secure) return next();
+    if (req.path === "/health") return next();
+    const host = req.headers.host;
+    if (!host) return res.status(400).send("Bad Request: missing Host header");
+    return res.redirect(301, `https://${host}${req.originalUrl}`);
+  });
+}
 
 // CORS — explicit allowlist only, deduped. APP_URL often points at
 // localhost in dev, so we dedupe against the built-in local entries.
@@ -54,127 +100,246 @@ const allowedOrigins = Array.from(
   ),
 );
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS: origin ${origin} not allowed`));
-    }
-  },
-  // Bearer tokens in Authorization header don't need credentialed CORS.
-  credentials: false,
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    // Bearer tokens in Authorization header don't need credentialed CORS.
+    credentials: false,
+  }),
+);
 
 // Stripe webhook — must be registered before express.json() to receive raw body
+app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const signature = req.headers["stripe-signature"];
+  if (!signature) {
+    return res.status(400).json({ error: "Missing stripe-signature" });
+  }
+
+  try {
+    const sig = Array.isArray(signature) ? signature[0] : signature;
+    if (!Buffer.isBuffer(req.body)) {
+      logger.error("Stripe webhook: req.body is not a Buffer");
+      return res.status(500).json({ error: "Webhook processing error" });
+    }
+    await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+    res.status(200).json({ received: true });
+  } catch (error: any) {
+    logger.error({ err: error }, "Stripe webhook error");
+    Sentry.captureException(error, { tags: { source: "stripe-webhook" } });
+    res.status(400).json({ error: "Webhook processing error" });
+  }
+});
+
+// Shopify webhook — also needs raw body for HMAC verification, so it
+// must be registered before express.json(). Lives here (not routes.ts)
+// for the same reason as the Stripe handler. Fail-closed if
+// SHOPIFY_WEBHOOK_SECRET is unset; idempotent on retries.
 app.post(
-  '/api/stripe/webhook',
-  express.raw({ type: 'application/json' }),
+  "/webhooks/shopify/orders",
+  express.raw({ type: ["application/json", "application/*+json"] }),
   async (req, res) => {
-    const signature = req.headers['stripe-signature'];
-    if (!signature) {
-      return res.status(400).json({ error: 'Missing stripe-signature' });
+    const hmacHeader = req.headers["x-shopify-hmac-sha256"];
+    const webhookId = req.headers["x-shopify-webhook-id"];
+    const topic = req.headers["x-shopify-topic"];
+    const shopDomain = req.headers["x-shopify-shop-domain"];
+
+    if (!hmacHeader || !webhookId || !topic) {
+      return res.status(400).json({ error: "Missing required Shopify headers" });
+    }
+    if (!Buffer.isBuffer(req.body)) {
+      logger.error("Shopify webhook: req.body is not a Buffer");
+      return res.status(500).json({ error: "Webhook processing error" });
+    }
+
+    const hmac = Array.isArray(hmacHeader) ? hmacHeader[0] : hmacHeader;
+    const wid = Array.isArray(webhookId) ? webhookId[0] : webhookId;
+    const tpc = Array.isArray(topic) ? topic[0] : topic;
+    const dom = Array.isArray(shopDomain) ? shopDomain[0] : shopDomain;
+
+    try {
+      const result = await WebhookHandlers.processShopifyOrder(req.body, {
+        hmac,
+        webhookId: wid,
+        topic: tpc,
+        shopDomain: dom,
+      });
+      if (!result.processed) {
+        if (result.reason === "invalid_signature" || result.reason === "missing_secret") {
+          // Don't echo the reason — that's information disclosure.
+          return res.status(401).json({ error: "Unauthorized" });
+        }
+        // duplicate — Shopify treats 200 as "stop retrying" which is what we want
+      }
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      logger.error({ err: error }, "Shopify webhook error");
+      Sentry.captureException(error, { tags: { source: "shopify-webhook" } });
+      res.status(500).json({ error: "Webhook processing error" });
+    }
+  },
+);
+
+// Resend webhook (Wave 3.6) — Svix-style signed payload, also needs raw
+// body for HMAC. Updates users.email_status when the recipient bounces
+// or marks our mail as spam, so the email service stops sending to them.
+app.post(
+  "/api/webhooks/resend",
+  express.raw({ type: ["application/json", "application/*+json"] }),
+  async (req, res) => {
+    const secret = process.env.RESEND_WEBHOOK_SECRET;
+    if (!secret) {
+      // Fail closed — without a secret every request is unauthenticated.
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const svixId = String(req.headers["svix-id"] ?? "");
+    const svixTimestamp = String(req.headers["svix-timestamp"] ?? "");
+    const svixSignature = String(req.headers["svix-signature"] ?? "");
+
+    if (!Buffer.isBuffer(req.body)) {
+      logger.error("Resend webhook: req.body is not a Buffer");
+      return res.status(500).json({ error: "Webhook processing error" });
+    }
+
+    const { verifyResendWebhook } = await import("./lib/resendWebhook");
+    const ok = verifyResendWebhook({
+      rawBody: req.body,
+      svixId,
+      svixTimestamp,
+      svixSignature,
+      secret,
+    });
+    if (!ok) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
-      const sig = Array.isArray(signature) ? signature[0] : signature;
-      if (!Buffer.isBuffer(req.body)) {
-        console.error('STRIPE WEBHOOK ERROR: req.body is not a Buffer');
-        return res.status(500).json({ error: 'Webhook processing error' });
+      const event = JSON.parse(req.body.toString("utf8")) as {
+        type?: string;
+        data?: { to?: string | string[]; email_id?: string };
+      };
+      const recipientList = Array.isArray(event.data?.to)
+        ? event.data?.to
+        : event.data?.to
+          ? [event.data.to]
+          : [];
+
+      // Map Resend event type → our email_status enum.
+      const statusByType: Record<string, "bounced" | "complained" | "active" | undefined> = {
+        "email.bounced": "bounced",
+        "email.complained": "complained",
+        "email.delivered": "active",
+      };
+      const newStatus = event.type ? statusByType[event.type] : undefined;
+      if (newStatus && recipientList.length > 0) {
+        const { db } = await import("./db");
+        const { users } = await import("@shared/schema");
+        const { inArray } = await import("drizzle-orm");
+        await db
+          .update(users)
+          .set({ emailStatus: newStatus })
+          .where(inArray(users.email, recipientList));
+        logger.info(
+          { type: event.type, recipients: recipientList.length, newStatus },
+          "resend webhook processed",
+        );
+      } else {
+        logger.info(
+          { type: event.type, recipients: recipientList.length },
+          "resend webhook: ignored (unhandled type)",
+        );
       }
-      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
       res.status(200).json({ received: true });
-    } catch (error: any) {
-      console.error('Webhook error:', error.message);
-      res.status(400).json({ error: 'Webhook processing error' });
+    } catch (err) {
+      logger.error({ err }, "Resend webhook handler error");
+      Sentry.captureException(err, { tags: { source: "resend-webhook" } });
+      res.status(500).json({ error: "Webhook processing error" });
     }
-  }
+  },
 );
 
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 
-// Request logging. We only log response bodies in development so production
-// logs can't accidentally capture Supabase tokens, password hashes, or
-// generated article content. Even in dev, `access_token`, `refresh_token`,
-// `password`, and similar fields are stripped before serialization.
-const SENSITIVE_KEYS = new Set([
-  "password",
-  "passwordHash",
-  "access_token",
-  "refresh_token",
-  "authorization",
-  "token",
-  "secret",
-  "apiKey",
-  "api_key",
-]);
-
-function sanitizeLogBody(value: unknown, depth = 0): unknown {
-  if (depth > 3) return "[truncated]";
-  if (value === null || value === undefined) return value;
-  if (typeof value === "string") {
-    return value.length > 200 ? value.slice(0, 197) + "…" : value;
-  }
-  if (typeof value !== "object") return value;
-  if (Array.isArray(value)) {
-    return value.slice(0, 10).map((v) => sanitizeLogBody(v, depth + 1));
-  }
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    if (SENSITIVE_KEYS.has(k)) {
-      out[k] = "[redacted]";
-    } else {
-      out[k] = sanitizeLogBody(v, depth + 1);
-    }
-  }
-  return out;
-}
-
+// Request-ID + structured-logging middleware.
+//
+// Every incoming request gets a UUID (or honors an upstream `x-request-id`
+// header for trace propagation through proxies). The ID is echoed back on
+// the response and pushed into AsyncLocalStorage so any downstream log
+// line — controller, service, worker callback — automatically includes it.
+//
+// We keep the existing one-line summary log on `res.finish` for parity
+// with the previous output, but emit it via Pino so it has structured
+// fields and the request ID. In dev we still attach a sanitized response
+// preview to aid debugging; never in prod.
 app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  const isProd = process.env.NODE_ENV === "production";
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  const inboundId = (req.headers["x-request-id"] as string | undefined)?.trim();
+  const requestId = inboundId && inboundId.length > 0 ? inboundId : uuidv4();
+  res.setHeader("x-request-id", requestId);
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+  requestContext.run({ requestId }, () => {
+    const start = Date.now();
+    const reqPath = req.path;
+    const isProd = process.env.NODE_ENV === "production";
+    let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (!isProd && capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(sanitizeLogBody(capturedJsonResponse))}`;
+    const originalResJson = res.json;
+    res.json = function (bodyJson, ...args) {
+      capturedJsonResponse = bodyJson;
+      return originalResJson.apply(res, [bodyJson, ...args]);
+    };
+
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      if (!reqPath.startsWith("/api")) return;
+
+      const fields = {
+        method: req.method,
+        path: reqPath,
+        status: res.statusCode,
+        durationMs: duration,
+        ...(isProd
+          ? {}
+          : {
+              response: capturedJsonResponse ? sanitizeLogBody(capturedJsonResponse) : undefined,
+            }),
+      };
+
+      // Mirror the prior behavior: keep a short human-readable summary in
+      // the dev console using `log()` so existing visual scanning still
+      // works, while structured Pino entry goes to stdout for aggregation.
+      logger.info(fields, `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`);
+      if (!isProd) {
+        let summary = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
+        if (summary.length > 160) summary = summary.slice(0, 159) + "…";
+        log(summary);
       }
-      if (logLine.length > 160) {
-        logLine = logLine.slice(0, 159) + "…";
-      }
-      log(logLine);
-    }
+    });
+
+    next();
   });
-
-  next();
 });
 
 // Health check. Verifies both read and write capability — a read-only
 // replica or a revoked role would pass `SELECT 1` but fail real traffic.
 // Uses `schema_migrations` as a harmless write target: advisory-lock acquire
 // and release is a round-trip through the primary without touching data.
-app.get('/health', async (_req, res) => {
+app.get("/health", async (_req, res) => {
   try {
-    const { db } = await import('./db');
-    const { sql } = await import('drizzle-orm');
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
     await db.execute(sql`SELECT 1`);
     // Advisory lock round-trip — write path, zero data touched.
     await db.execute(sql`SELECT pg_advisory_lock(1)`);
     await db.execute(sql`SELECT pg_advisory_unlock(1)`);
-    res.json({ status: 'ok', db: true, timestamp: new Date().toISOString() });
+    res.json({ status: "ok", db: true, timestamp: new Date().toISOString() });
   } catch {
-    res.status(503).json({ status: 'error', db: false, timestamp: new Date().toISOString() });
+    res.status(503).json({ status: "error", db: false, timestamp: new Date().toISOString() });
   }
 });
 
@@ -241,9 +406,10 @@ async function applyMigrations() {
 
   // Initialise Stripe products on startup (idempotent — skips existing)
   if (process.env.STRIPE_SECRET_KEY) {
-    setupStripeProducts().catch((err) =>
-      console.error('Stripe product setup failed:', err)
-    );
+    setupStripeProducts().catch((err) => {
+      logger.error({ err }, "Stripe product setup failed");
+      Sentry.captureException(err, { tags: { source: "stripe-setup" } });
+    });
   }
 
   const server = await registerRoutes(app);
@@ -254,17 +420,33 @@ async function applyMigrations() {
   // Background content generation worker (polls content_generation_jobs)
   await initContentGenerationWorker();
 
+  // Resume any onboarding auto-pilot runs that were in-flight when the
+  // process last stopped.
+  const { resumeInFlightAutopilots } = await import("./lib/onboardingAutopilot");
+  void resumeInFlightAutopilots();
+
   // Global error handler — in production, never leak internal error messages
   // to the client. Always log the full error server-side; return a generic
   // message unless the thrown error explicitly opted in via .expose = true.
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  // 5xx errors are reported to Sentry; 4xx are expected client mistakes and
+  // skipped to avoid noise.
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    console.error('[error]', err);
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = process.env.NODE_ENV === "production";
     const safeToExpose = err.expose === true || (status >= 400 && status < 500);
-    const message = (!isProd || safeToExpose)
-      ? (err.message || 'Internal Server Error')
-      : 'Internal Server Error';
+    const message =
+      !isProd || safeToExpose ? err.message || "Internal Server Error" : "Internal Server Error";
+
+    logger.error(
+      { err, status, method: req.method, path: req.path },
+      `request failed: ${req.method} ${req.path}`,
+    );
+    if (status >= 500) {
+      Sentry.captureException(err, {
+        tags: { source: "global-error-handler", path: req.path, method: req.method },
+      });
+    }
+
     res.status(status).json({ success: false, error: message });
   });
 
@@ -274,7 +456,7 @@ async function applyMigrations() {
     serveStatic(app);
   }
 
-  const port = parseInt(process.env.PORT || '5000', 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
   });
@@ -288,20 +470,22 @@ async function applyMigrations() {
     shuttingDown = true;
     log(`${signal} received — shutting down`);
     const forceExit = setTimeout(() => {
-      log('Forced exit after 10s grace period');
+      log("Forced exit after 10s grace period");
       process.exit(1);
     }, 10_000);
     forceExit.unref();
     server.close(async (err) => {
-      if (err) console.error('server.close error:', err);
+      if (err) logger.error({ err }, "server.close error");
       try {
         await pool.end();
       } catch (e) {
-        console.error('pool.end error:', e);
+        logger.error({ err: e }, "pool.end error");
       }
+      // Best-effort flush so in-flight Sentry events make it out before exit.
+      await Sentry.close(2_000).catch(() => {});
       process.exit(err ? 1 : 0);
     });
   }
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 })();

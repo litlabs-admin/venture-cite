@@ -3,11 +3,19 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
+import { Helmet } from "react-helmet-async";
 
 export default function ForgotPassword() {
   const { toast } = useToast();
@@ -23,7 +31,9 @@ export default function ForgotPassword() {
         body: JSON.stringify({ email }),
       });
       let result: any = {};
-      try { result = await response.json(); } catch {}
+      try {
+        result = await response.json();
+      } catch {}
       if (!response.ok || !result.success) {
         throw new Error(result.error || `Request failed (${response.status})`);
       }
@@ -56,7 +66,8 @@ export default function ForgotPassword() {
             </div>
             <CardTitle className="text-2xl font-bold text-slate-900">Check your email</CardTitle>
             <CardDescription className="mt-2">
-              If an account exists for <span className="font-medium">{email}</span>, you'll receive a password reset link shortly.
+              If an account exists for <span className="font-medium">{email}</span>, you'll receive
+              a password reset link shortly.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
@@ -79,7 +90,10 @@ export default function ForgotPassword() {
             </Button>
           </CardContent>
           <CardFooter className="justify-center">
-            <a href="/login" className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1">
+            <a
+              href="/login"
+              className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
+            >
               <ArrowLeft className="h-4 w-4" /> Back to sign in
             </a>
           </CardFooter>
@@ -90,6 +104,10 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+      <Helmet>
+        <title>Reset Password - VentureCite</title>
+        <meta name="robots" content="noindex" />
+      </Helmet>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -136,7 +154,10 @@ export default function ForgotPassword() {
           </form>
         </CardContent>
         <CardFooter className="justify-center">
-          <a href="/login" className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1">
+          <a
+            href="/login"
+            className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
+          >
             <ArrowLeft className="h-4 w-4" /> Back to sign in
           </a>
         </CardFooter>

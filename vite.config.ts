@@ -11,10 +11,7 @@ export default defineConfig({
         // Strip data-testid attributes from production bundles. They're
         // useful for tests but pure bloat in the shipped JS.
         plugins: isProd
-          ? [[
-              "babel-plugin-jsx-remove-data-test-id",
-              { attributes: ["data-testid"] },
-            ]]
+          ? [["babel-plugin-jsx-remove-data-test-id", { attributes: ["data-testid"] }]]
           : [],
       },
     }),

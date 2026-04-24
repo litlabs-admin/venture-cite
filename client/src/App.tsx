@@ -1,11 +1,11 @@
 import { lazy, Suspense, type ComponentType } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import GuidedOnboarding from "@/components/GuidedOnboarding";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/use-auth";
 import AppLayout from "@/components/AppLayout";
@@ -30,24 +30,20 @@ const AIVisibility = lazy(() => import("@/pages/ai-visibility"));
 const Pricing = lazy(() => import("@/pages/pricing"));
 
 // Phase 2 feature pages
-const GeoRankings = lazy(() => import("@/pages/geo-rankings"));
-const RevenueAnalytics = lazy(() => import("@/pages/revenue-analytics"));
-const PublicationIntelligence = lazy(() => import("@/pages/publication-intelligence"));
 const Competitors = lazy(() => import("@/pages/competitors"));
 const CrawlerCheck = lazy(() => import("@/pages/crawler-check"));
 const GeoOpportunities = lazy(() => import("@/pages/geo-opportunities"));
 const GeoAnalytics = lazy(() => import("@/pages/geo-analytics"));
 const GeoTools = lazy(() => import("@/pages/geo-tools"));
 const AiIntelligence = lazy(() => import("@/pages/ai-intelligence"));
-const AgentDashboard = lazy(() => import("@/pages/agent-dashboard"));
-const Outreach = lazy(() => import("@/pages/outreach"));
-const AiTraffic = lazy(() => import("@/pages/ai-traffic"));
-const AnalyticsIntegrations = lazy(() => import("@/pages/analytics-integrations"));
 const GeoSignals = lazy(() => import("@/pages/geo-signals"));
 const FaqManager = lazy(() => import("@/pages/faq-manager"));
 const ClientReports = lazy(() => import("@/pages/client-reports"));
 const BrandFactSheet = lazy(() => import("@/pages/brand-fact-sheet"));
 const CommunityEngagement = lazy(() => import("@/pages/community-engagement"));
+const Settings = lazy(() => import("@/pages/settings"));
+const Privacy = lazy(() => import("@/pages/privacy"));
+const Welcome = lazy(() => import("@/pages/welcome"));
 
 function RouteSpinner() {
   return (
@@ -68,13 +64,10 @@ function HomePage() {
     );
   }
 
-  return isAuthenticated ? (
-    <AppLayout>
-      <ErrorBoundary>
-        <Home />
-      </ErrorBoundary>
-    </AppLayout>
-  ) : <Landing />;
+  // Authenticated users land here post-signup (register.tsx → setLocation("/")).
+  // Route through FirstRunGate so brand-less users get redirected to /welcome
+  // before the dashboard renders.
+  return isAuthenticated ? <FirstRunGate component={Home} /> : <Landing />;
 }
 
 function AuthenticatedRoute({ component: Component }: { component: ComponentType }) {
@@ -104,6 +97,69 @@ function AuthenticatedRoute({ component: Component }: { component: ComponentType
   );
 }
 
+function AuthenticatedBareRoute({ component: Component }: { component: ComponentType }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = "/login";
+    return null;
+  }
+
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<RouteSpinner />}>
+        <Component />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+function FirstRunGate({ component: Component }: { component: ComponentType }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  // The /api/brands response is { success: true, data: Brand[] }.
+  // Unwrap it so the redirect check below sees the array, not the envelope.
+  const brandsQuery = useQuery<{ success: boolean; data: unknown[] }>({
+    queryKey: ["/api/brands"],
+    enabled: isAuthenticated,
+  });
+
+  if (isLoading || (isAuthenticated && brandsQuery.isLoading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = "/login";
+    return null;
+  }
+
+  const brands = brandsQuery.data?.data;
+  if (Array.isArray(brands) && brands.length === 0) {
+    return <Redirect to="/welcome" />;
+  }
+
+  return (
+    <AppLayout>
+      <ErrorBoundary>
+        <Suspense fallback={<RouteSpinner />}>
+          <Component />
+        </Suspense>
+      </ErrorBoundary>
+    </AppLayout>
+  );
+}
+
 function Router() {
   return (
     <Switch>
@@ -112,7 +168,8 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/dashboard">{() => <AuthenticatedRoute component={Home} />}</Route>
+      <Route path="/welcome">{() => <AuthenticatedBareRoute component={Welcome} />}</Route>
+      <Route path="/dashboard">{() => <FirstRunGate component={Home} />}</Route>
       <Route path="/content">{() => <AuthenticatedRoute component={Content} />}</Route>
       <Route path="/citations">{() => <AuthenticatedRoute component={Citations} />}</Route>
       <Route path="/articles">{() => <AuthenticatedRoute component={Articles} />}</Route>
@@ -125,27 +182,38 @@ function Router() {
       </Route>
       {/* Phase 1 core features */}
       <Route path="/brands">{() => <AuthenticatedRoute component={Brands} />}</Route>
-      <Route path="/keyword-research">{() => <AuthenticatedRoute component={KeywordResearch} />}</Route>
+      <Route path="/keyword-research">
+        {() => <AuthenticatedRoute component={KeywordResearch} />}
+      </Route>
       <Route path="/ai-visibility">{() => <AuthenticatedRoute component={AIVisibility} />}</Route>
       {/* Phase 2 — Feature pages */}
-      <Route path="/geo-rankings">{() => <AuthenticatedRoute component={GeoRankings} />}</Route>
-      <Route path="/revenue-analytics">{() => <AuthenticatedRoute component={RevenueAnalytics} />}</Route>
-      <Route path="/publications">{() => <AuthenticatedRoute component={PublicationIntelligence} />}</Route>
       <Route path="/competitors">{() => <AuthenticatedRoute component={Competitors} />}</Route>
       <Route path="/crawler-check">{() => <AuthenticatedRoute component={CrawlerCheck} />}</Route>
-      <Route path="/opportunities">{() => <AuthenticatedRoute component={GeoOpportunities} />}</Route>
+      <Route path="/opportunities">
+        {() => <AuthenticatedRoute component={GeoOpportunities} />}
+      </Route>
       <Route path="/geo-analytics">{() => <AuthenticatedRoute component={GeoAnalytics} />}</Route>
       <Route path="/geo-tools">{() => <AuthenticatedRoute component={GeoTools} />}</Route>
-      <Route path="/ai-intelligence">{() => <AuthenticatedRoute component={AiIntelligence} />}</Route>
-      <Route path="/agent">{() => <AuthenticatedRoute component={AgentDashboard} />}</Route>
-      <Route path="/outreach">{() => <AuthenticatedRoute component={Outreach} />}</Route>
-      <Route path="/ai-traffic">{() => <AuthenticatedRoute component={AiTraffic} />}</Route>
-      <Route path="/analytics-integrations">{() => <AuthenticatedRoute component={AnalyticsIntegrations} />}</Route>
+      <Route path="/ai-intelligence">
+        {() => <AuthenticatedRoute component={AiIntelligence} />}
+      </Route>
       <Route path="/geo-signals">{() => <AuthenticatedRoute component={GeoSignals} />}</Route>
       <Route path="/faq-manager">{() => <AuthenticatedRoute component={FaqManager} />}</Route>
       <Route path="/client-reports">{() => <AuthenticatedRoute component={ClientReports} />}</Route>
-      <Route path="/brand-fact-sheet">{() => <AuthenticatedRoute component={BrandFactSheet} />}</Route>
-      <Route path="/community">{() => <AuthenticatedRoute component={CommunityEngagement} />}</Route>
+      <Route path="/brand-fact-sheet">
+        {() => <AuthenticatedRoute component={BrandFactSheet} />}
+      </Route>
+      <Route path="/community">
+        {() => <AuthenticatedRoute component={CommunityEngagement} />}
+      </Route>
+      <Route path="/settings">{() => <AuthenticatedRoute component={Settings} />}</Route>
+      <Route path="/privacy">
+        {() => (
+          <Suspense fallback={<RouteSpinner />}>
+            <Privacy />
+          </Suspense>
+        )}
+      </Route>
       <Route path="/pricing">
         {() => (
           <Suspense fallback={<RouteSpinner />}>
@@ -165,7 +233,6 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <Toaster />
-            <GuidedOnboarding />
             <Router />
           </TooltipProvider>
         </QueryClientProvider>

@@ -13,7 +13,12 @@ export class OwnershipError extends Error {
   }
 }
 
-export function requireUser(req: Request): { id: string; isAdmin?: number; accessTier?: string; email?: string } {
+export function requireUser(req: Request): {
+  id: string;
+  isAdmin?: number;
+  accessTier?: string;
+  email?: string;
+} {
   const user = (req as any).user;
   if (!user) throw new OwnershipError(401, "Not authenticated");
   return user;
@@ -54,83 +59,158 @@ async function loadEntityThroughBrand(
   return row;
 }
 
-export async function requireArticle(id: string, userId: string): Promise<typeof schema.articles.$inferSelect> {
+export async function requireArticle(
+  id: string,
+  userId: string,
+): Promise<typeof schema.articles.$inferSelect> {
   return loadEntityThroughBrand(schema.articles, id, userId, "Article not found");
 }
 
-export async function requireCompetitor(id: string, userId: string): Promise<typeof schema.competitors.$inferSelect> {
+export async function requireCompetitor(
+  id: string,
+  userId: string,
+): Promise<typeof schema.competitors.$inferSelect> {
   return loadEntityThroughBrand(schema.competitors, id, userId, "Competitor not found");
 }
 
-export async function requireFaq(id: string, userId: string): Promise<typeof schema.faqItems.$inferSelect> {
+export async function requireFaq(
+  id: string,
+  userId: string,
+): Promise<typeof schema.faqItems.$inferSelect> {
   return loadEntityThroughBrand(schema.faqItems, id, userId, "FAQ not found");
 }
 
-export async function requireListicle(id: string, userId: string): Promise<typeof schema.listicles.$inferSelect> {
+export async function requireListicle(
+  id: string,
+  userId: string,
+): Promise<typeof schema.listicles.$inferSelect> {
   return loadEntityThroughBrand(schema.listicles, id, userId, "Listicle not found");
 }
 
-export async function requireBofuContent(id: string, userId: string): Promise<typeof schema.bofuContent.$inferSelect> {
+export async function requireBofuContent(
+  id: string,
+  userId: string,
+): Promise<typeof schema.bofuContent.$inferSelect> {
   return loadEntityThroughBrand(schema.bofuContent, id, userId, "BOFU content not found");
 }
 
-export async function requireHallucination(id: string, userId: string): Promise<typeof schema.brandHallucinations.$inferSelect> {
+export async function requireHallucination(
+  id: string,
+  userId: string,
+): Promise<typeof schema.brandHallucinations.$inferSelect> {
   return loadEntityThroughBrand(schema.brandHallucinations, id, userId, "Hallucination not found");
 }
 
-export async function requireBrandFact(id: string, userId: string): Promise<typeof schema.brandFactSheet.$inferSelect> {
+export async function requireBrandFact(
+  id: string,
+  userId: string,
+): Promise<typeof schema.brandFactSheet.$inferSelect> {
   return loadEntityThroughBrand(schema.brandFactSheet, id, userId, "Brand fact not found");
 }
 
-export async function requireBrandMention(id: string, userId: string): Promise<typeof schema.brandMentions.$inferSelect> {
+export async function requireBrandMention(
+  id: string,
+  userId: string,
+): Promise<typeof schema.brandMentions.$inferSelect> {
   return loadEntityThroughBrand(schema.brandMentions, id, userId, "Brand mention not found");
 }
 
-export async function requireAiSource(id: string, userId: string): Promise<typeof schema.aiSources.$inferSelect> {
+export async function requireAiSource(
+  id: string,
+  userId: string,
+): Promise<typeof schema.aiSources.$inferSelect> {
   return loadEntityThroughBrand(schema.aiSources, id, userId, "AI source not found");
 }
 
-export async function requirePromptTest(id: string, userId: string): Promise<typeof schema.promptTestRuns.$inferSelect> {
+export async function requirePromptTest(
+  id: string,
+  userId: string,
+): Promise<typeof schema.promptTestRuns.$inferSelect> {
   return loadEntityThroughBrand(schema.promptTestRuns, id, userId, "Prompt test not found");
 }
 
-export async function requireAgentTask(id: string, userId: string): Promise<typeof schema.agentTasks.$inferSelect> {
+export async function requireAgentTask(
+  id: string,
+  userId: string,
+): Promise<typeof schema.agentTasks.$inferSelect> {
   return loadEntityThroughBrand(schema.agentTasks, id, userId, "Agent task not found");
 }
 
-export async function requireOutreachCampaign(id: string, userId: string): Promise<typeof schema.outreachCampaigns.$inferSelect> {
-  return loadEntityThroughBrand(schema.outreachCampaigns, id, userId, "Outreach campaign not found");
+export async function requireOutreachCampaign(
+  id: string,
+  userId: string,
+): Promise<typeof schema.outreachCampaigns.$inferSelect> {
+  return loadEntityThroughBrand(
+    schema.outreachCampaigns,
+    id,
+    userId,
+    "Outreach campaign not found",
+  );
 }
 
-export async function requireAutomationRule(id: string, userId: string): Promise<typeof schema.automationRules.$inferSelect> {
+export async function requireAutomationRule(
+  id: string,
+  userId: string,
+): Promise<typeof schema.automationRules.$inferSelect> {
   return loadEntityThroughBrand(schema.automationRules, id, userId, "Automation rule not found");
 }
 
-export async function requirePublicationTarget(id: string, userId: string): Promise<typeof schema.publicationTargets.$inferSelect> {
-  return loadEntityThroughBrand(schema.publicationTargets, id, userId, "Publication target not found");
+export async function requirePublicationTarget(
+  id: string,
+  userId: string,
+): Promise<typeof schema.publicationTargets.$inferSelect> {
+  return loadEntityThroughBrand(
+    schema.publicationTargets,
+    id,
+    userId,
+    "Publication target not found",
+  );
 }
 
-export async function requireOutreachEmail(id: string, userId: string): Promise<typeof schema.outreachEmails.$inferSelect> {
+export async function requireOutreachEmail(
+  id: string,
+  userId: string,
+): Promise<typeof schema.outreachEmails.$inferSelect> {
   return loadEntityThroughBrand(schema.outreachEmails, id, userId, "Outreach email not found");
 }
 
-export async function requireCommunityPost(id: string, userId: string): Promise<typeof schema.communityPosts.$inferSelect> {
+export async function requireCommunityPost(
+  id: string,
+  userId: string,
+): Promise<typeof schema.communityPosts.$inferSelect> {
   return loadEntityThroughBrand(schema.communityPosts, id, userId, "Community post not found");
 }
 
-export async function requirePromptPortfolio(id: string, userId: string): Promise<typeof schema.promptPortfolio.$inferSelect> {
+export async function requirePromptPortfolio(
+  id: string,
+  userId: string,
+): Promise<typeof schema.promptPortfolio.$inferSelect> {
   return loadEntityThroughBrand(schema.promptPortfolio, id, userId, "Prompt not found");
 }
 
-export async function requireCitationQuality(id: string, userId: string): Promise<typeof schema.citationQuality.$inferSelect> {
-  return loadEntityThroughBrand(schema.citationQuality, id, userId, "Citation quality entry not found");
+export async function requireCitationQuality(
+  id: string,
+  userId: string,
+): Promise<typeof schema.citationQuality.$inferSelect> {
+  return loadEntityThroughBrand(
+    schema.citationQuality,
+    id,
+    userId,
+    "Citation quality entry not found",
+  );
 }
 
-export async function requireKeywordResearch(id: string, userId: string): Promise<typeof schema.keywordResearch.$inferSelect> {
+export async function requireKeywordResearch(
+  id: string,
+  userId: string,
+): Promise<typeof schema.keywordResearch.$inferSelect> {
   return loadEntityThroughBrand(schema.keywordResearch, id, userId, "Keyword research not found");
 }
 
-export async function requireAlertSetting(id: string, userId: string): Promise<typeof schema.alertSettings.$inferSelect> {
+export async function requireAlertSetting(
+  id: string,
+  userId: string,
+): Promise<typeof schema.alertSettings.$inferSelect> {
   return loadEntityThroughBrand(schema.alertSettings, id, userId, "Alert setting not found");
 }
 

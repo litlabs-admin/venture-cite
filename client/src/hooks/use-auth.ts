@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAccessToken, clearSession } from "@/lib/authStore";
+import { clearAllVentureCiteStorage } from "@/lib/clientStorage";
 
 interface User {
   id: string;
@@ -29,6 +30,10 @@ async function fetchUser(): Promise<User | null> {
 async function logoutUser(): Promise<void> {
   await clearSession();
   await fetch("/api/auth/logout", { method: "POST" });
+  // Clear VentureCite-owned localStorage keys so the next user on this
+  // browser can't inherit the previous user's onboarding flags, draft IDs,
+  // GA4 property IDs, etc. Supabase clears its own auth token via signOut.
+  clearAllVentureCiteStorage();
 }
 
 export function useAuth() {

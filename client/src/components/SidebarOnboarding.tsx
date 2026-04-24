@@ -35,7 +35,8 @@ const STEPS: OnboardingStep[] = [
   {
     id: "brand",
     title: "Create your first brand",
-    description: "Set up a brand profile so content can be personalized with your tone, values, and unique selling points.",
+    description:
+      "Set up a brand profile so content can be personalized with your tone, values, and unique selling points.",
     link: "/brands",
     linkText: "Create brand",
     icon: Building2,
@@ -44,7 +45,8 @@ const STEPS: OnboardingStep[] = [
   {
     id: "content",
     title: "Generate AI-optimized content",
-    description: "Use the AI content generator to create articles designed to be cited by AI search engines.",
+    description:
+      "Use the AI content generator to create articles designed to be cited by AI search engines.",
     link: "/content",
     linkText: "Create content",
     icon: PenLine,
@@ -53,7 +55,8 @@ const STEPS: OnboardingStep[] = [
   {
     id: "visibility",
     title: "View the AI Visibility Guide",
-    description: "Step-by-step recommendations to optimize your presence across ChatGPT, Claude, and other AI engines.",
+    description:
+      "Step-by-step recommendations to optimize your presence across ChatGPT, Claude, and other AI engines.",
     link: "/ai-visibility",
     linkText: "View guide",
     icon: ScanEye,
@@ -64,13 +67,15 @@ const STEPS: OnboardingStep[] = [
   {
     id: "citation",
     title: "Run your first citation check",
-    description: "Kick off an AI citation run so we can start tracking how often platforms mention your brand.",
+    description:
+      "Kick off an AI citation run so we can start tracking how often platforms mention your brand.",
     link: "/citations",
     linkText: "Run check",
     icon: Target,
     // Done the moment the user triggers their first run — no need to wait
     // for an actual cited result.
-    checkFn: (d) => (d?.citationRunsCount || 0) > 0 ||
+    checkFn: (d) =>
+      (d?.citationRunsCount || 0) > 0 ||
       (d?.citations?.length || 0) > 0 ||
       (d?.citedRankingsCount || 0) > 0,
   },
@@ -178,7 +183,9 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{completed} of {total} complete</span>
+                  <span className="text-muted-foreground">
+                    {completed} of {total} complete
+                  </span>
                   <span className="font-medium text-foreground">{Math.round(progress)}%</span>
                 </div>
                 <Progress value={progress} className="h-1.5" />
@@ -226,10 +233,14 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
                         </span>
                       )}
                     </div>
-                    <p className={`text-sm font-semibold mt-0.5 ${done ? "text-muted-foreground line-through" : "text-foreground"}`}>
+                    <p
+                      className={`text-sm font-semibold mt-0.5 ${done ? "text-muted-foreground line-through" : "text-foreground"}`}
+                    >
                       {step.title}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{step.description}</p>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {step.description}
+                    </p>
                     {!done && (
                       <Link href={step.link}>
                         <Button
@@ -270,9 +281,7 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
           </div>
 
           <div className="px-6 py-3 border-t border-border bg-muted/30 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Reopen this anytime from the sidebar.
-            </p>
+            <p className="text-xs text-muted-foreground">Reopen this anytime from the sidebar.</p>
             <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
               Close
             </Button>

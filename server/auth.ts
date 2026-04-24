@@ -1,8 +1,16 @@
 import type { Express, RequestHandler } from "express";
+import rateLimit from "express-rate-limit";
 import { supabaseAdmin } from "./supabase";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { Sentry } from "./instrument";
+import { logger, requestContext } from "./lib/logger";
+import { authRateKey } from "./lib/authRateKey";
+
+// Re-exported for callers that want to use the same keying scheme on
+// other endpoints (e.g. account-deletion in Wave 2).
+export { authRateKey };
 
 function publicUserShape(dbUser: typeof users.$inferSelect) {
   return {
@@ -32,7 +40,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const { data, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !data.user) {
     if (error && error.message && !/invalid jwt/i.test(error.message)) {
-      console.warn("[auth] JWT verify failed:", error.message);
+      logger.warn({ err: error }, "auth: JWT verify failed");
     }
     return res.status(401).json({ success: false, error: "Not authenticated" });
   }
@@ -42,7 +50,26 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ success: false, error: "Not authenticated" });
   }
 
+  // Account is in the post-delete grace window. Block all authenticated
+  // requests so the user can't keep operating while their data is queued
+  // for purge. The dedicated `account_deleted` error code lets the
+  // frontend show a recovery page instead of a generic auth-failure.
+  if (dbUser.deletedAt) {
+    return res.status(401).json({
+      success: false,
+      error: "Account scheduled for deletion. Contact support to restore.",
+      code: "account_deleted",
+    });
+  }
+
   (req as any).user = dbUser;
+
+  // Push the user ID into the per-request context so every subsequent log
+  // line and Sentry event in this request is automatically tagged.
+  const ctx = requestContext.getStore();
+  if (ctx) ctx.userId = dbUser.id;
+  Sentry.setUser({ id: dbUser.id });
+
   next();
 };
 
@@ -121,6 +148,16 @@ const PUBLIC_API_ROUTES = new Set<string>([
   "POST /api/auth/reset-password",
   "POST /api/waitlist",
   "POST /api/stripe/webhook",
+  // Resend bounce/complaint webhook — signed via Svix, registered in
+  // server/index.ts with raw body parser.
+  "POST /api/webhooks/resend",
+  // Unsubscribe is HMAC-token-authenticated (not session); mail clients
+  // POST here without any cookie/bearer per RFC 8058.
+  "POST /api/unsubscribe",
+  "GET /api/unsubscribe",
+  // Image proxy — loaded by <img> tags, which can't send bearer tokens.
+  // Endpoint itself is hardened (SSRF-safe, image-only responses).
+  "GET /api/logo-proxy",
 ]);
 
 export const requireAuthForApi: RequestHandler = (req, res, next) => {
@@ -160,8 +197,61 @@ export const attachUserIfPresent: RequestHandler = async (req, _res, next) => {
   next();
 };
 
+const RATE_LIMIT_MESSAGE = {
+  success: false,
+  error: "Too many attempts. Please wait a few minutes and try again.",
+};
+
+// Login: 10 attempts per (IP, email) per 15 minutes. Generous enough for
+// honest typo-prone users; costly enough that credential stuffing against
+// a single account is impractical.
+const loginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: authRateKey,
+  message: RATE_LIMIT_MESSAGE,
+});
+
+// Register: 5 per IP per hour. Slows mass-signup abuse without
+// blocking a busy office or hackathon.
+const registerRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ip:${req.ip ?? "unknown"}`,
+  message: RATE_LIMIT_MESSAGE,
+});
+
+// Forgot password: 3 per (IP, email) per hour. The endpoint always
+// returns the same response regardless of account existence (anti-
+// enumeration), but each successful trigger sends a real email — so
+// without a limit the endpoint is an inbox-bombing vector for any
+// attacker who can guess valid email addresses.
+const forgotPasswordRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: authRateKey,
+  message: RATE_LIMIT_MESSAGE,
+});
+
+// Reset password: defunct (returns 410) but still rate-limited as
+// belt-and-braces against probe traffic.
+const resetPasswordRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ip:${req.ip ?? "unknown"}`,
+  message: RATE_LIMIT_MESSAGE,
+});
+
 export function setupAuth(app: Express) {
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", registerRateLimit, async (req, res) => {
     try {
       const { email, password, firstName, lastName } = req.body ?? {};
 
@@ -169,7 +259,9 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ success: false, error: "Email and password are required" });
       }
       if (typeof password !== "string" || password.length < 8) {
-        return res.status(400).json({ success: false, error: "Password must be at least 8 characters" });
+        return res
+          .status(400)
+          .json({ success: false, error: "Password must be at least 8 characters" });
       }
 
       const normalizedEmail = String(email).toLowerCase().trim();
@@ -222,7 +314,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", loginRateLimit, async (req, res) => {
     try {
       const { email, password } = req.body ?? {};
       if (!email || !password) {
@@ -241,6 +333,17 @@ export function setupAuth(app: Express) {
       const dbUser = await loadPublicUser(data.user.id);
       if (!dbUser) {
         return res.status(401).json({ success: false, error: "User profile not found" });
+      }
+
+      // Refuse logins for accounts in the post-delete grace window.
+      // Returning a fresh session would let the user keep operating while
+      // their data is queued for purge.
+      if (dbUser.deletedAt) {
+        return res.status(401).json({
+          success: false,
+          error: "Account scheduled for deletion. Contact support to restore.",
+          code: "account_deleted",
+        });
       }
 
       res.json({
@@ -268,7 +371,7 @@ export function setupAuth(app: Express) {
     res.json({ success: true, user: publicUserShape(user) });
   });
 
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  app.post("/api/auth/forgot-password", forgotPasswordRateLimit, async (req, res) => {
     try {
       const { email } = req.body ?? {};
       if (!email) {
@@ -300,7 +403,7 @@ export function setupAuth(app: Express) {
   // link, Supabase places a session in the browser and the client calls
   // supabase.auth.updateUser({ password }). This endpoint remains for
   // backward compatibility with any code that POSTs to it directly.
-  app.post("/api/auth/reset-password", async (_req, res) => {
+  app.post("/api/auth/reset-password", resetPasswordRateLimit, async (_req, res) => {
     res.status(410).json({
       success: false,
       error: "Password reset is now handled in the browser via Supabase magic link.",

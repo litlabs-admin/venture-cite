@@ -1,10 +1,26 @@
 import { Link, useLocation } from "wouter";
 import {
-  Home, Building2, FileText, PenLine, Link2, Search, ScanEye,
-  CreditCard, LogOut, Settings,
-  TrendingUp, BarChart3, Brain, Lightbulb, Mail, Users,
-  Bot, DollarSign, BookOpen, Swords, Bug, Wrench,
-  Radio, Activity, Plug, HelpCircle, ClipboardList, Shield,
+  Home,
+  Building2,
+  FileText,
+  PenLine,
+  Link2,
+  Search,
+  ScanEye,
+  CreditCard,
+  LogOut,
+  Settings,
+  BarChart3,
+  Brain,
+  Lightbulb,
+  Users,
+  Swords,
+  Bug,
+  Wrench,
+  Radio,
+  HelpCircle,
+  ClipboardList,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -22,43 +38,36 @@ import SidebarOnboarding from "@/components/SidebarOnboarding";
 // ─── Nav definitions ─────────────────────────────────────────────────────────
 
 const NAV_MAIN = [
-  { href: "/dashboard",       label: "Dashboard",  icon: Home      },
-  { href: "/brands",          label: "Brands",     icon: Building2 },
-  { href: "/articles",        label: "Articles",   icon: FileText  },
+  { href: "/dashboard", label: "Dashboard", icon: Home },
+  { href: "/brands", label: "Brands", icon: Building2 },
+  { href: "/articles", label: "Articles", icon: FileText },
 ];
 
 const NAV_TOOLS = [
-  { href: "/content",          label: "Content",       icon: PenLine  },
-  { href: "/citations",        label: "Citations",     icon: Link2    },
-  { href: "/keyword-research", label: "Keywords",      icon: Search   },
-  { href: "/ai-visibility",    label: "AI Visibility", icon: ScanEye  },
+  { href: "/content", label: "Content", icon: PenLine },
+  { href: "/citations", label: "Citations", icon: Link2 },
+  { href: "/keyword-research", label: "Keywords", icon: Search },
+  { href: "/ai-visibility", label: "AI Visibility", icon: ScanEye },
 ];
 
 const NAV_ANALYTICS = [
-  { href: "/geo-rankings",      label: "GEO Rankings",  icon: TrendingUp  },
-  { href: "/geo-analytics",     label: "GEO Analytics", icon: BarChart3   },
-  { href: "/ai-intelligence",   label: "AI Intelligence", icon: Brain     },
-  { href: "/ai-traffic",        label: "AI Traffic",    icon: Activity    },
-  { href: "/client-reports",    label: "Reports",       icon: ClipboardList },
-  { href: "/revenue-analytics", label: "Revenue",       icon: DollarSign  },
+  { href: "/geo-analytics", label: "GEO Analytics", icon: BarChart3 },
+  { href: "/ai-intelligence", label: "AI Intelligence", icon: Brain },
+  { href: "/client-reports", label: "Reports", icon: ClipboardList },
 ];
 
 const NAV_GROWTH = [
-  { href: "/opportunities",          label: "Opportunities",  icon: Lightbulb },
-  { href: "/outreach",               label: "Outreach",       icon: Mail      },
-  { href: "/community",              label: "Community",      icon: Users     },
-  { href: "/competitors",            label: "Competitors",    icon: Swords    },
-  { href: "/publications",           label: "Publications",   icon: BookOpen  },
+  { href: "/opportunities", label: "Opportunities", icon: Lightbulb },
+  { href: "/community", label: "Community", icon: Users },
+  { href: "/competitors", label: "Competitors", icon: Swords },
 ];
 
 const NAV_OPTIMIZE = [
-  { href: "/geo-tools",              label: "GEO Tools",      icon: Wrench    },
-  { href: "/geo-signals",            label: "Signals",        icon: Radio     },
-  { href: "/crawler-check",          label: "Crawler Check",  icon: Bug       },
-  { href: "/faq-manager",            label: "FAQ Manager",    icon: HelpCircle },
-  { href: "/brand-fact-sheet",       label: "Fact Sheet",     icon: Shield    },
-  { href: "/analytics-integrations", label: "Integrations",   icon: Plug      },
-  { href: "/agent",                  label: "AI Agent",       icon: Bot       },
+  { href: "/geo-tools", label: "GEO Tools", icon: Wrench },
+  { href: "/geo-signals", label: "Signals", icon: Radio },
+  { href: "/crawler-check", label: "Crawler Check", icon: Bug },
+  { href: "/faq-manager", label: "FAQ Manager", icon: HelpCircle },
+  { href: "/brand-fact-sheet", label: "Fact Sheet", icon: Shield },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -135,34 +144,62 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="flex-1 overflow-y-auto py-2">
         <SectionLabel label="Main" />
         {NAV_MAIN.map((item) => (
-          <NavItem key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
+          <NavItem
+            key={item.href}
+            {...item}
+            active={activePath === item.href}
+            onNavigate={onNavigate}
+          />
         ))}
 
         <SectionLabel label="Tools" />
         {NAV_TOOLS.map((item) => (
-          <NavItem key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
+          <NavItem
+            key={item.href}
+            {...item}
+            active={activePath === item.href}
+            onNavigate={onNavigate}
+          />
         ))}
 
         <SectionLabel label="Analytics" />
         {NAV_ANALYTICS.map((item) => (
-          <NavItem key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
+          <NavItem
+            key={item.href}
+            {...item}
+            active={activePath === item.href}
+            onNavigate={onNavigate}
+          />
         ))}
 
         <SectionLabel label="Growth" />
         {NAV_GROWTH.map((item) => (
-          <NavItem key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
+          <NavItem
+            key={item.href}
+            {...item}
+            active={activePath === item.href}
+            onNavigate={onNavigate}
+          />
         ))}
 
         <SectionLabel label="Optimize" />
         {NAV_OPTIMIZE.map((item) => (
-          <NavItem key={item.href} {...item} active={activePath === item.href} onNavigate={onNavigate} />
+          <NavItem
+            key={item.href}
+            {...item}
+            active={activePath === item.href}
+            onNavigate={onNavigate}
+          />
         ))}
       </nav>
 
       {/* Bottom: pricing + user */}
       <div className="shrink-0 border-t border-sidebar-border px-2 py-3 space-y-1">
         <Link href="/pricing" onClick={onNavigate}>
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" tabIndex={0}>
+          <div
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            tabIndex={0}
+          >
             <CreditCard className="w-4 h-4 shrink-0" />
             <span>Pricing</span>
           </div>

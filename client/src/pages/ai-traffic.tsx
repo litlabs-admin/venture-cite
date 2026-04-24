@@ -3,7 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Helmet } from "react-helmet-async";
@@ -23,7 +29,7 @@ import {
   ExternalLink,
   Activity,
   Zap,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { SiOpenai, SiGoogle } from "react-icons/si";
 
@@ -43,7 +49,16 @@ export default function AiTraffic() {
     enabled: !!selectedBrandId,
   });
 
-  const { data: statsData } = useQuery<{ data: { totalSessions: number; totalPageViews: number; conversions: number; conversionRate: number; byPlatform: Record<string, { sessions: number; conversions: number }>; avgSessionDuration: number } }>({
+  const { data: statsData, isLoading: statsLoading } = useQuery<{
+    data: {
+      totalSessions: number;
+      totalPageViews: number;
+      conversions: number;
+      conversionRate: number;
+      byPlatform: Record<string, { sessions: number; conversions: number }>;
+      avgSessionDuration: number;
+    };
+  }>({
     queryKey: ["/api/ai-traffic/stats", selectedBrandId],
     enabled: !!selectedBrandId,
   });
@@ -59,11 +74,16 @@ export default function AiTraffic() {
 
   const getPlatformIcon = (platform: string) => {
     switch (platform.toLowerCase()) {
-      case "chatgpt": return <SiOpenai className="w-4 h-4" />;
-      case "gemini": return <SiGoogle className="w-4 h-4" />;
-      case "perplexity": return <Zap className="w-4 h-4" />;
-      case "claude": return <Activity className="w-4 h-4" />;
-      default: return <Globe className="w-4 h-4" />;
+      case "chatgpt":
+        return <SiOpenai className="w-4 h-4" />;
+      case "gemini":
+        return <SiGoogle className="w-4 h-4" />;
+      case "perplexity":
+        return <Zap className="w-4 h-4" />;
+      case "claude":
+        return <Activity className="w-4 h-4" />;
+      default:
+        return <Globe className="w-4 h-4" />;
     }
   };
 
@@ -85,7 +105,9 @@ export default function AiTraffic() {
 
   return (
     <>
-      <Helmet><title>AI Traffic - VentureCite</title></Helmet>
+      <Helmet>
+        <title>AI Traffic - VentureCite</title>
+      </Helmet>
       <div className="space-y-8">
         <PageHeader
           title="AI Traffic"
@@ -93,211 +115,191 @@ export default function AiTraffic() {
           actions={brands.length > 0 ? <BrandSelector /> : null}
         />
 
-          {!selectedBrandId ? (
-            <Card className="text-center py-12">
-              <CardContent>
-                <BarChart3 className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Select a Brand</h3>
-                <p className="text-muted-foreground">Choose a brand to view AI traffic analytics</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <Card>
-                  <CardContent className="p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Sessions</span>
-                      <Users className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-sessions">{stats?.totalSessions || 0}</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Page Views</span>
-                      <MousePointerClick className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-pageviews">{stats?.totalPageViews || 0}</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Conversions</span>
-                      <Target className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-conversions">{stats?.conversions || 0}</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Conversion Rate</span>
-                      <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-rate">{((stats?.conversionRate || 0) * 100).toFixed(1)}%</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Traffic by Platform</CardTitle>
-                    <CardDescription>Sessions and conversions from each AI platform</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {stats?.byPlatform && Object.keys(stats.byPlatform).length > 0 ? (
-                      <div className="space-y-4">
-                        {Object.entries(stats.byPlatform).map(([platform, data]) => (
-                          <div key={platform} className="space-y-2" data-testid={`platform-${platform}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                {getPlatformIcon(platform)}
-                                <span className="font-medium capitalize">{platform}</span>
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {data.sessions} sessions • {data.conversions} conversions
-                              </div>
-                            </div>
-                            <Progress 
-                              value={(data.sessions / (stats?.totalSessions || 1)) * 100} 
-                              className={`h-2 ${platformColors[platform.toLowerCase()] || "bg-gray-500"}`}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>No traffic data yet</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Top Citation Sources</CardTitle>
-                    <CardDescription>Where AI platforms find your brand information</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {sourcesLoading ? (
-                      <div className="text-center py-8">
-                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-                      </div>
-                    ) : topSources.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Globe className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>No sources discovered yet</p>
-                      </div>
-                    ) : (
-                      <ScrollArea className="h-[300px]">
-                        <div className="space-y-3">
-                          {topSources.map((source, idx) => (
-                            <div key={source.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`source-${source.id}`}>
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                                  {idx + 1}
-                                </div>
-                                <div>
-                                  <p className="font-medium">{source.sourceName || source.sourceDomain}</p>
-                                  <p className="text-sm text-muted-foreground">{source.sourceDomain}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline">{source.occurrenceCount}x</Badge>
-                                <Badge className={platformColors[source.aiPlatform.toLowerCase()] || "bg-gray-500"}>
-                                  {source.aiPlatform}
-                                </Badge>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card className="mt-6">
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle>Recent Traffic Sessions</CardTitle>
-                      <CardDescription>Individual visits from AI platform referrals</CardDescription>
-                    </div>
-                    <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                      <SelectTrigger className="w-40" data-testid="select-platform-filter">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Platforms</SelectItem>
-                        <SelectItem value="chatgpt">ChatGPT</SelectItem>
-                        <SelectItem value="perplexity">Perplexity</SelectItem>
-                        <SelectItem value="claude">Claude</SelectItem>
-                        <SelectItem value="gemini">Gemini</SelectItem>
-                        <SelectItem value="copilot">Copilot</SelectItem>
-                      </SelectContent>
-                    </Select>
+        {!selectedBrandId ? (
+          <Card className="text-center py-12">
+            <CardContent>
+              <BarChart3 className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Select a Brand</h3>
+              <p className="text-muted-foreground">Choose a brand to view AI traffic analytics</p>
+            </CardContent>
+          </Card>
+        ) : !statsLoading && (stats?.totalSessions ?? 0) === 0 ? (
+          /* Ingestion hasn't happened yet — no tracking pixel, no
+             analytics import. Rather than show a row of zero cards that
+             looks broken, surface a single CTA that tells the user what
+             to do. Keeps the page honest about state. */
+          <Card className="text-center py-16 border-dashed">
+            <CardContent className="max-w-md mx-auto">
+              <Activity className="w-16 h-16 mx-auto text-violet-500 mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Connect your analytics</h3>
+              <p className="text-muted-foreground mb-4">
+                To see AI referral traffic here, hook up Google Analytics, Plausible, or Shopify.
+                VentureCite filters sessions where the referrer is an AI platform (ChatGPT,
+                Perplexity, Gemini, etc.) and surfaces conversions + top landing pages.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                No integration yet — coming soon. For now this page will stay empty.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <Card>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Total Sessions
+                    </span>
+                    <Users className="w-4 h-4 text-muted-foreground" />
                   </div>
+                  <p
+                    className="text-3xl font-semibold text-foreground tracking-tight"
+                    data-testid="stat-sessions"
+                  >
+                    {stats?.totalSessions || 0}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Page Views
+                    </span>
+                    <MousePointerClick className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <p
+                    className="text-3xl font-semibold text-foreground tracking-tight"
+                    data-testid="stat-pageviews"
+                  >
+                    {stats?.totalPageViews || 0}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Conversions
+                    </span>
+                    <Target className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <p
+                    className="text-3xl font-semibold text-foreground tracking-tight"
+                    data-testid="stat-conversions"
+                  >
+                    {stats?.conversions || 0}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Conversion Rate
+                    </span>
+                    <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <p
+                    className="text-3xl font-semibold text-foreground tracking-tight"
+                    data-testid="stat-rate"
+                  >
+                    {((stats?.conversionRate || 0) * 100).toFixed(1)}%
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Traffic by Platform</CardTitle>
+                  <CardDescription>Sessions and conversions from each AI platform</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {trafficLoading ? (
+                  {stats?.byPlatform && Object.keys(stats.byPlatform).length > 0 ? (
+                    <div className="space-y-4">
+                      {Object.entries(stats.byPlatform).map(([platform, data]) => (
+                        <div
+                          key={platform}
+                          className="space-y-2"
+                          data-testid={`platform-${platform}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {getPlatformIcon(platform)}
+                              <span className="font-medium capitalize">{platform}</span>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {data.sessions} sessions • {data.conversions} conversions
+                            </div>
+                          </div>
+                          <Progress
+                            value={(data.sessions / (stats?.totalSessions || 1)) * 100}
+                            className={`h-2 ${platformColors[platform.toLowerCase()] || "bg-gray-500"}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No traffic data yet</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Citation Sources</CardTitle>
+                  <CardDescription>Where AI platforms find your brand information</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {sourcesLoading ? (
                     <div className="text-center py-8">
                       <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
                     </div>
-                  ) : sessions.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p className="font-medium">No traffic sessions yet</p>
-                      <p className="text-sm">Traffic will appear when visitors come from AI platforms</p>
+                  ) : topSources.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Globe className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No sources discovered yet</p>
                     </div>
                   ) : (
-                    <ScrollArea className="h-[400px]">
+                    <ScrollArea className="h-[300px]">
                       <div className="space-y-3">
-                        {sessions.map(session => (
-                          <div key={session.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`session-${session.id}`}>
-                            <div className="flex items-center gap-4">
-                              <div className={`p-2 rounded-lg ${platformColors[session.aiPlatform.toLowerCase()] || "bg-gray-100"}`}>
-                                {getPlatformIcon(session.aiPlatform)}
+                        {topSources.map((source, idx) => (
+                          <div
+                            key={source.id}
+                            className="flex items-center justify-between p-3 border rounded-lg"
+                            data-testid={`source-${source.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                                {idx + 1}
                               </div>
                               <div>
-                                <p className="font-medium">{session.landingPage}</p>
-                                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <MousePointerClick className="w-3 h-3" />
-                                    {session.pageViews} pages
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    {formatDuration(session.sessionDuration)}
-                                  </span>
-                                  {session.country && (
-                                    <span className="flex items-center gap-1">
-                                      <Globe className="w-3 h-3" />
-                                      {session.country}
-                                    </span>
-                                  )}
-                                </div>
+                                <p className="font-medium">
+                                  {source.sourceName || source.sourceDomain}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {source.sourceDomain}
+                                </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              {session.converted === 1 && (
-                                <Badge className="bg-green-500">
-                                  <Target className="w-3 h-3 mr-1" />
-                                  Converted
-                                </Badge>
-                              )}
-                              {session.bounced === 1 && (
-                                <Badge variant="outline" className="text-red-600">Bounced</Badge>
-                              )}
-                              <Badge variant="outline" className="capitalize">{session.aiPlatform}</Badge>
+                              <Badge variant="outline">{source.occurrenceCount}x</Badge>
+                              <Badge
+                                className={
+                                  platformColors[source.aiPlatform.toLowerCase()] || "bg-gray-500"
+                                }
+                              >
+                                {source.aiPlatform}
+                              </Badge>
                             </div>
                           </div>
                         ))}
@@ -306,8 +308,103 @@ export default function AiTraffic() {
                   )}
                 </CardContent>
               </Card>
-            </>
-          )}
+            </div>
+
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Recent Traffic Sessions</CardTitle>
+                    <CardDescription>Individual visits from AI platform referrals</CardDescription>
+                  </div>
+                  <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                    <SelectTrigger className="w-40" data-testid="select-platform-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Platforms</SelectItem>
+                      <SelectItem value="chatgpt">ChatGPT</SelectItem>
+                      <SelectItem value="perplexity">Perplexity</SelectItem>
+                      <SelectItem value="claude">Claude</SelectItem>
+                      <SelectItem value="gemini">Gemini</SelectItem>
+                      <SelectItem value="copilot">Copilot</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {trafficLoading ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+                  </div>
+                ) : sessions.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p className="font-medium">No traffic sessions yet</p>
+                    <p className="text-sm">
+                      Traffic will appear when visitors come from AI platforms
+                    </p>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[400px]">
+                    <div className="space-y-3">
+                      {sessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                          data-testid={`session-${session.id}`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div
+                              className={`p-2 rounded-lg ${platformColors[session.aiPlatform.toLowerCase()] || "bg-gray-100"}`}
+                            >
+                              {getPlatformIcon(session.aiPlatform)}
+                            </div>
+                            <div>
+                              <p className="font-medium">{session.landingPage}</p>
+                              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <MousePointerClick className="w-3 h-3" />
+                                  {session.pageViews} pages
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {formatDuration(session.sessionDuration)}
+                                </span>
+                                {session.country && (
+                                  <span className="flex items-center gap-1">
+                                    <Globe className="w-3 h-3" />
+                                    {session.country}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {session.converted === 1 && (
+                              <Badge className="bg-green-500">
+                                <Target className="w-3 h-3 mr-1" />
+                                Converted
+                              </Badge>
+                            )}
+                            {session.bounced === 1 && (
+                              <Badge variant="outline" className="text-red-600">
+                                Bounced
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="capitalize">
+                              {session.aiPlatform}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </>
   );

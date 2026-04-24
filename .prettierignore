@@ -1,0 +1,16 @@
+node_modules
+dist
+build
+out
+coverage
+server/public
+*.tsbuildinfo
+package-lock.json
+drizzle/meta
+.husky
+audit
+PHASE1_FEATURES.md
+PHASE2_FEATURES.md
+PRODUCTION_READINESS_AUDIT.md
+AUDIT.md
+VentureCite_Phase1_PRD.md

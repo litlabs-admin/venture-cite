@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 export function useLoadingMessages(
   isLoading: boolean,
   messages: string[],
-  intervalMs = 3000
+  intervalMs = 3000,
 ): string {
   const [index, setIndex] = useState(0);
 

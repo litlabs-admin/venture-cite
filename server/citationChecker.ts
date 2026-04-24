@@ -4,6 +4,11 @@ import type { GeoRanking, Brand } from "@shared/schema";
 import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS, OPENROUTER_BASE_URL } from "./lib/modelConfig";
 import { judgeCitation, type JudgeBrand } from "./citationJudge";
+import { assertWithinBudget, recordSpend, type Tier } from "./lib/llmBudget";
+import { logger } from "./lib/logger";
+import { openaiBreaker, openrouterBreaker } from "./lib/circuitBreaker";
+import { analyzeResponse, deriveSentiment, type TrackedEntity } from "./lib/responseAnalyzer";
+import { matchEntity } from "./lib/brandMatcher";
 
 // ChatGPT citation checks go through the direct OpenAI client.
 const openai = new OpenAI({
@@ -30,112 +35,13 @@ const openrouter = process.env.OPENROUTER_API_KEY
     })()
   : null;
 
-export const DEFAULT_CITATION_PLATFORMS = ['ChatGPT', 'Perplexity', 'DeepSeek', 'Claude', 'Gemini'] as const;
-
-const COMPANY_SUFFIX_RE = /\b(inc|inc\.|llc|ltd|ltd\.|co|co\.|corp|corporation|company|gmbh|s\.?a\.?|plc|pty|limited|labs|technologies|technology|software|holdings|group)\b/gi;
-
-// Strip legal suffixes and normalize whitespace/punctuation so "Notion Labs,
-// Inc." also matches responses that just say "Notion".
-function normalizeBrandName(name: string): string {
-  return name
-    .replace(COMPANY_SUFFIX_RE, "")
-    .replace(/[,.]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// Fold accents so "Nestlé" also matches "Nestle" in responses.
-function foldDiacritics(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-// 3–5 letter tokens that look like acronyms but are either English words or
-// ubiquitous abbreviations. Auto-acronyms matching these are NOT indexed —
-// prevents "Cool Auto Repair" from matching every mention of a "CAR".
-const COMMON_ACRONYM_WORDS = new Set([
-  "CAR", "SUN", "CAT", "DOG", "BIG", "TOP", "NEW", "OLD", "FAR", "WAY",
-  "AIR", "OIL", "GAS", "RUN", "FUN", "LOG", "LAB", "NET", "WEB", "APP",
-  "API", "CEO", "CFO", "COO", "CTO", "HR", "PR", "IT", "FAQ", "PDF",
-  "URL", "HTML", "CSS", "JSON", "AJAX", "REST", "HTTP", "HTTPS", "USA",
-  "EU", "UK", "USD", "EUR", "GBP",
-]);
-
-// Generic domain prefixes that shouldn't be indexed as a standalone brand
-// name even if they're the bare subdomain of the user's website.
-const COMMON_DOMAIN_WORDS = new Set([
-  "store", "shop", "blog", "news", "media", "group", "online", "global",
-  "cloud", "world", "daily", "inc", "company", "corp", "home", "app", "apps",
-  "web", "site", "pro", "team",
-]);
-
-// Single-word brand names that share a spelling with a common English word.
-// Matches for these variants must appear near a "signal token" (see
-// SIGNAL_TOKEN_RE below) — otherwise a blog post about apple pie would
-// falsely cite Apple Inc.
-const AMBIGUOUS_GENERIC_WORDS = new Set([
-  "apple", "target", "square", "stripe", "amazon", "meta", "twitter",
-  "pinterest", "snap", "discord", "notion", "chrome", "mint", "slack",
-  "dropbox", "oracle", "shell", "mars", "coach", "gap", "hermes",
-  "shopify", "patch", "block", "ring", "nest", "echo", "basecamp",
-]);
-
-// Words that, when they appear near an ambiguous brand name, indicate the
-// mention is about the company (not the generic word).
-const SIGNAL_TOKEN_RE = /\b(platform|company|app|service|tool|product|startup|brand|software|website|site|founder|launched|acquired|announced|subscribe|subscription|saas|ceo|cfo|coo|cto|headquartered|\.com|\.io|\.ai|\.co|founded|developer|ipo|shares|stock|investors)\b/i;
-
-// Build the set of name variants we should search for in a response. Order
-// matters — the longest variant is tried first so the match snippet is as
-// specific as possible.
-export function buildBrandNameVariants(
-  brandName: string,
-  extraVariations: string[] = [],
-  website?: string,
-): string[] {
-  const raw = [brandName, ...extraVariations].filter((s) => typeof s === "string" && s.trim().length > 0);
-  const set = new Set<string>();
-
-  for (const r of raw) {
-    const trimmed = r.trim();
-    if (trimmed.length >= 3) set.add(trimmed.toLowerCase());
-
-    // Legal suffix stripped + punctuation normalized
-    const normalized = normalizeBrandName(trimmed).toLowerCase();
-    if (normalized.length >= 3) set.add(normalized);
-
-    // Diacritic-folded and de-hyphenated forms
-    const folded = foldDiacritics(trimmed.replace(/[-_]/g, " ").replace(/\s+/g, " ").trim()).toLowerCase();
-    if (folded.length >= 3) set.add(folded);
-    const foldedNorm = foldDiacritics(normalized).toLowerCase();
-    if (foldedNorm.length >= 3) set.add(foldedNorm);
-
-    // Auto-acronym from multi-word names with 3+ words
-    const words = normalized.split(/\s+/).filter((w) => w.length > 0);
-    if (words.length >= 3) {
-      const acronym = words.map((w) => w[0]).join("").toUpperCase();
-      if (acronym.length >= 3 && acronym.length <= 5 && !COMMON_ACRONYM_WORDS.has(acronym)) {
-        set.add(acronym.toLowerCase());
-      }
-    }
-  }
-
-  // Website-derived variants — "https://stripe.com" → "stripe.com" + "stripe".
-  if (website) {
-    try {
-      const rawHost = website.startsWith("http") ? website : `https://${website}`;
-      const host = new URL(rawHost).hostname.replace(/^www\./i, "");
-      if (host.length >= 4) set.add(host.toLowerCase());
-      const bare = host.split(".")[0];
-      if (bare && bare.length >= 4 && !COMMON_DOMAIN_WORDS.has(bare.toLowerCase())) {
-        set.add(bare.toLowerCase());
-      }
-    } catch {
-      // malformed URL — skip
-    }
-  }
-
-  // Sort longest → shortest so the most specific match wins.
-  return Array.from(set).sort((a, b) => b.length - a.length);
-}
+export const DEFAULT_CITATION_PLATFORMS = [
+  "ChatGPT",
+  "Perplexity",
+  "DeepSeek",
+  "Claude",
+  "Gemini",
+] as const;
 
 // LLM-judged citation detector. The string matcher is only a cheap pre-filter:
 // if NO brand variant appears anywhere in the response, skip the LLM call
@@ -151,13 +57,30 @@ export async function checkForCitation(
     description?: string | null;
     industry?: string | null;
   },
-): Promise<{ isCited: boolean; rank: number | null; relevance: number | null; reasoning?: string }> {
+): Promise<{
+  isCited: boolean;
+  rank: number | null;
+  relevance: number | null;
+  reasoning?: string;
+}> {
   if (!brandName || !responseText) return { isCited: false, rank: null, relevance: null };
 
-  const variants = buildBrandNameVariants(brandName, extraVariations, brandContext?.website || undefined);
-  const lower = responseText.toLowerCase();
-  const anyHit = variants.some((v) => lower.includes(v));
-  if (!anyHit) return { isCited: false, rank: null, relevance: null, reasoning: "No brand variant found in response" };
+  // Stage 1: shared matcher decides presence. Whole-word, possessive-aware,
+  // URL-boundary for domains, proximity-gated for short/ambiguous names.
+  const matcherResult = matchEntity(responseText, {
+    id: "brand",
+    name: brandName,
+    nameVariations: extraVariations,
+    website: brandContext?.website ?? null,
+  });
+  if (!matcherResult.matched) {
+    return {
+      isCited: false,
+      rank: null,
+      relevance: null,
+      reasoning: "No brand variant found in response",
+    };
+  }
 
   const judgeBrand: JudgeBrand = {
     name: brandName,
@@ -206,7 +129,11 @@ export function classifySourceType(url: string | null | undefined): string | nul
   } catch {
     return null;
   }
-  if (/(^|\.)reddit\.com$|(^|\.)quora\.com$|(^|\.)ycombinator\.com$|stackexchange\.com$|stackoverflow\.com$/.test(host)) {
+  if (
+    /(^|\.)reddit\.com$|(^|\.)quora\.com$|(^|\.)ycombinator\.com$|stackexchange\.com$|stackoverflow\.com$/.test(
+      host,
+    )
+  ) {
     return "community";
   }
   if (/(^|\.)wikipedia\.org$|(^|\.)britannica\.com$|\.gov$|\.edu$/.test(host)) {
@@ -233,7 +160,7 @@ export function computeAuthorityScore(
     return null;
   }
   const prior = domainOccurrenceMap.get(host) || 0;
-  return Math.min(100, (prior * 10) + 10);
+  return Math.min(100, prior * 10 + 10);
 }
 
 // Maps each non-ChatGPT citation platform to its OpenRouter model slug.
@@ -247,6 +174,10 @@ const OPENROUTER_MODEL_BY_PLATFORM: Record<string, string> = {
 // Per-platform query. ChatGPT hits OpenAI directly; the other four go through
 // OpenRouter. No simulation fallbacks — if OPENROUTER_API_KEY is missing the
 // caller gets a clear context string so the UI can surface it.
+//
+// userId is optional for legacy callers (e.g. ad-hoc /api/citation/check
+// hits where the route already enforces ownership). When provided, the
+// LLM call's token spend is recorded against that user's budget.
 export async function runPlatformCitationCheck(
   platform: string,
   prompt: string,
@@ -254,33 +185,61 @@ export async function runPlatformCitationCheck(
   brandName: string,
   brandNameVariations: string[] = [],
   website?: string,
-): Promise<{ isCited: boolean; rank: number | null; relevance: number | null; responseText: string; error?: string }> {
+  userId?: string,
+  opts: { skipJudge?: boolean } = {},
+): Promise<{
+  isCited: boolean;
+  rank: number | null;
+  relevance: number | null;
+  responseText: string;
+  error?: string;
+}> {
+  const { skipJudge = false } = opts;
   const brandContext = {
     website: website || brand?.website || null,
     companyName: brand?.companyName || null,
     description: brand?.description || null,
     industry: brand?.industry || null,
   };
-  const systemMsg = "You are a helpful assistant. Answer the question thoroughly, citing specific sources, brands, companies, or products when relevant.";
+  const systemMsg =
+    "You are a helpful assistant. Answer the question thoroughly, citing specific sources, brands, companies, or products when relevant.";
 
-  if (platform === 'ChatGPT' || platform === 'GPT-4') {
-    const chatResponse = await openai.chat.completions.create({
-      model: MODELS.citationChatGPT,
-      messages: [
-        { role: "system", content: systemMsg },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 1500,
-      temperature: 0.7,
-    });
-    const responseText = chatResponse.choices[0].message.content || '';
+  if (platform === "ChatGPT" || platform === "GPT-4") {
+    const chatResponse = await openaiBreaker.run(() =>
+      openai.chat.completions.create({
+        model: MODELS.citationChatGPT,
+        messages: [
+          { role: "system", content: systemMsg },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 1500,
+        temperature: 0.7,
+      }),
+    );
+    if (userId) {
+      await recordSpend({
+        userId,
+        service: "openai",
+        model: MODELS.citationChatGPT,
+        tokensIn: chatResponse.usage?.prompt_tokens ?? 0,
+        tokensOut: chatResponse.usage?.completion_tokens ?? 0,
+      });
+    }
+    const responseText = chatResponse.choices[0].message.content || "";
+    if (skipJudge) return { isCited: false, rank: null, relevance: null, responseText };
     const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
     return { isCited: r.isCited, rank: r.rank, relevance: r.relevance, responseText };
   }
 
   const openrouterModel = OPENROUTER_MODEL_BY_PLATFORM[platform];
   if (!openrouterModel) {
-    return { isCited: false, rank: null, relevance: null, responseText: '', error: `Unknown citation platform: ${platform}` };
+    return {
+      isCited: false,
+      rank: null,
+      relevance: null,
+      responseText: "",
+      error: `Unknown citation platform: ${platform}`,
+    };
   }
 
   if (!openrouter) {
@@ -288,21 +247,33 @@ export async function runPlatformCitationCheck(
       isCited: false,
       rank: null,
       relevance: null,
-      responseText: '',
+      responseText: "",
       error: `${platform} check skipped — OPENROUTER_API_KEY is not configured.`,
     };
   }
 
-  const chatResponse = await openrouter.chat.completions.create({
-    model: openrouterModel,
-    messages: [
-      { role: "system", content: `You are ${platform}, a helpful AI assistant. ${systemMsg}` },
-      { role: "user", content: prompt },
-    ],
-    max_tokens: 1500,
-    temperature: 0.7,
-  });
-  const responseText = chatResponse.choices[0]?.message?.content || '';
+  const chatResponse = await openrouterBreaker.run(() =>
+    openrouter!.chat.completions.create({
+      model: openrouterModel,
+      messages: [
+        { role: "system", content: `You are ${platform}, a helpful AI assistant. ${systemMsg}` },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 1500,
+      temperature: 0.7,
+    }),
+  );
+  if (userId) {
+    await recordSpend({
+      userId,
+      service: "openrouter",
+      model: openrouterModel,
+      tokensIn: chatResponse.usage?.prompt_tokens ?? 0,
+      tokensOut: chatResponse.usage?.completion_tokens ?? 0,
+    });
+  }
+  const responseText = chatResponse.choices[0]?.message?.content || "";
+  if (skipJudge) return { isCited: false, rank: null, relevance: null, responseText };
   const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
   return { isCited: r.isCited, rank: r.rank, relevance: r.relevance, responseText };
 }
@@ -313,20 +284,44 @@ export async function runPlatformCitationCheck(
 export async function runBrandPrompts(
   brandId: string,
   platforms: string[] = [...DEFAULT_CITATION_PLATFORMS],
-  options: { triggeredBy?: "manual" | "cron"; runId?: string } = {},
-): Promise<{ totalChecks: number; totalCited: number; rankings: GeoRanking[]; runId: string | null }> {
+  options: {
+    triggeredBy?: "manual" | "cron" | "auto_onboarding";
+    runId?: string;
+    promptIds?: string[];
+    onProgress?: (checked: number, total: number) => void | Promise<void>;
+  } = {},
+): Promise<{
+  totalChecks: number;
+  totalCited: number;
+  rankings: GeoRanking[];
+  runId: string | null;
+}> {
   const brand = await storage.getBrandById(brandId);
   if (!brand) throw new Error("Brand not found");
-  const brandName = brand.companyName || brand.name || '';
+
+  // Wave 3.2: enforce per-user LLM budget. Cron runs and manual triggers
+  // both go through here, so blocking here covers both. brand.userId can
+  // be null for orphaned/legacy rows; in that case skip the check.
+  if (brand.userId) {
+    const owner = await storage.getUser(brand.userId);
+    const tier = (owner?.accessTier ?? "free") as Tier;
+    await assertWithinBudget(brand.userId, tier);
+  }
+
+  const brandName = brand.companyName || brand.name || "";
   // Pass every name we know about — short name, company name, and any
   // stored variations — into the detector so "Notion Labs, Inc." also
   // matches a response that just says "Notion".
   const brandNameVariations = [
-    brand.name || '',
-    brand.companyName || '',
+    brand.name || "",
+    brand.companyName || "",
     ...(Array.isArray(brand.nameVariations) ? brand.nameVariations : []),
-  ].filter((s) => typeof s === 'string' && s.trim().length > 0);
-  const prompts = await storage.getBrandPromptsByBrandId(brandId);
+  ].filter((s) => typeof s === "string" && s.trim().length > 0);
+  const allPrompts = await storage.getBrandPromptsByBrandId(brandId);
+  const prompts =
+    options.promptIds && options.promptIds.length > 0
+      ? allPrompts.filter((p) => options.promptIds!.includes(p.id))
+      : allPrompts;
   if (prompts.length === 0) return { totalChecks: 0, totalCited: 0, rankings: [], runId: null };
 
   // Create a citation_runs row upfront so every geo_ranking can reference it.
@@ -355,15 +350,35 @@ export async function runBrandPrompts(
       try {
         const host = new URL(r.citingOutletUrl).hostname.toLowerCase().replace(/^www\./, "");
         if (host) domainOccurrenceMap.set(host, (domainOccurrenceMap.get(host) || 0) + 1);
-      } catch { /* skip malformed URLs */ }
+      } catch {
+        /* skip malformed URLs */
+      }
     }
   } catch (err) {
-    console.warn(`[citationChecker] failed to build domain occurrence map:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `[citationChecker] failed to build domain occurrence map:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 
   // Load competitors once so every task can pre-filter responses against them.
-  const competitors = await storage.getCompetitors(brandId).catch(() => []);
+  // getCompetitors defaults to excluding deletedAt rows — ignored competitors
+  // are soft-deleted too, so they're already filtered.
+  const competitors = await storage.getCompetitors(brandId).catch((err) => {
+    console.warn(
+      `[citationChecker] getCompetitors failed — proceeding without competitor tracking:`,
+      err instanceof Error ? err.message : err,
+    );
+    return [];
+  });
+  console.log(
+    `[citationChecker] loaded ${competitors.length} active competitors for brand ${brandId}`,
+  );
   const competitorDetections = new Map<string, Map<string, number>>(); // competitorId → platform → cited count
+  // Platforms where we've already done auto-discovery of new competitors
+  // this run — once per (runId, platform) to cap LLM cost at ~5 extra
+  // calls per run total.
+  const autoDiscoveredPlatforms = new Set<string>();
 
   // Flatten all (prompt × platform) pairs into one queue and run them with a
   // fixed concurrency ceiling. As soon as one task finishes (AI call + DB
@@ -372,7 +387,7 @@ export async function runBrandPrompts(
   // well under every platform's rate limit.
   const CONCURRENCY = 5;
 
-  type Task = { bp: typeof prompts[number]; promptIdx: number; platform: string };
+  type Task = { bp: (typeof prompts)[number]; promptIdx: number; platform: string };
   const queue: Task[] = [];
   prompts.forEach((bp, i) => {
     for (const platform of cappedPlatforms) {
@@ -380,72 +395,265 @@ export async function runBrandPrompts(
     }
   });
 
-  console.log(`[citationChecker] starting ${prompts.length} prompts × ${cappedPlatforms.length} platforms = ${queue.length} checks (concurrency=${CONCURRENCY})`);
+  console.log(
+    `[citationChecker] starting ${prompts.length} prompts × ${cappedPlatforms.length} platforms = ${queue.length} checks (concurrency=${CONCURRENCY})`,
+  );
+
+  // Wave A: build the tracked-entity list once — brand + every competitor.
+  // Passed to analyzeResponse on each task so a single LLM call returns
+  // cited/rank/relevance/context/citedUrls for every entity plus any
+  // untracked brands (candidates for auto-discovery).
+  const MAX_AUTO_DISCOVERIES_PER_PLATFORM = 10;
 
   let cursor = 0;
+  let completedCount = 0;
+  const totalTasks = queue.length;
   const runOne = async (task: Task): Promise<void> => {
     const { bp, promptIdx, platform } = task;
-    let isCited = false;
-    let citationContext: string | null = null;
-    let rank: number | null = null;
-    let relevance: number | null = null;
-    let responseText = '';
+    let responseText = "";
+    let fetchError: string | null = null;
     const started = Date.now();
-    try {
-      const result = await runPlatformCitationCheck(platform, bp.prompt, brand, brandName, brandNameVariations, brand.website || undefined);
-      isCited = result.isCited;
-      rank = result.rank;
-      relevance = result.relevance;
-      responseText = result.responseText || '';
-      if (result.error) {
-        citationContext = result.error;
-      } else {
-        // Persist the full AI response so the UI can render it as markdown.
-        // Status line + `||| RAW_RESPONSE |||` delimiter so the API can split
-        // the two back out on the way to the client.
-        const statusLine = isCited ? "Cited" : "Not cited";
-        citationContext = `${statusLine}\n\n||| RAW_RESPONSE |||\n${responseText}`;
-      }
-      console.log(`[citationChecker] prompt ${promptIdx} ${platform} ok in ${Date.now() - started}ms — cited=${isCited}`);
-    } catch (apiError) {
-      const msg = apiError instanceof Error ? apiError.message : 'API error';
-      citationContext = `Check failed: ${msg}`;
-      console.error(`[citationChecker] prompt ${promptIdx} ${platform} FAILED in ${Date.now() - started}ms —`, msg);
-    }
 
-    // Enrichment: extract URL, classify source, compute authority.
-    const citingOutletUrl = extractFirstUrl(responseText);
-    const sourceType = classifySourceType(citingOutletUrl);
-    const authorityScore = computeAuthorityScore(citingOutletUrl, domainOccurrenceMap);
-
-    // Update the in-run map so subsequent tasks see fresh counts.
-    if (citingOutletUrl) {
+    // 1. Fetch the platform response with a single retry on transient failure
+    // (rate limit, breaker trip, network blip). skipJudge=true — analyzer
+    // below does all citation judgment in one merged call.
+    const attemptFetch = async (): Promise<{ text: string; error: string | null }> => {
       try {
-        const host = new URL(citingOutletUrl).hostname.toLowerCase().replace(/^www\./, "");
-        if (host) domainOccurrenceMap.set(host, (domainOccurrenceMap.get(host) || 0) + 1);
-      } catch { /* skip */ }
+        const r = await runPlatformCitationCheck(
+          platform,
+          bp.prompt,
+          brand,
+          brandName,
+          brandNameVariations,
+          brand.website || undefined,
+          brand.userId ?? undefined,
+          { skipJudge: true },
+        );
+        return { text: r.responseText || "", error: r.error ?? null };
+      } catch (apiError) {
+        return { text: "", error: apiError instanceof Error ? apiError.message : "API error" };
+      }
+    };
+
+    let attempt = await attemptFetch();
+    if (attempt.error || !attempt.text) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const retry = await attemptFetch();
+      if (retry.text) attempt = retry;
+      else if (retry.error) attempt = retry;
+    }
+    responseText = attempt.text;
+    if (attempt.error) fetchError = attempt.error;
+    if (fetchError) {
+      console.error(
+        `[citationChecker] prompt ${promptIdx} ${platform} FAILED after retry in ${Date.now() - started}ms —`,
+        fetchError,
+      );
+    } else {
+      console.log(
+        `[citationChecker] prompt ${promptIdx} ${platform} fetched in ${Date.now() - started}ms`,
+      );
     }
 
-    // Competitor detection: cheap string pre-filter against every competitor's
-    // name variants. No LLM call per competitor — the brand is already judged;
-    // competitor mentions are tracked as raw name hits in the response text.
-    if (isCited && responseText && competitors.length > 0) {
-      const respLower = responseText.toLowerCase();
-      for (const comp of competitors) {
-        const variants = buildBrandNameVariants(
-          comp.name,
-          [],
-          comp.domain || undefined,
+    // 2. Merged analyzer call: one JSON response returns {brands, tracked,
+    // untracked}. tracked[entityId] contains each tracked entity's verdict
+    // (cited, rank, relevance, context, citedUrls). untracked holds every
+    // other brand the analyzer surfaced — feeds auto-discovery.
+    const trackedEntities: TrackedEntity[] = [
+      {
+        kind: "brand",
+        id: brand.id,
+        name: brand.name,
+        website: brand.website,
+        industry: brand.industry,
+        description: brand.description,
+        aliases: [
+          ...(Array.isArray(brand.nameVariations) ? brand.nameVariations : []),
+          brand.companyName,
+        ].filter((s): s is string => typeof s === "string" && s.trim().length > 0),
+      },
+      ...competitors.map(
+        (c): TrackedEntity => ({
+          kind: "competitor",
+          id: c.id,
+          name: c.name,
+          website: c.domain || null,
+          industry: (c as any).industry || null,
+          description: (c as any).description || null,
+        }),
+      ),
+    ];
+
+    let analysis: Awaited<ReturnType<typeof analyzeResponse>> = {
+      brands: [],
+      tracked: Object.fromEntries(trackedEntities.map((e) => [e.id, null])),
+      untracked: [],
+    };
+    if (responseText && !fetchError) {
+      try {
+        analysis = await analyzeResponse({ responseText, trackedEntities });
+      } catch (err) {
+        console.warn(
+          `[citationChecker] analyzer failed for prompt ${promptIdx} ${platform}:`,
+          err instanceof Error ? err.message : err,
         );
-        const hit = variants.some((v) => respLower.includes(v));
-        if (hit) {
-          const perPlatform = competitorDetections.get(comp.id) || new Map<string, number>();
-          perPlatform.set(platform, (perPlatform.get(platform) || 0) + 1);
-          competitorDetections.set(comp.id, perPlatform);
+      }
+    }
+
+    // Variant-learning loop: every surface form the analyzer surfaced for a
+    // tracked entity that isn't already in its variant list gets appended.
+    // The matcher reads variants live so subsequent detection calls see the
+    // new forms without a deploy. User can delete unwanted variants from
+    // the brand/competitor edit UI.
+    for (const te of trackedEntities) {
+      const verdict = analysis.tracked[te.id];
+      if (!verdict) continue;
+      const surfaceForms = [verdict.name, ...(verdict.variants ?? [])].filter(
+        (s): s is string => typeof s === "string" && s.trim().length > 0,
+      );
+      for (const form of surfaceForms) {
+        try {
+          if (te.kind === "brand") {
+            await storage.addBrandNameVariation(te.id, form);
+          } else {
+            await storage.addCompetitorNameVariation(te.id, form);
+          }
+        } catch (err) {
+          logger.warn(
+            { err, entityId: te.id, kind: te.kind, form },
+            "citationChecker: variant append failed",
+          );
         }
       }
     }
 
+    const brandVerdict = analysis.tracked[brand.id] ?? null;
+    const isCited = Boolean(brandVerdict?.cited);
+    const rank = isCited ? (brandVerdict?.rank ?? null) : null;
+    const relevance = brandVerdict?.relevance ?? null;
+    const brandSentiment = deriveSentiment(relevance, isCited);
+
+    let citationContext: string | null = null;
+    if (fetchError) {
+      // Even when the fetch failed, surface the error text in the delimited
+      // section so the UI shows something useful instead of a generic "No
+      // response captured." Prefix with "Check failed:" so the snippet area
+      // explains the state, then put the raw error as the expanded response.
+      const statusLine = fetchError.startsWith("Check failed")
+        ? fetchError
+        : `Check failed: ${fetchError}`;
+      citationContext = `${statusLine}\n\n||| RAW_RESPONSE |||\n${fetchError}`;
+    } else {
+      const statusLine = isCited ? "Cited" : "Not cited";
+      citationContext = `${statusLine}\n\n||| RAW_RESPONSE |||\n${responseText}`;
+    }
+
+    // 3. citingOutletUrl — prefer the analyzer's explicitly-attributed URL
+    // for the brand, fall back to the first URL regex-extracted from the
+    // response. Feeds Source Types, authority_score, and Citation Quality.
+    const analyzerUrl = brandVerdict?.citedUrls?.[0] ?? null;
+    const extractedUrl = extractFirstUrl(responseText);
+    const citingOutletUrl = analyzerUrl || extractedUrl;
+    const sourceType = classifySourceType(citingOutletUrl);
+    const authorityScore = computeAuthorityScore(citingOutletUrl, domainOccurrenceMap);
+    if (citingOutletUrl) {
+      try {
+        const host = new URL(
+          citingOutletUrl.startsWith("http") ? citingOutletUrl : `https://${citingOutletUrl}`,
+        ).hostname
+          .toLowerCase()
+          .replace(/^www\./, "");
+        if (host) domainOccurrenceMap.set(host, (domainOccurrenceMap.get(host) || 0) + 1);
+      } catch {
+        /* skip malformed URLs */
+      }
+    }
+
+    // 4. Competitor citation rows — one per competitor the analyzer flagged
+    // as cited. Absence of a row = not cited (keeps table narrow).
+    if (responseText && !fetchError) {
+      for (const comp of competitors) {
+        const v = analysis.tracked[comp.id];
+        if (!v || !v.cited) continue;
+        const compUrl = v.citedUrls?.[0] ?? citingOutletUrl;
+        const compContext = v.context
+          ? `${v.context.slice(0, 400)}\n\n||| RAW_RESPONSE |||\n${responseText}`
+          : citationContext;
+        try {
+          await storage.createCompetitorGeoRanking({
+            competitorId: comp.id,
+            runId: citationRun.id,
+            brandPromptId: bp.id,
+            aiPlatform: platform,
+            isCited: 1,
+            rank: v.rank,
+            relevanceScore: v.relevance,
+            citationContext: compContext,
+            citingOutletUrl: compUrl,
+            sentiment: deriveSentiment(v.relevance, true),
+          } as any);
+        } catch (err) {
+          console.warn(
+            `[citationChecker] competitor_geo_rankings insert failed for ${comp.name}:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+
+        const perPlatform = competitorDetections.get(comp.id) || new Map<string, number>();
+        perPlatform.set(platform, (perPlatform.get(platform) || 0) + 1);
+        competitorDetections.set(comp.id, perPlatform);
+      }
+
+      // 5. Auto-discovery — upsert analyzer.untracked brands as new
+      // competitors with discoveredBy='citation_auto'. Only when the brand
+      // was cited (filters off-topic responses) and only once per
+      // (runId, platform) with a per-platform cap to bound storm risk.
+      if (isCited && !autoDiscoveredPlatforms.has(platform) && analysis.untracked.length > 0) {
+        autoDiscoveredPlatforms.add(platform);
+        let inserted = 0;
+        const candidates = analysis.untracked
+          .filter((u) => u.cited)
+          .slice(0, MAX_AUTO_DISCOVERIES_PER_PLATFORM);
+        for (const cand of candidates) {
+          const name = cand.name?.trim();
+          if (!name || name.length < 2 || name.length > 120) continue;
+          const firstUrl = cand.citedUrls?.[0] ?? "";
+          let derivedDomain = "";
+          if (firstUrl) {
+            try {
+              const u = firstUrl.startsWith("http") ? firstUrl : `https://${firstUrl}`;
+              derivedDomain = new URL(u).hostname.toLowerCase().replace(/^www\./, "");
+            } catch {
+              /* skip bad URLs */
+            }
+          }
+          try {
+            await storage.createCompetitor({
+              brandId,
+              name,
+              domain: derivedDomain,
+              industry: brand.industry || null,
+              description: "[auto-discovered from citation run]",
+              discoveredBy: "citation_auto",
+            } as any);
+            inserted += 1;
+          } catch (err) {
+            console.warn(
+              `[citationChecker] auto-discovery upsert failed for ${name}:`,
+              err instanceof Error ? err.message : err,
+            );
+          }
+        }
+        if (inserted > 0) {
+          console.log(
+            `[citationChecker] auto-discovered ${inserted} new competitors from ${platform}`,
+          );
+        }
+      }
+    }
+
+    // 6. Write the brand's geo_ranking row (always — denominator for
+    // citation-rate) and brand_mentions on cited responses.
     try {
       const row = await storage.createGeoRanking({
         articleId: null,
@@ -460,13 +668,68 @@ export async function runBrandPrompts(
         sourceType,
         authorityScore,
         relevanceScore: relevance,
+        sentiment: brandSentiment,
         checkedAt: new Date(),
       } as any);
       rankings.push(row);
       if (isCited) totalCited += 1;
-      console.log(`[citationChecker] prompt ${promptIdx} ${platform} saved at ${Date.now() - started}ms`);
+      console.log(
+        `[citationChecker] prompt ${promptIdx} ${platform} saved at ${Date.now() - started}ms — cited=${isCited}`,
+      );
+
+      // Brand mentions — semantic distinction from citations:
+      //   Citation = brand appeared in a ranked recommendation (geo_rankings.isCited=1)
+      //   Mention  = brand name appeared in the response at all, even if
+      //              only as a passing reference (analyzer detected it)
+      // We write a brand_mentions row whenever the analyzer surfaced the
+      // brand, NOT just on cited responses. This keeps "Brand Mentions" on
+      // client-reports meaningfully different from "Citations" — previously
+      // they were the same number since mentions were only written on
+      // cited rows.
+      //
+      // Synthetic URL makes every (run, prompt, platform) tuple unique so
+      // the (brand_id, platform, source_url) dedup index doesn't inflate on
+      // re-runs. `rank` is null when the brand was mentioned without being
+      // in a ranked list — UI can filter on this to distinguish the two.
+      const brandDetected = Boolean(brandVerdict);
+      if (brandDetected) {
+        const syntheticUrl = citingOutletUrl || `ai://${platform}/${citationRun.id}/${bp.id}`;
+        const aiPlatformLabel = `ai:${platform}`;
+        try {
+          await storage.createBrandMention({
+            brandId,
+            platform: aiPlatformLabel,
+            sourceUrl: syntheticUrl,
+            sourceTitle: bp.prompt.slice(0, 500),
+            mentionContext: brandVerdict?.context?.slice(0, 2000) || responseText.slice(0, 2000),
+            sentiment: brandSentiment ?? "neutral",
+            sentimentScore:
+              relevance !== null
+                ? (Math.max(0, Math.min(100, relevance)) / 50 - 1).toFixed(2)
+                : "0",
+            engagementScore: null,
+            mentionedAt: new Date(),
+            metadata: {
+              runId: citationRun.id,
+              brandPromptId: bp.id,
+              rank,
+              // `cited` distinguishes a full citation from a passing
+              // mention when downstream code wants only the stronger signal.
+              cited: isCited,
+            },
+          } as any);
+        } catch (mentionErr) {
+          const msg = mentionErr instanceof Error ? mentionErr.message : String(mentionErr);
+          if (!/duplicate key|unique/i.test(msg)) {
+            console.warn(`[citationChecker] brand mention insert failed — ${msg}`);
+          }
+        }
+      }
     } catch (dbErr) {
-      console.error(`[citationChecker] prompt ${promptIdx} ${platform} DB insert failed —`, dbErr instanceof Error ? dbErr.message : dbErr);
+      console.error(
+        `[citationChecker] prompt ${promptIdx} ${platform} DB insert failed —`,
+        dbErr instanceof Error ? dbErr.message : dbErr,
+      );
     }
   };
 
@@ -475,12 +738,18 @@ export async function runBrandPrompts(
       const idx = cursor++;
       if (idx >= queue.length) return;
       await runOne(queue[idx]);
+      completedCount += 1;
+      if (options.onProgress) {
+        try {
+          await options.onProgress(completedCount, totalTasks);
+        } catch (err) {
+          logger.warn({ err }, "citationChecker: onProgress callback threw");
+        }
+      }
     }
   };
 
-  await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()),
-  );
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
 
   // Finalize the run row with aggregate totals + per-platform breakdown.
   const totalChecks = rankings.length;
@@ -493,7 +762,10 @@ export async function runBrandPrompts(
     platformMap.set(r.aiPlatform, entry);
   }
   const platformBreakdown = Object.fromEntries(
-    Array.from(platformMap.entries()).map(([p, s]) => [p, { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 }]),
+    Array.from(platformMap.entries()).map(([p, s]) => [
+      p,
+      { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 },
+    ]),
   );
   await storage.updateCitationRun(citationRun.id, {
     totalChecks,
@@ -503,12 +775,16 @@ export async function runBrandPrompts(
     platformBreakdown,
   });
 
-  console.log(`[citationChecker] run ${citationRun.id} complete — ${totalCited}/${totalChecks} cited (${citationRate}%)`);
+  console.log(
+    `[citationChecker] run ${citationRun.id} complete — ${totalCited}/${totalChecks} cited (${citationRate}%)`,
+  );
 
   // Post-processing stage. All three are best-effort — a failure here must
   // never revert the rankings we already saved.
 
-  // 1. Competitor citation snapshots — one row per (competitor, platform).
+  // 1. Competitor citation snapshots — one row per (competitor, platform,
+  // runId). runId is used as the idempotency key so retries don't inflate
+  // leaderboard totals.
   for (const [competitorId, perPlatform] of Array.from(competitorDetections.entries())) {
     for (const [platform, count] of Array.from(perPlatform.entries())) {
       try {
@@ -516,9 +792,13 @@ export async function runBrandPrompts(
           competitorId,
           aiPlatform: platform,
           citationCount: count,
+          runId: citationRun.id,
         } as any);
       } catch (err) {
-        console.warn(`[citationChecker] competitor snapshot insert failed:`, err instanceof Error ? err.message : err);
+        console.warn(
+          `[citationChecker] competitor snapshot insert failed:`,
+          err instanceof Error ? err.message : err,
+        );
       }
     }
   }
@@ -529,16 +809,26 @@ export async function runBrandPrompts(
     const { recordCurrentMetrics } = await import("./lib/metricsSnapshot");
     await recordCurrentMetrics(brandId, { citationRate, totalChecks, totalCited });
   } catch (err) {
-    console.warn(`[citationChecker] metrics snapshot failed:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `[citationChecker] metrics snapshot failed:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 
   // 3. Hallucination detection — compare each cited response against the
   // brand fact sheet. Skipped if the fact sheet is empty.
   try {
-    const { detectHallucinationsForRun } = await import("./lib/hallucinationDetector");
+    const { detectHallucinationsForRun, reverifyHallucinationsForRun } =
+      await import("./lib/hallucinationDetector");
     await detectHallucinationsForRun(brandId, rankings);
+    // 3b. Re-verify: auto-close previously-flagged hallucinations whose
+    // claimedStatement no longer appears in this run's responses.
+    await reverifyHallucinationsForRun(brandId, rankings);
   } catch (err) {
-    console.warn(`[citationChecker] hallucination detection failed:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `[citationChecker] hallucination detection failed:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 
   return { totalChecks, totalCited, rankings, runId: citationRun.id };

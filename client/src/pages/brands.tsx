@@ -8,15 +8,59 @@ import PageHeader from "@/components/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type Brand } from "@shared/schema";
 import { z } from "zod";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Building2, Plus, Pencil, Trash2, Globe, Target, Megaphone, Briefcase, Sparkles, Loader2, CheckCircle2, ArrowRight, Shield } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Building2,
+  Plus,
+  Pencil,
+  Trash2,
+  Globe,
+  Target,
+  Megaphone,
+  Briefcase,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  ArrowRight,
+  Shield,
+} from "lucide-react";
 import { Link } from "wouter";
 import { normalizeWebsite, safeExternalHref } from "@/lib/urlSafety";
 import BrandFormFields from "@/components/BrandFormFields";
@@ -26,19 +70,46 @@ const formSchema = z.object({
   name: z.string().min(1, "Brand name is required"),
   companyName: z.string().min(1, "Company name is required"),
   industry: z.string().min(1, "Industry is required"),
-  description: z.string().optional().transform(v => v || undefined),
-  website: z.string().optional().transform(v => v || undefined).refine(
-    (v) => !v || normalizeWebsite(v) !== null,
-    "Enter a valid http(s) URL",
-  ),
-  tone: z.enum(["professional", "casual", "friendly", "formal", "conversational", "authoritative"]).default("professional"),
-  targetAudience: z.string().optional().transform(v => v || undefined),
-  products: z.string().optional().transform(v => v || undefined),
-  keyValues: z.string().optional().transform(v => v || undefined),
-  uniqueSellingPoints: z.string().optional().transform(v => v || undefined),
-  brandVoice: z.string().optional().transform(v => v || undefined),
-  sampleContent: z.string().optional().transform(v => v || undefined),
-  nameVariations: z.string().optional().transform(v => v || undefined),
+  description: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  website: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined)
+    .refine((v) => !v || normalizeWebsite(v) !== null, "Enter a valid http(s) URL"),
+  tone: z
+    .enum(["professional", "casual", "friendly", "formal", "conversational", "authoritative"])
+    .default("professional"),
+  targetAudience: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  products: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  keyValues: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  uniqueSellingPoints: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  brandVoice: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  sampleContent: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  nameVariations: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -57,6 +128,9 @@ export default function Brands() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    // Wave 6.2: validate on blur so users see errors after they leave a
+    // field instead of only on submit. Matches HIG expectation on web forms.
+    mode: "onBlur",
     defaultValues: {
       name: "",
       companyName: "",
@@ -126,10 +200,14 @@ export default function Brands() {
     mutationFn: async (data: FormValues) => {
       const brandData = {
         ...data,
-        products: data.products ? data.products.split(',').map(p => p.trim()) : [],
-        keyValues: data.keyValues ? data.keyValues.split(',').map(v => v.trim()) : [],
-        uniqueSellingPoints: data.uniqueSellingPoints ? data.uniqueSellingPoints.split(',').map(u => u.trim()) : [],
-        nameVariations: data.nameVariations ? data.nameVariations.split(',').map(n => n.trim()) : [],
+        products: data.products ? data.products.split(",").map((p) => p.trim()) : [],
+        keyValues: data.keyValues ? data.keyValues.split(",").map((v) => v.trim()) : [],
+        uniqueSellingPoints: data.uniqueSellingPoints
+          ? data.uniqueSellingPoints.split(",").map((u) => u.trim())
+          : [],
+        nameVariations: data.nameVariations
+          ? data.nameVariations.split(",").map((n) => n.trim())
+          : [],
       };
       return apiRequest("POST", "/api/brands", brandData);
     },
@@ -163,10 +241,14 @@ export default function Brands() {
       const { id, ...brandData } = data;
       const payload = {
         ...brandData,
-        products: brandData.products ? brandData.products.split(',').map(p => p.trim()) : [],
-        keyValues: brandData.keyValues ? brandData.keyValues.split(',').map(v => v.trim()) : [],
-        uniqueSellingPoints: brandData.uniqueSellingPoints ? brandData.uniqueSellingPoints.split(',').map(u => u.trim()) : [],
-        nameVariations: brandData.nameVariations ? brandData.nameVariations.split(',').map(n => n.trim()) : [],
+        products: brandData.products ? brandData.products.split(",").map((p) => p.trim()) : [],
+        keyValues: brandData.keyValues ? brandData.keyValues.split(",").map((v) => v.trim()) : [],
+        uniqueSellingPoints: brandData.uniqueSellingPoints
+          ? brandData.uniqueSellingPoints.split(",").map((u) => u.trim())
+          : [],
+        nameVariations: brandData.nameVariations
+          ? brandData.nameVariations.split(",").map((n) => n.trim())
+          : [],
       };
       return apiRequest("PUT", `/api/brands/${id}`, payload);
     },
@@ -224,14 +306,22 @@ export default function Brands() {
       industry: brand.industry,
       description: brand.description ?? "",
       website: brand.website ?? "",
-      tone: (brand.tone ?? "professional") as "professional" | "casual" | "friendly" | "formal" | "conversational" | "authoritative",
+      tone: (brand.tone ?? "professional") as
+        | "professional"
+        | "casual"
+        | "friendly"
+        | "formal"
+        | "conversational"
+        | "authoritative",
       targetAudience: brand.targetAudience ?? "",
-      products: Array.isArray(brand.products) ? brand.products.join(', ') : "",
-      keyValues: Array.isArray(brand.keyValues) ? brand.keyValues.join(', ') : "",
-      uniqueSellingPoints: Array.isArray(brand.uniqueSellingPoints) ? brand.uniqueSellingPoints.join(', ') : "",
+      products: Array.isArray(brand.products) ? brand.products.join(", ") : "",
+      keyValues: Array.isArray(brand.keyValues) ? brand.keyValues.join(", ") : "",
+      uniqueSellingPoints: Array.isArray(brand.uniqueSellingPoints)
+        ? brand.uniqueSellingPoints.join(", ")
+        : "",
       brandVoice: brand.brandVoice ?? "",
       sampleContent: brand.sampleContent ?? "",
-      nameVariations: Array.isArray(brand.nameVariations) ? brand.nameVariations.join(', ') : "",
+      nameVariations: Array.isArray(brand.nameVariations) ? brand.nameVariations.join(", ") : "",
     });
   }
 
@@ -275,9 +365,12 @@ export default function Brands() {
             </div>
             <div className="flex-1 space-y-4">
               <div>
-                <h2 className="text-xl font-semibold mb-1" data-testid="text-add-brand-heading">Add Your Brand</h2>
+                <h2 className="text-xl font-semibold mb-1" data-testid="text-add-brand-heading">
+                  Add Your Brand
+                </h2>
                 <p className="text-muted-foreground">
-                  Just enter your website and our AI will analyze it to create your brand profile automatically. It takes about 5 seconds.
+                  Just enter your website and our AI will analyze it to create your brand profile
+                  automatically. It takes about 5 seconds.
                 </p>
               </div>
               <div className="flex gap-3 max-w-xl">
@@ -315,11 +408,23 @@ export default function Brands() {
                 </Button>
               </div>
               {createFromWebsiteMutation.isPending && (
-                <div className="flex items-center gap-3 text-sm text-muted-foreground" data-testid="status-analyzing">
+                <div
+                  className="flex items-center gap-3 text-sm text-muted-foreground"
+                  data-testid="status-analyzing"
+                >
                   <div className="flex gap-1">
-                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <div
+                      className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
                   </div>
                   Visiting your website, reading your content, and building your brand profile...
                 </div>
@@ -359,10 +464,16 @@ export default function Brands() {
         </div>
       ) : brands && brands.length > 0 ? (
         <>
-          <h2 className="text-lg font-semibold mb-4" data-testid="text-brands-heading">Your Brands ({brands.length})</h2>
+          <h2 className="text-lg font-semibold mb-4" data-testid="text-brands-heading">
+            Your Brands ({brands.length})
+          </h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {brands.map((brand) => (
-              <Card key={brand.id} className="hover:shadow-lg transition-shadow" data-testid={`card-brand-${brand.id}`}>
+              <Card
+                key={brand.id}
+                className="hover:shadow-lg transition-shadow"
+                data-testid={`card-brand-${brand.id}`}
+              >
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -378,6 +489,7 @@ export default function Brands() {
                         size="icon"
                         onClick={() => handleEdit(brand)}
                         data-testid={`button-edit-${brand.id}`}
+                        aria-label={`Edit brand ${brand.name}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -398,7 +510,12 @@ export default function Brands() {
                   {brand.website && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Globe className="h-4 w-4" />
-                      <a href={safeExternalHref(brand.website)} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">
+                      <a
+                        href={safeExternalHref(brand.website)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline truncate"
+                      >
                         {brand.website}
                       </a>
                     </div>
@@ -416,14 +533,19 @@ export default function Brands() {
                     </div>
                   )}
                   {brand.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 pt-2 border-t">{brand.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2 pt-2 border-t">
+                      {brand.description}
+                    </p>
                   )}
                   {brand.products && brand.products.length > 0 && (
                     <div className="pt-2 border-t">
                       <p className="text-xs font-semibold mb-1">Products/Services:</p>
                       <div className="flex flex-wrap gap-1">
                         {brand.products.slice(0, 3).map((product, idx) => (
-                          <span key={idx} className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs">
+                          <span
+                            key={idx}
+                            className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs"
+                          >
                             {product}
                           </span>
                         ))}
@@ -447,13 +569,20 @@ export default function Brands() {
                   <Shield className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold mb-1">Next Step: Get Your Brand Cited by AI Engines</h3>
+                  <h3 className="font-semibold mb-1">
+                    Next Step: Get Your Brand Cited by AI Engines
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    Now that your brand is set up, follow the step-by-step checklists to ensure ChatGPT, Claude, Perplexity, Gemini, Grok, and Manus AI can find and cite your brand.
+                    Now that your brand is set up, follow the step-by-step checklists to ensure
+                    ChatGPT, Claude, Perplexity, Gemini, Grok, and Manus AI can find and cite your
+                    brand.
                   </p>
                 </div>
                 <Link href="/ai-visibility">
-                  <Button className="bg-primary hover:bg-primary/90 text-white gap-2 flex-shrink-0" data-testid="button-ai-visibility">
+                  <Button
+                    className="bg-primary hover:bg-primary/90 text-white gap-2 flex-shrink-0"
+                    data-testid="button-ai-visibility"
+                  >
                     Open Checklists
                     <ArrowRight className="w-4 h-4" />
                   </Button>
@@ -468,7 +597,8 @@ export default function Brands() {
             <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No brands yet</h3>
             <p className="text-muted-foreground text-center mb-4 max-w-md">
-              Enter your website above and we'll create your brand profile automatically. This powers all the AI optimization features in VentureCite.
+              Enter your website above and we'll create your brand profile automatically. This
+              powers all the AI optimization features in VentureCite.
             </p>
           </CardContent>
         </Card>
@@ -497,7 +627,11 @@ export default function Brands() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending} data-testid="button-save-brand">
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  data-testid="button-save-brand"
+                >
                   Create Brand
                 </Button>
               </div>
@@ -510,9 +644,7 @@ export default function Brands() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Brand</DialogTitle>
-            <DialogDescription>
-              Update your brand profile information
-            </DialogDescription>
+            <DialogDescription>Update your brand profile information</DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -529,7 +661,11 @@ export default function Brands() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateMutation.isPending} data-testid="button-save-brand">
+                <Button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  data-testid="button-save-brand"
+                >
                   Update Brand
                 </Button>
               </div>

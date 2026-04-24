@@ -38,11 +38,14 @@ export interface JudgeVerdict {
 function buildProfileBlock(brand: JudgeBrand): string {
   const lines: string[] = [];
   lines.push(`- Name: ${brand.name}`);
-  if (brand.companyName && brand.companyName !== brand.name) lines.push(`- Full company name: ${brand.companyName}`);
+  if (brand.companyName && brand.companyName !== brand.name)
+    lines.push(`- Full company name: ${brand.companyName}`);
   if (brand.website) lines.push(`- Website: ${brand.website}`);
   if (brand.industry) lines.push(`- Industry: ${brand.industry}`);
   if (brand.description) lines.push(`- Description: ${brand.description}`);
-  const variations = (brand.nameVariations || []).filter((v) => typeof v === "string" && v.trim().length > 0);
+  const variations = (brand.nameVariations || []).filter(
+    (v) => typeof v === "string" && v.trim().length > 0,
+  );
   if (variations.length > 0) lines.push(`- Also known as: ${variations.join(", ")}`);
   return lines.join("\n");
 }
@@ -55,9 +58,10 @@ export async function judgeCitation(params: {
   brand: JudgeBrand;
 }): Promise<JudgeVerdict> {
   const { responseText, brand } = params;
-  const truncated = responseText.length > MAX_RESPONSE_CHARS
-    ? responseText.slice(0, MAX_RESPONSE_CHARS)
-    : responseText;
+  const truncated =
+    responseText.length > MAX_RESPONSE_CHARS
+      ? responseText.slice(0, MAX_RESPONSE_CHARS)
+      : responseText;
 
   const profile = buildProfileBlock(brand);
 
@@ -97,13 +101,20 @@ Respond with JSON only.`;
   try {
     const parsed = JSON.parse(raw);
     const cited = Boolean(parsed.cited);
-    const rank = typeof parsed.rank === "number" && parsed.rank > 0 ? Math.round(parsed.rank) : null;
-    const relevance = typeof parsed.relevance === "number"
-      ? Math.max(0, Math.min(100, Math.round(parsed.relevance)))
-      : null;
+    const rank =
+      typeof parsed.rank === "number" && parsed.rank > 0 ? Math.round(parsed.rank) : null;
+    const relevance =
+      typeof parsed.relevance === "number"
+        ? Math.max(0, Math.min(100, Math.round(parsed.relevance)))
+        : null;
     const reasoning = typeof parsed.reasoning === "string" ? parsed.reasoning : "";
     return { cited, rank: cited ? rank : null, relevance, reasoning };
   } catch {
-    return { cited: false, rank: null, relevance: null, reasoning: "Judge returned malformed JSON" };
+    return {
+      cited: false,
+      rank: null,
+      relevance: null,
+      reasoning: "Judge returned malformed JSON",
+    };
   }
 }

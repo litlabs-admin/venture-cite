@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { attachAiLogger } from "./aiLogger";
 import { MODELS, OPENROUTER_BASE_URL } from "./modelConfig";
 import { safeFetchText } from "./ssrf";
+import { matchEntity } from "./brandMatcher";
 import type { Brand, Listicle } from "@shared/schema";
 
 const openai = new OpenAI({
@@ -34,7 +35,11 @@ function safeParseJson<T = any>(raw: string | null | undefined): T | null {
   const stripped = raw.replace(/```json\s*|\s*```/g, "").trim();
   const match = stripped.match(/[\[{][\s\S]*[\]}]/);
   const candidate = match ? match[0] : stripped;
-  try { return JSON.parse(candidate) as T; } catch { return null; }
+  try {
+    return JSON.parse(candidate) as T;
+  } catch {
+    return null;
+  }
 }
 
 function htmlToText(html: string): string {
@@ -49,7 +54,8 @@ function htmlToText(html: string): string {
 function buildQueries(brand: Brand): string[] {
   const q: string[] = [];
   const industry = brand.industry || "";
-  const product = Array.isArray(brand.products) && brand.products.length > 0 ? brand.products[0] : industry;
+  const product =
+    Array.isArray(brand.products) && brand.products.length > 0 ? brand.products[0] : industry;
   const year = new Date().getFullYear();
   if (industry) q.push(`best ${industry} tools`);
   if (industry) q.push(`top ${industry} companies ${year}`);
@@ -59,7 +65,11 @@ function buildQueries(brand: Brand): string[] {
   return q.filter(Boolean).slice(0, MAX_QUERIES);
 }
 
-interface PerplexityUrl { url: string; title?: string; snippet?: string }
+interface PerplexityUrl {
+  url: string;
+  title?: string;
+  snippet?: string;
+}
 
 /**
  * Weekly cron. Use Perplexity's web-search model to find currently-published
@@ -69,10 +79,11 @@ interface PerplexityUrl { url: string; title?: string; snippet?: string }
  * Rows where the brand isn't in the list are still stored (isIncluded=0) as
  * outreach targets.
  */
-export async function scanBrandListicles(brandId: string): Promise<number> {
+export async function scanBrandListicles(
+  brandId: string,
+): Promise<{ inserted: number; candidates: number; reason: "ok" | "no_candidates" }> {
   if (!openrouter) {
-    console.log(`[listicleScanner] skipping — OPENROUTER_API_KEY not configured`);
-    return 0;
+    throw new Error("OPENROUTER_API_KEY not configured");
   }
   const brand = await storage.getBrandById(brandId);
   if (!brand) throw new Error("Brand not found");
@@ -81,7 +92,7 @@ export async function scanBrandListicles(brandId: string): Promise<number> {
   const existingUrls = new Set(existing.map((l: Listicle) => l.url.toLowerCase()));
 
   const queries = buildQueries(brand);
-  if (queries.length === 0) return 0;
+  if (queries.length === 0) return { inserted: 0, candidates: 0, reason: "no_candidates" };
 
   const candidateUrls = new Map<string, { query: string; title?: string }>();
   for (const q of queries) {
@@ -92,7 +103,10 @@ export async function scanBrandListicles(brandId: string): Promise<number> {
         if (!candidateUrls.has(key)) candidateUrls.set(key, { query: q, title: u.title });
       }
     } catch (err) {
-      console.warn(`[listicleScanner] perplexity "${q}" failed:`, err instanceof Error ? err.message : err);
+      console.warn(
+        `[listicleScanner] perplexity "${q}" failed:`,
+        err instanceof Error ? err.message : err,
+      );
     }
   }
 
@@ -102,10 +116,15 @@ export async function scanBrandListicles(brandId: string): Promise<number> {
 
     let html = "";
     try {
-      const { status, text } = await safeFetchText(url, { maxBytes: 5 * 1024 * 1024, timeoutMs: 15_000 });
+      const { status, text } = await safeFetchText(url, {
+        maxBytes: 5 * 1024 * 1024,
+        timeoutMs: 15_000,
+      });
       if (status < 200 || status >= 300) continue;
       html = text;
-    } catch { continue; }
+    } catch {
+      continue;
+    }
 
     const pageText = htmlToText(html).slice(0, MAX_PAGE_CHARS);
     if (pageText.length < 300) continue;
@@ -113,7 +132,24 @@ export async function scanBrandListicles(brandId: string): Promise<number> {
     const parsed = await parseListicle(pageText, brand).catch(() => null);
     if (!parsed || !parsed.isListicle) continue;
 
-    const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } })();
+    const host = (() => {
+      try {
+        return new URL(url).hostname.replace(/^www\./, "");
+      } catch {
+        return "";
+      }
+    })();
+
+    // Shared matcher decides isIncluded — authoritative over the LLM's
+    // mentionsBrand guess. The LLM can hallucinate; variant-matching against
+    // the actual page text can't.
+    const matcherResult = matchEntity(pageText, {
+      id: brand.id,
+      name: brand.name,
+      nameVariations: Array.isArray(brand.nameVariations) ? brand.nameVariations : [],
+      website: brand.website ?? null,
+    });
+    const isIncluded = matcherResult.matched || Boolean(parsed.mentionsBrand) ? 1 : 0;
 
     try {
       await storage.createListicle({
@@ -123,19 +159,30 @@ export async function scanBrandListicles(brandId: string): Promise<number> {
         sourcePublication: host,
         listPosition: parsed.brandPosition ?? null,
         totalListItems: parsed.totalItems ?? null,
-        isIncluded: parsed.mentionsBrand ? 1 : 0,
-        competitorsMentioned: Array.isArray(parsed.items) ? parsed.items.map((i: any) => String(i.name).slice(0, 120)).slice(0, 30) : [],
+        isIncluded,
+        competitorsMentioned: Array.isArray(parsed.items)
+          ? parsed.items.map((i: any) => String(i.name).slice(0, 120)).slice(0, 30)
+          : [],
         keyword: meta.query,
         lastChecked: new Date(),
       } as any);
       inserted += 1;
     } catch (err) {
-      console.warn(`[listicleScanner] insert failed for ${url}:`, err instanceof Error ? err.message : err);
+      console.warn(
+        `[listicleScanner] insert failed for ${url}:`,
+        err instanceof Error ? err.message : err,
+      );
     }
   }
 
-  console.log(`[listicleScanner] brand=${brandId} candidates=${candidateUrls.size} inserted=${inserted}`);
-  return inserted;
+  console.log(
+    `[listicleScanner] brand=${brandId} candidates=${candidateUrls.size} inserted=${inserted}`,
+  );
+  return {
+    inserted,
+    candidates: candidateUrls.size,
+    reason: candidateUrls.size === 0 ? "no_candidates" : "ok",
+  };
 }
 
 async function searchPerplexity(query: string): Promise<PerplexityUrl[]> {
@@ -143,12 +190,11 @@ async function searchPerplexity(query: string): Promise<PerplexityUrl[]> {
   const completion = await openrouter.chat.completions.create({
     model: MODELS.citationPerplexity,
     temperature: 0,
-    response_format: { type: "json_object" },
     max_tokens: 1500,
     messages: [
       {
         role: "system",
-        content: `You are a web search assistant. Given a search query, return up to ${MAX_URLS_PER_QUERY} real URLs of currently-published listicles or "best of" articles that would appear on Google's first page for this query. Return JSON: {"urls": [{"url": "https://...", "title": "...", "snippet": "..."}]}. Only real URLs you can verify exist right now.`,
+        content: `You are a web search assistant. Given a search query, return up to ${MAX_URLS_PER_QUERY} real URLs of currently-published listicles or "best of" articles that would appear on Google's first page for this query. Respond with ONLY a JSON object of this exact shape (no prose, no markdown fences): {"urls": [{"url": "https://...", "title": "...", "snippet": "..."}]}. Only real URLs you can verify exist right now.`,
       },
       { role: "user", content: query },
     ],
@@ -160,7 +206,10 @@ async function searchPerplexity(query: string): Promise<PerplexityUrl[]> {
     .slice(0, MAX_URLS_PER_QUERY);
 }
 
-async function parseListicle(pageText: string, brand: Brand): Promise<{
+async function parseListicle(
+  pageText: string,
+  brand: Brand,
+): Promise<{
   isListicle: boolean;
   title?: string;
   items?: Array<{ position: number; name: string; domain?: string }>;

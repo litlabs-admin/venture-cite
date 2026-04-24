@@ -8,6 +8,51 @@ import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
 
+// Wave 6.1: SPA routes the client router knows about. Anything else is a
+// genuine not-found — we still serve index.html (so the client NotFound page
+// renders), but with a 404 status so crawlers don't index garbage URLs.
+// Keep this in sync with client/src/App.tsx `<Route path="…">` declarations.
+const KNOWN_ROUTES: RegExp[] = [
+  /^\/$/,
+  /^\/login$/,
+  /^\/register$/,
+  /^\/forgot-password$/,
+  /^\/reset-password$/,
+  /^\/privacy$/,
+  /^\/pricing$/,
+  /^\/article\/[^/]+$/,
+  /^\/dashboard$/,
+  /^\/content$/,
+  /^\/citations$/,
+  /^\/articles$/,
+  /^\/brands$/,
+  /^\/keyword-research$/,
+  /^\/ai-visibility$/,
+  /^\/ai-intelligence$/,
+  /^\/geo-rankings$/,
+  /^\/geo-analytics$/,
+  /^\/geo-tools$/,
+  /^\/geo-signals$/,
+  /^\/revenue-analytics$/,
+  /^\/publications$/,
+  /^\/competitors$/,
+  /^\/crawler-check$/,
+  /^\/opportunities$/,
+  /^\/agent$/,
+  /^\/outreach$/,
+  /^\/ai-traffic$/,
+  /^\/analytics-integrations$/,
+  /^\/faq-manager$/,
+  /^\/client-reports$/,
+  /^\/brand-fact-sheet$/,
+  /^\/community$/,
+  /^\/settings$/,
+];
+
+function isKnownRoute(pathname: string): boolean {
+  return KNOWN_ROUTES.some((re) => re.test(pathname));
+}
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -45,21 +90,15 @@ export async function setupVite(app: Express, server: Server) {
     const url = req.originalUrl;
 
     try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
-        "index.html",
-      );
+      const clientTemplate = path.resolve(import.meta.dirname, "..", "client", "index.html");
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
-      );
+      template = template.replace(`src="/src/main.tsx"`, `src="/src/main.tsx?v=${nanoid()}"`);
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      const pathname = req.path.split("?")[0];
+      const status = isKnownRoute(pathname) ? 200 : 404;
+      res.status(status).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -78,8 +117,12 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // SPA fallback — serve index.html for everything that didn't match a
+  // static asset. Return 404 for unknown paths so Googlebot doesn't index
+  // garbage URLs; the client router still renders the NotFound page.
+  app.use("*", (req, res) => {
+    const pathname = req.path.split("?")[0];
+    const status = isKnownRoute(pathname) ? 200 : 404;
+    res.status(status).sendFile(path.resolve(distPath, "index.html"));
   });
 }

@@ -1,27 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
-import { 
-  MessageSquare, 
-  HelpCircle, 
-  Youtube, 
-  Linkedin, 
-  BookOpen, 
+import {
+  MessageSquare,
+  HelpCircle,
+  Youtube,
+  Linkedin,
+  BookOpen,
   Rocket,
   ExternalLink,
   TrendingUp,
   Target,
   Lightbulb,
   Users,
-  BarChart3
+  BarChart3,
 } from "lucide-react";
 import { SiReddit, SiQuora, SiWikipedia, SiYcombinator, SiProducthunt } from "react-icons/si";
 
@@ -68,21 +75,26 @@ interface OpportunitiesData {
 }
 
 const platformIcons: Record<string, JSX.Element> = {
-  'Reddit': <SiReddit className="h-5 w-5 text-orange-500" />,
-  'Quora': <SiQuora className="h-5 w-5 text-red-600" />,
-  'YouTube': <Youtube className="h-5 w-5 text-red-500" />,
-  'LinkedIn': <Linkedin className="h-5 w-5 text-blue-600" />,
-  'Medium': <BookOpen className="h-5 w-5 text-gray-800 dark:text-gray-200" />,
-  'Hacker News': <SiYcombinator className="h-5 w-5 text-orange-500" />,
-  'Product Hunt': <SiProducthunt className="h-5 w-5 text-orange-600" />,
-  'Wikipedia': <SiWikipedia className="h-5 w-5 text-gray-600" />,
+  Reddit: <SiReddit className="h-5 w-5 text-orange-500" />,
+  Quora: <SiQuora className="h-5 w-5 text-red-600" />,
+  YouTube: <Youtube className="h-5 w-5 text-red-500" />,
+  LinkedIn: <Linkedin className="h-5 w-5 text-blue-600" />,
+  Medium: <BookOpen className="h-5 w-5 text-gray-800 dark:text-gray-200" />,
+  "Hacker News": <SiYcombinator className="h-5 w-5 text-orange-500" />,
+  "Product Hunt": <SiProducthunt className="h-5 w-5 text-orange-600" />,
+  Wikipedia: <SiWikipedia className="h-5 w-5 text-gray-600" />,
 };
 
 export default function GeoOpportunities() {
   const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
 
-  const { data: opportunitiesResponse, isLoading: oppsLoading } = useQuery<{ success: boolean; data: OpportunitiesData }>({
-    queryKey: selectedBrandId ? ["/api/geo-opportunities", selectedBrandId] : ["/api/geo-opportunities"],
+  const { data: opportunitiesResponse, isLoading: oppsLoading } = useQuery<{
+    success: boolean;
+    data: OpportunitiesData;
+  }>({
+    queryKey: selectedBrandId
+      ? ["/api/geo-opportunities", selectedBrandId]
+      : ["/api/geo-opportunities"],
     enabled: true,
   });
 
@@ -91,7 +103,9 @@ export default function GeoOpportunities() {
 
   return (
     <div className="space-y-8">
-      <Helmet><title>GEO Opportunities - VentureCite</title></Helmet>
+      <Helmet>
+        <title>GEO Opportunities - VentureCite</title>
+      </Helmet>
       <PageHeader
         title="GEO Opportunities"
         description="Discover where to post content for maximum AI visibility"
@@ -111,9 +125,13 @@ export default function GeoOpportunities() {
               <CardContent className="p-4 flex items-start gap-3">
                 <Lightbulb className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Industry benchmarks — select a brand to see your data</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    Industry benchmarks — select a brand to see your data
+                  </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    The figures below are category-wide AI citation benchmarks, not your brand's results. Pick a brand above to replace them with your actual per-platform citation share.
+                    The figures below are category-wide AI citation benchmarks, not your brand's
+                    results. Pick a brand above to replace them with your actual per-platform
+                    citation share.
                   </p>
                 </div>
               </CardContent>
@@ -123,11 +141,19 @@ export default function GeoOpportunities() {
             <Card>
               <CardContent className="p-4 flex items-start gap-3">
                 <Lightbulb className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
-                <div>
+                <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">No citation data yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Run a citation check from the Citations page to populate this breakdown with real per-platform data for {opportunities.brand.name}. Until then, the numbers below are zeros, not industry averages.
+                  <p className="text-sm text-muted-foreground mt-1 mb-3">
+                    Run a citation check from the Citations page to populate this breakdown with
+                    real per-platform data for {opportunities.brand.name}. Until then, the numbers
+                    below are zeros, not industry averages.
                   </p>
+                  <Link href="/citations">
+                    <Button size="sm" data-testid="button-run-citation-check">
+                      Run Citation Check
+                      <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -136,10 +162,15 @@ export default function GeoOpportunities() {
             <Card>
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Third-Party Citations</span>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Third-Party Citations
+                  </span>
                   <MessageSquare className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-third-party">
+                <p
+                  className="text-3xl font-semibold text-foreground tracking-tight"
+                  data-testid="stat-third-party"
+                >
                   {opportunities.keyStats.thirdPartyCitationShare}%
                 </p>
               </CardContent>
@@ -147,10 +178,15 @@ export default function GeoOpportunities() {
             <Card>
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reddit Citations</span>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Reddit Citations
+                  </span>
                   <SiReddit className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-reddit">
+                <p
+                  className="text-3xl font-semibold text-foreground tracking-tight"
+                  data-testid="stat-reddit"
+                >
                   {opportunities.keyStats.redditCitationShare}%
                 </p>
               </CardContent>
@@ -158,10 +194,15 @@ export default function GeoOpportunities() {
             <Card>
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quora Citations</span>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Quora Citations
+                  </span>
                   <SiQuora className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-quora">
+                <p
+                  className="text-3xl font-semibold text-foreground tracking-tight"
+                  data-testid="stat-quora"
+                >
                   {opportunities.keyStats.quoraCitationShare}%
                 </p>
               </CardContent>
@@ -169,10 +210,15 @@ export default function GeoOpportunities() {
             <Card>
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Brand Site Citations</span>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Brand Site Citations
+                  </span>
                   <Target className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <p className="text-3xl font-semibold text-foreground tracking-tight" data-testid="stat-brand">
+                <p
+                  className="text-3xl font-semibold text-foreground tracking-tight"
+                  data-testid="stat-brand"
+                >
                   {opportunities.keyStats.brandWebsiteCitationShare}%
                 </p>
               </CardContent>
@@ -188,9 +234,18 @@ export default function GeoOpportunities() {
             </CardHeader>
             <CardContent>
               <p className="text-lg">
-                <strong>{opportunities.keyStats.thirdPartyCitationShare}% of AI citations come from third-party sources</strong> like Reddit and Quora.
-                {opportunities.brand ? " Your" : " Brand"} website{opportunities.brand ? "" : "s"} account{opportunities.brand ? "s" : ""} for {opportunities.keyStats.brandWebsiteCitationShare}% of citations.
-                <span className="text-amber-600 font-medium"> Focus your content strategy on community platforms!</span>
+                <strong>
+                  {opportunities.keyStats.thirdPartyCitationShare}% of AI citations come from
+                  third-party sources
+                </strong>{" "}
+                like Reddit and Quora.
+                {opportunities.brand ? " Your" : " Brand"} website{opportunities.brand ? "" : "s"}{" "}
+                account{opportunities.brand ? "s" : ""} for{" "}
+                {opportunities.keyStats.brandWebsiteCitationShare}% of citations.
+                <span className="text-amber-600 font-medium">
+                  {" "}
+                  Focus your content strategy on community platforms!
+                </span>
               </p>
             </CardContent>
           </Card>
@@ -220,11 +275,15 @@ export default function GeoOpportunities() {
                       <div key={platform.name} className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
-                            <span className="text-2xl font-bold text-muted-foreground">#{index + 1}</span>
+                            <span className="text-2xl font-bold text-muted-foreground">
+                              #{index + 1}
+                            </span>
                             {platformIcons[platform.name] || <Rocket className="h-5 w-5" />}
                             <div>
                               <h3 className="font-semibold">{platform.name}</h3>
-                              <p className="text-sm text-muted-foreground">{platform.description}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {platform.description}
+                              </p>
                             </div>
                           </div>
                           <Badge variant="secondary" className="text-lg px-3 py-1">
@@ -276,7 +335,9 @@ export default function GeoOpportunities() {
                         data-testid={`link-subreddit-${sub.subreddit}`}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono font-semibold text-orange-600">{sub.subreddit}</span>
+                          <span className="font-mono font-semibold text-orange-600">
+                            {sub.subreddit}
+                          </span>
                           <div className="flex items-center gap-2">
                             <Badge variant="secondary">
                               <Users className="h-3 w-3 mr-1" />
@@ -296,10 +357,22 @@ export default function GeoOpportunities() {
                       Reddit Success Tips
                     </h4>
                     <ul className="text-sm space-y-2">
-                      <li>• <strong>Build karma first:</strong> Comment genuinely for 2-4 weeks before posting links</li>
-                      <li>• <strong>Be helpful:</strong> Answer questions with real experience, include pros AND cons</li>
-                      <li>• <strong>Avoid marketing speak:</strong> Reddit users can spot promotion instantly</li>
-                      <li>• <strong>Link strategically:</strong> Only add links when they genuinely help the discussion</li>
+                      <li>
+                        • <strong>Build karma first:</strong> Comment genuinely for 2-4 weeks before
+                        posting links
+                      </li>
+                      <li>
+                        • <strong>Be helpful:</strong> Answer questions with real experience,
+                        include pros AND cons
+                      </li>
+                      <li>
+                        • <strong>Avoid marketing speak:</strong> Reddit users can spot promotion
+                        instantly
+                      </li>
+                      <li>
+                        • <strong>Link strategically:</strong> Only add links when they genuinely
+                        help the discussion
+                      </li>
                     </ul>
                   </div>
                 </CardContent>
@@ -325,7 +398,7 @@ export default function GeoOpportunities() {
                     {opportunities.quoraTopics.map((topic) => (
                       <a
                         key={topic}
-                        href={`https://quora.com/topic/${topic.replace(/\s+/g, '-')}`}
+                        href={`https://quora.com/topic/${topic.replace(/\s+/g, "-")}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-full hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
@@ -344,10 +417,22 @@ export default function GeoOpportunities() {
                       Quora Success Tips
                     </h4>
                     <ul className="text-sm space-y-2">
-                      <li>• <strong>Answer format:</strong> Keep core answer 40-60 words (optimal for AI summaries)</li>
-                      <li>• <strong>Add depth:</strong> Include detailed examples and context below the summary</li>
-                      <li>• <strong>Be consistent:</strong> Answer regularly to build topical authority</li>
-                      <li>• <strong>Target high-follower questions:</strong> More followers = more visibility</li>
+                      <li>
+                        • <strong>Answer format:</strong> Keep core answer 40-60 words (optimal for
+                        AI summaries)
+                      </li>
+                      <li>
+                        • <strong>Add depth:</strong> Include detailed examples and context below
+                        the summary
+                      </li>
+                      <li>
+                        • <strong>Be consistent:</strong> Answer regularly to build topical
+                        authority
+                      </li>
+                      <li>
+                        • <strong>Target high-follower questions:</strong> More followers = more
+                        visibility
+                      </li>
                     </ul>
                   </div>
                 </CardContent>
@@ -364,9 +449,7 @@ export default function GeoOpportunities() {
                       <Badge variant="outline">for {opportunities.brand.name}</Badge>
                     )}
                   </CardTitle>
-                  <CardDescription>
-                    Content formats that AI systems love to cite
-                  </CardDescription>
+                  <CardDescription>Content formats that AI systems love to cite</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {opportunities.contentIdeas && opportunities.contentIdeas.length > 0 ? (
@@ -389,7 +472,8 @@ export default function GeoOpportunities() {
                       </p>
                       <div className="space-y-3 text-left max-w-md mx-auto">
                         <div className="p-3 bg-muted rounded-lg">
-                          <strong>How-to Guides:</strong> Answer specific problems your audience faces
+                          <strong>How-to Guides:</strong> Answer specific problems your audience
+                          faces
                         </div>
                         <div className="p-3 bg-muted rounded-lg">
                           <strong>Industry Trends:</strong> Share predictions and analysis

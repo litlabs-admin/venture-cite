@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,16 +17,7 @@ import { Link, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { isAllowedStripeRedirect } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Check,
-  ArrowLeft,
-  Sparkles,
-  Crown,
-  Zap,
-  Users,
-  Gift,
-  Loader2
-} from "lucide-react";
+import { Check, ArrowLeft, Sparkles, Crown, Zap, Users, Gift, Loader2 } from "lucide-react";
 
 interface StripeProduct {
   id: string;
@@ -87,8 +85,8 @@ export default function Pricing() {
   });
 
   const formatPrice = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
       currency: currency.toUpperCase(),
     }).format(amount / 100);
   };
@@ -104,11 +102,11 @@ export default function Pricing() {
         "5 AI-generated articles/month",
         "Auto-humanization included",
         "Basic GEO rankings",
-        "Community support"
+        "Community support",
       ],
       cta: "Get Started",
       popular: false,
-      tier: "free"
+      tier: "free",
     },
     {
       name: "Pro",
@@ -122,11 +120,11 @@ export default function Pricing() {
         "Full GEO rankings & analytics",
         "AI Intelligence dashboard",
         "Publication Intelligence",
-        "Priority support"
+        "Priority support",
       ],
       cta: "Start Free Trial",
       popular: true,
-      tier: "pro"
+      tier: "pro",
     },
     {
       name: "Enterprise",
@@ -141,25 +139,32 @@ export default function Pricing() {
         "AI Traffic Analytics",
         "Custom integrations",
         "Dedicated account manager",
-        "SSO & advanced security"
+        "SSO & advanced security",
       ],
       cta: "Contact Sales",
       popular: false,
-      tier: "enterprise"
-    }
+      tier: "enterprise",
+    },
   ];
 
   return (
     <>
       <Helmet>
         <title>Pricing - GEO Platform</title>
-        <meta name="description" content="Choose the right plan for your GEO optimization needs. Free, Pro, and Enterprise options available." />
+        <meta
+          name="description"
+          content="Choose the right plan for your GEO optimization needs. Free, Pro, and Enterprise options available."
+        />
       </Helmet>
-      
+
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="container mx-auto px-4 py-12">
           <div className="mb-8">
-            <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4" data-testid="link-back">
+            <Link
+              href="/"
+              className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+              data-testid="link-back"
+            >
               <ArrowLeft className="w-4 h-4 mr-1" /> Back to Home
             </Link>
           </div>
@@ -167,13 +172,17 @@ export default function Pricing() {
           {success && (
             <div className="mb-8 p-4 bg-green-100 border border-green-300 rounded-lg text-center">
               <Check className="w-6 h-6 inline mr-2 text-green-600" />
-              <span className="text-green-800 font-medium">Payment successful! Your subscription is now active.</span>
+              <span className="text-green-800 font-medium">
+                Payment successful! Your subscription is now active.
+              </span>
             </div>
           )}
 
           {canceled && (
             <div className="mb-8 p-4 bg-yellow-100 border border-yellow-300 rounded-lg text-center">
-              <span className="text-yellow-800 font-medium">Checkout was canceled. No charges were made.</span>
+              <span className="text-yellow-800 font-medium">
+                Checkout was canceled. No charges were made.
+              </span>
             </div>
           )}
 
@@ -185,24 +194,30 @@ export default function Pricing() {
               Choose Your GEO Plan
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Optimize your brand's visibility in AI search engines with our comprehensive GEO platform
+              Optimize your brand's visibility in AI search engines with our comprehensive GEO
+              platform
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 mb-12 max-w-5xl mx-auto">
-            {(products.length > 0 ? products.map((product, idx) => ({
-              name: product.name,
-              description: product.description || "",
-              price: product.prices[0] ? formatPrice(product.prices[0].unit_amount, product.prices[0].currency) : "$0",
-              interval: product.prices[0]?.recurring?.interval || "month",
-              features: (product.metadata?.features || "").split(",").filter(Boolean),
-              priceId: product.prices[0]?.id,
-              popular: product.metadata?.popular === "true",
-              tier: product.metadata?.tier || "pro"
-            })) : defaultPlans).map((plan, idx) => (
-              <Card 
-                key={plan.name} 
-                className={`relative ${plan.popular ? 'border-2 border-purple-500 shadow-lg scale-105' : ''}`}
+            {(products.length > 0
+              ? products.map((product, idx) => ({
+                  name: product.name,
+                  description: product.description || "",
+                  price: product.prices[0]
+                    ? formatPrice(product.prices[0].unit_amount, product.prices[0].currency)
+                    : "$0",
+                  interval: product.prices[0]?.recurring?.interval || "month",
+                  features: (product.metadata?.features || "").split(",").filter(Boolean),
+                  priceId: product.prices[0]?.id,
+                  popular: product.metadata?.popular === "true",
+                  tier: product.metadata?.tier || "pro",
+                }))
+              : defaultPlans
+            ).map((plan, idx) => (
+              <Card
+                key={plan.name}
+                className={`relative ${plan.popular ? "border-2 border-purple-500 shadow-lg scale-105" : ""}`}
                 data-testid={`pricing-card-${plan.name.toLowerCase()}`}
               >
                 {plan.popular && (
@@ -231,8 +246,8 @@ export default function Pricing() {
                   </ul>
                 </CardContent>
                 <CardFooter>
-                  <Button 
-                    className={`w-full ${plan.popular ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
+                  <Button
+                    className={`w-full ${plan.popular ? "bg-purple-600 hover:bg-purple-700" : ""}`}
                     variant={plan.popular ? "default" : "outline"}
                     onClick={() => {
                       if ((plan as any).priceId) {
@@ -240,14 +255,22 @@ export default function Pricing() {
                       } else if (plan.tier === "free") {
                         window.location.href = "/";
                       } else {
-                        toast({ title: "Products not configured yet. Please set up Stripe products." });
+                        toast({
+                          title: "Products not configured yet. Please set up Stripe products.",
+                        });
                       }
                     }}
                     disabled={checkoutMutation.isPending}
                     data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
                   >
-                    {checkoutMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    {plan.tier === "free" ? "Get Started" : plan.tier === "enterprise" ? "Contact Sales" : "Start Free Trial"}
+                    {checkoutMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    {plan.tier === "free"
+                      ? "Get Started"
+                      : plan.tier === "enterprise"
+                        ? "Contact Sales"
+                        : "Start Free Trial"}
                   </Button>
                 </CardFooter>
               </Card>
@@ -271,12 +294,16 @@ export default function Pricing() {
                   className="flex-1"
                   data-testid="input-beta-code"
                 />
-                <Button 
+                <Button
                   onClick={() => betaCodeMutation.mutate(betaCode)}
                   disabled={!betaCode || betaCodeMutation.isPending}
                   data-testid="button-redeem-code"
                 >
-                  {betaCodeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Redeem"}
+                  {betaCodeMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Redeem"
+                  )}
                 </Button>
               </div>
             </CardContent>

@@ -5,16 +5,22 @@ import PageHeader from "@/components/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  TrendingUp,
+  TrendingDown,
   Minus,
-  Eye, 
-  PieChart, 
-  MessageSquare, 
+  Eye,
+  PieChart,
+  MessageSquare,
   Users,
   ThumbsUp,
   ThumbsDown,
@@ -22,7 +28,7 @@ import {
   Trophy,
   Target,
   BarChart3,
-  Zap
+  Zap,
 } from "lucide-react";
 import { SiOpenai, SiGoogle } from "react-icons/si";
 import BrandSelector from "@/components/BrandSelector";
@@ -69,41 +75,45 @@ interface GeoAnalyticsData {
 }
 
 const AI_PLATFORM_ICONS: Record<string, JSX.Element> = {
-  'ChatGPT': <SiOpenai className="h-4 w-4" />,
-  'Claude': <span className="text-sm font-bold">C</span>,
-  'Grok': <span className="text-sm font-bold">X</span>,
-  'Gemini': <SiGoogle className="h-4 w-4" />,
-  'Perplexity': <span className="text-sm font-bold">P</span>,
-  'Microsoft Copilot': <span className="text-sm font-bold">M</span>,
-  'Meta AI': <span className="text-sm font-bold">M</span>,
-  'DeepSeek': <span className="text-sm font-bold">D</span>,
-  'Bing AI': <span className="text-sm font-bold">B</span>,
+  ChatGPT: <SiOpenai className="h-4 w-4" />,
+  Claude: <span className="text-sm font-bold">C</span>,
+  Grok: <span className="text-sm font-bold">X</span>,
+  Gemini: <SiGoogle className="h-4 w-4" />,
+  Perplexity: <span className="text-sm font-bold">P</span>,
+  "Microsoft Copilot": <span className="text-sm font-bold">M</span>,
+  "Meta AI": <span className="text-sm font-bold">M</span>,
+  DeepSeek: <span className="text-sm font-bold">D</span>,
+  "Bing AI": <span className="text-sm font-bold">B</span>,
 };
 
 function getVisibilityColor(score: number): string {
-  if (score >= 70) return 'text-green-600';
-  if (score >= 40) return 'text-yellow-600';
-  return 'text-red-600';
+  if (score >= 70) return "text-green-600";
+  if (score >= 40) return "text-yellow-600";
+  return "text-red-600";
 }
 
 function getVisibilityLabel(score: number): string {
-  if (score >= 80) return 'Excellent';
-  if (score >= 60) return 'Good';
-  if (score >= 40) return 'Fair';
-  if (score >= 20) return 'Poor';
-  return 'Very Low';
+  if (score >= 80) return "Excellent";
+  if (score >= 60) return "Good";
+  if (score >= 40) return "Fair";
+  if (score >= 20) return "Poor";
+  return "Very Low";
 }
 
 function getSentimentIcon(label: string) {
-  if (label === 'Positive') return <ThumbsUp className="h-5 w-5 text-green-500" />;
-  if (label === 'Negative') return <ThumbsDown className="h-5 w-5 text-red-500" />;
+  if (label === "Positive") return <ThumbsUp className="h-5 w-5 text-green-500" />;
+  if (label === "Negative") return <ThumbsDown className="h-5 w-5 text-red-500" />;
   return <Meh className="h-5 w-5 text-gray-500" />;
 }
 
 export default function GeoAnalytics() {
   const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
 
-  const { data: analyticsResponse, isLoading: analyticsLoading, error } = useQuery<{ success: boolean; data: GeoAnalyticsData }>({
+  const {
+    data: analyticsResponse,
+    isLoading: analyticsLoading,
+    error,
+  } = useQuery<{ success: boolean; data: GeoAnalyticsData }>({
     queryKey: ["/api/geo-analytics", selectedBrandId],
     enabled: !!selectedBrandId,
   });
@@ -112,7 +122,9 @@ export default function GeoAnalytics() {
 
   return (
     <div className="space-y-8">
-      <Helmet><title>GEO Analytics - VentureCite</title></Helmet>
+      <Helmet>
+        <title>GEO Analytics - VentureCite</title>
+      </Helmet>
       <PageHeader
         title="GEO Analytics"
         description="AI Visibility Score, Share of Voice, and Sentiment Analysis"
@@ -122,7 +134,13 @@ export default function GeoAnalytics() {
       {brandsLoading && brands.length === 0 ? (
         <Skeleton className="h-10 w-[300px]" />
       ) : brands.length === 0 ? (
-        <Card><CardContent className="p-6"><p className="text-muted-foreground">No brands found. Create a brand first to see analytics.</p></CardContent></Card>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-muted-foreground">
+              No brands found. Create a brand first to see analytics.
+            </p>
+          </CardContent>
+        </Card>
       ) : null}
 
       {!selectedBrandId ? (
@@ -131,7 +149,8 @@ export default function GeoAnalytics() {
             <Eye className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Select a Brand to View Analytics</h3>
             <p className="text-muted-foreground">
-              Choose a brand above to see AI Visibility Score, Share of Voice, and Sentiment Analysis
+              Choose a brand above to see AI Visibility Score, Share of Voice, and Sentiment
+              Analysis
             </p>
           </CardContent>
         </Card>
@@ -164,7 +183,10 @@ export default function GeoAnalytics() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-end gap-3">
-                  <span className={`text-5xl font-bold ${getVisibilityColor(analytics.overview.aiVisibilityScore)}`} data-testid="visibility-score">
+                  <span
+                    className={`text-5xl font-bold ${getVisibilityColor(analytics.overview.aiVisibilityScore)}`}
+                    data-testid="visibility-score"
+                  >
                     {analytics.overview.aiVisibilityScore}
                   </span>
                   <span className="text-2xl text-muted-foreground mb-1">/100</span>
@@ -245,7 +267,9 @@ export default function GeoAnalytics() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Citations</p>
-                    <p className="text-2xl font-bold" data-testid="total-citations">{analytics.overview.totalCitations}</p>
+                    <p className="text-2xl font-bold" data-testid="total-citations">
+                      {analytics.overview.totalCitations}
+                    </p>
                   </div>
                   <Zap className="h-8 w-8 text-blue-500" />
                 </div>
@@ -256,7 +280,9 @@ export default function GeoAnalytics() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Mentions</p>
-                    <p className="text-2xl font-bold" data-testid="total-mentions">{analytics.overview.totalMentions}</p>
+                    <p className="text-2xl font-bold" data-testid="total-mentions">
+                      {analytics.overview.totalMentions}
+                    </p>
                   </div>
                   <MessageSquare className="h-8 w-8 text-purple-500" />
                 </div>
@@ -267,7 +293,9 @@ export default function GeoAnalytics() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Market Size</p>
-                    <p className="text-2xl font-bold" data-testid="market-size">{analytics.overview.marketSize}</p>
+                    <p className="text-2xl font-bold" data-testid="market-size">
+                      {analytics.overview.marketSize}
+                    </p>
                   </div>
                   <BarChart3 className="h-8 w-8 text-green-500" />
                 </div>
@@ -278,7 +306,9 @@ export default function GeoAnalytics() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Competitors Tracked</p>
-                    <p className="text-2xl font-bold" data-testid="competitor-count">{analytics.overview.competitorCount}</p>
+                    <p className="text-2xl font-bold" data-testid="competitor-count">
+                      {analytics.overview.competitorCount}
+                    </p>
                   </div>
                   <Users className="h-8 w-8 text-orange-500" />
                 </div>
@@ -299,9 +329,7 @@ export default function GeoAnalytics() {
                     <BarChart3 className="h-5 w-5" />
                     Visibility by AI Platform
                   </CardTitle>
-                  <CardDescription>
-                    Performance metrics across all 9 AI platforms
-                  </CardDescription>
+                  <CardDescription>Performance metrics across all 9 AI platforms</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -312,12 +340,16 @@ export default function GeoAnalytics() {
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                                {AI_PLATFORM_ICONS[platform] || <span className="text-xs">{platform[0]}</span>}
+                                {AI_PLATFORM_ICONS[platform] || (
+                                  <span className="text-xs">{platform[0]}</span>
+                                )}
                               </div>
                               <span className="font-semibold">{platform}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className={`text-lg font-bold ${getVisibilityColor(metrics.visibilityScore)}`}>
+                              <span
+                                className={`text-lg font-bold ${getVisibilityColor(metrics.visibilityScore)}`}
+                              >
                                 {metrics.visibilityScore}
                               </span>
                               <span className="text-sm text-muted-foreground">/100</span>
@@ -335,12 +367,14 @@ export default function GeoAnalytics() {
                             </div>
                             <div>
                               <p className="text-muted-foreground">Avg Rank</p>
-                              <p className="font-semibold">{metrics.avgRank || 'N/A'}</p>
+                              <p className="font-semibold">{metrics.avgRank || "N/A"}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Sentiment</p>
                               <div className="flex gap-1 text-xs">
-                                <span className="text-green-600">+{metrics.sentiment.positive}</span>
+                                <span className="text-green-600">
+                                  +{metrics.sentiment.positive}
+                                </span>
                                 <span className="text-gray-400">/{metrics.sentiment.neutral}</span>
                                 <span className="text-red-500">-{metrics.sentiment.negative}</span>
                               </div>
@@ -360,9 +394,7 @@ export default function GeoAnalytics() {
                     <Trophy className="h-5 w-5" />
                     Share of Voice Leaderboard
                   </CardTitle>
-                  <CardDescription>
-                    Your brand vs competitors by total AI citations
-                  </CardDescription>
+                  <CardDescription>Your brand vs competitors by total AI citations</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {analytics.leaderboard.length === 0 ? (
@@ -374,21 +406,25 @@ export default function GeoAnalytics() {
                       {analytics.leaderboard.map((entry, index) => {
                         const totalMarket = analytics.overview.marketSize || 1;
                         const sovPercent = Math.round((entry.totalCitations / totalMarket) * 100);
-                        
+
                         return (
-                          <div 
-                            key={entry.domain} 
+                          <div
+                            key={entry.domain}
                             className={`flex items-center gap-4 p-3 rounded-lg ${
-                              entry.isOwn 
-                                ? 'bg-primary/10 border-2 border-primary' 
-                                : 'bg-muted/50'
+                              entry.isOwn ? "bg-primary/10 border-2 border-primary" : "bg-muted/50"
                             }`}
                           >
-                            <span className={`text-2xl font-bold w-8 ${
-                              index === 0 ? 'text-yellow-500' : 
-                              index === 1 ? 'text-gray-400' : 
-                              index === 2 ? 'text-amber-600' : 'text-muted-foreground'
-                            }`}>
+                            <span
+                              className={`text-2xl font-bold w-8 ${
+                                index === 0
+                                  ? "text-yellow-500"
+                                  : index === 1
+                                    ? "text-gray-400"
+                                    : index === 2
+                                      ? "text-amber-600"
+                                      : "text-muted-foreground"
+                              }`}
+                            >
                               #{index + 1}
                             </span>
                             <div className="flex-1">
@@ -427,8 +463,8 @@ export default function GeoAnalytics() {
                     AI Visibility Score
                   </h4>
                   <p className="text-muted-foreground">
-                    A 0-100 score measuring how visible your brand is across AI platforms. 
-                    Based on citations (40%), mentions (30%), and average ranking position (30%).
+                    A 0-100 score measuring how visible your brand is across AI platforms. Based on
+                    citations (40%), mentions (30%), and average ranking position (30%).
                   </p>
                 </div>
                 <div>
@@ -437,8 +473,8 @@ export default function GeoAnalytics() {
                     Share of Voice
                   </h4>
                   <p className="text-muted-foreground">
-                    Your percentage of total AI citations compared to your competitors. 
-                    Higher is better - it means AI systems recommend you more often.
+                    Your percentage of total AI citations compared to your competitors. Higher is
+                    better - it means AI systems recommend you more often.
                   </p>
                 </div>
                 <div>
@@ -447,8 +483,8 @@ export default function GeoAnalytics() {
                     Sentiment Analysis
                   </h4>
                   <p className="text-muted-foreground">
-                    How positively or negatively AI platforms describe your brand. 
-                    Positive mentions correlate with higher recommendation rates.
+                    How positively or negatively AI platforms describe your brand. Positive mentions
+                    correlate with higher recommendation rates.
                   </p>
                 </div>
               </div>

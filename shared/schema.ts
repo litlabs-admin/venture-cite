@@ -1,10 +1,25 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, jsonb, numeric, index, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  bigint,
+  timestamp,
+  jsonb,
+  numeric,
+  index,
+  uniqueIndex,
+  boolean,
+  primaryKey,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   email: text("email").unique(),
   passwordHash: text("password_hash"),
   firstName: text("first_name"),
@@ -22,7 +37,21 @@ export const users = pgTable("users", {
   weeklyReportEnabled: integer("weekly_report_enabled").default(1).notNull(),
   lastWeeklyReportSentAt: timestamp("last_weekly_report_sent_at"),
   visibilityGuideVisitedAt: timestamp("visibility_guide_visited_at"),
+  // Wave 4.7: free-form bag of onboarding flags, persisted server-side
+  // so dismiss state syncs across devices. Keys defined in
+  // server/routes/onboarding.ts (see ONBOARDING_FIELDS).
+  onboardingState: jsonb("onboarding_state").default({}).notNull(),
   bufferAccessToken: text("buffer_access_token"),
+  // Soft-delete (Wave 2.2). Set when the user requests account deletion
+  // — the row stays for the 30-day grace period so an admin can restore
+  // accidental deletions; the daily cron then hard-deletes after grace.
+  deletedAt: timestamp("deleted_at"),
+  deletionScheduledFor: timestamp("deletion_scheduled_for"),
+  // Email deliverability state (Wave 3.6). Values: 'active', 'bounced',
+  // 'complained', 'unsubscribed'. The email service refuses to send
+  // when this isn't 'active' so we don't keep blasting addresses that
+  // hurt our domain reputation.
+  emailStatus: text("email_status").default("active").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -38,7 +67,9 @@ export const usageLimits = {
 export type UpsertUser = typeof users.$inferInsert;
 
 export const betaInviteCodes = pgTable("beta_invite_codes", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   code: text("code").notNull().unique(),
   maxUses: integer("max_uses").default(1).notNull(),
   usedCount: integer("used_count").default(0).notNull(),
@@ -54,20 +85,27 @@ export type BetaInviteCode = typeof betaInviteCodes.$inferSelect;
 export type InsertBetaInviteCode = typeof betaInviteCodes.$inferInsert;
 
 export const waitlist = pgTable("waitlist", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   source: text("source").default("landing"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertWaitlistSchema = createInsertSchema(waitlist).omit({ id: true, createdAt: true });
+export const insertWaitlistSchema = createInsertSchema(waitlist).omit({
+  id: true,
+  createdAt: true,
+});
 export type Waitlist = typeof waitlist.$inferSelect;
 export type InsertWaitlist = z.infer<typeof insertWaitlistSchema>;
 
 export const citations = pgTable(
   "citations",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
     userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
     source: text("source"),
     url: text("url"),
@@ -80,7 +118,9 @@ export const citations = pgTable(
 );
 
 export const analytics = pgTable("analytics", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   totalCitations: integer("total_citations").default(0).notNull(),
   weeklyGrowth: numeric("weekly_growth", { precision: 5, scale: 2 }).default("0").notNull(),
   avgPosition: numeric("avg_position", { precision: 5, scale: 2 }).default("0").notNull(),
@@ -91,7 +131,9 @@ export const analytics = pgTable("analytics", {
 export const brands = pgTable(
   "brands",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
     userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     companyName: text("company_name").notNull(),
@@ -106,9 +148,25 @@ export const brands = pgTable(
     brandVoice: text("brand_voice"),
     sampleContent: text("sample_content"),
     nameVariations: text("name_variations").array(),
+    logoUrl: text("logo_url"),
+    autopilotStatus: text("autopilot_status").default("idle"),
+    autopilotStep: integer("autopilot_step").default(0),
+    autopilotStartedAt: timestamp("autopilot_started_at"),
+    autopilotCompletedAt: timestamp("autopilot_completed_at"),
+    autopilotError: text("autopilot_error"),
+    autopilotProgress: jsonb("autopilot_progress"),
     autoCitationSchedule: text("auto_citation_schedule").default("off").notNull(), // off | weekly | biweekly | monthly
     autoCitationDay: integer("auto_citation_day").default(0).notNull(), // 0=Sun, 1=Mon, ... 6=Sat
     lastAutoCitationAt: timestamp("last_auto_citation_at"),
+    // Wave 4.4: optimistic-lock version. Bumped on every write; client
+    // sends `expectedVersion` and the UPDATE matches `WHERE version = $`,
+    // returning 409 on mismatch.
+    version: integer("version").default(0).notNull(),
+    // Wave 4.5: soft-delete window. DELETE handler sets these; cron
+    // hard-deletes after deletion_scheduled_for elapses. Filters
+    // (`deleted_at IS NULL`) keep deleted brands out of GET responses.
+    deletedAt: timestamp("deleted_at"),
+    deletionScheduledFor: timestamp("deletion_scheduled_for"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -118,8 +176,12 @@ export const brands = pgTable(
 export const articles = pgTable(
   "articles",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     slug: varchar("slug", { length: 255 }).notNull(),
     content: text("content").notNull(),
@@ -132,6 +194,8 @@ export const articles = pgTable(
     author: text("author").default("GEO Platform"),
     viewCount: integer("view_count").default(0).notNull(),
     citationCount: integer("citation_count").default(0).notNull(),
+    // Wave 4.4: optimistic-lock version (see brands.version).
+    version: integer("version").default(0).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     seoData: jsonb("seo_data"),
@@ -145,8 +209,12 @@ export const articles = pgTable(
 export const distributions = pgTable(
   "distributions",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    articleId: varchar("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    articleId: varchar("article_id")
+      .notNull()
+      .references(() => articles.id, { onDelete: "cascade" }),
     platform: text("platform").notNull(),
     platformPostId: text("platform_post_id"),
     platformUrl: text("platform_url"),
@@ -162,8 +230,12 @@ export const distributions = pgTable(
 export const keywordResearch = pgTable(
   "keyword_research",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     keyword: text("keyword").notNull(),
     searchVolume: integer("search_volume"),
     difficulty: integer("difficulty"),
@@ -183,7 +255,11 @@ export const keywordResearch = pgTable(
   (table) => [index("keyword_research_brand_id_idx").on(table.brandId)],
 );
 
-export const insertKeywordResearchSchema = createInsertSchema(keywordResearch).omit({ id: true, discoveredAt: true, updatedAt: true });
+export const insertKeywordResearchSchema = createInsertSchema(keywordResearch).omit({
+  id: true,
+  discoveredAt: true,
+  updatedAt: true,
+});
 export type KeywordResearch = typeof keywordResearch.$inferSelect;
 export type InsertKeywordResearch = z.infer<typeof insertKeywordResearchSchema>;
 
@@ -193,8 +269,12 @@ export type InsertKeywordResearch = z.infer<typeof insertKeywordResearchSchema>;
 export const contentGenerationJobs = pgTable(
   "content_generation_jobs",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     brandId: varchar("brand_id").references(() => brands.id, { onDelete: "set null" }),
     status: text("status").notNull().default("pending"),
     requestPayload: jsonb("request_payload").notNull(),
@@ -224,7 +304,9 @@ export type InsertContentGenerationJob = z.infer<typeof insertContentGenerationJ
 export const contentDrafts = pgTable(
   "content_drafts",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
     userId: varchar("user_id").notNull(),
     title: text("title"),
     keywords: text("keywords").notNull().default(""),
@@ -256,24 +338,37 @@ export type InsertContentDraft = typeof contentDrafts.$inferInsert;
 export const promptGenerations = pgTable(
   "prompt_generations",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     generationNumber: integer("generation_number").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("prompt_generations_brand_id_idx").on(table.brandId)],
 );
 
-export const insertPromptGenerationSchema = createInsertSchema(promptGenerations).omit({ id: true, createdAt: true });
+export const insertPromptGenerationSchema = createInsertSchema(promptGenerations).omit({
+  id: true,
+  createdAt: true,
+});
 export type PromptGeneration = typeof promptGenerations.$inferSelect;
 export type InsertPromptGeneration = z.infer<typeof insertPromptGenerationSchema>;
 
 export const brandPrompts = pgTable(
   "brand_prompts",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
-    generationId: varchar("generation_id").references(() => promptGenerations.id, { onDelete: "set null" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    generationId: varchar("generation_id").references(() => promptGenerations.id, {
+      onDelete: "set null",
+    }),
     prompt: text("prompt").notNull(),
     rationale: text("rationale"),
     orderIndex: integer("order_index").default(0).notNull(),
@@ -292,7 +387,10 @@ export const brandPrompts = pgTable(
   ],
 );
 
-export const insertBrandPromptSchema = createInsertSchema(brandPrompts).omit({ id: true, createdAt: true });
+export const insertBrandPromptSchema = createInsertSchema(brandPrompts).omit({
+  id: true,
+  createdAt: true,
+});
 export type BrandPrompt = typeof brandPrompts.$inferSelect;
 export type InsertBrandPrompt = z.infer<typeof insertBrandPromptSchema>;
 
@@ -301,19 +399,30 @@ export type InsertBrandPrompt = z.infer<typeof insertBrandPromptSchema>;
 export const visibilityProgress = pgTable(
   "visibility_progress",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     engineId: text("engine_id").notNull(),
     stepId: text("step_id").notNull(),
     completedAt: timestamp("completed_at").defaultNow().notNull(),
   },
   (table) => [
     index("visibility_progress_brand_id_idx").on(table.brandId),
-    uniqueIndex("visibility_progress_brand_engine_step_idx").on(table.brandId, table.engineId, table.stepId),
+    uniqueIndex("visibility_progress_brand_engine_step_idx").on(
+      table.brandId,
+      table.engineId,
+      table.stepId,
+    ),
   ],
 );
 
-export const insertVisibilityProgressSchema = createInsertSchema(visibilityProgress).omit({ id: true, completedAt: true });
+export const insertVisibilityProgressSchema = createInsertSchema(visibilityProgress).omit({
+  id: true,
+  completedAt: true,
+});
 export type VisibilityProgress = typeof visibilityProgress.$inferSelect;
 export type InsertVisibilityProgress = z.infer<typeof insertVisibilityProgressSchema>;
 
@@ -323,8 +432,12 @@ export type InsertVisibilityProgress = z.infer<typeof insertVisibilityProgressSc
 export const citationRuns = pgTable(
   "citation_runs",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     totalChecks: integer("total_checks").default(0).notNull(),
     totalCited: integer("total_cited").default(0).notNull(),
     citationRate: integer("citation_rate").default(0).notNull(),
@@ -341,16 +454,23 @@ export const citationRuns = pgTable(
   ],
 );
 
-export const insertCitationRunSchema = createInsertSchema(citationRuns).omit({ id: true, startedAt: true });
+export const insertCitationRunSchema = createInsertSchema(citationRuns).omit({
+  id: true,
+  startedAt: true,
+});
 export type CitationRun = typeof citationRuns.$inferSelect;
 export type InsertCitationRun = z.infer<typeof insertCitationRunSchema>;
 
 export const geoRankings = pgTable(
   "geo_rankings",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "cascade" }),
-    brandPromptId: varchar("brand_prompt_id").references(() => brandPrompts.id, { onDelete: "set null" }),
+    brandPromptId: varchar("brand_prompt_id").references(() => brandPrompts.id, {
+      onDelete: "set null",
+    }),
     runId: varchar("run_id").references(() => citationRuns.id, { onDelete: "set null" }),
     aiPlatform: text("ai_platform").notNull(),
     prompt: text("prompt").notNull(),
@@ -369,6 +489,10 @@ export const geoRankings = pgTable(
     authorityScore: integer("authority_score"),
     relevanceScore: integer("relevance_score"),
     checkedAt: timestamp("checked_at").defaultNow().notNull(),
+    // Set by the "Re-check stored" flow when updated name variations
+    // newly reveal a citation that the original run missed. Rank stays
+    // null on these rows since the LLM rank pass didn't see them as cited.
+    reDetectedAt: timestamp("re_detected_at"),
     metadata: jsonb("metadata"),
   },
   (table) => [
@@ -382,8 +506,12 @@ export const geoRankings = pgTable(
 export const brandVisibilitySnapshots = pgTable(
   "brand_visibility_snapshots",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     aiPlatform: text("ai_platform").notNull(),
     mentionCount: integer("mention_count").default(0).notNull(),
     citationCount: integer("citation_count").default(0).notNull(),
@@ -402,7 +530,9 @@ export const brandVisibilitySnapshots = pgTable(
 export const aiCommerceSessions = pgTable(
   "ai_commerce_sessions",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "cascade" }),
     brandId: varchar("brand_id").references(() => brands.id, { onDelete: "cascade" }),
     aiPlatform: text("ai_platform").notNull(),
@@ -419,14 +549,24 @@ export const aiCommerceSessions = pgTable(
 export const purchaseEvents = pgTable(
   "purchase_events",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    commerceSessionId: varchar("commerce_session_id").references(() => aiCommerceSessions.id, { onDelete: "set null" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    commerceSessionId: varchar("commerce_session_id").references(() => aiCommerceSessions.id, {
+      onDelete: "set null",
+    }),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
     brandId: varchar("brand_id").references(() => brands.id, { onDelete: "cascade" }),
     aiPlatform: text("ai_platform").notNull(),
     ecommercePlatform: text("ecommerce_platform").notNull(),
     orderId: text("order_id"),
     revenue: numeric("revenue", { precision: 10, scale: 2 }).notNull(),
+    // Wave 4.1: integer-cents twin of `revenue`. Prefer this for any
+    // arithmetic; sum it as bigint and divide by 100 only at display.
+    // bigint is read out of pg as `string` to avoid 2^53 truncation —
+    // do `BigInt(row.revenueCents)` or treat it as Number when known
+    // safe (< $90 trillion).
+    revenueCents: bigint("revenue_cents", { mode: "number" }),
     currency: text("currency").default("USD").notNull(),
     productName: text("product_name"),
     quantity: integer("quantity").default(1).notNull(),
@@ -439,7 +579,9 @@ export const purchaseEvents = pgTable(
 );
 
 export const publicationReferences = pgTable("publication_references", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   outletName: text("outlet_name").notNull(),
   outletDomain: text("outlet_domain").notNull(),
   outletUrl: text("outlet_url"),
@@ -452,7 +594,9 @@ export const publicationReferences = pgTable("publication_references", {
 });
 
 export const publicationMetrics = pgTable("publication_metrics", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
   outletName: text("outlet_name").notNull(),
   outletDomain: text("outlet_domain").notNull(),
   industry: text("industry").notNull(),
@@ -525,29 +669,92 @@ export const insertPublicationMetricSchema = createInsertSchema(publicationMetri
 export const competitors = pgTable(
   "competitors",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     domain: text("domain").notNull(),
     industry: text("industry"),
     description: text("description"),
-    discoveredBy: text("discovered_by").default("manual").notNull(), // "manual" | "ai" | "citation_mining"
+    // Shares semantics with brands.nameVariations: extra surface forms
+    // the detection matcher should treat as equivalent. LLM-extracted
+    // surface forms get auto-appended; users can edit in the UI.
+    nameVariations: text("name_variations")
+      .array()
+      .default(sql`ARRAY[]::text[]`),
+    discoveredBy: text("discovered_by").default("manual").notNull(), // "manual" | "ai" | "citation_mining" | "scheduler"
+    // Soft delete + ignore tombstone. `deletedAt` hides from lists;
+    // `isIgnored=1` additionally blocks re-discovery in cron.
+    deletedAt: timestamp("deleted_at"),
+    isIgnored: integer("is_ignored").default(0).notNull(),
+    lastSeenAt: timestamp("last_seen_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("competitors_brand_id_idx").on(table.brandId)],
+  (table) => [
+    index("competitors_brand_id_idx").on(table.brandId),
+    // Unique index is maintained via migration 0026 using lower(name) +
+    // lower(coalesce(domain,'')); Drizzle cannot express the expression here.
+  ],
+);
+
+// Per-run, per-prompt competitor citation detail. Mirrors geo_rankings so
+// competitors are tracked with the same fidelity as the brand — one row
+// per (competitor × run × prompt × platform), containing whether the
+// competitor was cited, its rank, relevance, and a snippet of the
+// mentioning response. Powers the competitor leaderboard, drill-downs
+// ("which prompts cited HubSpot on Claude?"), and share-of-voice.
+export const competitorGeoRankings = pgTable(
+  "competitor_geo_rankings",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    competitorId: varchar("competitor_id")
+      .notNull()
+      .references(() => competitors.id, { onDelete: "cascade" }),
+    runId: varchar("run_id").notNull(),
+    brandPromptId: varchar("brand_prompt_id").notNull(),
+    aiPlatform: text("ai_platform").notNull(),
+    isCited: integer("is_cited").default(0).notNull(),
+    rank: integer("rank"),
+    relevanceScore: integer("relevance_score"),
+    citationContext: text("citation_context"),
+    citingOutletUrl: text("citing_outlet_url"),
+    sentiment: text("sentiment"),
+    checkedAt: timestamp("checked_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("cgr_competitor_idx").on(table.competitorId),
+    index("cgr_run_idx").on(table.runId),
+    index("cgr_brand_prompt_idx").on(table.brandPromptId),
+  ],
 );
 
 export const competitorCitationSnapshots = pgTable(
   "competitor_citation_snapshots",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    competitorId: varchar("competitor_id").notNull().references(() => competitors.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    competitorId: varchar("competitor_id")
+      .notNull()
+      .references(() => competitors.id, { onDelete: "cascade" }),
     aiPlatform: text("ai_platform").notNull(),
     citationCount: integer("citation_count").default(0).notNull(),
     snapshotDate: timestamp("snapshot_date").defaultNow().notNull(),
+    // Correlates a snapshot row to the citation run that produced it.
+    // Null for legacy rows. Unique (competitor_id, ai_platform, run_id)
+    // enforced via migration 0026 (partial index where run_id IS NOT NULL).
+    runId: varchar("run_id"),
     metadata: jsonb("metadata"),
   },
-  (table) => [index("competitor_citation_snapshots_competitor_id_idx").on(table.competitorId)],
+  (table) => [
+    index("competitor_citation_snapshots_competitor_id_idx").on(table.competitorId),
+    index("cc_snapshots_run_id_idx").on(table.runId),
+  ],
 );
 
 export const insertCompetitorSchema = createInsertSchema(competitors).omit({
@@ -555,12 +762,21 @@ export const insertCompetitorSchema = createInsertSchema(competitors).omit({
   createdAt: true,
 });
 
-export const insertCompetitorCitationSnapshotSchema = createInsertSchema(competitorCitationSnapshots).omit({
+export const insertCompetitorCitationSnapshotSchema = createInsertSchema(
+  competitorCitationSnapshots,
+).omit({
   id: true,
   snapshotDate: true,
 });
 
-export const insertBrandVisibilitySnapshotSchema = createInsertSchema(brandVisibilitySnapshots).omit({
+export const insertCompetitorGeoRankingSchema = createInsertSchema(competitorGeoRankings).omit({
+  id: true,
+  checkedAt: true,
+});
+
+export const insertBrandVisibilitySnapshotSchema = createInsertSchema(
+  brandVisibilitySnapshots,
+).omit({
   id: true,
   snapshotDate: true,
 });
@@ -569,8 +785,12 @@ export const insertBrandVisibilitySnapshotSchema = createInsertSchema(brandVisib
 export const listicles = pgTable(
   "listicles",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     url: text("url").notNull(),
     sourcePublication: text("source_publication"),
@@ -592,8 +812,12 @@ export const listicles = pgTable(
 export const wikipediaMentions = pgTable(
   "wikipedia_mentions",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     pageTitle: text("page_title").notNull(),
     pageUrl: text("page_url").notNull(),
     mentionContext: text("mention_context"),
@@ -611,8 +835,12 @@ export const wikipediaMentions = pgTable(
 export const bofuContent = pgTable(
   "bofu_content",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     contentType: text("content_type").notNull(),
     title: text("title").notNull(),
     content: text("content").notNull(),
@@ -632,8 +860,12 @@ export const bofuContent = pgTable(
 export const faqItems = pgTable(
   "faq_items",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
     question: text("question").notNull(),
     answer: text("answer").notNull(),
@@ -653,8 +885,12 @@ export const faqItems = pgTable(
 export const brandMentions = pgTable(
   "brand_mentions",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     platform: text("platform").notNull(),
     sourceUrl: text("source_url").notNull(),
     sourceTitle: text("source_title"),
@@ -704,8 +940,12 @@ export const insertBrandMentionSchema = createInsertSchema(brandMentions).omit({
 export const promptPortfolio = pgTable(
   "prompt_portfolio",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     prompt: text("prompt").notNull(),
     category: text("category").notNull(),
     funnelStage: text("funnel_stage").notNull(),
@@ -730,8 +970,12 @@ export const promptPortfolio = pgTable(
 export const citationQuality = pgTable(
   "citation_quality",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
     aiPlatform: text("ai_platform").notNull(),
     prompt: text("prompt"),
@@ -754,32 +998,51 @@ export const citationQuality = pgTable(
 export const brandHallucinations = pgTable(
   "brand_hallucinations",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     aiPlatform: text("ai_platform").notNull(),
     prompt: text("prompt").notNull(),
     claimedStatement: text("claimed_statement").notNull(),
     actualFact: text("actual_fact"),
     hallucinationType: text("hallucination_type").notNull(),
-    severity: text("severity").notNull().default("medium"),
+    severity: text("severity").notNull().default("medium"), // 'low' | 'medium' | 'high' | 'critical' (CHECK in 0026)
     category: text("category"),
     isResolved: integer("is_resolved").default(0).notNull(),
     remediationSteps: text("remediation_steps").array(),
-    remediationStatus: text("remediation_status").default("pending"),
+    remediationStatus: text("remediation_status").default("pending"), // 'pending' | 'in_progress' | 'resolved' | 'dismissed' | 'verified'
     detectedAt: timestamp("detected_at").defaultNow().notNull(),
     resolvedAt: timestamp("resolved_at"),
     verifiedBy: text("verified_by"),
+    // Source traceback: copied from the originating geo_ranking at detect time.
+    rankingId: varchar("ranking_id"),
+    citingOutletUrl: text("citing_outlet_url"),
+    citationContext: text("citation_context"),
+    articleTitle: text("article_title"),
+    // Bumped on ON CONFLICT dedup so we can show "seen 12 times".
+    lastSeenAt: timestamp("last_seen_at"),
+    seenCount: integer("seen_count").default(1).notNull(),
     metadata: jsonb("metadata"),
   },
-  (table) => [index("brand_hallucinations_brand_id_idx").on(table.brandId)],
+  (table) => [
+    index("brand_hallucinations_brand_id_idx").on(table.brandId),
+    index("brand_hallucinations_ranking_id_idx").on(table.rankingId),
+  ],
 );
 
 // Brand Fact Sheet - Source of truth for hallucination checking
 export const brandFactSheet = pgTable(
   "brand_fact_sheet",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     factCategory: text("fact_category").notNull(),
     factKey: text("fact_key").notNull(),
     factValue: text("fact_value").notNull(),
@@ -798,8 +1061,12 @@ export const brandFactSheet = pgTable(
 export const metricsHistory = pgTable(
   "metrics_history",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     metricType: text("metric_type").notNull(),
     metricValue: numeric("metric_value", { precision: 10, scale: 2 }).notNull(),
     metricDetails: jsonb("metric_details"),
@@ -812,8 +1079,12 @@ export const metricsHistory = pgTable(
 export const alertSettings = pgTable(
   "alert_settings",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     alertType: text("alert_type").notNull(),
     isEnabled: integer("is_enabled").default(1).notNull(),
     threshold: numeric("threshold", { precision: 10, scale: 2 }),
@@ -831,8 +1102,12 @@ export const alertSettings = pgTable(
 export const alertHistory = pgTable(
   "alert_history",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    alertSettingId: varchar("alert_setting_id").references(() => alertSettings.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    alertSettingId: varchar("alert_setting_id").references(() => alertSettings.id, {
+      onDelete: "cascade",
+    }),
     brandId: varchar("brand_id").references(() => brands.id, { onDelete: "cascade" }),
     alertType: text("alert_type").notNull(),
     message: text("message").notNull(),
@@ -847,8 +1122,12 @@ export const alertHistory = pgTable(
 export const aiSources = pgTable(
   "ai_sources",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     aiPlatform: text("ai_platform").notNull(),
     sourceUrl: text("source_url").notNull(),
     sourceDomain: text("source_domain").notNull(),
@@ -871,8 +1150,12 @@ export const aiSources = pgTable(
 export const aiTrafficSessions = pgTable(
   "ai_traffic_sessions",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
     aiPlatform: text("ai_platform").notNull(),
     referrerUrl: text("referrer_url"),
@@ -884,6 +1167,9 @@ export const aiTrafficSessions = pgTable(
     converted: integer("converted").default(0).notNull(),
     conversionType: text("conversion_type"),
     conversionValue: numeric("conversion_value", { precision: 10, scale: 2 }),
+    // Wave 4.1: integer-cents twin of conversionValue. See note on
+    // purchaseEvents.revenueCents.
+    conversionValueCents: bigint("conversion_value_cents", { mode: "number" }),
     country: text("country"),
     device: text("device"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -896,9 +1182,15 @@ export const aiTrafficSessions = pgTable(
 export const promptTestRuns = pgTable(
   "prompt_test_runs",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
-    promptPortfolioId: varchar("prompt_portfolio_id").references(() => promptPortfolio.id, { onDelete: "set null" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    promptPortfolioId: varchar("prompt_portfolio_id").references(() => promptPortfolio.id, {
+      onDelete: "set null",
+    }),
     prompt: text("prompt").notNull(),
     aiPlatform: text("ai_platform").notNull(),
     response: text("response"),
@@ -921,43 +1213,113 @@ export const promptTestRuns = pgTable(
 );
 
 // Agent Tasks - Queue for automated GEO optimization tasks
-export const agentTasks = pgTable("agent_tasks", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
-  taskType: text("task_type").notNull(),
-  taskTitle: text("task_title").notNull(),
-  taskDescription: text("task_description"),
-  priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
-  status: text("status").notNull().default("queued"), // 'queued', 'in_progress', 'completed', 'failed', 'cancelled'
-  assignedTo: text("assigned_to").default("agent"), // 'agent' for automated, or user ID for manual
-  triggeredBy: text("triggered_by").notNull(), // 'automation_rule', 'manual', 'schedule', 'alert'
-  automationRuleId: varchar("automation_rule_id"),
-  inputData: jsonb("input_data"), // Task-specific input parameters
-  outputData: jsonb("output_data"), // Task results/outputs
-  aiModelUsed: text("ai_model_used"),
-  tokensUsed: integer("tokens_used").default(0).notNull(),
-  estimatedCredits: numeric("estimated_credits", { precision: 10, scale: 4 }),
-  actualCredits: numeric("actual_credits", { precision: 10, scale: 4 }),
-  scheduledFor: timestamp("scheduled_for"),
-  startedAt: timestamp("started_at"),
-  completedAt: timestamp("completed_at"),
-  error: text("error"),
-  retryCount: integer("retry_count").default(0).notNull(),
-  maxRetries: integer("max_retries").default(3).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  metadata: jsonb("metadata"),
-}, (table) => [
-  index("agent_tasks_brand_id_idx").on(table.brandId),
-  index("agent_tasks_status_idx").on(table.status),
-]);
+export const agentTasks = pgTable(
+  "agent_tasks",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    taskType: text("task_type").notNull(),
+    taskTitle: text("task_title").notNull(),
+    taskDescription: text("task_description"),
+    priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
+    status: text("status").notNull().default("queued"), // 'queued', 'in_progress', 'completed', 'failed', 'cancelled'
+    assignedTo: text("assigned_to").default("agent"), // 'agent' for automated, or user ID for manual
+    triggeredBy: text("triggered_by").notNull(), // 'automation_rule', 'manual', 'schedule', 'alert'
+    automationRuleId: varchar("automation_rule_id"),
+    inputData: jsonb("input_data"), // Task-specific input parameters
+    outputData: jsonb("output_data"), // Task results/outputs
+    aiModelUsed: text("ai_model_used"),
+    tokensUsed: integer("tokens_used").default(0).notNull(),
+    estimatedCredits: numeric("estimated_credits", { precision: 10, scale: 4 }),
+    actualCredits: numeric("actual_credits", { precision: 10, scale: 4 }),
+    scheduledFor: timestamp("scheduled_for"),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    error: text("error"),
+    retryCount: integer("retry_count").default(0).notNull(),
+    maxRetries: integer("max_retries").default(3).notNull(),
+    // Artifact link: set after /execute creates a downstream object so the
+    // task row points to its result. type ∈ content_job | citation_run |
+    // outreach_email | hallucination | source_analysis. CHECK in 0026.
+    artifactType: text("artifact_type"),
+    artifactId: varchar("artifact_id"),
+    workflowRunId: varchar("workflow_run_id"),
+    workflowStepKey: text("workflow_step_key"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    metadata: jsonb("metadata"),
+  },
+  (table) => [
+    index("agent_tasks_brand_id_idx").on(table.brandId),
+    index("agent_tasks_status_idx").on(table.status),
+    index("agent_tasks_artifact_idx").on(table.artifactType, table.artifactId),
+    index("agent_tasks_workflow_run_idx").on(table.workflowRunId),
+  ],
+);
+
+export const workflowRuns = pgTable(
+  "workflow_runs",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    workflowKey: text("workflow_key").notNull(),
+    status: text("status").notNull().default("pending"),
+    currentStepIndex: integer("current_step_index").default(0).notNull(),
+    stepStates: jsonb("step_states")
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    input: jsonb("input"),
+    lastError: text("last_error"),
+    triggeredBy: text("triggered_by").notNull().default("manual"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => [
+    index("workflow_runs_brand_status_idx").on(table.brandId, table.status),
+    index("workflow_runs_user_idx").on(table.userId),
+  ],
+);
+
+export const workflowApprovals = pgTable(
+  "workflow_approvals",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    runId: varchar("run_id")
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: "cascade" }),
+    stepIndex: integer("step_index").notNull(),
+    summary: jsonb("summary"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    respondedAt: timestamp("responded_at"),
+    decision: text("decision"),
+  },
+  (table) => [index("workflow_approvals_run_responded_idx").on(table.runId, table.respondedAt)],
+);
 
 // Outreach Campaigns - Track publication outreach and guest posts
 export const outreachCampaigns = pgTable(
   "outreach_campaigns",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     campaignName: text("campaign_name").notNull(),
     campaignType: text("campaign_type").notNull(),
     targetPublicationId: varchar("target_publication_id"),
@@ -969,7 +1331,9 @@ export const outreachCampaigns = pgTable(
     emailBody: text("email_body"),
     pitchAngle: text("pitch_angle"),
     proposedTopic: text("proposed_topic"),
-    linkedArticleId: varchar("linked_article_id").references(() => articles.id, { onDelete: "set null" }),
+    linkedArticleId: varchar("linked_article_id").references(() => articles.id, {
+      onDelete: "set null",
+    }),
     authorityScore: integer("authority_score").default(0).notNull(),
     expectedImpact: text("expected_impact"),
     aiGeneratedDraft: integer("ai_generated_draft").default(0).notNull(),
@@ -990,8 +1354,12 @@ export const outreachCampaigns = pgTable(
 export const publicationTargets = pgTable(
   "publication_targets",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     publicationName: text("publication_name").notNull(),
     domain: text("domain").notNull(),
     category: text("category").notNull(),
@@ -1024,10 +1392,18 @@ export const publicationTargets = pgTable(
 export const outreachEmails = pgTable(
   "outreach_emails",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    campaignId: varchar("campaign_id").references(() => outreachCampaigns.id, { onDelete: "cascade" }),
-    publicationTargetId: varchar("publication_target_id").references(() => publicationTargets.id, { onDelete: "set null" }),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    campaignId: varchar("campaign_id").references(() => outreachCampaigns.id, {
+      onDelete: "cascade",
+    }),
+    publicationTargetId: varchar("publication_target_id").references(() => publicationTargets.id, {
+      onDelete: "set null",
+    }),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     recipientEmail: text("recipient_email").notNull(),
     recipientName: text("recipient_name"),
     subject: text("subject").notNull(),
@@ -1051,11 +1427,16 @@ export const outreachEmails = pgTable(
 );
 
 // Automation Rules - Define triggers and actions for autonomous workflows
+// Deprecated as of 2026-04 — workflow engine (server/lib/workflowEngine.ts) replaces this.
 export const automationRules = pgTable(
   "automation_rules",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     ruleName: text("rule_name").notNull(),
     ruleDescription: text("rule_description"),
     triggerType: text("trigger_type").notNull(),
@@ -1080,8 +1461,12 @@ export const automationRules = pgTable(
 export const automationExecutions = pgTable(
   "automation_executions",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    automationRuleId: varchar("automation_rule_id").references(() => automationRules.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    automationRuleId: varchar("automation_rule_id").references(() => automationRules.id, {
+      onDelete: "cascade",
+    }),
     brandId: varchar("brand_id").references(() => brands.id, { onDelete: "cascade" }),
     agentTaskId: varchar("agent_task_id").references(() => agentTasks.id, { onDelete: "set null" }),
     triggerData: jsonb("trigger_data"),
@@ -1159,6 +1544,19 @@ export const insertAutomationExecutionSchema = createInsertSchema(automationExec
   startedAt: true,
 });
 
+export const insertWorkflowRunSchema = createInsertSchema(workflowRuns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedAt: true,
+});
+
+export const insertWorkflowApprovalSchema = createInsertSchema(workflowApprovals).omit({
+  id: true,
+  createdAt: true,
+  respondedAt: true,
+});
+
 export const insertMetricsHistorySchema = createInsertSchema(metricsHistory).omit({
   id: true,
   snapshotDate: true,
@@ -1209,8 +1607,12 @@ export type InsertPublicationMetric = z.infer<typeof insertPublicationMetricSche
 export type PublicationMetric = typeof publicationMetrics.$inferSelect;
 export type InsertCompetitor = z.infer<typeof insertCompetitorSchema>;
 export type Competitor = typeof competitors.$inferSelect;
-export type InsertCompetitorCitationSnapshot = z.infer<typeof insertCompetitorCitationSnapshotSchema>;
+export type InsertCompetitorCitationSnapshot = z.infer<
+  typeof insertCompetitorCitationSnapshotSchema
+>;
 export type CompetitorCitationSnapshot = typeof competitorCitationSnapshots.$inferSelect;
+export type InsertCompetitorGeoRanking = z.infer<typeof insertCompetitorGeoRankingSchema>;
+export type CompetitorGeoRanking = typeof competitorGeoRankings.$inferSelect;
 export type InsertBrandVisibilitySnapshot = z.infer<typeof insertBrandVisibilitySnapshotSchema>;
 export type BrandVisibilitySnapshot = typeof brandVisibilitySnapshots.$inferSelect;
 export type InsertListicle = z.infer<typeof insertListicleSchema>;
@@ -1255,13 +1657,21 @@ export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
 export type AutomationRule = typeof automationRules.$inferSelect;
 export type InsertAutomationExecution = z.infer<typeof insertAutomationExecutionSchema>;
 export type AutomationExecution = typeof automationExecutions.$inferSelect;
+export type InsertWorkflowRun = z.infer<typeof insertWorkflowRunSchema>;
+export type WorkflowRun = typeof workflowRuns.$inferSelect;
+export type InsertWorkflowApproval = z.infer<typeof insertWorkflowApprovalSchema>;
+export type WorkflowApproval = typeof workflowApprovals.$inferSelect;
 
 // Community Engagement - Reddit, Quora, forums
 export const communityPosts = pgTable(
   "community_posts",
   {
-    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
     platform: text("platform").notNull(),
     groupName: text("group_name").notNull(),
     groupUrl: text("group_url"),
@@ -1285,3 +1695,152 @@ export const insertCommunityPostSchema = createInsertSchema(communityPosts).omit
 
 export type CommunityPost = typeof communityPosts.$inferSelect;
 export type InsertCommunityPost = z.infer<typeof insertCommunityPostSchema>;
+
+// ─── Email DLQ (Wave 3.6) ─────────────────────────────────────────
+// After the retry helper exhausts its attempts, the failed send lands
+// here so we can inspect / requeue / surface in admin UI. Migration in
+// 0020_email_status_and_failures.sql.
+export const emailFailures = pgTable(
+  "email_failures",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id"),
+    template: text("template").notNull(),
+    toAddress: text("to_address").notNull(),
+    payloadJsonb: jsonb("payload_jsonb"),
+    lastError: text("last_error"),
+    retryCount: integer("retry_count").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("email_failures_created_idx").on(table.createdAt)],
+);
+
+export type EmailFailure = typeof emailFailures.$inferSelect;
+export type InsertEmailFailure = typeof emailFailures.$inferInsert;
+
+// ─── API cost tracking (Wave 3.2) ─────────────────────────────────
+// Records every outbound LLM call so we can enforce per-user, per-tier
+// daily/monthly token budgets. Migration in 0019_api_costs.sql.
+export const apiCosts = pgTable(
+  "api_costs",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    service: text("service").notNull(),
+    model: text("model"),
+    tokensIn: integer("tokens_in").default(0).notNull(),
+    tokensOut: integer("tokens_out").default(0).notNull(),
+    estCostCents: integer("est_cost_cents").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("api_costs_user_created_idx").on(table.userId, table.createdAt)],
+);
+
+export type ApiCost = typeof apiCosts.$inferSelect;
+export type InsertApiCost = typeof apiCosts.$inferInsert;
+
+// ─── Audit log (Wave 2.1) ─────────────────────────────────────────
+// Sensitive operations (delete, subscription change, admin action) write
+// a row here via server/lib/audit.ts. Migration in 0017_audit_logs.sql.
+// user_id is ON DELETE SET NULL — log rows survive account deletion.
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id"),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id"),
+    beforeJsonb: jsonb("before_jsonb"),
+    afterJsonb: jsonb("after_jsonb"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("audit_logs_user_idx").on(table.userId, table.createdAt),
+    index("audit_logs_action_idx").on(table.action, table.createdAt),
+  ],
+);
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// ─── Notification preferences (Wave 6.8) ──────────────────────────
+// One row per (user, notification type). Missing row == enabled
+// (the default). Non-dismissable categories (billing, security) are
+// never persisted here; they're hardcoded at send sites. Migration
+// in 0025_notification_preferences.sql.
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    userId: varchar("user_id").notNull(),
+    type: text("type").notNull(),
+    emailEnabled: boolean("email_enabled").default(true).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.type] }),
+    index("notification_preferences_user_idx").on(table.userId),
+  ],
+);
+
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
+
+// ─── Schema audits ────────────────────────────────────────────────
+// Cache of structured-data (JSON-LD / schema.org) audits for a given
+// URL. Keyed by `urlHash` = sha256(url).slice(0,32) so we can dedupe
+// + look up without indexing full URLs. Migration in
+// 0030_schema_audits_and_article_version.sql.
+export const schemaAudits = pgTable(
+  "schema_audits",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    urlHash: text("url_hash").notNull(),
+    url: text("url").notNull(),
+    // Full audit result payload (detected schemas, raw JSON-LD, etc).
+    schemas: jsonb("schemas").notNull(),
+    // Flat list of extra schema.org @types discovered on the page.
+    additionalTypes: text("additional_types").array(),
+    // Per-type completeness scores, e.g. { Article: 0.75, FAQPage: 0.4 }.
+    completenessByType: jsonb("completeness_by_type"),
+    fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("schema_audits_url_hash_idx").on(table.urlHash)],
+);
+
+export const insertSchemaAuditSchema = createInsertSchema(schemaAudits).omit({
+  id: true,
+  fetchedAt: true,
+});
+export type SchemaAudit = typeof schemaAudits.$inferSelect;
+export type InsertSchemaAudit = z.infer<typeof insertSchemaAuditSchema>;
+
+export const competitorFavicons = pgTable(
+  "competitor_favicons",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    domain: text("domain").notNull(),
+    iconUrl: text("icon_url"),
+    fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("competitor_favicons_domain_idx").on(table.domain)],
+);
+
+export const insertCompetitorFaviconSchema = createInsertSchema(competitorFavicons).omit({
+  id: true,
+  fetchedAt: true,
+});
+export type CompetitorFavicon = typeof competitorFavicons.$inferSelect;
+export type InsertCompetitorFavicon = z.infer<typeof insertCompetitorFaviconSchema>;

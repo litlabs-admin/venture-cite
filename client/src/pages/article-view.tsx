@@ -51,20 +51,29 @@ export default function ArticleView() {
     <>
       <Helmet>
         <title>{article.title} | GEO Platform</title>
-        <meta name="description" content={article.metaDescription || article.excerpt || article.title} />
-        <meta name="keywords" content={article.keywords?.join(', ') || ''} />
-        
+        <meta
+          name="description"
+          content={article.metaDescription || article.excerpt || article.title}
+        />
+        <meta name="keywords" content={article.keywords?.join(", ") || ""} />
+
         {/* Open Graph tags */}
         <meta property="og:title" content={article.title} />
-        <meta property="og:description" content={article.metaDescription || article.excerpt || article.title} />
+        <meta
+          property="og:description"
+          content={article.metaDescription || article.excerpt || article.title}
+        />
         <meta property="og:type" content="article" />
         <meta property="og:url" content={window.location.href} />
         {article.featuredImage && <meta property="og:image" content={article.featuredImage} />}
-        
+
         {/* Twitter Card tags */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={article.title} />
-        <meta name="twitter:description" content={article.metaDescription || article.excerpt || article.title} />
+        <meta
+          name="twitter:description"
+          content={article.metaDescription || article.excerpt || article.title}
+        />
         {article.featuredImage && <meta name="twitter:image" content={article.featuredImage} />}
       </Helmet>
 
@@ -85,7 +94,7 @@ export default function ArticleView() {
             <h1 className="text-4xl md:text-5xl font-bold mb-4" data-testid="article-title">
               {article.title}
             </h1>
-            
+
             {article.excerpt && (
               <p className="text-xl text-muted-foreground mb-6" data-testid="article-excerpt">
                 {article.excerpt}
@@ -99,15 +108,15 @@ export default function ArticleView() {
                   <span data-testid="article-author">{article.author}</span>
                 </div>
               )}
-              
+
               {article.createdAt && (
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   <time dateTime={article.createdAt} data-testid="article-date">
-                    {new Date(article.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
+                    {new Date(article.createdAt).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
                     })}
                   </time>
                 </div>
@@ -150,16 +159,16 @@ export default function ArticleView() {
 
           <Card>
             <CardContent className="prose prose-lg dark:prose-invert max-w-none pt-6">
-              <SafeMarkdown>
-                {article.content}
-              </SafeMarkdown>
+              <SafeMarkdown>{article.content}</SafeMarkdown>
             </CardContent>
           </Card>
 
           {article.citations > 0 && (
             <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>AI Platform Citations:</strong> This article has been cited {article.citations} time{article.citations !== 1 ? 's' : ''} by AI platforms including ChatGPT, Claude, and Perplexity.
+                <strong>AI Platform Citations:</strong> This article has been cited{" "}
+                {article.citations} time{article.citations !== 1 ? "s" : ""} by AI platforms
+                including ChatGPT, Claude, and Perplexity.
               </p>
             </div>
           )}

@@ -13,10 +13,18 @@ export async function recordCurrentMetrics(
   brandId: string,
   runStats: { citationRate: number; totalChecks: number; totalCited: number },
 ): Promise<void> {
-  // 1. Citation rate — the headline metric.
+  // 1. Citation rate — also written as "share_of_answer" for the TrendsTab
+  // chart which queries that key. Same underlying numerator (cited/total)
+  // since we don't currently distinguish SoA from citation-rate per run.
   await storage.createMetricsSnapshot({
     brandId,
     metricType: "citation_rate",
+    metricValue: runStats.citationRate.toFixed(2),
+    metricDetails: { totalChecks: runStats.totalChecks, totalCited: runStats.totalCited },
+  } as any);
+  await storage.createMetricsSnapshot({
+    brandId,
+    metricType: "share_of_answer",
     metricValue: runStats.citationRate.toFixed(2),
     metricDetails: { totalChecks: runStats.totalChecks, totalCited: runStats.totalCited },
   } as any);
@@ -41,9 +49,17 @@ export async function recordCurrentMetrics(
     }
   }
 
-  // 3. Hallucinations — unresolved count.
+  // 3. Hallucinations — unresolved count. Written under two metric keys:
+  // "hallucinations" for TrendsTab's existing query, and
+  // "hallucinations_unresolved" preserved for anything that still reads it.
   const hallucinations = await storage.getBrandHallucinations(brandId).catch(() => []);
   const unresolved = hallucinations.filter((h: any) => h.isResolved === 0).length;
+  await storage.createMetricsSnapshot({
+    brandId,
+    metricType: "hallucinations",
+    metricValue: unresolved.toString(),
+    metricDetails: { total: hallucinations.length, unresolved },
+  } as any);
   await storage.createMetricsSnapshot({
     brandId,
     metricType: "hallucinations_unresolved",

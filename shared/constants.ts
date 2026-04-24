@@ -25,13 +25,10 @@ export const AI_PLATFORMS = [
 export type AiPlatform = (typeof AI_PLATFORMS)[number];
 
 // Shorter subset used by client reports / compact badges where space is tight.
-export const AI_PLATFORMS_CORE = [
-  "ChatGPT",
-  "Claude",
-  "Perplexity",
-  "Gemini",
-  "Microsoft Copilot",
-] as const;
+// Reflects the platforms we actively run citation checks against. Microsoft
+// Copilot and Meta AI removed — not currently queried; DeepSeek added since
+// we run against it via OpenRouter.
+export const AI_PLATFORMS_CORE = ["ChatGPT", "Claude", "Perplexity", "Gemini", "DeepSeek"] as const;
 
 // ---------------------------------------------------------------------------
 // Citation scoring weights (server/routes.ts /api/geo-analytics).

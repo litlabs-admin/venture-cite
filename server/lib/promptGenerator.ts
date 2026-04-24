@@ -28,7 +28,9 @@ function safeParseJson<T = any>(raw: string | null | undefined): T | null {
  * replacing any existing prompts. Shared between the API handler and
  * the auto-citation scheduler.
  */
-export async function generateBrandPrompts(brand: Brand): Promise<{ saved: any[]; error?: string; generationId?: string }> {
+export async function generateBrandPrompts(
+  brand: Brand,
+): Promise<{ saved: any[]; error?: string; generationId?: string }> {
   if (!process.env.OPENAI_API_KEY) {
     return { saved: [], error: "OPENAI_API_KEY not configured" };
   }
@@ -41,13 +43,14 @@ export async function generateBrandPrompts(brand: Brand): Promise<{ saved: any[]
 
   let completion;
   try {
-    completion = await openai.chat.completions.create({
-      model: MODELS.brandPromptGeneration,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: `You are a GEO (Generative Engine Optimization) expert. Your job is to generate EXACTLY 10 user questions where the given brand is most likely to be cited if those questions were asked to ChatGPT, Claude, or Gemini.
+    completion = await openai.chat.completions.create(
+      {
+        model: MODELS.brandPromptGeneration,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: `You are a GEO (Generative Engine Optimization) expert. Your job is to generate EXACTLY 10 user questions where the given brand is most likely to be cited if those questions were asked to ChatGPT, Claude, or Gemini.
 
 Rules:
 - Mix query types: direct ("best X tools"), comparison ("X vs Y"), how-to, and buyer-intent.
@@ -60,30 +63,41 @@ Rules:
   - funnelStage: EXACTLY one of "TOFU" (awareness: "what is X"), "MOFU" (consideration: "best X for Y"), or "BOFU" (decision: "X vs Y", "X pricing", "X alternatives")
 
 Return JSON: { "prompts": [{ "prompt": "...", "rationale": "...", "category": "...", "funnelStage": "TOFU"|"MOFU"|"BOFU" }, ... 10 items total] }`,
-        },
-        {
-          role: "user",
-          content: `Brand: ${brand.name}
+          },
+          {
+            role: "user",
+            content: `Brand: ${brand.name}
 Company: ${brand.companyName}
 Industry: ${brand.industry}
-Description: ${brand.description || 'N/A'}
-Target audience: ${brand.targetAudience || 'N/A'}
-Products/services: ${Array.isArray(brand.products) ? brand.products.join(', ') : 'N/A'}
-Unique selling points: ${Array.isArray(brand.uniqueSellingPoints) ? brand.uniqueSellingPoints.join(', ') : 'N/A'}
+Description: ${brand.description || "N/A"}
+Target audience: ${brand.targetAudience || "N/A"}
+Products/services: ${Array.isArray(brand.products) ? brand.products.join(", ") : "N/A"}
+Unique selling points: ${Array.isArray(brand.uniqueSellingPoints) ? brand.uniqueSellingPoints.join(", ") : "N/A"}
 
 Published articles:
-${articleSummaries.length === 0 ? '(no articles published yet — base prompts on brand profile only)' : articleSummaries.map((a, i) => `${i + 1}. "${a.title}" — keywords: ${a.keywords.join(', ') || 'none'}`).join('\n')}`,
-        },
-      ],
-      max_tokens: 2000,
-    }, { signal: AbortSignal.timeout(45_000) });
+${articleSummaries.length === 0 ? "(no articles published yet — base prompts on brand profile only)" : articleSummaries.map((a, i) => `${i + 1}. "${a.title}" — keywords: ${a.keywords.join(", ") || "none"}`).join("\n")}`,
+          },
+        ],
+        max_tokens: 2000,
+      },
+      { signal: AbortSignal.timeout(45_000) },
+    );
   } catch (err: any) {
     return { saved: [], error: err?.message || "AI call failed" };
   }
 
-  const parsed = safeParseJson<{ prompts?: Array<{ prompt: string; rationale?: string; category?: string; funnelStage?: string }> }>(completion.choices[0].message.content);
+  const parsed = safeParseJson<{
+    prompts?: Array<{
+      prompt: string;
+      rationale?: string;
+      category?: string;
+      funnelStage?: string;
+    }>;
+  }>(completion.choices[0].message.content);
   const promptList = Array.isArray(parsed?.prompts) ? parsed!.prompts : [];
-  const valid = promptList.filter((p) => p && typeof p.prompt === 'string' && p.prompt.trim().length > 0).slice(0, 10);
+  const valid = promptList
+    .filter((p) => p && typeof p.prompt === "string" && p.prompt.trim().length > 0)
+    .slice(0, 10);
   if (valid.length === 0) {
     return { saved: [], error: "AI returned no usable prompts" };
   }
@@ -95,7 +109,8 @@ ${articleSummaries.length === 0 ? '(no articles published yet — base prompts o
   const saved = [];
   for (let i = 0; i < valid.length; i += 1) {
     const rawStage = (valid[i].funnelStage || "").toString().toUpperCase();
-    const funnelStage = rawStage === "TOFU" || rawStage === "MOFU" || rawStage === "BOFU" ? rawStage : null;
+    const funnelStage =
+      rawStage === "TOFU" || rawStage === "MOFU" || rawStage === "BOFU" ? rawStage : null;
     const category = valid[i].category?.toString().trim().slice(0, 64) || null;
     const row = await storage.createBrandPrompt({
       brandId: brand.id,

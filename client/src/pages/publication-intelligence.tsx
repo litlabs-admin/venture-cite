@@ -7,7 +7,9 @@ import PageHeader from "@/components/PageHeader";
 export default function PublicationIntelligence() {
   return (
     <div className="space-y-8">
-      <Helmet><title>Publication Intelligence - VentureCite</title></Helmet>
+      <Helmet>
+        <title>Publication Intelligence - VentureCite</title>
+      </Helmet>
       <PageHeader
         title="Publication Intelligence"
         description="Discover which outlets AI platforms cite most for your industry"
@@ -24,7 +26,9 @@ export default function PublicationIntelligence() {
           <Newspaper className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">We're Building Something Great</h3>
           <p className="text-muted-foreground max-w-md mb-6">
-            Publication Intelligence will analyze which media outlets and publications get cited most by AI engines like ChatGPT, Claude, and Perplexity — so you know exactly where to pitch your brand for maximum AI visibility.
+            Publication Intelligence will analyze which media outlets and publications get cited
+            most by AI engines like ChatGPT, Claude, and Perplexity — so you know exactly where to
+            pitch your brand for maximum AI visibility.
           </p>
           <div className="grid grid-cols-3 gap-8 max-w-md">
             <div>

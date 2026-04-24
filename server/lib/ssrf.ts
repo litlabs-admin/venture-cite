@@ -16,13 +16,13 @@ import net from "net";
 // change; this module is the first line.
 
 const PRIVATE_V4_RANGES: [number, number][] = [
-  [ip4("10.0.0.0"),       ip4("10.255.255.255")],
-  [ip4("172.16.0.0"),     ip4("172.31.255.255")],
-  [ip4("192.168.0.0"),    ip4("192.168.255.255")],
-  [ip4("127.0.0.0"),      ip4("127.255.255.255")],
-  [ip4("169.254.0.0"),    ip4("169.254.255.255")],  // link-local + AWS metadata
-  [ip4("0.0.0.0"),        ip4("0.255.255.255")],
-  [ip4("100.64.0.0"),     ip4("100.127.255.255")],  // CGNAT
+  [ip4("10.0.0.0"), ip4("10.255.255.255")],
+  [ip4("172.16.0.0"), ip4("172.31.255.255")],
+  [ip4("192.168.0.0"), ip4("192.168.255.255")],
+  [ip4("127.0.0.0"), ip4("127.255.255.255")],
+  [ip4("169.254.0.0"), ip4("169.254.255.255")], // link-local + AWS metadata
+  [ip4("0.0.0.0"), ip4("0.255.255.255")],
+  [ip4("100.64.0.0"), ip4("100.127.255.255")], // CGNAT
 ];
 
 function ip4(addr: string): number {
@@ -87,6 +87,54 @@ export async function assertSafeUrl(raw: string): Promise<URL> {
   }
 
   return url;
+}
+
+// Binary variant — used for images (logo proxy). Same SSRF + size caps as
+// safeFetchText but returns a raw Buffer so the caller doesn't have to round
+// through UTF-8.
+export async function safeFetchBuffer(
+  raw: string,
+  opts: { maxBytes?: number; timeoutMs?: number; headers?: Record<string, string> } = {},
+): Promise<{ status: number; buffer: Buffer; contentType: string }> {
+  const url = await assertSafeUrl(raw);
+  const maxBytes = opts.maxBytes ?? 2 * 1024 * 1024;
+  const timeoutMs = opts.timeoutMs ?? 10_000;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url.toString(), {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "VentureCiteBot/1.0",
+        ...opts.headers,
+      },
+    });
+    const contentType = res.headers.get("content-type") ?? "";
+    const reader = res.body?.getReader();
+    if (!reader) {
+      return { status: res.status, buffer: Buffer.alloc(0), contentType };
+    }
+    let total = 0;
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel();
+          throw new Error("Response exceeded maximum size");
+        }
+        chunks.push(value);
+      }
+    }
+    const buffer = Buffer.concat(chunks.map((c) => Buffer.from(c)));
+    return { status: res.status, buffer, contentType };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Convenience: fetch with SSRF check + size cap. Returns text body or throws.

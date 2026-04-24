@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
+import { Sentry } from "@/lib/sentry";
 
 interface Props {
   children: ReactNode;
@@ -19,8 +20,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: { componentStack?: string }) {
-    // eslint-disable-next-line no-console
     console.error("[ErrorBoundary]", error, info.componentStack);
+    Sentry.captureException(error, {
+      tags: { source: "ErrorBoundary" },
+      contexts: { react: { componentStack: info.componentStack ?? "" } },
+    });
   }
 
   reset = () => this.setState({ error: null });
@@ -40,8 +44,12 @@ export class ErrorBoundary extends Component<Props, State> {
             {this.state.error.message || "An unexpected error occurred while rendering this view."}
           </p>
           <div className="flex gap-2 justify-center">
-            <Button size="sm" variant="outline" onClick={this.reset}>Try again</Button>
-            <Button size="sm" onClick={() => window.location.reload()}>Reload</Button>
+            <Button size="sm" variant="outline" onClick={this.reset}>
+              Try again
+            </Button>
+            <Button size="sm" onClick={() => window.location.reload()}>
+              Reload
+            </Button>
           </div>
         </div>
       </div>

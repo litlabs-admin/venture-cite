@@ -4,7 +4,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +34,7 @@ import {
   Zap,
   BarChart3,
   Filter,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
 
 const intentColors: Record<string, string> = {
@@ -52,19 +58,23 @@ export default function KeywordResearchPage() {
   const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
   const [statusFilter, setStatusFilter] = usePersistedState<string>("vc_keywords_filter", "all");
 
-  const { data: keywordsData, isLoading: keywordsLoading } = useQuery<{ success: boolean; data: KeywordResearch[] }>({
+  const { data: keywordsData, isLoading: keywordsLoading } = useQuery<{
+    success: boolean;
+    data: KeywordResearch[];
+  }>({
     queryKey: [`/api/keyword-research/${selectedBrandId}`],
     enabled: !!selectedBrandId,
   });
 
   const keywords = keywordsData?.data || [];
-  const filteredKeywords = statusFilter === "all" 
-    ? keywords 
-    : keywords.filter(k => k.status === statusFilter);
+  const filteredKeywords =
+    statusFilter === "all" ? keywords : keywords.filter((k) => k.status === statusFilter);
 
   const discoverMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/keyword-research/discover", { brandId: selectedBrandId });
+      const response = await apiRequest("POST", "/api/keyword-research/discover", {
+        brandId: selectedBrandId,
+      });
       return response.json();
     },
     onSuccess: (data) => {
@@ -118,7 +128,7 @@ export default function KeywordResearchPage() {
       const qk = [`/api/keyword-research/${selectedBrandId}`];
       queryClient.setQueryData<{ success: boolean; data: KeywordResearch[] }>(qk, (old) => {
         if (!old) return old;
-        return { ...old, data: old.data.map((k) => k.id === id ? { ...k, status } : k) };
+        return { ...old, data: old.data.map((k) => (k.id === id ? { ...k, status } : k)) };
       });
     },
   });
@@ -144,7 +154,10 @@ export default function KeywordResearchPage() {
     <div className="space-y-8">
       <Helmet>
         <title>AI Keyword Research | VentureCite</title>
-        <meta name="description" content="Discover high-opportunity keywords for AI search optimization with intelligent research powered by GPT-4." />
+        <meta
+          name="description"
+          content="Discover high-opportunity keywords for AI search optimization with intelligent research powered by GPT-4."
+        />
       </Helmet>
 
       <PageHeader
@@ -152,238 +165,270 @@ export default function KeywordResearchPage() {
         description="Discover keywords that will get your brand cited by AI search engines"
       />
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="lg:col-span-1">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Select Brand
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {brandsLoading ? <Skeleton className="h-10 w-full" /> : <BrandSelector className="w-full" />}
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Select Brand
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {brandsLoading ? (
+              <Skeleton className="h-10 w-full" />
+            ) : (
+              <BrandSelector className="w-full" />
+            )}
+          </CardContent>
+        </Card>
 
-          <Card className="lg:col-span-1">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Filter Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger data-testid="select-status-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" data-testid="filter-all">All Keywords</SelectItem>
-                  <SelectItem value="discovered" data-testid="filter-discovered">Discovered</SelectItem>
-                  <SelectItem value="targeted" data-testid="filter-targeted">Targeted</SelectItem>
-                  <SelectItem value="content_created" data-testid="filter-content-created">Content Created</SelectItem>
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Filter Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger data-testid="select-status-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" data-testid="filter-all">
+                  All Keywords
+                </SelectItem>
+                <SelectItem value="discovered" data-testid="filter-discovered">
+                  Discovered
+                </SelectItem>
+                <SelectItem value="targeted" data-testid="filter-targeted">
+                  Targeted
+                </SelectItem>
+                <SelectItem value="content_created" data-testid="filter-content-created">
+                  Content Created
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
 
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                AI Discovery
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button
-                onClick={() => discoverMutation.mutate()}
-                disabled={!selectedBrandId || discoverMutation.isPending}
-                className="w-full bg-red-600 hover:bg-red-700"
-                data-testid="button-discover-keywords"
-              >
-                {discoverMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {keywordLoadingMessage}
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-4 w-4 mr-2" />
-                    Discover Keywords with AI
-                  </>
-                )}
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2">
-                AI analyzes your brand, industry, and competitors to find high-opportunity keywords
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              AI Discovery
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => discoverMutation.mutate()}
+              disabled={!selectedBrandId || discoverMutation.isPending}
+              className="w-full bg-red-600 hover:bg-red-700"
+              data-testid="button-discover-keywords"
+            >
+              {discoverMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {keywordLoadingMessage}
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4 mr-2" />
+                  Discover Keywords with AI
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              AI analyzes your brand, industry, and competitors to find high-opportunity keywords
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-        {!selectedBrandId ? (
-          <Card>
-            <CardContent className="py-16 text-center">
-              <Search className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="text-xl font-semibold text-foreground mb-2">Select a Brand to Start</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Choose a brand above to discover AI-optimized keywords and generate content that gets cited.
-              </p>
-            </CardContent>
-          </Card>
-        ) : keywordsLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <Skeleton className="h-12 w-12 rounded-lg" />
-                    <div className="flex-1">
-                      <Skeleton className="h-5 w-48 mb-2" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
+      {!selectedBrandId ? (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <Search className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+            <h3 className="text-xl font-semibold text-foreground mb-2">Select a Brand to Start</h3>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Choose a brand above to discover AI-optimized keywords and generate content that gets
+              cited.
+            </p>
+          </CardContent>
+        </Card>
+      ) : keywordsLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-12 w-12 rounded-lg" />
+                  <div className="flex-1">
+                    <Skeleton className="h-5 w-48 mb-2" />
+                    <Skeleton className="h-4 w-32" />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filteredKeywords.length === 0 ? (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <Sparkles className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+            <h3 className="text-xl font-semibold text-foreground mb-2">No Keywords Found</h3>
+            <p className="text-muted-foreground max-w-md mx-auto mb-4">
+              Click "Discover Keywords with AI" to find high-opportunity keywords for{" "}
+              {selectedBrand?.name}.
+            </p>
+            <Button
+              onClick={() => discoverMutation.mutate()}
+              disabled={discoverMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-discover-empty-state"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Discover Keywords
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-muted-foreground">
+              Showing {filteredKeywords.length} keyword{filteredKeywords.length !== 1 ? "s" : ""}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => discoverMutation.mutate()}
+              disabled={discoverMutation.isPending}
+              data-testid="button-refresh-keywords"
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${discoverMutation.isPending ? "animate-spin" : ""}`}
+              />
+              Find More
+            </Button>
           </div>
-        ) : filteredKeywords.length === 0 ? (
-          <Card>
-            <CardContent className="py-16 text-center">
-              <Sparkles className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="text-xl font-semibold text-foreground mb-2">No Keywords Found</h3>
-              <p className="text-muted-foreground max-w-md mx-auto mb-4">
-                Click "Discover Keywords with AI" to find high-opportunity keywords for {selectedBrand?.name}.
-              </p>
-              <Button
-                onClick={() => discoverMutation.mutate()}
-                disabled={discoverMutation.isPending}
-                className="bg-red-600 hover:bg-red-700"
-                data-testid="button-discover-empty-state"
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Discover Keywords
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground">
-                Showing {filteredKeywords.length} keyword{filteredKeywords.length !== 1 ? "s" : ""}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => discoverMutation.mutate()}
-                disabled={discoverMutation.isPending}
-                data-testid="button-refresh-keywords"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${discoverMutation.isPending ? "animate-spin" : ""}`} />
-                Find More
-              </Button>
-            </div>
 
-            {filteredKeywords.map((keyword) => (
-              <Card key={keyword.id} className="hover:shadow-md transition-shadow" data-testid={`keyword-card-${keyword.id}`}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-foreground" data-testid={`text-keyword-${keyword.id}`}>{keyword.keyword}</h3>
-                        <Badge className={intentColors[keyword.intent || "informational"]} data-testid={`badge-intent-${keyword.id}`}>
-                          {keyword.intent}
+          {filteredKeywords.map((keyword) => (
+            <Card
+              key={keyword.id}
+              className="hover:shadow-md transition-shadow"
+              data-testid={`keyword-card-${keyword.id}`}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3
+                        className="text-lg font-semibold text-foreground"
+                        data-testid={`text-keyword-${keyword.id}`}
+                      >
+                        {keyword.keyword}
+                      </h3>
+                      <Badge
+                        className={intentColors[keyword.intent || "informational"]}
+                        data-testid={`badge-intent-${keyword.id}`}
+                      >
+                        {keyword.intent}
+                      </Badge>
+                      {keyword.category && (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          {keyword.category}
                         </Badge>
-                        {keyword.category && (
-                          <Badge variant="outline" className="text-muted-foreground">
-                            {keyword.category}
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">Opportunity Score</p>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-lg font-bold ${getScoreColor(keyword.opportunityScore)}`} data-testid={`score-opportunity-${keyword.id}`}>
-                              {keyword.opportunityScore}
-                            </span>
-                            <Progress value={keyword.opportunityScore} className="h-2 flex-1" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">AI Citation Potential</p>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-lg font-bold ${getScoreColor(keyword.aiCitationPotential)}`} data-testid={`score-citation-${keyword.id}`}>
-                              {keyword.aiCitationPotential}
-                            </span>
-                            <Progress value={keyword.aiCitationPotential} className="h-2 flex-1" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">Search Volume</p>
-                          <span className="text-lg font-bold text-foreground">
-                            {keyword.searchVolume ? keyword.searchVolume.toLocaleString() : "—"}
-                          </span>
-                        </div>
-
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">Difficulty</p>
-                          <span className="text-lg font-bold text-foreground">
-                            {keyword.difficulty || "—"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {keyword.relatedKeywords && keyword.relatedKeywords.length > 0 && (
-                        <div className="mt-4">
-                          <p className="text-xs text-muted-foreground mb-2">Related Keywords</p>
-                          <div className="flex flex-wrap gap-2">
-                            {keyword.relatedKeywords.map((related, i) => (
-                              <Badge key={i} variant="secondary" className="text-xs">
-                                {related}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
                       )}
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleGenerateContent(keyword)}
-                        className="bg-red-600 hover:bg-red-700"
-                        data-testid={`button-generate-content-${keyword.id}`}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Generate Content
-                      </Button>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Opportunity Score</p>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-lg font-bold ${getScoreColor(keyword.opportunityScore)}`}
+                            data-testid={`score-opportunity-${keyword.id}`}
+                          >
+                            {keyword.opportunityScore}
+                          </span>
+                          <Progress value={keyword.opportunityScore} className="h-2 flex-1" />
+                        </div>
+                      </div>
 
-                      <Badge 
-                        variant="outline" 
-                        className="justify-center text-xs"
-                      >
-                        {contentTypeLabels[keyword.suggestedContentType || "article"] || keyword.suggestedContentType}
-                      </Badge>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">AI Citation Potential</p>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-lg font-bold ${getScoreColor(keyword.aiCitationPotential)}`}
+                            data-testid={`score-citation-${keyword.id}`}
+                          >
+                            {keyword.aiCitationPotential}
+                          </span>
+                          <Progress value={keyword.aiCitationPotential} className="h-2 flex-1" />
+                        </div>
+                      </div>
 
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deleteMutation.mutate(keyword.id)}
-                        className="text-muted-foreground hover:text-red-600"
-                        data-testid={`button-delete-keyword-${keyword.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Search Volume</p>
+                        <span className="text-lg font-bold text-foreground">
+                          {keyword.searchVolume ? keyword.searchVolume.toLocaleString() : "—"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Difficulty</p>
+                        <span className="text-lg font-bold text-foreground">
+                          {keyword.difficulty || "—"}
+                        </span>
+                      </div>
                     </div>
+
+                    {keyword.relatedKeywords && keyword.relatedKeywords.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-xs text-muted-foreground mb-2">Related Keywords</p>
+                        <div className="flex flex-wrap gap-2">
+                          {keyword.relatedKeywords.map((related, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs">
+                              {related}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleGenerateContent(keyword)}
+                      className="bg-red-600 hover:bg-red-700"
+                      data-testid={`button-generate-content-${keyword.id}`}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Generate Content
+                    </Button>
+
+                    <Badge variant="outline" className="justify-center text-xs">
+                      {contentTypeLabels[keyword.suggestedContentType || "article"] ||
+                        keyword.suggestedContentType}
+                    </Badge>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteMutation.mutate(keyword.id)}
+                      className="text-muted-foreground hover:text-red-600"
+                      data-testid={`button-delete-keyword-${keyword.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

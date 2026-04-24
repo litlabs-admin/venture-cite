@@ -10,7 +10,10 @@ export class ApiError extends Error {
     // Keep the legacy "<status>: <text>" prefix so any older string-matching
     // callers still work during the migration.
     const message =
-      (body && typeof body === "object" && "error" in (body as any) && typeof (body as any).error === "string")
+      body &&
+      typeof body === "object" &&
+      "error" in (body as any) &&
+      typeof (body as any).error === "string"
         ? (body as any).error
         : bodyText || `Request failed with status ${status}`;
     super(`${status}: ${message}`);
@@ -30,7 +33,11 @@ async function throwIfResNotOk(res: Response) {
     const raw = await res.text();
     let body: unknown = null;
     if (raw) {
-      try { body = JSON.parse(raw); } catch { body = raw; }
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        body = raw;
+      }
     }
     throw new ApiError(res.status, raw || res.statusText, body);
   }
@@ -92,9 +99,7 @@ function urlFromQueryKey(queryKey: readonly unknown[]): string {
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
+export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const res = await fetch(urlFromQueryKey(queryKey), {
@@ -118,7 +123,20 @@ export const queryClient = new QueryClient({
       // with imperative setQueryData/refetch in mutations.
       refetchOnWindowFocus: false,
       staleTime: 30_000,
-      retry: false,
+      // Wave 6.5: retry transient failures with exponential backoff. 401s
+      // should not retry (user lost session — re-retrying just hammers the
+      // endpoint). 4xx in general is a client error; retrying won't help.
+      // Only retry on network errors and 5xx.
+      retry: (failureCount, error: unknown) => {
+        if (failureCount >= 2) return false;
+        const status =
+          error && typeof error === "object" && "status" in error
+            ? Number((error as { status?: number }).status)
+            : undefined;
+        if (status !== undefined && status >= 400 && status < 500) return false;
+        return true;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
     },
     mutations: {
       retry: false,

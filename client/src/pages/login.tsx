@@ -4,11 +4,19 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
 import { setSession } from "@/lib/authStore";
+import { Helmet } from "react-helmet-async";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -26,7 +34,9 @@ export default function Login() {
         body: JSON.stringify(data),
       });
       let result: any = {};
-      try { result = await response.json(); } catch {}
+      try {
+        result = await response.json();
+      } catch {}
       if (!response.ok || !result.success) {
         throw new Error(result.error || `Login failed (${response.status})`);
       }
@@ -50,6 +60,10 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+      <Helmet>
+        <title>Sign In - VentureCite</title>
+        <meta name="robots" content="noindex" />
+      </Helmet>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -96,8 +110,8 @@ export default function Login() {
               </div>
             </div>
             <div className="flex justify-end">
-              <a 
-                href="/forgot-password" 
+              <a
+                href="/forgot-password"
                 className="text-sm text-red-600 hover:text-red-700"
                 data-testid="link-forgot-password"
               >
@@ -124,7 +138,11 @@ export default function Login() {
         <CardFooter className="justify-center">
           <p className="text-sm text-slate-600">
             Don't have an account?{" "}
-            <a href="/register" className="text-red-600 hover:text-red-700 font-medium" data-testid="link-register">
+            <a
+              href="/register"
+              className="text-red-600 hover:text-red-700 font-medium"
+              data-testid="link-register"
+            >
               Sign up
             </a>
           </p>

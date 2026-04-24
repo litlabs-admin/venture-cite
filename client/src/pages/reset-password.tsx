@@ -4,11 +4,19 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, Check, X, CheckCircle } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
 import { supabase } from "@/lib/supabase";
+import { Helmet } from "react-helmet-async";
 
 export default function ResetPassword() {
   const [, setLocation] = useLocation();
@@ -53,7 +61,7 @@ export default function ResetPassword() {
   ];
 
   const passwordsMatch = password === confirmPassword && password.length > 0;
-  const allRequirementsMet = passwordRequirements.every(r => r.met);
+  const allRequirementsMet = passwordRequirements.every((r) => r.met);
 
   const resetMutation = useMutation({
     mutationFn: async (newPassword: string) => {
@@ -138,6 +146,10 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+      <Helmet>
+        <title>Set New Password - VentureCite</title>
+        <meta name="robots" content="noindex" />
+      </Helmet>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -173,7 +185,10 @@ export default function ResetPassword() {
               {password && (
                 <ul className="text-xs space-y-1 mt-2">
                   {passwordRequirements.map((req, i) => (
-                    <li key={i} className={`flex items-center gap-1 ${req.met ? "text-foreground" : "text-slate-500"}`}>
+                    <li
+                      key={i}
+                      className={`flex items-center gap-1 ${req.met ? "text-foreground" : "text-slate-500"}`}
+                    >
                       {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                       {req.label}
                     </li>
@@ -201,7 +216,12 @@ export default function ResetPassword() {
             <Button
               type="submit"
               className="w-full bg-primary hover:bg-primary/90"
-              disabled={resetMutation.isPending || !allRequirementsMet || !passwordsMatch || hasSession !== true}
+              disabled={
+                resetMutation.isPending ||
+                !allRequirementsMet ||
+                !passwordsMatch ||
+                hasSession !== true
+              }
               data-testid="button-reset-password"
             >
               {resetMutation.isPending ? (

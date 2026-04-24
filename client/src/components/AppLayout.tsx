@@ -11,6 +11,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Wave 6.3: skip link for keyboard + screen-reader users. Hidden off-
+          screen until focused, then jumps past sidebar nav straight to main. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       <Sidebar />
 
       <div className="flex-1 min-w-0 lg:ml-[220px]">
@@ -32,10 +40,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="w-9" />
         </header>
 
-        <main className="overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8 py-6">
-            {children}
-          </div>
+        <main id="main-content" className="overflow-y-auto">
+          <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8 py-6">{children}</div>
         </main>
       </div>
     </div>
