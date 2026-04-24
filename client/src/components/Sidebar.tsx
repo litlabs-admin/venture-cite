@@ -7,7 +7,6 @@ import {
   Link2,
   Search,
   ScanEye,
-  CreditCard,
   LogOut,
   Settings,
   BarChart3,
@@ -193,18 +192,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
 
-      {/* Bottom: pricing + user */}
+      {/* Bottom: user */}
       <div className="shrink-0 border-t border-sidebar-border px-2 py-3 space-y-1">
-        <Link href="/pricing" onClick={onNavigate}>
-          <div
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            tabIndex={0}
-          >
-            <CreditCard className="w-4 h-4 shrink-0" />
-            <span>Pricing</span>
-          </div>
-        </Link>
-
         <div className="px-1 pt-1">
           <SidebarOnboarding onNavigate={onNavigate} />
         </div>

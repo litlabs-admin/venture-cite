@@ -1,6 +1,4 @@
-import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
 interface UsageWidgetProps {
@@ -48,11 +46,7 @@ export default function UsageWidget({ data }: UsageWidgetProps) {
               </div>
             )}
             {data.articlesRemaining === 0 && (
-              <Link href="/pricing">
-                <Button size="sm" variant="default" className="bg-primary hover:bg-primary/90">
-                  Upgrade Plan
-                </Button>
-              </Link>
+              <span className="text-xs text-destructive font-medium">Monthly limit reached</span>
             )}
             {data.articlesRemaining > 0 &&
               data.articlesRemaining <= 5 &&

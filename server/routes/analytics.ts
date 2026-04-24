@@ -590,37 +590,52 @@ export function setupAnalyticsRoutes(app: Express): void {
       for (const platform of AI_PLATFORMS) {
         const platformRankings = brandRankings.filter((r) => r.aiPlatform === platform);
         const citations = platformRankings.filter((r) => r.isCited === 1).length;
+        // `mentions` here = total checks run on this platform. Kept on the
+        // row for downstream consumers that want "checks attempted," but
+        // it is NOT fed into the visibility score — that would credit
+        // non-cited checks, which is the root cause of the 15/100 score
+        // users saw with zero citations.
         const mentions = platformRankings.length;
 
-        // Calculate average rank (lower is better)
-        const rankedItems = platformRankings.filter((r) => r.rank !== null && r.rank !== undefined);
+        // Average rank across CITED rows only (not across all rankings).
+        // Rank was previously computed over every row with a rank field —
+        // which pulled down the visibility signal even when the brand
+        // wasn't cited.
+        const citedRows = platformRankings.filter((r) => r.isCited === 1);
+        const rankedItems = citedRows.filter((r) => r.rank !== null && r.rank !== undefined);
         const avgRank =
           rankedItems.length > 0
             ? rankedItems.reduce((sum, r) => sum + (r.rank || 0), 0) / rankedItems.length
             : 0;
 
-        // Count sentiment
+        // Count sentiment (only from cited rows — sentiment of a not-cited
+        // row is noise).
         const sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
-        for (const ranking of platformRankings) {
+        for (const ranking of citedRows) {
           const sentiment = (ranking.sentiment as "positive" | "neutral" | "negative") || "neutral";
           sentimentCounts[sentiment]++;
         }
 
-        // Visibility score (0-100) = citations + mentions + rank components.
-        // Weights/multipliers centralized in @shared/constants CITATION_SCORING.
-        const citationScore = Math.min(
-          citations * CITATION_SCORING.citationMultiplier,
-          CITATION_SCORING.citationWeight,
-        );
-        const mentionScore = Math.min(
-          mentions * CITATION_SCORING.mentionMultiplier,
-          CITATION_SCORING.mentionWeight,
-        );
-        const rankScore =
-          avgRank > 0
-            ? Math.max(CITATION_SCORING.rankWeight - avgRank * CITATION_SCORING.rankMultiplier, 0)
-            : 0;
-        const visibilityScore = Math.round(citationScore + mentionScore + rankScore);
+        // Visibility score is 0 when a platform has zero citations — no
+        // theater. Once there's at least one citation, the score blends
+        // citation count and rank position:
+        //   citationScore: up to 70 pts (was 40 + 30 for the bogus mention
+        //                  score; now just the citation weight plus what
+        //                  the mention weight used to be, so "Strong"
+        //                  labels at a similar citation count).
+        //   rankScore:     up to 30 pts, better rank = more.
+        let visibilityScore = 0;
+        if (citations > 0) {
+          const citationScore = Math.min(
+            citations * CITATION_SCORING.citationMultiplier,
+            CITATION_SCORING.citationWeight + CITATION_SCORING.mentionWeight,
+          );
+          const rankScore =
+            avgRank > 0
+              ? Math.max(CITATION_SCORING.rankWeight - avgRank * CITATION_SCORING.rankMultiplier, 0)
+              : 0;
+          visibilityScore = Math.round(citationScore + rankScore);
+        }
 
         platformMetrics[platform] = {
           mentions,
@@ -651,11 +666,22 @@ export function setupAnalyticsRoutes(app: Express): void {
           ? Math.round((brandTotalCitations / totalMarketCitations) * 1000) / 10
           : 0;
 
-      // Calculate overall AI Visibility Score (0-100)
-      const platformScores = Object.values(platformMetrics).map((p) => p.visibilityScore);
+      // Overall AI Visibility Score — average of per-platform scores across
+      // platforms that actually have check data. Previously this averaged
+      // across every platform in AI_PLATFORMS, which dragged the score
+      // down with zeros for platforms the user hasn't run yet (and also
+      // inflated it when the mention-score bug was in place). Now: if no
+      // checks exist anywhere, score is 0; otherwise it's the honest mean
+      // over platforms we have data for.
+      const platformsWithData = Object.values(platformMetrics).filter(
+        (p) => p.citations + p.mentions > 0,
+      );
       const overallVisibilityScore =
-        platformScores.length > 0
-          ? Math.round(platformScores.reduce((sum, s) => sum + s, 0) / platformScores.length)
+        platformsWithData.length > 0 && brandTotalCitations > 0
+          ? Math.round(
+              platformsWithData.reduce((sum, p) => sum + p.visibilityScore, 0) /
+                platformsWithData.length,
+            )
           : 0;
 
       // True mentions = rows in brand_mentions (populated by the citation

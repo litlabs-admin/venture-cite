@@ -27,7 +27,6 @@ const ArticleView = lazy(() => import("@/pages/article-view"));
 const Brands = lazy(() => import("@/pages/brands"));
 const KeywordResearch = lazy(() => import("@/pages/keyword-research"));
 const AIVisibility = lazy(() => import("@/pages/ai-visibility"));
-const Pricing = lazy(() => import("@/pages/pricing"));
 
 // Phase 2 feature pages
 const Competitors = lazy(() => import("@/pages/competitors"));
@@ -211,13 +210,6 @@ function Router() {
         {() => (
           <Suspense fallback={<RouteSpinner />}>
             <Privacy />
-          </Suspense>
-        )}
-      </Route>
-      <Route path="/pricing">
-        {() => (
-          <Suspense fallback={<RouteSpinner />}>
-            <Pricing />
           </Suspense>
         )}
       </Route>

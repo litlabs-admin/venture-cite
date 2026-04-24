@@ -89,7 +89,14 @@ export default function Register() {
         <title>Create Account - VentureCite</title>
         <meta name="robots" content="noindex" />
       </Helmet>
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md relative">
+        <a
+          href="/"
+          className="absolute top-3 left-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          data-testid="link-back-home"
+        >
+          ← Back to home
+        </a>
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />

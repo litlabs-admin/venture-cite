@@ -325,7 +325,6 @@ export default function Landing() {
                 {[
                   { href: "#about", label: "About Us" },
                   { href: "#features", label: "Features" },
-                  { href: "#pricing", label: "Pricing" },
                   { href: "#faq", label: "FAQ" },
                 ].map((l) => (
                   <a
@@ -374,9 +373,9 @@ export default function Landing() {
                   {[
                     { href: "#about", label: "About Us" },
                     { href: "#features", label: "Features" },
-                    { href: "#pricing", label: "Pricing" },
                     { href: "#faq", label: "FAQ" },
                     { href: "/login", label: "Log in" },
+                    { href: "/register", label: "Sign up" },
                   ].map((l) => (
                     <a
                       key={l.href}
@@ -450,15 +449,15 @@ export default function Landing() {
                     <ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
                   </Button>
                 </a>
-                <Link href="/pricing">
+                <a href="/login">
                   <Button
                     variant="outline"
                     className="bg-white border-gray-200 text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-full h-12 lg:h-14 px-7 lg:px-9 text-sm lg:text-base font-medium w-full sm:w-auto hover:-translate-y-0.5 transition-all duration-300"
-                    data-testid="button-hero-pricing"
+                    data-testid="button-hero-login"
                   >
-                    View Pricing
+                    Log in
                   </Button>
-                </Link>
+                </a>
               </div>
 
               {/* Dashboard preview */}
@@ -1132,66 +1131,6 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── Pricing ── */}
-        <section id="pricing" className="py-20 lg:py-28 xl:py-32">
-          <div className="max-w-7xl mx-auto px-6 xl:px-10">
-            <div className="text-center mb-10 lg:mb-14 max-w-2xl lg:max-w-3xl mx-auto reveal">
-              <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-1.5 mb-4 lg:mb-5 shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-sm lg:text-base text-gray-600">Pricing</span>
-              </div>
-              <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-3 lg:mb-4 tracking-[-0.03em] text-gray-900">
-                Build, automate, and scale your GEO
-              </h2>
-              <p className="text-base lg:text-lg xl:text-xl text-gray-500">
-                Enterprise-level automation and workflows at a startup-friendly price.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-5 lg:gap-7 max-w-5xl xl:max-w-6xl mx-auto items-start">
-              {pricing.map((plan, i) => (
-                <div
-                  key={plan.name}
-                  className={`rounded-2xl lg:rounded-3xl p-6 lg:p-8 xl:p-10 border card-lift reveal ${
-                    plan.featured
-                      ? "bg-gradient-to-br from-red-50 to-rose-50 border-red-200 shadow-xl shadow-red-100/50 md:scale-[1.04]"
-                      : "bg-white border-gray-200/60 hover:border-red-200"
-                  }`}
-                  style={{ transitionDelay: `${i * 80}ms` }}
-                >
-                  {plan.featured && (
-                    <div className="inline-block mb-3 lg:mb-4 bg-red-600 text-white text-xs lg:text-sm font-medium px-3 py-1 rounded-full">
-                      Most Popular
-                    </div>
-                  )}
-                  <h3
-                    className={`text-lg lg:text-xl xl:text-2xl font-semibold mb-4 lg:mb-5 ${plan.featured ? "text-red-600" : "text-gray-900"}`}
-                  >
-                    {plan.name}
-                  </h3>
-                  <div className="mb-4 lg:mb-5">
-                    <span className="text-4xl lg:text-5xl xl:text-6xl font-bold tracking-[-0.03em] text-gray-900">
-                      {plan.price}
-                    </span>
-                    <span className="text-sm lg:text-base text-gray-400 ml-2">/mo</span>
-                  </div>
-                  <p className="text-sm lg:text-base text-gray-500 mb-6 lg:mb-8 leading-relaxed">
-                    {plan.desc}
-                  </p>
-                  <Link href="/pricing">
-                    <Button
-                      className="w-full bg-red-600 hover:bg-red-700 text-white rounded-full h-11 lg:h-12 text-sm lg:text-base font-medium shadow-sm hover:shadow-md hover:shadow-red-200 hover:-translate-y-0.5 transition-all duration-200"
-                      data-testid={`button-pricing-${plan.name.toLowerCase()}`}
-                    >
-                      Get Started
-                    </Button>
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* ── ROI Calculator ── */}
         <section className="py-16 lg:py-24 bg-white" id="roi-calculator">
           <div className="max-w-7xl mx-auto px-6 xl:px-10">
@@ -1516,15 +1455,6 @@ export default function Landing() {
                     <ArrowRight className="ml-2 w-4 h-4 lg:w-5 lg:h-5 transition-transform group-hover:translate-x-1" />
                   </Button>
                 </a>
-                <Link href="/pricing">
-                  <Button
-                    variant="outline"
-                    className="bg-white border-gray-200 text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-full h-12 lg:h-14 px-8 lg:px-10 text-sm lg:text-base hover:-translate-y-0.5 transition-all duration-300"
-                    data-testid="button-cta-pricing"
-                  >
-                    See Plans
-                  </Button>
-                </Link>
               </div>
             </div>
           </div>
@@ -1566,7 +1496,6 @@ export default function Landing() {
                 {[
                   { href: "#about", label: "About" },
                   { href: "#features", label: "Features" },
-                  { href: "#pricing", label: "Pricing" },
                   { href: "#faq", label: "FAQ" },
                 ].map((l) => (
                   <a key={l.href} href={l.href} className="hover:text-red-600 transition-colors">
