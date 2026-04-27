@@ -108,18 +108,26 @@ export function setupDashboardRoutes(app: Express): void {
       const avgAuthorityScore =
         authScores.length > 0 ? authScores.reduce((a, b) => a + b, 0) / authScores.length : 0;
 
-      // Not-found rate = fraction of checks that returned nothing
-      // recognizable. Proxy: uncited with no rank and no citation context.
-      const notFound = rankings.filter(
-        (r) => r.isCited === 0 && r.rank === null && !r.citationContext,
-      ).length;
-      const notFoundRate = totalChecks > 0 ? notFound / totalChecks : 1;
+      // Average rank across cited rows — lower is better. Drives the
+      // "ranking quality" component of the score.
+      const ranks = cited.map((r) => r.rank).filter((r): r is number => typeof r === "number");
+      const avgRank = ranks.length > 0 ? ranks.reduce((a, b) => a + b, 0) / ranks.length : 0;
+      const rankFactor = avgRank > 0 ? Math.max(0, 1 - (avgRank - 1) / 10) : 1;
 
-      const visibilityScore = clamp(
-        round(0.5 * citationRate * 100 + 0.3 * avgAuthorityScore + 0.2 * (1 - notFoundRate) * 100),
-        0,
-        100,
-      );
+      // Zero citations → zero visibility. No theater.
+      // When there ARE citations:
+      //   70 pts max from cite_rate × rank_factor (blended so rank-1
+      //     citations score more than rank-10 citations at the same rate).
+      //   30 pts max from avg authority of cited rows.
+      // Must match the formula in /api/geo-analytics so both pages agree.
+      const visibilityScore =
+        citedChecks === 0
+          ? 0
+          : clamp(
+              round(70 * citationRate * ((1 + rankFactor) / 2) + 30 * (avgAuthorityScore / 100)),
+              0,
+              100,
+            );
 
       // Score delta from most recent metrics_history snapshot of the same
       // metric type. If we have <2 points, delta is 0.
