@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Plus, ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
-import { ContentDraft, draftStatus, draftLabel, relativeTime } from "./draftHelpers";
+import { draftStatus, draftLabel, relativeTime, type DraftableArticle } from "./draftHelpers";
+
+// Recent drafts dropdown. Lists every article in {draft, generating, failed}.
+// Clicking one navigates to /content/:articleId; the trash icon soft-deletes.
 
 interface DraftToolbarProps {
-  drafts: ContentDraft[];
+  drafts: DraftableArticle[];
   activeDraftId: string | null;
   onNewArticle: () => void | Promise<void>;
-  onLoadDraft: (d: ContentDraft) => void;
+  onLoadDraft: (d: DraftableArticle) => void;
   onDeleteDraft: (id: string) => void | Promise<void>;
 }
 
@@ -22,7 +25,6 @@ export default function DraftToolbar({
   const [showDraftPanel, setShowDraftPanel] = useState(false);
   const draftPanelRef = useRef<HTMLDivElement>(null);
 
-  // Close draft dropdown when clicking outside
   useEffect(() => {
     if (!showDraftPanel) return;
     const handler = (e: MouseEvent) => {
@@ -41,7 +43,6 @@ export default function DraftToolbar({
         New Article
       </Button>
 
-      {/* Drafts dropdown — only shows when drafts exist */}
       {drafts.length > 0 && (
         <div className="relative" ref={draftPanelRef}>
           <Button
@@ -84,9 +85,11 @@ export default function DraftToolbar({
                             className={`text-[10px] px-1.5 py-0 h-4 ${
                               status === "generating"
                                 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                : status === "done"
-                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                  : "bg-muted text-muted-foreground"
+                                : status === "failed"
+                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                  : status === "ready"
+                                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    : "bg-muted text-muted-foreground"
                             }`}
                           >
                             {status === "generating" && (
@@ -94,9 +97,11 @@ export default function DraftToolbar({
                             )}
                             {status === "generating"
                               ? "Generating"
-                              : status === "done"
-                                ? "Done"
-                                : "Draft"}
+                              : status === "failed"
+                                ? "Failed"
+                                : status === "ready"
+                                  ? "Done"
+                                  : "Draft"}
                           </Badge>
                           <span className="text-[10px] text-muted-foreground">
                             {relativeTime(draft.updatedAt)}
@@ -122,7 +127,6 @@ export default function DraftToolbar({
         </div>
       )}
 
-      {/* Active draft indicator */}
       {activeDraftId && drafts.find((d) => d.id === activeDraftId) && (
         <span className="text-xs text-muted-foreground hidden sm:inline">
           Editing:{" "}

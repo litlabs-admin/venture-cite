@@ -85,8 +85,8 @@ import {
   type CommunityPost,
   type InsertCommunityPost,
   type PromptGeneration,
-  type ContentDraft,
-  type InsertContentDraft,
+  type ArticleRevision,
+  type InsertArticleRevision,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -139,7 +139,6 @@ export interface IStorage {
     opts?: { limit?: number; offset?: number },
   ): Promise<Article[]>;
   getArticleById(id: string): Promise<Article | undefined>;
-  getArticleBySlug(slug: string): Promise<Article | undefined>;
   updateArticle(id: string, article: Partial<InsertArticle>): Promise<Article | undefined>;
   // Wave 4.4: optimistic-lock variant.
   updateArticleIfVersion(
@@ -205,7 +204,9 @@ export interface IStorage {
   getContentJobById(id: string, userId: string): Promise<ContentGenerationJob | undefined>;
   getActiveContentJob(userId: string): Promise<ContentGenerationJob | undefined>;
   getRecentCompletedContentJob(userId: string): Promise<ContentGenerationJob | undefined>;
-  failStuckContentJobs(olderThanMinutes: number): Promise<number>;
+  failStuckContentJobs(
+    olderThanMinutes: number,
+  ): Promise<Array<{ id: string; userId: string; articleId: string | null }>>;
 
   // Commerce Session methods
   createCommerceSession(session: InsertCommerceSession): Promise<CommerceSession>;
@@ -603,18 +604,41 @@ export interface IStorage {
   ): Promise<CommunityPost | undefined>;
   deleteCommunityPost(id: string): Promise<boolean>;
 
-  // Content Draft methods (multi-draft persistence for the content page)
-  createContentDraft(userId: string, data: Partial<InsertContentDraft>): Promise<ContentDraft>;
-  getContentDraftsByUserId(userId: string): Promise<ContentDraft[]>;
-  getContentDraftById(id: string, userId: string): Promise<ContentDraft | null>;
-  getContentDraftByJobId(jobId: string, userId: string): Promise<ContentDraft | null>;
-  updateContentDraft(
-    id: string,
+  // Wave 7: drafts are now articles with status='draft'. The methods below
+  // power the unified flow.
+  createDraftArticle(
     userId: string,
-    data: Partial<InsertContentDraft>,
-  ): Promise<ContentDraft | null>;
-  deleteContentDraft(id: string, userId: string): Promise<void>;
-  deleteContentDraftsByBrandId(brandId: string): Promise<void>;
+    brandId: string,
+    fields: {
+      title?: string | null;
+      keywords?: string[] | null;
+      industry?: string | null;
+      contentType?: string | null;
+      targetCustomers?: string | null;
+      geography?: string | null;
+      contentStyle?: string | null;
+    },
+  ): Promise<Article>;
+  // Lists every article whose owning brand belongs to the user, optionally
+  // filtered by status. Used by the Articles list (status='ready') and the
+  // Content page's Recent Drafts dropdown (status IN ('draft','generating')).
+  getArticlesByUserIdWithStatus(
+    userId: string,
+    opts: { status?: string | string[]; brandId?: string; limit?: number; offset?: number },
+  ): Promise<Article[]>;
+  // Returns the article currently linked to a generation job — used by the
+  // worker on success/failure to flip status and write content. Owner-scoped.
+  getArticleByJobId(jobId: string): Promise<Article | undefined>;
+  // Atomic helpers used by the worker.
+  setArticleGeneratingFromDraft(articleId: string, jobId: string): Promise<void>;
+  setArticleReady(articleId: string, content: string, title: string | null): Promise<void>;
+  setArticleFailed(articleId: string): Promise<void>;
+  setArticleDraft(articleId: string): Promise<void>;
+  appendStreamBuffer(jobId: string, delta: string): Promise<void>;
+  // Article revisions (Auto-Improve + manual edits + restore).
+  createRevision(input: InsertArticleRevision): Promise<ArticleRevision>;
+  listRevisions(articleId: string, limit?: number): Promise<ArticleRevision[]>;
+  getRevisionById(revisionId: string): Promise<ArticleRevision | undefined>;
 }
 
 import { DatabaseStorage } from "./databaseStorage";

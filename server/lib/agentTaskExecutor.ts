@@ -89,12 +89,11 @@ export async function executeAgentTask(taskId: string, userId: string): Promise<
           industry: (input.industry as string) || brand.industry || "general",
           type: (input.type as string) || "article",
           brandId: brand.id,
-          humanize: input.humanize !== false,
           targetCustomers: input.targetCustomers as string | undefined,
           geography: input.geography as string | undefined,
           contentStyle: (input.contentStyle as string) || "b2c",
         };
-        const jobId = await enqueueContentGenerationJob(
+        const { jobId, articleId } = await enqueueContentGenerationJob(
           userId,
           brand.id,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,6 +105,7 @@ export async function executeAgentTask(taskId: string, userId: string): Promise<
           success: true,
           action: "content_generation_enqueued",
           jobId,
+          articleId,
           output: `Article generation job ${jobId} enqueued. Poll GET /api/content-jobs/${jobId} for progress.`,
         };
         break;
@@ -615,22 +615,24 @@ Severity: ${hall.severity}${factsBlurb}`,
           throw new Error(`Article ${articleId} not found for this brand`);
         }
         const { enqueueContentGenerationJob } = await import("../contentGenerationWorker");
-        const jobId = await enqueueContentGenerationJob(userId, task.brandId, {
-          keywords: Array.isArray(article.keywords) ? article.keywords.join(", ") : article.title,
+        const enqueued = await enqueueContentGenerationJob(userId, task.brandId, {
+          keywords: Array.isArray(article.keywords)
+            ? article.keywords.join(", ")
+            : (article.title ?? ""),
           industry: article.industry || "general",
           type: article.contentType || "article",
           brandId: task.brandId,
-          humanize: true,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
         artifactType = "content_job";
-        artifactId = jobId;
+        artifactId = enqueued.jobId;
         result = {
           success: true,
           action: "seo_update_enqueued",
-          jobId,
+          jobId: enqueued.jobId,
           sourceArticleId: articleId,
-          output: `Refresh job ${jobId} enqueued for article ${articleId}.`,
+          newArticleId: enqueued.articleId,
+          output: `Refresh job ${enqueued.jobId} enqueued for article ${articleId}.`,
         };
         break;
       }

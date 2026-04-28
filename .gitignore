@@ -24,6 +24,10 @@ logs/
 *.md
 !README.md
 !docs/privacy-policy.md
+!docs/phase1_goals.md
+!docs/phase1_completion.md
+!docs/phase2_goals.md
+!docs/phase2_completion.md
 
 # ─── Editor / IDE ────────────────────────────────────────────────
 .vscode

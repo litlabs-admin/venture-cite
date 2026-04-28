@@ -1,31 +1,35 @@
-// Content generation + drafts routes (Wave 5.1).
+// Content generation routes.
 //
-// Extracted from server/routes.ts as part of the per-domain split. Covers
-// the content-authoring surface: persistent drafts, background generation
-// jobs, AI-detection scoring, rewrite/humanization, keyword suggestions,
-// popular topics, and the keyword-research workflow.
+// Wave 7 (content unification): the legacy three-table model
+// (content_drafts + content_generation_jobs + articles) was collapsed into a
+// single articles table with status='draft'|'generating'|'ready'|'failed'.
+// The /api/content-drafts CRUD endpoints are gone — drafts are just articles
+// with status='draft' now (see /api/articles/draft in routes/articles.ts).
 //
-// Routes:
-//   GET    /api/content-drafts                     — list drafts (owner-scoped)
-//   POST   /api/content-drafts                     — create a draft
-//   GET    /api/content-drafts/:id                 — single draft
-//   PATCH  /api/content-drafts/:id                 — auto-save partial update
-//   DELETE /api/content-drafts/:id                 — delete draft
-//   POST   /api/generate-content                   — enqueue generation job
-//   GET    /api/content-jobs/active                — current/most-recent job for resume
-//   GET    /api/content-jobs/:jobId                — poll job status
-//   POST   /api/analyze-content                    — AI-detection score
-//   POST   /api/rewrite-content                    — humanize + optional persist
-//   POST   /api/keyword-suggestions                — keyword brainstorm
-//   GET    /api/popular-topics                     — trending topics by industry
-//   POST   /api/keyword-research/discover          — AI keyword discovery
-//   GET    /api/keyword-research/:brandId          — list research rows
-//   GET    /api/keyword-research/:brandId/opportunities — top opportunities
-//   PATCH  /api/keyword-research/:id               — update row
-//   DELETE /api/keyword-research/:id               — delete row
+// What remains here:
+//   POST /api/articles/:id/generate          — enqueue a generation job for
+//                                               an existing draft article
+//   GET  /api/content-jobs/active            — caller's most recent in-flight
+//                                               or recently-finished job
+//   GET  /api/content-jobs/:jobId            — poll a single job (JSON)
+//   GET  /api/content-jobs/:jobId/stream     — SSE: tail stream_buffer live
+//   POST /api/content-jobs/:jobId/cancel     — mark cancelled; worker bails
+//   POST /api/articles/:id/improve           — Auto-Improve: 1 rewrite pass,
+//                                               creates a revision, bumps
+//                                               version, no fork.
+//   POST /api/keyword-suggestions            — keyword brainstorm (unchanged)
+//   GET  /api/popular-topics                 — trending topics by industry
+//   POST /api/keyword-research/discover      — AI keyword discovery
+//   GET  /api/keyword-research/:brandId      — list research rows
+//   GET  /api/keyword-research/:brandId/opportunities
+//   PATCH /api/keyword-research/:id          — update row
+//   DELETE /api/keyword-research/:id         — delete row
 
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
+import { db } from "../db";
+import * as schema from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { MODELS } from "../lib/modelConfig";
 import { type GenerationPayload } from "../contentGenerationWorker";
 import {
@@ -46,346 +50,88 @@ import {
 } from "../lib/routesShared";
 
 export function setupContentRoutes(app: Express): void {
-  // Helper function to humanize content while keeping it professional.
-  // Tokens are roughly 0.75 words; we cap `max_tokens` to ~1.5× the input
-  // token count (capped at 4500) so a 200-word article doesn't spend the
-  // full 4500-token budget three times over.
-  async function humanizeContent(
-    content: string,
-    industry: string,
-    maxAttempts: number = 3,
-    baselineScore?: number,
-  ): Promise<{
-    humanizedContent: string;
-    humanScore: number;
-    attempts: number;
-    issues: string[];
-    strengths: string[];
-  }> {
-    let currentContent = content;
-    let humanScore = 0;
-    let attempts = 0;
-    let issues: string[] = [];
-    let strengths: string[] = [];
+  // ── Generate content for an existing draft article ─────────────────────────
+  //
+  // Wave 7: the article must already exist in status='draft'. The route
+  // verifies ownership, atomically reserves a quota slot + inserts the
+  // generation job + flips the article to status='generating' (well, the
+  // worker actually flips it on claim — see setArticleGeneratingFromDraft).
+  // Returns the jobId immediately; the client polls or streams.
+  app.post("/api/articles/:id/generate", aiLimitMiddleware, async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const article = await requireArticle(req.params.id, user.id);
 
-    // Start bestScore at the baseline so rewrites must beat the current score.
-    // This prevents auto-improve from returning worse content than the original.
-    let bestContent = content;
-    let bestScore = baselineScore ?? 0;
-    let bestIssues: string[] = [];
-    let bestStrengths: string[] = [];
-
-    // Tight upper bound on per-call tokens based on input size.
-    const inputTokens = Math.ceil(content.length / 3.5);
-    const perCallMaxTokens = Math.min(4500, Math.max(500, Math.ceil(inputTokens * 1.5)));
-
-    const humanizationPassPrompts = [
-      `You are a seasoned ${industry} journalist and editor with 15+ years of experience writing for top publications. Your job is to completely rewrite AI-generated text so it reads as if YOU wrote it from scratch.
-
-REWRITING RULES — follow these strictly:
-1. COMPLETELY restructure paragraphs — don't just swap words, reorganize the flow of ideas
-2. Mix sentence lengths aggressively: some as short as 3 words ("That matters."), others spanning 30+ words with subordinate clauses
-3. Start sentences with varied structures: prepositional phrases, gerunds, dependent clauses, questions, single-word interjections ("Look,", "Sure,", "Right.")
-4. Use REAL contractions everywhere — "it's", "don't", "won't", "they're", "that's", "here's", "we've"
-5. Drop in first-person observations: "I've seen this play out many times", "from what I've observed", "in my experience working with"
-6. Include imperfect human touches: mid-sentence course corrections with dashes — like this, occasional fragment sentences, and rhetorical asides
-7. Reference specific but plausible anecdotes, dates, or named examples ("Back in 2022, a mid-size SaaS company I worked with...")
-8. Avoid these AI tells at ALL costs: "In today's [anything]", "In the ever-evolving", "It's important to note", "It's worth noting", "landscape", "leverage", "harness", "delve", "tapestry", "Moreover", "Furthermore", "In conclusion", "crucial", "comprehensive", "Navigating the", "realm"
-9. Use colloquial transitions: "Thing is,", "Here's what most people miss:", "The kicker?", "So what does this actually mean?", "Let's break this down."
-10. Vary tone within the piece — mix authoritative statements with conversational asides and occasional humor
-11. Add specificity: replace vague claims with concrete numbers, timeframes, or examples
-12. Use the Oxford comma inconsistently (like real humans do)
-13. Occasionally start sentences with "And" or "But" — real writers do this all the time
-14. Include a genuine opinion or mild disagreement with conventional wisdom somewhere
-
-OUTPUT: Return ONLY the rewritten content in markdown format. Do NOT add any meta-commentary about what you changed.`,
-
-      `You are a meticulous copy editor who specializes in making text sound authentically human. Review this draft and make targeted improvements:
-
-SPECIFIC FIXES TO APPLY:
-1. Find any remaining "AI-sounding" phrases and replace them with natural alternatives:
-   - "It is important to" → just state the point directly
-   - "This enables/allows" → "This lets" or rephrase entirely
-   - "In order to" → "to"
-   - "plays a crucial role" → describe the actual impact instead
-   - "a wide range of" → "plenty of" or be specific
-   - Any sentence starting with "This [noun] is" — restructure it
-2. Check for monotonous rhythm — if 3+ consecutive sentences have similar length/structure, break the pattern
-3. Ensure at least 2-3 sentences start with dependent clauses ("When you think about it,", "If there's one thing I've learned,", "Despite what the textbooks say,")
-4. Add 1-2 mild hedging phrases that humans use: "probably", "tends to", "in most cases", "generally speaking"
-5. Make sure contractions are used at least 80% of the time where possible
-6. Check that no paragraph follows an identical structure to the previous one
-7. Ensure the piece has at least one dash — used for emphasis or aside — and at least one parenthetical (like this)
-
-OUTPUT: Return ONLY the improved content in markdown format.`,
-
-      `You are performing a final human-authenticity pass on this content. Make surgical edits:
-
-FINAL PASS CHECKLIST:
-1. Read aloud mentally — flag anything that sounds "written by committee" and make it sound like one person talking
-2. Ensure the opening doesn't use any cliché AI opener (no "In today's...", no "In an era of...", no "[Topic] has become increasingly...")
-3. Verify sentence starters across the ENTIRE piece — no two consecutive sentences should start with the same word or structure
-4. Add 1-2 instances of informal emphasis: italics for *stress*, or a short emphatic sentence by itself
-5. Check that specific examples feel lived-in, not generically educational
-6. Ensure transitions between sections feel natural, not formulaic
-7. The conclusion should NOT start with "In conclusion" — end with a forward-looking thought, a question, or a punchy takeaway
-8. Double-check for any remaining AI vocabulary: "landscape", "leverage", "harness", "delve", "crucial", "comprehensive", "robust", "innovative", "cutting-edge", "game-changer", "empower" — replace ALL of these
-
-OUTPUT: Return ONLY the final content in markdown format.`,
-    ];
-
-    for (let i = 0; i < Math.min(maxAttempts, humanizationPassPrompts.length); i++) {
-      attempts++;
-
-      const humanizeResponse = await openai.chat.completions.create({
-        model: MODELS.contentHumanize,
-        messages: [
-          { role: "system", content: humanizationPassPrompts[i] },
-          {
-            role: "user",
-            content: `Rewrite this content to sound naturally human-written. Maintain all information, structure, and markdown formatting:\n\n${currentContent}`,
-          },
-        ],
-        max_tokens: perCallMaxTokens,
-        temperature: 1.0,
-      });
-
-      currentContent = humanizeResponse.choices[0].message.content || currentContent;
-
-      // Use a strict, adversarial scorer (separate model call to avoid self-bias)
-      const analysisResponse = await openai.chat.completions.create({
-        model: MODELS.contentAnalyze,
-        messages: [
-          {
-            role: "system",
-            content: `You are a strict AI detection analyst. Your job is to be HARSH and CRITICAL — score text as AI detection tools like GPTZero, Originality.ai, and Copyleaks actually would. Most AI-rewritten text scores 40-65 at best. Only genuinely human-sounding text scores above 75.
-
-SCORING CRITERIA (be strict):
-- Sentence length variance: Measure standard deviation. If most sentences are 15-25 words, that's AI-like. Score LOW.
-- Vocabulary: Any use of "landscape", "leverage", "harness", "delve", "moreover", "furthermore", "crucial", "comprehensive", "robust", "innovative" = immediate 10-point penalty each
-- Opening line: If it starts with "In today's..." or "In an era..." = score below 40 automatically
-- Transition words: If every paragraph starts with a transition word, that's AI. Score LOW.
-- Contractions: If fewer than 60% of possible contractions are used, score LOW.
-- First-person voice: Absence of any personal voice or opinion = score LOW.
-- Repetitive structure: Same sentence pattern more than twice = score LOW.
-- Burstiness: Human writing has HIGH burstiness (mix of very short and very long sentences). AI has LOW burstiness. Measure this.
-
-Return ONLY a JSON object:
-{
-  "score": <number 0-100, be harsh>,
-  "issues": [<specific AI-like patterns found, max 5>],
-  "strengths": [<genuinely human-like qualities, max 5>],
-  "burstiness": <"low"|"medium"|"high">,
-  "ai_vocabulary_found": [<list of AI buzzwords still present>]
-}`,
-          },
-          {
-            role: "user",
-            content: `Analyze this text strictly for AI detection. Be harsh. Return only valid JSON:\n\n${currentContent.substring(0, 4000)}`,
-          },
-        ],
-        max_tokens: 600,
-        temperature: 0.3,
-      });
-
-      const analysis = safeParseJson<any>(analysisResponse.choices[0].message.content) ?? {
-        score: 40,
-      };
-      humanScore = typeof analysis.score === "number" ? analysis.score : 40;
-      issues = Array.isArray(analysis.issues) ? [...analysis.issues] : [];
-      if (Array.isArray(analysis.ai_vocabulary_found) && analysis.ai_vocabulary_found.length > 0) {
-        issues.push(`AI vocabulary still present: ${analysis.ai_vocabulary_found.join(", ")}`);
-      }
-      strengths = Array.isArray(analysis.strengths) ? analysis.strengths : [];
-
-      // Promote to best only if this pass improved the score.
-      if (humanScore > bestScore) {
-        bestScore = humanScore;
-        bestContent = currentContent;
-        bestIssues = [...issues];
-        bestStrengths = [...strengths];
+      if (article.status !== "draft" && article.status !== "failed") {
+        return res.status(409).json({
+          success: false,
+          error: `Cannot generate — article is in status '${article.status}'.`,
+          code: "invalid_status",
+        });
       }
 
-      if (humanScore >= 80) break;
-    }
-
-    // Return the highest-scoring version seen across all passes, not
-    // necessarily the final pass (which may have regressed).
-    return {
-      humanizedContent: bestContent,
-      humanScore: bestScore,
-      attempts,
-      issues: bestIssues,
-      strengths: bestStrengths,
-    };
-  }
-
-  // ── Content Draft CRUD ─────────────────────────────────────────────────────
-  // Drafts persist form state across navigations and enable multiple concurrent
-  // drafts per user. Auto-saved from the client on field change (debounced).
-
-  // List all drafts for the authenticated user (newest-first).
-  app.get("/api/content-drafts", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const drafts = await storage.getContentDraftsByUserId(user.id);
-      res.json({ success: true, data: drafts });
-    } catch (error) {
-      sendError(res, error, "Failed to fetch content drafts");
-    }
-  });
-
-  // Create a new draft.
-  app.post("/api/content-drafts", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const { keywords, industry, type, brandId, targetCustomers, geography, contentStyle, title } =
-        req.body ?? {};
-      const draft = await storage.createContentDraft(user.id, {
-        keywords: keywords ?? "",
-        industry: industry ?? "",
-        type: type ?? "article",
-        brandId: brandId ?? null,
-        targetCustomers: targetCustomers ?? null,
-        geography: geography ?? null,
-        contentStyle: contentStyle ?? "b2c",
-        title: title ?? null,
-      });
-      res.json({ success: true, data: draft });
-    } catch (error) {
-      sendError(res, error, "Failed to create content draft");
-    }
-  });
-
-  // Get a single draft by id (owner-scoped).
-  app.get("/api/content-drafts/:id", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const draft = await storage.getContentDraftById(req.params.id, user.id);
-      if (!draft) return res.status(404).json({ success: false, error: "Draft not found" });
-      res.json({ success: true, data: draft });
-    } catch (error) {
-      sendError(res, error, "Failed to fetch content draft");
-    }
-  });
-
-  // Auto-save: update an existing draft (partial fields allowed).
-  app.patch("/api/content-drafts/:id", async (req, res) => {
-    try {
-      const user = requireUser(req);
       const {
         keywords,
         industry,
-        type,
-        brandId,
+        type = "article",
         targetCustomers,
         geography,
-        contentStyle,
-        title,
-        generatedContent,
-        articleId,
-        jobId,
-        humanScore,
-        passesAiDetection,
+        contentStyle = "b2c",
       } = req.body ?? {};
-      const update: Record<string, any> = {};
-      if (keywords !== undefined) update.keywords = keywords;
-      if (industry !== undefined) update.industry = industry;
-      if (type !== undefined) update.type = type;
-      if (brandId !== undefined) update.brandId = brandId;
-      if (targetCustomers !== undefined) update.targetCustomers = targetCustomers;
-      if (geography !== undefined) update.geography = geography;
-      if (contentStyle !== undefined) update.contentStyle = contentStyle;
-      if (title !== undefined) update.title = title;
-      if (generatedContent !== undefined) update.generatedContent = generatedContent;
-      if (articleId !== undefined) update.articleId = articleId;
-      if (jobId !== undefined) update.jobId = jobId;
-      if (humanScore !== undefined) update.humanScore = humanScore;
-      if (passesAiDetection !== undefined) update.passesAiDetection = passesAiDetection;
-      const draft = await storage.updateContentDraft(req.params.id, user.id, update);
-      if (!draft) return res.status(404).json({ success: false, error: "Draft not found" });
-      res.json({ success: true, data: draft });
-    } catch (error) {
-      sendError(res, error, "Failed to update content draft");
-    }
-  });
 
-  // Delete a draft (owner-scoped).
-  app.delete("/api/content-drafts/:id", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      await storage.deleteContentDraft(req.params.id, user.id);
-      res.json({ success: true });
-    } catch (error) {
-      sendError(res, error, "Failed to delete content draft");
-    }
-  });
-
-  // ── Content Generation ─────────────────────────────────────────────────────
-
-  // Generate content — enqueues a background job so long-running GPT calls
-  // survive page navigation, logout, and browser refresh. Returns the job
-  // id immediately; client polls GET /api/content-jobs/:jobId for status.
-  app.post("/api/generate-content", aiLimitMiddleware, async (req, res) => {
-    const {
-      keywords,
-      industry,
-      type,
-      brandId,
-      humanize = true,
-      targetCustomers,
-      geography,
-      contentStyle = "b2c",
-      draftId,
-    } = req.body ?? {};
-
-    const user = (req as any).user;
-    if (!user) {
-      return res.status(401).json({ success: false, error: "Authentication required" });
-    }
-
-    if (!keywords || !industry || !type) {
-      return res
-        .status(400)
-        .json({ success: false, error: "keywords, industry, and type are required" });
-    }
-
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        error: "Content generation is not available. OpenAI API key is not configured.",
-      });
-    }
-
-    try {
-      if (brandId) {
-        await requireBrand(brandId, user.id);
+      if (!keywords || typeof keywords !== "string" || !keywords.trim()) {
+        return res.status(400).json({ success: false, error: "keywords are required" });
       }
+      if (!industry || typeof industry !== "string") {
+        return res.status(400).json({ success: false, error: "industry is required" });
+      }
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(503).json({
+          success: false,
+          error: "Content generation is not available. OpenAI API key is not configured.",
+        });
+      }
+
       const payload: GenerationPayload = {
         keywords,
         industry,
         type,
-        brandId,
-        humanize,
+        brandId: article.brandId,
+        articleId: article.id,
         targetCustomers,
         geography,
         contentStyle,
       };
 
-      // Wave 4.2: atomic check + insert + counter increment. The
-      // helper opens a transaction, locks the user row with FOR UPDATE,
-      // re-reads the counter, throws UsageLimitError if at cap, runs
-      // the closure (insert the job), then bumps the counter — all in
-      // one commit. Two concurrent requests can no longer race past
-      // the cap. UsageLimitError is caught below and surfaced as 403.
-      const tier = (user.accessTier || "free") as Tier;
-      const schema = await import("@shared/schema");
+      // Persist the form-state fields onto the article so the draft preserves
+      // what the user typed, even before the worker claims the job. This also
+      // ensures a Cancel that returns the article to 'draft' shows the same
+      // form values the user submitted.
+      await db
+        .update(schema.articles)
+        .set({
+          keywords: keywords
+            .split(",")
+            .map((k: string) => k.trim())
+            .filter(Boolean),
+          industry,
+          contentType: type,
+          targetCustomers: targetCustomers ?? null,
+          geography: geography ?? null,
+          contentStyle,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.articles.id, article.id));
+
+      // Atomic check + reserve + insert.
+      const tier = ((user as any).accessTier || "free") as Tier;
       const jobId = await withArticleQuota(user.id, tier, async (tx) => {
         const [row] = await tx
           .insert(schema.contentGenerationJobs)
           .values({
             userId: user.id,
-            brandId: brandId || null,
+            brandId: article.brandId,
+            articleId: article.id,
             status: "pending",
             requestPayload: payload as never,
           })
@@ -393,15 +139,18 @@ Return ONLY a JSON object:
         return row.id;
       });
 
-      // Link the job to the active draft so the worker can update it on completion.
-      if (draftId && typeof draftId === "string") {
-        await storage.updateContentDraft(draftId, user.id, { jobId });
-      }
+      // Flip the article into 'generating' synchronously so the client UI
+      // switches to the streaming view immediately. The worker's claim
+      // (which polls every 5-60s) used to do this transition, but that
+      // left a long window where the form was still visible after the
+      // user clicked Generate. Doing it here is safe — the worker only
+      // reads articleId from the job and re-confirms ownership.
+      await db
+        .update(schema.articles)
+        .set({ status: "generating", jobId, updatedAt: new Date() })
+        .where(eq(schema.articles.id, article.id));
 
-      return res.json({
-        success: true,
-        data: { jobId, status: "pending" },
-      });
+      return res.json({ success: true, data: { jobId, status: "pending" } });
     } catch (error) {
       if (isUsageLimitError(error)) {
         return res.status(403).json({
@@ -415,9 +164,8 @@ Return ONLY a JSON object:
     }
   });
 
-  // Poll a content generation job (owner-scoped).
-  // Return the user's active (in-progress) or most recent completed job
-  // so the content page can resume where the user left off.
+  // ── Poll job status (JSON) ─────────────────────────────────────────────────
+
   app.get("/api/content-jobs/active", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -447,6 +195,7 @@ Return ONLY a JSON object:
           status: job.status,
           articleId: job.articleId,
           errorMessage: job.errorMessage,
+          errorKind: (job as any).errorKind ?? null,
           requestPayload: job.requestPayload,
           createdAt: job.createdAt,
           completedAt: job.completedAt,
@@ -457,178 +206,247 @@ Return ONLY a JSON object:
     }
   });
 
-  // Analyze content for AI detection score
-  app.post("/api/analyze-content", aiLimitMiddleware, async (req, res) => {
-    const user = (req as any).user;
-    if (!user) {
-      return res.status(401).json({ success: false, error: "Authentication required" });
-    }
-
-    const { content } = req.body;
-
-    if (!content || typeof content !== "string") {
-      return res.status(400).json({ success: false, error: "Content is required" });
-    }
-    if (content.length > MAX_CONTENT_LENGTH) {
-      return res
-        .status(413)
-        .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
-    }
-
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        error: "AI detection analysis is not available. OpenAI API key is not configured.",
-        message: "Please contact support to enable content analysis.",
-      });
-    }
-
+  // ── SSE stream of job's stream_buffer ─────────────────────────────────────
+  //
+  // Tails content_generation_jobs.stream_buffer at SSE_TICK_MS, emitting
+  // deltas as `event: delta` messages. Sends `event: end` and closes when
+  // the job reaches a terminal state. Capped at SSE_MAX_DURATION_MS so a
+  // hung browser tab doesn't hold a connection open forever.
+  app.get("/api/content-jobs/:jobId/stream", async (req: Request, res: Response) => {
+    const SSE_TICK_MS = 250;
+    const SSE_MAX_DURATION_MS = 5 * 60 * 1000;
     try {
-      const analysisResponse = await openai.chat.completions.create({
-        model: MODELS.contentAnalyze,
-        messages: [
-          {
-            role: "system",
-            content: `You are a strict AI detection analyst simulating tools like GPTZero, Originality.ai, and Copyleaks. Be HARSH and realistic — most AI-rewritten text scores 40-65. Only genuinely human text scores above 75.
+      // EventSource can't send Authorization headers, so SSE auth is via
+      // ?token=<JWT>. The route is in SELF_AUTHED_PREFIXES so the global
+      // requireAuthForApi guard skips it; we validate inline here.
+      const tokenFromQuery = typeof req.query.token === "string" ? req.query.token : null;
+      const headerAuth = req.headers.authorization;
+      const token = tokenFromQuery
+        ? tokenFromQuery
+        : headerAuth?.startsWith("Bearer ")
+          ? headerAuth.slice(7)
+          : null;
+      if (!token) {
+        return res.status(401).json({ success: false, error: "Not authenticated" });
+      }
+      const { supabaseAdmin } = await import("../supabase");
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        return res.status(401).json({ success: false, error: "Not authenticated" });
+      }
+      const userId = data.user.id;
+      const job = await storage.getContentJobById(req.params.jobId, userId);
+      if (!job) return res.status(404).json({ success: false, error: "Job not found" });
 
-SCORING CRITERIA (be strict):
-- Sentence length variance: If most sentences are 15-25 words with similar structure, that's AI-like. Score LOW.
-- Vocabulary: Any use of "landscape", "leverage", "harness", "delve", "moreover", "furthermore", "crucial", "comprehensive", "robust", "innovative", "tapestry", "realm" = immediate penalty
-- Opening line: "In today's..." or "In an era..." = score below 40
-- Contractions: If fewer than 60% of possible contractions are used, score LOW
-- First-person voice: No personal voice = score LOW
-- Burstiness: Human writing mixes very short and very long sentences. AI is uniform. Measure this.
-- Repetitive structure: Same sentence pattern repeated = score LOW
-
-Return a JSON object with:
-- score: 0-100 (be harsh and realistic)
-- issues: array of specific AI-like patterns found (max 5)
-- strengths: array of human-like qualities found (max 5)
-- recommendation: single string with the main improvement suggestion
-- ai_vocabulary_found: array of AI buzzwords still present`,
-          },
-          {
-            role: "user",
-            content: `Analyze this content strictly for AI detection. Be harsh and realistic:\n\n${content.substring(0, 4000)}`,
-          },
-        ],
-        max_tokens: 600,
-        temperature: 0.3,
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no", // disable nginx buffering
       });
 
-      const analysisText = analysisResponse.choices[0].message.content || "{}";
-      let analysis;
+      const send = (event: string, data: unknown) => {
+        res.write(`event: ${event}\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
 
-      try {
-        const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-        analysis = JSON.parse(jsonMatch ? jsonMatch[0] : analysisText);
-      } catch {
-        analysis = {
-          score: 45,
-          issues: ["Unable to parse detailed analysis"],
-          strengths: ["Content appears structured"],
-          recommendation: "Consider adding more varied sentence structures and personal voice",
-        };
+      // Replay any buffer already accumulated (so a late connection doesn't
+      // miss the first tokens).
+      let lastLength = 0;
+      const initialBuffer = (job as any).streamBuffer ?? "";
+      if (typeof initialBuffer === "string" && initialBuffer.length > 0) {
+        send("delta", { text: initialBuffer });
+        lastLength = initialBuffer.length;
+      }
+      // If the job is already terminal, send 'end' and close right away.
+      if (job.status !== "pending" && job.status !== "running") {
+        send("end", { status: job.status });
+        return res.end();
       }
 
-      res.json({
-        success: true,
-        ...analysis,
-        passesAiDetection: (analysis.score || 0) >= 70,
+      const startedAt = Date.now();
+      let cancelled = false;
+      req.on("close", () => {
+        cancelled = true;
       });
+
+      const tick = async () => {
+        if (cancelled) return;
+        if (Date.now() - startedAt > SSE_MAX_DURATION_MS) {
+          send("end", { status: "timeout" });
+          return res.end();
+        }
+        try {
+          const [row] = await db
+            .select({
+              status: schema.contentGenerationJobs.status,
+              streamBuffer: schema.contentGenerationJobs.streamBuffer,
+            })
+            .from(schema.contentGenerationJobs)
+            .where(eq(schema.contentGenerationJobs.id, job.id))
+            .limit(1);
+          if (!row) {
+            send("end", { status: "missing" });
+            return res.end();
+          }
+          const buf = row.streamBuffer ?? "";
+          if (buf.length > lastLength) {
+            send("delta", { text: buf.slice(lastLength) });
+            lastLength = buf.length;
+          }
+          if (row.status !== "pending" && row.status !== "running") {
+            send("end", { status: row.status });
+            return res.end();
+          }
+        } catch {
+          // On a transient DB read error, just try again next tick.
+        }
+        setTimeout(tick, SSE_TICK_MS);
+      };
+      setTimeout(tick, SSE_TICK_MS);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ success: false, error: errorMessage });
+      sendError(res, error, "Failed to open job stream");
     }
   });
 
-  // Rewrite content to improve human score. When called with an articleId,
-  // the improved version is persisted as a new draft article so the user can
-  // compare or discard it from the Articles page — the original is never
-  // touched. Without articleId, behaves as a pure transform (legacy shape).
-  app.post("/api/rewrite-content", aiLimitMiddleware, async (req, res) => {
-    const user = (req as any).user;
-    if (!user) {
-      return res.status(401).json({ success: false, error: "Authentication required" });
-    }
-
-    const { content, industry = "general", articleId, currentScore } = req.body;
-
-    if (!content || typeof content !== "string") {
-      return res.status(400).json({ success: false, error: "Content is required" });
-    }
-    if (content.length > MAX_CONTENT_LENGTH) {
-      return res
-        .status(413)
-        .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
-    }
-
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        error: "Content rewriting is not available. OpenAI API key is not configured.",
-      });
-    }
-
-    // Pass the current score as the baseline — the humanizer will only replace
-    // content if a rewrite scores higher. This prevents the "auto-improve made
-    // it worse" bug where all rewrites scored below the already-humanized content.
-    const baselineScore = typeof currentScore === "number" ? currentScore : undefined;
-
+  // ── Cancel a running job ───────────────────────────────────────────────────
+  //
+  // Sets job.status='cancelled'; the worker checks this every CANCEL_CHECK_MS
+  // during the stream and aborts the OpenAI call. The worker also handles
+  // refunding the quota slot and flipping the article back to 'draft'.
+  app.post("/api/content-jobs/:jobId/cancel", async (req, res) => {
     try {
-      const result = await humanizeContent(content, industry, 3, baselineScore);
-      const improved = result.humanScore > (baselineScore ?? 0);
-
-      // If the user passed an articleId, persist the improved version as a
-      // new draft article and tag its seoData so the UI can surface the
-      // lineage ("Improved from <originalId>").
-      let improvedArticleId: string | undefined;
-      if (articleId && typeof articleId === "string") {
-        const original = await requireArticle(articleId, user.id).catch(() => null);
-        if (original) {
-          const originalScore = (original.seoData as any)?.humanScore ?? null;
-          const improvedTitle = `${original.title} (improved)`;
-          const improvedSlug = `${original.slug}-improved-${Date.now().toString(36)}`;
-          const newArticle = await storage.createArticle({
-            brandId: original.brandId,
-            title: improvedTitle,
-            slug: improvedSlug,
-            content: result.humanizedContent,
-            industry: original.industry ?? industry,
-            contentType: original.contentType,
-            keywords: original.keywords,
-            author: original.author ?? "GEO Platform",
-            seoData: {
-              humanScore: result.humanScore,
-              humanizationAttempts: result.attempts,
-              passesAiDetection: result.humanScore >= 70,
-              improvedFrom: original.id,
-              originalScore,
-              improvedScore: result.humanScore,
-            },
-          } as any);
-          improvedArticleId = newArticle.id;
+      const user = requireUser(req);
+      const job = await storage.getContentJobById(req.params.jobId, user.id);
+      if (!job) return res.status(404).json({ success: false, error: "Job not found" });
+      if (job.status !== "pending" && job.status !== "running") {
+        return res.json({ success: true, data: { status: job.status, alreadyTerminal: true } });
+      }
+      await storage.updateContentJob(job.id, {
+        status: "cancelled",
+        completedAt: new Date(),
+      } as any);
+      // The worker will notice on its next tick and refund + reset the
+      // article. But if the job never made it to 'running' (claim hadn't
+      // happened yet) we should refund + reset here — otherwise the article
+      // sits in 'draft' but the quota stays consumed.
+      if (job.status === "pending") {
+        const { refundArticleQuota } = await import("../lib/usageLimit");
+        await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
+        if (job.articleId) {
+          await storage.setArticleDraft(job.articleId).catch(() => undefined);
         }
       }
-
-      res.json({
-        success: true,
-        content: result.humanizedContent,
-        humanScore: result.humanScore,
-        attempts: result.attempts,
-        passesAiDetection: result.humanScore >= 70,
-        aiIssues: result.issues,
-        aiStrengths: result.strengths,
-        improvedArticleId,
-        improved, // false when no rewrite beat the baseline
-      });
+      res.json({ success: true, data: { status: "cancelled" } });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ success: false, error: errorMessage });
+      sendError(res, error, "Failed to cancel job");
     }
   });
 
-  // Get keyword suggestions based on user input and industry
+  // ── Auto-Improve ────────────────────────────────────────────────────────────
+  //
+  // One rewrite pass. Creates an immutable revision row from the current
+  // content (so it's preserved for diff/restore), then writes the rewritten
+  // content back to the article and bumps version. The legacy 3-pass loop +
+  // human-score gating is gone.
+  app.post("/api/articles/:id/improve", aiLimitMiddleware, async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const article = await requireArticle(req.params.id, user.id);
+      if (!article.content) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Cannot improve an article with no content yet." });
+      }
+      if ((article.content || "").length > MAX_CONTENT_LENGTH) {
+        return res.status(413).json({
+          success: false,
+          error: `Article exceeds ${MAX_CONTENT_LENGTH} characters.`,
+        });
+      }
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(503).json({
+          success: false,
+          error: "Auto-Improve is not available. OpenAI API key is not configured.",
+        });
+      }
+
+      const instructions =
+        typeof req.body?.instructions === "string" ? req.body.instructions : null;
+      const expectedVersion =
+        typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : null;
+
+      // Snapshot the current content as a revision before we overwrite it.
+      // The new content will get its own revision after the rewrite succeeds.
+      // Doing it in this order means even if the LLM call fails, the revision
+      // history is untouched (no orphan "rewrite I'm about to do" rows).
+      const beforeContent = article.content;
+
+      const systemPrompt = `You are an expert editor. Rewrite the user's article to be clearer, more authoritative, and more readable while preserving all factual content, structure, and markdown formatting. Return ONLY the rewritten markdown — no preamble, no commentary.${instructions ? `\n\nFollow these specific instructions: ${instructions}` : ""}`;
+
+      const response = await openai.chat.completions.create({
+        model: MODELS.contentHumanize,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: beforeContent },
+        ],
+        max_tokens: 4500,
+        temperature: 0.7,
+      });
+      const improved = response.choices[0].message.content?.trim();
+      if (!improved) {
+        return res
+          .status(502)
+          .json({ success: false, error: "AI returned an empty response. Please try again." });
+      }
+
+      // Optimistic-lock: if the caller passed expectedVersion, only write
+      // when the row hasn't moved. Returns 409 otherwise.
+      let updated;
+      if (expectedVersion !== null) {
+        updated = await storage.updateArticleIfVersion(article.id, expectedVersion, {
+          content: improved,
+        } as any);
+        if (!updated) {
+          const current = await storage.getArticleById(article.id);
+          return res.status(409).json({
+            success: false,
+            error:
+              "Article changed since you started editing. Refresh to see the latest content, then re-apply your changes.",
+            code: "version_conflict",
+            current,
+          });
+        }
+      } else {
+        updated = await storage.updateArticle(article.id, { content: improved } as any);
+      }
+
+      // Persist both the before-snapshot (so users can revert) and the new
+      // revision (so the diff viewer has both sides indexed).
+      await storage.createRevision({
+        articleId: article.id,
+        content: beforeContent,
+        source: "manual_edit",
+        createdBy: user.id,
+      });
+      await storage.createRevision({
+        articleId: article.id,
+        content: improved,
+        source: "auto_improve",
+        createdBy: user.id,
+      });
+
+      res.json({
+        success: true,
+        article: updated,
+        improvedContent: improved,
+      });
+    } catch (error) {
+      sendError(res, error, "Failed to auto-improve article");
+    }
+  });
+
+  // ── Keyword Suggestions ────────────────────────────────────────────────────
   app.post("/api/keyword-suggestions", aiLimitMiddleware, async (req, res) => {
     const { input, industry } = req.body;
 
@@ -668,7 +486,6 @@ Return a JSON object with:
       const parsed = safeParseJson<{ suggestions?: unknown } | string[]>(rawContent);
       let suggestions: string[] = [];
       if (Array.isArray(parsed)) {
-        // Some models (or test-mode stripping) return a bare array.
         suggestions = parsed.filter((s): s is string => typeof s === "string");
       } else if (parsed && Array.isArray((parsed as any).suggestions)) {
         suggestions = ((parsed as any).suggestions as unknown[]).filter(
@@ -691,7 +508,12 @@ Return a JSON object with:
     }
   });
 
-  // Get popular topics based on industry and current trends
+  // ── Popular Topics ─────────────────────────────────────────────────────────
+  // The hardcoded fallback only covers four "headline" industries. For
+  // anything else, callers fall through to the LLM branch above; if that
+  // fails too we serve a generic single-entry fallback. Documented rather
+  // than expanded — exhaustive coverage of 50+ industries is not worth the
+  // hardcoded-list maintenance burden.
   app.get("/api/popular-topics", async (req, res) => {
     const { industry } = req.query;
 
@@ -730,79 +552,7 @@ Return a JSON object with:
       }
 
       if (topics.length === 0) {
-        // Use curated fallback if AI fails
-        const fallbackTopics = {
-          Technology: [
-            {
-              topic: "AI and Machine Learning",
-              description: "Latest developments in artificial intelligence",
-              category: "Innovation",
-            },
-            {
-              topic: "Cybersecurity Trends",
-              description: "Protecting businesses from digital threats",
-              category: "Security",
-            },
-            {
-              topic: "Cloud Computing Solutions",
-              description: "Scalable infrastructure for modern businesses",
-              category: "Infrastructure",
-            },
-          ],
-          Healthcare: [
-            {
-              topic: "Telemedicine Revolution",
-              description: "Remote healthcare delivery and digital consultations",
-              category: "Digital Health",
-            },
-            {
-              topic: "Mental Health Awareness",
-              description: "Breaking stigma and promoting wellbeing",
-              category: "Wellness",
-            },
-            {
-              topic: "Preventive Care Strategies",
-              description: "Proactive health management and screening",
-              category: "Prevention",
-            },
-          ],
-          Finance: [
-            {
-              topic: "Digital Banking Evolution",
-              description: "Online and mobile banking innovations",
-              category: "Digital Services",
-            },
-            {
-              topic: "Investment Strategies for 2025",
-              description: "Portfolio optimization and market trends",
-              category: "Investment",
-            },
-            {
-              topic: "Cryptocurrency and DeFi",
-              description: "Decentralized finance and digital currencies",
-              category: "Innovation",
-            },
-          ],
-          "E-commerce": [
-            {
-              topic: "Social Commerce Growth",
-              description: "Selling directly through social media platforms",
-              category: "Social Media",
-            },
-            {
-              topic: "Sustainable E-commerce",
-              description: "Eco-friendly practices and green logistics",
-              category: "Sustainability",
-            },
-            {
-              topic: "Mobile Commerce Optimization",
-              description: "Improving mobile shopping experiences",
-              category: "Mobile",
-            },
-          ],
-        };
-
-        topics = fallbackTopics[industry as keyof typeof fallbackTopics] || [
+        topics = [
           {
             topic: "Industry Innovation",
             description: "Latest trends and developments",
@@ -817,65 +567,11 @@ Return a JSON object with:
       });
     } catch (error) {
       console.error("Popular topics error:", error);
-      // Return curated topics on error
-      const fallbackTopics = {
-        Technology: [
-          {
-            topic: "AI and Machine Learning",
-            description: "Latest developments in artificial intelligence",
-            category: "Innovation",
-          },
-          {
-            topic: "Cybersecurity Trends",
-            description: "Protecting businesses from digital threats",
-            category: "Security",
-          },
-        ],
-        Healthcare: [
-          {
-            topic: "Telemedicine Revolution",
-            description: "Remote healthcare delivery",
-            category: "Digital Health",
-          },
-          {
-            topic: "Mental Health Awareness",
-            description: "Breaking stigma and promoting wellbeing",
-            category: "Wellness",
-          },
-        ],
-        Finance: [
-          {
-            topic: "Digital Banking Evolution",
-            description: "Online banking innovations",
-            category: "Digital Services",
-          },
-          {
-            topic: "Investment Strategies",
-            description: "Portfolio optimization and trends",
-            category: "Investment",
-          },
-        ],
-        "E-commerce": [
-          {
-            topic: "Social Commerce Growth",
-            description: "Selling through social media",
-            category: "Social Media",
-          },
-          {
-            topic: "Sustainable E-commerce",
-            description: "Eco-friendly practices",
-            category: "Sustainability",
-          },
-        ],
-      };
-
-      const topics = fallbackTopics[industry as keyof typeof fallbackTopics] || [
-        { topic: "Industry Innovation", description: "Latest trends", category: "General" },
-      ];
-
       res.json({
         success: true,
-        topics: topics,
+        topics: [
+          { topic: "Industry Innovation", description: "Latest trends", category: "General" },
+        ],
         fallback: true,
       });
     }
@@ -883,7 +579,6 @@ Return a JSON object with:
 
   // ============ KEYWORD RESEARCH ENDPOINTS ============
 
-  // AI-powered keyword discovery for a brand
   app.post("/api/keyword-research/discover", aiLimitMiddleware, async (req, res) => {
     try {
       const user = requireUser(req);
@@ -1043,7 +738,6 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     }
   });
 
-  // Get keyword research for a brand
   app.get("/api/keyword-research/:brandId", async (req, res) => {
     try {
       const { brandId } = req.params;
@@ -1064,7 +758,6 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     }
   });
 
-  // Get top keyword opportunities
   app.get("/api/keyword-research/:brandId/opportunities", async (req, res) => {
     try {
       const { brandId } = req.params;
@@ -1082,7 +775,6 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     }
   });
 
-  // Update keyword research status
   app.patch("/api/keyword-research/:id", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -1111,7 +803,6 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     }
   });
 
-  // Delete keyword research
   app.delete("/api/keyword-research/:id", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -1122,6 +813,4 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
       sendError(res, error, "Failed to delete keyword");
     }
   });
-
-  // ============ END KEYWORD RESEARCH ENDPOINTS ============
 }

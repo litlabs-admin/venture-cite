@@ -893,7 +893,7 @@ export function setupAnalyticsRoutes(app: Express): void {
           const bestPlatform =
             Object.entries(topPlatform).sort((a, b) => b[1] - a[1])[0]?.[0] || "Unknown";
           articleCitations.push({
-            title: article.title,
+            title: article.title ?? "Untitled",
             citations: articleRankings.length,
             platform: bestPlatform,
           });

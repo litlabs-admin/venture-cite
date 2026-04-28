@@ -160,10 +160,31 @@ const PUBLIC_API_ROUTES = new Set<string>([
   "GET /api/logo-proxy",
 ]);
 
+// Routes whose handlers do their own auth (e.g. SSE endpoints which can't
+// send Authorization headers from EventSource and instead validate a token
+// from the query string). The handler MUST do the verify itself — we just
+// skip the global Bearer guard.
+const SELF_AUTHED_PREFIXES: Array<{ method: string; prefix: string; suffix: string }> = [
+  // GET /api/content-jobs/<id>/stream
+  { method: "GET", prefix: "/api/content-jobs/", suffix: "/stream" },
+];
+
+function isSelfAuthed(method: string, path: string): boolean {
+  for (const r of SELF_AUTHED_PREFIXES) {
+    if (method === r.method && path.startsWith(r.prefix) && path.endsWith(r.suffix)) {
+      // Make sure there's something between prefix and suffix (the id).
+      const idLen = path.length - r.prefix.length - r.suffix.length;
+      if (idLen > 0) return true;
+    }
+  }
+  return false;
+}
+
 export const requireAuthForApi: RequestHandler = (req, res, next) => {
   if (!req.path.startsWith("/api/")) return next();
   const key = `${req.method} ${req.path}`;
   if (PUBLIC_API_ROUTES.has(key)) return next();
+  if (isSelfAuthed(req.method, req.path)) return next();
   return isAuthenticated(req, res, next);
 };
 

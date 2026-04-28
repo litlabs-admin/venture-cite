@@ -1,38 +1,28 @@
-// Draft types + small formatting helpers shared between the Content page
-// and its presentational sub-components (e.g. DraftToolbar).
+// Wave 7: drafts are unified into the articles table. The shape we render
+// in the DraftToolbar dropdown is just the article row, status-aware.
 
-export type ContentDraft = {
-  id: string;
-  userId: string;
-  title: string | null;
-  keywords: string;
-  industry: string;
-  type: string;
-  brandId: string | null;
-  targetCustomers: string | null;
-  geography: string | null;
-  contentStyle: string | null;
-  generatedContent: string | null;
-  articleId: string | null;
-  jobId: string | null;
-  humanScore: number | null;
-  passesAiDetection: number | null; // 0=fails, 1=passes, null=unchecked
-  createdAt: string;
-  updatedAt: string;
-};
+import type { Article } from "@shared/schema";
 
-export function draftStatus(draft: ContentDraft): "generating" | "done" | "draft" {
-  if (draft.jobId) return "generating";
-  if (draft.generatedContent) return "done";
+// Anything in {draft, generating, failed} is "unfinished" — it shows up in
+// the Recent Drafts dropdown rather than the Articles list.
+export type DraftableArticle = Article;
+
+export function draftStatus(article: Article): "draft" | "generating" | "failed" | "ready" {
+  if (article.status === "generating") return "generating";
+  if (article.status === "failed") return "failed";
+  if (article.status === "ready") return "ready";
   return "draft";
 }
 
-export function draftLabel(draft: ContentDraft): string {
-  return draft.title || draft.keywords.split(",")[0]?.trim() || "Untitled";
+export function draftLabel(article: Article): string {
+  if (article.title && article.title.trim()) return article.title.trim();
+  if (article.keywords && article.keywords.length > 0) return article.keywords[0];
+  return "Untitled";
 }
 
-export function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+export function relativeTime(iso: string | Date): string {
+  const t = typeof iso === "string" ? new Date(iso).getTime() : iso.getTime();
+  const diff = Date.now() - t;
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;

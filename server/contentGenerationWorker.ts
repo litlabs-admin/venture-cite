@@ -1,168 +1,111 @@
-// Background content-generation worker. Polls the `content_generation_jobs`
-// table every few seconds, claims the oldest pending job, runs the existing
-// prompt + humanization pipeline, and persists the result as a draft
-// article. Because persistence happens server-side, generations survive
-// page navigation, logout, browser refresh, and device switches.
+// Background content-generation worker. Polls `content_generation_jobs`,
+// claims the oldest pending job, streams the OpenAI response into the
+// linked article (which already exists in status='draft'), and flips the
+// article to 'ready' on success.
 //
-// No Redis, no BullMQ — just Postgres + setInterval. Fine for low-volume
-// single-process deployments.
+// Wave 7: the worker no longer creates the article — the API route does
+// (in status='draft') before enqueuing the job. The worker's job is to
+// fill in the content, stream tokens into `jobs.stream_buffer` so the
+// SSE handler can tail them, classify errors so quotas can be refunded
+// for transient infra failures, and write a 'generated' revision row on
+// success.
+//
+// No Redis, no BullMQ — just Postgres + chained setTimeout. Fine for
+// low-volume single-process deployments.
 
 import OpenAI from "openai";
 import { storage } from "./storage";
+import { db } from "./db";
+import * as schema from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS } from "./lib/modelConfig";
 import { logger } from "./lib/logger";
 import { Sentry } from "./instrument";
 import { assertWithinBudget, recordSpend, isBudgetExceededError, type Tier } from "./lib/llmBudget";
 import { openaiBreaker, isCircuitOpenError } from "./lib/circuitBreaker";
-import type { ContentGenerationJob, InsertContentGenerationJob } from "@shared/schema";
+import { refundArticleQuota, type ErrorKind } from "./lib/usageLimit";
+import type { ContentGenerationJob } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45_000,
+  timeout: 120_000, // streaming runs longer than non-streaming
   maxRetries: 1,
 });
 attachAiLogger(openai);
 
 const POLL_INTERVAL_MS = 5_000;
 const POLL_INTERVAL_MAX_MS = 60_000;
-const STUCK_JOB_RECOVERY_MINUTES = 10;
+const STUCK_JOB_RECOVERY_MINUTES = 5;
+// How often the worker re-checks the cancel flag during a stream. 1s is a
+// good balance: short enough that Cancel feels instant, long enough that we
+// don't hammer the DB on every token.
+const CANCEL_CHECK_MS = 1_000;
+// How many tokens to buffer before flushing to the DB. Smaller = more
+// granular SSE updates; larger = less DB write pressure. Tokens are usually
+// 1-3 chars; 16 tokens ≈ 50 chars per flush.
+const STREAM_FLUSH_TOKEN_COUNT = 16;
+// Watchdog: if the OpenAI stream produces no chunk for this many ms, abort
+// and fail the job. The OpenAI SDK's per-request timeout doesn't reliably
+// fire on a stalled stream (the connection is "open" with no data flowing),
+// so we enforce our own. Generous enough to ride out brief network blips
+// but short enough that a stuck job clears within a couple of minutes.
+const STREAM_IDLE_TIMEOUT_MS = 60_000;
+// Hard ceiling on the total stream duration. A 4000-token response on
+// gpt-4o-mini takes 30-60s; we cap at 5min so a runaway model can't hold
+// a worker forever.
+const STREAM_TOTAL_TIMEOUT_MS = 5 * 60 * 1000;
 
 export type GenerationPayload = {
   keywords: string;
   industry: string;
   type: string;
   brandId?: string;
-  humanize?: boolean;
+  articleId: string; // Wave 7: required — the draft article the job will fill
   targetCustomers?: string;
   geography?: string;
   contentStyle?: "b2b" | "b2c";
 };
 
-function safeParseJson<T = any>(raw: string | null | undefined): T | null {
-  if (!raw) return null;
-  const stripped = raw.replace(/```json\s*|\s*```/g, "").trim();
-  const match = stripped.match(/[\[{][\s\S]*[\]}]/);
-  const candidate = match ? match[0] : stripped;
-  try {
-    return JSON.parse(candidate) as T;
-  } catch {
-    return null;
+class JobCancelledError extends Error {
+  constructor() {
+    super("Job was cancelled by user");
+    this.name = "JobCancelledError";
   }
 }
 
-async function humanizeContent(
-  content: string,
-  industry: string,
-  userId: string,
-  maxAttempts = 3,
-  baselineScore?: number, // rewrites must beat this to replace the content
-): Promise<{
-  humanizedContent: string;
-  humanScore: number;
-  attempts: number;
-  issues: string[];
-  strengths: string[];
-}> {
-  let currentContent = content;
-  let humanScore = 0;
-  let attempts = 0;
-  let issues: string[] = [];
-  let strengths: string[] = [];
-  // Start bestContent as the original and bestScore as the baseline (or 0 for
-  // first-time generation). A rewrite is only kept when it strictly beats the
-  // best seen so far — this prevents auto-improve from returning worse content.
-  let bestContent = content;
-  let bestScore = baselineScore ?? 0;
-  let bestIssues: string[] = [];
-  let bestStrengths: string[] = [];
+function isJobCancelledError(e: unknown): e is JobCancelledError {
+  return e instanceof JobCancelledError;
+}
 
-  const inputTokens = Math.ceil(content.length / 3.5);
-  const perCallMaxTokens = Math.min(4500, Math.max(500, Math.ceil(inputTokens * 1.5)));
+// Read job status without going through the storage layer. We need this hot
+// in the streaming loop and `select` is cheaper than a full `getById`.
+async function isJobCancelled(jobId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ status: schema.contentGenerationJobs.status })
+    .from(schema.contentGenerationJobs)
+    .where(eq(schema.contentGenerationJobs.id, jobId))
+    .limit(1);
+  return row?.status === "cancelled";
+}
 
-  const passes = [
-    `You are a seasoned ${industry} journalist. Rewrite AI-sounding text so it reads as if a human wrote it: vary sentence lengths aggressively, use contractions, drop first-person observations, avoid AI clichés ("landscape", "leverage", "delve", "crucial", "comprehensive", "In today's...", "In conclusion"). Return ONLY the rewritten markdown content.`,
-    `You are a meticulous copy editor. Replace any remaining AI-sounding phrases with natural alternatives, ensure contractions, vary sentence starts, and break any monotonous rhythm. Return ONLY improved markdown content.`,
-    `Final pass: flag anything that sounds "written by committee" and make it sound like one person talking. Ensure varied sentence structure, no AI clichés, and end on a forward-looking thought. Return ONLY the final markdown content.`,
-  ];
-
-  for (let i = 0; i < Math.min(maxAttempts, passes.length); i += 1) {
-    attempts += 1;
-    const rewrite = await openaiBreaker.run(() =>
-      openai.chat.completions.create({
-        model: MODELS.contentHumanize,
-        messages: [
-          { role: "system", content: passes[i] },
-          {
-            role: "user",
-            content: `Rewrite this to sound naturally human, keeping all info + markdown:\n\n${currentContent}`,
-          },
-        ],
-        max_tokens: perCallMaxTokens,
-        temperature: 1.0,
-      }),
-    );
-    currentContent = rewrite.choices[0].message.content || currentContent;
-    await recordSpend({
-      userId,
-      service: "openai",
-      model: MODELS.contentHumanize,
-      tokensIn: rewrite.usage?.prompt_tokens ?? 0,
-      tokensOut: rewrite.usage?.completion_tokens ?? 0,
-    });
-
-    const analysis = await openaiBreaker.run(() =>
-      openai.chat.completions.create({
-        model: MODELS.contentAnalyze,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: `Strict AI-detection analyst. Return JSON {"score": 0-100, "issues": [...max 5], "strengths": [...max 5]}. Be harsh — most AI-rewritten text scores 40-65.`,
-          },
-          { role: "user", content: `Analyze strictly:\n\n${currentContent.substring(0, 4000)}` },
-        ],
-        max_tokens: 600,
-        temperature: 0.3,
-      }),
-    );
-    await recordSpend({
-      userId,
-      service: "openai",
-      model: MODELS.contentAnalyze,
-      tokensIn: analysis.usage?.prompt_tokens ?? 0,
-      tokensOut: analysis.usage?.completion_tokens ?? 0,
-    });
-
-    const parsed = safeParseJson<{ score?: number; issues?: string[]; strengths?: string[] }>(
-      analysis.choices[0].message.content,
-    ) ?? { score: 40 };
-    humanScore = typeof parsed.score === "number" ? parsed.score : 40;
-    issues = Array.isArray(parsed.issues) ? parsed.issues : [];
-    strengths = Array.isArray(parsed.strengths) ? parsed.strengths : [];
-
-    if (humanScore > bestScore) {
-      bestScore = humanScore;
-      bestContent = currentContent;
-      bestIssues = [...issues];
-      bestStrengths = [...strengths];
-    }
-    if (humanScore >= 80) break;
+// Map a thrown error into one of the classifications the refund helper
+// understands. Be conservative: only refund for things we're sure are infra
+// problems, not user-input or quota issues.
+function classifyError(err: unknown): ErrorKind {
+  if (isJobCancelledError(err)) return "cancelled";
+  if (isBudgetExceededError(err)) return "budget";
+  if (isCircuitOpenError(err)) return "circuit";
+  const e = err as { status?: number; code?: string; name?: string } | undefined;
+  if (e?.status === 429) return "openai_429";
+  if (typeof e?.status === "number" && e.status >= 500 && e.status < 600) return "openai_5xx";
+  if (e?.name === "AbortError" || e?.name === "TimeoutError" || e?.code === "ETIMEDOUT") {
+    return "timeout";
   }
-
-  return {
-    humanizedContent: bestContent,
-    humanScore: bestScore,
-    attempts,
-    issues: bestIssues,
-    strengths: bestStrengths,
-  };
+  return "unknown";
 }
 
 async function generateArticleForJob(job: ContentGenerationJob): Promise<{
-  articleId: string;
-  humanScore: number;
-  passesAiDetection: boolean;
   generatedContent: string;
 }> {
   const payload = job.requestPayload as unknown as GenerationPayload;
@@ -171,17 +114,25 @@ async function generateArticleForJob(job: ContentGenerationJob): Promise<{
     industry,
     type,
     brandId,
-    humanize = true,
+    articleId,
     targetCustomers,
     geography,
     contentStyle = "b2c",
   } = payload;
 
-  // Wave 3.2: refuse the job upfront if the user is at their daily token
-  // cap. Cheaper than letting the job consume tokens to discover it's over.
+  if (!articleId) {
+    throw new Error("Job is missing articleId — cannot fill draft");
+  }
+
+  // Refuse upfront if the user is at their daily token cap.
   const userRow = await storage.getUser(job.userId);
   const tier = (userRow?.accessTier ?? "free") as Tier;
   await assertWithinBudget(job.userId, tier);
+
+  // Flip the linked article from 'draft' → 'generating' so the UI / queries
+  // know work is in flight. If the article was deleted between enqueue and
+  // claim, this is a no-op and the next cancel check will short-circuit.
+  await storage.setArticleGeneratingFromDraft(articleId, job.id);
 
   const brand = brandId ? await storage.getBrandById(brandId) : null;
 
@@ -208,9 +159,16 @@ async function generateArticleForJob(job: ContentGenerationJob): Promise<{
     ? `\n\nSTYLE: B2C — warm, conversational, benefit-first, second-person, lifestyle framing. No jargon.`
     : `\n\nSTYLE: B2B — professional, data-driven, ROI-focused, industry terminology, business impact framing.`;
 
-  const response = await openaiBreaker.run(() =>
-    openai.chat.completions.create({
+  // Stream the response. We pass an AbortController so we can force-abort
+  // when our watchdogs trip (idle timeout, total timeout, user cancel).
+  // Without this, a stalled OpenAI connection leaves the for-await loop
+  // hanging indefinitely — which is exactly the bug we hit in Wave 7.
+  const abortController = new AbortController();
+  const stream = await openai.chat.completions.create(
+    {
       model: MODELS.contentGeneration,
+      stream: true,
+      stream_options: { include_usage: true },
       messages: [
         {
           role: "system",
@@ -222,87 +180,168 @@ async function generateArticleForJob(job: ContentGenerationJob): Promise<{
         },
       ],
       max_tokens: 4000,
-    }),
+    },
+    { signal: abortController.signal },
   );
+
+  let finalContent = "";
+  let bufferedDelta = "";
+  let bufferedCount = 0;
+  let lastCancelCheck = Date.now();
+  let lastChunkAt = Date.now();
+  const startedAt = Date.now();
+  let promptTokens = 0;
+  let completionTokens = 0;
+
+  const flushBuffer = async () => {
+    if (bufferedDelta.length === 0) return;
+    await storage.appendStreamBuffer(job.id, bufferedDelta);
+    bufferedDelta = "";
+    bufferedCount = 0;
+  };
+
+  // Watchdog timer: every second, check whether the stream has gone idle
+  // or run past the total ceiling. If so, abort the underlying request so
+  // the for-await loop unblocks and the catch handler classifies the
+  // failure as a timeout (which the refund helper treats as refundable).
+  let timedOutReason: "idle" | "total" | null = null;
+  const watchdog = setInterval(() => {
+    const now = Date.now();
+    if (now - lastChunkAt > STREAM_IDLE_TIMEOUT_MS) {
+      timedOutReason = "idle";
+      abortController.abort();
+    } else if (now - startedAt > STREAM_TOTAL_TIMEOUT_MS) {
+      timedOutReason = "total";
+      abortController.abort();
+    }
+  }, 1_000);
+
+  try {
+    for await (const chunk of stream) {
+      lastChunkAt = Date.now();
+      // Streaming SDKs surface usage on the final chunk when stream_options.
+      if (chunk.usage) {
+        promptTokens = chunk.usage.prompt_tokens ?? promptTokens;
+        completionTokens = chunk.usage.completion_tokens ?? completionTokens;
+      }
+      const delta = chunk.choices?.[0]?.delta?.content ?? "";
+      if (delta) {
+        finalContent += delta;
+        bufferedDelta += delta;
+        bufferedCount += 1;
+        if (bufferedCount >= STREAM_FLUSH_TOKEN_COUNT) {
+          await flushBuffer();
+        }
+      }
+      // Periodic cancel check so the user's "Cancel" click takes effect
+      // promptly without hammering the DB on every token.
+      const now = Date.now();
+      if (now - lastCancelCheck >= CANCEL_CHECK_MS) {
+        lastCancelCheck = now;
+        if (await isJobCancelled(job.id)) {
+          abortController.abort();
+          throw new JobCancelledError();
+        }
+      }
+    }
+    await flushBuffer();
+  } catch (err) {
+    // Make sure any partial buffer is persisted even on failure so the user
+    // can see what got generated before the error. They can copy + retry.
+    await flushBuffer().catch(() => {});
+    if (timedOutReason && !isJobCancelledError(err)) {
+      // Re-throw a classified timeout error so the worker tick refunds quota.
+      const timeoutErr: Error & { name?: string } = new Error(
+        timedOutReason === "idle"
+          ? `Stream went idle for >${STREAM_IDLE_TIMEOUT_MS}ms (no tokens)`
+          : `Stream exceeded total ceiling of ${STREAM_TOTAL_TIMEOUT_MS}ms`,
+      );
+      timeoutErr.name = "TimeoutError";
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearInterval(watchdog);
+  }
+
   await recordSpend({
     userId: job.userId,
     service: "openai",
     model: MODELS.contentGeneration,
-    tokensIn: response.usage?.prompt_tokens ?? 0,
-    tokensOut: response.usage?.completion_tokens ?? 0,
+    tokensIn: promptTokens,
+    tokensOut: completionTokens,
   });
 
-  let finalContent = response.choices[0].message.content || "";
-  let humanScore = 0;
-  let humanizationAttempts = 0;
-
-  if (humanize && finalContent) {
-    const result = await humanizeContent(finalContent, industry, job.userId, 3);
-    finalContent = result.humanizedContent;
-    humanScore = result.humanScore;
-    humanizationAttempts = result.attempts;
-  }
-
-  // Derive a title from the first markdown heading, or fall back to keywords.
+  // Derive a title from the first markdown heading; fall back to keywords.
   const headingMatch = finalContent.match(/^#\s+(.+)$/m);
   const title = headingMatch?.[1]?.trim() || `${keywords} — ${industry}`;
-  const slug = `${title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80)}-${Date.now().toString(36)}`;
 
-  const article = await storage.createArticle({
-    brandId: brandId || null,
-    title,
-    slug,
+  // Atomically write content + flip status + bump version.
+  await storage.setArticleReady(articleId, finalContent, title);
+
+  // Seed the revision history with a 'generated' baseline so Auto-Improve
+  // has something to diff against.
+  await storage.createRevision({
+    articleId,
     content: finalContent,
-    industry,
-    contentType: type,
-    keywords: keywords
-      ? keywords
+    source: "generated",
+    createdBy: "system",
+  });
+
+  return { generatedContent: finalContent };
+}
+
+// Programmatic enqueue used by the agent task executor (the autonomous
+// Win-a-Prompt + content-generation workflows). The HTTP route at
+// POST /api/articles/:id/generate is the user-facing entry point; this
+// helper does the same atomic create-draft + enqueue but skips the request
+// validation since callers are server-side.
+//
+// Returns { articleId, jobId }. The article is left in status='draft' until
+// the worker claims the job and flips it (same flow as the HTTP route).
+export async function enqueueContentGenerationJob(
+  userId: string,
+  brandId: string,
+  payload: Omit<GenerationPayload, "articleId">,
+): Promise<{ articleId: string; jobId: string }> {
+  // Create the draft article first so the job has something to fill.
+  const article = await storage.createDraftArticle(userId, brandId, {
+    keywords: payload.keywords
+      ? payload.keywords
           .split(",")
           .map((k) => k.trim())
           .filter(Boolean)
-      : [],
-    author: "GEO Platform",
-    seoData: {
-      humanScore,
-      humanizationAttempts,
-      passesAiDetection: humanScore >= 70,
-      generatedVia: "background-worker",
-    },
-  } as any);
+      : null,
+    industry: payload.industry ?? null,
+    contentType: payload.type ?? "article",
+    targetCustomers: payload.targetCustomers ?? null,
+    geography: payload.geography ?? null,
+    contentStyle: payload.contentStyle ?? "b2c",
+  });
 
-  // Wave 4.2: usage is now incremented atomically at enqueue time
-  // (server/lib/usageLimit.ts:withArticleQuota). Don't double-count it
-  // here. Trade-off: failed jobs still consume quota — acceptable for
-  // the cap-correctness gain.
-
-  return {
+  const job = await storage.enqueueContentJob({
+    userId,
+    brandId,
     articleId: article.id,
-    humanScore,
-    passesAiDetection: humanScore >= 70,
-    generatedContent: finalContent,
-  };
+    status: "pending",
+    requestPayload: { ...payload, articleId: article.id, brandId } as never,
+  } as schema.InsertContentGenerationJob);
+
+  // Link job onto the article so the SSE handler can find it via the article.
+  await db
+    .update(schema.articles)
+    .set({ jobId: job.id, updatedAt: new Date() })
+    .where(eq(schema.articles.id, article.id));
+
+  return { articleId: article.id, jobId: job.id };
 }
 
 let workerTimeout: NodeJS.Timeout | null = null;
-
-// Re-entry guard. The chained-setTimeout scheduler below already ensures
-// the next tick fires only after the previous resolves, but the guard is
-// a belt-and-braces against an init-twice bug that double-arms the timer.
 let ticking = false;
-
-// Wave 3.4: when a tick claims no job, back off exponentially up to
-// POLL_INTERVAL_MAX_MS. Reset to base whenever a job IS claimed. This
-// turns an idle worker from "5 SELECT FOR UPDATE per second" into
-// "1 every 60s" without sacrificing latency when work arrives.
 let consecutiveEmptyTicks = 0;
 
 function nextDelayMs(): number {
   if (consecutiveEmptyTicks === 0) return POLL_INTERVAL_MS;
-  // 5s, 10s, 20s, 40s, 60s, 60s, …
   const exp = Math.min(consecutiveEmptyTicks, 4);
   return Math.min(POLL_INTERVAL_MAX_MS, POLL_INTERVAL_MS * Math.pow(2, exp));
 }
@@ -315,60 +354,63 @@ async function tick(): Promise<{ claimed: boolean }> {
     if (!job) return { claimed: false };
     logger.info({ jobId: job.id, userId: job.userId }, "content job claimed");
     try {
-      const { articleId, humanScore, passesAiDetection, generatedContent } =
-        await generateArticleForJob(job);
+      await generateArticleForJob(job);
       await storage.updateContentJob(job.id, {
         status: "succeeded",
-        articleId,
         completedAt: new Date(),
       });
-      logger.info({ jobId: job.id, articleId }, "content job succeeded");
-
-      // Update the linked draft (if any) with the finished article so the
-      // content page can restore state without fetching the job separately.
-      try {
-        const draft = await storage.getContentDraftByJobId(job.id, job.userId);
-        if (draft) {
-          await storage.updateContentDraft(draft.id, job.userId, {
-            generatedContent,
-            articleId,
-            jobId: null, // job is done — clear the pointer
-            humanScore: humanScore ?? null,
-            passesAiDetection: passesAiDetection ? 1 : 0,
-          });
-        }
-      } catch (draftErr) {
-        logger.warn({ err: draftErr, jobId: job.id }, "could not update draft for job");
-      }
+      logger.info({ jobId: job.id, articleId: (job as any).articleId }, "content job succeeded");
     } catch (err: any) {
+      const errorKind = classifyError(err);
       const message = err instanceof Error ? err.message : String(err);
+      const cancelled = isJobCancelledError(err);
+
+      // Update job status. Cancelled jobs stay 'cancelled'; otherwise 'failed'.
       await storage.updateContentJob(job.id, {
-        status: "failed",
+        status: cancelled ? "cancelled" : "failed",
         errorMessage: message.slice(0, 500),
+        errorKind,
         completedAt: new Date(),
-      });
-      // Clear the jobId on the draft so the UI stops polling
+      } as any);
+
+      // Move the article back so the user can retry. If cancelled, it goes
+      // back to 'draft' (form is intact). If failed, status='failed' so the
+      // UI can show a Retry button and explain what went wrong.
+      const articleId = (job as any).articleId as string | null;
+      if (articleId) {
+        if (cancelled) {
+          await storage.setArticleDraft(articleId);
+        } else {
+          await storage.setArticleFailed(articleId);
+        }
+      }
+
+      // Refund quota for transient/cancellable failures only.
       try {
-        const draft = await storage.getContentDraftByJobId(job.id, job.userId);
-        if (draft) await storage.updateContentDraft(draft.id, job.userId, { jobId: null });
-      } catch {}
-      // Budget-exceeded and circuit-open are both expected operational
-      // outcomes (user hit cap / provider outage), not crashes. Log them
-      // as info/warn and don't page Sentry — that's noise.
-      if (isBudgetExceededError(err)) {
+        await refundArticleQuota(job.userId, job.id, errorKind);
+      } catch (refundErr) {
+        logger.error(
+          { err: refundErr, jobId: job.id },
+          "refundArticleQuota failed — quota may not have been refunded",
+        );
+      }
+
+      if (cancelled) {
+        logger.info({ jobId: job.id, userId: job.userId }, "content job cancelled by user");
+      } else if (errorKind === "budget") {
         logger.info(
           { jobId: job.id, userId: job.userId, message },
           "content job rejected: budget exceeded",
         );
-      } else if (isCircuitOpenError(err)) {
+      } else if (errorKind === "circuit") {
         logger.warn(
-          { jobId: job.id, userId: job.userId, breaker: err.breakerName },
+          { jobId: job.id, userId: job.userId },
           "content job rejected: provider circuit open",
         );
       } else {
-        logger.error({ err, jobId: job.id }, "content job failed");
+        logger.error({ err, jobId: job.id, errorKind }, "content job failed");
         Sentry.captureException(err, {
-          tags: { source: "contentWorker.job" },
+          tags: { source: "contentWorker.job", errorKind },
           extra: { jobId: job.id, userId: job.userId },
         });
       }
@@ -382,27 +424,22 @@ async function tick(): Promise<{ claimed: boolean }> {
   return { claimed: true };
 }
 
-export async function enqueueContentGenerationJob(
-  userId: string,
-  brandId: string | null,
-  payload: GenerationPayload,
-): Promise<string> {
-  const job = await storage.enqueueContentJob({
-    userId,
-    brandId: brandId || null,
-    status: "pending",
-    requestPayload: payload as any,
-  } as InsertContentGenerationJob);
-  return job.id;
-}
-
 export async function initContentGenerationWorker(): Promise<void> {
   // Crash recovery: any job left in `running` longer than the recovery
   // window is assumed to be orphaned (server was killed mid-job).
+  // Wave 7: also refund quota and reset the linked article back to draft.
   try {
     const failed = await storage.failStuckContentJobs(STUCK_JOB_RECOVERY_MINUTES);
-    if (failed > 0) {
-      logger.info({ failed }, "marked stuck jobs as failed on boot");
+    if (failed.length > 0) {
+      logger.info({ failed: failed.length }, "marked stuck jobs as failed on boot");
+      for (const j of failed) {
+        try {
+          if (j.articleId) await storage.setArticleFailed(j.articleId);
+          await refundArticleQuota(j.userId, j.id, "timeout");
+        } catch (err) {
+          logger.error({ err, jobId: j.id }, "boot recovery: failed to refund/reset article");
+        }
+      }
     }
   } catch (err) {
     logger.error({ err }, "content worker boot recovery failed");
@@ -411,9 +448,6 @@ export async function initContentGenerationWorker(): Promise<void> {
 
   if (workerTimeout) return;
 
-  // Chained setTimeout (not setInterval) so the gap between ticks
-  // grows when there's no work and shrinks when there is. This
-  // mirrors how a queue-driven worker would behave but stays in-process.
   const scheduleNext = (delay: number) => {
     workerTimeout = setTimeout(() => {
       tick()
@@ -428,7 +462,6 @@ export async function initContentGenerationWorker(): Promise<void> {
         .catch((err) => {
           logger.error({ err }, "content worker unhandled tick error");
           Sentry.captureException(err, { tags: { source: "contentWorker.tick-unhandled" } });
-          // Even on a thrown error, keep the scheduler running.
           scheduleNext(POLL_INTERVAL_MS);
         });
     }, delay);

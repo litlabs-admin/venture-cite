@@ -173,6 +173,12 @@ export const brands = pgTable(
   (table) => [index("brands_user_id_idx").on(table.userId)],
 );
 
+// Articles are the single source of truth for user-authored content.
+// Wave 7 (content unification) collapsed the old `content_drafts` table into
+// this one — see migration 0033. Lifecycle: draft → generating → ready
+// (or failed). Drafts have no content yet; generating jobs are linked via
+// `jobId`; ready articles have content + at least one row in
+// `article_revisions`.
 export const articles = pgTable(
   "articles",
   {
@@ -182,9 +188,10 @@ export const articles = pgTable(
     brandId: varchar("brand_id")
       .notNull()
       .references(() => brands.id, { onDelete: "cascade" }),
-    title: text("title").notNull(),
-    slug: varchar("slug", { length: 255 }).notNull(),
-    content: text("content").notNull(),
+    // title/content are nullable so a draft article can exist before either
+    // is filled in. The worker writes both on transition to 'ready'.
+    title: text("title"),
+    content: text("content"),
     excerpt: text("excerpt"),
     metaDescription: text("meta_description"),
     keywords: text("keywords").array(),
@@ -196,15 +203,56 @@ export const articles = pgTable(
     citationCount: integer("citation_count").default(0).notNull(),
     // Wave 4.4: optimistic-lock version (see brands.version).
     version: integer("version").default(0).notNull(),
+    // Wave 7: lifecycle + form-state fields absorbed from content_drafts.
+    status: text("status").default("ready").notNull(), // 'draft'|'generating'|'ready'|'failed'
+    jobId: varchar("job_id"), // soft FK → content_generation_jobs.id, set while generating
+    targetCustomers: text("target_customers"),
+    geography: text("geography"),
+    contentStyle: text("content_style").default("b2c"),
+    // Where this article actually lives on the user's own site (their CMS
+    // or blog URL). Replaces the old slug-based fake URL.
+    externalUrl: text("external_url"),
+    // Legacy AI-detection score columns. Preserved through the rebuild so
+    // existing data isn't lost; UI no longer reads them. Dropped in a later
+    // cleanup migration.
+    humanScore: integer("human_score"),
+    passesAiDetection: integer("passes_ai_detection"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     seoData: jsonb("seo_data"),
   },
   (table) => [
     index("articles_brand_id_idx").on(table.brandId),
-    uniqueIndex("articles_brand_slug_idx").on(table.brandId, table.slug),
+    index("articles_status_idx").on(table.status),
+    index("articles_job_id_idx").on(table.jobId),
   ],
 );
+
+// Per-revision history for Auto-Improve and manual edits. Each row is an
+// immutable snapshot of `articles.content` at the moment the revision was
+// created. The diff viewer renders newest-vs-current; restore copies an old
+// revision's content back onto the article and logs a `manual_edit` row to
+// record the restore point.
+export const articleRevisions = pgTable(
+  "article_revisions",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    articleId: varchar("article_id")
+      .notNull()
+      .references(() => articles.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    // 'generated' | 'manual_edit' | 'auto_improve' | 'distribute_back'
+    source: text("source").notNull(),
+    createdBy: varchar("created_by"), // userId, or 'system' for worker writes
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("article_revisions_article_idx").on(table.articleId, table.createdAt)],
+);
+
+export type ArticleRevision = typeof articleRevisions.$inferSelect;
+export type InsertArticleRevision = typeof articleRevisions.$inferInsert;
 
 export const distributions = pgTable(
   "distributions",
@@ -276,10 +324,20 @@ export const contentGenerationJobs = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     brandId: varchar("brand_id").references(() => brands.id, { onDelete: "set null" }),
+    // 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'
     status: text("status").notNull().default("pending"),
     requestPayload: jsonb("request_payload").notNull(),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
     errorMessage: text("error_message"),
+    // Wave 7: streaming + refund support.
+    // streamBuffer accumulates token deltas as the worker streams from OpenAI;
+    // the SSE handler tails this column. errorKind classifies failures so
+    // refundArticleQuota knows whether to refund (transient infra) or not
+    // (user error / budget). refundedAt is set once the refund is applied,
+    // making the refund idempotent.
+    streamBuffer: text("stream_buffer").default(""),
+    errorKind: text("error_kind"), // 'budget'|'circuit'|'openai_5xx'|'openai_429'|'timeout'|'invalid_input'|'unknown'
+    refundedAt: timestamp("refunded_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     startedAt: timestamp("started_at"),
     completedAt: timestamp("completed_at"),
@@ -297,41 +355,8 @@ export const insertContentGenerationJobSchema = createInsertSchema(contentGenera
 export type ContentGenerationJob = typeof contentGenerationJobs.$inferSelect;
 export type InsertContentGenerationJob = z.infer<typeof insertContentGenerationJobSchema>;
 
-// Multi-draft persistence for the content generation page. Each draft stores
-// the full form state and is auto-saved on field change. Linked to a
-// background job (jobId) while generating, then updated with the finished
-// article when the job completes.
-export const contentDrafts = pgTable(
-  "content_drafts",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    userId: varchar("user_id").notNull(),
-    title: text("title"),
-    keywords: text("keywords").notNull().default(""),
-    industry: text("industry").notNull().default(""),
-    type: text("type").notNull().default("article"),
-    brandId: varchar("brand_id"),
-    targetCustomers: text("target_customers"),
-    geography: text("geography"),
-    contentStyle: text("content_style").default("b2c"),
-    generatedContent: text("generated_content"),
-    articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
-    jobId: varchar("job_id"), // references content_generation_jobs(id) — nullable FK (no cascade needed)
-    humanScore: integer("human_score"),
-    passesAiDetection: integer("passes_ai_detection"), // NULL=unchecked, 0=fails, 1=passes
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("content_drafts_user_id_idx").on(table.userId),
-    index("content_drafts_job_id_idx").on(table.jobId),
-  ],
-);
-
-export type ContentDraft = typeof contentDrafts.$inferSelect;
-export type InsertContentDraft = typeof contentDrafts.$inferInsert;
+// Wave 7: the legacy content_drafts table was absorbed into `articles` (with
+// status='draft'). See migration 0033_content_unification.sql.
 
 // Tracks each batch of 10 prompts generated for a brand. Enables prompt
 // versioning so users can see which prompts were used in historical runs.

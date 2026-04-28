@@ -23,7 +23,6 @@ import ResetPassword from "@/pages/reset-password";
 const Content = lazy(() => import("@/pages/content"));
 const Citations = lazy(() => import("@/pages/citations"));
 const Articles = lazy(() => import("@/pages/articles"));
-const ArticleView = lazy(() => import("@/pages/article-view"));
 const Brands = lazy(() => import("@/pages/brands"));
 const KeywordResearch = lazy(() => import("@/pages/keyword-research"));
 const AIVisibility = lazy(() => import("@/pages/ai-visibility"));
@@ -171,15 +170,9 @@ function Router() {
       <Route path="/welcome">{() => <AuthenticatedBareRoute component={Welcome} />}</Route>
       <Route path="/dashboard">{() => <FirstRunGate component={Home} />}</Route>
       <Route path="/content">{() => <AuthenticatedRoute component={Content} />}</Route>
+      <Route path="/content/:articleId">{() => <AuthenticatedRoute component={Content} />}</Route>
       <Route path="/citations">{() => <AuthenticatedRoute component={Citations} />}</Route>
       <Route path="/articles">{() => <AuthenticatedRoute component={Articles} />}</Route>
-      <Route path="/article/:slug">
-        {() => (
-          <Suspense fallback={<RouteSpinner />}>
-            <ArticleView />
-          </Suspense>
-        )}
-      </Route>
       {/* Phase 1 core features */}
       <Route path="/brands">{() => <AuthenticatedRoute component={Brands} />}</Route>
       <Route path="/keyword-research">

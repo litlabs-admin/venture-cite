@@ -92,11 +92,42 @@ if (isProd) {
 
 // CORS — explicit allowlist only, deduped. APP_URL often points at
 // localhost in dev, so we dedupe against the built-in local entries.
+//
+// Auto-expand the allowlist to cover the bare-apex / www mirror of every
+// env-supplied origin: if APP_URL is https://venturecite.com we also accept
+// https://www.venturecite.com (and vice-versa), so DNS pointing both names
+// at the same service doesn't require a code change to add the alternate.
+function expandApexAndWww(origin: string): string[] {
+  try {
+    const u = new URL(origin);
+    const host = u.hostname;
+    const out = new Set<string>([origin]);
+    if (host.startsWith("www.")) {
+      out.add(`${u.protocol}//${host.slice(4)}${u.port ? `:${u.port}` : ""}`);
+    } else if (!host.includes(".") || host.split(".").length === 2) {
+      // Bare apex like `venturecite.com` — also accept `www.venturecite.com`.
+      out.add(`${u.protocol}//www.${host}${u.port ? `:${u.port}` : ""}`);
+    }
+    return Array.from(out);
+  } catch {
+    return [origin];
+  }
+}
+
+// EXTRA_CORS_ORIGINS is a comma-separated list for staging/preview deploys.
+const extra = (process.env.EXTRA_CORS_ORIGINS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 const allowedOrigins = Array.from(
   new Set(
-    [process.env.APP_URL, "http://localhost:5000", "http://127.0.0.1:5000"].filter(
-      Boolean,
-    ) as string[],
+    [
+      ...(process.env.APP_URL ? expandApexAndWww(process.env.APP_URL) : []),
+      ...extra.flatMap(expandApexAndWww),
+      "http://localhost:5000",
+      "http://127.0.0.1:5000",
+    ].filter(Boolean),
   ),
 );
 

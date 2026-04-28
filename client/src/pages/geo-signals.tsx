@@ -430,11 +430,11 @@ export default function GeoSignals() {
   };
 
   const handleAnalyzeArticle = () => {
-    if (selectedArticle) {
+    if (selectedArticle && selectedArticle.content) {
       setContentToAnalyze(selectedArticle.content);
       analyzeSignalsMutation.mutate({
         content: selectedArticle.content,
-        targetQuery: targetQuery || selectedArticle.title,
+        targetQuery: targetQuery || selectedArticle.title || "",
         brandId: selectedBrandId,
         articleUpdatedAt: selectedArticle.updatedAt
           ? new Date(selectedArticle.updatedAt).toISOString()
@@ -965,12 +965,16 @@ export default function GeoSignals() {
                 <div className="flex gap-4">
                   <Button
                     onClick={() => {
-                      if (selectedArticle) {
+                      if (selectedArticle && selectedArticle.content) {
                         setContentToAnalyze(selectedArticle.content);
                         analyzeChunksMutation.mutate({ content: selectedArticle.content });
                       }
                     }}
-                    disabled={!selectedArticle || analyzeChunksMutation.isPending}
+                    disabled={
+                      !selectedArticle ||
+                      !selectedArticle.content ||
+                      analyzeChunksMutation.isPending
+                    }
                     variant="outline"
                     data-testid="button-analyze-chunks"
                   >
@@ -983,14 +987,18 @@ export default function GeoSignals() {
                   </Button>
                   <Button
                     onClick={() => {
-                      if (selectedArticle) {
+                      if (selectedArticle && selectedArticle.content) {
                         optimizeChunksMutation.mutate({
                           content: selectedArticle.content,
                           brandId: selectedBrandId,
                         });
                       }
                     }}
-                    disabled={!selectedArticle || optimizeChunksMutation.isPending}
+                    disabled={
+                      !selectedArticle ||
+                      !selectedArticle.content ||
+                      optimizeChunksMutation.isPending
+                    }
                     className="bg-primary hover:bg-primary/90"
                     data-testid="button-optimize-chunks"
                   >
@@ -1313,10 +1321,10 @@ export default function GeoSignals() {
                 <div className="flex gap-4">
                   <Button
                     onClick={() => {
-                      if (selectedArticle) {
+                      if (selectedArticle && selectedArticle.content) {
                         simulatePipelineMutation.mutate({
                           content: selectedArticle.content,
-                          query: targetQuery || selectedArticle.title,
+                          query: targetQuery || selectedArticle.title || "",
                           articleUpdatedAt: selectedArticle.updatedAt
                             ? new Date(selectedArticle.updatedAt).toISOString()
                             : undefined,

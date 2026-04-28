@@ -382,9 +382,8 @@ export async function runBrandPurgeJob(): Promise<{ purged: number; failed: numb
   let failed = 0;
   for (const brand of due) {
     try {
-      // Drafts have no FK cascade — clean them up explicitly first.
-      // (Same pattern as the soft-delete handler in routes.ts pre-Wave 4.5.)
-      await storage.deleteContentDraftsByBrandId(brand.id);
+      // Wave 7: drafts are now articles with status='draft' and brand_id has
+      // ON DELETE CASCADE, so the explicit cleanup is no longer needed.
       await db.delete(schema.brands).where(eq(schema.brands.id, brand.id));
 
       await logSystemAudit(brand.userId ?? null, {

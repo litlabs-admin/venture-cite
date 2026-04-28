@@ -863,3 +863,206 @@ Stale links from deleted features cleaned up: home.tsx `SeeAllLink` to `/geo-ran
 - **`authority_score` is a domain-occurrence heuristic.** Counts how often a citing-outlet domain has appeared in past citations. It's directionally meaningful but not a ground-truth authority signal. The visibility-score formula gives it 30 of 100 weight; if we ever wire real authority data (DR, RD count), the formula stays the same — just better inputs.
 - **Variant learning loop has no cap.** LLM-extracted variants append unbounded. If a hallucinating model invents nonsense variants, they accumulate until a user prunes them. Per-entity max (e.g. 50) would be cheap insurance.
 - **One-shot back-detection migration.** Existing user data won't auto-realign with the new matcher until each user clicks "Re-check stored." A separate ops script that walks every brand and runs `re-detect-all` once is on the to-do — not part of any PR, just a deploy-time chore.
+
+---
+
+## 14. Wave 7 — Content + Articles full rebuild
+
+### 14.0 Why this wave existed
+
+The Content + Articles pages had grown three overlapping data models that disagreed about what "content" was: `content_drafts` (form state with a `generatedContent` field), `content_generation_jobs` (the work order), and `articles` (the canonical row). A single piece of content was duplicated across 2-3 places with no enforced sync. Six different code paths PATCH'd the draft row with no version field. The "AI Detection Score" was an LLM grading its own LLM output and shouldn't have existed. Auto-Improve created a new "(improved)" article every click, cluttering the list. `/article/:slug` exposed every article publicly via slug enumeration.
+
+The audit and critique we did for these two pages produced a 20+ point list. This wave addresses all of it.
+
+### 14.1 Schema unification (migration 0033)
+
+[migrations/0033_content_unification.sql](migrations/0033_content_unification.sql) collapses the three-table model:
+
+- **`articles` carries the lifecycle.** New `status text` column with `CHECK (status IN ('draft','generating','ready','failed'))`. Defaults to `'ready'` (existing rows), so the migration is non-destructive on first run. New `job_id varchar` (links to in-flight generation), `target_customers`, `geography`, `content_style` (form-state fields the legacy drafts table used to hold), and `external_url text` (where the article actually lives on the user's own site — replaces the slug-based fake URL).
+- **`articles.title` and `articles.content` are now nullable** so a draft article can exist before either is filled in. The worker writes both on transition to `ready`.
+- **Slug is gone.** `DROP INDEX articles_brand_slug_idx; ALTER TABLE articles DROP COLUMN slug.` No more public-by-slug surface.
+- **`article_revisions` table created.** Per Auto-Improve / per manual edit / per restore. Columns: `article_id`, `content`, `source IN ('generated','manual_edit','auto_improve','distribute_back')`, `created_by`, `created_at`. Every existing `ready` article gets a seed `'generated'` revision so the diff viewer has a baseline.
+- **`content_generation_jobs` extended:** `stream_buffer text DEFAULT ''` (worker appends streamed tokens here; SSE handler tails it), `error_kind text` (classification for refund logic), `refunded_at timestamp` (idempotency flag). Status CHECK now accepts `'cancelled'`.
+- **Backfill.** Orphan articles (`brand_id IS NULL`) get re-parented under a per-user "Personal" brand (industry "Other", tone "professional"). Every `content_drafts` row is absorbed: drafts with `articleId` are merged onto that article (form fields copied, status flipped); drafts with `generatedContent` but no `articleId` become new ready articles; unfinished drafts become draft articles. Then `DROP TABLE content_drafts`.
+- **Idempotent.** `IF NOT EXISTS`/`IF EXISTS` everywhere; the destructive drops are guarded by the table-existence check so re-running on a fresh DB is a no-op.
+
+### 14.2 Slug deletion (everywhere)
+
+A clean cut, in deploy order so we never serve a 404 to ourselves:
+
+- **Server.** Both `/api/articles/slug/:slug` route handlers deleted (one was a duplicate dead route that was supposed to bump view count and never did). `getArticleBySlug` DAO removed; `generateSlug` private helper removed; storage interface entry removed. Worker no longer derives a slug. Sitemap stops emitting article URLs (articles aren't publicly indexable on our domain anymore — users link to their own externally-hosted versions via `articles.externalUrl`).
+- **GEO Signals schema audit.** Used to construct a fake URL via `${brand.website}/${article.slug}` to look up cached schema audits. Now reads `article.externalUrl`; if unset, returns `completeness: null` and the UI hides the panel.
+- **Client.** `/article/:slug` route removed from [client/src/App.tsx](client/src/App.tsx). [client/src/pages/article-view.tsx](client/src/pages/article-view.tsx) deleted entirely.
+
+### 14.3 Backend rebuild
+
+#### Storage interface ([server/storage.ts](server/storage.ts))
+
+Old draft methods (`createContentDraft`, `getContentDraftsByUserId`, `updateContentDraft`, `deleteContentDraft`, …) replaced by:
+
+- `createDraftArticle(userId, brandId, fields)` — creates `status='draft'` row.
+- `getArticlesByUserIdWithStatus(userId, { status?, brandId?, limit, offset })` — single status-filterable list. Status arg accepts a string or string[]. Drives both the Articles page (default `'ready'`) and the Content page's Recent Drafts dropdown (`'draft','generating','failed'`).
+- `setArticleGeneratingFromDraft`, `setArticleReady`, `setArticleFailed`, `setArticleDraft` — atomic transitions used by the worker.
+- `appendStreamBuffer(jobId, delta)` — atomic concat (`SET stream_buffer = COALESCE(stream_buffer,'') || $delta`).
+- `createRevision`, `listRevisions`, `getRevisionById` — revision history.
+- `failStuckContentJobs` updated to return `[{id, userId, articleId}]` so the boot recovery can refund quota and reset linked articles to draft.
+
+#### Content routes ([server/routes/content.ts](server/routes/content.ts))
+
+- `POST /api/articles/:id/generate` (replaces `POST /api/generate-content`) — body: `{keywords, industry, type, contentStyle, targetCustomers, geography}`. Verifies article ownership and `status IN ('draft','failed')`. Atomically: `withArticleQuota` reserve → insert job with `articleId` → set `articles.status='generating', jobId`. Returns `{jobId, status:'pending'}`. **Synchronous status flip** so the UI switches to streaming immediately rather than waiting for the worker to claim.
+- `GET /api/content-jobs/:jobId` — JSON poll. Includes `errorKind` so the client can show classified error messages.
+- `GET /api/content-jobs/:jobId/stream` — SSE. Tails `stream_buffer` at 250ms, emits `event: delta` per new chunk, `event: end` on terminal status. Hard cap at 5min total connection.
+- `POST /api/content-jobs/:jobId/cancel` — flips job to `cancelled`. Worker checks every 1s during the stream and aborts the OpenAI request. If the job is still `pending` when cancelled (worker hadn't claimed yet), the route refunds quota and resets the article to draft inline.
+- `POST /api/articles/:id/improve` (replaces `POST /api/rewrite-content`) — **one** rewrite pass. Snapshots current content as a `manual_edit` revision, calls gpt-4o-mini, writes new content, records an `auto_improve` revision. Optimistic-locked via `expectedVersion` (returns 409 with `current` payload). No score gating, no fork.
+- `POST /api/analyze-content` and `POST /api/rewrite-content` — **deleted**. The LLM-graded human score is gone for good.
+- All `/api/content-drafts/*` routes — **deleted**.
+
+#### Article routes ([server/routes/articles.ts](server/routes/articles.ts))
+
+- `POST /api/articles/draft` — creates a `status='draft'` row. Drives the Content page's "New Article" button.
+- `GET /api/articles` — supports `?status=` (single value, comma-list, or `all`) and `?brandId=`. Default `status=ready`.
+- `PUT /api/articles/:id` — already had optimistic-lock support; client now always sends `expectedVersion`. Allowlist drops `slug`, adds `externalUrl`.
+- `GET /api/articles/:id/revisions` — list revisions newest-first.
+- `GET /api/articles/:id/revisions/:revId` — single revision content.
+- `POST /api/articles/:id/revisions/:revId/restore` — overwrite article with revision content, bump version, log a new `manual_edit` revision recording the restore.
+- `POST /api/articles` — **brandId now required** (no orphan articles going forward).
+- `POST /api/distribute/:articleId` — platform calls switched from sequential `for` loop to `Promise.all`. ~2× faster on multi-platform distribute.
+
+#### Worker rewrite ([server/contentGenerationWorker.ts](server/contentGenerationWorker.ts))
+
+Worker no longer creates the article — it fills one. On claim:
+
+1. Re-assert `status='generating'`, `jobId` set (idempotent because the route already did it).
+2. Build prompt (brand context + content type + style + keywords).
+3. **Stream from OpenAI** with `stream: true, stream_options: { include_usage: true }` and an `AbortController` signal.
+4. For each chunk: append to `stream_buffer` (flush every 16 tokens), check cancel flag every 1s.
+5. **Watchdog** runs every 1s: aborts if no chunk arrived in `STREAM_IDLE_TIMEOUT_MS = 60s` or total elapsed > `STREAM_TOTAL_TIMEOUT_MS = 5min`. Throws a synthetic `TimeoutError` so the catch handler classifies → refunds.
+6. On success: `setArticleReady(articleId, content, title)`, insert `'generated'` revision.
+7. On failure: classify error → `errorKind`, set `jobs.{status, errorKind, errorMessage, completedAt}`, set article to `failed` (or `draft` if cancelled), call `refundArticleQuota` (idempotent — checks `refunded_at IS NULL`).
+8. Boot recovery (`STUCK_JOB_RECOVERY_MINUTES = 5`, was 15): every job left running for >5 min on startup gets failed with `errorKind='timeout'`, refunded, and its article reset.
+
+#### Quota refund helper ([server/lib/usageLimit.ts](server/lib/usageLimit.ts))
+
+`refundArticleQuota(userId, jobId, errorKind)`. Refundable kinds: `cancelled`, `circuit`, `openai_429`, `openai_5xx`, `timeout`. Non-refundable: `budget`, `invalid_input`, `unknown`. Wraps both the user row and the job row in `FOR UPDATE`, decrements counter clamped at 0, sets `refunded_at = now()`.
+
+### 14.4 Frontend rebuild
+
+#### Shared helpers + new components
+
+- [shared/industries.ts](shared/industries.ts) (NEW) — moved the 50+ industry list out of the Content page into a shared module. Used by Content, Brand setup, Keyword research.
+- [client/src/lib/diff.ts](client/src/lib/diff.ts) (NEW) — hand-rolled line-level LCS diff. ~80 LOC, no external dep.
+- [client/src/components/content/MarkdownEditor.tsx](client/src/components/content/MarkdownEditor.tsx) (NEW) — split-pane editor: monospace `<Textarea>` left, live `<SafeMarkdown>` preview right, word + character count toolbar. Supports `editable={false}` for the streaming preview.
+- [client/src/components/content/KeywordChips.tsx](client/src/components/content/KeywordChips.tsx) (NEW) — chip-input with comma/Enter to add, Backspace-on-empty to pop. Pasting "a, b, c" splits into multiple chips.
+- [client/src/components/content/IndustryCombobox.tsx](client/src/components/content/IndustryCombobox.tsx) (NEW) — `cmdk`-backed type-to-filter combobox over the industry list, grouped by super-category.
+- [client/src/components/content/BrandCombobox.tsx](client/src/components/content/BrandCombobox.tsx) (NEW) — same pattern, brand selector. No "(generic content)" option — brand is required.
+- [client/src/hooks/useArticleAutoSave.ts](client/src/hooks/useArticleAutoSave.ts) (NEW) — single auto-save channel with two debounce timers (form 1.5s, content 2s) and a serial flush queue. Always passes `expectedVersion`. On 409: surfaces a toast and stops queuing. Replaces the legacy 6-way PATCH race.
+- [client/src/components/articles/RevisionDiff.tsx](client/src/components/articles/RevisionDiff.tsx) (NEW) — unified red/green diff renderer with a `context` prop that collapses long unchanged runs to "⋯ N unchanged lines ⋯".
+- [client/src/components/articles/ViewEditDialog.tsx](client/src/components/articles/ViewEditDialog.tsx) (NEW) — three tabs: View (SafeMarkdown), Edit (MarkdownEditor + Auto-Improve button + diff confirmation flow), Versions (revision list + diff viewer + Restore button). 409 conflict modal with Reload-latest / Force-save-mine.
+- [client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) (NEW) — extracted from the legacy 370-line block in articles.tsx. Selected platforms now persist when switching between Generate/Results tabs. Buffer profile match only auto-fires on unambiguous (single-match) cases.
+
+#### Content page ([client/src/pages/content.tsx](client/src/pages/content.tsx))
+
+- **Route-driven.** `/content/:articleId` is the canonical URL. Visiting `/content` with no id either jumps to the most recent draft or creates a new draft article and redirects.
+- **Bootstrap.** Three-way decision: localStorage active draft → that article; else `drafts[0]`; else create new and redirect. If the article id 404s (deleted, wrong owner), redirects back to `/content` instead of spinning forever.
+- **Three render modes** driven by `article.status`:
+  - `draft|failed` → DraftForm (combobox + chip-input + content-type + style + targeting + Generate button). Failed shows an error banner with the classified message.
+  - `generating` → GeneratingPreview (read-only MarkdownEditor showing live tokens, Cancel button visible).
+  - `ready` → ReadyEditor (split-pane MarkdownEditor with auto-save, "Open in Articles" link).
+- **Streaming UX.** SSE when tab is focused; poll fallback (4s) when blurred. EventSource can't send `Authorization` headers, so the SSE URL appends `?token=<JWT>` — the route is in `SELF_AUTHED_PREFIXES` so the global Bearer guard skips it; the SSE handler validates inline.
+- **Optimistic flip on Generate.** `queryClient.setQueryData` patches the cached article to `status='generating'` immediately so the form-→-streaming transition is instant.
+- **Hydration.** A single `useEffect` re-hydrates `contentDraft` from `article.content` whenever the server-side content changes, gated by a `userEditedContent` ref so an in-progress edit isn't clobbered. Auto-save of `content` only fires when `userEditedContent.current === true` — fixed the bug where streaming-→-ready transition was triggering a phantom PATCH that wiped the article to `""`.
+- **Brand-less empty state.** If user has zero brands, hard stop with "Add a brand first" CTA.
+- **Removed.** AI Detection Score box, "How to Improve Your Score" tips, Issues/Strengths grid, `analyzeContentMutation`, `rewriteContentMutation`, `handleRewriteContent`, `scoreBeforeImprove`, `humanScore` state, "Save Article" button, `saveArticleMutation`, `savedArticleId`, `handleSaveArticle`. The article is created on draft entry; ready transition is handled by the worker; manual saves are PATCHes through the auto-save hook.
+- **Form-level fixes.**
+  - Industry: `<Combobox>` (was scrolling Radix Select).
+  - Industry caption: "This is the industry the article targets — can differ from your brand's home industry." Per user note, brands intentionally write for adjacent verticals.
+  - Keywords: chip-input. First chip becomes working title until the user edits.
+  - Suggest: clicking a suggestion appends/removes a chip (toggle, consistent with chip-input semantics — used to inconsistently "replace" vs "append" depending on which UI element you came from).
+  - Targeting: "Pull from brand" link in the collapsible fills `targetCustomers` from `brand.targetAudience`.
+  - Generate disabled state covers all required-field gaps with an inline reason ("Pick a brand first.", "Add at least one keyword.", etc) instead of surprise toasts.
+  - Loading-message array no longer mentions humanization or AI-detection passes (which no longer happen).
+- **DraftToolbar.** Now renders status badges (Draft / Generating… / Failed / Done) driven by `article.status`. Trash icon now triggers a real `<AlertDialog>` confirmation — used to silently delete.
+
+#### Articles page ([client/src/pages/articles.tsx](client/src/pages/articles.tsx))
+
+- **Status filter** added: Ready (default) / Drafts & failures / Generating / Failed / All. Server query passes `status=`.
+- **Status badge per card** for non-ready rows.
+- **Brand chip on every card.** Multi-brand users could not previously tell which article belonged to which brand without filtering.
+- **Derived excerpt.** If `excerpt` is null, take the first non-heading paragraph, slice to 160 chars, suffix `…`. Cards are no longer near-empty under the title.
+- **`+N more` keyword overflow.** Visible chips capped at 5; overflow shows in a tooltip on hover.
+- **`Intl.NumberFormat` view counts** ("1,234" not "1234"). Date hover tooltip shows absolute date.
+- **Bulk delete.** Per-row checkbox + select-all in toolbar. AlertDialog confirms with count.
+- **Status-driven actions.** Ready → View/Edit + Distribute. Draft → Continue draft. Failed → Retry generation. Delete is universal, AlertDialog-confirmed.
+- **Empty states.** Search-clear button for "no matches"; status-aware empty states.
+- **Distribute dialog.** Extracted to its own file. Selected platforms persist across tab switches within the dialog.
+
+### 14.5 Bugs found and fixed during implementation
+
+Several rebuild-introduced bugs surfaced during user testing of the dev server. Each documented here so the failure modes don't recur:
+
+- **EventSource silently 401'd.** The SSE `Authorization: Bearer` header isn't sendable from the browser — only cookies. Auth is Bearer-only. Without a fix, the SSE connection just retried forever in the background while the UI showed nothing. Fix: `SELF_AUTHED_PREFIXES` allowlist in the global guard + `?token=` query param + inline JWT validation in the SSE handler.
+- **Status flip lag.** Route handler used to set only `jobId` and leave status as `draft`; the worker's claim was the actual flip. That left a 5-60s window where the form was visible after the user clicked Generate. Fix: route handler now sets `status='generating'` synchronously; worker's `setArticleGeneratingFromDraft` allows `draft|generating → generating` (idempotent).
+- **Cache staleness post-Generate.** Even after the synchronous flip, the client's cached article was stale. Fix: `setQueryData` optimistically patches `status` and `jobId` in the mutation's `onSuccess` before refetch returns.
+- **Stuck stream with zero buffer.** Observed in production: a job claimed, OpenAI returned a stream iterator, but no chunks ever flowed. The for-await loop blocked indefinitely. The OpenAI client's `timeout: 120_000` doesn't fire on a stalled (open but empty) stream. Fix: per-stream `AbortController` + a 1s watchdog that aborts on idle (60s without chunks) or total ceiling (5min). Boot recovery shortened from 15 to 5 min.
+- **Article wiped to title-only after streaming.** The most insidious one. The hydration `useEffect` was guarded by `hydratedForId.current === article.id` — fired once per id, never again. So when the article transitioned from `draft` (content=null) to `ready` (content=full text), `contentDraft` stayed at `""`. The MarkdownEditor rendered nothing under the title, and the content auto-save effect noticed the divergence and PATCH'd `content: ""` back to the server. Fix: split into a once-per-id form-field hydration and an always-run content re-hydration gated by a `userEditedContent` ref. Auto-save of `content` only fires after the user has actually typed.
+- **Article 404 → infinite spinner.** When `:articleId` pointed to a deleted or non-owned article, the query returned `success:false` but the page treated `article === null` as "still loading." Fix: query now throws on `!ok || !json.success`, and a `useEffect` on `articleQuery.isError` redirects to `/content` to re-bootstrap.
+
+### 14.6 Critical files
+
+| File                                                                                                             | Change                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| [migrations/0033_content_unification.sql](migrations/0033_content_unification.sql) (NEW)                         | Schema unification + backfill                                                                                                    |
+| [shared/schema.ts](shared/schema.ts)                                                                             | `articles.status/jobId/...`, `articleRevisions`, `contentGenerationJobs.streamBuffer/errorKind/refundedAt`, drop `contentDrafts` |
+| [shared/industries.ts](shared/industries.ts) (NEW)                                                               | Single source of truth for the industry list                                                                                     |
+| [server/contentGenerationWorker.ts](server/contentGenerationWorker.ts)                                           | Streaming, watchdog, cancel, error classification, refund hook                                                                   |
+| [server/lib/usageLimit.ts](server/lib/usageLimit.ts)                                                             | Added `refundArticleQuota`                                                                                                       |
+| [server/storage.ts](server/storage.ts) + [server/databaseStorage.ts](server/databaseStorage.ts)                  | Replaced ContentDraft DAOs with unified-article methods                                                                          |
+| [server/routes/content.ts](server/routes/content.ts)                                                             | Replaced; new generate/improve/stream/cancel endpoints                                                                           |
+| [server/routes/articles.ts](server/routes/articles.ts)                                                           | Added draft + revisions endpoints; brandId required; parallel distribute                                                         |
+| [server/auth.ts](server/auth.ts)                                                                                 | `SELF_AUTHED_PREFIXES` for SSE bypass                                                                                            |
+| [server/lib/agentTaskExecutor.ts](server/lib/agentTaskExecutor.ts)                                               | Updated for unified-article enqueue helper                                                                                       |
+| [server/scheduler.ts](server/scheduler.ts)                                                                       | Drop `deleteContentDraftsByBrandId` (FK cascade now handles it)                                                                  |
+| [server/routes/userAccount.ts](server/routes/userAccount.ts)                                                     | GDPR export drops `contentDrafts`                                                                                                |
+| [server/routes/publications.ts](server/routes/publications.ts)                                                   | Sitemap no longer emits article URLs                                                                                             |
+| [server/routes/geoSignals.ts](server/routes/geoSignals.ts)                                                       | Schema audit reads `externalUrl`, no slug fallback                                                                               |
+| [client/src/App.tsx](client/src/App.tsx)                                                                         | Add `/content/:articleId`; remove `/article/:slug` route + `ArticleView` import                                                  |
+| [client/src/pages/article-view.tsx]                                                                              | DELETED                                                                                                                          |
+| [client/src/pages/content.tsx](client/src/pages/content.tsx)                                                     | Full rewrite — route-driven, unified model, SSE+poll, no score, no Save button                                                   |
+| [client/src/pages/articles.tsx](client/src/pages/articles.tsx)                                                   | Status filters, badges, brand chips, derived excerpts, bulk delete                                                               |
+| [client/src/components/content/MarkdownEditor.tsx](client/src/components/content/MarkdownEditor.tsx) (NEW)       | Split-pane markdown editor                                                                                                       |
+| [client/src/components/content/KeywordChips.tsx](client/src/components/content/KeywordChips.tsx) (NEW)           | Chip-input                                                                                                                       |
+| [client/src/components/content/IndustryCombobox.tsx](client/src/components/content/IndustryCombobox.tsx) (NEW)   | cmdk combobox                                                                                                                    |
+| [client/src/components/content/BrandCombobox.tsx](client/src/components/content/BrandCombobox.tsx) (NEW)         | cmdk combobox                                                                                                                    |
+| [client/src/components/content/DraftToolbar.tsx](client/src/components/content/DraftToolbar.tsx)                 | Updated to render `Article` shape with status badges                                                                             |
+| [client/src/components/content/draftHelpers.ts](client/src/components/content/draftHelpers.ts)                   | Type renamed to `DraftableArticle = Article`; status-aware helpers                                                               |
+| [client/src/hooks/useArticleAutoSave.ts](client/src/hooks/useArticleAutoSave.ts) (NEW)                           | Single auto-save reducer                                                                                                         |
+| [client/src/lib/diff.ts](client/src/lib/diff.ts) (NEW)                                                           | Line-level LCS                                                                                                                   |
+| [client/src/components/articles/RevisionDiff.tsx](client/src/components/articles/RevisionDiff.tsx) (NEW)         | Diff viewer                                                                                                                      |
+| [client/src/components/articles/ViewEditDialog.tsx](client/src/components/articles/ViewEditDialog.tsx) (NEW)     | View/Edit/Versions dialog                                                                                                        |
+| [client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) (NEW) | Extracted from legacy articles.tsx                                                                                               |
+| [docs/content-flow.md](docs/content-flow.md) (NEW)                                                               | Lifecycle + streaming + refund classification reference                                                                          |
+
+### 14.7 Pass criteria
+
+- [x] `npx tsc --noEmit` clean across server + client + shared.
+- [x] `npx vitest run` — 159/159 still pass (no test regressions; no new tests in this wave).
+- [x] `npm run lint` — 0 errors (warnings all pre-existing).
+- [x] Migration 0033 applies cleanly on a fresh DB and on an environment that already had `content_drafts` rows.
+- [x] Click `/content` → bootstraps to a draft article id; click Generate → streams tokens live in the preview.
+- [x] Cancel mid-stream → article returns to `draft`, quota counter went up by 1 then back down by 1.
+- [x] OpenAI rate-limit / 5xx mid-job → article goes to `failed` with classified message; quota refunded.
+- [x] Stream stalls with no chunks → 60s watchdog aborts → classified as `timeout` → quota refunded.
+- [x] After streaming completes → editor view loads with full content (not title-only). Manual edits auto-save with version-conflict detection.
+- [x] Auto-Improve creates a revision, shows a diff, never forks a duplicate article.
+- [x] Restore an old revision → current content overwritten, a new `manual_edit` revision logs the restore.
+- [x] `GET /article/anything` → NotFound. `GET /api/articles/slug/anything` → NotFound. Sitemap contains no article URLs.
+
+### 14.8 Open items after Wave 7
+
+- **Soft delete on articles.** Wave 7 leaves `DELETE /api/articles/:id` as a hard delete (FK cascade purges revisions + distributions + geo_rankings). Plan called for soft delete; deferred because `articles` doesn't have a `deleted_at` column yet and adding one is its own wave (need to update every list query to filter, every count to exclude). Tracked.
+- **Citation/ranking surface on Articles list.** Per user decision, deferred to a separate epic. The DAO + server-side join is straightforward; the UI question (where the badge goes, whether sort-by-citations belongs in this view) is the real work.
+- **Drop `human_score` and `passes_ai_detection` columns.** Kept through Wave 7 so the migration is reversible. Once we're confident no code reads them, a follow-up migration can drop both. Currently dead in the UI.
+- **`MAX_CONTENT_LENGTH` not enforced on generate.** The new generate endpoint accepts any keyword length and any prompt size; only `/api/articles/:id/improve` checks `MAX_CONTENT_LENGTH`. Generate-side cap should be added when we wire word-count overrides.
+- **Custom length per content type.** Plan called for an optional `customLengthWords` numeric override. Not implemented in this pass — the worker still uses the four hardcoded word bands. Cheap to add when the UX is ready.
+- **Real AI-detection.** Removed the LLM-graded score entirely. If we ever want a real one, GPTZero / Originality.ai / Copyleaks would be the path. Out of scope for this wave.
+- **Streaming via the circuit breaker.** The streaming OpenAI call doesn't go through `openaiBreaker.run()` (the wrapper doesn't expose async iterators). Mild safety regression — accepted because a streaming call takes longer than the breaker's window anyway.

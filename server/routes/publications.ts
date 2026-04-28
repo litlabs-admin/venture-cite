@@ -128,31 +128,16 @@ Sitemap: ${baseUrl}/sitemap.xml`;
     res.send(robotsTxt);
   });
 
-  // Sitemap.xml — public pages + every published article permalink. Crawled
-  // by Google, Bing, and AI engines that respect the spec. Kept deliberately
-  // small (public-only): authenticated routes are robots-disallowed above,
-  // so listing them here would just be noise.
+  // Sitemap.xml — public pages only. Articles are no longer published on
+  // VentureCite-owned URLs (slug column was dropped in Wave 7). Users link
+  // to their own externally-hosted articles via `articles.externalUrl`,
+  // which is not our concern to advertise.
   app.get("/sitemap.xml", async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const now = new Date().toISOString();
 
     const staticPaths = ["/", "/pricing", "/privacy"];
-
-    let articleEntries = "";
-    try {
-      const articles = await storage.getArticles({ limit: 5000 });
-      articleEntries = articles
-        .map((a) => {
-          const lastmod = new Date(a.updatedAt ?? a.createdAt ?? now).toISOString();
-          const loc = `${baseUrl}/article/${encodeURIComponent(a.slug)}`;
-          return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`;
-        })
-        .join("\n");
-    } catch {
-      // Sitemap generation must never break if a single article row is bad
-      // — serve what we can (static pages) rather than 500'ing Googlebot.
-      articleEntries = "";
-    }
+    const articleEntries = "";
 
     const staticEntries = staticPaths
       .map((p) => `  <url>\n    <loc>${baseUrl}${p}</loc>\n    <lastmod>${now}</lastmod>\n  </url>`)

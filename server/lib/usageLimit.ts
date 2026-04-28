@@ -105,6 +105,70 @@ export async function withArticleQuota<T>(
   });
 }
 
+// Wave 7: refund an article quota slot when a generation job ends in a
+// transient failure (OpenAI 429/5xx, circuit open, timeout, or user-cancel)
+// so users aren't billed for infrastructure problems they can't fix.
+//
+// Idempotent: gated on `content_generation_jobs.refunded_at IS NULL`. The
+// caller passes the classified errorKind; the helper itself only refunds for
+// kinds we judge "infra error or user-cancel". 'budget' and 'invalid_input'
+// are *not* refunded — those are real terminal failures the user caused.
+const REFUNDABLE_ERROR_KINDS = new Set([
+  "openai_429",
+  "openai_5xx",
+  "circuit",
+  "timeout",
+  "cancelled",
+]);
+
+export type ErrorKind =
+  | "budget"
+  | "circuit"
+  | "openai_5xx"
+  | "openai_429"
+  | "timeout"
+  | "invalid_input"
+  | "cancelled"
+  | "unknown";
+
+export function isRefundableErrorKind(kind: string | null | undefined): boolean {
+  return kind !== null && kind !== undefined && REFUNDABLE_ERROR_KINDS.has(kind);
+}
+
+export async function refundArticleQuota(
+  userId: string,
+  jobId: string,
+  errorKind: ErrorKind,
+): Promise<{ refunded: boolean }> {
+  if (!isRefundableErrorKind(errorKind)) return { refunded: false };
+  return await db.transaction(async (tx) => {
+    // Lock both the user row (for the counter) and the job row (for the
+    // refund flag). Same ordering as withArticleQuota so we can't deadlock.
+    await tx.execute(sql`select id from public.users where id = ${userId} for update`);
+    const job = firstRow<{ id: string; refunded_at: Date | null }>(
+      await tx.execute(sql`
+        select id, refunded_at
+        from public.content_generation_jobs
+        where id = ${jobId}
+        for update
+      `),
+    );
+    if (!job) return { refunded: false };
+    if (job.refunded_at) return { refunded: false }; // idempotent
+    await tx.execute(sql`
+      update public.users
+      set articles_used_this_month = greatest(articles_used_this_month - 1, 0)
+      where id = ${userId}
+    `);
+    await tx.execute(sql`
+      update public.content_generation_jobs
+      set refunded_at = now()
+      where id = ${jobId}
+    `);
+    return { refunded: true };
+  });
+}
+
 // Brand quota — counts rows in public.brands rather than reading a
 // per-user counter (the existing brands_used column drifts because of
 // soft deletes and FK cascades). Same FOR UPDATE row-lock pattern.

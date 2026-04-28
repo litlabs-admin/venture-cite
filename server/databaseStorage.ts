@@ -88,8 +88,8 @@ import {
   type InsertCommunityPost,
   type CitationRun,
   type InsertCitationRun,
-  type ContentDraft,
-  type InsertContentDraft,
+  type ArticleRevision,
+  type InsertArticleRevision,
 } from "@shared/schema";
 
 export class DatabaseStorage implements IStorage {
@@ -327,12 +327,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createArticle(insertArticle: InsertArticle): Promise<Article> {
-    const slug = insertArticle.slug || this.generateSlug(insertArticle.title);
     const result = await db
       .insert(schema.articles)
       .values({
         ...insertArticle,
-        slug,
         author: insertArticle.author ?? "GEO Platform",
         viewCount: 0,
         citationCount: 0,
@@ -371,11 +369,6 @@ export class DatabaseStorage implements IStorage {
 
   async getArticleById(id: string): Promise<Article | undefined> {
     const result = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
-    return result[0];
-  }
-
-  async getArticleBySlug(slug: string): Promise<Article | undefined> {
-    const result = await db.select().from(schema.articles).where(eq(schema.articles.slug, slug));
     return result[0];
   }
 
@@ -441,13 +434,6 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(schema.analytics.id, analyticsRows[0].id));
     }
-  }
-
-  private generateSlug(title: string): string {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
   }
 
   async createDistribution(insertDistribution: InsertDistribution): Promise<Distribution> {
@@ -796,13 +782,19 @@ export class DatabaseStorage implements IStorage {
 
   // Crash recovery — flip `running` jobs older than N minutes back to
   // `failed`. Called once on server boot so we don't have orphaned rows.
-  async failStuckContentJobs(olderThanMinutes: number): Promise<number> {
+  // Wave 7: also classifies the failure as 'timeout' (which the refund
+  // helper considers refundable) and returns the affected jobs so the
+  // caller can issue refunds + flip the linked article back to draft.
+  async failStuckContentJobs(
+    olderThanMinutes: number,
+  ): Promise<Array<{ id: string; userId: string; articleId: string | null }>> {
     const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000);
     const result = await db
       .update(schema.contentGenerationJobs)
       .set({
         status: "failed",
         errorMessage: "Job was interrupted (server restart or crash).",
+        errorKind: "timeout",
         completedAt: new Date(),
       })
       .where(
@@ -811,8 +803,12 @@ export class DatabaseStorage implements IStorage {
           sql`${schema.contentGenerationJobs.startedAt} < ${cutoff}`,
         ),
       )
-      .returning({ id: schema.contentGenerationJobs.id });
-    return result.length;
+      .returning({
+        id: schema.contentGenerationJobs.id,
+        userId: schema.contentGenerationJobs.userId,
+        articleId: schema.contentGenerationJobs.articleId,
+      });
+    return result;
   }
 
   async createCommerceSession(insertSession: InsertCommerceSession): Promise<CommerceSession> {
@@ -3819,78 +3815,167 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // ── Content Draft methods ──────────────────────────────────────────────────
+  // ── Wave 7: unified-article methods (replaces the old content_drafts DAO) ──
 
-  async createContentDraft(
+  async createDraftArticle(
     userId: string,
-    data: Partial<InsertContentDraft>,
-  ): Promise<ContentDraft> {
+    brandId: string,
+    fields: {
+      title?: string | null;
+      keywords?: string[] | null;
+      industry?: string | null;
+      contentType?: string | null;
+      targetCustomers?: string | null;
+      geography?: string | null;
+      contentStyle?: string | null;
+    },
+  ): Promise<Article> {
+    // Verify the brand belongs to the user before creating an article under it.
+    const ownsBrand = await db
+      .select({ id: schema.brands.id })
+      .from(schema.brands)
+      .where(
+        and(
+          eq(schema.brands.id, brandId),
+          eq(schema.brands.userId, userId),
+          isNull(schema.brands.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (ownsBrand.length === 0) {
+      throw new Error("Brand not found or not owned by user");
+    }
     const result = await db
-      .insert(schema.contentDrafts)
+      .insert(schema.articles)
       .values({
-        userId,
-        keywords: data.keywords ?? "",
-        industry: data.industry ?? "",
-        type: data.type ?? "article",
-        brandId: data.brandId ?? null,
-        targetCustomers: data.targetCustomers ?? null,
-        geography: data.geography ?? null,
-        contentStyle: data.contentStyle ?? "b2c",
-        title: data.title ?? null,
-        generatedContent: data.generatedContent ?? null,
-        articleId: data.articleId ?? null,
-        jobId: data.jobId ?? null,
-        humanScore: data.humanScore ?? null,
-        passesAiDetection: data.passesAiDetection ?? null,
+        brandId,
+        title: fields.title ?? null,
+        content: null,
+        keywords: fields.keywords ?? null,
+        industry: fields.industry ?? null,
+        contentType: fields.contentType ?? null,
+        targetCustomers: fields.targetCustomers ?? null,
+        geography: fields.geography ?? null,
+        contentStyle: fields.contentStyle ?? "b2c",
+        status: "draft",
+        author: "GEO Platform",
       })
       .returning();
     return result[0];
   }
 
-  async getContentDraftsByUserId(userId: string): Promise<ContentDraft[]> {
+  async getArticlesByUserIdWithStatus(
+    userId: string,
+    opts: { status?: string | string[]; brandId?: string; limit?: number; offset?: number },
+  ): Promise<Article[]> {
+    const limit = opts.limit ?? 100;
+    const offset = opts.offset ?? 0;
+    const conds = [eq(schema.brands.userId, userId), isNull(schema.brands.deletedAt)];
+    if (opts.brandId) conds.push(eq(schema.articles.brandId, opts.brandId));
+    if (opts.status) {
+      if (Array.isArray(opts.status)) {
+        conds.push(inArray(schema.articles.status, opts.status));
+      } else {
+        conds.push(eq(schema.articles.status, opts.status));
+      }
+    }
+    const result = await db
+      .select({ articles: schema.articles })
+      .from(schema.articles)
+      .innerJoin(schema.brands, eq(schema.articles.brandId, schema.brands.id))
+      .where(and(...conds))
+      .orderBy(desc(schema.articles.updatedAt))
+      .limit(limit)
+      .offset(offset);
+    return result.map((r) => r.articles);
+  }
+
+  async getArticleByJobId(jobId: string): Promise<Article | undefined> {
+    const result = await db
+      .select()
+      .from(schema.articles)
+      .where(eq(schema.articles.jobId, jobId))
+      .limit(1);
+    return result[0];
+  }
+
+  async setArticleGeneratingFromDraft(articleId: string, jobId: string): Promise<void> {
+    // Flip draft|generating → generating. The route handler already does
+    // this synchronously so the UI flips on click; this call is the worker
+    // re-asserting the state when it claims the job (idempotent).
+    await db
+      .update(schema.articles)
+      .set({
+        status: "generating",
+        jobId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.articles.id, articleId),
+          inArray(schema.articles.status, ["draft", "generating"]),
+        ),
+      );
+  }
+
+  async setArticleReady(articleId: string, content: string, title: string | null): Promise<void> {
+    await db
+      .update(schema.articles)
+      .set({
+        status: "ready",
+        content,
+        title: title ?? sql`${schema.articles.title}`, // keep existing title if caller passes null
+        jobId: null,
+        version: sql`${schema.articles.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.articles.id, articleId));
+  }
+
+  async setArticleFailed(articleId: string): Promise<void> {
+    await db
+      .update(schema.articles)
+      .set({ status: "failed", jobId: null, updatedAt: new Date() })
+      .where(eq(schema.articles.id, articleId));
+  }
+
+  async setArticleDraft(articleId: string): Promise<void> {
+    await db
+      .update(schema.articles)
+      .set({ status: "draft", jobId: null, updatedAt: new Date() })
+      .where(eq(schema.articles.id, articleId));
+  }
+
+  async appendStreamBuffer(jobId: string, delta: string): Promise<void> {
+    // Atomic concat — multiple worker writes never trample each other.
+    await db
+      .update(schema.contentGenerationJobs)
+      .set({
+        streamBuffer: sql`COALESCE(${schema.contentGenerationJobs.streamBuffer}, '') || ${delta}`,
+      })
+      .where(eq(schema.contentGenerationJobs.id, jobId));
+  }
+
+  async createRevision(input: InsertArticleRevision): Promise<ArticleRevision> {
+    const result = await db.insert(schema.articleRevisions).values(input).returning();
+    return result[0];
+  }
+
+  async listRevisions(articleId: string, limit: number = 50): Promise<ArticleRevision[]> {
     return db
       .select()
-      .from(schema.contentDrafts)
-      .where(eq(schema.contentDrafts.userId, userId))
-      .orderBy(desc(schema.contentDrafts.updatedAt));
+      .from(schema.articleRevisions)
+      .where(eq(schema.articleRevisions.articleId, articleId))
+      .orderBy(desc(schema.articleRevisions.createdAt))
+      .limit(limit);
   }
 
-  async getContentDraftById(id: string, userId: string): Promise<ContentDraft | null> {
+  async getRevisionById(revisionId: string): Promise<ArticleRevision | undefined> {
     const result = await db
       .select()
-      .from(schema.contentDrafts)
-      .where(and(eq(schema.contentDrafts.id, id), eq(schema.contentDrafts.userId, userId)));
-    return result[0] ?? null;
-  }
-
-  async getContentDraftByJobId(jobId: string, userId: string): Promise<ContentDraft | null> {
-    const result = await db
-      .select()
-      .from(schema.contentDrafts)
-      .where(and(eq(schema.contentDrafts.jobId, jobId), eq(schema.contentDrafts.userId, userId)));
-    return result[0] ?? null;
-  }
-
-  async updateContentDraft(
-    id: string,
-    userId: string,
-    data: Partial<InsertContentDraft>,
-  ): Promise<ContentDraft | null> {
-    const result = await db
-      .update(schema.contentDrafts)
-      .set({ ...data, updatedAt: new Date() })
-      .where(and(eq(schema.contentDrafts.id, id), eq(schema.contentDrafts.userId, userId)))
-      .returning();
-    return result[0] ?? null;
-  }
-
-  async deleteContentDraft(id: string, userId: string): Promise<void> {
-    await db
-      .delete(schema.contentDrafts)
-      .where(and(eq(schema.contentDrafts.id, id), eq(schema.contentDrafts.userId, userId)));
-  }
-
-  async deleteContentDraftsByBrandId(brandId: string): Promise<void> {
-    await db.delete(schema.contentDrafts).where(eq(schema.contentDrafts.brandId, brandId));
+      .from(schema.articleRevisions)
+      .where(eq(schema.articleRevisions.id, revisionId))
+      .limit(1);
+    return result[0];
   }
 }

@@ -778,12 +778,13 @@ ${brand ? `Brand context: ${brand.name}, Industry: ${brand.industry}` : ""}`,
       if (!brand) {
         return res.status(404).json({ success: false, error: "Article not found" });
       }
-      if (!brand.website) {
+      // Wave 7: articles no longer have a slug. Use the user-supplied
+      // externalUrl (the article's URL on their own site) as the source
+      // of truth. If unset, schema audit isn't possible — return null.
+      if (!article.externalUrl) {
         return res.json({ success: true, data: { completeness: null } });
       }
-      const url = normaliseUrl(
-        `${brand.website.replace(/\/$/, "")}/${article.slug.replace(/^\//, "")}`,
-      );
+      const url = normaliseUrl(article.externalUrl);
       const hash = urlHashOf(url);
       const cached = (
         await db.select().from(schemaAudits).where(eq(schemaAudits.urlHash, hash)).limit(1)
