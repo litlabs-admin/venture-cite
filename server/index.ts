@@ -101,16 +101,21 @@ function expandApexAndWww(origin: string): string[] {
   try {
     const u = new URL(origin);
     const host = u.hostname;
-    const out = new Set<string>([origin]);
+    // Browser Origin headers never include a path or trailing slash. Build
+    // canonical form `${protocol}//${host}[:${port}]` so a trailing slash in
+    // APP_URL doesn't silently break the allowlist match.
+    const port = u.port ? `:${u.port}` : "";
+    const canonical = `${u.protocol}//${host}${port}`;
+    const out = new Set<string>([canonical]);
     if (host.startsWith("www.")) {
-      out.add(`${u.protocol}//${host.slice(4)}${u.port ? `:${u.port}` : ""}`);
+      out.add(`${u.protocol}//${host.slice(4)}${port}`);
     } else if (!host.includes(".") || host.split(".").length === 2) {
       // Bare apex like `venturecite.com` — also accept `www.venturecite.com`.
-      out.add(`${u.protocol}//www.${host}${u.port ? `:${u.port}` : ""}`);
+      out.add(`${u.protocol}//www.${host}${port}`);
     }
     return Array.from(out);
   } catch {
-    return [origin];
+    return [origin.replace(/\/+$/, "")];
   }
 }
 
