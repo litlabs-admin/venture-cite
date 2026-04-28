@@ -131,19 +131,32 @@ const allowedOrigins = Array.from(
   ),
 );
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS: origin ${origin} not allowed`));
-      }
-    },
-    // Bearer tokens in Authorization header don't need credentialed CORS.
-    credentials: false,
-  }),
-);
+// Log the resolved CORS allowlist on boot so misconfiguration is visible
+// immediately instead of buried in 500 logs after the first request.
+log(`CORS allowlist: ${allowedOrigins.join(", ") || "(none)"}`);
+
+const corsMiddleware = cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
+  // Bearer tokens in Authorization header don't need credentialed CORS.
+  credentials: false,
+});
+
+// Only run CORS on /api/* requests. Static assets (HTML, JS, CSS, fonts)
+// are served same-origin from this same server — they don't need CORS,
+// and Vite's `crossorigin` script tags would otherwise trigger a CORS
+// rejection on a same-origin request that happens to include an Origin
+// header. Limiting CORS to the API surface fixes the spurious 500s on
+// /assets/* without weakening the API's origin gate.
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) return corsMiddleware(req, res, next);
+  return next();
+});
 
 // Stripe webhook — must be registered before express.json() to receive raw body
 app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
