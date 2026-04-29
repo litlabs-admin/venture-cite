@@ -153,20 +153,39 @@ export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: num
 // Per-brand auto-citation: runs daily at 6 AM UTC, checks each brand's
 // individual schedule (off/weekly/biweekly/monthly) and preferred day.
 // Re-runs the locked tracked-prompt set and refreshes suggestions.
-const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 6 * * *"; // daily check
+// Wave 9.2: hourly cron so the per-brand auto_citation_hour gate can
+// actually fire. The legacy "0 6 * * *" schedule combined with the
+// hour gate (`currentHour >= autoCitationHour`) caused any brand with
+// auto_citation_hour ≥ 7 to be silently skipped forever — the cron
+// only ran once a day at 06:00 UTC, which always failed the gate.
+// Env override preserved so anyone running a custom cron keeps it.
+const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 * * * *"; // hourly check
 
 function isBrandDueForCitation(brand: {
   autoCitationSchedule: string;
   autoCitationDay: number;
+  autoCitationHour?: number;
+  autoCitationActive?: boolean;
   lastAutoCitationAt: Date | null;
 }): boolean {
   if (brand.autoCitationSchedule === "off") return false;
+  // Wave 9: pause without losing the day/hour. autoCitationActive defaults
+  // to true, so existing brands continue to behave as before.
+  if (brand.autoCitationActive === false) return false;
 
   const now = new Date();
   const todayDow = now.getUTCDay(); // 0=Sun ... 6=Sat
+  const currentHour = now.getUTCHours();
 
   // Only run on the user's chosen day of week
   if (todayDow !== brand.autoCitationDay) return false;
+  // Wave 9: only fire once the chosen hour has been reached. The cron is
+  // hourly-granular (default 0 6 * * *) so without this gate every brand
+  // would fire at the cron hour regardless of the user's hour pick.
+  // brand.autoCitationHour defaults to 9 from migration 0037, but be
+  // defensive for pre-migration rows / tests.
+  const targetHour = brand.autoCitationHour ?? 9;
+  if (currentHour < targetHour) return false;
 
   if (!brand.lastAutoCitationAt) return true; // never run before
 
@@ -212,7 +231,7 @@ async function runAutoCitationJob(): Promise<void> {
       }
 
       // Step 1: Re-check citations on the locked tracked set.
-      await runBrandPrompts(brand.id, undefined, { triggeredBy: "cron" });
+      const runResult = await runBrandPrompts(brand.id, undefined, { triggeredBy: "cron" });
 
       // Step 2: Refresh suggestions for the user to review.
       const suggestionResult = await generateSuggestedPrompts(brand.id, { replaceExisting: true });
@@ -223,15 +242,34 @@ async function runAutoCitationJob(): Promise<void> {
         );
       }
 
-      // Step 3: Update lastAutoCitationAt
+      // Step 3: Wave 9 — update lastAutoCitationAt + status so ScheduleTab
+      // can render "Last run 3d ago — succeeded" vs "failed". Pre-Wave-9
+      // schema columns (lastAutoCitationStatus) are nullable so this is
+      // safe on rolling deploys before the migration applies.
       await db
         .update(schema.brands)
-        .set({ lastAutoCitationAt: new Date() })
+        .set({
+          lastAutoCitationAt: new Date(),
+          lastAutoCitationStatus: runResult.totalChecks > 0 ? "succeeded" : "failed",
+        })
         .where(eq(schema.brands.id, brand.id));
 
       ranCount += 1;
       logger.info({ brandId: brand.id, name: brand.name }, "auto-citation done for brand");
     } catch (err) {
+      // Wave 9: persist the failure so the UI surfaces it instead of just
+      // showing the prior succeeded timestamp.
+      try {
+        await db
+          .update(schema.brands)
+          .set({
+            lastAutoCitationAt: new Date(),
+            lastAutoCitationStatus: "failed",
+          })
+          .where(eq(schema.brands.id, brand.id));
+      } catch {
+        // ignore — Sentry capture below covers operational visibility.
+      }
       logger.error({ err, brandId: brand.id }, "auto-citation failed for brand");
       Sentry.captureException(err, {
         tags: { source: "scheduler.auto-citation" },

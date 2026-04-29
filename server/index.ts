@@ -453,6 +453,13 @@ async function applyMigrations() {
   // Apply idempotent SQL migrations (triggers, RLS) before anything else.
   await applyMigrations();
 
+  // Wave 9: mark stale citation_runs rows as failed before any HTTP traffic
+  // arrives. A crash mid-run otherwise pins status='running' forever, which
+  // (a) keeps every dependent page polling and (b) blocks new runs via the
+  // partial unique index from migration 0035.
+  const { reconcileOrphanCitationRuns } = await import("./lib/citationReconciliation");
+  await reconcileOrphanCitationRuns();
+
   // Initialise Stripe products on startup (idempotent — skips existing)
   if (process.env.STRIPE_SECRET_KEY) {
     setupStripeProducts().catch((err) => {

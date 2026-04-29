@@ -1066,3 +1066,490 @@ Several rebuild-introduced bugs surfaced during user testing of the dev server. 
 - **Custom length per content type.** Plan called for an optional `customLengthWords` numeric override. Not implemented in this pass — the worker still uses the four hardcoded word bands. Cheap to add when the UX is ready.
 - **Real AI-detection.** Removed the LLM-graded score entirely. If we ever want a real one, GPTZero / Originality.ai / Copyleaks would be the path. Out of scope for this wave.
 - **Streaming via the circuit breaker.** The streaming OpenAI call doesn't go through `openaiBreaker.run()` (the wrapper doesn't expose async iterators). Mild safety regression — accepted because a streaming call takes longer than the breaker's window anyway.
+
+### 14.9 Production CORS + APP_URL fixes (Render deploy)
+
+After the Wave 7 push went live the production logs surfaced two CORS-shaped failures that needed follow-up fixes:
+
+#### Static assets blocked by CORS
+
+Symptom: every page load 500'd on `/assets/index-*.js` and `/assets/index-*.css` with `CORS: origin https://www.venturecite.com not allowed`. The page is served from the same origin — CORS shouldn't even apply.
+
+Cause: Vite emits `<script crossorigin>` and `<link crossorigin>` on its module-preload tags. With `crossorigin` set, the browser sends an `Origin` header even on same-origin asset requests, which made our global CORS middleware run and reject. The request was technically same-origin but the `Origin` header was unfamiliar to the API allowlist.
+
+Fix in [server/index.ts](server/index.ts): scoped the CORS middleware to `/api/*` requests only. Static assets bypass it entirely. Same-origin asset loads no longer trip the allowlist:
+
+```ts
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) return corsMiddleware(req, res, next);
+  return next();
+});
+```
+
+#### APP_URL trailing slash silently breaking the allowlist
+
+Symptom: even after fixing static assets and adding `APP_URL=https://www.venturecite.com/` in Render, `POST /api/auth/login` still 500'd with `CORS: origin https://www.venturecite.com not allowed`.
+
+Cause: the env var had a trailing slash (`https://www.venturecite.com/`). The boot-time CORS allowlist log showed `https://www.venturecite.com/` literally. The browser's `Origin` header is `https://www.venturecite.com` (no slash). String comparison fails.
+
+Two-part fix:
+
+1. **Operator fix:** dropped the trailing slash from `APP_URL` in Render's env vars.
+2. **Code fix in [server/index.ts](server/index.ts):** `expandApexAndWww` now reconstructs a canonical `${protocol}//${host}[:${port}]` form (no path, no trailing slash) before adding to the allowlist. A trailing slash in `APP_URL` or `EXTRA_CORS_ORIGINS` is now stripped automatically:
+
+```ts
+const port = u.port ? `:${u.port}` : "";
+const canonical = `${u.protocol}//${host}${port}`;
+const out = new Set<string>([canonical]);
+```
+
+Also added a boot-time log line so the resolved allowlist is visible immediately on startup instead of buried inside 500 responses:
+
+```
+[express] CORS allowlist: https://www.venturecite.com, https://venturecite.com, http://localhost:5000, http://127.0.0.1:5000
+```
+
+#### APP_URL fallback to RENDER_EXTERNAL_URL
+
+While debugging CORS we also relaxed `APP_URL` from required to optional in [server/env.ts](server/env.ts). Resolution order is now:
+
+1. `APP_URL` if set (highest priority — required when you have a custom domain like `https://venturecite.com` because Render's auto URL is the wrong host for emails).
+2. `RENDER_EXTERNAL_URL` (Render auto-injects this; points at the `*.onrender.com` URL).
+3. `http://localhost:5000` in dev.
+4. Hard fail in production if none of the above resolve.
+
+Ship-fresh Render deploys without a custom domain now boot without manual env config — `RENDER_EXTERNAL_URL` covers email links, Stripe redirects, and CORS. Custom-domain deploys still require `APP_URL` to be set explicitly so emails don't link to the `*.onrender.com` URL.
+
+#### CORS apex/www auto-expansion
+
+Added in [server/index.ts](server/index.ts): every entry in the CORS allowlist auto-expands to cover both the bare-apex and `www.` form. If `APP_URL=https://venturecite.com`, the allowlist also accepts `https://www.venturecite.com`, and vice-versa. DNS pointing both names at the same service no longer requires a code change to add the alternate. New `EXTRA_CORS_ORIGINS` env var (comma-separated) for staging/preview deploys; each entry is also auto-expanded.
+
+#### Slug column 500s on the deployed-but-not-pushed window
+
+Symptom: production was throwing `column "slug" does not exist` for every `getArticles()` call.
+
+Cause: migration 0033 had been applied to the production DB (dropping the slug column), but the deployed code bundle was still pre-Wave-7 (`fd16ce8`) and Drizzle's compiled SELECT still listed `slug`. Database and code were out of sync because Wave 7 hadn't been pushed yet.
+
+Fix: pushed the Wave 7 commit. Once Render rebuilt the bundle from the new shared/schema.ts, the SELECT no longer requested a non-existent column. No code change needed beyond the original Wave 7 work — this was a deploy-ordering artifact, documented here so the failure pattern is recognizable next time a schema migration races a code push.
+
+---
+
+## 15. Wave 8 — Analytics correctness v2 + crawler refresh + Opportunities / GEO Tools / GEO Signals fixes
+
+### 15.0 Why this wave existed
+
+After Wave 5 / 6 shipped the analytics scaffolding, a live QA walkthrough surfaced a second layer of failures:
+
+1. Sentiment was never populated during citation runs — geo-analytics rendered 0/0/0 forever.
+2. Competitor leaderboard summed brand citations only from `articles`, missing the `brand_prompts` path that holds most real citations. Brands with 29 cited rankings showed 0% share-of-voice.
+3. Share-of-Answer "By Prompt Category" bucketed by AI platform (DeepSeek, Gemini…) instead of intent (informational, transactional…) — the Phase-1 fallback author took a shortcut.
+4. By Funnel / Competitor Comparison / Answer Stability / Tracked Prompts read from a deprecated `prompt_portfolio` table nothing in the active pipeline writes to.
+5. Citation Quality "Breakdown" card read `citation_quality` directly with no Phase-1 fallback.
+6. Source Types showed 1 because `citingOutletUrl` was rarely populated.
+7. Hallucinations "Mark as resolved" fired the DB update but the list never refreshed (query-key mismatch between list and invalidation).
+
+On top of that, the user wanted the counting pipeline collapsed: one merged LLM analysis call per response (extract + judge), down from N+1 per-entity judge calls + a separate auto-discovery pass.
+
+The wave also covered: a crawler-check bot-list refresh + parser bug, the Opportunities empty state, four GEO Tools gaps (Wikipedia persistence, BOFU clarity, Mentions scan trigger, FAQ optimised toggle), and four GEO Signals gaps (Chunk Engineer apply-to-article, Schema Lab real fetch, Schedule Update wiring, no-articles empty state).
+
+### 15.1 Merged extract+judge analyzer
+
+[server/lib/responseAnalyzer.ts](server/lib/responseAnalyzer.ts) (new) — single function `analyzeResponse({responseText, trackedEntities})`. One gpt-4o-mini call returns `{brands: {name: {variants, cited, rank, relevance, context, citedUrls}}}` for every brand it detected, tracked or not. Validated with Zod (≤25 brands, ≤5 variants, ≤3 URLs). `parseLLMJson` for tolerant JSON parsing. `deriveSentiment(relevance, cited)` helper exported alongside.
+
+[server/citationChecker.ts](server/citationChecker.ts) — `runPlatformCitationCheck` accepts `opts.skipJudge` so the per-response brand judge call is skipped. The main `runOne` task now:
+
+1. Fetches the platform response (no internal judge).
+2. Calls `analyzeResponse` once with brand + every competitor as `trackedEntities`.
+3. Reads `analysis.tracked[brand.id]` for brand verdict; loops competitors using `analysis.tracked[comp.id]`.
+4. Auto-discovers brands from `analysis.untracked[]` (cap 10/run/platform).
+5. Writes `geo_rankings` (always) + `competitor_geo_rankings` (cited only) + `brand_mentions` rows.
+
+Call-count math for a 30-prompt × 5-platform × 15-competitor run: ~2,250 judge calls → ~150 analyzer calls. ~80% reduction in LLM spend.
+
+Sentiment is now derived from analyzer relevance (`>=70 positive, 40-69 neutral, <40 negative, null when not cited`) and persisted to both `geo_rankings.sentiment` and `competitor_geo_rankings.sentiment`. Migration `0028_competitor_sentiment.sql` adds the column.
+
+Auto-discovered competitors carry `discoveredBy='citation_auto'`. UI badge added at [client/src/pages/competitors.tsx](client/src/pages/competitors.tsx) (`Auto` label) so users can review and demote them.
+
+Entity matching in the analyzer was hardening-pass strengthened: `stripSuffixes` strips legal suffixes (`Inc`, `LLC`, `Labs`, `Technologies`, etc.) on both sides of the index — so "Notion Labs, Inc." matches "Notion" and vice versa. Without this fix, real brands with formal names never matched analyzer output and the competitor pipeline produced zero rows.
+
+### 15.2 Brand citations unified across articles + brand_prompts
+
+[server/databaseStorage.ts](server/databaseStorage.ts) `getCompetitorLeaderboard` rewrote the brand-row builder to OR brand-articles AND brand-prompt rankings in a single window-scoped query, deduped by ranking id. The geo-analytics page already did this correctly — the bug was leaderboard-only.
+
+The leaderboard endpoint now returns `meta: {totalTracked, withActivity}`. UI renders "15 tracked · 14 with activity in last 30d" instead of one number that disagreed with the competitors page count.
+
+### 15.3 Share-of-Answer rebuild
+
+[server/databaseStorage.ts](server/databaseStorage.ts) `getShareOfAnswerStats`:
+
+- Queries `prompt_portfolio` directly (NOT through `getPromptPortfolio`, which now synthesizes Phase-1 rows for the Tracked Prompts tab and was masking the Phase-1 stats branch).
+- When the Phase-2 table is empty (the common case): bucket `byCategory` by `brand_prompts.category`, `byFunnel` by `funnelStage` (with category-derived fallback: informational → awareness, comparison → consideration, transactional → decision).
+- `byCompetitor` joins `competitor_geo_rankings` filtered to `isCited=1`. Denominator is the brand's total checks in the window — previously every competitor showed 100% shareAgainst because total/cited counted the same rows.
+- `avgVolatility` / `volatilityDistribution` per **(brand_prompt, ai_platform) pair** across runs, not per brand_prompt alone — previous grouping mixed platforms together and inflated apparent flips. Pairs with <2 runs are skipped (no history yet).
+
+`citedPrompts` semantic fix: was `rankings.filter(isCited===1).length` (raw rows, inflated by platforms × runs). Now: `new Set(rankings.filter(...).map(r.brandPromptId)).size` — distinct prompts cited at least once. Separate `citationRate = citedChecks / totalChecks` keeps the per-check rate.
+
+`getPromptPortfolio` synthesizes Phase-1 rows from `brand_prompts × geo_rankings` when the real table is empty so the Tracked Prompts list isn't blank for new brands.
+
+### 15.4 Citation Quality Phase-1 fallback
+
+[server/databaseStorage.ts](server/databaseStorage.ts) `getCitationQualities` falls back to deriving rows from `geo_rankings` when `citation_quality` is empty:
+
+```
+qualityScore = positionScore * 0.4 + relevance * 0.4 + authority * 0.2
+positionScore = max(0, 100 - (rank - 1) * 10)
+isPrimaryCitation = rank <= 3 ? 1 : 0
+sourceType = domain(citingOutletUrl) || 'ai-generated'
+recencyScore = 100 - (ageDays / 90) * 100, clamped 0..100
+```
+
+The endpoint serves real per-row data even when the deprecated Phase-2 table is untouched, so the Citation Quality breakdown card renders.
+
+### 15.5 metrics_history dual-write + Trends granularity
+
+[server/lib/metricsSnapshot.ts](server/lib/metricsSnapshot.ts) writes both `citation_rate` + `share_of_answer` (same value) and both `hallucinations` + `hallucinations_unresolved` so TrendsTab queries match.
+
+[server/databaseStorage.ts](server/databaseStorage.ts) `storage.recordCurrentMetrics` (the version called by the Trends "Record Snapshot" button — different function from `lib/metricsSnapshot.ts`) gained a Phase-1 fallback. Previously it only read `prompt_portfolio` and silently wrote nothing on click. Now Phase-2 first, Phase-1 fallback, hallucinations always.
+
+[client/src/components/intelligence/TrendsTab.tsx](client/src/components/intelligence/TrendsTab.tsx) `getTrendChartData` keys snapshots by ISO timestamp rounded to the minute (was `toLocaleDateString()` — day granularity). Three citation runs on the same day previously collapsed into one chart point with `.find()` returning the first row only; now each run gets its own point.
+
+### 15.6 Mentions semantics
+
+Citation = brand in a ranked recommendation (`isCited=1`). Mention = brand name appeared in the response at all (cited OR not-cited but analyzer-detected).
+
+[server/citationChecker.ts](server/citationChecker.ts) writes a `brand_mentions` row whenever the analyzer surfaced the brand, not only when cited. Metadata carries `cited: true|false` so downstream filters can distinguish. Synthetic URL `ai://{platform}/{runId}/{promptId}` prevents the `(brandId, platform, sourceUrl)` dedup index from inflating across re-runs.
+
+[server/routes/analytics.ts](server/routes/analytics.ts) `totalMentions` reads from `brand_mentions` table (real source) instead of counting ranking rows. Previously "mentions" on geo-analytics was just "total checks" mislabeled.
+
+### 15.7 Hallucinations — invalidation + URL parse + state machine
+
+Three separate bugs, all fixed:
+
+[client/src/components/intelligence/HallucinationsTab.tsx:96](client/src/components/intelligence/HallucinationsTab.tsx#L96) — invalidation key changed from `["/api/hallucinations"]` to `[`/api/hallucinations?brandId=${id}`]` to match the list query exactly. Same-array exact-match is how TanStack Query compares single-string keys; the bare path never matched the parameterised list, so the DB updated but the UI showed stale state until reload.
+
+[client/src/components/intelligence/HallucinationsTab.tsx:300-328](client/src/components/intelligence/HallucinationsTab.tsx) — `new URL(citingUrl)` was throwing on synthetic `ai://` URLs and bare-domain strings. Wrapped in a try/catch that prepends `https://` when no scheme is present, hides the source link entirely for `ai://` URLs.
+
+[server/lib/statusTransitions.ts:29-37](server/lib/statusTransitions.ts) — added `pending → resolved` to the allowed transitions (was `pending → in_progress → resolved` only). The UI's "Mark as resolved" is a one-click flow; users shouldn't have to first toggle to in_progress. New unit test covers the direct path.
+
+### 15.8 Crawler check refresh
+
+[server/routes/analytics.ts](server/routes/analytics.ts):
+
+- **Bot list updated** to current vendor names. Removed deprecated `Claude-Web`, `anthropic-ai`, `facebookexternalhit` (link previews, not AI training). Added `OAI-SearchBot`, `ClaudeBot`, `Claude-User`, `Claude-SearchBot`, `Applebot` (plain), `meta-externalagent`. Each entry carries a `category` so the UI groups by vendor.
+- **Parser bug fixed.** `Disallow:` with empty value used to normalise to `/` — that's the opposite semantic (empty Disallow = allow everything per RFC 9309). The previous code flagged every crawler as blocked on sites with `Disallow:`. Empty paths are now preserved and treated as an explicit allow-all signal in `isCrawlerBlocked`.
+- **Recommended robots.txt snippet** now covers every vendor, grouped with comments. `criticalBlocked` set updated to current names.
+
+[client/src/pages/crawler-check.tsx](client/src/pages/crawler-check.tsx) — crawlers grouped by category in the UI ("OpenAI (3 bots)", "Anthropic (3 bots)") with per-vendor "N blocked" badge.
+
+### 15.9 Opportunities — empty-state CTA
+
+[client/src/pages/geo-opportunities.tsx](client/src/pages/geo-opportunities.tsx) added a "Run Citation Check →" button (wouter `<Link>` to `/citations`) inside the "No citation data yet" card. Previously a dead text-only empty state.
+
+### 15.10 GEO Tools
+
+[server/routes/contentTypes.ts](server/routes/contentTypes.ts) — Wikipedia scan now persists each recommended page to `wikipedia_mentions` (mentionType `related`, source `wikipedia_scan`, deduped by `pageUrl`). The endpoint returns `savedRecommendations` count so the toast can reflect "Saved N new recommendations" vs "All recommendations were already tracked".
+
+[client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx):
+
+- BOFU toast clarified ("Saved! View in BOFU Content tab — saved to this brand's library"). Server already auto-saves at `contentTypes.ts:476` — the previous toast just didn't tell users.
+- Mentions tab gained a `Scan Now` button + `scanMentionsMutation` calling the existing `POST /api/brand-mentions/scan/:brandId` endpoint (Reddit + HN + citation-domain mining).
+- FAQ list status icon → clickable button. `toggleFaqOptimizedMutation` PATCHes `/api/faqs/:id` with `{isOptimized: 0|1}`. Toggles between "Mark optimized" and "Optimized" with a success toast. Replaces a read-only badge that nothing flipped.
+
+### 15.11 GEO Signals
+
+[client/src/pages/geo-signals.tsx](client/src/pages/geo-signals.tsx):
+
+- **Chunk Engineer "Apply to Article".** New `applyOptimizedMutation` PUTs `/api/articles/:id` with the optimised content. Buttons added next to the optimised-content textarea: "Copy" + "Apply to Article". Closes the loop — feature is now a real tool, not a report.
+- **"Schedule Update" → "Mark Updated".** Vaporware button is now wired: empty-body PUT to `/api/articles/:id`, which causes `storage.updateArticle` to bump `updatedAt = now()` (server-managed). Freshness scores reflect the new timestamp on next render. Articles invalidated.
+- **No-articles empty state.** When a brand has no articles, the empty `<Select>` dropdown is replaced with a "Create an article →" link to `/articles`.
+
+[server/routes/geoSignals.ts](server/routes/geoSignals.ts) — Schema Lab does a real fetch + JSON-LD parse:
+
+1. SSRF-safe fetch via `safeFetchText` (max 2MB, 15s timeout, custom User-Agent).
+2. Regex-extract every `<script type="application/ld+json">` block.
+3. Parse each as JSON (skips malformed blocks, walks nested `@graph` and arbitrary keys), collect every `@type` value.
+4. Mark each catalogue schema (Article, FAQPage, HowTo, Organization, BreadcrumbList, WebPage, Product) as present/missing based on real findings.
+5. Surface `additionalTypes` for schemas outside the catalogue (Event, Recipe, VideoObject, etc.).
+6. SSRF rejection (private IPs, file://, metadata endpoints) returns 400 with a clear error.
+
+Replaces the previous mock that returned `Math.random() > 0.3` regardless of URL — sites with FAQ schema were being told to "add FAQ schema".
+
+### 15.12 Verification
+
+- `npm run check` clean
+- `npm run lint` 0 errors (warnings pre-existing)
+- 129/129 tests pass (1 new: `pending → resolved` direct transition)
+
+### 15.13 Out of scope
+
+Deliberately not in this wave:
+
+- **Pipeline Simulation refinement** ([server/routes/geoSignals.ts](server/routes/geoSignals.ts) `pipeline-simulation`). Recommendations are templated heuristics; meaningful improvement requires real query/embedding analysis. Captured in the audit, not fixed.
+- **Freshness score sophistication.** Currently `100 - ageDays`. The "How to Improve" panel describes Google's nuanced signal (cadence, content type, topic churn) but the math doesn't reflect it. Acceptable simplification for now.
+- **Background scanners** for listicles / brand-mentions. Both still require a manual button; cron-driven scheduling deferred until usage patterns clarify which scans are worth running automatically.
+
+---
+
+> Wave 8 superseded by Wave 9 below.
+
+---
+
+## Wave 9 — Citations end-to-end fixes (correctness + UX + scaling)
+
+The dominant user-reported bug — "I have to manually refresh every page" — was a TanStack Query semantics gotcha: `setQueryDefaults({ refetchInterval })` only takes effect when a new observer is created, not on already-mounted ones. The Wave 8 live-refresh hook never started polling on dependent pages because they had already mounted by the time the hook ran. Wave 9 fixes that and 30+ adjacent issues found across every Citations sub-tab.
+
+### 16.1 Live-refresh fix (the actual bug)
+
+[client/src/hooks/useCitationLiveRefresh.ts](../client/src/hooks/useCitationLiveRefresh.ts) rewritten to return `{ hasActive, refetchInterval }` instead of mutating defaults imperatively. Every consuming page ([home.tsx](../client/src/pages/home.tsx), [geo-analytics.tsx](../client/src/pages/geo-analytics.tsx), [competitors.tsx](../client/src/pages/competitors.tsx), [geo-tools.tsx](../client/src/pages/geo-tools.tsx), [ResultsTab.tsx](../client/src/components/citations/ResultsTab.tsx), [HistoryTab.tsx](../client/src/components/citations/HistoryTab.tsx)) threads the value into its `useQuery({ refetchInterval })`. TanStack dedupes the gate query so the underlying status poll is shared across all hooks. [useActiveCitationRuns](../client/src/hooks/useActiveCitationRuns.ts) gained idle-aware backoff (8 s → 30 s → 60 s after consecutive empty polls) and pauses when the tab is hidden.
+
+### 16.2 Async run lifecycle
+
+- [migrations/0035_citation_runs_dedup.sql](../migrations/0035_citation_runs_dedup.sql): partial unique index `citation_runs(brand_id) WHERE status IN ('pending','running')`.
+- New `kickoffBrandPromptsRun` in [server/citationChecker.ts](../server/citationChecker.ts) creates the row synchronously, fires `runBrandPrompts` via `setImmediate`, returns `{ runId }` in ~100 ms. `POST /run` no longer holds HTTP open for 30-120 s. 23505 → 409 `{ error: 'already_running', runId }` so a second-tab race joins the existing stream.
+- [server/lib/citationReconciliation.ts](../server/lib/citationReconciliation.ts) called between `applyMigrations` and `initScheduler` in [server/index.ts](../server/index.ts) — marks any `pending|running` row older than 15 min as `failed` so server crashes don't permanently block the brand.
+- `bumpProgressIfDue` now bumps every 5 tasks **OR** every 1.5 s — small runs feel live.
+- `re-detect-all` writes a `triggeredBy='re-detect'` row so the live banner fires for it.
+
+### 16.3 SSE hardening
+
+In [server/routes/prompts.ts](../server/routes/prompts.ts): 20 s heartbeat (comment frame), per-user 3-stream cap (oldest evicted on the 4th tab), 5-min cap sends `event: end, data: { reason: "timeout", reconnect: true }`, client reconnects with a fresh JWT (bounded to 5 retries) so long runs (>1 h, JWT lifetime) keep their banner. First-tick `lastSinceMs = run.startedAt` so a (re)connect replays existing rankings — Latest Results populates immediately. `console.warn` → `logger.warn` per CLAUDE.md.
+
+### 16.4 Variation cache + disagreement counter
+
+Run-scoped `Map<entityId, string[]>` replaces ~50 per-response `getBrandById` + `getCompetitors` reads. Updated synchronously when `addBrandNameVariation` / `addCompetitorNameVariation` succeed so the matcher sees variants the analyzer just learned for THIS response — strict ordering preserved. [migrations/0036_citation_runs_disagreement.sql](../migrations/0036_citation_runs_disagreement.sql) adds `disagreement_count` to citation_runs; HistoryTab surfaces a tooltip when ratio ≥5%.
+
+### 16.5 ScheduleTab v2
+
+[migrations/0037_citation_schedule_v2.sql](../migrations/0037_citation_schedule_v2.sql) adds `auto_citation_hour`, `auto_citation_active`, `last_auto_citation_status`. [server/scheduler.ts](../server/scheduler.ts) honors all three. [ScheduleTab](../client/src/components/citations/ScheduleTab.tsx) rewritten with hour picker, pause Switch, "Next run" preview in local TZ, quota banner, last-run status indicator.
+
+### 16.6 Sub-tab UX
+
+| Tab                | Wave 9 changes                                                                                                                                                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Citations shell    | Re-check stored → overflow menu; banner deep-link to Results tab; hide "0 cited / 0 checks so far" until SSE delivers; loading messages tied to `hasActive`; "Run started" toast; 409 → "Run already in progress" toast. |
+| PromptsTab         | 1-500 char validation + counter + optimistic edit; checkbox-gate on Reset all; quota-confirm dialog before Refresh; Accept-suggestion radio default = none + side-by-side preview.                                       |
+| ResultsTab         | Best Platform requires ≥5 checks; stable best-prompt tie-break; 0% empty state with next steps; sortable platform table; per-prompt sort dropdown; CSV export; last-run timestamp.                                       |
+| HistoryTab         | Status badges + errorMessage tooltip; chart filter (Scheduled/Manual/Re-detect/All); excludes non-succeeded rows; date filter; drill-down cache; disagreement badge.                                                     |
+| PlatformResultCard | HSL hash for unknown platforms; "Check failed:" inline error pill; Copy + Open-in-chat (deep-link for ChatGPT/Gemini/Perplexity, clipboard fallback for Claude/DeepSeek).                                                |
+
+### 16.7 Tests
+
+- [tests/unit/citationChecker.kickoff.test.ts](../tests/unit/citationChecker.kickoff.test.ts) — kickoff returns sync, dedup 23505 → 409 shape, detached failure writes errorMessage.
+- [tests/unit/citationReconciliation.test.ts](../tests/unit/citationReconciliation.test.ts) — SQL filters by status + 15 min age, swallows DB errors, logs reconciled rows.
+- 18 files / 171 tests pass.
+
+### 16.8 Verification
+
+- `npm run check` — 0 errors.
+- `npx vitest run` — 171/171 green.
+- E2E manual matrix in [docs/citation-detection.md § Wave 9](citation-detection.md).
+
+### 16.9 Out of scope
+
+- Single-prompt re-run endpoint. Marginal value over Run Check.
+- `geo_ranking_flags` table for "Flag as wrong". Capture-only without admin review UI was vague-value.
+- Day-of-month vs day-of-week for monthly schedule. Edge cases (months <31 days) deserve a focused follow-up.
+- Postgres LISTEN/NOTIFY replacing SSE polling. Not needed at current scale.
+- Run cancellation. Detached run runs to completion regardless.
+
+## Wave 9.1 / 9.2 — Citations follow-ups (correctness + run-window scoping)
+
+Two rounds of user-reported bugs surfaced after Wave 9 shipped. The dominant theme: data shown during an active run mixed all-time history with the run's incoming numbers, so totals barely moved and aggregate cards looked frozen. Plus a handful of correctness bugs where re-detect rows polluted History, prompt-suggestion accept silently replaced rows, and historical aggregates drifted from `geo_rankings`.
+
+### 16a.1 Re-detect rows polluting History
+
+Clicking Re-check on a single result wrote a new `citation_runs` row with `triggeredBy='re-detect'`, which appeared in HistoryTab as a fresh "run" with totals like `1/50` (only the re-detected platform was checked). User read this as "the run failed for 49 prompts". [migrations/0038_drop_redetect_runs.sql](migrations/0038_drop_redetect_runs.sql) deletes existing re-detect rows; the re-detect path no longer writes to `citation_runs` at all. Live banner trigger for the bulk `re-detect-all` flow stays (Wave 9.2 — that one IS a real run; only single-row re-checks were demoted).
+
+### 16a.2 Suggested-prompt accept forced replacement
+
+The accept-suggestion endpoint required a `replaceTrackedId` even when the brand had open slots. Users on under-cap brands got "select a tracked prompt to replace" prompts that didn't apply. Fix: `replaceTrackedId` is now optional. Server enforces the cap explicitly (`getActivePromptCount(brand) >= cap` → require replacement; otherwise insert directly). UI no longer shows the replacement picker when slots are free.
+
+### 16a.3 Aggregate drift between citation_runs and geo_rankings
+
+User reported a History row showing `2/50` cited when the drill-down clearly summed to 16/50. Root cause: `citation_runs.total_cited` is a cached aggregate maintained by the run loop, but Wave 8's matcher-authoritative `is_cited` flips happened after the cache was last bumped, so the cache was stale.
+
+[migrations/0039_recompute_citation_run_aggregates.sql](migrations/0039_recompute_citation_run_aggregates.sql) recomputes `total_checks` + `total_cited` for every existing `citation_runs` row by summing the underlying `geo_rankings`. New helper [`recomputeCitationRunAggregate(runId)`](server/databaseStorage.ts) is called from `re-detect-all` (and is the entry point future `is_cited` mutations should use) so the cache stays honest. Wave 9.3's migration 0040 went further and rebuilt `platform_breakdown` JSONB the same way.
+
+### 16a.4 Latest Results not resetting on a fresh run
+
+Starting a new run left the prior run's results visible while the new run streamed in. User read it as "the new run is broken". Fix is the `?since=` filter pattern: when a run is active the page passes the run's `startedAt` ISO into the query key, so the cache rotates and only the run's rows render. Server-side, `loadRankingsContext(brandId, opts)` accepts `{ since?, windowDays? }` with `since` taking precedence. Same pattern was extended to Dashboard hero / rankings / gap-matrix / entity-strength and to GEO Analytics in Wave 9.2.
+
+[server/routes/prompts.ts](server/routes/prompts.ts), [server/routes/dashboard.ts](server/routes/dashboard.ts), [server/routes/analytics.ts](server/routes/analytics.ts), [client/src/pages/citations.tsx](client/src/pages/citations.tsx), [client/src/pages/home.tsx](client/src/pages/home.tsx), [client/src/pages/geo-analytics.tsx](client/src/pages/geo-analytics.tsx).
+
+### 16a.5 ScheduleTab v2 hour picker silently never fired
+
+Wave 9's hour gate inside `isBrandDueForCitation` rejects when `currentHour < auto_citation_hour`. But the `AUTO_CITATION_CRON` was `"0 6 * * *"` — daily at 06:00 UTC — so any brand that picked an hour ≥ 7 got rejected at 06:00 and the cron never ran again that day. Picker promised behavior the scheduler couldn't deliver.
+
+Fix: cron default → `"0 * * * *"` (hourly check). Each tick is cheap (one SELECT + per-brand filter); per-brand gates are unchanged. [migrations/0040_citation_schedule_v2_fixes.sql](migrations/0040_citation_schedule_v2_fixes.sql) backfills `auto_citation_hour=0` for any row still at the legacy migration default of 9, so brands that never touched the picker continue firing at the legacy 06:00 ish window. New brands explicitly choose an hour. Migration 0040 also rebuilds `platform_breakdown` JSONB on every existing `citation_runs` row via `jsonb_object_agg` over `geo_rankings` — so HistoryTab tooltips stop showing stale per-platform numbers from before Wave 8.
+
+[server/scheduler.ts](server/scheduler.ts).
+
+### 16a.6 Drill-down rows in arbitrary DB order
+
+`getGeoRankingsByRunId` returns whatever the DB hands back; under concurrency=5 prompts complete out of order. User read drill-down accordion as "5, 1, 7, 2, …". Fix: the route in [server/routes/prompts.ts](server/routes/prompts.ts) loads `brandPrompts` once, builds a `Map<promptText, orderIndex>`, and post-sorts the drill-down array. Prompts no longer in the brand (deleted/archived) sort to the end via `Number.MAX_SAFE_INTEGER`.
+
+### 16a.7 POST /run accepted empty platforms[]
+
+Empty `platforms[]` silently kicked off a run that finalized as failed. Phantom row in History. Now `POST /run` 400s with "At least one platform must be selected" before any DB write.
+
+### 16a.8 Kickoff race retry bounded
+
+Original `kickoffBrandPromptsRun` used a recursive IIFE on 23505 (the active-run partial unique index). Theoretical infinite loop on a pathological race. Capped at one retry; if the retry also hits 23505 _and_ `getActiveCitationRuns` is empty, returns `{ ok: false, reason: "race", runId: null }`. Surfaces as a 500 with a clean toast.
+
+[server/citationChecker.ts](server/citationChecker.ts).
+
+### 16a.9 SSE progress event also invalidates the results query
+
+The 1 s gap at 100%: the last `progress` SSE event delivered `totals=50/50` but didn't invalidate the results query, so the banner showed 100% while the accordion still showed 49/50 until `complete` fired the one-shot. Now the `progress` handler also calls `queryClient.invalidateQueries({ queryKey: [`/api/brand-prompts/${brandId}/results`] })`. Banner and accordion catch up together.
+
+### 16a.10 Optimistic banner + brand-switch state clear
+
+First-run banner used to wait ~8 s for the active-runs gate query to detect the new run. `runMutation.onSuccess` now seeds `pendingRunId` from the kickoff response so the banner appears within ~200 ms; cleared once the gate confirms or after a 30 s safety timeout. `useEffect` reset on `selectedBrandId` change clears both `liveProgress` and `pendingRunId` so old-brand state doesn't bleed into the new banner.
+
+[client/src/pages/citations.tsx](client/src/pages/citations.tsx).
+
+### 16a.11 HistoryTab — drilldown cache LRU + clearer trigger badges
+
+Drill-down details cached forever; long sessions accumulated 25 MB of stale blobs. Now LRU-capped at 10 (oldest key evicted on insert).
+
+Trigger badge used `<Badge className="capitalize">{run.triggeredBy}</Badge>`, which rendered `auto_onboarding` as `Auto_onboarding` — ugly and misleading. Replaced with an explicit label map (`manual → Manual`, `cron → Auto`, `auto_onboarding → Onboarding`, `re-detect → Re-detect`); fallback to title-case for unknowns.
+
+[client/src/components/citations/HistoryTab.tsx](client/src/components/citations/HistoryTab.tsx).
+
+### 16a.12 useActiveCitationRuns — module-scoped empty-streak
+
+The Wave 9 idle-aware backoff stored its consecutive-empty-poll counter in a per-component `useRef`. Home calls this hook 7+ times via `useDashboardQueries` observers, each with its own ref; one fast hook (just-mounted, streak=0) keeps every other observer fast even when the page is genuinely idle. Moved the counter to module scope keyed by `brandId` so all observers on the same brand share cadence. Roughly halves idle poll volume on multi-consumer pages.
+
+[client/src/hooks/useActiveCitationRuns.ts](client/src/hooks/useActiveCitationRuns.ts).
+
+### 16a.13 ResultsTab — CSV export removed
+
+User explicit request. Dropped `handleExportCsv`, the button, and the `Download` icon import. No server-side change — the endpoint never knew about CSV.
+
+[client/src/components/citations/ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx).
+
+### 16a.14 Verification
+
+- `npx tsc --noEmit` — 0 errors.
+- `npx vitest run` — 171/171 green.
+- Migrations 0038, 0039, 0040 are idempotent (UPDATE that's a no-op on already-correct rows).
+
+## Wave 9.3 — AI Intelligence + GEO Tools/Analytics correctness pass
+
+End-to-end critique covered the AI Intelligence page (6 sub-tabs), GEO Tools (5 sub-tabs), and GEO Analytics. Findings mixed real cross-tenant exposure, broken-by-design UX (mutation invalidations missing the cached entry), and Wave 9.2 follow-throughs that didn't reach every consumer. This wave fixes everything user-visible without breaking existing flows.
+
+### 17.1 Cross-tenant data leak: stat/list endpoints missing ownership
+
+`/api/prompt-portfolio/stats/:brandId`, `/api/citation-quality/stats/:brandId`, `/api/alert-settings/:brandId`, `/api/alert-history/:brandId`, `/api/bofu-content/:brandId`, and `/api/faqs/:brandId` accepted any brandId without verifying the caller owned it. The list-style siblings (e.g. `/api/hallucinations`) had been hardened, but these stat/by-brand reads slipped through. Fixed by threading `requireUser(req)` + `await requireBrand(:brandId, user.id)` through each handler. `/api/alert-history` also bounds `?limit` at 200 (was unbounded — a brand that misfires alerts overnight could load 10MB of JSON into the panel).
+
+[server/routes/intelligence.ts](server/routes/intelligence.ts), [server/routes/contentTypes.ts](server/routes/contentTypes.ts).
+
+### 17.2 Alert duplicate-fire: missing unique constraint
+
+The `alert_settings` schema only had a brand_id index. Double-clicking the create button — or two browser tabs racing — produced two rows of the same `(brand_id, alert_type)`, each then fired its own email/Slack notification on every triggering event. The user's complaint surfaced as "I keep getting two emails for the same hallucination."
+
+Fix is two-layered. [migrations/0041_alert_settings_unique.sql](migrations/0041_alert_settings_unique.sql) collapses legacy duplicates (keeping the oldest row per `(brand_id, alert_type)` so any user-edited threshold/channel survives) then adds `UNIQUE INDEX alert_settings_brand_id_alert_type_uniq`. The Wave 9.3 `POST /api/alert-settings` handler also pre-checks via `getAlertSettings(brandId)` and returns 409 with a clear message — so the UX surfaces "An alert of this type already exists" instead of a generic 500. The client mutation now has an `onError` toast that renders that message.
+
+### 17.3 GEO Analytics — Wave 9.2 since-filter incomplete
+
+Wave 9.2 threaded `?since=` into the brand-prompt rankings path but two consumers were missed:
+
+**Article-tied rankings** were still loaded via `getGeoRankings()` (full table scan) and post-filtered in memory by `r.checkedAt >= sinceFilter`. Inefficient at scale and a precision-mismatch hazard (timestamps stored at millisecond resolution but filter dates from `new Date(ISO)` could round differently across drivers). Added [`getGeoRankingsByArticleIds(ids, sinceDate?)`](server/databaseStorage.ts#L515) — symmetric to `getGeoRankingsByBrandPromptIds` — and the `/api/geo-analytics` handler now uses the indexed call.
+
+**Competitor leaderboard** wasn't getting `since` at all. So during a fresh run, brand citations were filtered to the run window (e.g. 100 in the last 5 minutes) but the leaderboard's `totalMarketCitations` still summed every competitor's all-time totals (e.g. 5000). Share-of-Voice read 100/5000 = 2% during the run when the run-relative SoV was actually 50%. The `getCompetitorLeaderboard()` storage method already accepted `opts.since` (Wave B); the handler just never passed it. Now it does.
+
+[server/routes/analytics.ts](server/routes/analytics.ts).
+
+### 17.4 GEO Analytics — queryKey instability across run boundaries
+
+Client built the key as `["/api/geo-analytics", selectedBrandId, { since: since ?? "" }]`. The default queryFn skips empty-string segments, so the URL was correct, but TanStack still treats `""` and an ISO string as different cache keys. When a run completes and `since` flips back to null, the queryKey changes — TanStack drops the run-window snapshot before the new fetch returns, and the visibility score visibly jumps as all-time data rehydrates the moment the run finishes.
+
+Fixed by using `since ?? "all"` as a stable sentinel; the server treats `since=all` the same as missing. Same key shape across the run lifecycle, no mid-flight cache evictions.
+
+[client/src/pages/geo-analytics.tsx:134](client/src/pages/geo-analytics.tsx#L134), [server/routes/analytics.ts](server/routes/analytics.ts).
+
+### 17.5 GEO Analytics — `avgRank: 0` collapses two distinct states
+
+The handler returned `avgRank: 0` both when no cited rows had any rank field (Gemini-style platforms that don't expose rank position) and when the platform had legitimate rank-0 data. The UI rendered `metrics.avgRank || "N/A"` — falsy `0` treated as missing. Distinct states became indistinguishable.
+
+Fixed by emitting `avgRank: number | null` from the handler (with the scoring math still using a numeric `avgRankRaw` internally) and rendering `null` as "—" on the client. Existing TS type updated.
+
+### 17.6 Competitors tab — queries ignored selectedBrandId
+
+`CompetitorsTab` received `selectedBrandId` and renamed it to `_selectedBrandId` to silence an unused-arg warning. Both queries (`/api/competitors`, `/api/competitors/leaderboard`) ran without a brandId, so the server's no-brand branch aggregated every brand the user owned. Switching brands in the selector didn't change what the panel rendered.
+
+Fixed by threading `{ brandId: selectedBrandId }` into both query keys (object segment → URL param via the default queryFn) and into the create-competitor mutation payload. Mutation invalidations switched to predicate-based matching so they catch every variant of the key shape regardless of future refactors.
+
+[client/src/components/intelligence/CompetitorsTab.tsx](client/src/components/intelligence/CompetitorsTab.tsx).
+
+### 17.7 Trends tab — invalidation always missed the cached entry
+
+Query key was `[`/api/metrics-history/${brandId}?days=${trendDays}`]`. The Record-Snapshot mutation invalidated the bare `[`/api/metrics-history/${brandId}`]` — exact-match miss because the cached key has the `?days=` suffix. The chart never refetched. User clicked "Record Snapshot", got a success toast, and the chart still showed yesterday's last point.
+
+Fixed by predicate-matching every key whose first segment starts with `/api/metrics-history/${brandId}` so the active window — whichever it happens to be — invalidates correctly.
+
+Also fixed timezone-naive labels: snapshots are stored UTC but `toLocaleString()` rendered in the user's local zone, which made the same chart read differently for collaborators across timezones. Labels now render with `timeZone: "UTC"` and an explicit "UTC" suffix.
+
+[client/src/components/intelligence/TrendsTab.tsx](client/src/components/intelligence/TrendsTab.tsx).
+
+### 17.8 Hallucinations tab — Mark Resolved produced 409 on already-actioned rows
+
+The "Mark Resolved" button stayed enabled even when `remediationStatus` was `verified` or `dismissed`. Server's `assertTransition` correctly rejected the call, but the UI surfaced it as "Failed to resolve" — confusing because the button was visibly clickable. Fixed by gating the button: only enabled when status is `pending` / `in_progress` / null.
+
+[client/src/components/intelligence/HallucinationsTab.tsx](client/src/components/intelligence/HallucinationsTab.tsx).
+
+### 17.9 Share-of-Answer tab — division-by-zero NaN renders + duplicate competitors
+
+Three rendering blocks (`byCategory`, `byFunnel`, `byCompetitor`) divided `data.cited / data.total` with no `>0` guard. A brand with stat rows but zero counts rendered `NaN%` and the Progress bar had `value={NaN}`. Now each block uses a single guarded computation that defaults to 0 when total is 0.
+
+Separately the create-prompt payload split competitor names by comma, trimmed, and filtered blanks but didn't dedupe — "Salesforce, salesforce" landed in `competitorSet` as two entries. The downstream win-rate matcher collapses them, but historical rows already stored both. Now we trim, drop blanks, and dedupe case-insensitively while preserving the user's first-seen casing.
+
+[client/src/components/intelligence/ShareOfAnswerTab.tsx](client/src/components/intelligence/ShareOfAnswerTab.tsx).
+
+### 17.10 Alerts tab — threshold UI hidden for hallucinations + clearer 409
+
+The threshold slider was hidden for `alertType: "hallucination_detected"`, which meant the alert always fired on every detection — but the UI gave no indication of that. New users created the alert thinking it would batch, then complained about notification volume. Now the slider is shown for hallucinations too with a count semantic ("fire when at least N new hallucinations are detected") and explanatory copy.
+
+The create mutation now has an `onError` handler that renders the server's 409 message ("An alert of this type already exists for this brand") instead of failing silently.
+
+[client/src/components/intelligence/AlertsTab.tsx](client/src/components/intelligence/AlertsTab.tsx).
+
+### 17.11 BOFU tab — competitor names duplicated by casing
+
+The `CompetitorCombobox` used `value.includes(name)` for presence checks (toggle, free-form Enter, checkbox state). User adds "Salesforce" then types "salesforce" — both stored in `bofuCompetitors`, posted to `/api/bofu-content/generate`, and saved to `comparedWith` with both casings. The downstream leaderboard matcher dedupes them but the BOFU rows are duplicated permanently.
+
+Fixed via a single `indexOfCi` helper used everywhere presence is checked. First-seen casing is preserved.
+
+[client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx).
+
+### 17.12 BOFU content — fake aiScore: 85
+
+`/api/bofu-content/generate` hard-coded `aiScore: 85` on every save. The BOFU panel surfaced this as a real quality signal, so users read the constant 85 as a meaningful ranking. Removed — the column is nullable; the optimizer flow can populate it later via PATCH if a real scoring step is added.
+
+[server/routes/contentTypes.ts](server/routes/contentTypes.ts).
+
+### 17.13 FAQ generation — pre-marked as optimized
+
+The bulk-generate endpoint (`POST /api/faqs/generate/:brandId`) inserted every freshly generated FAQ with `isOptimized: 1`. Users saw the green "Optimized" check on every newly-generated row, defeating the point of the per-FAQ optimize step (which is a separate `POST /api/faqs/:id/optimize` call that refines wording). Now generation defaults to `isOptimized: 0`; the optimize endpoint flips it to 1 as it always did.
+
+[server/routes/contentTypes.ts](server/routes/contentTypes.ts).
+
+### 17.14 Verification
+
+- `npx tsc --noEmit` — 0 errors.
+- `npx vitest run` — 171/171 green.
+- Apply migration 0041 on next boot to dedupe legacy alert rows + install the unique index.
+
+### 17.15 Out of scope (explicitly deferred)
+
+Critique findings the user judged not worth this round:
+
+- Hallucination paraphrase clustering (MD5 dedup misses near-duplicates with different wording).
+- Sentiment threshold tuning (skewed-neutral distributions still classify "Neutral").
+- Leaderboard medal colors keyed off filtered-array index instead of true rank — only matters if filtering is added.
+- GEO Tools mentions tab: no `?since=` filter; mentions discovered across runs aren't visually marked "new this run".
+- Scan-mutation timeouts; hung scan leaves the button stuck on "Scanning…".
+- Token-in-URL for SSE (#27), CSRF (#28), Redis-backed re-detect cooldown (#29) — security follow-up pass.
+- Wikipedia disambiguation handling, sentry classification of synthetic `ai://` source URLs.
+
+None of these block any active flow.

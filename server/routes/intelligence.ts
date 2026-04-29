@@ -245,6 +245,8 @@ export function setupIntelligenceRoutes(app: Express): void {
 
   app.get("/api/prompt-portfolio/stats/:brandId", async (req, res) => {
     try {
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
       const stats = await storage.getShareOfAnswerStats(req.params.brandId);
       res.json({ success: true, data: stats });
     } catch (error) {
@@ -339,6 +341,8 @@ export function setupIntelligenceRoutes(app: Express): void {
 
   app.get("/api/citation-quality/stats/:brandId", async (req, res) => {
     try {
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
       const stats = await storage.getCitationQualityStats(req.params.brandId);
       res.json({ success: true, data: stats });
     } catch (error) {
@@ -645,10 +649,12 @@ export function setupIntelligenceRoutes(app: Express): void {
   // Alert Settings routes
   app.get("/api/alert-settings/:brandId", async (req, res) => {
     try {
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
       const settings = await storage.getAlertSettings(req.params.brandId);
       res.json({ success: true, data: settings });
     } catch (error) {
-      res.status(500).json({ success: false, error: "Failed to fetch alert settings" });
+      sendError(res, error, "Failed to fetch alert settings");
     }
   });
 
@@ -706,6 +712,19 @@ export function setupIntelligenceRoutes(app: Express): void {
         }
       }
 
+      // Wave 9.3: enforce one alert-setting per (brand, alertType). The
+      // schema lacks a unique constraint historically, so dupes were
+      // possible from double-click-create — each then fired its own
+      // notification. Migration 0041 adds the constraint and dedupes
+      // legacy rows; here we surface a clean 409 instead of hitting it.
+      const existing = await storage.getAlertSettings(brandId);
+      if (existing.some((s) => s.alertType === alertType)) {
+        return res.status(409).json({
+          success: false,
+          error: "An alert of this type already exists for this brand",
+        });
+      }
+
       const setting = await storage.createAlertSetting({
         brandId,
         alertType,
@@ -718,7 +737,7 @@ export function setupIntelligenceRoutes(app: Express): void {
       });
       res.json({ success: true, data: setting });
     } catch (error) {
-      res.status(500).json({ success: false, error: "Failed to create alert setting" });
+      sendError(res, error, "Failed to create alert setting");
     }
   });
 
@@ -773,14 +792,15 @@ export function setupIntelligenceRoutes(app: Express): void {
   // Alert History routes
   app.get("/api/alert-history/:brandId", async (req, res) => {
     try {
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
       const { limit } = req.query;
-      const history = await storage.getAlertHistory(
-        req.params.brandId,
-        limit ? parseInt(limit as string) : 50,
-      );
+      const parsed = limit ? parseInt(limit as string, 10) : 50;
+      const safeLimit = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 200) : 50;
+      const history = await storage.getAlertHistory(req.params.brandId, safeLimit);
       res.json({ success: true, data: history });
     } catch (error) {
-      res.status(500).json({ success: false, error: "Failed to fetch alert history" });
+      sendError(res, error, "Failed to fetch alert history");
     }
   });
 

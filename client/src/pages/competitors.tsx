@@ -40,6 +40,7 @@ import {
 import PageHeader from "@/components/PageHeader";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Target } from "lucide-react";
 import { SiOpenai } from "react-icons/si";
@@ -84,6 +85,15 @@ export default function CompetitorsPage() {
     : Infinity;
   const shouldPollForDiscovery = selectedBrandAgeMs < 120_000;
 
+  // Wave 9: live-refresh during citation runs. Hook returns the cadence we
+  // thread directly into useQuery. Competitor list also has a discovery
+  // poll (3s) for new brands; we take the faster of the two when both are
+  // active.
+  const { refetchInterval: liveInterval } = useCitationLiveRefresh(selectedBrandId, [
+    ["/api/competitors", selectedBrandId],
+    ["/api/competitors/leaderboard", selectedBrandId],
+  ]);
+
   const { data: competitorsData, isLoading: isLoadingCompetitors } = useQuery<{
     success: boolean;
     data: Competitor[];
@@ -99,8 +109,11 @@ export default function CompetitorsPage() {
     enabled: !!selectedBrandId,
     refetchInterval: (query) => {
       const rows = (query.state.data as { data?: Competitor[] } | undefined)?.data;
-      if (rows && rows.length > 0) return false;
-      return shouldPollForDiscovery ? 3000 : false;
+      const discoveryInterval =
+        rows && rows.length > 0 ? false : shouldPollForDiscovery ? 3000 : false;
+      // Take the fastest active interval (smaller is faster).
+      if (discoveryInterval && liveInterval) return Math.min(discoveryInterval, liveInterval);
+      return discoveryInterval || liveInterval;
     },
   });
 
@@ -117,6 +130,7 @@ export default function CompetitorsPage() {
       return response.json();
     },
     enabled: !!selectedBrandId,
+    refetchInterval: liveInterval,
   });
 
   const createCompetitorMutation = useMutation({

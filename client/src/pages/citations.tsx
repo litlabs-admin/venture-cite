@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -6,15 +7,34 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import PageHeader from "@/components/PageHeader";
-import { Sparkles, Play, RefreshCw, Target, Loader2, Calendar } from "lucide-react";
+import {
+  Sparkles,
+  Play,
+  RefreshCw,
+  Target,
+  Loader2,
+  Calendar,
+  MoreVertical,
+  ArrowRight,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatDistanceToNow } from "date-fns";
 import PromptsTab, { type BrandPrompt } from "@/components/citations/PromptsTab";
 import ResultsTab from "@/components/citations/ResultsTab";
 import HistoryTab from "@/components/citations/HistoryTab";
 import ScheduleTab from "@/components/citations/ScheduleTab";
+import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
+import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
+import { getAccessToken } from "@/lib/authStore";
 
 export default function Citations() {
   const { toast } = useToast();
@@ -29,36 +49,59 @@ export default function Citations() {
   });
   const prompts = promptsData?.data || [];
 
+  // Wave 9: POST /run is now async (returns ~100ms with runId). Completion
+  // arrives entirely via the live channel (SSE + polling status gate); the
+  // mutation toast just confirms the run started. Two-tab races receive 409
+  // with the existing runId — surfaced as an "already running" toast rather
+  // than an error.
   const runMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/run`, {});
-      return response.json();
+      const json = await response.json();
+      return { status: response.status, body: json };
     },
-    onSuccess: (data) => {
-      if (data.success) {
-        // Invalidate to refetch full results and history — these are complex aggregations
-        // that the server computes, so we can't build them client-side from the run response.
-        queryClient.invalidateQueries({
-          queryKey: [`/api/brand-prompts/${selectedBrandId}/results`],
-        });
-        queryClient.invalidateQueries({
-          queryKey: [`/api/brand-prompts/${selectedBrandId}/history`],
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/onboarding-status"] });
+    onSuccess: ({ status, body }) => {
+      if (status === 409 && body?.error === "already_running") {
         toast({
-          title: "Citation check complete",
-          description: `${data.data.totalCited} of ${data.data.totalChecks} checks cited your brand (${data.data.citationRate}%).`,
+          title: "Run already in progress",
+          description: "Watching live progress for the existing run.",
+        });
+        // Make sure the active-runs gate ticks immediately so the banner shows.
+        queryClient.invalidateQueries({
+          queryKey: ["/api/brands", selectedBrandId, "citation-runs/active"],
+        });
+        // Wave 9.2: also seed pendingRunId from the existing run so the
+        // banner appears instantly rather than waiting up to 8s for the
+        // gate to confirm.
+        if (body?.data?.runId) setPendingRunId(body.data.runId);
+        return;
+      }
+      if (body?.success) {
+        queryClient.invalidateQueries({ queryKey: ["/api/onboarding-status"] });
+        // Trigger the active-runs gate to refresh now so the live banner
+        // appears in <1s instead of waiting on the 8s polling cadence.
+        queryClient.invalidateQueries({
+          queryKey: ["/api/brands", selectedBrandId, "citation-runs/active"],
+        });
+        // Wave 9.2: optimistic banner. The polling gate still has up to
+        // 8s of latency before it sees the new run; pendingRunId fills
+        // the gap so the banner shows in ~200ms. Cleared by the effect
+        // below once the gate confirms.
+        if (body?.data?.runId) setPendingRunId(body.data.runId);
+        toast({
+          title: "Run started",
+          description: "Watch live progress on this page.",
         });
       } else {
         toast({
-          title: "Check failed",
-          description: data.error || "Please try again.",
+          title: "Couldn't start run",
+          description: body?.error || "Please try again.",
           variant: "destructive",
         });
       }
     },
     onError: (err: Error) =>
-      toast({ title: "Check failed", description: err.message, variant: "destructive" }),
+      toast({ title: "Couldn't start run", description: err.message, variant: "destructive" }),
   });
 
   // Re-score stored responses with the current detector. Free (no AI calls).
@@ -103,7 +146,22 @@ export default function Citations() {
       toast({ title: "Re-check failed", description: err.message, variant: "destructive" }),
   });
 
-  const runLoadingMessage = useLoadingMessages(runMutation.isPending, [
+  // Wave 8/9: live-update lifecycle. The status-gate hook tells us whether
+  // any citation run is in flight; useCitationLiveRefresh fires a one-shot
+  // invalidate when the gate flips active→idle so the page picks up final
+  // numbers. Per-query polling (refetchInterval) is wired inside ResultsTab
+  // and HistoryTab themselves now (they each call useActiveCitationRuns).
+  const { hasActive, runs: activeRuns } = useActiveCitationRuns(selectedBrandId);
+  useCitationLiveRefresh(selectedBrandId, [
+    [`/api/brand-prompts/${selectedBrandId}/results`],
+    [`/api/brand-prompts/${selectedBrandId}/history`],
+  ]);
+
+  // Wave 9: keep the rotating loading messages cycling for the entire run,
+  // not just the (now ~100ms) kickoff request. Run is async — once the
+  // mutation resolves the UI relies entirely on `hasActive` for in-flight
+  // state, so the messages should follow the same signal.
+  const runLoadingMessage = useLoadingMessages(runMutation.isPending || hasActive, [
     "Querying ChatGPT...",
     "Querying Perplexity...",
     "Querying DeepSeek...",
@@ -111,6 +169,174 @@ export default function Citations() {
     "Querying Gemini...",
     "Analyzing responses for brand mentions...",
   ]);
+
+  // Live progress state, primarily fed by SSE. Falls back to the polled
+  // active-runs query when SSE isn't available (e.g. server still spinning
+  // up after deploy). The page just shows whatever it has.
+  const [liveProgress, setLiveProgress] = useState<{
+    runId: string;
+    progressPct: number;
+    totalChecks: number;
+    totalCited: number;
+  } | null>(null);
+
+  // Wave 9.2: optimistic banner. The active-runs gate polls every 8s, so
+  // the first ~8s after clicking Run had no banner — looked like nothing
+  // happened. `pendingRunId` is seeded from the kickoff response and
+  // displayed alongside `hasActive`. Cleared the moment the gate query
+  // confirms the run, OR after 30s if the gate never sees it (run
+  // failed before registering, network issue, etc.) — bounded so a
+  // stuck pendingRunId can't keep the banner up forever.
+  const [pendingRunId, setPendingRunId] = useState<string | null>(null);
+
+  // Reset live state on brand switch — both SSE-fed liveProgress and the
+  // optimistic pendingRunId. Without the second, switching brand mid-run
+  // would keep showing the old brand's optimistic banner until 30s timed
+  // out.
+  useEffect(() => {
+    setLiveProgress(null);
+    setPendingRunId(null);
+  }, [selectedBrandId]);
+
+  // Wave 9.2: clear pendingRunId once the active-runs gate confirms it
+  // OR after a 30s safety timeout (run never registered).
+  useEffect(() => {
+    if (!pendingRunId) return;
+    if (activeRuns.some((r) => r.id === pendingRunId)) {
+      setPendingRunId(null);
+      return;
+    }
+    const t = setTimeout(() => setPendingRunId(null), 30_000);
+    return () => clearTimeout(t);
+  }, [pendingRunId, activeRuns]);
+
+  // SSE subscription. Runs only while a citation run is in flight for the
+  // selected brand. EventSource can't send Authorization headers so we
+  // pass the JWT in ?token= (server validates inline; the path is in
+  // SELF_AUTHED_PREFIXES so the global Bearer guard skips it).
+  //
+  // Wave 9 hardening:
+  //   - Refresh the access token before EVERY (re)connect via getAccessToken()
+  //     so long runs (>1h, the Supabase JWT lifetime) keep authenticating.
+  //   - Reconnect on `end {reason: "timeout"}` (the server's 5-min cap) if
+  //     the run is still active. Bounded retry to prevent runaway loops.
+  //   - Close the stream on `complete` too — previously only `end` closed it,
+  //     so a dropped `end` event leaked the EventSource until unmount.
+  useEffect(() => {
+    if (!selectedBrandId || !hasActive) return;
+    if (typeof EventSource === "undefined") return;
+    let es: EventSource | null = null;
+    let cancelled = false;
+    let reconnectsLeft = 5;
+
+    const connect = async () => {
+      if (cancelled) return;
+      const token = await getAccessToken();
+      if (!token || cancelled) return;
+      const url = `/api/brands/${selectedBrandId}/citation-events?token=${encodeURIComponent(token)}`;
+      es = new EventSource(url);
+      es.addEventListener("progress", (ev) => {
+        try {
+          const d = JSON.parse((ev as MessageEvent).data);
+          setLiveProgress({
+            runId: d.runId,
+            progressPct: d.progressPct ?? 0,
+            totalChecks: d.totalChecks ?? 0,
+            totalCited: d.totalCited ?? 0,
+          });
+          // Wave 9.2: nudge the results query so the per-prompt
+          // accordion catches up alongside the banner. Without this,
+          // the LAST progress tick of a run can show 100% on the
+          // banner while the accordion still reads N-1/N for ~1s
+          // before the `complete` event fires the one-shot invalidate.
+          if (selectedBrandId) {
+            queryClient.invalidateQueries({
+              queryKey: [`/api/brand-prompts/${selectedBrandId}/results`],
+            });
+          }
+        } catch {
+          // ignore malformed payload
+        }
+      });
+      es.addEventListener("ranking", () => {
+        // Per-row event — invalidate the results query so users see new
+        // rows trickle in. Cheap because the live-refresh hook is also
+        // running a 6s refetch as backup.
+        if (selectedBrandId) {
+          queryClient.invalidateQueries({
+            queryKey: [`/api/brand-prompts/${selectedBrandId}/results`],
+          });
+        }
+      });
+      es.addEventListener("complete", () => {
+        // Server marks the run terminal — clear local progress and close.
+        setLiveProgress(null);
+        if (es) {
+          es.close();
+          es = null;
+        }
+      });
+      es.addEventListener("end", (ev) => {
+        let reconnect = false;
+        try {
+          const d = JSON.parse((ev as MessageEvent).data);
+          reconnect = !!d?.reconnect;
+        } catch {
+          // ignore
+        }
+        if (es) {
+          es.close();
+          es = null;
+        }
+        // Reconnect if the server hit its 5-min cap and the run is still
+        // active. Bounded so a permanently-failing connect doesn't loop.
+        if (reconnect && !cancelled && reconnectsLeft > 0 && hasActive) {
+          reconnectsLeft -= 1;
+          void connect();
+        }
+      });
+    };
+
+    void connect();
+
+    return () => {
+      cancelled = true;
+      if (es) es.close();
+    };
+  }, [selectedBrandId, hasActive]);
+
+  // Pick the most recent in-flight run as the one we surface on screen.
+  // active-runs is sorted desc by startedAt server-side.
+  // Wave 9: progressPct comes from the polling gate when SSE hasn't
+  // delivered a `progress` event yet, but totalChecks/totalCited stay
+  // unset (we hide the count line below until SSE fills them in,
+  // instead of showing a misleading "0 cited / 0 checks so far").
+  // Wave 9.2: when pendingRunId is set but the gate hasn't seen the
+  // run yet (the ~8s window between kickoff and the next gate poll),
+  // synthesize a 0% headline so the banner shows immediately.
+  const headlineRun = activeRuns[0];
+  const headlineProgress =
+    liveProgress?.runId === headlineRun?.id
+      ? liveProgress
+      : headlineRun
+        ? {
+            runId: headlineRun.id,
+            progressPct: headlineRun.progressPct,
+            totalChecks: -1,
+            totalCited: 0,
+          }
+        : pendingRunId
+          ? {
+              runId: pendingRunId,
+              progressPct: 0,
+              totalChecks: -1,
+              totalCited: 0,
+            }
+          : null;
+  // Wave 9.2: banner gating needs to include pendingRunId so the
+  // optimistic banner appears in the gap between kickoff and the gate
+  // confirming. `hasActive` lags up to 8s.
+  const showBanner = hasActive || !!pendingRunId;
 
   const [activeTab, setActiveTab] = usePersistedState<string>("vc_citations_tab", "prompts");
 
@@ -150,14 +376,19 @@ export default function Citations() {
                 <>
                   <Button
                     onClick={() => {
-                      if (runMutation.isPending || !selectedBrandId) return;
+                      if (runMutation.isPending || showBanner || !selectedBrandId) return;
                       runMutation.mutate();
                     }}
-                    disabled={runMutation.isPending || !selectedBrandId}
+                    disabled={runMutation.isPending || showBanner || !selectedBrandId}
                     className="bg-red-600 hover:bg-red-700 shrink-0"
                     data-testid="button-run-check"
                   >
-                    {runMutation.isPending ? (
+                    {showBanner ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Run in progress…
+                      </>
+                    ) : runMutation.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         {runLoadingMessage}
@@ -169,29 +400,100 @@ export default function Citations() {
                       </>
                     )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => backfillMutation.mutate()}
-                    disabled={backfillMutation.isPending}
-                    className="shrink-0"
-                    title="Re-apply the current brand-detection logic to stored responses. Free — no AI calls."
-                    data-testid="button-backfill-detection"
-                  >
-                    {backfillMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Re-checking…
-                      </>
-                    ) : (
-                      "Re-check stored"
-                    )}
-                  </Button>
+                  {/* Wave 9: secondary actions in an overflow menu so the
+                      primary Run Check button has clear visual hierarchy.
+                      Re-check stored is read-mostly and rarely needed. */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        data-testid="button-citations-overflow"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-72">
+                      <DropdownMenuItem
+                        disabled={backfillMutation.isPending}
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          if (!backfillMutation.isPending) backfillMutation.mutate();
+                        }}
+                        data-testid="button-backfill-detection"
+                      >
+                        {backfillMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Re-checking stored responses…
+                          </>
+                        ) : (
+                          <div>
+                            <div className="font-medium">Re-check stored responses</div>
+                            <div className="text-xs text-muted-foreground">
+                              Re-apply detection to old runs after adding name variations. Free — no
+                              AI calls.
+                            </div>
+                          </div>
+                        )}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Live progress banner — shown only while a citation run is in
+          flight for this brand. SSE feeds progress %; the polled status
+          gate provides the gating boolean. */}
+      {showBanner && headlineProgress && (
+        <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-2 gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                </span>
+                <span className="text-sm font-medium truncate">
+                  Citation run in progress — {headlineProgress.progressPct}%
+                </span>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {/* Wave 9: hide the count line until SSE fills in real
+                    numbers (initial state is totalChecks=-1 from the polling
+                    fallback). Avoids the misleading "0 cited / 0 checks so
+                    far" flash for ~8s after Run is clicked. */}
+                {headlineProgress.totalChecks > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {headlineProgress.totalCited} cited / {headlineProgress.totalChecks} checks
+                  </span>
+                )}
+                {/* Wave 9: deep-link to the tab where live data actually
+                    appears. Banner is page-level but per-row updates land
+                    on Latest Results. */}
+                {activeTab !== "results" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setActiveTab("results")}
+                    data-testid="button-banner-view-live"
+                  >
+                    View live results
+                    <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <Progress value={headlineProgress.progressPct} className="h-2" />
+          </CardContent>
+        </Card>
+      )}
 
       {!selectedBrandId ? (
         <Card>

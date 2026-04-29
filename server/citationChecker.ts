@@ -8,7 +8,7 @@ import { assertWithinBudget, recordSpend, type Tier } from "./lib/llmBudget";
 import { logger } from "./lib/logger";
 import { openaiBreaker, openrouterBreaker } from "./lib/circuitBreaker";
 import { analyzeResponse, deriveSentiment, type TrackedEntity } from "./lib/responseAnalyzer";
-import { matchEntity } from "./lib/brandMatcher";
+import { detectBrandAndCompetitors, matchEntity } from "./lib/brandMatcher";
 
 // ChatGPT citation checks go through the direct OpenAI client.
 const openai = new OpenAI({
@@ -91,20 +91,37 @@ export async function checkForCitation(
     nameVariations: extraVariations,
   };
 
+  // Wave 8: matcher already said "yes" above. The LLM judge runs only to
+  // enrich rank/relevance — it CANNOT flip isCited back to false. If the
+  // judge says cited=false but the matcher hit, we still return
+  // isCited=true (matcher wins) and discard the judge's rank/relevance.
   try {
     const verdict = await judgeCitation({ responseText, brand: judgeBrand });
+    if (!verdict.cited) {
+      logger.info(
+        { brandName, hitVariants: matcherResult.hitVariants },
+        "citation.matcher.disagreement",
+      );
+    }
+    const useJudgeEnrichment = verdict.cited;
     return {
-      isCited: verdict.cited,
-      rank: verdict.cited ? verdict.rank : null,
-      relevance: verdict.relevance,
+      isCited: true,
+      rank: useJudgeEnrichment ? verdict.rank : null,
+      relevance: useJudgeEnrichment ? verdict.relevance : null,
       reasoning: verdict.reasoning,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[citationChecker] judge call failed —`, msg);
-    // Fail closed: if the judge is unreachable, report not cited so we don't
-    // leave stale string-matcher false positives behind.
-    return { isCited: false, rank: null, relevance: null, reasoning: `Judge error: ${msg}` };
+    // Wave 8: judge failure no longer flips matcher-yes to no. The
+    // matcher already determined the brand is named in the response; we
+    // record isCited=true with no rank/relevance enrichment.
+    return {
+      isCited: true,
+      rank: null,
+      relevance: null,
+      reasoning: `Judge unreachable: ${msg}`,
+    };
   }
 }
 
@@ -325,14 +342,29 @@ export async function runBrandPrompts(
   if (prompts.length === 0) return { totalChecks: 0, totalCited: 0, rankings: [], runId: null };
 
   // Create a citation_runs row upfront so every geo_ranking can reference it.
+  // Wave 8: status='running' from creation so the live-update polling hook
+  // on every dependent page sees the run immediately and switches into
+  // refetch mode.
+  // Wave 9: if the caller already created the row (via kickoffBrandPromptsRun
+  // for the async POST /run path) we reuse it. The kickoff path lets the HTTP
+  // handler return immediately while the run continues in the background.
   const triggeredBy = options.triggeredBy ?? "manual";
-  const citationRun = await storage.createCitationRun({
-    brandId,
-    triggeredBy,
-    totalChecks: 0,
-    totalCited: 0,
-    citationRate: 0,
-  });
+  let citationRun;
+  if (options.runId) {
+    const existing = await storage.getCitationRunById(options.runId);
+    if (!existing) throw new Error(`citation_runs row ${options.runId} not found`);
+    citationRun = existing;
+  } else {
+    citationRun = await storage.createCitationRun({
+      brandId,
+      triggeredBy,
+      totalChecks: 0,
+      totalCited: 0,
+      citationRate: 0,
+      status: "running",
+      progressPct: 0,
+    } as any);
+  }
 
   const cappedPlatforms = platforms.slice(0, 5);
   const rankings: GeoRanking[] = [];
@@ -379,6 +411,58 @@ export async function runBrandPrompts(
   // this run — once per (runId, platform) to cap LLM cost at ~5 extra
   // calls per run total.
   const autoDiscoveredPlatforms = new Set<string>();
+
+  // Wave 9: run-scoped variation cache. Previously we did getBrandById +
+  // getCompetitors once per response (~50 reads per typical run) just to
+  // pick up freshly-learned variations from the analyzer. Instead, build
+  // the cache once at run start and mutate it in-place when
+  // addBrandNameVariation / addCompetitorNameVariation succeed below. The
+  // matcher reads from this cache directly. Strict ordering preserved:
+  // analyzer surfaces variants → cache mutated → matcher pass uses the
+  // updated cache for THIS response.
+  const variationCache = new Map<string, string[]>();
+  variationCache.set(
+    brandId,
+    [
+      brand.companyName ?? null,
+      brand.name ?? null,
+      ...(Array.isArray(brand.nameVariations) ? brand.nameVariations : []),
+    ].filter((s): s is string => typeof s === "string" && s.trim().length > 0),
+  );
+  for (const c of competitors) {
+    variationCache.set(
+      c.id,
+      [
+        c.name ?? null,
+        ...(Array.isArray((c as any).nameVariations)
+          ? ((c as any).nameVariations as string[])
+          : []),
+      ].filter((s): s is string => typeof s === "string" && s.trim().length > 0),
+    );
+  }
+  // Helper to append a variant to the cache idempotently — also writes to
+  // DB so the variant persists across runs. Lower-case dedupe matches the
+  // matcher's canonicalization.
+  const appendVariation = async (entityId: string, kind: "brand" | "competitor", form: string) => {
+    const trimmed = form.trim();
+    if (!trimmed) return;
+    const existing = variationCache.get(entityId) ?? [];
+    if (existing.some((v) => v.toLowerCase() === trimmed.toLowerCase())) return;
+    existing.push(trimmed);
+    variationCache.set(entityId, existing);
+    try {
+      if (kind === "brand") await storage.addBrandNameVariation(entityId, trimmed);
+      else await storage.addCompetitorNameVariation(entityId, trimmed);
+    } catch (err) {
+      logger.warn({ err, entityId, kind, form: trimmed }, "citationChecker.appendVariation_failed");
+    }
+  };
+
+  // Wave 9: per-run disagreement counter. Persisted on finalize so HistoryTab
+  // can surface "matcher and analyzer disagreed on N of M checks" — useful
+  // for tuning the variation list. Rate >5% suggests the brand needs more
+  // user-supplied variations.
+  let disagreementCount = 0;
 
   // Flatten all (prompt × platform) pairs into one queue and run them with a
   // fixed concurrency ceiling. As soon as one task finishes (AI call + DB
@@ -505,6 +589,10 @@ export async function runBrandPrompts(
     // The matcher reads variants live so subsequent detection calls see the
     // new forms without a deploy. User can delete unwanted variants from
     // the brand/competitor edit UI.
+    // Wave 9: append every analyzer-surfaced variant into the run-scoped
+    // cache (and persist to DB). This replaces the per-response
+    // getBrandById + getCompetitors round-trip — same correctness, ~50
+    // fewer reads per typical run.
     for (const te of trackedEntities) {
       const verdict = analysis.tracked[te.id];
       if (!verdict) continue;
@@ -512,25 +600,82 @@ export async function runBrandPrompts(
         (s): s is string => typeof s === "string" && s.trim().length > 0,
       );
       for (const form of surfaceForms) {
-        try {
-          if (te.kind === "brand") {
-            await storage.addBrandNameVariation(te.id, form);
-          } else {
-            await storage.addCompetitorNameVariation(te.id, form);
-          }
-        } catch (err) {
-          logger.warn(
-            { err, entityId: te.id, kind: te.kind, form },
-            "citationChecker: variant append failed",
-          );
-        }
+        await appendVariation(te.id, te.kind, form);
       }
     }
 
+    // Wave 8: matcher-authoritative `isCited`. Run the universal matcher —
+    // its verdict overrides the analyzer's `cited` boolean for every
+    // isCited write below. Analyzer's enrichment fields (rank, relevance,
+    // context, citedUrls) are still used, but only when matcher confirms.
+    // Variations come from the run-scoped cache (Wave 9) so the matcher
+    // sees variants the analyzer just learned for THIS response without
+    // a DB round-trip.
+    const matcherDetection = responseText
+      ? detectBrandAndCompetitors(
+          responseText,
+          {
+            id: brand.id,
+            name: brand.name,
+            website: brand.website ?? null,
+            nameVariations: variationCache.get(brand.id) ?? [],
+          },
+          competitors.map((c) => ({
+            id: c.id,
+            name: c.name,
+            website: c.domain ?? null,
+            nameVariations: variationCache.get(c.id) ?? [],
+          })),
+        )
+      : {
+          brand: { matched: false, hitVariants: [], positions: [] },
+          competitors: [] as Array<{
+            competitorId: string;
+            competitorName: string;
+            result: { matched: boolean; hitVariants: string[]; positions: number[] };
+          }>,
+        };
+
+    // Build a quick id→result lookup for the per-competitor write below.
+    const matcherCompResultById = new Map(
+      matcherDetection.competitors.map((c) => [c.competitorId, c.result]),
+    );
+
+    const matcherBrandMatched = matcherDetection.brand.matched;
     const brandVerdict = analysis.tracked[brand.id] ?? null;
-    const isCited = Boolean(brandVerdict?.cited);
-    const rank = isCited ? (brandVerdict?.rank ?? null) : null;
-    const relevance = brandVerdict?.relevance ?? null;
+    const analyzerCited = Boolean(brandVerdict?.cited);
+
+    // Disagreement logging — useful for tuning the variation list. Both
+    // directions are interesting: matcher-yes/analyzer-no usually means
+    // a phrase that's a citation but the analyzer judged off-topic;
+    // matcher-no/analyzer-yes usually means analyzer hallucinated or
+    // surfaced a name we haven't taught the matcher yet.
+    if (matcherBrandMatched !== analyzerCited && responseText) {
+      disagreementCount += 1;
+      logger.info(
+        {
+          brandId,
+          platform,
+          promptId: bp.id,
+          analyzerCited,
+          matcherMatched: matcherBrandMatched,
+          learnedVariants: brandVerdict
+            ? [brandVerdict.name, ...(brandVerdict.variants ?? [])].filter(Boolean)
+            : [],
+          hitVariants: matcherDetection.brand.hitVariants,
+        },
+        "citation.matcher.disagreement",
+      );
+    }
+
+    // Matcher wins. Analyzer's rank/relevance only carry over when the
+    // matcher agreed. When matcher says cited but analyzer did not, we
+    // still write isCited=1 but with null rank/relevance (no fabricated
+    // enrichment). When matcher says not cited, we write isCited=0
+    // regardless of analyzer.
+    const isCited = matcherBrandMatched;
+    const rank = isCited && analyzerCited ? (brandVerdict?.rank ?? null) : null;
+    const relevance = isCited && analyzerCited ? (brandVerdict?.relevance ?? null) : null;
     const brandSentiment = deriveSentiment(relevance, isCited);
 
     let citationContext: string | null = null;
@@ -569,16 +714,37 @@ export async function runBrandPrompts(
       }
     }
 
-    // 4. Competitor citation rows — one per competitor the analyzer flagged
-    // as cited. Absence of a row = not cited (keeps table narrow).
+    // 4. Competitor citation rows — one per competitor the matcher hit on
+    // this response. Absence of a row = not cited (keeps table narrow).
+    // Wave 8: matcher is authoritative for isCited; analyzer's rank/
+    // relevance only used when matcher agrees.
     if (responseText && !fetchError) {
       for (const comp of competitors) {
-        const v = analysis.tracked[comp.id];
-        if (!v || !v.cited) continue;
-        const compUrl = v.citedUrls?.[0] ?? citingOutletUrl;
-        const compContext = v.context
+        const compMatch = matcherCompResultById.get(comp.id);
+        if (!compMatch || !compMatch.matched) continue;
+        const v = analysis.tracked[comp.id] ?? null;
+        const analyzerCompCited = Boolean(v?.cited);
+        if (analyzerCompCited !== true) {
+          logger.info(
+            {
+              competitorId: comp.id,
+              platform,
+              promptId: bp.id,
+              analyzerCited: analyzerCompCited,
+              matcherMatched: true,
+              hitVariants: compMatch.hitVariants,
+            },
+            "citation.matcher.disagreement",
+          );
+        }
+        const compUrl = v?.citedUrls?.[0] ?? citingOutletUrl;
+        const compContext = v?.context
           ? `${v.context.slice(0, 400)}\n\n||| RAW_RESPONSE |||\n${responseText}`
           : citationContext;
+        // Use analyzer enrichment only when analyzer also said cited;
+        // otherwise null/default so we don't fabricate rank/relevance.
+        const compRank = analyzerCompCited ? (v?.rank ?? null) : null;
+        const compRelevance = analyzerCompCited ? (v?.relevance ?? null) : null;
         try {
           await storage.createCompetitorGeoRanking({
             competitorId: comp.id,
@@ -586,11 +752,11 @@ export async function runBrandPrompts(
             brandPromptId: bp.id,
             aiPlatform: platform,
             isCited: 1,
-            rank: v.rank,
-            relevanceScore: v.relevance,
+            rank: compRank,
+            relevanceScore: compRelevance,
             citationContext: compContext,
             citingOutletUrl: compUrl,
-            sentiment: deriveSentiment(v.relevance, true),
+            sentiment: deriveSentiment(compRelevance, true),
           } as any);
         } catch (err) {
           console.warn(
@@ -605,12 +771,17 @@ export async function runBrandPrompts(
       }
 
       // 5. Auto-discovery — upsert analyzer.untracked brands as new
-      // competitors with discoveredBy='citation_auto'. Only when the brand
-      // was cited (filters off-topic responses) and only once per
+      // competitors with discoveredBy='citation_auto'. Only when the
+      // brand was cited (filters off-topic responses) and only once per
       // (runId, platform) with a per-platform cap to bound storm risk.
+      // Wave 8: each candidate is matcher-confirmed against the response
+      // text before insert — protects against analyzer hallucinations
+      // creating phantom competitor rows for brands that aren't actually
+      // mentioned.
       if (isCited && !autoDiscoveredPlatforms.has(platform) && analysis.untracked.length > 0) {
         autoDiscoveredPlatforms.add(platform);
         let inserted = 0;
+        let dropped = 0;
         const candidates = analysis.untracked
           .filter((u) => u.cited)
           .slice(0, MAX_AUTO_DISCOVERIES_PER_PLATFORM);
@@ -626,6 +797,24 @@ export async function runBrandPrompts(
             } catch {
               /* skip bad URLs */
             }
+          }
+          // Matcher-confirm the candidate before persisting. Use the
+          // analyzer's reported name + variants as the entity definition,
+          // and the response text as the haystack. If the matcher can't
+          // find the brand at all, skip — analyzer probably hallucinated.
+          const candMatch = matchEntity(responseText, {
+            id: `auto-${name}`,
+            name,
+            nameVariations: cand.variants ?? [],
+            website: derivedDomain || null,
+          });
+          if (!candMatch.matched) {
+            dropped += 1;
+            logger.info(
+              { brandId, platform, candidate: name, variants: cand.variants ?? [] },
+              "citation.auto_discovery.dropped_no_match",
+            );
+            continue;
           }
           try {
             await storage.createCompetitor({
@@ -644,9 +833,9 @@ export async function runBrandPrompts(
             );
           }
         }
-        if (inserted > 0) {
+        if (inserted > 0 || dropped > 0) {
           console.log(
-            `[citationChecker] auto-discovered ${inserted} new competitors from ${platform}`,
+            `[citationChecker] auto-discovery ${platform}: inserted=${inserted}, dropped=${dropped}`,
           );
         }
       }
@@ -679,20 +868,18 @@ export async function runBrandPrompts(
 
       // Brand mentions — semantic distinction from citations:
       //   Citation = brand appeared in a ranked recommendation (geo_rankings.isCited=1)
-      //   Mention  = brand name appeared in the response at all, even if
-      //              only as a passing reference (analyzer detected it)
-      // We write a brand_mentions row whenever the analyzer surfaced the
-      // brand, NOT just on cited responses. This keeps "Brand Mentions" on
-      // client-reports meaningfully different from "Citations" — previously
-      // they were the same number since mentions were only written on
-      // cited rows.
+      //   Mention  = brand name appeared verbatim in the response at all,
+      //              even if only as a passing reference
+      // Wave 8: a mention row exists if AND ONLY IF the matcher hit. We
+      // used to gate this on the analyzer surfacing the brand (which
+      // included hallucinated mentions). Now mentions are tied to the
+      // same authoritative signal as citations.
       //
       // Synthetic URL makes every (run, prompt, platform) tuple unique so
-      // the (brand_id, platform, source_url) dedup index doesn't inflate on
-      // re-runs. `rank` is null when the brand was mentioned without being
-      // in a ranked list — UI can filter on this to distinguish the two.
-      const brandDetected = Boolean(brandVerdict);
-      if (brandDetected) {
+      // the (brand_id, platform, source_url) dedup index doesn't inflate
+      // on re-runs. `rank` is null when the brand was mentioned without
+      // being in a ranked list — UI filters on this to distinguish.
+      if (matcherBrandMatched) {
         const syntheticUrl = citingOutletUrl || `ai://${platform}/${citationRun.id}/${bp.id}`;
         const aiPlatformLabel = `ai:${platform}`;
         try {
@@ -733,12 +920,40 @@ export async function runBrandPrompts(
     }
   };
 
+  // Wave 8/9: bump citation_runs.progress_pct so the live-update hook sees
+  // movement. Bump cadence: every PROGRESS_BUMP_EVERY tasks OR every
+  // PROGRESS_BUMP_INTERVAL_MS, whichever comes first. The time-based path
+  // ensures small runs (e.g. 3-task single-prompt re-runs) still feel live;
+  // the count-based path keeps the write rate sane on large runs.
+  const PROGRESS_BUMP_EVERY = 5;
+  const PROGRESS_BUMP_INTERVAL_MS = 1500;
+  let lastBumpAt = 0;
+  let tasksSinceBump = 0;
+  const bumpProgressIfDue = async (force = false) => {
+    if (completedCount === 0 && !force) return;
+    if (completedCount === totalTasks) return; // finalize handles 100%
+    tasksSinceBump += 1;
+    const now = Date.now();
+    const dueByCount = tasksSinceBump >= PROGRESS_BUMP_EVERY;
+    const dueByTime = now - lastBumpAt >= PROGRESS_BUMP_INTERVAL_MS;
+    if (!force && !dueByCount && !dueByTime) return;
+    const pct = Math.min(99, Math.floor((completedCount / Math.max(1, totalTasks)) * 100));
+    try {
+      await storage.bumpCitationRunProgress(citationRun.id, pct, rankings.length, totalCited);
+      lastBumpAt = now;
+      tasksSinceBump = 0;
+    } catch (err) {
+      logger.warn({ err, runId: citationRun.id }, "bumpCitationRunProgress failed");
+    }
+  };
+
   const worker = async (): Promise<void> => {
     while (true) {
       const idx = cursor++;
       if (idx >= queue.length) return;
       await runOne(queue[idx]);
       completedCount += 1;
+      await bumpProgressIfDue();
       if (options.onProgress) {
         try {
           await options.onProgress(completedCount, totalTasks);
@@ -767,13 +982,29 @@ export async function runBrandPrompts(
       { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 },
     ]),
   );
+  // Wave 8: classify the run as succeeded / partial / failed based on what
+  // actually got persisted. 'partial' = some checks went through but at
+  // least one platform fully failed (every task on it errored). For now
+  // we treat any run with rankings present as succeeded — the platform-
+  // level partial-failure detection is left for a future tighter pass.
+  const runStatus: "succeeded" | "failed" = totalChecks === 0 ? "failed" : "succeeded";
+
   await storage.updateCitationRun(citationRun.id, {
     totalChecks,
     totalCited,
     citationRate,
     completedAt: new Date(),
     platformBreakdown,
-  });
+    status: runStatus,
+    progressPct: 100,
+    // Wave 9: surface a reason on HistoryTab when a run finalizes with zero
+    // rankings — helps users tell "0% citation rate" apart from "every API
+    // call failed". The detached kickoff overwrites this if the run threw.
+    ...(runStatus === "failed" && totalChecks === 0
+      ? { errorMessage: "All platform calls failed — no rankings were saved." }
+      : {}),
+    disagreementCount,
+  } as any);
 
   console.log(
     `[citationChecker] run ${citationRun.id} complete — ${totalCited}/${totalChecks} cited (${citationRate}%)`,
@@ -832,4 +1063,100 @@ export async function runBrandPrompts(
   }
 
   return { totalChecks, totalCited, rankings, runId: citationRun.id };
+}
+
+// ---- Wave 9: async kickoff path ----------------------------------------
+//
+// `runBrandPrompts` blocks for the entire run (10 prompts × 5 platforms can
+// take 30-120s of held-open HTTP). Reverse proxies (Cloudflare 100s, Render
+// 100s, AWS ALB 60s) idle-timeout long before that, returning a 502 to the
+// browser even though the run continues server-side. The user then sees a
+// "Check failed" toast for a successful run.
+//
+// `kickoffBrandPromptsRun` is the new front door: it synchronously creates
+// the citation_runs row (which hits the partial unique index from migration
+// 0035 — duplicate concurrent kickoffs throw a 23505 we surface as 409),
+// then schedules the actual run on `setImmediate` and returns the runId.
+// HTTP handler returns ~100ms regardless of run size; the client subscribes
+// to SSE / polls the active-runs gate for completion.
+
+export type KickoffResult =
+  | { ok: true; runId: string }
+  | { ok: false; reason: "already_running"; runId: string }
+  | { ok: false; reason: "race"; runId: null };
+
+export async function kickoffBrandPromptsRun(
+  brandId: string,
+  platforms: string[] = [...DEFAULT_CITATION_PLATFORMS],
+  options: {
+    triggeredBy?: "manual" | "cron" | "auto_onboarding";
+    promptIds?: string[];
+  } = {},
+): Promise<KickoffResult> {
+  const triggeredBy = options.triggeredBy ?? "manual";
+  const newRow = () =>
+    storage.createCitationRun({
+      brandId,
+      triggeredBy,
+      totalChecks: 0,
+      totalCited: 0,
+      citationRate: 0,
+      status: "running",
+      progressPct: 0,
+    } as any);
+
+  let runId: string;
+  try {
+    const created = await newRow();
+    runId = created.id;
+  } catch (err: any) {
+    // 23505 = unique_violation on citation_runs_one_active_per_brand.
+    if (err?.code !== "23505") throw err;
+    const active = await storage.getActiveCitationRuns(brandId);
+    const existing = active[0];
+    if (existing) {
+      logger.info(
+        { brandId, existingRunId: existing.id },
+        "citation.run.kickoff.duplicate_blocked",
+      );
+      return { ok: false, reason: "already_running", runId: existing.id };
+    }
+    // Wave 9.2: race window — the partial unique index tripped, but
+    // by the time we re-read active runs, the conflicting row has
+    // already finalized. Retry the insert exactly once. If it still
+    // collides, surface as a "race" result; the caller (route) returns
+    // 500 with a generic "couldn't start run — try again" message.
+    // Bounded so we can never recurse on a pathological loop.
+    try {
+      const retry = await newRow();
+      runId = retry.id;
+    } catch (retryErr: any) {
+      logger.warn({ err: retryErr, brandId }, "citation.run.kickoff.race_after_retry");
+      return { ok: false, reason: "race", runId: null };
+    }
+  }
+
+  // Detach the heavy work. Errors are written to citation_runs.error_message
+  // so the UI can surface them on HistoryTab without losing the run record.
+  setImmediate(() => {
+    runBrandPrompts(brandId, platforms, {
+      ...options,
+      runId,
+    }).catch(async (err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error({ err, brandId, runId }, "citation.run.detached_failed");
+      try {
+        await storage.updateCitationRun(runId, {
+          status: "failed",
+          progressPct: 100,
+          completedAt: new Date(),
+          errorMessage: msg.slice(0, 500),
+        } as any);
+      } catch (writeErr) {
+        logger.error({ err: writeErr, runId }, "citation.run.failure_write_failed");
+      }
+    });
+  });
+
+  return { ok: true, runId };
 }

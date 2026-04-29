@@ -165,6 +165,7 @@ export interface IStorage {
   getGeoRankingsByPlatform(platform: string): Promise<GeoRanking[]>;
   countCitedRankingsForArticle(articleId: string): Promise<number>;
   getGeoRankingsByBrandPromptIds(ids: string[], sinceDate?: Date): Promise<GeoRanking[]>;
+  getGeoRankingsByArticleIds(ids: string[], sinceDate?: Date): Promise<GeoRanking[]>;
   updateGeoRanking(id: string, update: Partial<GeoRanking>): Promise<GeoRanking | undefined>;
 
   // Brand Prompt methods
@@ -178,7 +179,10 @@ export interface IStorage {
   archiveSuggestedPrompts(brandId: string): Promise<void>;
   updateBrandPromptText(id: string, prompt: string): Promise<BrandPrompt | undefined>;
   archiveBrandPrompt(id: string): Promise<void>;
-  promoteSuggestionToTracked(suggestionId: string, replaceTrackedId: string): Promise<void>;
+  // Wave 9.1: replaceTrackedId is optional now. Pass null to add the
+  // suggestion as a new tracked prompt without archiving anything (only
+  // valid when current tracked count < cap; route enforces).
+  promoteSuggestionToTracked(suggestionId: string, replaceTrackedId: string | null): Promise<void>;
   createPromptGeneration(brandId: string): Promise<PromptGeneration>;
   getPromptGenerationsByBrandId(brandId: string): Promise<PromptGeneration[]>;
   getGeoRankingsByRunId(runId: string): Promise<GeoRanking[]>;
@@ -193,6 +197,45 @@ export interface IStorage {
   createCitationRun(run: InsertCitationRun): Promise<CitationRun>;
   updateCitationRun(id: string, update: Partial<CitationRun>): Promise<CitationRun | undefined>;
   getCitationRunsByBrandId(brandId: string, limit?: number): Promise<CitationRun[]>;
+  // Wave 9: read a single run by id (used by the async kickoff to hand the
+  // pre-created row over to runBrandPrompts via options.runId).
+  getCitationRunById(runId: string): Promise<CitationRun | undefined>;
+  // Wave 9.1: recompute totals + breakdown for a single run from
+  // geo_rankings. The canonical aggregator — every code path that mutates
+  // is_cited on a ranking should call this so the run header stays in
+  // sync with the drill-down. Returns the new totals for the caller's
+  // convenience (no-op if the run has no rankings yet).
+  recomputeCitationRunAggregate(runId: string): Promise<{
+    totalChecks: number;
+    totalCited: number;
+    citationRate: number;
+  }>;
+  // Wave 8: live-update lifecycle
+  getActiveCitationRuns(
+    brandId: string,
+  ): Promise<Array<{ id: string; startedAt: Date; progressPct: number; status: string }>>;
+  bumpCitationRunProgress(
+    runId: string,
+    progressPct: number,
+    totalChecks: number,
+    totalCited: number,
+  ): Promise<void>;
+  getCitationRunLiveState(runId: string): Promise<
+    | {
+        id: string;
+        status: string;
+        progressPct: number;
+        totalChecks: number;
+        totalCited: number;
+        citationRate: number;
+      }
+    | undefined
+  >;
+  getRecentRankingsForRun(
+    runId: string,
+    sinceMs: number,
+    limit?: number,
+  ): Promise<Array<{ id: string; aiPlatform: string; isCited: number; checkedAt: Date | null }>>;
 
   // Content generation job queue
   enqueueContentJob(job: InsertContentGenerationJob): Promise<ContentGenerationJob>;

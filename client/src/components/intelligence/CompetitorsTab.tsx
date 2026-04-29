@@ -26,18 +26,20 @@ interface LeaderboardEntry {
   platformBreakdown: Record<string, number>;
 }
 
-export default function CompetitorsTab({
-  selectedBrandId: _selectedBrandId,
-}: {
-  selectedBrandId: string;
-}) {
+export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: string }) {
   const { toast } = useToast();
 
+  // Wave 9.3: scope both queries to the active brand. Previously these
+  // omitted brandId entirely, so the server's no-brand-id branch
+  // aggregated leaderboards across every brand the user owned and
+  // mixed multi-brand competitor lists into the panel — switching
+  // brands didn't change what was rendered.
   const { data: competitorsData, isLoading: competitorsLoading } = useQuery<{
     success: boolean;
     data: Competitor[];
   }>({
-    queryKey: ["/api/competitors"],
+    queryKey: ["/api/competitors", { brandId: selectedBrandId }],
+    enabled: !!selectedBrandId,
   });
 
   const { data: leaderboardData, isLoading: leaderboardLoading } = useQuery<{
@@ -45,7 +47,8 @@ export default function CompetitorsTab({
     data: LeaderboardEntry[];
     meta?: { totalTracked: number; withActivity: number };
   }>({
-    queryKey: ["/api/competitors/leaderboard"],
+    queryKey: ["/api/competitors/leaderboard", { brandId: selectedBrandId }],
+    enabled: !!selectedBrandId,
   });
 
   const competitorsList = competitorsData?.data || [];
@@ -62,11 +65,17 @@ export default function CompetitorsTab({
 
   const createCompetitorMutation = useMutation({
     mutationFn: async (data: typeof newCompetitor) => {
-      return apiRequest("POST", "/api/competitors", data);
+      return apiRequest("POST", "/api/competitors", { ...data, brandId: selectedBrandId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/competitors"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/competitors/leaderboard"] });
+      // Predicate-based invalidation matches every variant of the key
+      // (with or without a brandId object segment).
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          (q.queryKey[0] === "/api/competitors" ||
+            q.queryKey[0] === "/api/competitors/leaderboard"),
+      });
       setIsCompetitorDialogOpen(false);
       setNewCompetitor({ name: "", domain: "", industry: "", description: "" });
       toast({
@@ -84,8 +93,12 @@ export default function CompetitorsTab({
       return apiRequest("DELETE", `/api/competitors/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/competitors"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/competitors/leaderboard"] });
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          (q.queryKey[0] === "/api/competitors" ||
+            q.queryKey[0] === "/api/competitors/leaderboard"),
+      });
       toast({
         title: "Competitor Removed",
         description: "Competitor has been removed from tracking.",

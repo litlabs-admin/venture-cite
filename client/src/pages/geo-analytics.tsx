@@ -33,11 +33,15 @@ import {
 import { SiOpenai, SiGoogle } from "react-icons/si";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
+import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 
 interface PlatformMetrics {
   mentions: number;
   citations: number;
-  avgRank: number;
+  // null = no ranked rows (rank field absent on this platform); 0 is
+  // a valid "ranked at position 0" value, so we keep them distinct.
+  avgRank: number | null;
   sentiment: { positive: number; neutral: number; negative: number };
   visibilityScore: number;
 }
@@ -109,13 +113,36 @@ function getSentimentIcon(label: string) {
 export default function GeoAnalytics() {
   const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
 
+  // Wave 9: live-refresh during citation runs. Hook returns the polling
+  // cadence we thread directly into useQuery — TanStack only honors
+  // refetchInterval at observer-creation time, so it has to be set on the
+  // useQuery itself, not via setQueryDefaults after the fact.
+  // Wave 9.2: also scope the query to the active run's window via the
+  // `since` segment in the queryKey (default queryFn turns object
+  // segments into URL params). Without this, GEO Analytics mixes
+  // months of historical rankings with the few new ones from a fresh
+  // run — totals barely move during the run and SoV looks frozen.
+  const { refetchInterval } = useCitationLiveRefresh(selectedBrandId, [
+    ["/api/geo-analytics", selectedBrandId],
+  ]);
+  const { runs: activeRuns } = useActiveCitationRuns(selectedBrandId);
+  const since = activeRuns[0]?.startedAt ?? null;
+
   const {
     data: analyticsResponse,
     isLoading: analyticsLoading,
     error,
   } = useQuery<{ success: boolean; data: GeoAnalyticsData }>({
-    queryKey: ["/api/geo-analytics", selectedBrandId],
+    // Wave 9.3: use an explicit "all" sentinel when no run is active so
+    // the queryKey is stable. The previous `since: ""` form silently
+    // dropped the segment from the URL via the queryFn's empty-string
+    // skip, but TanStack still treats `""` and a non-empty ISO string
+    // as different keys — so when a run completes and `since` flips
+    // back to null, the cache key changed and the page lost its
+    // run-window snapshot before the new fetch returned.
+    queryKey: ["/api/geo-analytics", selectedBrandId, { since: since ?? "all" }],
     enabled: !!selectedBrandId,
+    refetchInterval,
   });
 
   const analytics = analyticsResponse?.data;
@@ -367,7 +394,9 @@ export default function GeoAnalytics() {
                             </div>
                             <div>
                               <p className="text-muted-foreground">Avg Rank</p>
-                              <p className="font-semibold">{metrics.avgRank || "N/A"}</p>
+                              <p className="font-semibold">
+                                {metrics.avgRank === null ? "—" : metrics.avgRank}
+                              </p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Sentiment</p>

@@ -555,6 +555,17 @@ export function setupAnalyticsRoutes(app: Express): void {
         return res.status(404).json({ success: false, error: "Brand not found" });
       }
 
+      // Wave 9.2: optional ?since=<ISO> filters rankings to a fresh
+      // citation run's window. Without this, every all-time ranking
+      // counts during a fresh run, so the new run's incoming numbers
+      // are statistically dwarfed by months of history. When the param
+      // is missing/malformed we fall back to all-time (legacy behavior).
+      // Wave 9.3: client sends `since=all` as a sentinel for "no active
+      // run, give me the all-time view." Treat it the same as missing.
+      const sinceRaw = typeof req.query.since === "string" ? req.query.since : null;
+      const sinceDate = sinceRaw && sinceRaw !== "all" ? new Date(sinceRaw) : null;
+      const sinceFilter = sinceDate && !isNaN(sinceDate.getTime()) ? sinceDate : undefined;
+
       // Get brand's articles (all statuses; the brand-ownership guard
       // already ensured the caller owns this brand).
       const allArticles = await storage.getArticles();
@@ -568,12 +579,23 @@ export function setupAnalyticsRoutes(app: Express): void {
       const brandPrompts = await storage.getBrandPromptsByBrandId(brand.id);
       const brandPromptIds = new Set(brandPrompts.map((p) => p.id));
 
-      const allRankings = await storage.getGeoRankings();
-      const brandRankings = allRankings.filter(
-        (r) =>
-          (r.articleId && articleIds.has(r.articleId)) ||
-          (r.brandPromptId && brandPromptIds.has(r.brandPromptId)),
-      );
+      // Wave 9.2: prefer the indexed (brandPromptId, since) read over
+      // the all-rankings scan + post-filter. The article-tied rankings
+      // are loaded separately and merged below — they aren't tied to
+      // citation runs and don't suffer from the mixed-window problem.
+      const promptRankings =
+        brandPrompts.length > 0
+          ? await storage.getGeoRankingsByBrandPromptIds(Array.from(brandPromptIds), sinceFilter)
+          : [];
+      // Wave 9.3: indexed read with the same `since` filter as the
+      // brand-prompt path. Previously this fetched every geo_ranking
+      // row globally and post-filtered in memory — both inefficient
+      // and prone to mixing all-time article rankings into a fresh
+      // run's window if `checkedAt` precision drifted.
+      const articleRankings = articleIds.size
+        ? await storage.getGeoRankingsByArticleIds(Array.from(articleIds), sinceFilter)
+        : [];
+      const brandRankings = [...promptRankings, ...articleRankings];
 
       // Calculate metrics by platform
       const platformMetrics: Record<
@@ -581,7 +603,7 @@ export function setupAnalyticsRoutes(app: Express): void {
         {
           mentions: number;
           citations: number;
-          avgRank: number;
+          avgRank: number | null;
           sentiment: { positive: number; neutral: number; negative: number };
           visibilityScore: number;
         }
@@ -603,10 +625,15 @@ export function setupAnalyticsRoutes(app: Express): void {
         // wasn't cited.
         const citedRows = platformRankings.filter((r) => r.isCited === 1);
         const rankedItems = citedRows.filter((r) => r.rank !== null && r.rank !== undefined);
-        const avgRank =
+        // Use a separate `avgRankRaw` for scoring (treat missing rank as
+        // 0 = no penalty) and emit `avgRank: number | null` for the UI
+        // so it can show "—" for "no rank data" vs a real 0.
+        const avgRankRaw =
           rankedItems.length > 0
             ? rankedItems.reduce((sum, r) => sum + (r.rank || 0), 0) / rankedItems.length
             : 0;
+        const avgRank: number | null =
+          rankedItems.length > 0 ? Math.round(avgRankRaw * 10) / 10 : null;
 
         // Count sentiment (only from cited rows — sentiment of a not-cited
         // row is noise).
@@ -631,8 +658,11 @@ export function setupAnalyticsRoutes(app: Express): void {
             CITATION_SCORING.citationWeight + CITATION_SCORING.mentionWeight,
           );
           const rankScore =
-            avgRank > 0
-              ? Math.max(CITATION_SCORING.rankWeight - avgRank * CITATION_SCORING.rankMultiplier, 0)
+            avgRankRaw > 0
+              ? Math.max(
+                  CITATION_SCORING.rankWeight - avgRankRaw * CITATION_SCORING.rankMultiplier,
+                  0,
+                )
               : 0;
           visibilityScore = Math.round(citationScore + rankScore);
         }
@@ -640,15 +670,22 @@ export function setupAnalyticsRoutes(app: Express): void {
         platformMetrics[platform] = {
           mentions,
           citations,
-          avgRank: Math.round(avgRank * 10) / 10,
+          avgRank,
           sentiment: sentimentCounts,
           visibilityScore: Math.min(visibilityScore, 100),
         };
       }
 
-      // Get competitor data for Share of Voice calculation
+      // Get competitor data for Share of Voice calculation. Pass the
+      // same `sinceFilter` so the leaderboard's totals come from the
+      // same window as the brand metrics — otherwise SoV mixes a
+      // run-window numerator with an all-time denominator and reads
+      // dramatically too low during a fresh run. When no run is
+      // active the leaderboard helper falls back to its 30-day default.
       const competitors = await storage.getCompetitors(brand.id);
-      const leaderboard = await storage.getCompetitorLeaderboard(brand.id);
+      const leaderboard = await storage.getCompetitorLeaderboard(brand.id, {
+        since: sinceFilter,
+      });
 
       // Calculate total market citations (brand + all competitors)
       const brandTotalCitations = Object.values(platformMetrics).reduce(

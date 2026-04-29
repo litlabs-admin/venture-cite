@@ -91,6 +91,11 @@ export async function scanBrandListicles(
   const existing = await storage.getListicles(brandId).catch(() => [] as Listicle[]);
   const existingUrls = new Set(existing.map((l: Listicle) => l.url.toLowerCase()));
 
+  // Wave 8: load tracked competitors once so we can matcher-confirm the
+  // LLM's competitorsMentioned[] per page. Drops phantom competitors
+  // the LLM hallucinated as being on the page.
+  const trackedCompetitors = await storage.getCompetitors(brandId).catch(() => []);
+
   const queries = buildQueries(brand);
   if (queries.length === 0) return { inserted: 0, candidates: 0, reason: "no_candidates" };
 
@@ -140,16 +145,58 @@ export async function scanBrandListicles(
       }
     })();
 
-    // Shared matcher decides isIncluded — authoritative over the LLM's
-    // mentionsBrand guess. The LLM can hallucinate; variant-matching against
-    // the actual page text can't.
+    // Wave 8: matcher is the sole authority for isIncluded. Previously we
+    // OR'd matcher result with the LLM's mentionsBrand boolean — but that
+    // let LLM hallucinations through. The variant list now resolves the
+    // LLM's job (catching alternative spellings) without trusting its
+    // verdict.
     const matcherResult = matchEntity(pageText, {
       id: brand.id,
       name: brand.name,
       nameVariations: Array.isArray(brand.nameVariations) ? brand.nameVariations : [],
       website: brand.website ?? null,
     });
-    const isIncluded = matcherResult.matched || Boolean(parsed.mentionsBrand) ? 1 : 0;
+    const isIncluded = matcherResult.matched ? 1 : 0;
+    // Force position to null when the matcher says the brand isn't on
+    // the page, regardless of what the LLM claimed about brandPosition.
+    const listPosition = matcherResult.matched ? (parsed.brandPosition ?? null) : null;
+
+    // Filter the LLM's competitorsMentioned[] through a matcher pass per
+    // tracked competitor. Drops names the LLM claims are on the page but
+    // the matcher can't verify in pageText. Untracked names (not in our
+    // competitor table) pass through unchanged — matcher can't validate
+    // what it doesn't know about, and these are useful for outreach.
+    const trackedCompIds = new Set(trackedCompetitors.map((c) => c.id));
+    const llmItemNames = Array.isArray(parsed.items)
+      ? parsed.items.map((i: any) => String(i.name).slice(0, 120)).slice(0, 30)
+      : [];
+    const filteredCompetitorNames: string[] = [];
+    for (const item of llmItemNames) {
+      // Try to map this LLM-extracted name to a tracked competitor by
+      // case-insensitive name match. If we have a tracked match, run the
+      // matcher with that competitor's full variation list.
+      const trackedMatch = trackedCompetitors.find(
+        (c) => c.name.toLowerCase() === item.toLowerCase(),
+      );
+      if (trackedMatch) {
+        const compMatch = matchEntity(pageText, {
+          id: trackedMatch.id,
+          name: trackedMatch.name,
+          nameVariations: Array.isArray((trackedMatch as any).nameVariations)
+            ? ((trackedMatch as any).nameVariations as string[])
+            : [],
+          website: trackedMatch.domain ?? null,
+        });
+        if (compMatch.matched) filteredCompetitorNames.push(item);
+        // else: LLM claimed this competitor was on the page but matcher
+        // couldn't find them — drop. Don't log per-name (would spam on
+        // every weekly cron).
+      } else {
+        // Not in our competitor table. Keep — useful for outreach UI.
+        filteredCompetitorNames.push(item);
+      }
+    }
+    void trackedCompIds; // reserved for future stricter filters
 
     try {
       await storage.createListicle({
@@ -157,12 +204,10 @@ export async function scanBrandListicles(
         title: String(parsed.title || meta.title || url).slice(0, 500),
         url,
         sourcePublication: host,
-        listPosition: parsed.brandPosition ?? null,
+        listPosition,
         totalListItems: parsed.totalItems ?? null,
         isIncluded,
-        competitorsMentioned: Array.isArray(parsed.items)
-          ? parsed.items.map((i: any) => String(i.name).slice(0, 120)).slice(0, 30)
-          : [],
+        competitorsMentioned: filteredCompetitorNames,
         keyword: meta.query,
         lastChecked: new Date(),
       } as any);

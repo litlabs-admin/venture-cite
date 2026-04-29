@@ -270,15 +270,27 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                         {hal.isResolved === 1 ? (
                           <Badge className="bg-green-100 text-green-800">Resolved</Badge>
                         ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => resolveHallucinationMutation.mutate(hal.id)}
-                            data-testid={`button-resolve-${hal.id}`}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            Mark Resolved
-                          </Button>
+                          (() => {
+                            // Only "pending" / "in_progress" hallucinations
+                            // can transition to resolved (server enforces
+                            // via assertTransition; the button used to
+                            // stay enabled for "verified"/"dismissed" too,
+                            // producing a confusing 409 toast).
+                            const actionable =
+                              !remStatus || remStatus === "pending" || remStatus === "in_progress";
+                            return (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => resolveHallucinationMutation.mutate(hal.id)}
+                                disabled={!actionable || resolveHallucinationMutation.isPending}
+                                data-testid={`button-resolve-${hal.id}`}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Mark Resolved
+                              </Button>
+                            );
+                          })()
                         )}
                       </div>
 

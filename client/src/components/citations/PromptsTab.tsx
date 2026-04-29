@@ -30,6 +30,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { Brand } from "@shared/schema";
 
+// Wave 9: client-side cap on prompt length. Mirrors a sensible LLM context
+// budget — 500 chars is plenty for a citation-style question while keeping
+// the textarea readable. Server may impose a different limit; this cap
+// just avoids round-tripping obviously-bad input.
+const PROMPT_MAX_LEN = 500;
+
 type BrandPrompt = {
   id: string;
   brandId: string;
@@ -157,25 +163,35 @@ export default function PromptsTab({
       toast({ title: "Couldn't refresh", description: err.message, variant: "destructive" }),
   });
 
+  // Wave 9.1: Accept can run in two modes.
+  //   * Add (tracked count < cap): just promote — no archive needed.
+  //   * Replace (cap reached): caller picks a tracked prompt to retire.
+  // Server enforces the cap; client picks the right body shape based on
+  // current count so the dialog can render an "Add" UX vs the existing
+  // "Replace" radio list.
   const acceptSuggestionMutation = useMutation({
     mutationFn: async ({
       suggestionId,
       replaceTrackedId,
     }: {
       suggestionId: string;
-      replaceTrackedId: string;
+      replaceTrackedId: string | null;
     }) => {
       const r = await apiRequest(
         "POST",
         `/api/brand-prompts/${selectedBrandId}/suggestions/${suggestionId}/accept`,
-        { replaceTrackedId },
+        replaceTrackedId ? { replaceTrackedId } : {},
       );
       return r.json();
     },
     onSuccess: (data) => {
       if (data.success) {
         invalidatePromptQueries();
-        toast({ title: "Suggestion accepted", description: "Tracked set updated." });
+        toast({
+          title: "Suggestion accepted",
+          description:
+            data.data?.mode === "added" ? "Added to tracked set." : "Tracked set updated.",
+        });
       } else {
         toast({
           title: "Couldn't accept",
@@ -205,6 +221,9 @@ export default function PromptsTab({
     },
   });
 
+  // Wave 9: optimistic update — write the new text into the cache before
+  // the server responds, rollback on error. ~500ms of unresponsive UI per
+  // edit on slow networks goes to instant. Snapshot/restore on error.
   const editPromptMutation = useMutation({
     mutationFn: async ({ promptId, text }: { promptId: string; text: string }) => {
       const r = await apiRequest(
@@ -214,11 +233,31 @@ export default function PromptsTab({
       );
       return r.json();
     },
+    onMutate: async ({ promptId, text }) => {
+      const key = [`/api/brand-prompts/${selectedBrandId}`];
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<{ success: boolean; data: BrandPrompt[] }>(key);
+      if (previous?.data) {
+        queryClient.setQueryData(key, {
+          ...previous,
+          data: previous.data.map((p) => (p.id === promptId ? { ...p, prompt: text } : p)),
+        });
+      }
+      return { previous };
+    },
+    onError: (err: Error, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData([`/api/brand-prompts/${selectedBrandId}`], ctx.previous);
+      }
+      toast({ title: "Update failed", description: err.message, variant: "destructive" });
+    },
     onSuccess: (data) => {
       if (data.success) {
         invalidatePromptQueries();
         toast({ title: "Prompt updated" });
       } else {
+        // Server returned 200 but data.success=false — rollback via invalidate.
+        invalidatePromptQueries();
         toast({
           title: "Update failed",
           description: data.error || "Try again",
@@ -261,7 +300,16 @@ export default function PromptsTab({
   const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [acceptingSuggestion, setAcceptingSuggestion] = useState<BrandPrompt | null>(null);
+  // Wave 9: default to no selection so accidentally clicking Confirm on the
+  // accept dialog can't silently nuke prompt #1 (previous default).
   const [acceptReplaceId, setAcceptReplaceId] = useState<string>("");
+  // Wave 9: gate Reset all behind an explicit checkbox to avoid one-click
+  // destructive actions. Reset is rare; the extra friction is the right
+  // trade-off.
+  const [resetConfirmed, setResetConfirmed] = useState(false);
+  // Wave 9: confirmation gate for Refresh suggestions — it silently burns
+  // an AI call from the user's monthly quota and was a one-click button.
+  const [showRefreshSuggestionsConfirm, setShowRefreshSuggestionsConfirm] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -285,7 +333,11 @@ export default function PromptsTab({
               </CardDescription>
             </div>
             {hasPrompts && (
-              <AlertDialog>
+              <AlertDialog
+                onOpenChange={(open) => {
+                  if (!open) setResetConfirmed(false);
+                }}
+              >
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" size="sm" data-testid="button-reset-prompts">
                     <RefreshCw className="h-4 w-4 mr-2" />
@@ -301,12 +353,27 @@ export default function PromptsTab({
                       week-over-week trends will restart.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
+                  {/* Wave 9: explicit checkbox so a misclick can't trigger
+                      a destructive 10-prompt rebuild. */}
+                  <label className="flex items-start gap-2 text-sm cursor-pointer mt-2">
+                    <input
+                      type="checkbox"
+                      checked={resetConfirmed}
+                      onChange={(e) => setResetConfirmed(e.target.checked)}
+                      className="mt-0.5"
+                      data-testid="checkbox-reset-confirm"
+                    />
+                    <span>
+                      I understand this archives all {prompts.length} tracked prompts and all
+                      pending suggestions.
+                    </span>
+                  </label>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                      disabled={resetMutation.isPending}
+                      disabled={resetMutation.isPending || !resetConfirmed}
                       onClick={(e) => {
-                        if (resetMutation.isPending) {
+                        if (resetMutation.isPending || !resetConfirmed) {
                           e.preventDefault();
                           return;
                         }
@@ -375,34 +442,67 @@ export default function PromptsTab({
                           <div className="space-y-2">
                             <Textarea
                               value={editingText}
-                              onChange={(e) => setEditingText(e.target.value)}
+                              onChange={(e) =>
+                                setEditingText(e.target.value.slice(0, PROMPT_MAX_LEN))
+                              }
                               className="min-h-[60px]"
+                              maxLength={PROMPT_MAX_LEN}
                               autoFocus
                             />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  if (editingText.trim() && editingText.trim() !== p.prompt) {
-                                    editPromptMutation.mutate({
-                                      promptId: p.id,
-                                      text: editingText.trim(),
-                                    });
-                                  }
-                                  setEditingPromptId(null);
-                                }}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    const trimmed = editingText.trim();
+                                    // Wave 9: client-side validation. Empty
+                                    // and over-length values are rejected
+                                    // with a toast rather than silently
+                                    // dropped. No-op on unchanged text.
+                                    if (!trimmed) {
+                                      toast({
+                                        title: "Prompt can't be empty",
+                                        variant: "destructive",
+                                      });
+                                      return;
+                                    }
+                                    if (trimmed.length > PROMPT_MAX_LEN) {
+                                      toast({
+                                        title: `Prompt is too long (${trimmed.length}/${PROMPT_MAX_LEN})`,
+                                        variant: "destructive",
+                                      });
+                                      return;
+                                    }
+                                    if (trimmed !== p.prompt) {
+                                      editPromptMutation.mutate({
+                                        promptId: p.id,
+                                        text: trimmed,
+                                      });
+                                    }
+                                    setEditingPromptId(null);
+                                  }}
+                                >
+                                  <Check className="h-3.5 w-3.5 mr-1" />
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEditingPromptId(null)}
+                                >
+                                  <X className="h-3.5 w-3.5 mr-1" />
+                                  Cancel
+                                </Button>
+                              </div>
+                              <span
+                                className={`text-xs tabular-nums ${
+                                  editingText.length >= PROMPT_MAX_LEN
+                                    ? "text-destructive"
+                                    : "text-muted-foreground"
+                                }`}
                               >
-                                <Check className="h-3.5 w-3.5 mr-1" />
-                                Save
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingPromptId(null)}
-                              >
-                                <X className="h-3.5 w-3.5 mr-1" />
-                                Cancel
-                              </Button>
+                                {editingText.length}/{PROMPT_MAX_LEN}
+                              </span>
                             </div>
                           </div>
                         ) : (
@@ -443,8 +543,10 @@ export default function PromptsTab({
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Remove this tracked prompt?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Future weekly runs won't include it. Past citation history stays
-                                  intact. You can accept a suggestion later to backfill the slot.
+                                  Future weekly runs won&apos;t include it. Past citation history
+                                  for this prompt stays intact, but the week-over-week trend line
+                                  will gap until a replacement is accepted. You can accept a
+                                  suggestion later to backfill the slot.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -488,18 +590,45 @@ export default function PromptsTab({
                   set misses. Accept one to swap it in for a tracked prompt you want to retire.
                 </CardDescription>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refreshSuggestionsMutation.mutate()}
-                disabled={refreshSuggestionsMutation.isPending}
-                data-testid="button-refresh-suggestions"
+              {/* Wave 9: confirm before burning AI quota. */}
+              <AlertDialog
+                open={showRefreshSuggestionsConfirm}
+                onOpenChange={setShowRefreshSuggestionsConfirm}
               >
-                <RefreshCw
-                  className={`h-4 w-4 mr-2 ${refreshSuggestionsMutation.isPending ? "animate-spin" : ""}`}
-                />
-                {suggestions.length === 0 ? "Generate suggestions" : "Refresh"}
-              </Button>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={refreshSuggestionsMutation.isPending}
+                    data-testid="button-refresh-suggestions"
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 mr-2 ${refreshSuggestionsMutation.isPending ? "animate-spin" : ""}`}
+                    />
+                    {suggestions.length === 0 ? "Generate suggestions" : "Refresh"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Generate fresh suggestions?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This uses 1 AI call from your monthly quota and replaces any pending
+                      suggestions you haven&apos;t accepted yet.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        refreshSuggestionsMutation.mutate();
+                        setShowRefreshSuggestionsConfirm(false);
+                      }}
+                    >
+                      Generate
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </CardHeader>
           <CardContent>
@@ -529,7 +658,9 @@ export default function PromptsTab({
                           size="sm"
                           onClick={() => {
                             setAcceptingSuggestion(s);
-                            setAcceptReplaceId(prompts[0]?.id || "");
+                            // Wave 9: no default selection so a misclick on
+                            // Confirm can't silently nuke prompt #1.
+                            setAcceptReplaceId("");
                           }}
                           data-testid={`button-accept-suggestion-${s.id}`}
                         >
@@ -562,61 +693,138 @@ export default function PromptsTab({
         }}
       >
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Replace which tracked prompt?</DialogTitle>
-            <DialogDescription>
-              The suggestion below will become tracked. Pick an existing tracked prompt to archive
-              in its place so the set stays at {prompts.length}.
-            </DialogDescription>
-          </DialogHeader>
-          {acceptingSuggestion && (
-            <div className="space-y-3">
-              <div className="text-sm p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded">
-                <span className="text-amber-700 dark:text-amber-300 font-medium">New:</span>{" "}
-                <span className="text-foreground">{acceptingSuggestion.prompt}</span>
-              </div>
-              <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                {prompts.map((p, i) => (
-                  <label
-                    key={p.id}
-                    className={`flex items-start gap-2 p-2 rounded border cursor-pointer hover:bg-muted/40 ${acceptReplaceId === p.id ? "border-red-500 bg-red-50 dark:bg-red-900/20" : "border-border"}`}
-                  >
-                    <input
-                      type="radio"
-                      name="replaceTracked"
-                      value={p.id}
-                      checked={acceptReplaceId === p.id}
-                      onChange={() => setAcceptReplaceId(p.id)}
-                      className="mt-1"
-                    />
-                    <div className="text-sm">
-                      <span className="text-muted-foreground mr-2">#{i + 1}</span>
-                      <span className="text-foreground">{p.prompt}</span>
+          {/* Wave 9.1: dialog has two modes.
+              * Add (slot open, prompts.length < cap): just promote — no
+                radio list, no replacement choice. Confirm = "Add to set".
+              * Replace (cap reached): pick a tracked prompt to archive.
+              Previously this dialog forced "replace" even after the user
+              had explicitly deleted a prompt to make room — bad UX. */}
+          {(() => {
+            const TRACKED_CAP = 10;
+            const hasOpenSlot = prompts.length < TRACKED_CAP;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>
+                    {hasOpenSlot
+                      ? "Add this prompt to your tracked set?"
+                      : "Replace which tracked prompt?"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {hasOpenSlot
+                      ? `You have ${TRACKED_CAP - prompts.length} open slot${TRACKED_CAP - prompts.length === 1 ? "" : "s"} — accepting just adds the suggestion. Future weekly runs will include it.`
+                      : `Your tracked set is at the cap of ${TRACKED_CAP}. Pick an existing prompt to archive so this one can take its slot.`}
+                  </DialogDescription>
+                </DialogHeader>
+                {acceptingSuggestion && (
+                  <div className="space-y-3">
+                    {/* New-prompt preview is shown in both modes. */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="text-sm p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded">
+                        <div className="text-amber-700 dark:text-amber-300 font-medium text-xs uppercase tracking-wide mb-1">
+                          {hasOpenSlot ? "Will be added" : "New (will be tracked)"}
+                        </div>
+                        <div className="text-foreground">{acceptingSuggestion.prompt}</div>
+                        {acceptingSuggestion.rationale && (
+                          <div className="text-xs text-muted-foreground italic mt-1">
+                            {acceptingSuggestion.rationale}
+                          </div>
+                        )}
+                      </div>
+                      {/* Replace-side panel only renders in replace mode.
+                          In add mode there's nothing to preview. */}
+                      {!hasOpenSlot && (
+                        <div
+                          className={`text-sm p-3 rounded border ${
+                            acceptReplaceId
+                              ? "border-red-300 bg-red-50/50 dark:bg-red-900/20 dark:border-red-900"
+                              : "border-dashed border-muted-foreground/40 bg-muted/30"
+                          }`}
+                        >
+                          <div
+                            className={`font-medium text-xs uppercase tracking-wide mb-1 ${
+                              acceptReplaceId
+                                ? "text-red-700 dark:text-red-400"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            Replacing (will be archived)
+                          </div>
+                          {acceptReplaceId ? (
+                            (() => {
+                              const old = prompts.find((p) => p.id === acceptReplaceId);
+                              return old ? (
+                                <>
+                                  <div className="text-foreground line-through opacity-80">
+                                    {old.prompt}
+                                  </div>
+                                  {old.rationale && (
+                                    <div className="text-xs text-muted-foreground italic mt-1">
+                                      {old.rationale}
+                                    </div>
+                                  )}
+                                </>
+                              ) : null;
+                            })()
+                          ) : (
+                            <div className="text-muted-foreground italic">
+                              Pick a tracked prompt below to preview the swap.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setAcceptingSuggestion(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (acceptingSuggestion && acceptReplaceId) {
-                  acceptSuggestionMutation.mutate({
-                    suggestionId: acceptingSuggestion.id,
-                    replaceTrackedId: acceptReplaceId,
-                  });
-                  setAcceptingSuggestion(null);
-                }
-              }}
-              disabled={!acceptReplaceId}
-            >
-              Confirm swap
-            </Button>
-          </DialogFooter>
+                    {/* Replace-list only renders when the cap is hit. */}
+                    {!hasOpenSlot && (
+                      <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                        {prompts.map((p, i) => (
+                          <label
+                            key={p.id}
+                            className={`flex items-start gap-2 p-2 rounded border cursor-pointer hover:bg-muted/40 ${acceptReplaceId === p.id ? "border-red-500 bg-red-50 dark:bg-red-900/20" : "border-border"}`}
+                          >
+                            <input
+                              type="radio"
+                              name="replaceTracked"
+                              value={p.id}
+                              checked={acceptReplaceId === p.id}
+                              onChange={() => setAcceptReplaceId(p.id)}
+                              className="mt-1"
+                            />
+                            <div className="text-sm">
+                              <span className="text-muted-foreground mr-2">#{i + 1}</span>
+                              <span className="text-foreground">{p.prompt}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setAcceptingSuggestion(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (!acceptingSuggestion) return;
+                      // Add mode: replaceTrackedId=null. Server validates
+                      // the tracked count is under cap before promoting.
+                      // Replace mode: must have a radio selection.
+                      if (!hasOpenSlot && !acceptReplaceId) return;
+                      acceptSuggestionMutation.mutate({
+                        suggestionId: acceptingSuggestion.id,
+                        replaceTrackedId: hasOpenSlot ? null : acceptReplaceId,
+                      });
+                      setAcceptingSuggestion(null);
+                    }}
+                    disabled={!hasOpenSlot && !acceptReplaceId}
+                  >
+                    {hasOpenSlot ? "Add to tracked set" : "Confirm swap"}
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

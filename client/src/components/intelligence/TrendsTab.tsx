@@ -54,7 +54,15 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
       return apiRequest("POST", `/api/metrics-history/record/${selectedBrandId}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/metrics-history/${selectedBrandId}`] });
+      // Predicate match: the list query keys include `?days=` so the
+      // bare prefix never invalidated the cached entry. Match every
+      // metrics-history key for this brand regardless of window.
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          typeof q.queryKey[0] === "string" &&
+          q.queryKey[0].startsWith(`/api/metrics-history/${selectedBrandId}`),
+      });
       toast({
         title: "Metrics snapshot recorded",
         description: "Historical data has been captured",
@@ -82,12 +90,17 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
     };
     const labelOf = (iso: string): string => {
       const d = new Date(iso);
-      return d.toLocaleString(undefined, {
+      // Render in UTC with an explicit suffix. Snapshots are stored in
+      // UTC; rendering in the user's local timezone made the same chart
+      // read differently for collaborators in different timezones.
+      const formatted = d.toLocaleString("en-US", {
+        timeZone: "UTC",
         month: "short",
         day: "numeric",
         hour: "numeric",
         minute: "2-digit",
       });
+      return `${formatted} UTC`;
     };
 
     const byKey = new Map<

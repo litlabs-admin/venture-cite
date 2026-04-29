@@ -85,15 +85,26 @@ export default function ShareOfAnswerTab({ selectedBrandId }: { selectedBrandId:
 
   const createPromptMutation = useMutation({
     mutationFn: async (data: any) => {
+      // Trim, drop blanks, and dedupe case-insensitively while preserving
+      // the user's first-seen casing. Otherwise "Salesforce" + "salesforce"
+      // round-trip as two competitor entries the matcher later collapses
+      // into one — leaving stale duplicate rows in the portfolio.
+      const seen = new Set<string>();
+      const competitorSet: string[] = [];
+      if (typeof data.competitorSet === "string") {
+        for (const raw of data.competitorSet.split(",")) {
+          const name = raw.trim();
+          if (!name) continue;
+          const key = name.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          competitorSet.push(name);
+        }
+      }
       const payload = {
         ...data,
         brandId: selectedBrandId,
-        competitorSet: data.competitorSet
-          ? data.competitorSet
-              .split(",")
-              .map((c: string) => c.trim())
-              .filter((c: string) => c)
-          : [],
+        competitorSet,
         isBrandCited: data.isBrandCited ? 1 : 0,
       };
       return apiRequest("POST", "/api/prompt-portfolio", payload);
@@ -201,17 +212,22 @@ export default function ShareOfAnswerTab({ selectedBrandId }: { selectedBrandId:
               </p>
             ) : (
               <div className="space-y-4">
-                {Object.entries(soaStats.byCategory).map(([category, data]: [string, any]) => (
-                  <div key={category} className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium capitalize">{category}</span>
-                      <span className="text-muted-foreground">
-                        {data.cited}/{data.total} ({((data.cited / data.total) * 100).toFixed(0)}%)
-                      </span>
+                {Object.entries(soaStats.byCategory).map(([category, data]: [string, any]) => {
+                  const total = Number(data?.total) || 0;
+                  const cited = Number(data?.cited) || 0;
+                  const pct = total > 0 ? (cited / total) * 100 : 0;
+                  return (
+                    <div key={category} className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium capitalize">{category}</span>
+                        <span className="text-muted-foreground">
+                          {cited}/{total} ({pct.toFixed(0)}%)
+                        </span>
+                      </div>
+                      <Progress value={pct} />
                     </div>
-                    <Progress value={(data.cited / data.total) * 100} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -232,17 +248,22 @@ export default function ShareOfAnswerTab({ selectedBrandId }: { selectedBrandId:
               </p>
             ) : (
               <div className="space-y-4">
-                {Object.entries(soaStats.byFunnel).map(([stage, data]: [string, any]) => (
-                  <div key={stage} className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium capitalize">{stage}</span>
-                      <span className="text-muted-foreground">
-                        {data.cited}/{data.total} ({((data.cited / data.total) * 100).toFixed(0)}%)
-                      </span>
+                {Object.entries(soaStats.byFunnel).map(([stage, data]: [string, any]) => {
+                  const total = Number(data?.total) || 0;
+                  const cited = Number(data?.cited) || 0;
+                  const pct = total > 0 ? (cited / total) * 100 : 0;
+                  return (
+                    <div key={stage} className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium capitalize">{stage}</span>
+                        <span className="text-muted-foreground">
+                          {cited}/{total} ({pct.toFixed(0)}%)
+                        </span>
+                      </div>
+                      <Progress value={pct} />
                     </div>
-                    <Progress value={(data.cited / data.total) * 100} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -267,22 +288,27 @@ export default function ShareOfAnswerTab({ selectedBrandId }: { selectedBrandId:
               </p>
             ) : (
               <div className="space-y-4">
-                {Object.entries(soaStats.byCompetitor).map(([competitor, data]: [string, any]) => (
-                  <div key={competitor} className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium">{competitor}</span>
-                      <span
-                        className={data.shareAgainst >= 50 ? "text-green-600" : "text-orange-600"}
-                      >
-                        {data.shareAgainst.toFixed(0)}% win rate ({data.cited}/{data.total})
-                      </span>
+                {Object.entries(soaStats.byCompetitor).map(([competitor, data]: [string, any]) => {
+                  const total = Number(data?.total) || 0;
+                  const cited = Number(data?.cited) || 0;
+                  const shareAgainst = Number.isFinite(data?.shareAgainst)
+                    ? Number(data.shareAgainst)
+                    : 0;
+                  return (
+                    <div key={competitor} className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">{competitor}</span>
+                        <span className={shareAgainst >= 50 ? "text-green-600" : "text-orange-600"}>
+                          {shareAgainst.toFixed(0)}% win rate ({cited}/{total})
+                        </span>
+                      </div>
+                      <Progress
+                        value={shareAgainst}
+                        className={shareAgainst >= 50 ? "bg-green-100" : "bg-orange-100"}
+                      />
                     </div>
-                    <Progress
-                      value={data.shareAgainst}
-                      className={data.shareAgainst >= 50 ? "bg-green-100" : "bg-orange-100"}
-                    />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

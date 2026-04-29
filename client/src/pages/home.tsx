@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
+import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { Loader2, X, ArrowUp, ArrowDown } from "lucide-react";
 import {
   LineChart,
@@ -153,31 +155,51 @@ function SeeAllLink({ href, label = "See all" }: { href: string; label?: string 
   );
 }
 
-function useDashboardQueries(brandId: string) {
+function useDashboardQueries(
+  brandId: string,
+  refetchInterval: number | false,
+  // Wave 9.2: when a fresh citation run is in flight for this brand,
+  // `since` is the run's startedAt — server scopes ranking aggregates
+  // to that window so dashboards reset cleanly and fill in as new
+  // platform results land. When no run is active, this is null and
+  // every endpoint falls back to its default window. Threaded into
+  // every queryKey via the `{ since }` object segment, which the
+  // default queryFn at queryClient.ts converts into a URL query param.
+  since: string | null,
+) {
   const enabled = !!brandId;
+  const sinceSeg = { since: since ?? "" };
   const hero = useQuery<{ success: boolean; data: HeroData }>({
-    queryKey: [`/api/dashboard/hero/${brandId}`],
+    queryKey: [`/api/dashboard/hero/${brandId}`, sinceSeg],
     enabled,
+    refetchInterval,
   });
   const rankings = useQuery<{ success: boolean; data: { platforms: PlatformRanking[] } }>({
-    queryKey: [`/api/dashboard/rankings/${brandId}`],
+    queryKey: [`/api/dashboard/rankings/${brandId}`, sinceSeg],
     enabled,
+    refetchInterval,
   });
   const gap = useQuery<{
     success: boolean;
     data: { categories: string[]; rows: GapMatrixRow[] };
   }>({
-    queryKey: [`/api/dashboard/gap-matrix/${brandId}`],
+    queryKey: [`/api/dashboard/gap-matrix/${brandId}`, sinceSeg],
     enabled,
+    refetchInterval,
   });
   const entity = useQuery<{ success: boolean; data: EntityStrengthData }>({
-    queryKey: [`/api/dashboard/entity-strength/${brandId}`],
+    queryKey: [`/api/dashboard/entity-strength/${brandId}`, sinceSeg],
     enabled,
+    refetchInterval,
   });
   // 8-week citation trend, computed directly from geo_rankings on the
   // server. Replaces the old metrics_history-powered "Score History"
   // chart, which showed 0 scans for most users because it depended on
   // snapshots that were rarely written.
+  // Wave 9.2: trend is intentionally NOT scoped to the active run —
+  // it's a multi-week aggregation, and filtering it would collapse the
+  // chart to a single point during a run. Leaderboard + reddit mentions
+  // similarly aren't run-scoped (they don't suffer from mixed-window).
   const trend = useQuery<{
     success: boolean;
     data: {
@@ -186,6 +208,7 @@ function useDashboardQueries(brandId: string) {
   }>({
     queryKey: [`/api/dashboard/citation-trend/${brandId}`],
     enabled,
+    refetchInterval,
   });
   const leaderboard = useQuery<{
     success: boolean;
@@ -199,10 +222,12 @@ function useDashboardQueries(brandId: string) {
   }>({
     queryKey: [`/api/competitors/leaderboard?brandId=${brandId}`],
     enabled,
+    refetchInterval,
   });
   const redditMentions = useQuery<{ success: boolean; data: BrandMention[] }>({
     queryKey: [`/api/brand-mentions/${brandId}?platform=reddit`],
     enabled,
+    refetchInterval,
   });
   return { hero, rankings, gap, entity, trend, leaderboard, redditMentions };
 }
@@ -274,8 +299,36 @@ export default function Home() {
     }
   }, [autopilot?.status, toast]);
 
-  const { hero, rankings, gap, entity, trend, leaderboard, redditMentions } =
-    useDashboardQueries(selectedBrandId);
+  // Wave 9: live-refresh during citation runs. The hook returns the
+  // refetch cadence we thread directly into each useQuery via
+  // useDashboardQueries — TanStack only honors refetchInterval at observer
+  // creation time, so it must be set on the useQuery itself (not via
+  // setQueryDefaults). The hook also fires a one-shot invalidate per key
+  // when the run finishes so post-run aggregates appear immediately.
+  const { refetchInterval } = useCitationLiveRefresh(selectedBrandId, [
+    [`/api/dashboard/hero/${selectedBrandId}`],
+    [`/api/dashboard/rankings/${selectedBrandId}`],
+    [`/api/dashboard/gap-matrix/${selectedBrandId}`],
+    [`/api/dashboard/entity-strength/${selectedBrandId}`],
+    [`/api/dashboard/citation-trend/${selectedBrandId}`],
+    [`/api/competitors/leaderboard?brandId=${selectedBrandId}`],
+    [`/api/brand-mentions/${selectedBrandId}?platform=reddit`],
+  ]);
+
+  // Wave 9.2: scope dashboard ranking aggregates to the active run's
+  // window so a fresh run resets cleanly (vs. mixing old+new for the
+  // entire run duration). TanStack dedupes the gate query — calling
+  // useActiveCitationRuns here doesn't add a second poll. When no run
+  // is active, `since` is null and endpoints fall back to their default
+  // 30-day window.
+  const { runs: activeRuns } = useActiveCitationRuns(selectedBrandId);
+  const since = activeRuns[0]?.startedAt ?? null;
+
+  const { hero, rankings, gap, entity, trend, leaderboard, redditMentions } = useDashboardQueries(
+    selectedBrandId,
+    refetchInterval,
+    since,
+  );
 
   const heroData = hero.data?.data;
   const platforms = rankings.data?.data.platforms ?? [];

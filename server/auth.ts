@@ -167,6 +167,8 @@ const PUBLIC_API_ROUTES = new Set<string>([
 const SELF_AUTHED_PREFIXES: Array<{ method: string; prefix: string; suffix: string }> = [
   // GET /api/content-jobs/<id>/stream
   { method: "GET", prefix: "/api/content-jobs/", suffix: "/stream" },
+  // GET /api/brands/<id>/citation-events  (Wave 8 SSE)
+  { method: "GET", prefix: "/api/brands/", suffix: "/citation-events" },
 ];
 
 function isSelfAuthed(method: string, path: string): boolean {

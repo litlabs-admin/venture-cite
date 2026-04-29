@@ -512,6 +512,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(schema.geoRankings.checkedAt));
   }
 
+  async getGeoRankingsByArticleIds(ids: string[], sinceDate?: Date): Promise<GeoRanking[]> {
+    if (ids.length === 0) return [];
+    const conditions = [inArray(schema.geoRankings.articleId, ids)];
+    if (sinceDate) conditions.push(gte(schema.geoRankings.checkedAt, sinceDate));
+    return await db
+      .select()
+      .from(schema.geoRankings)
+      .where(and(...conditions))
+      .orderBy(desc(schema.geoRankings.checkedAt));
+  }
+
   async updateGeoRanking(id: string, update: Partial<GeoRanking>): Promise<GeoRanking | undefined> {
     const [row] = await db
       .update(schema.geoRankings)
@@ -582,16 +593,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.brandPrompts.id, id));
   }
 
-  async promoteSuggestionToTracked(suggestionId: string, replaceTrackedId: string): Promise<void> {
-    // Wave 4.3: atomic swap. The two updates must succeed together —
-    // a partial failure would leave the brand with either two tracked
-    // prompts or none for this slot. Wrapping in a transaction means
-    // both rows commit or neither does.
+  async promoteSuggestionToTracked(
+    suggestionId: string,
+    replaceTrackedId: string | null,
+  ): Promise<void> {
+    // Wave 4.3: atomic swap when replacing — both updates succeed together
+    // so we can't end up with two tracked prompts (or none) for the slot.
+    // Wave 9.1: when replaceTrackedId is null, the user is filling an
+    // empty slot (tracked count < cap) — just promote, no archive.
     await db.transaction(async (tx) => {
-      await tx
-        .update(schema.brandPrompts)
-        .set({ isActive: 0, status: "archived" })
-        .where(eq(schema.brandPrompts.id, replaceTrackedId));
+      if (replaceTrackedId) {
+        await tx
+          .update(schema.brandPrompts)
+          .set({ isActive: 0, status: "archived" })
+          .where(eq(schema.brandPrompts.id, replaceTrackedId));
+      }
       await tx
         .update(schema.brandPrompts)
         .set({ isActive: 1, status: "tracked" })
@@ -689,6 +705,160 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.citationRuns.brandId, brandId))
       .orderBy(desc(schema.citationRuns.startedAt))
       .limit(limit);
+  }
+
+  // Wave 9: single-row read used by the async kickoff path. The HTTP handler
+  // creates the row, hands the runId to a detached `runBrandPrompts(...)`,
+  // and returns immediately; runBrandPrompts uses this to load it back.
+  async getCitationRunById(runId: string): Promise<CitationRun | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.citationRuns)
+      .where(eq(schema.citationRuns.id, runId))
+      .limit(1);
+    return row;
+  }
+
+  // Wave 9.1: recompute totals + per-platform breakdown for a run by
+  // reading geo_rankings live. The canonical aggregator — call this any
+  // time is_cited mutates on a ranking (re-detect, future bulk fixes)
+  // so the cached aggregate on citation_runs stays in sync with what the
+  // drill-down would show. Cheaper than dragging it through application
+  // code: one indexed read of the run's rankings.
+  async recomputeCitationRunAggregate(runId: string): Promise<{
+    totalChecks: number;
+    totalCited: number;
+    citationRate: number;
+  }> {
+    const runRows = await db
+      .select({
+        isCited: schema.geoRankings.isCited,
+        aiPlatform: schema.geoRankings.aiPlatform,
+      })
+      .from(schema.geoRankings)
+      .where(eq(schema.geoRankings.runId, runId));
+
+    const totalChecks = runRows.length;
+    const totalCited = runRows.filter((x) => x.isCited === 1).length;
+    const citationRate = totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0;
+
+    const platformMap = new Map<string, { cited: number; checks: number }>();
+    for (const x of runRows) {
+      const e = platformMap.get(x.aiPlatform) || { cited: 0, checks: 0 };
+      e.checks += 1;
+      if (x.isCited === 1) e.cited += 1;
+      platformMap.set(x.aiPlatform, e);
+    }
+    const platformBreakdown = Object.fromEntries(
+      Array.from(platformMap.entries()).map(([p, s]) => [
+        p,
+        { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 },
+      ]),
+    );
+
+    await db
+      .update(schema.citationRuns)
+      .set({ totalChecks, totalCited, citationRate, platformBreakdown })
+      .where(eq(schema.citationRuns.id, runId));
+
+    return { totalChecks, totalCited, citationRate };
+  }
+
+  // Wave 8: lightweight "is any run live for this brand" check used by the
+  // live-update polling hook on every dependent page. Hits the partial
+  // index on (brand_id, status) — should be O(1) regardless of run history.
+  async getActiveCitationRuns(
+    brandId: string,
+  ): Promise<Array<{ id: string; startedAt: Date; progressPct: number; status: string }>> {
+    const rows = await db
+      .select({
+        id: schema.citationRuns.id,
+        startedAt: schema.citationRuns.startedAt,
+        progressPct: schema.citationRuns.progressPct,
+        status: schema.citationRuns.status,
+      })
+      .from(schema.citationRuns)
+      .where(
+        and(
+          eq(schema.citationRuns.brandId, brandId),
+          inArray(schema.citationRuns.status, ["pending", "running"]),
+        ),
+      )
+      .orderBy(desc(schema.citationRuns.startedAt));
+    return rows;
+  }
+
+  // Atomic progress bump. The worker calls this every Nth completed task
+  // so the SSE handler + status-gate endpoint see live values without a
+  // full updateCitationRun round-trip.
+  async bumpCitationRunProgress(
+    runId: string,
+    progressPct: number,
+    totalChecks: number,
+    totalCited: number,
+  ): Promise<void> {
+    await db
+      .update(schema.citationRuns)
+      .set({
+        progressPct,
+        totalChecks,
+        totalCited,
+        status: "running",
+      })
+      .where(eq(schema.citationRuns.id, runId));
+  }
+
+  // Single read of one run's live state for the SSE handler's tick loop.
+  async getCitationRunLiveState(runId: string): Promise<
+    | {
+        id: string;
+        status: string;
+        progressPct: number;
+        totalChecks: number;
+        totalCited: number;
+        citationRate: number;
+      }
+    | undefined
+  > {
+    const [row] = await db
+      .select({
+        id: schema.citationRuns.id,
+        status: schema.citationRuns.status,
+        progressPct: schema.citationRuns.progressPct,
+        totalChecks: schema.citationRuns.totalChecks,
+        totalCited: schema.citationRuns.totalCited,
+        citationRate: schema.citationRuns.citationRate,
+      })
+      .from(schema.citationRuns)
+      .where(eq(schema.citationRuns.id, runId))
+      .limit(1);
+    return row;
+  }
+
+  // Returns rankings written for this run since the cursor (a timestamp).
+  // Used by the SSE handler to emit per-ranking events without re-sending
+  // already-emitted rows. Ordered by checkedAt so the cursor advances
+  // monotonically.
+  async getRecentRankingsForRun(
+    runId: string,
+    sinceMs: number,
+    limit: number = 50,
+  ): Promise<Array<{ id: string; aiPlatform: string; isCited: number; checkedAt: Date | null }>> {
+    const since = new Date(sinceMs);
+    const rows = await db
+      .select({
+        id: schema.geoRankings.id,
+        aiPlatform: schema.geoRankings.aiPlatform,
+        isCited: schema.geoRankings.isCited,
+        checkedAt: schema.geoRankings.checkedAt,
+      })
+      .from(schema.geoRankings)
+      .where(
+        and(eq(schema.geoRankings.runId, runId), sql`${schema.geoRankings.checkedAt} > ${since}`),
+      )
+      .orderBy(asc(schema.geoRankings.checkedAt))
+      .limit(limit);
+    return rows;
   }
 
   async enqueueContentJob(job: InsertContentGenerationJob): Promise<ContentGenerationJob> {

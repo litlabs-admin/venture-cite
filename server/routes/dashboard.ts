@@ -60,17 +60,38 @@ async function requireOwnedBrand(req: any) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared loader — brand prompts + cited/uncited rankings windowed to 30d.
-// All four endpoints read the same base set, so we expose a single helper
-// and let each handler slice it differently.
-// ---------------------------------------------------------------------------
-async function loadRankingsContext(brandId: string, windowDays = 30) {
-  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+// Shared loader — brand prompts + cited/uncited rankings.
+//
+// Wave 9.2: accepts an optional `since` Date overriding the default
+// 30-day window. Used by Citations to scope dashboard reads to "rankings
+// from the active run only" while a fresh run is in flight — without
+// this, completed-cells from the new run mix with un-rechecked-cells
+// from the old run for the entire run duration. When `since` is null
+// (no active run), behavior is unchanged: 30-day rolling window.
+async function loadRankingsContext(
+  brandId: string,
+  opts: { windowDays?: number; since?: Date | null } = {},
+) {
+  const since =
+    opts.since instanceof Date && !isNaN(opts.since.getTime())
+      ? opts.since
+      : new Date(Date.now() - (opts.windowDays ?? 30) * 24 * 60 * 60 * 1000);
   const prompts = await storage.getBrandPromptsByBrandId(brandId);
   const promptIds = prompts.map((p) => p.id);
   const rankings =
     promptIds.length > 0 ? await storage.getGeoRankingsByBrandPromptIds(promptIds, since) : [];
   return { prompts, promptIds, rankings, since };
+}
+
+// Wave 9.2: parse the optional ?since=<ISO> query param. Returns null
+// when missing or malformed — the loader then falls back to the default
+// 30-day window. Defensive against junk input (clients only ever pass
+// what useActiveCitationRuns surfaced, but we guard anyway).
+function parseSinceQuery(req: { query: Record<string, unknown> }): Date | null {
+  const raw = typeof req.query.since === "string" ? req.query.since : null;
+  if (!raw) return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 function toCitedArr(rankings: GeoRanking[]) {
@@ -95,7 +116,7 @@ export function setupDashboardRoutes(app: Express): void {
       const brand = await requireOwnedBrand(req);
       if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
 
-      const { rankings } = await loadRankingsContext(brand.id);
+      const { rankings } = await loadRankingsContext(brand.id, { since: parseSinceQuery(req) });
       const totalChecks = rankings.length;
       const cited = toCitedArr(rankings);
       const citedChecks = cited.length;
@@ -172,7 +193,7 @@ export function setupDashboardRoutes(app: Express): void {
       const brand = await requireOwnedBrand(req);
       if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
 
-      const { rankings } = await loadRankingsContext(brand.id);
+      const { rankings } = await loadRankingsContext(brand.id, { since: parseSinceQuery(req) });
 
       // Group rows by canonical platform label (case-insensitive match).
       // Only the exact platform names the citation runner writes are honored
@@ -261,7 +282,9 @@ export function setupDashboardRoutes(app: Express): void {
       const brand = await requireOwnedBrand(req);
       if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
 
-      const { prompts, rankings } = await loadRankingsContext(brand.id);
+      const { prompts, rankings } = await loadRankingsContext(brand.id, {
+        since: parseSinceQuery(req),
+      });
 
       // Category set = non-null distinct category values on tracked prompts.
       // Fall back to a generic "General" bucket when the prompt has none.
@@ -395,7 +418,7 @@ export function setupDashboardRoutes(app: Express): void {
       const brand = await requireOwnedBrand(req);
       if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
 
-      const { rankings } = await loadRankingsContext(brand.id);
+      const { rankings } = await loadRankingsContext(brand.id, { since: parseSinceQuery(req) });
       const totalChecks = rankings.length;
       const cited = toCitedArr(rankings);
       const citedCount = cited.length;

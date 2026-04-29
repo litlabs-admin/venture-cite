@@ -1,7 +1,16 @@
 import { useState } from "react";
-import { CheckCircle2, XCircle, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  AlertCircle,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import SafeMarkdown from "@/components/SafeMarkdown";
+import { useToast } from "@/hooks/use-toast";
 
 export type PlatformResult = {
   platform: string;
@@ -13,8 +22,14 @@ export type PlatformResult = {
   // newly-added name variation. Rank is null on these rows because the
   // original LLM run didn't see the brand, so we have no honest rank signal.
   reDetectedAt?: string | null;
+  // Wave 9: optional — when present, lets the "Open in chat" link send the
+  // user directly to a fresh chat with the same prompt pre-filled.
+  prompt?: string;
 };
 
+// Wave 9: known-platform palette stays explicit so the brand colors look
+// right; everything else falls back to a stable hash → HSL so a 6th /
+// 7th platform doesn't render as plain grey.
 const PLATFORM_COLORS: Record<string, string> = {
   ChatGPT: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
   Claude: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
@@ -23,13 +38,71 @@ const PLATFORM_COLORS: Record<string, string> = {
   DeepSeek: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20",
 };
 
+// Wave 9: inline color hash for unknown platforms. djb2-ish — stable across
+// renders, distributes hues evenly. Returns CSS variables so the same
+// value works for bg/text/border with consistent opacity.
+function hashHue(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h) % 360;
+}
+
+function colorClassForPlatform(platform: string): string {
+  if (PLATFORM_COLORS[platform]) return PLATFORM_COLORS[platform];
+  // hsl-based inline style won't work via class; render as Tailwind arbitrary value.
+  const hue = hashHue(platform);
+  return `border [color:hsl(${hue},70%,40%)] dark:[color:hsl(${hue},70%,70%)] [background-color:hsl(${hue},70%,95%)] dark:[background-color:hsl(${hue},70%,15%)] [border-color:hsl(${hue},70%,80%)] dark:[border-color:hsl(${hue},70%,30%)]`;
+}
+
+// Wave 9: deep-link templates. ChatGPT supports ?q=... on the share URL,
+// Claude only opens the home page so we fall back to clipboard, etc.
+// `null` = no deep link, just copy-to-clipboard.
+const PLATFORM_DEEP_LINKS: Record<string, ((prompt: string) => string) | null> = {
+  ChatGPT: (q) => `https://chat.openai.com/?q=${encodeURIComponent(q)}`,
+  Perplexity: (q) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
+  Gemini: (q) => `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
+  Claude: null,
+  DeepSeek: null,
+};
+
 // One card per platform result inside the by-prompt accordion. Shows a clear
 // status pill, a short snippet, and an expand control to reveal the full
 // markdown-rendered AI response.
 export function PlatformResultCard({ result }: { result: PlatformResult }) {
   const [expanded, setExpanded] = useState(false);
-  const colorClass =
-    PLATFORM_COLORS[result.platform] || "bg-muted text-muted-foreground border-border";
+  const { toast } = useToast();
+  const colorClass = colorClassForPlatform(result.platform);
+  // Wave 9: detect transport failures (rate-limit, network blip etc.) so
+  // we surface them inline as an error pill rather than burying them
+  // behind the expand toggle. The citation pipeline writes
+  // "Check failed: <reason>" into snippet on failure.
+  const isError = !!result.snippet?.startsWith("Check failed:");
+
+  const handleCopy = async () => {
+    if (!result.fullResponse) return;
+    try {
+      await navigator.clipboard.writeText(result.fullResponse);
+      toast({ title: "Response copied" });
+    } catch {
+      toast({ title: "Couldn't copy", variant: "destructive" });
+    }
+  };
+
+  const deepLink = result.prompt ? PLATFORM_DEEP_LINKS[result.platform]?.(result.prompt) : null;
+  const handleOpenInChat = () => {
+    if (deepLink) {
+      window.open(deepLink, "_blank", "noopener,noreferrer");
+    } else if (result.prompt) {
+      // Fallback for platforms with no public deep-link query — copy the
+      // prompt so the user can paste it.
+      navigator.clipboard
+        .writeText(result.prompt)
+        .then(() =>
+          toast({ title: "Prompt copied", description: `Paste into ${result.platform}.` }),
+        )
+        .catch(() => toast({ title: "Couldn't copy prompt", variant: "destructive" }));
+    }
+  };
 
   return (
     <div
@@ -68,21 +141,75 @@ export function PlatformResultCard({ result }: { result: PlatformResult }) {
         </span>
       </div>
 
+      {/* Wave 9: failure pill. Previously, a "Check failed: rate limited"
+          snippet was hidden behind an expand toggle — the user had no
+          way to see WHY the platform didn't respond without clicking
+          through. Show it inline + tinted red so it's unmissable. */}
+      {isError && (
+        <div className="px-3 py-2 border-t bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900">
+          <div className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400">
+            <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>{result.snippet}</span>
+          </div>
+        </div>
+      )}
+
       {result.fullResponse ? (
         <div className="border-t">
-          <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/40 transition-colors"
-            data-testid={`toggle-response-${result.platform.toLowerCase()}`}
-          >
-            {expanded ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
+          <div className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted/40 transition-colors">
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center gap-2 text-xs font-medium text-muted-foreground flex-1 text-left"
+              data-testid={`toggle-response-${result.platform.toLowerCase()}`}
+            >
+              {expanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+              {expanded ? "Hide full response" : "Show full response"}
+            </button>
+            {/* Wave 9: copy + open-in-chat actions. Only render when
+                expanded so they don't add visual noise to the collapsed
+                row. */}
+            {expanded && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy();
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted"
+                  title="Copy response to clipboard"
+                  data-testid={`button-copy-${result.platform.toLowerCase()}`}
+                >
+                  <Copy className="h-3 w-3" />
+                  Copy
+                </button>
+                {result.prompt && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenInChat();
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted"
+                    title={
+                      deepLink
+                        ? `Open this prompt in ${result.platform}`
+                        : `Copy the prompt — ${result.platform} has no deep-link support`
+                    }
+                    data-testid={`button-open-in-chat-${result.platform.toLowerCase()}`}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Open in {result.platform}
+                  </button>
+                )}
+              </div>
             )}
-            {expanded ? "Hide full response" : "Show full response"}
-          </button>
+          </div>
           {expanded && (
             <div className="px-4 py-3 bg-muted/20 border-t max-h-[480px] overflow-y-auto">
               <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-pre:text-xs">
@@ -91,18 +218,17 @@ export function PlatformResultCard({ result }: { result: PlatformResult }) {
             </div>
           )}
         </div>
-      ) : result.snippet ? (
-        // Snippet present but no expanded response — typically a stored error
-        // line like "Check failed: rate limited". Show the snippet inline so
-        // the user can see what happened rather than a generic message.
+      ) : !isError && result.snippet ? (
+        // Wave 9: snippet without fullResponse and not an error → unusual
+        // legacy state. Show inline so the user sees what was captured.
         <div className="px-3 py-2 border-t text-xs text-muted-foreground italic">
           {result.snippet}
         </div>
-      ) : (
+      ) : !isError ? (
         <div className="px-3 py-2 border-t text-xs text-muted-foreground italic">
           No response captured. Re-run the check to populate.
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

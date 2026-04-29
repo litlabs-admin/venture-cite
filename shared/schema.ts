@@ -157,7 +157,13 @@ export const brands = pgTable(
     autopilotProgress: jsonb("autopilot_progress"),
     autoCitationSchedule: text("auto_citation_schedule").default("off").notNull(), // off | weekly | biweekly | monthly
     autoCitationDay: integer("auto_citation_day").default(0).notNull(), // 0=Sun, 1=Mon, ... 6=Sat
+    // Wave 9: hour of day (UTC) the scheduled run fires + active toggle
+    // (pause without losing the day/hour) + status of the most recent
+    // scheduled run. See migration 0037_citation_schedule_v2.sql.
+    autoCitationHour: integer("auto_citation_hour").default(9).notNull(),
+    autoCitationActive: boolean("auto_citation_active").default(true).notNull(),
     lastAutoCitationAt: timestamp("last_auto_citation_at"),
+    lastAutoCitationStatus: text("last_auto_citation_status"),
     // Wave 4.4: optimistic-lock version. Bumped on every write; client
     // sends `expectedVersion` and the UPDATE matches `WHERE version = $`,
     // returning 409 on mismatch.
@@ -472,6 +478,16 @@ export const citationRuns = pgTable(
     // Per-platform breakdown snapshot so the history endpoint doesn't
     // need to re-join geo_rankings for every run.
     platformBreakdown: jsonb("platform_breakdown"),
+    // Wave 8: explicit lifecycle. Drives the "is any run active for this
+    // brand" status gate that the live-update hooks read on every page.
+    // 'pending'|'running'|'succeeded'|'failed'|'partial'|'cancelled'.
+    status: text("status").default("succeeded").notNull(),
+    progressPct: integer("progress_pct").default(100).notNull(),
+    errorMessage: text("error_message"),
+    // Wave 9: number of (matcher, analyzer) disagreements during the run.
+    // Surfaced on HistoryTab as a tooltip so users can spot brands whose
+    // nameVariations list needs tuning.
+    disagreementCount: integer("disagreement_count").default(0).notNull(),
   },
   (table) => [
     index("citation_runs_brand_id_idx").on(table.brandId),

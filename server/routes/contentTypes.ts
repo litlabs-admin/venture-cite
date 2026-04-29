@@ -224,12 +224,13 @@ export function setupContentTypesRoutes(app: Express): void {
   // Get BOFU content for a brand
   app.get("/api/bofu-content/:brandId", async (req, res) => {
     try {
-      const { brandId } = req.params;
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
       const contentType = req.query.contentType as string;
-      const content = await storage.getBofuContent(brandId, contentType);
+      const content = await storage.getBofuContent(req.params.brandId, contentType);
       res.json({ success: true, data: content });
     } catch (error) {
-      res.status(500).json({ success: false, error: "Failed to fetch BOFU content" });
+      sendError(res, error, "Failed to fetch BOFU content");
     }
   });
 
@@ -401,7 +402,10 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
         comparedWith: comparedWith || null,
         targetIntent: "transactional",
         status: "draft",
-        aiScore: 85,
+        // aiScore left null on generate; populated only when an actual
+        // scoring step runs (e.g. via PATCH from the optimizer). The
+        // previous hard-coded 85 was misleading — users read it as a
+        // real quality signal.
       });
 
       res.json({
@@ -424,10 +428,12 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
   // Get FAQ items
   app.get("/api/faqs/:brandId", async (req, res) => {
     try {
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
       const faqs = await storage.getFaqItems(req.params.brandId);
       res.json({ success: true, data: faqs });
     } catch (error) {
-      res.status(500).json({ success: false, error: "Failed to fetch FAQs" });
+      sendError(res, error, "Failed to fetch FAQs");
     }
   });
 
@@ -637,7 +643,11 @@ Return ONLY the JSON array.`;
             answer: faq.answer,
             category: faq.category ?? null,
             aiSurfaceScore: typeof faq.aiSurfaceScore === "number" ? faq.aiSurfaceScore : null,
-            isOptimized: 1,
+            // Generation produces draft FAQs; the per-FAQ optimizer is
+            // a separate manual step that flips this to 1. Defaulting
+            // to 1 here pre-marked everything as optimized and made
+            // the toggle meaningless.
+            isOptimized: 0,
             optimizationTips: Array.isArray(faq.optimizationTips) ? faq.optimizationTips : [],
           });
           savedFaqs.push(saved);

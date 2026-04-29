@@ -46,6 +46,7 @@ import type {
 } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import {
   List,
   BookOpen,
@@ -86,8 +87,16 @@ function CompetitorCombobox({ options, value, onChange, placeholder }: Competito
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  // Case-insensitive presence check: the existing `value.includes(name)`
+  // failed to detect "Salesforce" when the user previously added
+  // "salesforce", so the BOFU payload ended up with both casings of the
+  // same competitor and downstream comparison rows duplicated.
+  const indexOfCi = (list: string[], name: string) =>
+    list.findIndex((v) => v.toLowerCase() === name.toLowerCase());
+
   const toggle = (name: string) => {
-    if (value.includes(name)) onChange(value.filter((v) => v !== name));
+    const idx = indexOfCi(value, name);
+    if (idx >= 0) onChange(value.filter((_, i) => i !== idx));
     else onChange([...value, name]);
   };
 
@@ -140,7 +149,7 @@ function CompetitorCombobox({ options, value, onChange, placeholder }: Competito
                 if (e.key === "Enter" && isFreeform) {
                   e.preventDefault();
                   const name = search.trim();
-                  if (!value.includes(name)) onChange([...value, name]);
+                  if (indexOfCi(value, name) < 0) onChange([...value, name]);
                   setSearch("");
                 }
               }}
@@ -152,7 +161,7 @@ function CompetitorCombobox({ options, value, onChange, placeholder }: Competito
               {matches.length > 0 && (
                 <CommandGroup heading="Tracked competitors">
                   {matches.map((name) => {
-                    const checked = value.includes(name);
+                    const checked = indexOfCi(value, name) >= 0;
                     return (
                       <CommandItem key={name} value={name} onSelect={() => toggle(name)}>
                         <Check
@@ -261,6 +270,15 @@ export default function GeoTools() {
       }),
   });
 
+  // Wave 9: live-refresh during citation runs. Hook returns the cadence
+  // we thread directly into the affected useQuery calls below. Listicles
+  // + Wikipedia have their own scanners and aren't tied to citation runs,
+  // so they keep default caching.
+  const { refetchInterval: liveInterval } = useCitationLiveRefresh(selectedBrandId, [
+    ["/api/brand-mentions", selectedBrandId],
+    ["/api/competitors", selectedBrandId],
+  ]);
+
   // Tracked competitors for BOFU combobox
   const { data: competitorsData } = useQuery<{ success: boolean; data: Competitor[] }>({
     queryKey: ["/api/competitors", selectedBrandId],
@@ -269,6 +287,7 @@ export default function GeoTools() {
       return res.json();
     },
     enabled: !!selectedBrandId,
+    refetchInterval: liveInterval,
   });
   const trackedCompetitors: Competitor[] = competitorsData?.data ?? [];
 
@@ -322,6 +341,7 @@ export default function GeoTools() {
   const { data: mentionsData, isLoading: mentionsLoading } = useQuery({
     queryKey: ["/api/brand-mentions", selectedBrandId],
     enabled: !!selectedBrandId,
+    refetchInterval: liveInterval,
   });
 
   // Toggle an FAQ's isOptimized flag. The badge next to each FAQ used to

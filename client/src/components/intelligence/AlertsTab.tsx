@@ -70,6 +70,12 @@ export default function AlertsTab({ selectedBrandId }: { selectedBrandId: string
       setIsAlertDialogOpen(false);
       toast({ title: "Alert created", description: "You'll be notified when this event occurs" });
     },
+    onError: async (err: any) => {
+      // 409 from the dedup guard surfaces here as a clear toast instead
+      // of the generic "create failed" mystery error.
+      const msg = err?.message || "Failed to create alert";
+      toast({ title: "Could not create alert", description: msg, variant: "destructive" });
+    },
   });
 
   const deleteAlertMutation = useMutation({
@@ -160,7 +166,25 @@ export default function AlertsTab({ selectedBrandId }: { selectedBrandId: string
                 </p>
               </div>
 
-              {newAlert.alertType !== "hallucination_detected" && (
+              {newAlert.alertType === "hallucination_detected" ? (
+                <div className="space-y-2">
+                  <Label>Fire when at least N new hallucinations are detected</Label>
+                  <div className="flex items-center gap-4">
+                    <Slider
+                      value={[newAlert.threshold]}
+                      onValueChange={([v]) => setNewAlert({ ...newAlert, threshold: v })}
+                      min={1}
+                      max={20}
+                      step={1}
+                      className="flex-1"
+                    />
+                    <span className="w-12 text-right font-medium">{newAlert.threshold}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Set to 1 to fire on every new hallucination.
+                  </p>
+                </div>
+              ) : (
                 <div className="space-y-2">
                   <Label>Threshold (%)</Label>
                   <div className="flex items-center gap-4">
