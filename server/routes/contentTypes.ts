@@ -19,6 +19,37 @@ import {
   pickFields,
 } from "../lib/ownership";
 import { openai, aiLimitMiddleware, sendError, safeParseJson } from "../lib/routesShared";
+import {
+  loadBrandGenerationContext,
+  renderFactsBlock,
+  renderCompetitorBlock,
+} from "../lib/brandGenerationContext";
+import { computeAiSurfaceScore } from "../lib/faqScoring";
+import { normalizeUrl } from "../lib/trackedContentMatcher";
+
+// Wave 9.4: keep tracked_content_urls in sync with bofu_content / faq_items
+// publishedUrl. Called from PATCH handlers; defensive against partial inputs.
+async function syncTrackedContentUrl(
+  sourceType: "bofu" | "faq",
+  sourceId: string,
+  brandId: string,
+  publishedUrl: string | null | undefined,
+): Promise<void> {
+  if (publishedUrl && typeof publishedUrl === "string" && publishedUrl.trim()) {
+    const normalized = normalizeUrl(publishedUrl);
+    if (!normalized) return; // unparseable; leave the row unchanged
+    await storage.upsertTrackedContentUrl({
+      brandId,
+      sourceType,
+      sourceId,
+      url: publishedUrl.trim(),
+      normalizedUrl: normalized,
+    });
+  } else if (publishedUrl === null || publishedUrl === "") {
+    // Explicit unpublish — drop the tracking row.
+    await storage.deleteTrackedContentUrlBySource(sourceType, sourceId);
+  }
+}
 
 export function setupContentTypesRoutes(app: Express): void {
   // ========== LISTICLE TRACKER ==========
@@ -35,12 +66,18 @@ export function setupContentTypesRoutes(app: Express): void {
     "keyword",
     "searchVolume",
     "domainAuthority",
+    // Wave 9.4: outreach lifecycle.
+    "outreachStatus",
+    "outreachNotes",
     "metadata",
   ] as const;
+  const LISTICLE_OUTREACH_STATUSES = new Set(["new", "contacted", "won", "dropped"]);
 
   // Get listicles for a brand — :brandId app.param checks ownership.
   app.get("/api/listicles/:brandId", async (req, res) => {
     try {
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
       const listicles = await storage.getListicles(req.params.brandId);
       res.json({ success: true, data: listicles });
     } catch (error) {
@@ -66,7 +103,9 @@ export function setupContentTypesRoutes(app: Express): void {
     }
   });
 
-  // Create a listicle — brandId must belong to caller.
+  // Create a listicle — brandId must belong to caller. Wave 9.4: use
+  // tryInsertListicle so the unique (brand_id, lower(url)) index is the
+  // arbiter; manual entry returns 409 if the URL is already tracked.
   app.post("/api/listicles", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -78,7 +117,12 @@ export function setupContentTypesRoutes(app: Express): void {
       if (!body.title || !body.url) {
         return res.status(400).json({ success: false, error: "title and url are required" });
       }
-      const listicle = await storage.createListicle(body as any);
+      const listicle = await storage.tryInsertListicle(body as any);
+      if (!listicle) {
+        return res
+          .status(409)
+          .json({ success: false, error: "A listicle with this URL is already tracked" });
+      }
       res.json({ success: true, data: listicle });
     } catch (error) {
       sendError(res, error, "Failed to create listicle");
@@ -93,6 +137,14 @@ export function setupContentTypesRoutes(app: Express): void {
       const update = pickFields<any>(req.body, LISTICLE_WRITE_FIELDS);
       if (update.brandId && typeof update.brandId === "string") {
         await requireBrand(update.brandId, user.id);
+      }
+      // Wave 9.4: validate outreach status transitions. Categorical
+      // column, not a strict state machine — users can correct mistakes
+      // by moving back to any prior state.
+      if (update.outreachStatus !== undefined) {
+        if (!LISTICLE_OUTREACH_STATUSES.has(update.outreachStatus)) {
+          return res.status(400).json({ success: false, error: "Invalid outreachStatus" });
+        }
       }
       const listicle = await storage.updateListicle(req.params.id, update as any);
       if (!listicle) return res.status(404).json({ success: false, error: "Listicle not found" });
@@ -125,16 +177,22 @@ export function setupContentTypesRoutes(app: Express): void {
       }
 
       const { scanBrandListicles } = await import("../lib/listicleScanner");
-      const result = await scanBrandListicles(brand.id);
+      // Wave 9.4: full ScanReport — includes reverified/lostInclusion +
+      // multi-line failure list so the toast can surface partial failures.
+      const report = await scanBrandListicles(brand.id);
       const listicles = await storage.getListicles(brand.id);
 
       res.json({
         success: true,
         data: {
           brand: { id: brand.id, name: brand.name },
-          inserted: result.inserted,
-          candidates: result.candidates,
-          reason: result.reason,
+          report,
+          // Legacy field aliases kept for any existing client that
+          // still reads { inserted, candidates }. New clients should
+          // read `report.*` directly.
+          inserted: report.inserted,
+          candidates: report.found,
+          reason: report.found === 0 ? "no_candidates" : "ok",
           listicles,
           tips: [
             "Listicles where you're not yet listed are outreach targets",
@@ -171,7 +229,8 @@ export function setupContentTypesRoutes(app: Express): void {
     "metadata",
   ] as const;
 
-  // Create Wikipedia mention — brandId must belong to caller.
+  // Create Wikipedia mention — brandId must belong to caller. Wave 9.4:
+  // tryInsert so manual-add surfaces a 409 instead of duplicating.
   app.post("/api/wikipedia", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -185,7 +244,12 @@ export function setupContentTypesRoutes(app: Express): void {
           .status(400)
           .json({ success: false, error: "pageTitle and pageUrl are required" });
       }
-      const mention = await storage.createWikipediaMention(body as any);
+      const mention = await storage.tryInsertWikipediaMention(body as any);
+      if (!mention) {
+        return res
+          .status(409)
+          .json({ success: false, error: "A mention for this Wikipedia page is already tracked" });
+      }
       res.json({ success: true, data: mention });
     } catch (error) {
       sendError(res, error, "Failed to create Wikipedia mention");
@@ -195,22 +259,26 @@ export function setupContentTypesRoutes(app: Express): void {
   // Scan for Wikipedia opportunities — real MediaWiki API + LLM classification.
   app.post("/api/wikipedia/scan/:brandId", async (req, res) => {
     try {
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
       const brand = await storage.getBrandById(req.params.brandId);
       if (!brand) {
         return res.status(404).json({ success: false, error: "Brand not found" });
       }
 
       const { scanBrandWikipedia } = await import("../lib/wikipediaScanner");
-      const result = await scanBrandWikipedia(brand.id);
+      const report = await scanBrandWikipedia(brand.id);
       const mentions = await storage.getWikipediaMentions(brand.id);
 
       res.json({
         success: true,
         data: {
           brand: { id: brand.id, name: brand.name },
-          existing: result.existing,
-          opportunities: result.opportunities,
-          inserted: result.inserted,
+          report,
+          // Legacy aliases for back-compat.
+          existing: report.existing,
+          opportunities: report.opportunities,
+          inserted: report.inserted,
           mentions,
         },
       });
@@ -244,6 +312,8 @@ export function setupContentTypesRoutes(app: Express): void {
     "targetIntent",
     "status",
     "aiScore",
+    "publishedUrl",
+    "publishedAt",
     "metadata",
   ] as const;
 
@@ -294,8 +364,19 @@ export function setupContentTypesRoutes(app: Express): void {
       if (update.brandId && typeof update.brandId === "string") {
         await requireBrand(update.brandId, user.id);
       }
+      // Wave 9.4: when the user marks the piece as published (toggles
+      // the publishedAt timestamp), accept either the explicit value or
+      // a "publish now" sentinel. publishedUrl can be cleared by sending
+      // null or "".
+      if (update.publishedAt && typeof update.publishedAt === "string") {
+        update.publishedAt = new Date(update.publishedAt);
+      }
       const content = await storage.updateBofuContent(req.params.id, update as any);
       if (!content) return res.status(404).json({ success: false, error: "Content not found" });
+      // Sync tracked_content_urls on every PATCH that touches publishedUrl.
+      if (Object.prototype.hasOwnProperty.call(update, "publishedUrl")) {
+        await syncTrackedContentUrl("bofu", content.id, content.brandId, update.publishedUrl);
+      }
       res.json({ success: true, data: content });
     } catch (error) {
       sendError(res, error, "Failed to update BOFU content");
@@ -309,6 +390,9 @@ export function setupContentTypesRoutes(app: Express): void {
       await requireBofuContent(req.params.id, user.id);
       const deleted = await storage.deleteBofuContent(req.params.id);
       if (!deleted) return res.status(404).json({ success: false, error: "Content not found" });
+      // Wave 9.4: remove from tracked content registry (no-op if it
+      // wasn't published).
+      await storage.deleteTrackedContentUrlBySource("bofu", req.params.id).catch(() => {});
       res.json({ success: true });
     } catch (error) {
       sendError(res, error, "Failed to delete BOFU content");
@@ -323,43 +407,74 @@ export function setupContentTypesRoutes(app: Express): void {
       if (!brandId || typeof brandId !== "string") {
         return res.status(400).json({ success: false, error: "brandId is required" });
       }
-      const brand = await requireBrand(brandId, user.id);
+      await requireBrand(brandId, user.id);
+
+      // Wave 9.4: load full grounding context — fact sheet + ALL
+      // tracked competitors (was: comparedWith[0] only). The fact-sheet
+      // block + per-competitor verified data goes into the prompt so
+      // the LLM stops inventing comparison features.
+      const ctx = await loadBrandGenerationContext(
+        brandId,
+        Array.isArray(comparedWith) ? comparedWith : [],
+      );
+      if (!ctx) return res.status(404).json({ success: false, error: "Brand not found" });
+      const { brand, facts, competitorsResolved } = ctx;
+      const factsBlock = renderFactsBlock(facts);
+      const competitorBlock = renderCompetitorBlock(competitorsResolved);
+      const groundingNote = factsBlock
+        ? '\n\nGrounding rules:\n- Use only facts in the Verified-facts block above for claims about this brand.\n- For competitor specifics not in the Competitors block, hedge with phrases like "commonly reported as" or omit.\n- If a comparison data point is unknown, say so explicitly rather than inventing a number.\n'
+        : '\n\nGrounding rules:\n- This brand has no verified facts on file. Avoid specific numbers or feature claims; describe at a category level only and hedge with "commonly" / "typically".\n';
+      const competitorNamesForTitle = competitorsResolved.map((c) => c.name).filter(Boolean);
+      const firstCompetitor = competitorNamesForTitle[0] ?? "Competitor";
 
       let prompt = "";
       let title = "";
 
       if (contentType === "comparison") {
-        const competitor = comparedWith?.[0] || "Competitor";
-        title = `${brand.name} vs ${competitor}: Complete Comparison Guide`;
+        title =
+          competitorNamesForTitle.length > 1
+            ? `${brand.name} vs ${competitorNamesForTitle.slice(0, 3).join(" vs ")}: Complete Comparison Guide`
+            : `${brand.name} vs ${firstCompetitor}: Complete Comparison Guide`;
         prompt = `Create a comprehensive comparison article: "${title}"
 
 Brand: ${brand.name}
 Industry: ${brand.industry}
 Description: ${brand.description || ""}
-Key Products/Services: ${brand.products?.join(", ") || ""}
-Unique Selling Points: ${brand.uniqueSellingPoints?.join(", ") || ""}
+Key Products/Services: ${Array.isArray(brand.products) ? brand.products.join(", ") : ""}
+Unique Selling Points: ${Array.isArray((brand as any).uniqueSellingPoints) ? (brand as any).uniqueSellingPoints.join(", ") : ""}
+
+${factsBlock}
+
+${competitorBlock}
+
+${groundingNote}
 
 Create an in-depth, balanced comparison (1500+ words) that:
-1. Compares features, pricing, pros/cons objectively
+1. Compares features, pricing, pros/cons objectively across ALL competitors listed above (not just one)
 2. Helps readers make an informed decision
 3. Is optimized for AI citation (structured with headers, tables, clear conclusions)
 4. Includes a FAQ section at the end
+5. Uses a comparison table near the top so AI engines can extract structured data
 
-Format with markdown headers. Be balanced but highlight genuine strengths of ${brand.name}.`;
+Format with markdown headers. Be balanced but highlight genuine strengths of ${brand.name} grounded in the verified facts above.`;
       } else if (contentType === "alternatives") {
-        const to = comparedWith?.[0] || "Industry Leader";
         title = `Top ${brand.name} Alternatives: Best Options for ${new Date().getFullYear()}`;
-        prompt = `Create an "Alternatives to ${to}" article that positions ${brand.name} as a top alternative.
+        prompt = `Create an alternatives guide that positions ${brand.name} alongside the alternatives listed below.
 
 Brand: ${brand.name}
 Industry: ${brand.industry}
 
+${factsBlock}
+
+${competitorBlock}
+
+${groundingNote}
+
 Create a comprehensive alternatives guide (1500+ words) that:
-1. Lists 5-7 alternatives (including ${brand.name})
+1. Lists each tracked competitor above PLUS ${brand.name} as alternatives, with pros/cons grounded in the verified facts
 2. Explains why someone might look for alternatives
-3. Compares each alternative with pros/cons
-4. Positions ${brand.name} favorably but honestly
-5. Includes FAQ section for AI indexing
+3. Positions ${brand.name} favorably but honestly
+4. Includes FAQ section for AI indexing
 
 Format with markdown. Each alternative should have clear headers and bullet points.`;
       } else if (contentType === "guide") {
@@ -371,10 +486,14 @@ Format with markdown. Each alternative should have clear headers and bullet poin
 Brand: ${brand.name}
 Target Keyword: ${keyword || brand.industry + " guide"}
 
+${factsBlock}
+
+${groundingNote}
+
 Create a comprehensive buyer's guide (1500+ words) that:
 1. Helps buyers understand what to look for
 2. Explains key features and considerations
-3. Naturally mentions ${brand.name} as a solution
+3. Naturally mentions ${brand.name} as a solution, citing the verified facts above
 4. Includes comparison tables and checklists
 5. Has a detailed FAQ section
 
@@ -447,6 +566,8 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
     "aiSurfaceScore",
     "isOptimized",
     "optimizationTips",
+    "publishedUrl",
+    "publishedAt",
     "metadata",
   ] as const;
 
@@ -498,8 +619,28 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
       if (update.brandId && typeof update.brandId === "string") {
         await requireBrand(update.brandId, user.id);
       }
+      if (update.publishedAt && typeof update.publishedAt === "string") {
+        update.publishedAt = new Date(update.publishedAt);
+      }
+      // Wave 9.4: recompute aiSurfaceScore deterministically when the
+      // question or answer changes. The legacy LLM-self-scored field
+      // produced inconsistent values; this gives a stable signal.
+      if (update.question !== undefined || update.answer !== undefined) {
+        const existing = await storage.getFaqItemById(req.params.id);
+        if (existing) {
+          const brand = await storage.getBrandById(existing.brandId);
+          update.aiSurfaceScore = computeAiSurfaceScore({
+            question: update.question ?? existing.question,
+            answer: update.answer ?? existing.answer,
+            brand: brand ? { name: brand.name, nameVariations: brand.nameVariations ?? [] } : null,
+          });
+        }
+      }
       const faq = await storage.updateFaqItem(req.params.id, update as any);
       if (!faq) return res.status(404).json({ success: false, error: "FAQ not found" });
+      if (Object.prototype.hasOwnProperty.call(update, "publishedUrl")) {
+        await syncTrackedContentUrl("faq", faq.id, faq.brandId, update.publishedUrl);
+      }
       res.json({ success: true, data: faq });
     } catch (error) {
       sendError(res, error, "Failed to update FAQ");
@@ -513,6 +654,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
       await requireFaq(req.params.id, user.id);
       const deleted = await storage.deleteFaqItem(req.params.id);
       if (!deleted) return res.status(404).json({ success: false, error: "FAQ not found" });
+      await storage.deleteTrackedContentUrlBySource("faq", req.params.id).catch(() => {});
       res.json({ success: true });
     } catch (error) {
       sendError(res, error, "Failed to delete FAQ");
@@ -525,14 +667,15 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
       const user = requireUser(req);
       const faq = await requireFaq(req.params.id, user.id);
 
-      // Get brand context
-      let brandContext = "";
-      if (faq.brandId) {
-        const brand = await storage.getBrandById(faq.brandId);
-        if (brand) {
-          brandContext = `Brand: ${brand.name}, Industry: ${brand.industry}, Products: ${brand.products?.join(", ") || "N/A"}`;
-        }
-      }
+      // Wave 9.4: pull the full grounding context (fact sheet) so the
+      // optimizer can hedge against unverified claims rather than
+      // inventing them.
+      const ctx = faq.brandId ? await loadBrandGenerationContext(faq.brandId, []) : null;
+      const brand = ctx?.brand ?? null;
+      const factsBlock = ctx ? renderFactsBlock(ctx.facts) : "";
+      const brandContext = brand
+        ? `Brand: ${brand.name}, Industry: ${brand.industry}, Products: ${Array.isArray(brand.products) ? brand.products.join(", ") : "N/A"}`
+        : "";
 
       const prompt = `You are an FAQ optimization expert for AI search engines. Optimize this FAQ for maximum AI citation likelihood.
 
@@ -542,22 +685,23 @@ Answer: ${faq.answer}
 
 Brand Context: ${brandContext}
 
+${factsBlock}
+
 Optimization requirements:
 1. Question should be natural and mirror how users ask AI chatbots
 2. Answer should be 40-60 words (optimal for AI summarization)
 3. Answer should start with a direct response, then provide context
-4. Include specific facts, numbers, or unique value props if applicable
+4. Use ONLY facts from the Verified-facts block above; hedge or omit anything unverified
 5. Make it authoritative but conversational
 
 Return JSON:
 {
   "question": "Optimized question",
   "answer": "Optimized answer (40-60 words)",
-  "aiSurfaceScore": 1-100,
   "optimizationTips": ["What was improved", "Additional suggestions"]
 }
 
-Return ONLY valid JSON.`;
+Return ONLY valid JSON. Do not include an aiSurfaceScore field — it is computed deterministically server-side.`;
 
       const response = await openai.chat.completions.create({
         model: MODELS.misc,
@@ -572,10 +716,19 @@ Return ONLY valid JSON.`;
           .json({ success: false, error: "Failed to parse optimization result" });
       }
 
+      const finalQuestion = optimized.question || faq.question;
+      const finalAnswer = optimized.answer || faq.answer;
+      // Wave 9.4: deterministic score; LLM's number is ignored.
+      const aiSurfaceScore = computeAiSurfaceScore({
+        question: finalQuestion,
+        answer: finalAnswer,
+        brand: brand ? { name: brand.name, nameVariations: brand.nameVariations ?? [] } : null,
+      });
+
       const updatedFaq = await storage.updateFaqItem(req.params.id, {
-        question: optimized.question || faq.question,
-        answer: optimized.answer || faq.answer,
-        aiSurfaceScore: optimized.aiSurfaceScore || 85,
+        question: finalQuestion,
+        answer: finalAnswer,
+        aiSurfaceScore,
         isOptimized: 1,
         optimizationTips: Array.isArray(optimized.optimizationTips)
           ? optimized.optimizationTips
@@ -591,10 +744,13 @@ Return ONLY valid JSON.`;
   // Generate optimized FAQs for a brand
   app.post("/api/faqs/generate/:brandId", aiLimitMiddleware, async (req, res) => {
     try {
-      const brand = await storage.getBrandById(req.params.brandId);
-      if (!brand) {
-        return res.status(404).json({ success: false, error: "Brand not found" });
-      }
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
+      // Wave 9.4: ownership-checked above; pull grounding context.
+      const ctx = await loadBrandGenerationContext(req.params.brandId, []);
+      if (!ctx) return res.status(404).json({ success: false, error: "Brand not found" });
+      const { brand, facts } = ctx;
+      const factsBlock = renderFactsBlock(facts);
 
       const { topic, count = 5 } = req.body;
       const faqCount = Math.min(Math.max(parseInt(count) || 5, 1), 20);
@@ -603,7 +759,13 @@ Return ONLY valid JSON.`;
 
 Topic focus: ${topic || brand.industry}
 Company description: ${brand.description || ""}
-Products/Services: ${brand.products?.join(", ") || ""}
+Products/Services: ${Array.isArray(brand.products) ? brand.products.join(", ") : ""}
+
+${factsBlock}
+
+Grounding rules:
+- Use only the verified facts above for any specific number, percentage, feature, or named integration.
+- For anything not in that block, hedge ("commonly", "typically") or omit. Never invent specific numbers.
 
 Generate FAQs that:
 1. Mirror how users ask AI chatbots questions
@@ -616,11 +778,10 @@ Return JSON array:
   "question": "The question users might ask AI",
   "answer": "Concise, authoritative answer",
   "category": "pricing|features|comparison|support|general",
-  "aiSurfaceScore": 1-100 (how likely AI will surface this),
   "optimizationTips": ["tip1", "tip2"]
 }]
 
-Return ONLY the JSON array.`;
+Return ONLY the JSON array. Do NOT include any aiSurfaceScore field — it is computed server-side from a deterministic heuristic.`;
 
       const response = await openai.chat.completions.create({
         model: MODELS.misc,
@@ -633,20 +794,37 @@ Return ONLY the JSON array.`;
 
       // Save sequentially with per-item try/catch so one bad item doesn't
       // abort the whole batch (fixes the Promise.all partial-failure bug).
+      // Wave 9.4: also dedupe semantically against existing FAQs and
+      // compute the aiSurfaceScore heuristically.
       const savedFaqs: any[] = [];
+      let merged = 0;
+      let invalid = 0;
       for (const faq of faqs) {
-        if (!faq || typeof faq.question !== "string" || typeof faq.answer !== "string") continue;
+        if (!faq || typeof faq.question !== "string" || typeof faq.answer !== "string") {
+          invalid += 1;
+          continue;
+        }
         try {
+          const similar = await storage
+            .findSimilarFaqQuestion(brand.id, faq.question)
+            .catch(() => null);
+          if (similar) {
+            merged += 1;
+            continue;
+          }
+          const aiSurfaceScore = computeAiSurfaceScore({
+            question: faq.question,
+            answer: faq.answer,
+            brand: { name: brand.name, nameVariations: brand.nameVariations ?? [] },
+          });
           const saved = await storage.createFaqItem({
             brandId: brand.id,
             question: faq.question,
             answer: faq.answer,
             category: faq.category ?? null,
-            aiSurfaceScore: typeof faq.aiSurfaceScore === "number" ? faq.aiSurfaceScore : null,
+            aiSurfaceScore,
             // Generation produces draft FAQs; the per-FAQ optimizer is
-            // a separate manual step that flips this to 1. Defaulting
-            // to 1 here pre-marked everything as optimized and made
-            // the toggle meaningless.
+            // a separate manual step that flips this to 1.
             isOptimized: 0,
             optimizationTips: Array.isArray(faq.optimizationTips) ? faq.optimizationTips : [],
           });
@@ -659,6 +837,13 @@ Return ONLY the JSON array.`;
       res.json({
         success: true,
         data: savedFaqs,
+        report: {
+          requested: faqCount,
+          generated: faqs.length,
+          inserted: savedFaqs.length,
+          mergedDuplicates: merged,
+          invalid,
+        },
         tips: [
           "Add FAQ schema markup to your pages for rich snippets",
           "Keep answers 40-60 words for optimal AI summarization",
@@ -668,6 +853,79 @@ Return ONLY the JSON array.`;
       });
     } catch (error) {
       sendError(res, error, "Failed to generate FAQs");
+    }
+  });
+
+  // ============================================================
+  // Wave 9.4: GEO Tools header summary endpoint.
+  // ============================================================
+  app.get("/api/geo-tools/summary/:brandId", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      await requireBrand(req.params.brandId, user.id);
+      const summary = await storage.getGeoToolsSummary(req.params.brandId);
+      res.json({ success: true, data: summary });
+    } catch (error) {
+      sendError(res, error, "Failed to load GEO Tools summary");
+    }
+  });
+
+  // ============================================================
+  // Wave 9.4: Wikipedia draft-text helper. NPOV-tuned 2-3 sentence
+  // mention the user can paste into the Wikipedia edit form.
+  // ============================================================
+  app.post("/api/wikipedia/draft/:mentionId", aiLimitMiddleware, async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const mention = await storage
+        .getWikipediaMentions()
+        .then((rows) => rows.find((m) => m.id === req.params.mentionId));
+      if (!mention) {
+        return res.status(404).json({ success: false, error: "Mention not found" });
+      }
+      await requireBrand(mention.brandId, user.id);
+      const ctx = await loadBrandGenerationContext(mention.brandId, []);
+      if (!ctx) return res.status(404).json({ success: false, error: "Brand not found" });
+      const { brand, facts } = ctx;
+      const factsBlock = renderFactsBlock(facts);
+
+      const prompt = `You are drafting a Wikipedia mention for the brand "${brand.name}" on the page "${mention.pageTitle}". Wikipedia requires neutral point of view (NPOV) — no marketing language, no superlatives, no claims that aren't backed by a citation.
+
+Brand context:
+${factsBlock || `- ${brand.name} (${brand.industry || "unspecified industry"})`}
+
+Page context (existing extract from the article):
+${(mention.mentionContext || "").slice(0, 1500)}
+
+Write 2-3 sentences (max ~80 words) that mention the brand neutrally in the context of the page topic. The text MUST:
+- Be encyclopedic and factual
+- Use only verified facts from the brand-context block above
+- Be drop-in addable to the article (don't repeat the page title; assume it's added inside an existing section)
+- Suggest a likely citation source after the sentence in parentheses (e.g. "(see: company website / industry report)")
+
+Return ONLY the draft text, no preamble.`;
+
+      const response = await openai.chat.completions.create({
+        model: MODELS.misc,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.4,
+        max_tokens: 250,
+      });
+
+      const draft = (response.choices[0]?.message?.content || "").trim();
+      res.json({
+        success: true,
+        data: {
+          draft,
+          notes: [
+            "Wikipedia requires reliable, independent sources — replace the parenthetical citation hint with a real reference URL before submitting.",
+            "Verify your brand meets Wikipedia's WP:NOTABILITY guideline before adding a mention.",
+            "Disclose any conflict of interest on the article's talk page (WP:COI).",
+          ],
+        },
+      });
+    } catch (error) {
+      sendError(res, error, "Failed to draft Wikipedia mention");
     }
   });
 }

@@ -9,6 +9,8 @@ import { logger } from "./lib/logger";
 import { openaiBreaker, openrouterBreaker } from "./lib/circuitBreaker";
 import { analyzeResponse, deriveSentiment, type TrackedEntity } from "./lib/responseAnalyzer";
 import { detectBrandAndCompetitors, matchEntity } from "./lib/brandMatcher";
+import { findSelfCitationsInText } from "./lib/trackedContentMatcher";
+import type { TrackedContentUrl } from "@shared/schema";
 
 // ChatGPT citation checks go through the direct OpenAI client.
 const openai = new OpenAI({
@@ -406,6 +408,20 @@ export async function runBrandPrompts(
   console.log(
     `[citationChecker] loaded ${competitors.length} active competitors for brand ${brandId}`,
   );
+
+  // Wave 9.4: tracked content URLs — the brand's own published BOFU/FAQ
+  // pages. Loaded once per run; substring-matched against each LLM
+  // response below so we can stamp last_cited_at + bump
+  // citation_runs.self_citation_count whenever an AI engine cites
+  // something the user generated themselves.
+  const trackedContentUrls = await storage
+    .getTrackedContentUrlsByBrandId(brandId)
+    .catch(() => [] as TrackedContentUrl[]);
+  // Dedup the set of (sourceType, sourceId) we've already stamped so a
+  // single piece of content gets at most one timestamp update + counter
+  // bump per run regardless of how many cells cite it.
+  const stampedThisRun = new Set<string>();
+
   const competitorDetections = new Map<string, Map<string, number>>(); // competitorId → platform → cited count
   // Platforms where we've already done auto-discovery of new competitors
   // this run — once per (runId, platform) to cap LLM cost at ~5 extra
@@ -644,6 +660,29 @@ export async function runBrandPrompts(
     const matcherBrandMatched = matcherDetection.brand.matched;
     const brandVerdict = analysis.tracked[brand.id] ?? null;
     const analyzerCited = Boolean(brandVerdict?.cited);
+
+    // Wave 9.4: self-citation detection. If the LLM response includes a
+    // URL we registered as user-published content (BOFU or FAQ), stamp
+    // the source row's lastCitedAt and bump the run's
+    // selfCitationCount. Idempotent within a single run via
+    // stampedThisRun.
+    if (responseText && trackedContentUrls.length > 0) {
+      const hits = findSelfCitationsInText(responseText, trackedContentUrls);
+      for (const hit of hits) {
+        const key = `${hit.sourceType}:${hit.sourceId}`;
+        if (stampedThisRun.has(key)) continue;
+        stampedThisRun.add(key);
+        try {
+          await storage.stampSelfCitation(hit.sourceType as "bofu" | "faq", hit.sourceId);
+          await storage.incrementCitationRunSelfCitations(citationRun.id, 1);
+        } catch (err) {
+          logger.warn(
+            { err, runId: citationRun.id, sourceType: hit.sourceType, sourceId: hit.sourceId },
+            "self-citation stamp failed",
+          );
+        }
+      }
+    }
 
     // Disagreement logging — useful for tuning the variation list. Both
     // directions are interesting: matcher-yes/analyzer-no usually means

@@ -289,7 +289,7 @@ const FACT_REFRESH_CRON = process.env.FACT_REFRESH_CRON || "0 10 1 * *"; // 1st 
 
 async function runForEveryBrand(
   label: string,
-  fn: (brandId: string) => Promise<number | void | { updated: number; checked: number }>,
+  fn: (brandId: string) => Promise<unknown>,
 ): Promise<void> {
   logger.info({ job: label }, `${label} job starting`);
   // Skip soft-deleted brands (Wave 4.5) — no point spending LLM tokens

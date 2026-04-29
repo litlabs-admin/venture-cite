@@ -46,6 +46,8 @@ import {
   type InsertFaqItem,
   type BrandMention,
   type InsertBrandMention,
+  type TrackedContentUrl,
+  type InsertTrackedContentUrl,
   type PromptPortfolio,
   type InsertPromptPortfolio,
   type CitationQuality,
@@ -382,6 +384,33 @@ export interface IStorage {
     update: Partial<InsertBrandMention>,
   ): Promise<BrandMention | undefined>;
   deleteBrandMention(id: string): Promise<boolean>;
+
+  // Wave 9.4: idempotent inserts (ON CONFLICT DO NOTHING). Return null
+  // when the row would have collided with a unique constraint, so
+  // scanners can count "newly inserted" vs "already had it" without a
+  // pre-read.
+  tryInsertListicle(insert: InsertListicle): Promise<Listicle | null>;
+  tryInsertWikipediaMention(insert: InsertWikipediaMention): Promise<WikipediaMention | null>;
+  tryInsertBrandMention(insert: InsertBrandMention): Promise<BrandMention | null>;
+  // Wave 9.4: trigram (or fallback exact-match) similarity for FAQ dedup.
+  findSimilarFaqQuestion(
+    brandId: string,
+    question: string,
+    threshold?: number,
+  ): Promise<{ id: string; question: string; similarity: number } | null>;
+  // Wave 9.4: tracked content URL CRUD + self-citation stamping.
+  upsertTrackedContentUrl(insert: InsertTrackedContentUrl): Promise<TrackedContentUrl>;
+  deleteTrackedContentUrlBySource(sourceType: "bofu" | "faq", sourceId: string): Promise<boolean>;
+  getTrackedContentUrlsByBrandId(brandId: string): Promise<TrackedContentUrl[]>;
+  stampSelfCitation(sourceType: "bofu" | "faq", sourceId: string, at?: Date): Promise<void>;
+  incrementCitationRunSelfCitations(runId: string, by?: number): Promise<void>;
+  getGeoToolsSummary(brandId: string): Promise<{
+    listicles: { total: number; included: number };
+    wikipedia: { existing: number; opportunities: number };
+    bofu: { drafts: number; published: number; cited30d: number };
+    faqs: { drafts: number; published: number; cited30d: number };
+    mentions: { total: number; unaddressed: number; negative: number };
+  }>;
 
   // Prompt Portfolio methods (Share-of-Answer)
   createPromptPortfolio(prompt: InsertPromptPortfolio): Promise<PromptPortfolio>;

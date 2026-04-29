@@ -488,6 +488,10 @@ export const citationRuns = pgTable(
     // Surfaced on HistoryTab as a tooltip so users can spot brands whose
     // nameVariations list needs tuning.
     disagreementCount: integer("disagreement_count").default(0).notNull(),
+    // Wave 9.4: number of times an LLM response in this run cited a URL
+    // registered in tracked_content_urls (i.e. the brand's own published
+    // BOFU/FAQ pages). Surfaces "did the content I generated work?".
+    selfCitationCount: integer("self_citation_count").default(0).notNull(),
   },
   (table) => [
     index("citation_runs_brand_id_idx").on(table.brandId),
@@ -843,6 +847,12 @@ export const listicles = pgTable(
     searchVolume: integer("search_volume"),
     domainAuthority: integer("domain_authority"),
     lastChecked: timestamp("last_checked").defaultNow().notNull(),
+    // Wave 9.4: outreach lifecycle. Values: 'new' | 'contacted' | 'won' | 'dropped'.
+    outreachStatus: text("outreach_status").default("new").notNull(),
+    outreachNotes: text("outreach_notes"),
+    // Wave 9.4: refresh on subsequent scans so isIncluded/listPosition can
+    // be re-validated rather than frozen at first-discovery time.
+    lastVerifiedAt: timestamp("last_verified_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
   },
@@ -890,6 +900,12 @@ export const bofuContent = pgTable(
     targetIntent: text("target_intent"),
     status: text("status").default("draft"),
     aiScore: integer("ai_score"),
+    // Wave 9.4: content lifecycle. publishedUrl is the canonical URL
+    // where this BOFU piece lives; once set, the citation checker tracks
+    // self-citations against it and updates lastCitedAt.
+    publishedUrl: text("published_url"),
+    publishedAt: timestamp("published_at"),
+    lastCitedAt: timestamp("last_cited_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
@@ -915,6 +931,10 @@ export const faqItems = pgTable(
     aiSurfaceScore: integer("ai_surface_score"),
     isOptimized: integer("is_optimized").default(0).notNull(),
     optimizationTips: text("optimization_tips").array(),
+    // Wave 9.4: lifecycle parallel to bofu_content.
+    publishedUrl: text("published_url"),
+    publishedAt: timestamp("published_at"),
+    lastCitedAt: timestamp("last_cited_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
@@ -941,11 +961,47 @@ export const brandMentions = pgTable(
     engagementScore: integer("engagement_score"),
     authorUsername: text("author_username"),
     isVerified: integer("is_verified").default(0).notNull(),
+    // Wave 9.4: explicit lifecycle. Values:
+    //   'new' | 'acknowledged' | 'replied' | 'false_positive' | 'ignored'.
+    status: text("status").default("new").notNull(),
     mentionedAt: timestamp("mentioned_at"),
     discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
   },
   (table) => [index("brand_mentions_brand_id_idx").on(table.brandId)],
+);
+
+// Wave 9.4: registry of brand-owned published URLs (currently from
+// bofu_content + faq_items via a polymorphic source_type/source_id pair)
+// that the citation checker matches against. When the LLM in a citation
+// run cites one of these URLs, the corresponding bofu_content / faq_items
+// row gets last_cited_at = now() and citation_runs.self_citation_count
+// increments.
+export const trackedContentUrls = pgTable(
+  "tracked_content_urls",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    sourceType: text("source_type").notNull(), // 'bofu' | 'faq'
+    sourceId: varchar("source_id").notNull(),
+    url: text("url").notNull(),
+    // Lower-cased host + path with www./trailing-slash/query/fragment
+    // stripped. The matcher works against this normalized form so URL
+    // variations match consistently.
+    normalizedUrl: text("normalized_url").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("tracked_content_urls_brand_id_idx").on(table.brandId),
+    index("tracked_content_urls_brand_id_normalized_url_idx").on(
+      table.brandId,
+      table.normalizedUrl,
+    ),
+  ],
 );
 
 export const insertListicleSchema = createInsertSchema(listicles).omit({
@@ -975,6 +1031,11 @@ export const insertFaqItemSchema = createInsertSchema(faqItems).omit({
 export const insertBrandMentionSchema = createInsertSchema(brandMentions).omit({
   id: true,
   discoveredAt: true,
+});
+
+export const insertTrackedContentUrlSchema = createInsertSchema(trackedContentUrls).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Prompt Portfolio - Track prompts by category/intent with share-of-answer
@@ -1658,6 +1719,8 @@ export type InsertBrandVisibilitySnapshot = z.infer<typeof insertBrandVisibility
 export type BrandVisibilitySnapshot = typeof brandVisibilitySnapshots.$inferSelect;
 export type InsertListicle = z.infer<typeof insertListicleSchema>;
 export type Listicle = typeof listicles.$inferSelect;
+export type InsertTrackedContentUrl = z.infer<typeof insertTrackedContentUrlSchema>;
+export type TrackedContentUrl = typeof trackedContentUrls.$inferSelect;
 export type InsertWikipediaMention = z.infer<typeof insertWikipediaMentionSchema>;
 export type WikipediaMention = typeof wikipediaMentions.$inferSelect;
 export type InsertBofuContent = z.infer<typeof insertBofuContentSchema>;

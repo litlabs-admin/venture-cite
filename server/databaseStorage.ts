@@ -50,6 +50,8 @@ import {
   type InsertFaqItem,
   type BrandMention,
   type InsertBrandMention,
+  type TrackedContentUrl,
+  type InsertTrackedContentUrl,
   type PromptPortfolio,
   type InsertPromptPortfolio,
   type CitationQuality,
@@ -1966,6 +1968,248 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.brandMentions.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // Wave 9.4: idempotent inserts for scanners. Returns the row only if
+  // the insert actually happened (i.e. no unique-index conflict). Used
+  // by the listicle / wikipedia / mention scanners to count "newly
+  // inserted" vs "skipped duplicate" without a pre-read.
+  async tryInsertListicle(insert: InsertListicle): Promise<Listicle | null> {
+    const result = await db
+      .insert(schema.listicles)
+      .values(insert)
+      .onConflictDoNothing()
+      .returning();
+    return result[0] ?? null;
+  }
+
+  async tryInsertWikipediaMention(
+    insert: InsertWikipediaMention,
+  ): Promise<WikipediaMention | null> {
+    const result = await db
+      .insert(schema.wikipediaMentions)
+      .values(insert)
+      .onConflictDoNothing()
+      .returning();
+    return result[0] ?? null;
+  }
+
+  async tryInsertBrandMention(insert: InsertBrandMention): Promise<BrandMention | null> {
+    const result = await db
+      .insert(schema.brandMentions)
+      .values(insert)
+      .onConflictDoNothing()
+      .returning();
+    return result[0] ?? null;
+  }
+
+  // Wave 9.4: trigram similarity-based FAQ dedup. Returns the highest
+  // similarity > threshold, or null if none. Falls back to exact-match
+  // when the pg_trgm extension or function is unavailable (the
+  // similarity() call throws → caller catches and treats as no match).
+  async findSimilarFaqQuestion(
+    brandId: string,
+    question: string,
+    threshold = 0.65,
+  ): Promise<{ id: string; question: string; similarity: number } | null> {
+    try {
+      const rows = await db.execute(sql`
+        SELECT id, question, similarity(question, ${question}) AS sim
+        FROM faq_items
+        WHERE brand_id = ${brandId}
+          AND similarity(question, ${question}) >= ${threshold}
+        ORDER BY sim DESC
+        LIMIT 1
+      `);
+      const row = (rows as any).rows?.[0] ?? (rows as any)[0];
+      if (!row) return null;
+      return {
+        id: String(row.id),
+        question: String(row.question),
+        similarity: Number(row.sim),
+      };
+    } catch {
+      // pg_trgm not available — fall back to exact case-insensitive match.
+      const exact = await db
+        .select({ id: schema.faqItems.id, question: schema.faqItems.question })
+        .from(schema.faqItems)
+        .where(
+          and(
+            eq(schema.faqItems.brandId, brandId),
+            sql`lower(${schema.faqItems.question}) = lower(${question})`,
+          ),
+        )
+        .limit(1);
+      if (exact.length === 0) return null;
+      return { id: exact[0].id, question: exact[0].question, similarity: 1 };
+    }
+  }
+
+  // ============================================================
+  // Wave 9.4: tracked_content_urls + self-citation tracking.
+  // ============================================================
+
+  async upsertTrackedContentUrl(insert: InsertTrackedContentUrl): Promise<TrackedContentUrl> {
+    // One row per (source_type, source_id) — when a piece of content's
+    // published_url changes we update in place rather than churning.
+    const existing = await db
+      .select()
+      .from(schema.trackedContentUrls)
+      .where(
+        and(
+          eq(schema.trackedContentUrls.sourceType, insert.sourceType),
+          eq(schema.trackedContentUrls.sourceId, insert.sourceId),
+        ),
+      )
+      .limit(1);
+    if (existing[0]) {
+      const updated = await db
+        .update(schema.trackedContentUrls)
+        .set({
+          brandId: insert.brandId,
+          url: insert.url,
+          normalizedUrl: insert.normalizedUrl,
+        })
+        .where(eq(schema.trackedContentUrls.id, existing[0].id))
+        .returning();
+      return updated[0];
+    }
+    const inserted = await db.insert(schema.trackedContentUrls).values(insert).returning();
+    return inserted[0];
+  }
+
+  async deleteTrackedContentUrlBySource(
+    sourceType: "bofu" | "faq",
+    sourceId: string,
+  ): Promise<boolean> {
+    const result = await db
+      .delete(schema.trackedContentUrls)
+      .where(
+        and(
+          eq(schema.trackedContentUrls.sourceType, sourceType),
+          eq(schema.trackedContentUrls.sourceId, sourceId),
+        ),
+      )
+      .returning();
+    return result.length > 0;
+  }
+
+  async getTrackedContentUrlsByBrandId(brandId: string): Promise<TrackedContentUrl[]> {
+    return await db
+      .select()
+      .from(schema.trackedContentUrls)
+      .where(eq(schema.trackedContentUrls.brandId, brandId));
+  }
+
+  async stampSelfCitation(
+    sourceType: "bofu" | "faq",
+    sourceId: string,
+    at: Date = new Date(),
+  ): Promise<void> {
+    if (sourceType === "bofu") {
+      await db
+        .update(schema.bofuContent)
+        .set({ lastCitedAt: at })
+        .where(eq(schema.bofuContent.id, sourceId));
+    } else {
+      await db
+        .update(schema.faqItems)
+        .set({ lastCitedAt: at })
+        .where(eq(schema.faqItems.id, sourceId));
+    }
+  }
+
+  async incrementCitationRunSelfCitations(runId: string, by = 1): Promise<void> {
+    await db
+      .update(schema.citationRuns)
+      .set({
+        selfCitationCount: sql`${schema.citationRuns.selfCitationCount} + ${by}`,
+      })
+      .where(eq(schema.citationRuns.id, runId));
+  }
+
+  // ============================================================
+  // Wave 9.4: GEO Tools header summary. Single round-trip count rollup
+  // per brand. Used by GET /api/geo-tools/summary/:brandId.
+  // ============================================================
+
+  async getGeoToolsSummary(brandId: string): Promise<{
+    listicles: { total: number; included: number };
+    wikipedia: { existing: number; opportunities: number };
+    bofu: { drafts: number; published: number; cited30d: number };
+    faqs: { drafts: number; published: number; cited30d: number };
+    mentions: { total: number; unaddressed: number; negative: number };
+  }> {
+    const cutoff30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [listicleAgg] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        included: sql<number>`count(*) filter (where is_included = 1)::int`,
+      })
+      .from(schema.listicles)
+      .where(eq(schema.listicles.brandId, brandId));
+
+    const [wikiAgg] = await db
+      .select({
+        existing: sql<number>`count(*) filter (where mention_type = 'existing')::int`,
+        opportunities: sql<number>`count(*) filter (where mention_type = 'opportunity')::int`,
+      })
+      .from(schema.wikipediaMentions)
+      .where(eq(schema.wikipediaMentions.brandId, brandId));
+
+    const [bofuAgg] = await db
+      .select({
+        drafts: sql<number>`count(*) filter (where published_at is null)::int`,
+        published: sql<number>`count(*) filter (where published_at is not null)::int`,
+        cited30d: sql<number>`count(*) filter (where last_cited_at >= ${cutoff30d})::int`,
+      })
+      .from(schema.bofuContent)
+      .where(eq(schema.bofuContent.brandId, brandId));
+
+    const [faqAgg] = await db
+      .select({
+        drafts: sql<number>`count(*) filter (where published_at is null)::int`,
+        published: sql<number>`count(*) filter (where published_at is not null)::int`,
+        cited30d: sql<number>`count(*) filter (where last_cited_at >= ${cutoff30d})::int`,
+      })
+      .from(schema.faqItems)
+      .where(eq(schema.faqItems.brandId, brandId));
+
+    const [mentionAgg] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        unaddressed: sql<number>`count(*) filter (where status = 'new')::int`,
+        negative: sql<number>`count(*) filter (where sentiment = 'negative')::int`,
+      })
+      .from(schema.brandMentions)
+      .where(eq(schema.brandMentions.brandId, brandId));
+
+    return {
+      listicles: {
+        total: listicleAgg?.total ?? 0,
+        included: listicleAgg?.included ?? 0,
+      },
+      wikipedia: {
+        existing: wikiAgg?.existing ?? 0,
+        opportunities: wikiAgg?.opportunities ?? 0,
+      },
+      bofu: {
+        drafts: bofuAgg?.drafts ?? 0,
+        published: bofuAgg?.published ?? 0,
+        cited30d: bofuAgg?.cited30d ?? 0,
+      },
+      faqs: {
+        drafts: faqAgg?.drafts ?? 0,
+        published: faqAgg?.published ?? 0,
+        cited30d: faqAgg?.cited30d ?? 0,
+      },
+      mentions: {
+        total: mentionAgg?.total ?? 0,
+        unaddressed: mentionAgg?.unaddressed ?? 0,
+        negative: mentionAgg?.negative ?? 0,
+      },
+    };
   }
 
   async createPromptPortfolio(insertPrompt: InsertPromptPortfolio): Promise<PromptPortfolio> {

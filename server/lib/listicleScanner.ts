@@ -4,6 +4,8 @@ import { attachAiLogger } from "./aiLogger";
 import { MODELS, OPENROUTER_BASE_URL } from "./modelConfig";
 import { safeFetchText } from "./ssrf";
 import { matchEntity } from "./brandMatcher";
+import { brandNameWarning } from "./brandNameAmbiguity";
+import { type ScanReport, emptyReport } from "./scanReport";
 import type { Brand, Listicle } from "@shared/schema";
 
 const openai = new OpenAI({
@@ -79,25 +81,75 @@ interface PerplexityUrl {
  * Rows where the brand isn't in the list are still stored (isIncluded=0) as
  * outreach targets.
  */
-export async function scanBrandListicles(
-  brandId: string,
-): Promise<{ inserted: number; candidates: number; reason: "ok" | "no_candidates" }> {
+export async function scanBrandListicles(brandId: string): Promise<ScanReport> {
   if (!openrouter) {
     throw new Error("OPENROUTER_API_KEY not configured");
   }
   const brand = await storage.getBrandById(brandId);
   if (!brand) throw new Error("Brand not found");
 
-  const existing = await storage.getListicles(brandId).catch(() => [] as Listicle[]);
-  const existingUrls = new Set(existing.map((l: Listicle) => l.url.toLowerCase()));
+  const report = emptyReport();
+  const ambiguityWarning = brandNameWarning(brand.name);
+  if (ambiguityWarning) report.warning = ambiguityWarning;
 
-  // Wave 8: load tracked competitors once so we can matcher-confirm the
-  // LLM's competitorsMentioned[] per page. Drops phantom competitors
-  // the LLM hallucinated as being on the page.
+  // Wave 9.4: re-verification phase. For every existing listicle whose
+  // last_verified_at is missing or older than 7 days, re-fetch the page
+  // and re-run the matcher. Updates isIncluded / listPosition /
+  // competitorsMentioned / lastVerifiedAt. Bounded at 50 to keep the
+  // wall time reasonable.
+  const REVERIFY_STALE_DAYS = 7;
+  const REVERIFY_BATCH = 50;
   const trackedCompetitors = await storage.getCompetitors(brandId).catch(() => []);
+  const existingRows = await storage.getListicles(brandId).catch(() => [] as Listicle[]);
+  const cutoff = Date.now() - REVERIFY_STALE_DAYS * 24 * 60 * 60 * 1000;
+  const stale = existingRows
+    .filter((l) => !l.lastVerifiedAt || new Date(l.lastVerifiedAt as any).getTime() < cutoff)
+    .slice(0, REVERIFY_BATCH);
+  let reverified = 0;
+  let lostInclusion = 0;
+  for (const row of stale) {
+    try {
+      const { status, text } = await safeFetchText(row.url, {
+        maxBytes: 5 * 1024 * 1024,
+        timeoutMs: 15_000,
+      });
+      if (status < 200 || status >= 300) {
+        await storage.updateListicle(row.id, { lastVerifiedAt: new Date() } as any);
+        continue;
+      }
+      const pageText = htmlToText(text).slice(0, MAX_PAGE_CHARS);
+      if (pageText.length < 300) {
+        await storage.updateListicle(row.id, { lastVerifiedAt: new Date() } as any);
+        continue;
+      }
+      const parsed = await parseListicle(pageText, brand).catch(() => null);
+      const matcher = matchEntity(pageText, {
+        id: brand.id,
+        name: brand.name,
+        nameVariations: Array.isArray(brand.nameVariations) ? brand.nameVariations : [],
+        website: brand.website ?? null,
+      });
+      const newIncluded = matcher.matched ? 1 : 0;
+      const newPos = matcher.matched ? (parsed?.brandPosition ?? null) : null;
+      if (row.isIncluded === 1 && newIncluded === 0) lostInclusion += 1;
+      await storage.updateListicle(row.id, {
+        isIncluded: newIncluded,
+        listPosition: newPos,
+        lastVerifiedAt: new Date(),
+      } as any);
+      reverified += 1;
+    } catch (err) {
+      report.failed.push({
+        url: row.url,
+        reason: `re-verify failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+  report.reverified = reverified;
+  report.lostInclusion = lostInclusion;
 
   const queries = buildQueries(brand);
-  if (queries.length === 0) return { inserted: 0, candidates: 0, reason: "no_candidates" };
+  if (queries.length === 0) return report;
 
   const candidateUrls = new Map<string, { query: string; title?: string }>();
   for (const q of queries) {
@@ -108,34 +160,44 @@ export async function scanBrandListicles(
         if (!candidateUrls.has(key)) candidateUrls.set(key, { query: q, title: u.title });
       }
     } catch (err) {
-      console.warn(
-        `[listicleScanner] perplexity "${q}" failed:`,
-        err instanceof Error ? err.message : err,
-      );
+      report.failed.push({
+        reason: `perplexity "${q}" failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
+  report.found = candidateUrls.size;
 
-  let inserted = 0;
   for (const [url, meta] of Array.from(candidateUrls.entries())) {
-    if (existingUrls.has(url)) continue;
-
     let html = "";
     try {
       const { status, text } = await safeFetchText(url, {
         maxBytes: 5 * 1024 * 1024,
         timeoutMs: 15_000,
       });
-      if (status < 200 || status >= 300) continue;
+      if (status < 200 || status >= 300) {
+        report.failed.push({ url, reason: `fetch returned ${status}` });
+        continue;
+      }
       html = text;
-    } catch {
+    } catch (err) {
+      report.failed.push({
+        url,
+        reason: `fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
       continue;
     }
 
     const pageText = htmlToText(html).slice(0, MAX_PAGE_CHARS);
-    if (pageText.length < 300) continue;
+    if (pageText.length < 300) {
+      report.skippedFiltered += 1;
+      continue;
+    }
 
     const parsed = await parseListicle(pageText, brand).catch(() => null);
-    if (!parsed || !parsed.isListicle) continue;
+    if (!parsed || !parsed.isListicle) {
+      report.skippedFiltered += 1;
+      continue;
+    }
 
     const host = (() => {
       try {
@@ -145,11 +207,6 @@ export async function scanBrandListicles(
       }
     })();
 
-    // Wave 8: matcher is the sole authority for isIncluded. Previously we
-    // OR'd matcher result with the LLM's mentionsBrand boolean — but that
-    // let LLM hallucinations through. The variant list now resolves the
-    // LLM's job (catching alternative spellings) without trusting its
-    // verdict.
     const matcherResult = matchEntity(pageText, {
       id: brand.id,
       name: brand.name,
@@ -157,24 +214,13 @@ export async function scanBrandListicles(
       website: brand.website ?? null,
     });
     const isIncluded = matcherResult.matched ? 1 : 0;
-    // Force position to null when the matcher says the brand isn't on
-    // the page, regardless of what the LLM claimed about brandPosition.
     const listPosition = matcherResult.matched ? (parsed.brandPosition ?? null) : null;
 
-    // Filter the LLM's competitorsMentioned[] through a matcher pass per
-    // tracked competitor. Drops names the LLM claims are on the page but
-    // the matcher can't verify in pageText. Untracked names (not in our
-    // competitor table) pass through unchanged — matcher can't validate
-    // what it doesn't know about, and these are useful for outreach.
-    const trackedCompIds = new Set(trackedCompetitors.map((c) => c.id));
     const llmItemNames = Array.isArray(parsed.items)
       ? parsed.items.map((i: any) => String(i.name).slice(0, 120)).slice(0, 30)
       : [];
     const filteredCompetitorNames: string[] = [];
     for (const item of llmItemNames) {
-      // Try to map this LLM-extracted name to a tracked competitor by
-      // case-insensitive name match. If we have a tracked match, run the
-      // matcher with that competitor's full variation list.
       const trackedMatch = trackedCompetitors.find(
         (c) => c.name.toLowerCase() === item.toLowerCase(),
       );
@@ -188,18 +234,17 @@ export async function scanBrandListicles(
           website: trackedMatch.domain ?? null,
         });
         if (compMatch.matched) filteredCompetitorNames.push(item);
-        // else: LLM claimed this competitor was on the page but matcher
-        // couldn't find them — drop. Don't log per-name (would spam on
-        // every weekly cron).
       } else {
-        // Not in our competitor table. Keep — useful for outreach UI.
         filteredCompetitorNames.push(item);
       }
     }
-    void trackedCompIds; // reserved for future stricter filters
 
     try {
-      await storage.createListicle({
+      // Wave 9.4: ON CONFLICT DO NOTHING via the storage helper. Returns
+      // null when the unique index (brand_id, lower(url)) collides — i.e.
+      // the same URL was inserted between our pre-dedupe read and now,
+      // which can happen on concurrent scans.
+      const inserted = await storage.tryInsertListicle({
         brandId,
         title: String(parsed.title || meta.title || url).slice(0, 500),
         url,
@@ -209,25 +254,22 @@ export async function scanBrandListicles(
         isIncluded,
         competitorsMentioned: filteredCompetitorNames,
         keyword: meta.query,
-        lastChecked: new Date(),
+        lastVerifiedAt: new Date(),
       } as any);
-      inserted += 1;
+      if (inserted) report.inserted += 1;
+      else report.skippedDuplicate += 1;
     } catch (err) {
-      console.warn(
-        `[listicleScanner] insert failed for ${url}:`,
-        err instanceof Error ? err.message : err,
-      );
+      report.failed.push({
+        url,
+        reason: `insert failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
 
   console.log(
-    `[listicleScanner] brand=${brandId} candidates=${candidateUrls.size} inserted=${inserted}`,
+    `[listicleScanner] brand=${brandId} found=${report.found} inserted=${report.inserted} dup=${report.skippedDuplicate} filt=${report.skippedFiltered} failed=${report.failed.length} reverified=${reverified}`,
   );
-  return {
-    inserted,
-    candidates: candidateUrls.size,
-    reason: candidateUrls.size === 0 ? "no_candidates" : "ok",
-  };
+  return report;
 }
 
 async function searchPerplexity(query: string): Promise<PerplexityUrl[]> {

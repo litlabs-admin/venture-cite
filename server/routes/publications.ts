@@ -69,11 +69,94 @@ export function setupPublicationsRoutes(app: Express): void {
         return res.status(404).json({ success: false, error: "Brand not found" });
       }
       const { scanBrandMentions } = await import("../lib/mentionScanner");
-      const inserted = await scanBrandMentions(brand.id);
+      // Wave 9.4: full ScanReport. Toast distinguishes inserted from
+      // duplicates from rate-limit-failures so silent partial failures
+      // stop being silent.
+      const report = await scanBrandMentions(brand.id);
       const mentions = await storage.getBrandMentions(brand.id);
-      res.json({ success: true, data: { inserted, mentions } });
+      res.json({
+        success: true,
+        data: {
+          report,
+          // Legacy alias for back-compat.
+          inserted: report.inserted,
+          mentions,
+        },
+      });
     } catch (error) {
       sendError(res, error, "Failed to scan brand mentions");
+    }
+  });
+
+  // Wave 9.4: PATCH for brand mention status transitions
+  // ('new' | 'acknowledged' | 'replied' | 'false_positive' | 'ignored').
+  // Called from the mentions tab inline action dropdown.
+  const MENTION_STATUSES = new Set(["new", "acknowledged", "replied", "false_positive", "ignored"]);
+  app.patch("/api/brand-mentions/:id", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const mention = await storage.getBrandMentionById(req.params.id);
+      if (!mention) {
+        return res.status(404).json({ success: false, error: "Mention not found" });
+      }
+      await requireBrand(mention.brandId, user.id);
+      const update: Record<string, any> = {};
+      if (typeof req.body?.status === "string") {
+        if (!MENTION_STATUSES.has(req.body.status)) {
+          return res.status(400).json({ success: false, error: "Invalid status" });
+        }
+        update.status = req.body.status;
+      }
+      if (typeof req.body?.isVerified === "number") {
+        update.isVerified = req.body.isVerified ? 1 : 0;
+      }
+      if (Object.keys(update).length === 0) {
+        return res.status(400).json({ success: false, error: "No supported fields to update" });
+      }
+      const updated = await storage.updateBrandMention(mention.id, update as any);
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      sendError(res, error, "Failed to update mention");
+    }
+  });
+
+  // Wave 9.4: manual brand-mention add — for users who find a mention
+  // the scanner missed (Discord, private Slack, etc.).
+  app.post("/api/brand-mentions", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const { brandId, platform, sourceUrl, sourceTitle, mentionContext, sentiment } =
+        req.body ?? {};
+      if (!brandId || typeof brandId !== "string") {
+        return res.status(400).json({ success: false, error: "brandId is required" });
+      }
+      await requireBrand(brandId, user.id);
+      if (!platform || typeof platform !== "string") {
+        return res.status(400).json({ success: false, error: "platform is required" });
+      }
+      if (!sourceUrl || typeof sourceUrl !== "string") {
+        return res.status(400).json({ success: false, error: "sourceUrl is required" });
+      }
+      const inserted = await storage.tryInsertBrandMention({
+        brandId,
+        platform: platform.slice(0, 50),
+        sourceUrl: sourceUrl.slice(0, 1000),
+        sourceTitle: typeof sourceTitle === "string" ? sourceTitle.slice(0, 500) : null,
+        mentionContext: typeof mentionContext === "string" ? mentionContext.slice(0, 2000) : null,
+        sentiment: typeof sentiment === "string" ? sentiment : "neutral",
+        sentimentScore: "0",
+        engagementScore: null,
+        authorUsername: null,
+        mentionedAt: null,
+      } as any);
+      if (!inserted) {
+        return res
+          .status(409)
+          .json({ success: false, error: "A mention with this URL is already tracked" });
+      }
+      res.json({ success: true, data: inserted });
+    } catch (error) {
+      sendError(res, error, "Failed to create brand mention");
     }
   });
 

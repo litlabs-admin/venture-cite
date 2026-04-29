@@ -5,7 +5,8 @@ import { MODELS } from "./modelConfig";
 import { logger } from "./logger";
 import { safeFetchText } from "./ssrf";
 import { matchEntity } from "./brandMatcher";
-import type { Brand, WikipediaMention, Competitor } from "@shared/schema";
+import { type ScanReport, emptyReport } from "./scanReport";
+import type { Brand, Competitor } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -176,25 +177,36 @@ ${pages
   return out;
 }
 
+export interface WikipediaScanReport extends ScanReport {
+  existing: number;
+  opportunities: number;
+}
+
 /**
  * Two-step Wikipedia scan. Real MediaWiki search finds pages (no hallucination),
  * then an LLM classifies each page as existing-mention / opportunity / irrelevant.
  * Only non-irrelevant pages are persisted to wikipedia_mentions.
  */
-export async function scanBrandWikipedia(
-  brandId: string,
-): Promise<{ inserted: number; existing: number; opportunities: number }> {
+export async function scanBrandWikipedia(brandId: string): Promise<WikipediaScanReport> {
   const brand = await storage.getBrandById(brandId);
   if (!brand) throw new Error("Brand not found");
 
   const competitors = await storage.getCompetitors(brandId).catch(() => [] as Competitor[]);
   const terms = buildSearchTerms(brand, competitors);
 
+  const report: WikipediaScanReport = { ...emptyReport(), existing: 0, opportunities: 0 };
+
   // (a) collect candidate titles
   const titleSet = new Set<string>();
   for (const term of terms) {
-    const titles = await searchWikipedia(term);
-    for (const t of titles) titleSet.add(t);
+    try {
+      const titles = await searchWikipedia(term);
+      for (const t of titles) titleSet.add(t);
+    } catch (err) {
+      report.failed.push({
+        reason: `wikipedia search "${term}" failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
     if (titleSet.size >= MAX_PAGES_TO_CLASSIFY * 2) break;
   }
 
@@ -203,35 +215,41 @@ export async function scanBrandWikipedia(
   const pages: WikiPageEntry[] = [];
   for (const title of titles) {
     const extract = await fetchExtract(title);
-    if (!extract) continue;
+    if (!extract) {
+      report.failed.push({ url: title, reason: "extract empty (404 or redirect)" });
+      continue;
+    }
     pages.push({ title, extract });
   }
+  report.found = pages.length;
 
   // (c) classify
-  const classified = await classifyPages(brand, competitors, pages).catch(() => []);
+  const classified = await classifyPages(brand, competitors, pages).catch((err) => {
+    report.failed.push({
+      reason: `classification failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return [] as Array<{
+      title: string;
+      classification: "existing" | "opportunity" | "irrelevant";
+      reason: string;
+    }>;
+  });
 
-  // (d) dedupe against existing rows by pageUrl
-  const existingRows = await storage
-    .getWikipediaMentions(brandId)
-    .catch(() => [] as WikipediaMention[]);
-  const existingUrls = new Set((existingRows as WikipediaMention[]).map((m) => m.pageUrl));
-
-  let inserted = 0;
-  let existingCount = 0;
-  let opportunityCount = 0;
   const pageByTitle = new Map(pages.map((p) => [p.title, p]));
 
   for (const row of classified) {
-    if (row.classification === "irrelevant") continue;
+    if (row.classification === "irrelevant") {
+      report.skippedFiltered += 1;
+      continue;
+    }
     const page = pageByTitle.get(row.title);
-    if (!page) continue;
+    if (!page) {
+      report.skippedFiltered += 1;
+      continue;
+    }
     const pageUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(row.title.replace(/ /g, "_"))}`;
 
-    // Matcher is authoritative for "is the brand named in this extract".
-    // LLM-only signal ("existing" vs "opportunity") can hallucinate a
-    // mention that isn't there, or miss one that's paraphrased. Combined
-    // rule: LLM decides topical relevance (we already filtered "irrelevant"
-    // above), matcher decides existing/opportunity.
+    // Matcher is authoritative for existing vs opportunity.
     const matcherResult = matchEntity(page.extract, {
       id: brand.id,
       name: brand.name,
@@ -241,11 +259,11 @@ export async function scanBrandWikipedia(
     const classification: "existing" | "opportunity" = matcherResult.matched
       ? "existing"
       : "opportunity";
-    if (classification === "existing") existingCount += 1;
-    else opportunityCount += 1;
-    if (existingUrls.has(pageUrl)) continue;
+    if (classification === "existing") report.existing += 1;
+    else report.opportunities += 1;
+
     try {
-      await storage.createWikipediaMention({
+      const inserted = await storage.tryInsertWikipediaMention({
         brandId,
         pageTitle: row.title.slice(0, 500),
         pageUrl: pageUrl.slice(0, 1000),
@@ -259,9 +277,13 @@ export async function scanBrandWikipedia(
           scannedAt: new Date().toISOString(),
         },
       } as any);
-      existingUrls.add(pageUrl);
-      inserted += 1;
+      if (inserted) report.inserted += 1;
+      else report.skippedDuplicate += 1;
     } catch (err) {
+      report.failed.push({
+        url: pageUrl,
+        reason: `insert failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
       logger.warn({ err, pageUrl, brandId }, "wikipediaScanner insert failed");
     }
   }
@@ -270,11 +292,13 @@ export async function scanBrandWikipedia(
     {
       brandId,
       classified: classified.length,
-      inserted,
-      existing: existingCount,
-      opportunities: opportunityCount,
+      inserted: report.inserted,
+      duplicates: report.skippedDuplicate,
+      existing: report.existing,
+      opportunities: report.opportunities,
+      failed: report.failed.length,
     },
     "wikipediaScanner complete",
   );
-  return { inserted, existing: existingCount, opportunities: opportunityCount };
+  return report;
 }

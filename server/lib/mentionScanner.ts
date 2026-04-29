@@ -3,7 +3,9 @@ import { storage } from "../storage";
 import { attachAiLogger } from "./aiLogger";
 import { MODELS } from "./modelConfig";
 import { safeFetchText } from "./ssrf";
-import type { BrandMention } from "@shared/schema";
+import { brandNameWarning } from "./brandNameAmbiguity";
+import { acquireOrWait } from "./rateLimitBuckets";
+import { type ScanReport, emptyReport } from "./scanReport";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -13,7 +15,9 @@ const openai = new OpenAI({
 attachAiLogger(openai);
 
 const USER_AGENT = "VentureCite/1.0 (mentions scanner)";
-const REDDIT_RATE_DELAY_MS = 2100; // 10 req/min unauthenticated limit
+// Wave 9.4: hard sleep replaced by acquireOrWait() against the
+// rateLimitBuckets module so concurrent users on the same instance
+// share quota with the source's actual API limits.
 const QUORA_RATE_DELAY_MS = 1000;
 const MAX_RESULTS_PER_SOURCE = 25;
 
@@ -47,16 +51,14 @@ interface RawMention {
  * Three-source weekly scan. Each source populates `brand_mentions` rows
  * after dedupe (by sourceUrl) and sentiment scoring.
  */
-export async function scanBrandMentions(brandId: string): Promise<number> {
+export async function scanBrandMentions(brandId: string): Promise<ScanReport> {
   const brand = await storage.getBrandById(brandId);
   if (!brand) throw new Error("Brand not found");
 
-  const existing = await storage.getBrandMentions(brandId).catch(() => [] as BrandMention[]);
-  const seenUrls = new Set(existing.map((m: BrandMention) => m.sourceUrl));
+  const report = emptyReport();
+  const ambiguityWarning = brandNameWarning(brand.name);
+  if (ambiguityWarning) report.warning = ambiguityWarning;
 
-  // Build search queries from the brand name + user-curated variations.
-  // We skip auto-generated forms (acronyms, bare domain) — those are useful
-  // for in-text matching but produce noisy search-API queries.
   const candidateQueries = [
     brand.name,
     ...(Array.isArray(brand.nameVariations) ? brand.nameVariations : []),
@@ -72,51 +74,71 @@ export async function scanBrandMentions(brandId: string): Promise<number> {
 
   const raw: RawMention[] = [];
 
-  // Source 1 — Reddit
+  // Source 1 — Reddit. Wave 9.4 routes through the rate-limit bucket so
+  // concurrent users on the same instance don't collide on the unauth
+  // 10/min cap. acquireOrWait blocks up to 30s; on timeout we record
+  // the rate-limit failure and move on rather than burning a 429.
   for (const q of searchQueries) {
+    const ok = await acquireOrWait("reddit", brandId, 30_000);
+    if (!ok) {
+      report.failed.push({
+        reason: `reddit "${q}" rate-limited (try again in ~30s)`,
+      });
+      continue;
+    }
     try {
       raw.push(...(await searchReddit(q)));
-      await sleep(REDDIT_RATE_DELAY_MS);
     } catch (err) {
-      console.warn(
-        `[mentionScanner] reddit "${q}" failed:`,
-        err instanceof Error ? err.message : err,
-      );
+      report.failed.push({
+        reason: `reddit "${q}" failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
 
-  // Source 2 — Hacker News (Algolia)
+  // Source 2 — Hacker News (Algolia). Generous limits but bucketed for safety.
   for (const q of searchQueries) {
+    const ok = await acquireOrWait("hackernews", brandId, 10_000);
+    if (!ok) {
+      report.failed.push({ reason: `hackernews "${q}" rate-limited` });
+      continue;
+    }
     try {
       raw.push(...(await searchHackerNews(q)));
     } catch (err) {
-      console.warn(`[mentionScanner] hn "${q}" failed:`, err instanceof Error ? err.message : err);
+      report.failed.push({
+        reason: `hackernews "${q}" failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
 
-  // Source 3 — Quora search (public HTML scrape, degrades gracefully)
+  // Source 3 — Quora search (public HTML scrape).
   for (const q of searchQueries) {
+    const ok = await acquireOrWait("quora", brandId, 10_000);
+    if (!ok) {
+      report.failed.push({ reason: `quora "${q}" rate-limited` });
+      continue;
+    }
     try {
       raw.push(...(await searchQuora(q)));
       await sleep(QUORA_RATE_DELAY_MS);
     } catch (err) {
-      console.warn(
-        `[mentionScanner] quora "${q}" failed:`,
-        err instanceof Error ? err.message : err,
-      );
+      report.failed.push({
+        reason: `quora "${q}" failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
 
-  // Dedupe by sourceUrl (case-insensitive)
+  // In-memory dedup against this run's batch (DB unique index handles
+  // dedup against historical rows via tryInsertBrandMention).
   const unique = new Map<string, RawMention>();
   for (const m of raw) {
     if (!m.sourceUrl) continue;
     const key = m.sourceUrl.toLowerCase().replace(/[?#].*$/, "");
-    if (seenUrls.has(m.sourceUrl) || unique.has(key)) continue;
+    if (unique.has(key)) continue;
     unique.set(key, m);
   }
+  report.found = unique.size;
 
-  let inserted = 0;
   for (const m of Array.from(unique.values())) {
     const sentimentText = m.mentionContext || m.sourceTitle || "";
     const sentiment =
@@ -128,7 +150,7 @@ export async function scanBrandMentions(brandId: string): Promise<number> {
         : { sentiment: "neutral", sentimentScore: 0 };
 
     try {
-      await storage.createBrandMention({
+      const inserted = await storage.tryInsertBrandMention({
         brandId,
         platform: m.platform,
         sourceUrl: m.sourceUrl,
@@ -140,14 +162,20 @@ export async function scanBrandMentions(brandId: string): Promise<number> {
         authorUsername: m.authorUsername?.slice(0, 120) || null,
         mentionedAt: m.mentionedAt ?? null,
       } as any);
-      inserted += 1;
+      if (inserted) report.inserted += 1;
+      else report.skippedDuplicate += 1;
     } catch (err) {
-      console.warn(`[mentionScanner] insert failed:`, err instanceof Error ? err.message : err);
+      report.failed.push({
+        url: m.sourceUrl,
+        reason: `insert failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
 
-  console.log(`[mentionScanner] brand=${brandId} unique=${unique.size} inserted=${inserted}`);
-  return inserted;
+  console.log(
+    `[mentionScanner] brand=${brandId} found=${report.found} inserted=${report.inserted} dup=${report.skippedDuplicate} failed=${report.failed.length}`,
+  );
+  return report;
 }
 
 async function searchReddit(query: string): Promise<RawMention[]> {
