@@ -1,0 +1,34 @@
+name: Keep Render Alive
+
+# Pings the production /health endpoint every 5 minutes so Render's free
+# tier doesn't spin the service down after 15 min of inactivity. The
+# endpoint exercises the DB (advisory-lock round-trip) so a green ping
+# also confirms Postgres connectivity, not just process liveness.
+#
+# Why */5 and not */10:
+#   GitHub Actions cron is best-effort and can be delayed by 5-15 min
+#   under runner-pool load. A 10-min cadence + a 6-min delay = 16-min
+#   gap = service sleeps anyway and the next request takes the full
+#   cold-start hit. */5 absorbs the slack.
+#
+# Cost: each run is ~5 seconds; public-repo Actions minutes are
+# unmetered. For private repos, ~9k minutes/month at this cadence —
+# well over the 2k free-tier limit, so flip to */10 if this repo is
+# private OR consider a real keepalive (UptimeRobot) / Render paid plan.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # manual trigger from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping /health
+        run: |
+          curl -fsSL --max-time 30 \
+            -o /dev/null \
+            -w "HTTP %{http_code} in %{time_total}s · DNS %{time_namelookup}s · connect %{time_connect}s\n" \
+            https://venturecite.com/health
