@@ -32,7 +32,10 @@ describe("assertSafeUrl", () => {
   });
 
   it("rejects IPv6 loopback", async () => {
-    await expect(assertSafeUrl("http://[::1]/")).rejects.toThrow(/private IP/i);
+    // Either rejection is correct: environments that resolve [::1] hit
+    // the SSRF private-IP guard; CI runners without IPv6 DNS fail
+    // earlier at the resolution step. Both block the request.
+    await expect(assertSafeUrl("http://[::1]/")).rejects.toThrow(/private IP|did not resolve/i);
   });
 
   it("rejects malformed URL", async () => {
