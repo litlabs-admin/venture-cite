@@ -9,7 +9,11 @@
 import { pool } from "../db";
 import { logger } from "./logger";
 
-const ORPHAN_THRESHOLD = "15 minutes";
+// Vercel migration: tightened from 15 → 5 minutes. A genuine in-progress
+// run completes in well under 5 minutes; anything past that on serverless
+// is almost certainly a lambda-killed orphan, and we want the UI to stop
+// polling ASAP rather than wait three reconciliation cycles.
+const ORPHAN_THRESHOLD = "5 minutes";
 
 export async function reconcileOrphanCitationRuns(): Promise<void> {
   try {

@@ -52,10 +52,19 @@ function buildSslConfig(): PoolConfig["ssl"] {
   return { rejectUnauthorized: false };
 }
 
+// Vercel migration: each lambda is a fresh process, so the in-process
+// pool can't be shared across invocations. With max:10 per lambda × N
+// concurrent lambdas you blow through Postgres' connection cap quickly.
+// On Vercel we expect DATABASE_URL to point at the Supabase transaction
+// pooler (port 6543, host *.pooler.supabase.com) which fans out to a
+// shared backend pool, so a per-lambda pool of 1 is enough. Local /
+// Render keep the original 10.
+const isServerless = !!process.env.VERCEL;
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 10,
-  idleTimeoutMillis: 30_000,
+  max: isServerless ? 1 : 10,
+  idleTimeoutMillis: isServerless ? 5_000 : 30_000,
+  connectionTimeoutMillis: 10_000,
   ssl: buildSslConfig(),
 });
 

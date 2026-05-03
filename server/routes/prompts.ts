@@ -11,6 +11,7 @@ import { requireUser, requireBrand } from "../lib/ownership";
 import {
   runBrandPrompts,
   kickoffBrandPromptsRun,
+  advanceCitationRun,
   DEFAULT_CITATION_PLATFORMS,
 } from "../citationChecker";
 import { generateBrandPrompts } from "../lib/promptGenerator";
@@ -18,13 +19,6 @@ import { generateSuggestedPrompts } from "../lib/suggestionGenerator";
 import { aiLimitMiddleware, sendError } from "../lib/routesShared";
 import { detectBrandAndCompetitors, matchEntity } from "../lib/brandMatcher";
 import { logger } from "../lib/logger";
-
-// Wave 9: module-scoped SSE registry for the per-user connection cap. Maps
-// userId -> Map<symbol, closer>. Map preserves insertion order, so calling
-// `keys().next().value` gives us the oldest stream for FIFO eviction. We
-// never grow unbounded — each cleanup deletes its key, and the outer entry
-// is removed when the user has no streams left.
-const sseStreams = new Map<string, Map<symbol, () => void>>();
 
 export function setupPromptsRoutes(app: Express): void {
   // ============ BRAND-LEVEL CITATION PROMPT PORTFOLIO ============
@@ -442,199 +436,103 @@ export function setupPromptsRoutes(app: Express): void {
   //   - `complete` when the run reaches a terminal status
   // Connection is capped at SSE_MAX_DURATION_MS so a hung tab doesn't
   // hold a slot forever; the client reconnects.
-  app.get("/api/brands/:brandId/citation-events", async (req, res) => {
-    const SSE_TICK_MS = 1_000;
-    const SSE_MAX_DURATION_MS = 5 * 60 * 1000;
-    const SSE_HEARTBEAT_MS = 20_000;
+  // Vercel migration: replaces the prior SSE endpoint
+  // (/api/brands/:brandId/citation-events). Client polls every ~1s with
+  // its `?since=<unixMs>` cursor; server returns the per-run progress
+  // snapshot plus rankings created since the cursor. `done: true` on the
+  // run's slot signals the client to stop polling that run.
+  app.get("/api/brands/:brandId/citation-runs/state", async (req, res) => {
     try {
-      // Auth: ?token=<JWT> (since EventSource can't send headers).
-      const tokenFromQuery = typeof req.query.token === "string" ? req.query.token : null;
-      const headerAuth = req.headers.authorization;
-      const token = tokenFromQuery
-        ? tokenFromQuery
-        : headerAuth?.startsWith("Bearer ")
-          ? headerAuth.slice(7)
-          : null;
-      if (!token) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
-      }
-      const { supabaseAdmin } = await import("../supabase");
-      const { data, error } = await supabaseAdmin.auth.getUser(token);
-      if (error || !data.user) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
-      }
-      const userId = data.user.id;
-
-      // Verify ownership of the brand. requireBrand throws OwnershipError
-      // (404) on a miss, which we catch and return as 404.
+      const user = requireUser(req);
       try {
-        await requireBrand(req.params.brandId, userId);
+        await requireBrand(req.params.brandId, user.id);
       } catch {
         return res.status(404).json({ success: false, error: "Brand not found" });
       }
       const brandId = req.params.brandId;
+      const since = Math.max(0, Number(req.query.since) || 0);
+      const sinceMs = since || Date.now() - 5 * 60 * 1000;
 
-      // Wave 9: per-user connection cap. A misbehaving client opening 50
-      // tabs would otherwise hold 50 polling connections each ticking at
-      // 1s. Cap at 3 streams per user; on the 4th, close the oldest.
-      // Map insertion order is preserved, so the first-key semantics give
-      // us oldest-first eviction.
-      const SSE_PER_USER_CAP = 3;
-      const userStreams = sseStreams.get(userId) ?? new Map<symbol, () => void>();
-      while (userStreams.size >= SSE_PER_USER_CAP) {
-        const oldestKey = userStreams.keys().next().value;
-        if (!oldestKey) break;
-        const closeOld = userStreams.get(oldestKey);
-        userStreams.delete(oldestKey);
-        try {
-          closeOld?.();
-        } catch {
-          /* ignore */
+      const active = await storage.getActiveCitationRuns(brandId);
+      const runs: Array<{
+        runId: string;
+        status: string;
+        progressPct: number;
+        totalChecks: number;
+        totalCited: number;
+        citationRate: number;
+        rankings: Array<{ id: string; aiPlatform: string; isCited: boolean; checkedAt: string }>;
+        done: boolean;
+      }> = [];
+
+      let nextSince = sinceMs;
+
+      for (const r of active) {
+        const live = await storage.getCitationRunLiveState(r.id);
+        if (!live) continue;
+        const recent = await storage.getRecentRankingsForRun(r.id, sinceMs, 100);
+        for (const row of recent) {
+          if (row.checkedAt) {
+            const ms = new Date(row.checkedAt).getTime();
+            if (ms > nextSince) nextSince = ms;
+          }
         }
+        runs.push({
+          runId: r.id,
+          status: live.status,
+          progressPct: live.progressPct,
+          totalChecks: live.totalChecks,
+          totalCited: live.totalCited,
+          citationRate: live.citationRate,
+          rankings: recent.map((row) => ({
+            id: row.id,
+            aiPlatform: row.aiPlatform,
+            isCited: !!row.isCited,
+            checkedAt: row.checkedAt
+              ? new Date(row.checkedAt).toISOString()
+              : new Date().toISOString(),
+          })),
+          done: live.status !== "pending" && live.status !== "running",
+        });
       }
-      sseStreams.set(userId, userStreams);
 
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
+      res.json({
+        success: true,
+        data: {
+          runs,
+          since: nextSince,
+          hasActive: active.length > 0,
+        },
       });
-
-      const send = (event: string, payload: unknown) => {
-        res.write(`event: ${event}\n`);
-        res.write(`data: ${JSON.stringify(payload)}\n\n`);
-      };
-
-      // Track state per-run so we don't re-emit identical progress and
-      // don't re-emit rankings we've already pushed.
-      const runState = new Map<
-        string,
-        { lastPct: number; lastTotalChecks: number; lastSinceMs: number }
-      >();
-
-      const startedAt = Date.now();
-      let cancelled = false;
-      // Wave 9: heartbeat. Comment frames keep idle proxies (Cloudflare 100s,
-      // ALB 60s) from killing the connection during quiet periods between
-      // ticks. Sent every 20s — well under any standard proxy idle timeout.
-      const heartbeat = setInterval(() => {
-        if (cancelled) return;
-        try {
-          res.write(": ping\n\n");
-        } catch {
-          /* socket already closed */
-        }
-      }, SSE_HEARTBEAT_MS);
-
-      const streamKey = Symbol("sse");
-      const cleanup = () => {
-        cancelled = true;
-        clearInterval(heartbeat);
-        userStreams.delete(streamKey);
-        if (userStreams.size === 0) sseStreams.delete(userId);
-      };
-      userStreams.set(streamKey, () => {
-        try {
-          send("end", { reason: "evicted" });
-        } catch {
-          /* ignore */
-        }
-        try {
-          res.end();
-        } catch {
-          /* ignore */
-        }
-        cleanup();
-      });
-      req.on("close", cleanup);
-
-      const tick = async () => {
-        if (cancelled) return;
-        if (Date.now() - startedAt > SSE_MAX_DURATION_MS) {
-          // Wave 9: signal client to reconnect rather than just dropping.
-          // Client's onEnd handler refreshes the JWT and re-opens if still
-          // active.
-          send("end", { reason: "timeout", reconnect: true });
-          cleanup();
-          return res.end();
-        }
-        try {
-          const active = await storage.getActiveCitationRuns(brandId);
-          // Initialize state for any newly-seen run.
-          for (const r of active) {
-            if (!runState.has(r.id)) {
-              runState.set(r.id, {
-                lastPct: -1,
-                lastTotalChecks: -1,
-                // Wave 9: backfill from the run's startedAt rather than a
-                // fixed 60s window. On (re)connect to a long-running run,
-                // every existing ranking is replayed as a `ranking` event so
-                // the Latest Results UI populates immediately.
-                lastSinceMs: r.startedAt ? new Date(r.startedAt).getTime() : Date.now() - 60_000,
-              });
-            }
-          }
-          // Emit progress + ranking events for each known run.
-          for (const [runId, state] of Array.from(runState.entries())) {
-            const live = await storage.getCitationRunLiveState(runId);
-            if (!live) continue;
-            if (live.progressPct !== state.lastPct || live.totalChecks !== state.lastTotalChecks) {
-              send("progress", {
-                runId,
-                progressPct: live.progressPct,
-                totalChecks: live.totalChecks,
-                totalCited: live.totalCited,
-                citationRate: live.citationRate,
-                status: live.status,
-              });
-              state.lastPct = live.progressPct;
-              state.lastTotalChecks = live.totalChecks;
-            }
-            // Per-ranking events since cursor.
-            const recent = await storage.getRecentRankingsForRun(runId, state.lastSinceMs, 50);
-            for (const r of recent) {
-              send("ranking", {
-                runId,
-                rankingId: r.id,
-                aiPlatform: r.aiPlatform,
-                isCited: r.isCited,
-              });
-              if (r.checkedAt) {
-                const ms = new Date(r.checkedAt).getTime();
-                if (ms > state.lastSinceMs) state.lastSinceMs = ms;
-              }
-            }
-            // Terminal? Emit complete and stop tracking.
-            if (live.status !== "pending" && live.status !== "running") {
-              send("complete", {
-                runId,
-                status: live.status,
-                citationRate: live.citationRate,
-                totalChecks: live.totalChecks,
-                totalCited: live.totalCited,
-              });
-              runState.delete(runId);
-            }
-          }
-          // If there are no active runs AND no in-flight tracked state,
-          // close the stream — client will reconnect when it sees a
-          // new active run via the polling status gate.
-          if (active.length === 0 && runState.size === 0) {
-            send("end", { reason: "no_active_runs" });
-            cleanup();
-            return res.end();
-          }
-        } catch (err) {
-          // Don't tear down the stream on a transient DB blip.
-          // Wave 9: use structured logger per CLAUDE.md.
-          logger.warn({ err, brandId, userId }, "citation_events.tick_error");
-        }
-        setTimeout(tick, SSE_TICK_MS);
-      };
-      setTimeout(tick, SSE_TICK_MS);
     } catch (error) {
-      sendError(res, error, "Failed to open citation events stream");
+      logger.warn({ err: error }, "citation_runs.state_error");
+      sendError(res, error, "Failed to read citation run state");
+    }
+  });
+
+  // Advance one slice of a citation run. Driven by the client polling
+  // loop on Vercel where the kickoff deadline may not have completed
+  // the full 50-pair sweep, and by the daily cron drain step.
+  app.post("/api/brands/:brandId/citation-runs/:runId/advance", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      try {
+        await requireBrand(req.params.brandId, user.id);
+      } catch {
+        return res.status(404).json({ success: false, error: "Brand not found" });
+      }
+      const runId = req.params.runId;
+      // 8s slice deadline keeps us safely under the function timeout
+      // even on Vercel Hobby (60s cap). On Render this just bounds the
+      // single-call work; the rest is handled by the next /advance.
+      const result = await advanceCitationRun(runId, Date.now() + 8000);
+      res.json({
+        success: true,
+        data: { runId, done: result.done, status: result.status },
+      });
+    } catch (error) {
+      logger.warn({ err: error }, "citation_runs.advance_error");
+      sendError(res, error, "Failed to advance citation run");
     }
   });
 

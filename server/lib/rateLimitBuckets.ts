@@ -1,21 +1,22 @@
-// Wave 9.4: in-process token bucket for outbound API rate limits.
+// Wave 9.5 / Vercel migration: Postgres-backed token-bucket rate limits.
 //
-// Single-instance deployment per CLAUDE.md, so an in-memory bucket is
-// fine for now; comment marks the spot for Redis migration if/when
-// multi-instance lands. The Reddit unauth limit is ~10 req/min — the
-// previous mention scanner sleep(2.1s) inside its own loop didn't help
-// when 5 users scanned simultaneously.
+// Previously a process-local Map (single-instance only). On serverless,
+// per-lambda Maps make the limit per-lambda instead of global, so users
+// can multiply their effective quota by N×concurrent lambdas. This module
+// now stores bucket state in `rate_limit_buckets` (migration 0043) and
+// uses SELECT ... FOR UPDATE to atomically refill+decrement.
+//
+// API stays the same; tryAcquire and secondsUntilAvailable became async.
+// Mention/listicle scanners and tests already await acquireOrWait.
+
+import { pool } from "../db";
+import { logger } from "./logger";
 
 interface BucketConfig {
   /** Max tokens the bucket can hold. */
   capacity: number;
   /** Tokens added per second. */
   refillPerSec: number;
-}
-
-interface BucketState {
-  tokens: number;
-  lastRefill: number;
 }
 
 const CONFIGS: Record<string, BucketConfig> = {
@@ -32,47 +33,94 @@ const CONFIGS: Record<string, BucketConfig> = {
   quora: { capacity: 5, refillPerSec: 1 / 4 },
 };
 
-const buckets = new Map<string, BucketState>();
-
-function key(provider: string, scopeId: string): string {
-  return `${provider}::${scopeId}`;
-}
-
-function refill(state: BucketState, cfg: BucketConfig): void {
-  const now = Date.now();
-  const elapsed = (now - state.lastRefill) / 1000;
-  if (elapsed > 0) {
-    state.tokens = Math.min(cfg.capacity, state.tokens + elapsed * cfg.refillPerSec);
-    state.lastRefill = now;
-  }
+function applyRefill(tokens: number, lastRefill: Date, cfg: BucketConfig, now: number): number {
+  const elapsedSec = (now - lastRefill.getTime()) / 1000;
+  if (elapsedSec <= 0) return tokens;
+  return Math.min(cfg.capacity, tokens + elapsedSec * cfg.refillPerSec);
 }
 
 /**
  * Try to acquire 1 token immediately. Returns true if acquired, false
- * if the bucket is empty. Callers can decide whether to await
- * `acquireOrWait` or surface 429.
+ * if the bucket is empty. Atomic via SELECT ... FOR UPDATE so concurrent
+ * lambdas can't double-spend.
  */
-export function tryAcquire(provider: string, scopeId: string): boolean {
+export async function tryAcquire(provider: string, scopeId: string): Promise<boolean> {
   const cfg = CONFIGS[provider];
   if (!cfg) return true; // unknown provider: don't gate
-  const k = key(provider, scopeId);
-  let state = buckets.get(k);
-  if (!state) {
-    state = { tokens: cfg.capacity, lastRefill: Date.now() };
-    buckets.set(k, state);
-  }
-  refill(state, cfg);
-  if (state.tokens >= 1) {
-    state.tokens -= 1;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // Initialise the row at full capacity on first use; ON CONFLICT
+    // makes the insert a no-op when the row already exists.
+    await client.query(
+      `INSERT INTO rate_limit_buckets (provider, scope_id, tokens, last_refill_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (provider, scope_id) DO NOTHING`,
+      [provider, scopeId, cfg.capacity],
+    );
+    const { rows } = await client.query<{
+      tokens: string;
+      last_refill_at: Date;
+    }>(
+      `SELECT tokens::text, last_refill_at
+       FROM rate_limit_buckets
+       WHERE provider = $1 AND scope_id = $2
+       FOR UPDATE`,
+      [provider, scopeId],
+    );
+    if (rows.length === 0) {
+      // Race: another tx deleted the row between insert and select. Treat
+      // as "no capacity" rather than re-inserting; next call will retry.
+      await client.query("ROLLBACK");
+      return false;
+    }
+    const now = Date.now();
+    const refilled = applyRefill(
+      Number(rows[0].tokens),
+      new Date(rows[0].last_refill_at),
+      cfg,
+      now,
+    );
+    if (refilled < 1) {
+      // Persist the refill so secondsUntilAvailable() returns a meaningful
+      // ETA even though the acquire failed.
+      await client.query(
+        `UPDATE rate_limit_buckets
+         SET tokens = $3, last_refill_at = to_timestamp($4 / 1000.0)
+         WHERE provider = $1 AND scope_id = $2`,
+        [provider, scopeId, refilled, now],
+      );
+      await client.query("COMMIT");
+      return false;
+    }
+    const remaining = refilled - 1;
+    await client.query(
+      `UPDATE rate_limit_buckets
+       SET tokens = $3, last_refill_at = to_timestamp($4 / 1000.0)
+       WHERE provider = $1 AND scope_id = $2`,
+      [provider, scopeId, remaining, now],
+    );
+    await client.query("COMMIT");
     return true;
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore — original error is what matters
+    }
+    logger.warn({ err, provider, scopeId }, "rateLimit: tryAcquire failed");
+    // Fail-open on infrastructure errors: better to over-call upstream
+    // briefly than to wedge every scan when the DB hiccups.
+    return true;
+  } finally {
+    client.release();
   }
-  return false;
 }
 
 /**
  * Acquire a token, waiting up to `maxWaitMs` for capacity. Returns
- * true if a token was acquired, false on timeout. Caller should
- * surface a 429 / "try again in N seconds" toast on false.
+ * true if a token was acquired, false on timeout.
  */
 export async function acquireOrWait(
   provider: string,
@@ -83,31 +131,53 @@ export async function acquireOrWait(
   if (!cfg) return true;
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
-    if (tryAcquire(provider, scopeId)) return true;
-    // Wait one refill interval before re-checking.
+    if (await tryAcquire(provider, scopeId)) return true;
     const waitMs = Math.max(50, Math.ceil(1000 / cfg.refillPerSec));
-    await new Promise((r) => setTimeout(r, Math.min(waitMs, maxWaitMs)));
+    const remaining = maxWaitMs - (Date.now() - start);
+    await new Promise((r) => setTimeout(r, Math.min(waitMs, Math.max(0, remaining))));
   }
   return false;
 }
 
 /**
- * Estimate seconds until at least one token will be available. Used to
- * surface "try again in N seconds" to the user. Returns 0 if a token is
- * already available.
+ * Estimate seconds until at least one token will be available. Reads the
+ * persisted bucket state and applies the refill curve in JS — does NOT
+ * mutate the row.
  */
-export function secondsUntilAvailable(provider: string, scopeId: string): number {
+export async function secondsUntilAvailable(provider: string, scopeId: string): Promise<number> {
   const cfg = CONFIGS[provider];
   if (!cfg) return 0;
-  const state = buckets.get(key(provider, scopeId));
-  if (!state) return 0;
-  refill(state, cfg);
-  if (state.tokens >= 1) return 0;
-  const deficit = 1 - state.tokens;
-  return Math.ceil(deficit / cfg.refillPerSec);
+  try {
+    const { rows } = await pool.query<{
+      tokens: string;
+      last_refill_at: Date;
+    }>(
+      `SELECT tokens::text, last_refill_at
+       FROM rate_limit_buckets
+       WHERE provider = $1 AND scope_id = $2`,
+      [provider, scopeId],
+    );
+    if (rows.length === 0) return 0;
+    const refilled = applyRefill(
+      Number(rows[0].tokens),
+      new Date(rows[0].last_refill_at),
+      cfg,
+      Date.now(),
+    );
+    if (refilled >= 1) return 0;
+    return Math.ceil((1 - refilled) / cfg.refillPerSec);
+  } catch (err) {
+    logger.warn({ err, provider, scopeId }, "rateLimit: secondsUntilAvailable failed");
+    return 0;
+  }
 }
 
-// For tests.
-export function _resetBuckets(): void {
-  buckets.clear();
+// For tests: wipes every bucket. Note: hits the live DB, so test setups
+// must point at a disposable schema/database.
+export async function _resetBuckets(): Promise<void> {
+  try {
+    await pool.query("DELETE FROM rate_limit_buckets");
+  } catch (err) {
+    logger.warn({ err }, "rateLimit: _resetBuckets failed");
+  }
 }

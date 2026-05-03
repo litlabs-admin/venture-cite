@@ -917,6 +917,71 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
+  async getContentJobByIdAdmin(id: string): Promise<ContentGenerationJob | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.contentGenerationJobs)
+      .where(eq(schema.contentGenerationJobs.id, id))
+      .limit(1);
+    return row;
+  }
+
+  async updateContentJobResponseId(jobId: string, openaiResponseId: string): Promise<void> {
+    await db
+      .update(schema.contentGenerationJobs)
+      .set({ openaiResponseId })
+      .where(eq(schema.contentGenerationJobs.id, jobId));
+  }
+
+  async claimContentJobForSlice(
+    id: string,
+    sliceBudgetSeconds: number,
+  ): Promise<ContentGenerationJob | undefined> {
+    // Win the lock by setting last_advance_started_at = now() WHERE the
+    // existing value is NULL or older than the slice budget. Drizzle's
+    // raw sql is the cleanest way to express the time-window guard.
+    const result = await db.execute(sql`
+      UPDATE public.content_generation_jobs
+      SET last_advance_started_at = now()
+      WHERE id = ${id}
+        AND status IN ('pending', 'running')
+        AND (
+          last_advance_started_at IS NULL
+          OR last_advance_started_at < now() - make_interval(secs => ${sliceBudgetSeconds})
+        )
+      RETURNING id, user_id AS "userId", brand_id AS "brandId", status,
+        request_payload AS "requestPayload", article_id AS "articleId",
+        error_message AS "errorMessage", error_kind AS "errorKind",
+        stream_buffer AS "streamBuffer", refunded_at AS "refundedAt",
+        last_advance_started_at AS "lastAdvanceStartedAt",
+        created_at AS "createdAt", started_at AS "startedAt",
+        completed_at AS "completedAt"
+    `);
+    const row = (result as any).rows?.[0];
+    return row as ContentGenerationJob | undefined;
+  }
+
+  async listAdvanceablePendingJobs(limit: number): Promise<ContentGenerationJob[]> {
+    const result = await db.execute(sql`
+      SELECT id, user_id AS "userId", brand_id AS "brandId", status,
+        request_payload AS "requestPayload", article_id AS "articleId",
+        error_message AS "errorMessage", error_kind AS "errorKind",
+        stream_buffer AS "streamBuffer", refunded_at AS "refundedAt",
+        last_advance_started_at AS "lastAdvanceStartedAt",
+        created_at AS "createdAt", started_at AS "startedAt",
+        completed_at AS "completedAt"
+      FROM public.content_generation_jobs
+      WHERE status IN ('pending', 'running')
+        AND (
+          last_advance_started_at IS NULL
+          OR last_advance_started_at < now() - INTERVAL '5 minutes'
+        )
+      ORDER BY created_at ASC
+      LIMIT ${limit}
+    `);
+    return ((result as any).rows ?? []) as ContentGenerationJob[];
+  }
+
   async getActiveContentJob(userId: string): Promise<ContentGenerationJob | undefined> {
     const [row] = await db
       .select()

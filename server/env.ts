@@ -7,17 +7,18 @@ import { z } from "zod";
 // Import this file ONCE, as early as possible in server/index.ts — after
 // `dotenv/config` and before any module that reads process.env.
 
-// On Render, RENDER_EXTERNAL_URL is auto-injected and points at the public
-// service URL — no manual config needed. We fall back to that when APP_URL
-// isn't set so the deploy works out of the box.
+// Auto-resolve the public app URL so a fresh deploy works without manual
+// APP_URL config. Order:
+//   1. APP_URL (explicit override — wins when set)
+//   2. VERCEL_URL (auto-injected by Vercel — *.vercel.app)
+//   3. RENDER_EXTERNAL_URL (auto-injected by Render)
+//   4. http://localhost:5000 in dev
 //
-// Local dev: defaults to http://localhost:5000 if neither is set.
-//
-// APP_URL still wins when set (it's how you point at a custom domain like
-// https://venturecite.com once DNS is wired up — Render's auto URL is the
-// *.onrender.com one, which isn't what you want in production).
+// Vercel injects VERCEL_URL without the protocol, so we prepend https://.
+// On Render, RENDER_EXTERNAL_URL is already a full https URL.
 const resolvedAppUrl =
   process.env.APP_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
   process.env.RENDER_EXTERNAL_URL ||
   (process.env.NODE_ENV === "production" ? undefined : "http://localhost:5000");
 if (resolvedAppUrl) process.env.APP_URL = resolvedAppUrl;

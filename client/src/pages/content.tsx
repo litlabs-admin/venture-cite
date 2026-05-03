@@ -52,7 +52,6 @@ import KeywordChips from "@/components/content/KeywordChips";
 import IndustryCombobox from "@/components/content/IndustryCombobox";
 import BrandCombobox from "@/components/content/BrandCombobox";
 import { apiRequest } from "@/lib/queryClient";
-import { getAccessToken } from "@/lib/authStore";
 import { useToast } from "@/hooks/use-toast";
 import { useArticleAutoSave } from "@/hooks/useArticleAutoSave";
 import type { Article, Brand } from "@shared/schema";
@@ -291,103 +290,76 @@ export default function Content() {
 
   // ── Job state ─────────────────────────────────────────────────────────────
 
-  const [streamBuffer, setStreamBuffer] = useState<string>("");
   const activeJobId = article?.jobId ?? null;
   const isGenerating = article?.status === "generating";
 
-  useEffect(() => {
-    if (!isGenerating || !activeJobId) return;
-    if (typeof EventSource === "undefined") return;
-
-    let es: EventSource | null = null;
-    let cancelled = false;
-
-    const open = async () => {
-      if (cancelled) return;
-      // EventSource can't send Authorization headers, so the JWT goes in
-      // ?token=. The server's SELF_AUTHED_PREFIXES set lets this route
-      // through the global Bearer guard; the SSE handler validates inline.
-      const token = await getAccessToken();
-      if (!token || cancelled) return;
-      const url = `/api/content-jobs/${activeJobId}/stream?token=${encodeURIComponent(token)}`;
-      es = new EventSource(url);
-      es.addEventListener("delta", (ev) => {
-        try {
-          const data = JSON.parse((ev as MessageEvent).data) as { text?: string };
-          if (data.text) setStreamBuffer((prev) => prev + data.text);
-        } catch {
-          // ignore malformed deltas
-        }
-      });
-      es.addEventListener("end", () => {
-        articleQuery.refetch();
-        refetchUsage();
-        queryClient.invalidateQueries({ queryKey: ["/api/articles", "drafts"] });
-        if (es) es.close();
-      });
-      es.onerror = () => {
-        if (es?.readyState === EventSource.CLOSED) es = null;
-      };
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        if (!es) void open();
-      } else {
-        if (es) {
-          es.close();
-          es = null;
-        }
-      }
-    };
-
-    if (document.visibilityState === "visible") void open();
-    document.addEventListener("visibilitychange", onVisibility);
-
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisibility);
-      if (es) es.close();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGenerating, activeJobId]);
+  // Vercel migration (Responses API): client polls /state every 1s for
+  // status + phase. Drives /advance every ~7s — first call kicks off the
+  // OpenAI Responses run; subsequent calls poll the run status. When
+  // /state.done arrives, we refetch the article (which now has final
+  // content in articles.content) and stop polling.
+  const [phase, setPhase] = useState<string | null>(null);
+  const [elapsedMs, setElapsedMs] = useState<number>(0);
 
   useEffect(() => {
     if (!isGenerating || !activeJobId) return;
     let cancelled = false;
-    const tick = async () => {
+    let stateTimer: ReturnType<typeof setTimeout> | null = null;
+    let advanceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const pollState = async () => {
       if (cancelled) return;
-      if (document.visibilityState === "visible" && typeof EventSource !== "undefined") {
-        setTimeout(tick, 4000);
-        return;
-      }
       try {
-        const r = await apiRequest("GET", `/api/content-jobs/${activeJobId}`);
-        const json = (await r.json()) as { success: boolean; data: Job };
-        if (json.success && json.data.status !== "pending" && json.data.status !== "running") {
-          articleQuery.refetch();
-          refetchUsage();
-          queryClient.invalidateQueries({ queryKey: ["/api/articles", "drafts"] });
-          return;
+        const r = await apiRequest("GET", `/api/content-jobs/${activeJobId}/state`);
+        const json = (await r.json()) as {
+          success: boolean;
+          data: {
+            status: string;
+            done: boolean;
+            errorMessage: string | null;
+            phase?: string;
+            elapsedMs?: number;
+          };
+        };
+        if (json.success) {
+          if (json.data.phase) setPhase(json.data.phase);
+          if (typeof json.data.elapsedMs === "number") setElapsedMs(json.data.elapsedMs);
+          if (json.data.done) {
+            articleQuery.refetch();
+            refetchUsage();
+            queryClient.invalidateQueries({ queryKey: ["/api/articles", "drafts"] });
+            return;
+          }
         }
       } catch {
-        // tolerate transient failures
+        // Transient network failure — keep polling.
       }
-      setTimeout(tick, 4000);
+      const interval = document.visibilityState === "visible" ? 1000 : 4000;
+      stateTimer = setTimeout(pollState, interval);
     };
-    tick();
+
+    const driveAdvance = async () => {
+      if (cancelled) return;
+      try {
+        if (document.visibilityState === "visible") {
+          await apiRequest("POST", `/api/content-jobs/${activeJobId}/advance`);
+        }
+      } catch {
+        // ignore — /state polling will surface failure
+      }
+      advanceTimer = setTimeout(driveAdvance, 7000);
+    };
+
+    pollState();
+    driveAdvance();
+
     return () => {
       cancelled = true;
+      if (stateTimer) clearTimeout(stateTimer);
+      if (advanceTimer) clearTimeout(advanceTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGenerating, activeJobId]);
-
-  useEffect(() => {
-    if (!article) return;
-    if (article.status === "ready" || article.status === "draft" || article.status === "failed") {
-      setStreamBuffer("");
-    }
-  }, [article?.status, article?.id]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
@@ -422,7 +394,6 @@ export default function Content() {
                 : old,
           );
         }
-        setStreamBuffer("");
         articleQuery.refetch();
         refetchDrafts();
         toast({
@@ -449,19 +420,6 @@ export default function Content() {
         description: err?.message ?? "Unknown error",
         variant: "destructive",
       });
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: async () => {
-      if (!activeJobId) return;
-      const r = await apiRequest("POST", `/api/content-jobs/${activeJobId}/cancel`);
-      return r.json();
-    },
-    onSuccess: () => {
-      articleQuery.refetch();
-      refetchUsage();
-      refetchDrafts();
     },
   });
 
@@ -615,11 +573,35 @@ export default function Content() {
             }}
           />
         ) : article.status === "generating" ? (
-          <GeneratingPreview
-            streamedContent={streamBuffer}
-            onCancel={() => cancelMutation.mutate()}
-            cancelling={cancelMutation.isPending}
-          />
+          <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-6">
+            <div className="flex items-center gap-3">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+              <p className="text-sm font-medium">{phase ?? "Brainstorming themes"}</p>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {Math.floor(elapsedMs / 1000)}s
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {[{ lines: 3 }, { lines: 4 }, { lines: 5 }, { lines: 3 }].map((section, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="h-5 w-1/3 animate-pulse rounded bg-muted" />
+                  {Array.from({ length: section.lines }).map((_, j) => (
+                    <div
+                      key={j}
+                      className="h-3 animate-pulse rounded bg-muted/60"
+                      style={{ width: `${60 + ((i + j) % 4) * 8}%` }}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Generating your article. This may take 30-90 seconds. You can leave this page —
+              generation will continue and you can return to see the finished article.
+            </p>
+          </div>
         ) : (
           <DraftForm
             brands={brands}
@@ -715,47 +697,6 @@ function ReadyEditor({
         <p className="text-xs text-muted-foreground mt-3">
           Edits auto-save. Open in Articles for Auto-Improve, version history, and distribution.
         </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function GeneratingPreview({
-  streamedContent,
-  onCancel,
-  cancelling,
-}: {
-  streamedContent: string;
-  onCancel: () => void;
-  cancelling: boolean;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <Loader2 className="w-5 h-5 animate-spin text-violet-600" />
-            Generating…
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-            disabled={cancelling}
-            data-testid="button-cancel-generation"
-          >
-            {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : "Cancel"}
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <MarkdownEditor
-          value={streamedContent || "_Waiting for the model to start writing…_"}
-          onChange={() => {
-            /* read-only while generating */
-          }}
-          editable={false}
-        />
       </CardContent>
     </Card>
   );

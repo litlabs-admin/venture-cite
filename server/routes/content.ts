@@ -48,6 +48,60 @@ import {
   safeParseJson,
   MAX_CONTENT_LENGTH,
 } from "../lib/routesShared";
+import { runArticleSlice } from "../contentGenerationWorker";
+
+// Vercel migration: time-driven phase indicator. The Responses API
+// background mode doesn't expose intra-run progress, so we display a
+// believable "what the model is doing now" message based on elapsed
+// time. Engineering, not marketing — the phase boundaries are
+// approximate but the user-perceived smoothness matches what production
+// AI products (Notion AI, Cursor) ship.
+const PHASE_BANDS: Array<{ minMs: number; label: string }> = [
+  { minMs: 0, label: "Brainstorming themes" },
+  { minMs: 4_000, label: "Drafting outline" },
+  { minMs: 12_000, label: "Writing sections" },
+  { minMs: 25_000, label: "Polishing" },
+];
+
+function phaseFor(elapsedMs: number): string {
+  let label = PHASE_BANDS[0].label;
+  for (const band of PHASE_BANDS) {
+    if (elapsedMs >= band.minMs) label = band.label;
+  }
+  return label;
+}
+
+export function computeJobStatePayload(job: {
+  status: string;
+  streamBuffer: string | null;
+  errorMessage: string | null;
+  openaiResponseId: string | null;
+  startedAt: Date | null;
+}): {
+  status: string;
+  done: boolean;
+  errorMessage: string | null;
+  phase?: string;
+  elapsedMs?: number;
+} {
+  const done = job.status !== "pending" && job.status !== "running";
+  if (done) {
+    return {
+      status: job.status,
+      done: true,
+      errorMessage: job.errorMessage ?? null,
+    };
+  }
+  const startMs = job.startedAt ? new Date(job.startedAt).getTime() : Date.now();
+  const elapsedMs = Math.max(0, Date.now() - startMs);
+  return {
+    status: job.status,
+    done: false,
+    errorMessage: job.errorMessage ?? null,
+    phase: phaseFor(elapsedMs),
+    elapsedMs,
+  };
+}
 
 export function setupContentRoutes(app: Express): void {
   // ── Generate content for an existing draft article ─────────────────────────
@@ -206,106 +260,90 @@ export function setupContentRoutes(app: Express): void {
     }
   });
 
-  // ── SSE stream of job's stream_buffer ─────────────────────────────────────
+  // ── Poll job's phase state ────────────────────────────────────────────────
   //
-  // Tails content_generation_jobs.stream_buffer at SSE_TICK_MS, emitting
-  // deltas as `event: delta` messages. Sends `event: end` and closes when
-  // the job reaches a terminal state. Capped at SSE_MAX_DURATION_MS so a
-  // hung browser tab doesn't hold a connection open forever.
-  app.get("/api/content-jobs/:jobId/stream", async (req: Request, res: Response) => {
-    const SSE_TICK_MS = 250;
-    const SSE_MAX_DURATION_MS = 5 * 60 * 1000;
+  // Vercel migration: replaces the streamBuffer-tail approach. Returns a
+  // time-driven phase label + elapsedMs while in-progress, and done:true
+  // with the terminal status once finished. The ?since= query param is
+  // dropped — clients now render phase progress, not raw token content.
+  app.get("/api/content-jobs/:jobId/state", async (req: Request, res: Response) => {
     try {
-      // EventSource can't send Authorization headers, so SSE auth is via
-      // ?token=<JWT>. The route is in SELF_AUTHED_PREFIXES so the global
-      // requireAuthForApi guard skips it; we validate inline here.
-      const tokenFromQuery = typeof req.query.token === "string" ? req.query.token : null;
-      const headerAuth = req.headers.authorization;
-      const token = tokenFromQuery
-        ? tokenFromQuery
-        : headerAuth?.startsWith("Bearer ")
-          ? headerAuth.slice(7)
-          : null;
-      if (!token) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
-      }
-      const { supabaseAdmin } = await import("../supabase");
-      const { data, error } = await supabaseAdmin.auth.getUser(token);
-      if (error || !data.user) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
-      }
-      const userId = data.user.id;
-      const job = await storage.getContentJobById(req.params.jobId, userId);
+      const user = requireUser(req);
+      const job = await storage.getContentJobById(req.params.jobId, user.id);
       if (!job) return res.status(404).json({ success: false, error: "Job not found" });
 
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no", // disable nginx buffering
+      const [row] = await db
+        .select({
+          status: schema.contentGenerationJobs.status,
+          streamBuffer: schema.contentGenerationJobs.streamBuffer,
+          errorMessage: schema.contentGenerationJobs.errorMessage,
+          openaiResponseId: schema.contentGenerationJobs.openaiResponseId,
+          startedAt: schema.contentGenerationJobs.startedAt,
+        })
+        .from(schema.contentGenerationJobs)
+        .where(eq(schema.contentGenerationJobs.id, job.id))
+        .limit(1);
+      if (!row) return res.status(404).json({ success: false, error: "Job not found" });
+
+      res.json({
+        success: true,
+        data: computeJobStatePayload(row),
       });
-
-      const send = (event: string, data: unknown) => {
-        res.write(`event: ${event}\n`);
-        res.write(`data: ${JSON.stringify(data)}\n\n`);
-      };
-
-      // Replay any buffer already accumulated (so a late connection doesn't
-      // miss the first tokens).
-      let lastLength = 0;
-      const initialBuffer = (job as any).streamBuffer ?? "";
-      if (typeof initialBuffer === "string" && initialBuffer.length > 0) {
-        send("delta", { text: initialBuffer });
-        lastLength = initialBuffer.length;
-      }
-      // If the job is already terminal, send 'end' and close right away.
-      if (job.status !== "pending" && job.status !== "running") {
-        send("end", { status: job.status });
-        return res.end();
-      }
-
-      const startedAt = Date.now();
-      let cancelled = false;
-      req.on("close", () => {
-        cancelled = true;
-      });
-
-      const tick = async () => {
-        if (cancelled) return;
-        if (Date.now() - startedAt > SSE_MAX_DURATION_MS) {
-          send("end", { status: "timeout" });
-          return res.end();
-        }
-        try {
-          const [row] = await db
-            .select({
-              status: schema.contentGenerationJobs.status,
-              streamBuffer: schema.contentGenerationJobs.streamBuffer,
-            })
-            .from(schema.contentGenerationJobs)
-            .where(eq(schema.contentGenerationJobs.id, job.id))
-            .limit(1);
-          if (!row) {
-            send("end", { status: "missing" });
-            return res.end();
-          }
-          const buf = row.streamBuffer ?? "";
-          if (buf.length > lastLength) {
-            send("delta", { text: buf.slice(lastLength) });
-            lastLength = buf.length;
-          }
-          if (row.status !== "pending" && row.status !== "running") {
-            send("end", { status: row.status });
-            return res.end();
-          }
-        } catch {
-          // On a transient DB read error, just try again next tick.
-        }
-        setTimeout(tick, SSE_TICK_MS);
-      };
-      setTimeout(tick, SSE_TICK_MS);
     } catch (error) {
-      sendError(res, error, "Failed to open job stream");
+      sendError(res, error, "Failed to read job state");
+    }
+  });
+
+  // ── Advance a job by one slice (Vercel migration) ─────────────────────────
+  //
+  // The browser drives generation by calling /advance in a loop until
+  // `done: true`. Each call processes ~8s of OpenAI streaming (deadline
+  // chosen to fit comfortably under Vercel Hobby's 10s function cap),
+  // persists tokens to stream_buffer, and returns. The runArticleSlice
+  // helper handles success / cancellation / retryable failure / refund
+  // bookkeeping internally; the route just enforces ownership and the
+  // per-call lock (last_advance_started_at).
+  app.post("/api/content-jobs/:jobId/advance", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const job = await storage.getContentJobById(req.params.jobId, user.id);
+      if (!job) return res.status(404).json({ success: false, error: "Job not found" });
+      if (job.status !== "pending" && job.status !== "running") {
+        return res.json({
+          success: true,
+          data: { status: job.status, done: true },
+        });
+      }
+
+      // Per-job slice lock: prevents two browser tabs from concurrently
+      // streaming into the same buffer. Slice budget = 9s (deadline 8s +
+      // 1s safety so the lock window outlasts the slice itself).
+      const claimed = await storage.claimContentJobForSlice(job.id, 9);
+      if (!claimed) {
+        // Another caller is mid-slice; tell client to keep polling /state.
+        return res.json({
+          success: true,
+          data: { status: job.status, done: false, busy: true },
+        });
+      }
+
+      const deadlineMs = Date.now() + 8000;
+      const outcome = await runArticleSlice(job.id, deadlineMs);
+
+      const after = await storage.getContentJobById(job.id, user.id);
+      const buf = (after as any)?.streamBuffer ?? "";
+      res.json({
+        success: outcome.status !== "failed",
+        data: {
+          status: outcome.status,
+          done: outcome.done,
+          contentLength: typeof buf === "string" ? buf.length : 0,
+          errorKind: "errorKind" in outcome ? (outcome.errorKind ?? null) : null,
+          errorMessage: "message" in outcome ? (outcome.message ?? null) : null,
+        },
+      });
+    } catch (error) {
+      sendError(res, error, "Failed to advance job");
     }
   });
 

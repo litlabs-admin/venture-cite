@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { Sentry } from "./instrument";
 import { logger, requestContext } from "./lib/logger";
 import { authRateKey } from "./lib/authRateKey";
+import { maybeTickActiveRunsForUser } from "./lib/workflowEngine";
 
 // Re-exported for callers that want to use the same keying scheme on
 // other endpoints (e.g. account-deletion in Wave 2).
@@ -69,6 +70,20 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const ctx = requestContext.getStore();
   if (ctx) ctx.userId = dbUser.id;
   Sentry.setUser({ id: dbUser.id });
+
+  // Lazy-eval workflow tick: replaces the 30s global cron (dropped for
+  // serverless compat). On Vercel we use waitUntil() so the tick runs
+  // *after* the response is sent (zero added request latency), bounded
+  // by maxDuration. On Render the .catch() promise is detached the
+  // standard way. advanceRun is idempotent and the helper debounces.
+  const tickPromise = maybeTickActiveRunsForUser(dbUser.id).catch((err) => {
+    logger.warn({ err, userId: dbUser.id }, "auth: maybeTickActiveRunsForUser failed");
+  });
+  if (process.env.VERCEL) {
+    const { waitUntil } = await import("@vercel/functions");
+    waitUntil(tickPromise);
+  }
+  // On non-Vercel, the promise is already running; nothing more to do.
 
   next();
 };
@@ -158,18 +173,19 @@ const PUBLIC_API_ROUTES = new Set<string>([
   // Image proxy — loaded by <img> tags, which can't send bearer tokens.
   // Endpoint itself is hardened (SSRF-safe, image-only responses).
   "GET /api/logo-proxy",
+  // Daily cron orchestrator — self-auths via CRON_SECRET (Vercel migration).
+  "POST /api/cron/daily-orchestrator",
 ]);
 
-// Routes whose handlers do their own auth (e.g. SSE endpoints which can't
-// send Authorization headers from EventSource and instead validate a token
-// from the query string). The handler MUST do the verify itself — we just
-// skip the global Bearer guard.
-const SELF_AUTHED_PREFIXES: Array<{ method: string; prefix: string; suffix: string }> = [
-  // GET /api/content-jobs/<id>/stream
-  { method: "GET", prefix: "/api/content-jobs/", suffix: "/stream" },
-  // GET /api/brands/<id>/citation-events  (Wave 8 SSE)
-  { method: "GET", prefix: "/api/brands/", suffix: "/citation-events" },
-];
+// Routes whose handlers do their own auth (e.g. legacy SSE endpoints
+// which couldn't send Authorization headers from EventSource and instead
+// validated a token from the query string). The handler MUST do the
+// verify itself — we just skip the global Bearer guard.
+//
+// Vercel migration: SSE endpoints were converted to polling (Authorization
+// header works for fetch). This array is now empty but kept in place for
+// future self-authenticated routes.
+const SELF_AUTHED_PREFIXES: Array<{ method: string; prefix: string; suffix: string }> = [];
 
 function isSelfAuthed(method: string, path: string): boolean {
   for (const r of SELF_AUTHED_PREFIXES) {

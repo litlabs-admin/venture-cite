@@ -1,17 +1,11 @@
 import cron from "node-cron";
 import { db } from "./db";
-import { and, eq, gte, ne, isNull, isNotNull, lte, or } from "drizzle-orm";
+import { and, eq, gte, ne, isNull, isNotNull, lte } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { runBrandPrompts } from "./citationChecker";
 import { generateSuggestedPrompts } from "./lib/suggestionGenerator";
 import { storage } from "./storage";
-import {
-  sendWeeklyVisibilityReport,
-  sendWeeklyDigest,
-  isEmailConfigured,
-  type BrandReport,
-  type WeeklyDigestBrandBrief,
-} from "./emailService";
+import { sendWeeklyVisibilityReport, isEmailConfigured, type BrandReport } from "./emailService";
 import { discoverCompetitors } from "./lib/competitorDiscovery";
 import { withAdvisoryLock, lockKeys } from "./lib/advisoryLock";
 import { refreshScrapedFacts } from "./lib/factExtractor";
@@ -21,7 +15,8 @@ import { logger } from "./lib/logger";
 import { Sentry } from "./instrument";
 import { logSystemAudit } from "./lib/audit";
 import { supabaseAdmin } from "./supabase";
-import { tickActiveRuns, startRun } from "./lib/workflowEngine";
+import { startRun } from "./lib/workflowEngine";
+import { tryEmitWeeklyDigestForUser } from "./lib/weeklyDigestEmitter";
 
 const WEEKLY_CRON = process.env.WEEKLY_REPORT_CRON || "0 8 * * 0";
 const MAX_BRANDS_PER_USER = Number(process.env.WEEKLY_MAX_BRANDS_PER_USER || 3);
@@ -179,13 +174,11 @@ function isBrandDueForCitation(brand: {
 
   // Only run on the user's chosen day of week
   if (todayDow !== brand.autoCitationDay) return false;
-  // Wave 9: only fire once the chosen hour has been reached. The cron is
-  // hourly-granular (default 0 6 * * *) so without this gate every brand
-  // would fire at the cron hour regardless of the user's hour pick.
-  // brand.autoCitationHour defaults to 9 from migration 0037, but be
-  // defensive for pre-migration rows / tests.
-  const targetHour = brand.autoCitationHour ?? 9;
-  if (currentHour < targetHour) return false;
+  // Wave 9.5: hour-of-day gate dropped. Vercel Hobby allows one cron per
+  // day, fired by the daily orchestrator at 06:00 UTC. Brand
+  // autoCitationHour is no longer respected at the cron layer; it remains
+  // in the schema for UI display only. Day-of-week is still honoured.
+  void currentHour;
 
   if (!brand.lastAutoCitationAt) return true; // never run before
 
@@ -204,7 +197,7 @@ function isBrandDueForCitation(brand: {
   }
 }
 
-async function runAutoCitationJob(): Promise<void> {
+export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
   logger.info("auto-citation job starting");
 
   // Fetch all brands that have auto-citation enabled (not "off") and
@@ -215,7 +208,17 @@ async function runAutoCitationJob(): Promise<void> {
     .where(and(ne(schema.brands.autoCitationSchedule, "off"), isNull(schema.brands.deletedAt)));
 
   let ranCount = 0;
+  let deferred = 0;
   for (const brand of scheduledBrands) {
+    if (deadlineMs !== undefined && Date.now() > deadlineMs) {
+      // Vercel migration: bail early so the function returns before
+      // the platform timeout. Brands not yet processed today retain
+      // their old lastAutoCitationAt and will be picked up next cron
+      // tick (the per-brand `daysSinceLast >= 6/13/27` gate prevents
+      // double-runs).
+      deferred += 1;
+      continue;
+    }
     if (!isBrandDueForCitation(brand)) continue;
 
     try {
@@ -277,7 +280,10 @@ async function runAutoCitationJob(): Promise<void> {
       });
     }
   }
-  logger.info({ ranCount }, `auto-citation job complete — ${ranCount} brands checked`);
+  logger.info(
+    { ranCount, deferred },
+    `auto-citation job complete — ${ranCount} brands checked${deferred > 0 ? ` (${deferred} deferred to next cron)` : ""}`,
+  );
 }
 
 // Weekly automation crons. Each iterates every brand in serial with a
@@ -287,19 +293,39 @@ const MENTION_SCAN_CRON = process.env.MENTION_SCAN_CRON || "0 9 * * 1"; // Monda
 const LISTICLE_SCAN_CRON = process.env.LISTICLE_SCAN_CRON || "0 11 * * 1"; // Monday 11 AM UTC
 const FACT_REFRESH_CRON = process.env.FACT_REFRESH_CRON || "0 10 1 * *"; // 1st of month 10 AM UTC
 
+// Vercel migration: every per-brand iteration accepts a deadline so the
+// daily orchestrator can bail out cleanly before the function timeout.
+// Brands that didn't get processed today get retried tomorrow — natural
+// backoff via the per-brand "lastXxxAt" timestamps the callers already
+// stamp. On Render (no deadline), the loop runs to completion as before.
+type RunForEveryBrandOptions = {
+  deadlineMs?: number;
+};
+
 async function runForEveryBrand(
   label: string,
   fn: (brandId: string) => Promise<unknown>,
-): Promise<void> {
+  options: RunForEveryBrandOptions = {},
+): Promise<{ ok: number; total: number; processed: number; bailedAt?: string }> {
   logger.info({ job: label }, `${label} job starting`);
-  // Skip soft-deleted brands (Wave 4.5) — no point spending LLM tokens
-  // on a brand the user has scheduled for deletion.
+  // Skip soft-deleted brands (Wave 4.5).
   const brands = await db
     .select({ id: schema.brands.id, name: schema.brands.name })
     .from(schema.brands)
     .where(isNull(schema.brands.deletedAt));
   let ok = 0;
+  let processed = 0;
+  let bailedAt: string | undefined;
   for (const b of brands) {
+    if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
+      bailedAt = b.id;
+      logger.info(
+        { job: label, processed, total: brands.length },
+        `${label}: deadline hit — remaining brands deferred to next cron run`,
+      );
+      break;
+    }
+    processed += 1;
     try {
       await fn(b.id);
       ok += 1;
@@ -312,35 +338,40 @@ async function runForEveryBrand(
     }
   }
   logger.info(
-    { job: label, ok, total: brands.length },
-    `${label} job complete — ${ok}/${brands.length} brands processed`,
+    { job: label, ok, processed, total: brands.length },
+    `${label} job complete — ${ok}/${processed} processed (${brands.length} total)`,
   );
+  return { ok, total: brands.length, processed, bailedAt };
 }
 
 // Each job body is wrapped in a pg advisory lock so overlapping scheduler
 // instances (container-restart overlap, accidental HA) skip instead of
 // double-running — which otherwise inflates competitor/snapshot counts
 // and racks up LLM spend.
-export async function runCompetitorDiscoveryJob(): Promise<void> {
+export async function runCompetitorDiscoveryJob(deadlineMs?: number): Promise<void> {
   await withAdvisoryLock(lockKeys.competitorDiscovery, "competitor-discovery", () =>
-    runForEveryBrand("competitor-discovery", (bid) => discoverCompetitors(bid)),
+    runForEveryBrand("competitor-discovery", (bid) => discoverCompetitors(bid), { deadlineMs }),
   );
 }
-export async function runMentionScanJob(): Promise<void> {
+export async function runMentionScanJob(deadlineMs?: number): Promise<void> {
   await withAdvisoryLock(lockKeys.mentionScan, "mention-scan", () =>
-    runForEveryBrand("mention-scan", (bid) => scanBrandMentions(bid)),
+    runForEveryBrand("mention-scan", (bid) => scanBrandMentions(bid), { deadlineMs }),
   );
 }
-export async function runListicleScanJob(): Promise<void> {
+export async function runListicleScanJob(deadlineMs?: number): Promise<void> {
   await withAdvisoryLock(lockKeys.listicleScan, "listicle-scan", () =>
-    runForEveryBrand("listicle-scan", async (bid) => {
-      await scanBrandListicles(bid);
-    }),
+    runForEveryBrand(
+      "listicle-scan",
+      async (bid) => {
+        await scanBrandListicles(bid);
+      },
+      { deadlineMs },
+    ),
   );
 }
-export async function runFactRefreshJob(): Promise<void> {
+export async function runFactRefreshJob(deadlineMs?: number): Promise<void> {
   await withAdvisoryLock(lockKeys.factRefresh, "fact-refresh", () =>
-    runForEveryBrand("fact-refresh", (bid) => refreshScrapedFacts(bid)),
+    runForEveryBrand("fact-refresh", (bid) => refreshScrapedFacts(bid), { deadlineMs }),
   );
 }
 
@@ -513,10 +544,12 @@ export async function runWeeklyCatchupKickoff(): Promise<{
   return { started, skipped, failed };
 }
 
-// Aggregator: runs every 5 minutes. For each user whose every brand's most
-// recent weekly_catchup run (since last digest send) has reached terminal
-// status, send ONE combined digest email and stamp lastWeeklyReportSentAt.
-// This replaces per-brand email sends from inside the workflow.
+// Aggregator: formerly a 5-min cron. Dropped for serverless compat.
+// Replaced by lazy-eval — the workflow engine calls
+// tryEmitWeeklyDigestForUser whenever a weekly_catchup run reaches
+// terminal status, which is exactly when the digest could become sendable.
+// This function remains callable as a fallback (e.g. from the daily cron
+// orchestrator or admin tooling) — it sweeps every eligible user.
 export async function runWeeklyDigestAggregator(): Promise<{ sent: number; pending: number }> {
   let sent = 0;
   let pending = 0;
@@ -524,120 +557,18 @@ export async function runWeeklyDigestAggregator(): Promise<{ sent: number; pendi
   if (!isEmailConfigured()) return { sent, pending };
 
   const eligibleUsers = await db
-    .select({
-      id: schema.users.id,
-      email: schema.users.email,
-      firstName: schema.users.firstName,
-      lastWeeklyReportSentAt: schema.users.lastWeeklyReportSentAt,
-    })
+    .select({ id: schema.users.id })
     .from(schema.users)
     .where(and(eq(schema.users.weeklyReportEnabled, 1), isNull(schema.users.deletedAt)));
 
-  const cutoff = new Date(Date.now() - 25 * 60 * 60 * 1000); // look back ~last day
-
   for (const user of eligibleUsers) {
-    if (!user.email) continue;
-    // Dedup: if we sent in the past 6 days, skip.
-    if (
-      user.lastWeeklyReportSentAt &&
-      Date.now() - new Date(user.lastWeeklyReportSentAt).getTime() < 6 * 24 * 60 * 60 * 1000
-    ) {
-      continue;
-    }
-
-    const userBrands = await db
-      .select({ id: schema.brands.id, name: schema.brands.name })
-      .from(schema.brands)
-      .where(and(eq(schema.brands.userId, user.id), isNull(schema.brands.deletedAt)));
-
-    if (userBrands.length === 0) continue;
-
-    // Fetch the latest weekly_catchup run per brand since the cutoff.
-    const briefs: WeeklyDigestBrandBrief[] = [];
-    let allTerminal = true;
-    let sawAnyRun = false;
-    for (const b of userBrands) {
-      const runs = await db
-        .select()
-        .from(schema.workflowRuns)
-        .where(
-          and(
-            eq(schema.workflowRuns.brandId, b.id),
-            eq(schema.workflowRuns.workflowKey, "weekly_catchup"),
-            gte(schema.workflowRuns.createdAt, cutoff),
-          ),
-        );
-      if (runs.length === 0) {
-        // No kickoff yet for this brand — treat as "still pending" so we
-        // don't send a partial digest that omits a brand.
-        allTerminal = false;
-        continue;
-      }
-      sawAnyRun = true;
-      // Pick most recent
-      runs.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-      const latest = runs[0];
-      const terminal =
-        latest.status === "completed" ||
-        latest.status === "failed" ||
-        latest.status === "cancelled";
-      if (!terminal) {
-        allTerminal = false;
-        continue;
-      }
-
-      // Extract compose_digest output from stepStates for this run.
-      const states =
-        (latest.stepStates as unknown as Array<{
-          key: string;
-          status: string;
-          output?: unknown;
-        }> | null) ?? [];
-      const compose = states.find((s) => s.key === "compose_digest")?.output as
-        | Record<string, unknown>
-        | undefined;
-      const delta = states.find((s) => s.key === "delta_calc")?.output as
-        | Record<string, unknown>
-        | undefined;
-
-      briefs.push({
-        brandName: String(compose?.brandName ?? b.name),
-        currentScore: Number(compose?.currentScore ?? 0),
-        delta:
-          compose?.delta === null || compose?.delta === undefined ? null : Number(compose.delta),
-        newlyLost: Array.isArray(delta?.newlyLost) ? (delta!.newlyLost as string[]) : [],
-        newlyWon: Array.isArray(delta?.newlyWon) ? (delta!.newlyWon as string[]) : [],
-        hallucinationCount: Number(compose?.hallucinationCount ?? 0),
-        topInsight: String(compose?.topInsight ?? ""),
-        firstRun: Boolean(compose?.firstRun),
-      });
-    }
-
-    if (!sawAnyRun || !allTerminal) {
-      pending += 1;
-      continue;
-    }
-
-    try {
-      const ok = await sendWeeklyDigest(user.email, {
-        user: { id: user.id, email: user.email, firstName: user.firstName ?? null },
-        brandBriefs: briefs,
-      });
-      if (ok) {
-        await db
-          .update(schema.users)
-          .set({ lastWeeklyReportSentAt: new Date() })
-          .where(eq(schema.users.id, user.id));
-        sent += 1;
-      }
-    } catch (err) {
-      logger.error({ err, userId: user.id }, "weekly digest aggregator send failed");
-      Sentry.captureException(err, { tags: { source: "scheduler.weekly-digest-agg" } });
-    }
+    const result = await tryEmitWeeklyDigestForUser(user.id);
+    if (result.sent) sent += 1;
+    else if (result.reason === "still_pending") pending += 1;
   }
 
   if (sent > 0 || pending > 0) {
-    logger.info({ sent, pending }, "weekly digest aggregator tick");
+    logger.info({ sent, pending }, "weekly digest aggregator sweep");
   }
   return { sent, pending };
 }
@@ -693,12 +624,10 @@ export function initScheduler(): void {
     logger.info({ cron: FACT_REFRESH_CRON }, "fact refresh scheduled");
   }
 
-  // Workflow tick — every 30 seconds, advance any pending/running runs.
-  const WORKFLOW_TICK_CRON = process.env.WORKFLOW_TICK_CRON || "*/30 * * * * *";
-  if (cron.validate(WORKFLOW_TICK_CRON)) {
-    cron.schedule(WORKFLOW_TICK_CRON, cronCrashGuard("workflow-tick", tickActiveRuns));
-    logger.info({ cron: WORKFLOW_TICK_CRON }, "workflow tick scheduled");
-  }
+  // Workflow tick — formerly a 30s global cron, dropped for serverless
+  // compatibility. Now driven lazily by the auth middleware via
+  // maybeTickActiveRunsForUser (fire-and-forget on every authenticated
+  // request). See server/auth.ts and server/lib/workflowEngine.ts.
 
   // Weekly catch-up workflow kickoff — Monday 06:00 UTC. Independent of
   // the weekly-report Resend gate below: the workflow's digest-send step
@@ -713,16 +642,11 @@ export function initScheduler(): void {
     logger.info({ cron: WEEKLY_CATCHUP_CRON }, "weekly catchup kickoff scheduled");
   }
 
-  // Weekly digest aggregator — every 5 minutes. When all of a user's
-  // per-brand weekly_catchup runs are terminal, send ONE combined digest.
-  const WEEKLY_DIGEST_AGG_CRON = process.env.WEEKLY_DIGEST_AGG_CRON || "*/5 * * * *";
-  if (cron.validate(WEEKLY_DIGEST_AGG_CRON)) {
-    cron.schedule(
-      WEEKLY_DIGEST_AGG_CRON,
-      cronCrashGuard("weekly-digest-aggregator", runWeeklyDigestAggregator),
-    );
-    logger.info({ cron: WEEKLY_DIGEST_AGG_CRON }, "weekly digest aggregator scheduled");
-  }
+  // Weekly digest aggregator — formerly a 5-min cron, dropped for
+  // serverless compat. Replaced by lazy-eval in workflowEngine.advanceRun
+  // (fires tryEmitWeeklyDigestForUser when a weekly_catchup run reaches
+  // terminal status). The runWeeklyDigestAggregator function remains
+  // exported as a fallback for the daily cron orchestrator.
 
   // Weekly email report — only if Resend is configured.
   if (!isEmailConfigured()) {

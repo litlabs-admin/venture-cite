@@ -1553,3 +1553,223 @@ Critique findings the user judged not worth this round:
 - Wikipedia disambiguation handling, sentry classification of synthetic `ai://` source URLs.
 
 None of these block any active flow.
+
+## Wave 9.4 — GEO Tools content lifecycle, citation-tracking integration, and scanner correctness
+
+The user's headline complaint was real and surfaced first: **BOFU content was generated but invisible** — [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx) rendered each piece as a 500-char preview inside a 160px ScrollArea with no view/edit/copy/publish/delete affordances. Generated content sat in the DB and the user had no way to actually use it. A fresh end-to-end audit of GEO Tools also surfaced harder problems: hallucinated competitor comparisons, fake `aiSurfaceScore` numbers, no DB-level dedup (concurrent scans = duplicate rows), no content lifecycle, no citation-tracking integration, scanners that swallowed rate-limit failures into silent success toasts. Wave 9.4 closes all of it.
+
+### 18.1 BOFU is now a real surface
+
+[client/src/components/geo-tools/BofuContentSheet.tsx](client/src/components/geo-tools/BofuContentSheet.tsx) (NEW) — full-content sheet with four tabs:
+
+- **Content**: full markdown render via `SafeMarkdown` (already sanitized via rehype-sanitize). Copy-all + download-as-`.md`.
+- **Metadata**: type, primary keyword, comparedWith list, target intent, aiScore, createdAt/updatedAt, last-cited timestamp.
+- **Publish**: text input for `publishedUrl` + a Switch that sets `publishedAt = now()` when toggled. Saves via `PATCH /api/bofu-content/:id`. Once a publishedUrl is saved, the citation checker registers it for self-citation tracking (see 18.6).
+- **Schema**: live JSON-LD generation tailored to content type (`Article` baseline; `comparison`/`alternatives` add an `about: [Thing]` array of competitors). Copy with `<script type="application/ld+json">` wrapper.
+
+Plus a delete with browser-native confirm. The geo-tools.tsx BOFU "Generated Content" section now renders compact clickable cards showing title + type + status + publishedUrl + a "Cited recently" badge if `last_cited_at` is within 30 days. Click anywhere on the card → sheet opens.
+
+### 18.2 Brand-fact grounding for BOFU + FAQ generation
+
+[server/lib/brandGenerationContext.ts](server/lib/brandGenerationContext.ts) (NEW) — `loadBrandGenerationContext(brandId, comparedWith)` returns the brand row, active fact-sheet entries (from `brand_fact_sheet`), and resolved competitors (case-insensitive match on `name` against the tracked-competitors table). `renderFactsBlock()` and `renderCompetitorBlock()` produce prompt-ready strings.
+
+Both BOFU `/generate` and FAQ `/generate` (in [server/routes/contentTypes.ts](server/routes/contentTypes.ts)) now consume these blocks. Two consequential changes:
+
+1. **The fact sheet goes into the prompt** with explicit grounding rules: "Use only facts in the Verified-facts block above for claims about this brand. For competitor specifics not in the Competitors block, hedge with phrases like 'commonly reported as' or omit. If a comparison data point is unknown, say so explicitly rather than inventing a number."
+2. **BOFU now uses the entire `comparedWith` array, not `[0]`.** Selecting 3 competitors used to silently drop 2; now all three flow into the prompt with their own description / industry / domain inlined when tracked. Untracked freeform names get a "(no verified facts available)" tag so the LLM hedges instead of inventing a feature list.
+
+The FAQ optimizer endpoint (`POST /api/faqs/:id/optimize`) gets the same grounding treatment.
+
+### 18.3 Real `aiSurfaceScore` heuristic — the LLM no longer scores its own output
+
+[server/lib/faqScoring.ts](server/lib/faqScoring.ts) (NEW) — `computeAiSurfaceScore({ question, answer, brand })` returns a deterministic 0-100 integer. Range design: a "perfect" FAQ scores ~95, a "terrible" one ~15-30. Inputs:
+
+- **Length window**: 40-80 word answers get +25 (sweet spot for AI summarization). 25-39 or 81-120 get +10. <15 gets −25; >200 gets −15.
+- **Question phrasing**: starts with what/how/why/when/where/who/which/is/are/do/does/can/should → +10. Otherwise −10.
+- **Question mark**: +5.
+- **Brand mention** in the answer (verbatim or via `nameVariations`): +10.
+- **Lead-with-bullets** (first non-empty line is `- ` / `* ` / `1.`): −5.
+
+Clamped to 0-100. Both `/generate` (per insert) and `/optimize` call this and **ignore any score the LLM returns**. The previous `aiSurfaceScore: 85` hardcoded fallback in the optimizer is gone.
+
+### 18.4 FAQ semantic dedup at insert time
+
+`storage.findSimilarFaqQuestion(brandId, question, threshold = 0.65)` runs `SELECT id, question, similarity(question, $1) AS sim FROM faq_items WHERE brand_id = $2 AND similarity(question, $1) >= $3 ORDER BY sim DESC LIMIT 1`. The FAQ generator consults it before each insert; on hit, increments `mergedDuplicates` in the report and skips. Toast now reads `Generated 5 · Merged 2 with existing similar questions`.
+
+Falls back to exact case-insensitive match if `pg_trgm` isn't installed (the function call throws → caller catches and treats as no match). Migration 0042 enables `pg_trgm` and creates `faq_items_question_trgm_idx` for index-backed lookups.
+
+### 18.5 DB-level scan dedup + ScanReport with failure accounting
+
+Three coordinated changes:
+
+**Migration 0042** ([migrations/0042_geo_tools_lifecycle.sql](migrations/0042_geo_tools_lifecycle.sql)) collapses legacy duplicates with a window-function CTE (keep oldest per `(brand_id, lower(url))`), then adds:
+
+- `listicles_brand_id_url_uniq` ON `(brand_id, lower(url))`
+- `wikipedia_mentions_brand_id_page_url_uniq` ON `(brand_id, page_url)`
+- `brand_mentions_brand_id_source_url_uniq` ON `(brand_id, lower(source_url))`
+
+**Storage** gains `tryInsertListicle` / `tryInsertWikipediaMention` / `tryInsertBrandMention`, which use Drizzle's `.onConflictDoNothing().returning()` pattern. They return `Listicle | null` — null = the unique index rejected the insert, i.e. the row already existed. Scanners use the null return to count "duplicates skipped" cleanly.
+
+**[server/lib/scanReport.ts](server/lib/scanReport.ts)** (NEW) — typed shape returned by every scanner: `{ found, inserted, skippedDuplicate, skippedFiltered, failed: [{ url?, reason }], reverified?, lostInclusion?, warning? }`. Routes return `report` in `data`; client renders multi-line toasts via a new `formatReportLines` helper that hides zero-valued lines so a clean run shows just the meaningful signal.
+
+What this fixes:
+
+- **Concurrent-scan duplicates** ([server/lib/listicleScanner.ts](server/lib/listicleScanner.ts) old behavior: read existing URLs into a Set, loop, insert) — gone. Two users scanning the same brand simultaneously now produce exactly one row per URL.
+- **Silent partial failures** — Reddit 429s, Wikipedia 404s, Quora HTML-shape changes, Perplexity hallucinated URLs that 404 on fetch — all push into `failed[]` with a reason instead of a `console.warn`-and-continue. Toast surfaces the count: "Found 12 · Inserted 3 · Duplicates 7 · Failed 2."
+
+### 18.6 Listicle re-verification phase
+
+Wave 9.3's audit flagged that listicle rows went stale forever — a brand could drop out of a listicle in May and the row still showed `isIncluded=1, listPosition=3` in October. [server/lib/listicleScanner.ts](server/lib/listicleScanner.ts) now does a two-phase scan:
+
+1. **Re-verify** every existing row whose `last_verified_at` is missing or older than 7 days (bounded at 50 per scan). Re-fetch the URL, re-run matcher, update `is_included` / `list_position` / `competitors_mentioned` / `last_verified_at`. New report fields `reverified` and `lostInclusion` surface in the toast.
+2. **Discover** new candidates (the existing flow).
+
+Status flips are logged to the toast — "Lost inclusion: 1" tells the user a previously-included listicle has dropped them.
+
+### 18.7 Lifecycle state tracking — the dropdowns
+
+[client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx) — inline `<Select>` per row drives a PATCH:
+
+**Listicles** (`outreach_status` column, default `'new'`): `new` → `contacted` → `won` / `dropped`. Stored on every listicle row, edited via the dropdown on the row card. Lets the user track outreach state without leaving the app.
+
+**Brand mentions** (`status` column, default `'new'`): `new` → `acknowledged` → `replied` / `false_positive` / `ignored`. The header summary card "Mentions: 47 · 12 unaddressed" only counts rows still at `new`. False-positive captures the common-word-brand-name case ("Apple", "Match") where the matcher mis-fires; ignored captures intentional non-engagement.
+
+Both columns are categorical, not strict state machines — users can move backward to correct mistakes. Server validates the value against an allowlist on PATCH; ownership-checked via `requireBrand` on the row's brand.
+
+#### 18.7.1 Followup — making the saved state visible
+
+User feedback after the dropdowns shipped: "but where can I see those tracked data? it just vanishes after I select something." The status was persisting correctly to the DB but the UI didn't render it back — listicle rows had no status badge at all, and mention rows only rendered a subtle outline badge when the status was non-default. Three additions:
+
+- **Always-visible colored status badge on every row.** Shared display maps (`LISTICLE_STATUS_DISPLAY`, `MENTION_STATUS_DISPLAY`) define a label + color class per state. Listicles: gray "New", blue "Contacted", green "Won", muted "Dropped". Mentions: gray "New", blue "Acknowledged", green "Replied", amber "False positive", muted "Ignored". The badge sits next to the existing Included / sentiment / platform badges so the row visibly updates as soon as the user picks a value.
+- **Filter `<Select>` at the top of each tab** — "Filter by outreach" on Listicles, "Filter by status" on Mentions, default `All`. Lets users see only the rows in a chosen state (e.g. "show me only Contacted listicles") so the workflow state actually drives the view.
+- **Real total counts in the section headers** ("Tracked Listicles (12)", "Recent Mentions (47)") so the user knows how many rows the filter is hiding. The mention list display cap also bumped from 10 to 25 so the filter has room to operate.
+
+[client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx).
+
+### 18.8 Manual-entry endpoints + dialogs
+
+For artifacts the scanner missed (a listicle a colleague forwarded, a Wikipedia mention discovered manually, a brand mention found in a private Slack):
+
+- `POST /api/listicles` (existed) — now uses `tryInsertListicle`, returns 409 on duplicate URL.
+- `POST /api/wikipedia` (existed) — same treatment via `tryInsertWikipediaMention`.
+- `POST /api/brand-mentions` (NEW) — `tryInsertBrandMention` + ownership check, accepts `platform` + `sourceUrl` + `mentionContext` + `sentiment`.
+
+Three dialog components (`ManualAddListicleDialog`, `ManualAddWikipediaDialog`, `ManualAddMentionDialog`) live at the bottom of [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx). "+ Add manually" buttons next to each tab's primary scan button open them.
+
+### 18.9 Citation-tracking integration — closing the loop
+
+**The biggest gap from the audit**: BOFU/FAQ/listicle rows had no foreign key into `citation_runs` or `geo_rankings`. Users had no way to answer "did the BOFU page I published actually get cited?"
+
+Fix:
+
+- **`tracked_content_urls` table** (migration 0042): polymorphic registry keyed by `(source_type, source_id)` where source_type is `'bofu'` or `'faq'`. Stores the canonical URL plus a `normalized_url` (lower-cased host + path with `www.` / trailing slash / query / fragment stripped) used as the citation-checker match target.
+- **`citation_runs.self_citation_count`** (migration 0042): aggregate maintained by the checker.
+- **`bofu_content.last_cited_at` and `faq_items.last_cited_at`** (migration 0042): per-row timestamps stamped on every match.
+
+When a user sets `publishedUrl` on a BOFU or FAQ piece, the PATCH handler calls `syncTrackedContentUrl()` which upserts into `tracked_content_urls` (one row per source — re-publishing a different URL UPDATEs in place; clearing publishedUrl DELETEs).
+
+[server/lib/trackedContentMatcher.ts](server/lib/trackedContentMatcher.ts) (NEW) exposes `normalizeUrl(raw)` and `findSelfCitationsInText(text, trackedUrls)`. The citation checker ([server/citationChecker.ts](server/citationChecker.ts)) preloads tracked URLs once per run, and after the existing matcher resolves the brand/competitor verdict for a `(brand, prompt, platform)` cell, calls `findSelfCitationsInText(responseText, trackedContentUrls)`. For each hit:
+
+- `storage.stampSelfCitation(sourceType, sourceId)` updates the source row's `lastCitedAt`.
+- `storage.incrementCitationRunSelfCitations(citationRun.id)` bumps the aggregate.
+
+Idempotent within a run via a `stampedThisRun: Set<string>` so a piece cited from multiple cells gets stamped exactly once per run.
+
+UI surfaces: BOFU cards (and the sheet header) show a "Cited recently" badge when `lastCitedAt` is within 30 days. Header summary card "BOFU: 4 published · 1 cited (30d)".
+
+### 18.10 GEO Tools header summary
+
+`GET /api/geo-tools/summary/:brandId` returns counts across all five tabs in one round trip. Storage method `getGeoToolsSummary(brandId)` runs five filtered counts (`count(*) filter (where ...)`) in parallel:
+
+```json
+{
+  "listicles": { "total": 12, "included": 5 },
+  "wikipedia": { "existing": 1, "opportunities": 3 },
+  "bofu": { "drafts": 4, "published": 2, "cited30d": 1 },
+  "faqs": { "drafts": 8, "published": 5, "cited30d": 2 },
+  "mentions": { "total": 47, "unaddressed": 12, "negative": 3 }
+}
+```
+
+Renders as a 5-card strip beneath PageHeader. Refreshes on the live-citation-run cadence so newly stamped `cited30d` counts surface within the run.
+
+### 18.11 Wikipedia draft helper
+
+`POST /api/wikipedia/draft/:mentionId` takes a known Wikipedia opportunity row, the brand's fact sheet, and the page extract, and asks OpenAI for a 2-3 sentence NPOV-tuned mention the user can paste into the Wikipedia edit form. Out-of-scope this wave: actually submitting via the MediaWiki API (legal/account compliance work).
+
+UI: each opportunity row gets a "Draft mention" button. Click → modal opens with the draft text + a copy button + three notes (cite a real source, verify WP:NOTABILITY, disclose WP:COI on the talk page).
+
+### 18.12 Common-name warning + multi-tenant rate limits
+
+Two coordinated changes for brands with ambiguous names ("Apple", "Match", "Square") and shared infra running multiple users' scans simultaneously:
+
+**[server/lib/brandNameAmbiguity.ts](server/lib/brandNameAmbiguity.ts)** (NEW) — hardcoded blocklist of ~80 common-word brand names. `brandNameAmbiguityScore(name)` returns 0 / 1 / 2; `brandNameWarning(name)` returns a copy-paste-ready advisory. Listicle and mention scanners check on kickoff and surface the warning in the toast (doesn't block the scan; just nudges the user to add `nameVariations`).
+
+**[server/lib/rateLimitBuckets.ts](server/lib/rateLimitBuckets.ts)** (NEW) — in-process token bucket per `(provider, scopeId)`. Configured for Reddit (10 cap, 1/6 refill — matches the unauth limit), Wikipedia (30/5), Hacker News (30/5), Quora (5/0.25). `acquireOrWait(provider, scopeId, maxWaitMs)` blocks up to 30s; on timeout the mention scanner records "rate-limited" in `report.failed` rather than burning a 429.
+
+The previous `await sleep(REDDIT_RATE_DELAY_MS)` was per-process; concurrent users on the same instance both hit Reddit within the 100ms window and most got 429s that were then swallowed by a `console.warn` while the success toast lied. Now: explicit ETA in failure messages ("reddit rate-limited (try again in ~30s)") and the toast surfaces the count.
+
+In-memory bucket is fine for single-instance deployment per CLAUDE.md; comments mark the spot for Redis migration when multi-instance lands.
+
+### 18.13 Files
+
+| File                                                                                                         | Change                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [migrations/0042_geo_tools_lifecycle.sql](migrations/0042_geo_tools_lifecycle.sql)                           | NEW. pg_trgm; dedup CTEs; lifecycle columns; tracked_content_urls table; self_citation_count; trigram GIN index.                                                                          |
+| [shared/schema.ts](shared/schema.ts)                                                                         | Lifecycle columns on bofu_content / faq_items / listicles / brand_mentions; new trackedContentUrls table + insert schema + types; citation_runs.selfCitationCount.                        |
+| [server/databaseStorage.ts](server/databaseStorage.ts)                                                       | tryInsert{Listicle,WikipediaMention,BrandMention}; findSimilarFaqQuestion; tracked_content_urls CRUD; stampSelfCitation; incrementCitationRunSelfCitations; getGeoToolsSummary.           |
+| [server/storage.ts](server/storage.ts)                                                                       | Type signatures for the new methods; TrackedContentUrl import.                                                                                                                            |
+| [server/lib/brandGenerationContext.ts](server/lib/brandGenerationContext.ts)                                 | NEW. loadBrandGenerationContext + renderFactsBlock + renderCompetitorBlock.                                                                                                               |
+| [server/lib/faqScoring.ts](server/lib/faqScoring.ts)                                                         | NEW. computeAiSurfaceScore deterministic heuristic.                                                                                                                                       |
+| [server/lib/trackedContentMatcher.ts](server/lib/trackedContentMatcher.ts)                                   | NEW. normalizeUrl + findSelfCitationsInText.                                                                                                                                              |
+| [server/lib/rateLimitBuckets.ts](server/lib/rateLimitBuckets.ts)                                             | NEW. in-process token bucket per (provider, scopeId).                                                                                                                                     |
+| [server/lib/brandNameAmbiguity.ts](server/lib/brandNameAmbiguity.ts)                                         | NEW. common-name blocklist + warning.                                                                                                                                                     |
+| [server/lib/scanReport.ts](server/lib/scanReport.ts)                                                         | NEW. shared ScanReport shape.                                                                                                                                                             |
+| [server/lib/listicleScanner.ts](server/lib/listicleScanner.ts)                                               | Re-verification phase; ON CONFLICT inserts; ScanReport return.                                                                                                                            |
+| [server/lib/wikipediaScanner.ts](server/lib/wikipediaScanner.ts)                                             | ON CONFLICT inserts; WikipediaScanReport return.                                                                                                                                          |
+| [server/lib/mentionScanner.ts](server/lib/mentionScanner.ts)                                                 | acquireOrWait against rate-limit buckets; ScanReport return.                                                                                                                              |
+| [server/routes/contentTypes.ts](server/routes/contentTypes.ts)                                               | Grounded BOFU + FAQ prompts; multi-competitor; tracked_content_urls sync on PATCH/DELETE; summary endpoint; Wikipedia draft endpoint; listicle outreach status; manual-add via tryInsert. |
+| [server/routes/publications.ts](server/routes/publications.ts)                                               | Mention scan returns full report; PATCH /api/brand-mentions/:id; POST /api/brand-mentions manual-add.                                                                                     |
+| [server/citationChecker.ts](server/citationChecker.ts)                                                       | Preloads tracked_content_urls per run; per-cell self-citation detection; idempotent-per-run stamping.                                                                                     |
+| [server/scheduler.ts](server/scheduler.ts)                                                                   | runForEveryBrand fn signature widened to `Promise<unknown>` to accept ScanReport returns.                                                                                                 |
+| [client/src/components/geo-tools/BofuContentSheet.tsx](client/src/components/geo-tools/BofuContentSheet.tsx) | NEW. Full-content view + publish + schema export + delete.                                                                                                                                |
+| [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx)                                             | Header summary cards; BOFU sheet wiring; status selects on listicle + mention rows; "+ Add manually" buttons; Wikipedia draft button + dialog; multi-line scan toasts.                    |
+
+### 18.14 Tests
+
+Four new test files, 31 new assertions:
+
+- [tests/unit/faqScoring.test.ts](tests/unit/faqScoring.test.ts) — table-driven across the sweet-spot length window, short answers, non-question questions, brand-mention bumps, and clamp-to-0-100 pathological cases.
+- [tests/unit/trackedContentMatcher.test.ts](tests/unit/trackedContentMatcher.test.ts) — URL normalization across scheme / www / casing / query / fragment / trailing-slash variations; `findSelfCitationsInText` per-call dedup, multi-URL match, empty-input safety.
+- [tests/unit/rateLimitBuckets.test.ts](tests/unit/rateLimitBuckets.test.ts) — initial burst up to capacity, scope isolation, ETA estimation, `acquireOrWait` timeout return.
+- [tests/unit/brandNameAmbiguity.test.ts](tests/unit/brandNameAmbiguity.test.ts) — common-word flags, short-word fallback, null-safe handling.
+
+### 18.15 Verification
+
+- `npx tsc --noEmit` — 0 errors.
+- `npx vitest run` — **22 files / 202 tests passing** (171 prior + 31 new).
+- Migration 0042 is idempotent: `CREATE EXTENSION IF NOT EXISTS`, dedup CTEs run before the unique indexes, all `ADD COLUMN IF NOT EXISTS`, trigram index wrapped in DO block that NOTICE-skips if pg_trgm is unavailable.
+
+### 18.16 Out of scope (deferred to a follow-up)
+
+- Wikipedia API submission flow (drafting in scope; actually editing Wikipedia from inside the app needs OAuth + account-compliance work).
+- BOFU regeneration / section-level edit (sheet supports view + publish + delete + duplicate; no in-place block-level rewriter yet).
+- Embedding-based competitor entity resolution (trigram is sufficient for FAQ dedup; competitor matching stays case-insensitive name matching).
+- Scheduled re-scan jobs (listicle re-verification piggy-backs on user-triggered scans; a cron-driven weekly auto-scan adds scheduler load + cost-management questions).
+- Mention reply flow (state tracking in scope; actually posting replies via Reddit/HN/Quora APIs is a bigger product call).
+- Outbound publishing integrations (manual publish + paste URL covers 95% of value; "Publish to Medium / LinkedIn" requires OAuth flows).
+- Multi-instance rate-limit coordination (in-memory bucket fine for current single-instance; Redis migration tracked separately).
+- Cross-brand competitive intelligence in the mentions tab.
+- Audit log of generation prompts (knowing exactly which fact-sheet version produced a given BOFU is desirable but adds a `generation_audit` table nothing else uses yet).
+
+## Wave 9.4 — Operational notes (Render free-tier keepalive)
+
+Not a code change but worth recording: a GitHub Actions workflow at [.github/workflows/keep-alive.yml](.github/workflows/keep-alive.yml) pings `/health` every 5 minutes from `ubuntu-latest` runners to defeat Render's 15-minute idle-spin-down on the free tier. The endpoint runs `SELECT 1` + advisory-lock round-trip ([server/index.ts:381](server/index.ts#L381)) so a green ping confirms DB connectivity, not just process liveness. `curl -fsSL` makes non-2xx fail the workflow; `-w` prints HTTP status + total time + DNS + connect time so creeping cold-start latency is visible in the run log.
+
+Cadence is `*/5` rather than `*/10` to absorb GitHub Actions cron jitter (scheduled workflows can be delayed 5-15 min during peak load on the runner pool; a 10-minute interval + 6-minute delay = 16-min gap = service sleeps anyway).
+
+Notes for whoever inherits this:
+
+- GitHub disables scheduled workflows after 60 days of repo inactivity. Push any commit (even a comment) every 8 weeks to keep the cron alive.
+- Public repo = unlimited Actions minutes; private repo = 2,000/month free, ~720 burned at this cadence (still fits, but other workflows share the budget).
+- Once the service moves to a paid Render tier (or off Render entirely), the workflow becomes redundant and should be removed.

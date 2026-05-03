@@ -87,6 +87,7 @@ import { setupIntelligenceRoutes } from "./routes/intelligence";
 import { setupAgentRoutes } from "./routes/agent";
 import { setupGeoSignalsRoutes } from "./routes/geoSignals";
 import { setupCommunityRoutes } from "./routes/community";
+import { setupCronRoutes } from "./routes/cron";
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -163,6 +164,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Global guard: every /api/* route not in the PUBLIC_API_ROUTES allowlist
   // requires a valid Bearer token. Single source of truth for auth.
   app.use(requireAuthForApi);
+
+  // Daily cron orchestrator (Vercel migration). Self-authenticated via
+  // CRON_SECRET — registered in PUBLIC_API_ROUTES so requireAuthForApi
+  // doesn't gate it.
+  setupCronRoutes(app);
 
   // GDPR self-service: account deletion + data export.
   setupUserAccountRoutes(app);

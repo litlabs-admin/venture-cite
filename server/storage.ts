@@ -247,6 +247,24 @@ export interface IStorage {
     update: Partial<ContentGenerationJob>,
   ): Promise<ContentGenerationJob | undefined>;
   getContentJobById(id: string, userId: string): Promise<ContentGenerationJob | undefined>;
+  // Vercel migration: admin-side job fetch used by runArticleSlice (which
+  // is called from server-side code paths that don't have a user scope).
+  // Ownership is enforced by the calling route before invocation.
+  getContentJobByIdAdmin(id: string): Promise<ContentGenerationJob | undefined>;
+  // Try to atomically claim a job for an /advance slice. Returns the job
+  // if this caller wins the lock, or undefined if another caller is
+  // already in the slice window (within slice budget seconds).
+  claimContentJobForSlice(
+    id: string,
+    sliceBudgetSeconds: number,
+  ): Promise<ContentGenerationJob | undefined>;
+  // Pending or running jobs whose advance lock has expired. Used by the
+  // daily cron orchestrator to drain orphaned generations.
+  listAdvanceablePendingJobs(limit: number): Promise<ContentGenerationJob[]>;
+  // Vercel migration: link an OpenAI Responses run to a content job.
+  // Idempotent — passing the same id is a no-op. Used by runArticleSlice's
+  // first call to record which OpenAI run owns this job.
+  updateContentJobResponseId(jobId: string, openaiResponseId: string): Promise<void>;
   getActiveContentJob(userId: string): Promise<ContentGenerationJob | undefined>;
   getRecentCompletedContentJob(userId: string): Promise<ContentGenerationJob | undefined>;
   failStuckContentJobs(

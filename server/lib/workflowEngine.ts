@@ -8,6 +8,7 @@ import { logger } from "./logger";
 import { Sentry } from "../instrument";
 import type { AgentTaskType } from "./agentTaskSchemas";
 import { executeAgentTask } from "./agentTaskExecutor";
+import { runArticleSlice } from "../contentGenerationWorker";
 
 export type StepStatus =
   | "pending"
@@ -158,11 +159,35 @@ export async function startRun(
 }
 
 export async function advanceRun(runId: string): Promise<void> {
+  const before = await workflowStorage.getRun(runId);
+  const wasActive = before?.status === "pending" || before?.status === "running";
+
   const result = await withRunLock(runId, async () => {
     await advanceRunInner(runId);
   });
   if (result === null) {
     // Busy; next tick will pick it up.
+  }
+
+  // Lazy-eval weekly digest: when a weekly_catchup run transitions from
+  // active -> terminal, try to emit the user's combined digest. Replaces
+  // the 5-min global aggregator cron. Idempotent (6-day cooldown stamp on
+  // users.lastWeeklyReportSentAt).
+  if (wasActive && before?.workflowKey === "weekly_catchup") {
+    const after = await workflowStorage.getRun(runId);
+    const nowTerminal =
+      after?.status === "completed" || after?.status === "failed" || after?.status === "cancelled";
+    if (nowTerminal && after?.userId) {
+      try {
+        const { tryEmitWeeklyDigestForUser } = await import("./weeklyDigestEmitter");
+        await tryEmitWeeklyDigestForUser(after.userId);
+      } catch (err) {
+        logger.warn(
+          { err, runId, userId: after.userId },
+          "workflow: weekly digest emit failed (non-fatal)",
+        );
+      }
+    }
   }
 }
 
@@ -501,7 +526,11 @@ async function advanceRunInner(runId: string): Promise<void> {
         return;
       }
 
-      if (job.status === "completed") {
+      // Schema comment says values are pending|running|succeeded|failed|
+      // cancelled. Accept "completed" too for forward-compat — historic
+      // code in this file used that label, and a stray legacy row
+      // shouldn't wedge a workflow.
+      if (job.status === "succeeded" || job.status === "completed") {
         states[idx] = {
           ...current,
           status: "completed",
@@ -516,7 +545,7 @@ async function advanceRunInner(runId: string): Promise<void> {
         return;
       }
 
-      if (job.status === "failed") {
+      if (job.status === "failed" || job.status === "cancelled") {
         const msg = job.errorMessage || "Content generation job failed";
         states[idx] = {
           ...current,
@@ -532,7 +561,23 @@ async function advanceRunInner(runId: string): Promise<void> {
         return;
       }
 
-      // Still pending/running — wait for next tick.
+      // Still pending/running. Vercel migration: the polling worker is
+      // gone, so the workflow engine itself has to drive a generation
+      // slice forward each tick. Lazy-eval auth ticks fire advanceRun
+      // for any active runs, so workflows progress whenever the user is
+      // active. The cron drain backstops user-absent cases.
+      try {
+        const claimed = await storage.claimContentJobForSlice(jobId, 9);
+        if (claimed) {
+          // 6s slice deadline keeps total tick well under any reasonable
+          // function timeout. The user's auth tick fires this code so
+          // we don't want to block their request for the full 8s budget.
+          const sliceDeadline = Date.now() + 6000;
+          await runArticleSlice(jobId, sliceDeadline);
+        }
+      } catch (err) {
+        logger.warn({ err, runId, jobId }, "awaitJob: slice-drive failed, will retry next tick");
+      }
       return;
     }
 
@@ -801,6 +846,39 @@ export async function tickActiveRuns(): Promise<void> {
       Sentry.captureException(err, {
         tags: { source: "workflowEngine.tick" },
         extra: { runId: r.id },
+      });
+    }
+  }
+}
+
+// In-memory debounce for the lazy-eval workflow tick. The 30s global cron
+// was dropped for serverless compatibility — instead each authenticated
+// request fires a per-user tick (fire-and-forget). Without this Map every
+// burst of requests would issue parallel advanceRun calls; advanceRun is
+// idempotent so a race is safe, but the DB churn is wasteful. Per-lambda
+// state is fine: under cold-start storms we get at most one tick per
+// lambda per 10s, which is still vastly cheaper than the 30s global cron
+// and converges quickly.
+const LAZY_TICK_DEBOUNCE_MS = 10_000;
+const lastLazyTickAt = new Map<string, number>();
+
+export async function maybeTickActiveRunsForUser(userId: string): Promise<void> {
+  const now = Date.now();
+  const last = lastLazyTickAt.get(userId) ?? 0;
+  if (now - last < LAZY_TICK_DEBOUNCE_MS) return;
+  lastLazyTickAt.set(userId, now);
+
+  const runs = await workflowStorage.getActiveRunsByUser(userId);
+  if (runs.length === 0) return;
+
+  for (const r of runs) {
+    try {
+      await advanceRun(r.id);
+    } catch (err) {
+      logger.error({ err, runId: r.id, userId }, "workflow: lazy advanceRun threw");
+      Sentry.captureException(err, {
+        tags: { source: "workflowEngine.lazyTick" },
+        extra: { runId: r.id, userId },
       });
     }
   }

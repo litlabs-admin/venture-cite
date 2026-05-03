@@ -186,6 +186,10 @@ export default function ScheduleTab({ selectedBrandId, selectedBrand }: Schedule
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  ⓘ Scheduled jobs run once per day around 06:00 UTC. The hour-of-day selection is
+                  preserved for future plan upgrades.
+                </p>
               </div>
             </>
           )}

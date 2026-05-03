@@ -418,9 +418,24 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
         }
       }
 
-      setImmediate(() => {
-        void runOnboardingAutopilot(brand.id, user.id);
-      });
+      // Vercel migration: setImmediate work is killed when the lambda
+      // terminates after responding. Run inline with a deadline so at
+      // least the prompt-generation phase completes before we return;
+      // the citation-run phase resumes via the autopilot status polling
+      // hook + the daily cron's resumeInFlightAutopilots step.
+      if (process.env.VERCEL) {
+        try {
+          await runOnboardingAutopilot(brand.id, user.id, {
+            deadlineMs: Date.now() + 50_000,
+          });
+        } catch (err) {
+          logger.warn({ err, brandId: brand.id }, "autopilot: inline kickoff failed");
+        }
+      } else {
+        setImmediate(() => {
+          void runOnboardingAutopilot(brand.id, user.id);
+        });
+      }
 
       res.json({ success: true, brandId: brand.id });
     } catch (err) {

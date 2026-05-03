@@ -46,6 +46,18 @@ export const workflowStorage = {
       .where(inArray(schema.workflowRuns.status, ["running", "pending"]));
   },
 
+  async getActiveRunsByUser(userId: string): Promise<WorkflowRun[]> {
+    return db
+      .select()
+      .from(schema.workflowRuns)
+      .where(
+        and(
+          eq(schema.workflowRuns.userId, userId),
+          inArray(schema.workflowRuns.status, ["running", "pending"]),
+        ),
+      );
+  },
+
   async updateRun(id: string, patch: Partial<WorkflowRun>): Promise<WorkflowRun | undefined> {
     const [row] = await db
       .update(schema.workflowRuns)

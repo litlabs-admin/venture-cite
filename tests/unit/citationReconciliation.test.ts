@@ -34,14 +34,16 @@ beforeEach(() => {
 });
 
 describe("reconcileOrphanCitationRuns", () => {
-  it("issues an UPDATE that filters by status + 15-minute age threshold", async () => {
+  it("issues an UPDATE that filters by status + 5-minute age threshold", async () => {
     queryMock.mockResolvedValueOnce({ rowCount: 0, rows: [] });
     await reconcileOrphanCitationRuns();
     expect(queryMock).toHaveBeenCalledTimes(1);
     const sql = queryMock.mock.calls[0][0] as string;
     expect(sql).toMatch(/UPDATE citation_runs/i);
     expect(sql).toMatch(/status\s+IN\s+\('pending',\s*'running'\)/i);
-    expect(sql).toMatch(/INTERVAL\s+'15 minutes'/i);
+    // Vercel migration: tightened from 15 min to 5 min so lambda-killed
+    // runs are picked up faster (see citationReconciliation.ts).
+    expect(sql).toMatch(/INTERVAL\s+'5 minutes'/i);
     expect(sql).toMatch(/error_message\s*=\s*'orphaned by restart'/i);
   });
 

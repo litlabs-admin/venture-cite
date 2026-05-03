@@ -308,12 +308,22 @@ export async function runBrandPrompts(
     runId?: string;
     promptIds?: string[];
     onProgress?: (checked: number, total: number) => void | Promise<void>;
+    // Vercel migration: when set, the per-pair worker loop checks this
+    // deadline and stops scheduling new pairs once exceeded. Run stays
+    // in 'running' state so the next slice (via /advance or cron drain)
+    // can pick up where we left off.
+    deadlineMs?: number;
+    // Vercel migration: when true, skip pairs that already have a
+    // geo_ranking row for this run. Used by the slice runner to resume
+    // a partially-completed run without redoing pairs.
+    resume?: boolean;
   } = {},
 ): Promise<{
   totalChecks: number;
   totalCited: number;
   rankings: GeoRanking[];
   runId: string | null;
+  done: boolean;
 }> {
   const brand = await storage.getBrandById(brandId);
   if (!brand) throw new Error("Brand not found");
@@ -341,7 +351,8 @@ export async function runBrandPrompts(
     options.promptIds && options.promptIds.length > 0
       ? allPrompts.filter((p) => options.promptIds!.includes(p.id))
       : allPrompts;
-  if (prompts.length === 0) return { totalChecks: 0, totalCited: 0, rankings: [], runId: null };
+  if (prompts.length === 0)
+    return { totalChecks: 0, totalCited: 0, rankings: [], runId: null, done: true };
 
   // Create a citation_runs row upfront so every geo_ranking can reference it.
   // Wave 8: status='running' from creation so the live-update polling hook
@@ -489,14 +500,34 @@ export async function runBrandPrompts(
 
   type Task = { bp: (typeof prompts)[number]; promptIdx: number; platform: string };
   const queue: Task[] = [];
+
+  // Vercel migration: when resuming a partially-completed run, skip the
+  // (prompt, platform) pairs that already have a geo_ranking row from a
+  // prior slice. Build a quick set of "<promptId>::<platform>" keys.
+  const alreadyDone = new Set<string>();
+  if (options.resume) {
+    try {
+      const existing = await storage.getGeoRankingsByRunId(citationRun.id);
+      for (const r of existing) {
+        alreadyDone.add(`${r.brandPromptId}::${r.aiPlatform}`);
+      }
+    } catch (err) {
+      logger.warn(
+        { err, runId: citationRun.id },
+        "citationChecker: getGeoRankingsByRunId for resume failed; falling back to full queue",
+      );
+    }
+  }
+
   prompts.forEach((bp, i) => {
     for (const platform of cappedPlatforms) {
+      if (alreadyDone.has(`${bp.id}::${platform}`)) continue;
       queue.push({ bp, promptIdx: i + 1, platform });
     }
   });
 
   console.log(
-    `[citationChecker] starting ${prompts.length} prompts × ${cappedPlatforms.length} platforms = ${queue.length} checks (concurrency=${CONCURRENCY})`,
+    `[citationChecker] ${options.resume ? "resuming" : "starting"} ${prompts.length} prompts × ${cappedPlatforms.length} platforms = ${queue.length} pending checks (concurrency=${CONCURRENCY}${options.resume ? `, ${alreadyDone.size} already done` : ""})`,
   );
 
   // Wave A: build the tracked-entity list once — brand + every competitor.
@@ -988,6 +1019,12 @@ export async function runBrandPrompts(
 
   const worker = async (): Promise<void> => {
     while (true) {
+      // Vercel migration: bail before scheduling more work if the
+      // caller-provided deadline has elapsed. Pairs not yet started in
+      // this slice will be picked up by the next /advance call.
+      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
+        return;
+      }
       const idx = cursor++;
       if (idx >= queue.length) return;
       await runOne(queue[idx]);
@@ -1004,6 +1041,31 @@ export async function runBrandPrompts(
   };
 
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
+
+  // Did we finish every pair, or did we bail out on the deadline?
+  // cursor is one past the last claimed index, so cursor < queue.length
+  // means at least one task wasn't even claimed. (Tasks claimed but not
+  // completed when the slice deadline hit are extremely rare since we
+  // check the deadline before claiming, but to be safe we also let the
+  // next /advance re-detect undone pairs via geo_rankings absence.)
+  const sliceCompleted = cursor >= queue.length;
+  if (!sliceCompleted) {
+    logger.info(
+      {
+        runId: citationRun.id,
+        processed: cursor,
+        remaining: queue.length - cursor,
+      },
+      "citationChecker: slice deadline reached, deferring remainder",
+    );
+    return {
+      totalChecks: rankings.length,
+      totalCited,
+      rankings,
+      runId: citationRun.id,
+      done: false,
+    };
+  }
 
   // Finalize the run row with aggregate totals + per-platform breakdown.
   const totalChecks = rankings.length;
@@ -1101,7 +1163,7 @@ export async function runBrandPrompts(
     );
   }
 
-  return { totalChecks, totalCited, rankings, runId: citationRun.id };
+  return { totalChecks, totalCited, rankings, runId: citationRun.id, done: true };
 }
 
 // ---- Wave 9: async kickoff path ----------------------------------------
@@ -1175,27 +1237,92 @@ export async function kickoffBrandPromptsRun(
     }
   }
 
-  // Detach the heavy work. Errors are written to citation_runs.error_message
-  // so the UI can surface them on HistoryTab without losing the run record.
-  setImmediate(() => {
-    runBrandPrompts(brandId, platforms, {
-      ...options,
-      runId,
-    }).catch(async (err) => {
+  // On Render / local dev: detach so the kickoff response returns
+  // immediately and the run completes in the background.
+  // On Vercel: the lambda terminates shortly after the response, killing
+  // setImmediate work. Instead, run synchronously up to a deadline that
+  // keeps us inside the function timeout. If the run finishes within
+  // that window the kickoff returns done; if not, the run stays in
+  // 'running' state and the client's /advance polling drives it to
+  // completion.
+  if (process.env.VERCEL) {
+    // Leave 8s of headroom under the 60s function cap so the response
+    // can still flush.
+    const deadlineMs = Date.now() + 50_000;
+    try {
+      await runBrandPrompts(brandId, platforms, { ...options, runId, deadlineMs });
+    } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      logger.error({ err, brandId, runId }, "citation.run.detached_failed");
+      logger.error({ err, brandId, runId }, "citation.run.kickoff_inline_failed");
       try {
         await storage.updateCitationRun(runId, {
           status: "failed",
           progressPct: 100,
           completedAt: new Date(),
           errorMessage: msg.slice(0, 500),
-        } as any);
+        } as never);
       } catch (writeErr) {
         logger.error({ err: writeErr, runId }, "citation.run.failure_write_failed");
       }
+    }
+  } else {
+    setImmediate(() => {
+      runBrandPrompts(brandId, platforms, {
+        ...options,
+        runId,
+      }).catch(async (err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error({ err, brandId, runId }, "citation.run.detached_failed");
+        try {
+          await storage.updateCitationRun(runId, {
+            status: "failed",
+            progressPct: 100,
+            completedAt: new Date(),
+            errorMessage: msg.slice(0, 500),
+          } as never);
+        } catch (writeErr) {
+          logger.error({ err: writeErr, runId }, "citation.run.failure_write_failed");
+        }
+      });
     });
-  });
+  }
 
   return { ok: true, runId };
+}
+
+// Advance one slice of an in-progress citation run. Used by the client's
+// polling loop and the cron drain step. Resumes by querying existing
+// geo_rankings for the run and skipping completed pairs. Idempotent:
+// calling on an already-terminal run is a no-op.
+export async function advanceCitationRun(
+  runId: string,
+  deadlineMs: number,
+): Promise<{ done: boolean; status: string }> {
+  const run = await storage.getCitationRunById(runId);
+  if (!run) return { done: true, status: "missing" };
+  if (run.status !== "pending" && run.status !== "running") {
+    return { done: true, status: run.status };
+  }
+  try {
+    const result = await runBrandPrompts(run.brandId, undefined, {
+      runId,
+      resume: true,
+      deadlineMs,
+    });
+    return { done: result.done, status: result.done ? "succeeded" : "running" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ err, runId }, "citation.run.advance_failed");
+    try {
+      await storage.updateCitationRun(runId, {
+        status: "failed",
+        progressPct: 100,
+        completedAt: new Date(),
+        errorMessage: msg.slice(0, 500),
+      } as never);
+    } catch {
+      // best effort
+    }
+    return { done: true, status: "failed" };
+  }
 }

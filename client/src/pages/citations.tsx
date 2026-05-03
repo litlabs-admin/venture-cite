@@ -34,7 +34,6 @@ import HistoryTab from "@/components/citations/HistoryTab";
 import ScheduleTab from "@/components/citations/ScheduleTab";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
-import { getAccessToken } from "@/lib/authStore";
 
 export default function Citations() {
   const { toast } = useToast();
@@ -210,99 +209,101 @@ export default function Citations() {
     return () => clearTimeout(t);
   }, [pendingRunId, activeRuns]);
 
-  // SSE subscription. Runs only while a citation run is in flight for the
-  // selected brand. EventSource can't send Authorization headers so we
-  // pass the JWT in ?token= (server validates inline; the path is in
-  // SELF_AUTHED_PREFIXES so the global Bearer guard skips it).
-  //
-  // Wave 9 hardening:
-  //   - Refresh the access token before EVERY (re)connect via getAccessToken()
-  //     so long runs (>1h, the Supabase JWT lifetime) keep authenticating.
-  //   - Reconnect on `end {reason: "timeout"}` (the server's 5-min cap) if
-  //     the run is still active. Bounded retry to prevent runaway loops.
-  //   - Close the stream on `complete` too — previously only `end` closed it,
-  //     so a dropped `end` event leaked the EventSource until unmount.
+  // Vercel migration: SSE replaced by polling /citation-runs/state every
+  // ~1s while a run is active. The `since` cursor is a unix-ms timestamp
+  // tracked locally so the server only returns rankings created since the
+  // last poll. We invalidate the results query whenever new rankings
+  // arrive so the per-prompt accordion catches up.
   useEffect(() => {
     if (!selectedBrandId || !hasActive) return;
-    if (typeof EventSource === "undefined") return;
-    let es: EventSource | null = null;
     let cancelled = false;
-    let reconnectsLeft = 5;
+    let cursor = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const connect = async () => {
+    const tick = async () => {
       if (cancelled) return;
-      const token = await getAccessToken();
-      if (!token || cancelled) return;
-      const url = `/api/brands/${selectedBrandId}/citation-events?token=${encodeURIComponent(token)}`;
-      es = new EventSource(url);
-      es.addEventListener("progress", (ev) => {
-        try {
-          const d = JSON.parse((ev as MessageEvent).data);
-          setLiveProgress({
-            runId: d.runId,
-            progressPct: d.progressPct ?? 0,
-            totalChecks: d.totalChecks ?? 0,
-            totalCited: d.totalCited ?? 0,
-          });
-          // Wave 9.2: nudge the results query so the per-prompt
-          // accordion catches up alongside the banner. Without this,
-          // the LAST progress tick of a run can show 100% on the
-          // banner while the accordion still reads N-1/N for ~1s
-          // before the `complete` event fires the one-shot invalidate.
-          if (selectedBrandId) {
-            queryClient.invalidateQueries({
-              queryKey: [`/api/brand-prompts/${selectedBrandId}/results`],
+      try {
+        // Fire /advance and /state in parallel: /advance drives the run
+        // forward (server-side slice) while /state surfaces the latest
+        // progress to the UI. On Vercel the polling browser is the only
+        // thing pushing a long-running citation run to completion.
+        const stateResp = apiRequest(
+          "GET",
+          `/api/brands/${selectedBrandId}/citation-runs/state?since=${cursor}`,
+        );
+
+        const headlineRunId = liveProgress?.runId;
+        if (headlineRunId) {
+          // Fire-and-forget; the response shape is just {done, status}
+          // and we'll see the effects via the next /state poll.
+          apiRequest(
+            "POST",
+            `/api/brands/${selectedBrandId}/citation-runs/${headlineRunId}/advance`,
+            {},
+          ).catch(() => {});
+        }
+
+        const r = await stateResp;
+        const json = (await r.json()) as {
+          success: boolean;
+          data: {
+            runs: Array<{
+              runId: string;
+              status: string;
+              progressPct: number;
+              totalChecks: number;
+              totalCited: number;
+              citationRate: number;
+              rankings: Array<{
+                id: string;
+                aiPlatform: string;
+                isCited: boolean;
+                checkedAt: string;
+              }>;
+              done: boolean;
+            }>;
+            since: number;
+            hasActive: boolean;
+          };
+        };
+        if (json.success) {
+          cursor = json.data.since || cursor;
+          const headline = json.data.runs[0];
+          if (headline) {
+            setLiveProgress({
+              runId: headline.runId,
+              progressPct: headline.progressPct,
+              totalChecks: headline.totalChecks,
+              totalCited: headline.totalCited,
             });
+            const newRankings = json.data.runs.some((rn) => rn.rankings.length > 0);
+            if (newRankings && selectedBrandId) {
+              queryClient.invalidateQueries({
+                queryKey: [`/api/brand-prompts/${selectedBrandId}/results`],
+              });
+            }
+            if (headline.done) {
+              setLiveProgress(null);
+            }
           }
-        } catch {
-          // ignore malformed payload
+          if (!json.data.hasActive) {
+            setLiveProgress(null);
+            return; // stop polling
+          }
         }
-      });
-      es.addEventListener("ranking", () => {
-        // Per-row event — invalidate the results query so users see new
-        // rows trickle in. Cheap because the live-refresh hook is also
-        // running a 6s refetch as backup.
-        if (selectedBrandId) {
-          queryClient.invalidateQueries({
-            queryKey: [`/api/brand-prompts/${selectedBrandId}/results`],
-          });
-        }
-      });
-      es.addEventListener("complete", () => {
-        // Server marks the run terminal — clear local progress and close.
-        setLiveProgress(null);
-        if (es) {
-          es.close();
-          es = null;
-        }
-      });
-      es.addEventListener("end", (ev) => {
-        let reconnect = false;
-        try {
-          const d = JSON.parse((ev as MessageEvent).data);
-          reconnect = !!d?.reconnect;
-        } catch {
-          // ignore
-        }
-        if (es) {
-          es.close();
-          es = null;
-        }
-        // Reconnect if the server hit its 5-min cap and the run is still
-        // active. Bounded so a permanently-failing connect doesn't loop.
-        if (reconnect && !cancelled && reconnectsLeft > 0 && hasActive) {
-          reconnectsLeft -= 1;
-          void connect();
-        }
-      });
+      } catch {
+        // tolerate transient network errors
+      }
+      timer = setTimeout(tick, 1000);
     };
 
-    void connect();
+    tick();
 
     return () => {
       cancelled = true;
-      if (es) es.close();
+      if (timer) clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBrandId, hasActive]);
 
   // Pick the most recent in-flight run as the one we surface on screen.

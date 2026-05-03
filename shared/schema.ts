@@ -344,6 +344,14 @@ export const contentGenerationJobs = pgTable(
     streamBuffer: text("stream_buffer").default(""),
     errorKind: text("error_kind"), // 'budget'|'circuit'|'openai_5xx'|'openai_429'|'timeout'|'invalid_input'|'unknown'
     refundedAt: timestamp("refunded_at"),
+    // Vercel migration: per-call slice lock. /advance updates this when
+    // it claims the job for an 8s slice; concurrent advance calls bail.
+    lastAdvanceStartedAt: timestamp("last_advance_started_at"),
+    // Vercel migration: ID of the OpenAI Responses run executing this
+    // job. Set by the first /advance call; subsequent calls poll
+    // openai.responses.retrieve(openaiResponseId). Null on legacy jobs
+    // and on jobs not yet started.
+    openaiResponseId: text("openai_response_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     startedAt: timestamp("started_at"),
     completedAt: timestamp("completed_at"),

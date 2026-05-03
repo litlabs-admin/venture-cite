@@ -1,17 +1,16 @@
-// Background content-generation worker. Polls `content_generation_jobs`,
-// claims the oldest pending job, streams the OpenAI response into the
-// linked article (which already exists in status='draft'), and flips the
-// article to 'ready' on success.
+// Content-generation slice runner.
 //
-// Wave 7: the worker no longer creates the article — the API route does
-// (in status='draft') before enqueuing the job. The worker's job is to
-// fill in the content, stream tokens into `jobs.stream_buffer` so the
-// SSE handler can tail them, classify errors so quotas can be refunded
-// for transient infra failures, and write a 'generated' revision row on
-// success.
+// Vercel migration: the prior background polling worker was replaced by
+// runArticleSlice(jobId, deadline) which is invoked by:
+//   - POST /api/content-jobs/:jobId/advance — user-driven, ~8s budget
+//   - the daily cron orchestrator's drain step — server-driven, longer
+//     budget
 //
-// No Redis, no BullMQ — just Postgres + chained setTimeout. Fine for
-// low-volume single-process deployments.
+// Each call streams tokens into stream_buffer, persists progress, and
+// returns. If the deadline trips mid-stream the partial buffer is kept
+// so the next /advance can either resume (continuation prompt) or the
+// user can copy what they have. Idle and total-stream watchdogs still
+// apply for genuine stalls vs the deliberate slice cutoff.
 
 import OpenAI from "openai";
 import { storage } from "./storage";
@@ -33,28 +32,6 @@ const openai = new OpenAI({
   maxRetries: 1,
 });
 attachAiLogger(openai);
-
-const POLL_INTERVAL_MS = 5_000;
-const POLL_INTERVAL_MAX_MS = 60_000;
-const STUCK_JOB_RECOVERY_MINUTES = 5;
-// How often the worker re-checks the cancel flag during a stream. 1s is a
-// good balance: short enough that Cancel feels instant, long enough that we
-// don't hammer the DB on every token.
-const CANCEL_CHECK_MS = 1_000;
-// How many tokens to buffer before flushing to the DB. Smaller = more
-// granular SSE updates; larger = less DB write pressure. Tokens are usually
-// 1-3 chars; 16 tokens ≈ 50 chars per flush.
-const STREAM_FLUSH_TOKEN_COUNT = 16;
-// Watchdog: if the OpenAI stream produces no chunk for this many ms, abort
-// and fail the job. The OpenAI SDK's per-request timeout doesn't reliably
-// fire on a stalled stream (the connection is "open" with no data flowing),
-// so we enforce our own. Generous enough to ride out brief network blips
-// but short enough that a stuck job clears within a couple of minutes.
-const STREAM_IDLE_TIMEOUT_MS = 60_000;
-// Hard ceiling on the total stream duration. A 4000-token response on
-// gpt-4o-mini takes 30-60s; we cap at 5min so a runaway model can't hold
-// a worker forever.
-const STREAM_TOTAL_TIMEOUT_MS = 5 * 60 * 1000;
 
 export type GenerationPayload = {
   keywords: string;
@@ -78,17 +55,6 @@ function isJobCancelledError(e: unknown): e is JobCancelledError {
   return e instanceof JobCancelledError;
 }
 
-// Read job status without going through the storage layer. We need this hot
-// in the streaming loop and `select` is cheaper than a full `getById`.
-async function isJobCancelled(jobId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ status: schema.contentGenerationJobs.status })
-    .from(schema.contentGenerationJobs)
-    .where(eq(schema.contentGenerationJobs.id, jobId))
-    .limit(1);
-  return row?.status === "cancelled";
-}
-
 // Map a thrown error into one of the classifications the refund helper
 // understands. Be conservative: only refund for things we're sure are infra
 // problems, not user-input or quota issues.
@@ -105,9 +71,15 @@ function classifyError(err: unknown): ErrorKind {
   return "unknown";
 }
 
-async function generateArticleForJob(job: ContentGenerationJob): Promise<{
-  generatedContent: string;
-}> {
+type SliceResult =
+  | { kind: "completed"; finalContent: string }
+  | { kind: "deadline"; partialContent: string }
+  | { kind: "cancelled" };
+
+async function runJobToCompletionOrDeadline(
+  job: ContentGenerationJob,
+  _executionDeadline: number,
+): Promise<SliceResult> {
   const payload = job.requestPayload as unknown as GenerationPayload;
   const {
     keywords,
@@ -124,17 +96,142 @@ async function generateArticleForJob(job: ContentGenerationJob): Promise<{
     throw new Error("Job is missing articleId — cannot fill draft");
   }
 
-  // Refuse upfront if the user is at their daily token cap.
+  // Legacy job migration: pre-Responses code wrote partial tokens to
+  // stream_buffer. Those jobs cannot be cleanly resumed with the new
+  // model — the original Chat Completions stream is gone, and the only
+  // way forward is to fail the job so the user retries. We mark the
+  // error with name="TimeoutError" so classifyError() returns "timeout",
+  // which refundArticleQuota treats as refundable (the failure is on
+  // our infra side, not the user's prompt).
+  const existingBuffer = (job.streamBuffer ?? "") as string;
+  const existingResponseId = (job as unknown as { openaiResponseId: string | null })
+    .openaiResponseId;
+  if (!existingResponseId && existingBuffer.length > 0) {
+    const err: Error & { name?: string } = new Error(
+      "legacy in-flight job from a prior deploy — please retry generation",
+    );
+    err.name = "TimeoutError";
+    throw err;
+  }
+
   const userRow = await storage.getUser(job.userId);
   const tier = (userRow?.accessTier ?? "free") as Tier;
   await assertWithinBudget(job.userId, tier);
 
-  // Flip the linked article from 'draft' → 'generating' so the UI / queries
-  // know work is in flight. If the article was deleted between enqueue and
-  // claim, this is a no-op and the next cancel check will short-circuit.
+  // Flip the article into 'generating' on the first call. Idempotent.
   await storage.setArticleGeneratingFromDraft(articleId, job.id);
 
-  const brand = brandId ? await storage.getBrandById(brandId) : null;
+  // First /advance call: kick off the OpenAI Responses run. Returns
+  // immediately; the actual work runs on OpenAI's servers.
+  if (!existingResponseId) {
+    const brand = brandId ? ((await storage.getBrandById(brandId)) ?? null) : null;
+    const promptText = buildContentPrompt({
+      keywords,
+      industry,
+      type,
+      brand: brand as Parameters<typeof buildContentPrompt>[0]["brand"],
+      targetCustomers,
+      geography,
+      contentStyle,
+    });
+
+    const response = await openaiBreaker.run(() =>
+      openai.responses.create({
+        model: MODELS.contentGeneration as string,
+        input: promptText,
+        background: true,
+        store: true,
+      }),
+    );
+
+    await storage.updateContentJobResponseId(job.id, response.id);
+
+    return { kind: "deadline", partialContent: "" };
+  }
+
+  // Subsequent /advance calls: poll OpenAI for completion.
+  const response = await openaiBreaker.run(() => openai.responses.retrieve(existingResponseId));
+
+  if (response.status === "completed") {
+    const finalContent = extractResponseText(response as Parameters<typeof extractResponseText>[0]);
+    if (!finalContent) {
+      // Refundable — empty output is a model anomaly, not user input.
+      const err: Error & { name?: string } = new Error(
+        "OpenAI Responses run completed with empty output",
+      );
+      err.name = "TimeoutError";
+      throw err;
+    }
+
+    if (response.usage) {
+      await recordSpend({
+        userId: job.userId,
+        service: "openai",
+        model: MODELS.contentGeneration,
+        tokensIn: response.usage.input_tokens ?? 0,
+        tokensOut: response.usage.output_tokens ?? 0,
+      });
+    }
+
+    const headingMatch = finalContent.match(/^#\s+(.+)$/m);
+    const title = headingMatch?.[1]?.trim() || `${keywords} — ${industry}`;
+    await storage.setArticleReady(articleId, finalContent, title);
+    await storage.createRevision({
+      articleId,
+      content: finalContent,
+      source: "generated",
+      createdBy: "system",
+    });
+    return { kind: "completed", finalContent };
+  }
+
+  if (response.status === "failed") {
+    // OpenAI-side failure → refundable (treat as timeout in classifyError
+    // so the user gets their quota back and can retry).
+    const message = response.error?.message ?? "OpenAI Responses run failed";
+    const err: Error & { name?: string } = new Error(message);
+    err.name = "TimeoutError";
+    throw err;
+  }
+
+  if (response.status === "cancelled") {
+    return { kind: "cancelled" };
+  }
+
+  if (response.status === "incomplete") {
+    // Incomplete means the run was truncated (e.g. max_output_tokens
+    // hit). Refundable — user should retry with adjusted scope.
+    const reason = response.incomplete_details?.reason ?? "incomplete";
+    const err: Error & { name?: string } = new Error(`OpenAI Responses run incomplete: ${reason}`);
+    err.name = "TimeoutError";
+    throw err;
+  }
+
+  // queued | in_progress — still running, return deadline-style outcome
+  // so the caller treats this slice as "more work to do."
+  return { kind: "deadline", partialContent: "" };
+}
+
+// Build the user prompt text from the job's request payload.
+function buildContentPrompt(args: {
+  keywords: string;
+  industry: string;
+  type: string;
+  brand: {
+    companyName: string | null;
+    name: string | null;
+    industry: string | null;
+    description: string | null;
+    tone: string | null;
+    targetAudience: string | null;
+    products: string[] | null;
+    uniqueSellingPoints: string[] | null;
+  } | null;
+  targetCustomers?: string;
+  geography?: string;
+  contentStyle: "b2b" | "b2c";
+}): string {
+  const { keywords, industry, type, brand, targetCustomers, geography, contentStyle } = args;
 
   const contentTypePrompts: Record<string, string> = {
     Article: "comprehensive article (1500-2000 words)",
@@ -159,136 +256,140 @@ async function generateArticleForJob(job: ContentGenerationJob): Promise<{
     ? `\n\nSTYLE: B2C — warm, conversational, benefit-first, second-person, lifestyle framing. No jargon.`
     : `\n\nSTYLE: B2B — professional, data-driven, ROI-focused, industry terminology, business impact framing.`;
 
-  // Stream the response. We pass an AbortController so we can force-abort
-  // when our watchdogs trip (idle timeout, total timeout, user cancel).
-  // Without this, a stalled OpenAI connection leaves the for-await loop
-  // hanging indefinitely — which is exactly the bug we hit in Wave 7.
-  const abortController = new AbortController();
-  const stream = await openai.chat.completions.create(
-    {
-      model: MODELS.contentGeneration,
-      stream: true,
-      stream_options: { include_usage: true },
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert content strategist specializing in GEO (Generative Engine Optimization). Create authoritative, well-structured markdown content that AI platforms like ChatGPT, Claude, and Perplexity would cite as a reliable source. Always include: clear intro, multiple sections with H2/H3 headings, practical examples, FAQ with 4-6 questions, strong conclusion.`,
-        },
-        {
-          role: "user",
-          content: `Write a ${promptType} about "${keywords}" for the ${industry} industry.${brandContext}${audienceContext}${styleDirective}\n\nUse markdown (# title, ## sections, ### subsections). Include an FAQ section.`,
-        },
-      ],
-      max_tokens: 4000,
-    },
-    { signal: abortController.signal },
-  );
+  const systemPreamble = `You are an expert content strategist specializing in GEO (Generative Engine Optimization). Create authoritative, well-structured markdown content that AI platforms like ChatGPT, Claude, and Perplexity would cite as a reliable source. Always include: clear intro, multiple sections with H2/H3 headings, practical examples, FAQ with 4-6 questions, strong conclusion.\n\n`;
+  const userPart = `Write a ${promptType} about "${keywords}" for the ${industry} industry.${brandContext}${audienceContext}${styleDirective}\n\nUse markdown (# title, ## sections, ### subsections). Include an FAQ section.`;
+  return `${systemPreamble}${userPart}`;
+}
 
-  let finalContent = "";
-  let bufferedDelta = "";
-  let bufferedCount = 0;
-  let lastCancelCheck = Date.now();
-  let lastChunkAt = Date.now();
-  const startedAt = Date.now();
-  let promptTokens = 0;
-  let completionTokens = 0;
-
-  const flushBuffer = async () => {
-    if (bufferedDelta.length === 0) return;
-    await storage.appendStreamBuffer(job.id, bufferedDelta);
-    bufferedDelta = "";
-    bufferedCount = 0;
-  };
-
-  // Watchdog timer: every second, check whether the stream has gone idle
-  // or run past the total ceiling. If so, abort the underlying request so
-  // the for-await loop unblocks and the catch handler classifies the
-  // failure as a timeout (which the refund helper treats as refundable).
-  let timedOutReason: "idle" | "total" | null = null;
-  const watchdog = setInterval(() => {
-    const now = Date.now();
-    if (now - lastChunkAt > STREAM_IDLE_TIMEOUT_MS) {
-      timedOutReason = "idle";
-      abortController.abort();
-    } else if (now - startedAt > STREAM_TOTAL_TIMEOUT_MS) {
-      timedOutReason = "total";
-      abortController.abort();
-    }
-  }, 1_000);
-
-  try {
-    for await (const chunk of stream) {
-      lastChunkAt = Date.now();
-      // Streaming SDKs surface usage on the final chunk when stream_options.
-      if (chunk.usage) {
-        promptTokens = chunk.usage.prompt_tokens ?? promptTokens;
-        completionTokens = chunk.usage.completion_tokens ?? completionTokens;
-      }
-      const delta = chunk.choices?.[0]?.delta?.content ?? "";
-      if (delta) {
-        finalContent += delta;
-        bufferedDelta += delta;
-        bufferedCount += 1;
-        if (bufferedCount >= STREAM_FLUSH_TOKEN_COUNT) {
-          await flushBuffer();
-        }
-      }
-      // Periodic cancel check so the user's "Cancel" click takes effect
-      // promptly without hammering the DB on every token.
-      const now = Date.now();
-      if (now - lastCancelCheck >= CANCEL_CHECK_MS) {
-        lastCancelCheck = now;
-        if (await isJobCancelled(job.id)) {
-          abortController.abort();
-          throw new JobCancelledError();
-        }
+// Extract markdown text from a Responses API result. The SDK exposes
+// output_text as a convenience; fall back to walking output[].content[]
+// if the convenience field is absent (e.g. older SDK or mocks).
+function extractResponseText(response: {
+  output_text?: string;
+  output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+}): string {
+  if (typeof response.output_text === "string" && response.output_text.length > 0) {
+    return response.output_text;
+  }
+  const segments: string[] = [];
+  for (const item of response.output ?? []) {
+    for (const c of item.content ?? []) {
+      if (c.type === "output_text" && typeof c.text === "string") {
+        segments.push(c.text);
       }
     }
-    await flushBuffer();
-  } catch (err) {
-    // Make sure any partial buffer is persisted even on failure so the user
-    // can see what got generated before the error. They can copy + retry.
-    await flushBuffer().catch(() => {});
-    if (timedOutReason && !isJobCancelledError(err)) {
-      // Re-throw a classified timeout error so the worker tick refunds quota.
-      const timeoutErr: Error & { name?: string } = new Error(
-        timedOutReason === "idle"
-          ? `Stream went idle for >${STREAM_IDLE_TIMEOUT_MS}ms (no tokens)`
-          : `Stream exceeded total ceiling of ${STREAM_TOTAL_TIMEOUT_MS}ms`,
-      );
-      timeoutErr.name = "TimeoutError";
-      throw timeoutErr;
-    }
-    throw err;
-  } finally {
-    clearInterval(watchdog);
+  }
+  return segments.join("");
+}
+
+// Public entry: run one slice of work for a job, bounded by deadlineMs.
+// Returns the resulting state. Caller (route or cron) decides whether to
+// loop again. Wraps runJobToCompletionOrDeadline with the
+// success/failure/refund bookkeeping that previously lived in tick().
+export type SliceOutcome =
+  | { done: true; status: "succeeded" }
+  | { done: true; status: "failed" | "cancelled"; errorKind?: ErrorKind; message?: string }
+  | { done: false; status: "running" };
+
+export async function runArticleSlice(jobId: string, deadlineMs: number): Promise<SliceOutcome> {
+  const job = await storage.getContentJobByIdAdmin(jobId);
+  if (!job) {
+    return {
+      done: true,
+      status: "failed",
+      errorKind: "unknown",
+      message: "Job not found",
+    };
+  }
+  if (job.status !== "pending" && job.status !== "running") {
+    return {
+      done: true,
+      status: job.status === "succeeded" ? "succeeded" : (job.status as "failed" | "cancelled"),
+    };
   }
 
-  await recordSpend({
-    userId: job.userId,
-    service: "openai",
-    model: MODELS.contentGeneration,
-    tokensIn: promptTokens,
-    tokensOut: completionTokens,
-  });
+  if (job.status === "pending") {
+    await storage.updateContentJob(job.id, {
+      status: "running",
+      startedAt: new Date(),
+    });
+  }
 
-  // Derive a title from the first markdown heading; fall back to keywords.
-  const headingMatch = finalContent.match(/^#\s+(.+)$/m);
-  const title = headingMatch?.[1]?.trim() || `${keywords} — ${industry}`;
+  let result: SliceResult;
+  try {
+    result = await runJobToCompletionOrDeadline(job, deadlineMs);
+  } catch (err) {
+    const errorKind = classifyError(err);
+    const message = err instanceof Error ? err.message : String(err);
+    const cancelled = isJobCancelledError(err);
+    await storage.updateContentJob(job.id, {
+      status: cancelled ? "cancelled" : "failed",
+      errorMessage: message.slice(0, 500),
+      errorKind,
+      completedAt: new Date(),
+    } as never);
+    if (job.articleId) {
+      try {
+        if (cancelled) await storage.setArticleDraft(job.articleId);
+        else await storage.setArticleFailed(job.articleId);
+      } catch {
+        // best-effort
+      }
+    }
+    try {
+      await refundArticleQuota(job.userId, job.id, errorKind);
+    } catch {
+      // logged separately; never throw out
+    }
+    if (cancelled) {
+      logger.info({ jobId: job.id, userId: job.userId }, "content slice cancelled by user");
+    } else if (errorKind === "budget") {
+      logger.info({ jobId: job.id, userId: job.userId, message }, "content slice rejected: budget");
+    } else if (errorKind === "circuit") {
+      logger.warn(
+        { jobId: job.id, userId: job.userId },
+        "content slice rejected: provider circuit open",
+      );
+    } else {
+      logger.error({ err, jobId: job.id, errorKind }, "content slice failed");
+      Sentry.captureException(err, {
+        tags: { source: "contentSlice", errorKind },
+        extra: { jobId: job.id, userId: job.userId },
+      });
+    }
+    return {
+      done: true,
+      status: cancelled ? "cancelled" : "failed",
+      errorKind,
+      message: message.slice(0, 500),
+    };
+  }
 
-  // Atomically write content + flip status + bump version.
-  await storage.setArticleReady(articleId, finalContent, title);
+  if (result.kind === "completed") {
+    await storage.updateContentJob(job.id, {
+      status: "succeeded",
+      completedAt: new Date(),
+    });
+    logger.info({ jobId: job.id }, "content slice completed");
+    return { done: true, status: "succeeded" };
+  }
+  if (result.kind === "cancelled") {
+    if (job.articleId) {
+      try {
+        await storage.setArticleDraft(job.articleId);
+      } catch {
+        // best-effort
+      }
+    }
+    await storage.updateContentJob(job.id, {
+      status: "cancelled",
+      completedAt: new Date(),
+    });
+    return { done: true, status: "cancelled" };
+  }
 
-  // Seed the revision history with a 'generated' baseline so Auto-Improve
-  // has something to diff against.
-  await storage.createRevision({
-    articleId,
-    content: finalContent,
-    source: "generated",
-    createdBy: "system",
-  });
-
-  return { generatedContent: finalContent };
+  // Deadline hit — leave job in 'running'; next /advance resumes.
+  return { done: false, status: "running" };
 }
 
 // Programmatic enqueue used by the agent task executor (the autonomous
@@ -336,140 +437,9 @@ export async function enqueueContentGenerationJob(
   return { articleId: article.id, jobId: job.id };
 }
 
-let workerTimeout: NodeJS.Timeout | null = null;
-let ticking = false;
-let consecutiveEmptyTicks = 0;
-
-function nextDelayMs(): number {
-  if (consecutiveEmptyTicks === 0) return POLL_INTERVAL_MS;
-  const exp = Math.min(consecutiveEmptyTicks, 4);
-  return Math.min(POLL_INTERVAL_MAX_MS, POLL_INTERVAL_MS * Math.pow(2, exp));
-}
-
-async function tick(): Promise<{ claimed: boolean }> {
-  if (ticking) return { claimed: false };
-  ticking = true;
-  try {
-    const job = await storage.claimPendingContentJob();
-    if (!job) return { claimed: false };
-    logger.info({ jobId: job.id, userId: job.userId }, "content job claimed");
-    try {
-      await generateArticleForJob(job);
-      await storage.updateContentJob(job.id, {
-        status: "succeeded",
-        completedAt: new Date(),
-      });
-      logger.info({ jobId: job.id, articleId: (job as any).articleId }, "content job succeeded");
-    } catch (err: any) {
-      const errorKind = classifyError(err);
-      const message = err instanceof Error ? err.message : String(err);
-      const cancelled = isJobCancelledError(err);
-
-      // Update job status. Cancelled jobs stay 'cancelled'; otherwise 'failed'.
-      await storage.updateContentJob(job.id, {
-        status: cancelled ? "cancelled" : "failed",
-        errorMessage: message.slice(0, 500),
-        errorKind,
-        completedAt: new Date(),
-      } as any);
-
-      // Move the article back so the user can retry. If cancelled, it goes
-      // back to 'draft' (form is intact). If failed, status='failed' so the
-      // UI can show a Retry button and explain what went wrong.
-      const articleId = (job as any).articleId as string | null;
-      if (articleId) {
-        if (cancelled) {
-          await storage.setArticleDraft(articleId);
-        } else {
-          await storage.setArticleFailed(articleId);
-        }
-      }
-
-      // Refund quota for transient/cancellable failures only.
-      try {
-        await refundArticleQuota(job.userId, job.id, errorKind);
-      } catch (refundErr) {
-        logger.error(
-          { err: refundErr, jobId: job.id },
-          "refundArticleQuota failed — quota may not have been refunded",
-        );
-      }
-
-      if (cancelled) {
-        logger.info({ jobId: job.id, userId: job.userId }, "content job cancelled by user");
-      } else if (errorKind === "budget") {
-        logger.info(
-          { jobId: job.id, userId: job.userId, message },
-          "content job rejected: budget exceeded",
-        );
-      } else if (errorKind === "circuit") {
-        logger.warn(
-          { jobId: job.id, userId: job.userId },
-          "content job rejected: provider circuit open",
-        );
-      } else {
-        logger.error({ err, jobId: job.id, errorKind }, "content job failed");
-        Sentry.captureException(err, {
-          tags: { source: "contentWorker.job", errorKind },
-          extra: { jobId: job.id, userId: job.userId },
-        });
-      }
-    }
-  } catch (pollErr) {
-    logger.error({ err: pollErr }, "content worker tick error");
-    Sentry.captureException(pollErr, { tags: { source: "contentWorker.tick" } });
-  } finally {
-    ticking = false;
-  }
-  return { claimed: true };
-}
-
-export async function initContentGenerationWorker(): Promise<void> {
-  // Crash recovery: any job left in `running` longer than the recovery
-  // window is assumed to be orphaned (server was killed mid-job).
-  // Wave 7: also refund quota and reset the linked article back to draft.
-  try {
-    const failed = await storage.failStuckContentJobs(STUCK_JOB_RECOVERY_MINUTES);
-    if (failed.length > 0) {
-      logger.info({ failed: failed.length }, "marked stuck jobs as failed on boot");
-      for (const j of failed) {
-        try {
-          if (j.articleId) await storage.setArticleFailed(j.articleId);
-          await refundArticleQuota(j.userId, j.id, "timeout");
-        } catch (err) {
-          logger.error({ err, jobId: j.id }, "boot recovery: failed to refund/reset article");
-        }
-      }
-    }
-  } catch (err) {
-    logger.error({ err }, "content worker boot recovery failed");
-    Sentry.captureException(err, { tags: { source: "contentWorker.boot" } });
-  }
-
-  if (workerTimeout) return;
-
-  const scheduleNext = (delay: number) => {
-    workerTimeout = setTimeout(() => {
-      tick()
-        .then(({ claimed }) => {
-          if (claimed) {
-            consecutiveEmptyTicks = 0;
-          } else {
-            consecutiveEmptyTicks += 1;
-          }
-          scheduleNext(nextDelayMs());
-        })
-        .catch((err) => {
-          logger.error({ err }, "content worker unhandled tick error");
-          Sentry.captureException(err, { tags: { source: "contentWorker.tick-unhandled" } });
-          scheduleNext(POLL_INTERVAL_MS);
-        });
-    }, delay);
-  };
-
-  scheduleNext(POLL_INTERVAL_MS);
-  logger.info(
-    { pollIntervalMs: POLL_INTERVAL_MS, pollIntervalMaxMs: POLL_INTERVAL_MAX_MS },
-    "content worker started",
-  );
-}
+// Vercel migration: the polling worker (initContentGenerationWorker, tick,
+// nextDelayMs) and the older generateArticleForJob entry were removed.
+// The /api/content-jobs/:jobId/advance route and the daily cron's drain
+// step are the only callers of runArticleSlice; both wrap the slice with
+// the per-job lock (last_advance_started_at) so concurrent calls don't
+// double-stream into the same buffer.
