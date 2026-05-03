@@ -1,13 +1,16 @@
 // tests/unit/bufferConnect.test.ts
 //
 // Coverage for POST /api/buffer/connect and DELETE /api/buffer/connection.
-// The legacy OAuth routes (GET /api/auth/buffer + callback) are deleted
-// in this same change; we don't test them because they no longer exist.
+// Connect validates against Buffer's GraphQL endpoint
+// (https://api.buffer.com) by issuing a `{ account { id } }` query and
+// requires both a 200 response AND a non-null `data.account.id` to
+// consider the key valid. UNAUTHORIZED extensions codes inside a 200
+// response also count as invalid.
 //
 // Strategy: build a minimal Express app, mount the buffer routes against
-// a stub `req.user`, mock the database update + Buffer's /user.json, and
-// drive the route via a manual request/response shim (same pattern used
-// in tests/unit/cronOrchestrator.test.ts so vitest's module mocks behave).
+// a stub `req.user`, mock the database update + Buffer fetch, and drive
+// the route via a manual request/response shim (same pattern used in
+// tests/unit/cronOrchestrator.test.ts so vitest's module mocks behave).
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import express from "express";
 
@@ -121,18 +124,30 @@ describe("buffer connect endpoint", () => {
   });
 
   it("POST /api/buffer/connect persists encrypted token when Buffer validates the token", async () => {
-    fetchStub.mockResolvedValueOnce({ ok: true, status: 200 } as any);
+    fetchStub.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { account: { id: "acc_123" } } }),
+    } as any);
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/buffer/connect", {
-      accessToken: "1/abcdef",
+      accessToken: "buf_abcdef",
     });
     expect(status).toBe(200);
     expect(body).toEqual({ success: true });
+    // GraphQL POST to https://api.buffer.com with Bearer auth.
     expect(fetchStub).toHaveBeenCalledWith(
-      expect.stringContaining("https://api.bufferapp.com/1/user.json?access_token=1%2Fabcdef"),
+      "https://api.buffer.com",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer buf_abcdef",
+          "Content-Type": "application/json",
+        }),
+      }),
     );
     // The .set() chain receives the encrypted token (our stub prefixes with enc:v1:).
-    expect(dbStubs.set).toHaveBeenCalledWith({ bufferAccessToken: "enc:v1:1/abcdef" });
+    expect(dbStubs.set).toHaveBeenCalledWith({ bufferAccessToken: "enc:v1:buf_abcdef" });
   });
 
   it("POST /api/buffer/connect returns 400 missing_token for empty body", async () => {
@@ -155,7 +170,11 @@ describe("buffer connect endpoint", () => {
   });
 
   it("POST /api/buffer/connect returns 400 invalid_token when Buffer responds 401", async () => {
-    fetchStub.mockResolvedValueOnce({ ok: false, status: 401 } as any);
+    fetchStub.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({}),
+    } as any);
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/buffer/connect", {
       accessToken: "bad-token",
@@ -165,11 +184,51 @@ describe("buffer connect endpoint", () => {
     expect(dbStubs.set).not.toHaveBeenCalled();
   });
 
-  it("POST /api/buffer/connect returns 502 buffer_unreachable on Buffer 5xx", async () => {
-    fetchStub.mockResolvedValueOnce({ ok: false, status: 503 } as any);
+  it("POST /api/buffer/connect returns 400 invalid_token when GraphQL response carries UNAUTHORIZED", async () => {
+    // Buffer's GraphQL API returns HTTP 200 with errors[].extensions.code
+    // for credential failures. The route must treat that as invalid_token,
+    // not buffer_unreachable.
+    fetchStub.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        errors: [{ message: "Not authorized", extensions: { code: "UNAUTHORIZED" } }],
+      }),
+    } as any);
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/buffer/connect", {
-      accessToken: "1/whatever",
+      accessToken: "wrong-key",
+    });
+    expect(status).toBe(400);
+    expect(body).toEqual({ success: false, error: "invalid_token" });
+    expect(dbStubs.set).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/buffer/connect returns 502 buffer_unreachable on Buffer 5xx", async () => {
+    fetchStub.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: async () => ({}),
+    } as any);
+    const app = buildApp();
+    const { status, body } = await call(app, "POST", "/api/buffer/connect", {
+      accessToken: "buf_whatever",
+    });
+    expect(status).toBe(502);
+    expect(body).toEqual({ success: false, error: "buffer_unreachable" });
+    expect(dbStubs.set).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/buffer/connect returns 502 buffer_unreachable when GraphQL succeeds but data.account is missing", async () => {
+    // 200 OK with no data — treat as buffer_unreachable, not silent success.
+    fetchStub.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { account: null } }),
+    } as any);
+    const app = buildApp();
+    const { status, body } = await call(app, "POST", "/api/buffer/connect", {
+      accessToken: "buf_whatever",
     });
     expect(status).toBe(502);
     expect(body).toEqual({ success: false, error: "buffer_unreachable" });
@@ -180,7 +239,7 @@ describe("buffer connect endpoint", () => {
     fetchStub.mockRejectedValueOnce(new Error("ECONNRESET"));
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/buffer/connect", {
-      accessToken: "1/whatever",
+      accessToken: "buf_whatever",
     });
     expect(status).toBe(502);
     expect(body).toEqual({ success: false, error: "buffer_unreachable" });

@@ -68,8 +68,8 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
   const bufferProfiles = bufferData?.data ?? [];
 
   const postToBufferMutation = useMutation({
-    mutationFn: async ({ text, profileIds }: { text: string; profileIds: string[] }) => {
-      const response = await apiRequest("POST", "/api/buffer/post", { text, profileIds });
+    mutationFn: async ({ text, channelId }: { text: string; channelId: string }) => {
+      const response = await apiRequest("POST", "/api/buffer/post", { text, channelId });
       return response.json();
     },
     onSuccess: () =>
@@ -212,7 +212,7 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
                   variant="default"
                   size="sm"
                   onClick={() =>
-                    postToBufferMutation.mutate({ text: content, profileIds: [match.id] })
+                    postToBufferMutation.mutate({ text: content, channelId: match.id })
                   }
                   disabled={postToBufferMutation.isPending}
                   data-testid={`button-buffer-${platform.toLowerCase()}`}

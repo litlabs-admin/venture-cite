@@ -1,16 +1,17 @@
 // Buffer (social publishing) integration routes — bring-your-own-key.
 //
-// Users generate an access token in Buffer's developer dashboard
-// (https://buffer.com/developers/api), paste it into the Connect dialog,
-// and we validate + persist it AES-256-GCM encrypted via tokenCipher.
-// No platform-owned OAuth app, no client_id / client_secret, no
-// callback URL.
+// Buffer's classic v1 REST API (api.bufferapp.com/1/) was retired in
+// favor of a single GraphQL endpoint at https://api.buffer.com. Users
+// generate an API key in their account settings
+// (https://publish.buffer.com/settings/api), paste it into the Connect
+// dialog, and we validate + persist it AES-256-GCM encrypted via
+// tokenCipher. No OAuth, no client_id, no callback URL.
 //
 // Routes:
-//   POST   /api/buffer/connect       — validate + persist a user-supplied token
-//   GET    /api/buffer/profiles      — list connected social profiles
-//   POST   /api/buffer/post          — schedule / publish a post
-//   DELETE /api/buffer/connection    — clear the stored token
+//   POST   /api/buffer/connect       — validate + persist a user-supplied key
+//   GET    /api/buffer/profiles      — list connected channels (formerly profiles)
+//   POST   /api/buffer/post          — schedule one post on one channel
+//   DELETE /api/buffer/connection    — clear the stored key
 
 import type { Express } from "express";
 import { eq } from "drizzle-orm";
@@ -20,11 +21,57 @@ import { requireUser } from "../lib/ownership";
 import { encryptToken, decryptToken } from "../lib/tokenCipher";
 import { sendError } from "../lib/routesShared";
 
+const BUFFER_GRAPHQL_ENDPOINT = "https://api.buffer.com";
+
+// One-shot helper around Buffer's GraphQL endpoint. Returns the parsed
+// JSON body and the raw Response so callers can branch on status (401 →
+// invalid_token) and on `errors[]` (UNAUTHORIZED in the extensions code
+// is also a credential failure). Throws on network errors so callers can
+// distinguish "Buffer rejected" from "couldn't reach Buffer".
+async function bufferGraphQL<T>(
+  accessToken: string,
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<{
+  resp: Response;
+  body: { data?: T; errors?: Array<{ message: string; extensions?: { code?: string } }> };
+}> {
+  const resp = await fetch(BUFFER_GRAPHQL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, ...(variables ? { variables } : {}) }),
+  });
+  let body: any;
+  try {
+    body = await resp.json();
+  } catch {
+    body = {};
+  }
+  return { resp, body };
+}
+
+// "twitter" → "Twitter", "google_business" → "Google Business". Buffer's
+// v1 REST API used to surface a `formatted_service` field; the GraphQL
+// API only exposes the lowercase `service` slug, but the existing
+// frontend matcher (DistributeDialog) keys off both. Synthesize it.
+function formatService(service: string): string {
+  if (!service) return "";
+  return service
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function setupBufferRoutes(app: Express): void {
-  // Validate a user-supplied Buffer access token by calling Buffer's
-  // /user.json (cheapest authenticated endpoint). If it succeeds, encrypt
-  // and store the token. If Buffer says 401, surface invalid_token so the
-  // UI can prompt the user to re-check the token they pasted.
+  // Validate a user-supplied Buffer API key by issuing a minimal account
+  // query against the GraphQL endpoint. A successful response with a
+  // non-null `account.id` confirms the key works. 401 or an
+  // UNAUTHORIZED extensions code → invalid_token. Network failure or
+  // other 5xx → buffer_unreachable.
   app.post("/api/buffer/connect", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -34,18 +81,25 @@ export function setupBufferRoutes(app: Express): void {
         return res.status(400).json({ success: false, error: "missing_token" });
       }
 
-      let bufferResp: Response;
+      let result: Awaited<ReturnType<typeof bufferGraphQL<{ account: { id: string } | null }>>>;
       try {
-        bufferResp = await fetch(
-          `https://api.bufferapp.com/1/user.json?access_token=${encodeURIComponent(accessToken)}`,
+        result = await bufferGraphQL<{ account: { id: string } | null }>(
+          accessToken,
+          "{ account { id } }",
         );
       } catch {
         return res.status(502).json({ success: false, error: "buffer_unreachable" });
       }
-      if (bufferResp.status === 401) {
+      if (result.resp.status === 401) {
         return res.status(400).json({ success: false, error: "invalid_token" });
       }
-      if (!bufferResp.ok) {
+      const unauthorizedError = result.body.errors?.find(
+        (e) => e.extensions?.code === "UNAUTHORIZED" || e.extensions?.code === "FORBIDDEN",
+      );
+      if (unauthorizedError) {
+        return res.status(400).json({ success: false, error: "invalid_token" });
+      }
+      if (!result.resp.ok || !result.body.data?.account?.id) {
         return res.status(502).json({ success: false, error: "buffer_unreachable" });
       }
 
@@ -59,8 +113,11 @@ export function setupBufferRoutes(app: Express): void {
     }
   });
 
-  // Existing endpoints — unchanged from the OAuth-era implementation,
-  // re-pasted here because we are replacing the file wholesale.
+  // Lists connected channels (Buffer's GraphQL successor to "profiles")
+  // across every organization the API key can see. The response shape
+  // intentionally mirrors the legacy REST mapping (id / service /
+  // formattedService / username / avatar) so the existing
+  // DistributeDialog matcher keeps working without UI changes.
   app.get("/api/buffer/profiles", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -73,37 +130,77 @@ export function setupBufferRoutes(app: Express): void {
         return res.status(200).json({ success: true, connected: false, data: [] });
       }
       const accessToken = decryptToken(row.token);
-      const resp = await fetch(
-        `https://api.bufferapp.com/1/profiles.json?access_token=${encodeURIComponent(accessToken)}`,
-      );
-      if (!resp.ok) {
+
+      let orgsResult;
+      try {
+        orgsResult = await bufferGraphQL<{
+          account: { organizations: Array<{ id: string }> } | null;
+        }>(accessToken, "{ account { organizations { id } } }");
+      } catch {
         return res.status(502).json({ success: false, error: "Failed to fetch Buffer profiles" });
       }
-      const profiles = (await resp.json()) as any[];
-      const mapped = Array.isArray(profiles)
-        ? profiles.map((p) => ({
-            id: p.id,
-            service: p.service,
-            formattedService: p.formatted_service,
-            username: p.formatted_username || p.service_username,
-            avatar: p.avatar,
-          }))
-        : [];
-      res.json({ success: true, connected: true, data: mapped });
+      if (!orgsResult.resp.ok || !orgsResult.body.data?.account) {
+        return res.status(502).json({ success: false, error: "Failed to fetch Buffer profiles" });
+      }
+      const organizations = orgsResult.body.data.account.organizations ?? [];
+
+      const channels: Array<{
+        id: string;
+        service: string;
+        formattedService: string;
+        username: string;
+        avatar: string | null;
+      }> = [];
+      for (const org of organizations) {
+        let chResult;
+        try {
+          chResult = await bufferGraphQL<{
+            channels: Array<{
+              id: string;
+              name: string | null;
+              service: string;
+              avatar: string | null;
+            }>;
+          }>(
+            accessToken,
+            `query GetChannels($input: ChannelsInput!) { channels(input: $input) { id name service avatar } }`,
+            { input: { organizationId: org.id } },
+          );
+        } catch {
+          continue;
+        }
+        if (!chResult.resp.ok || !chResult.body.data?.channels) continue;
+        for (const ch of chResult.body.data.channels) {
+          channels.push({
+            id: ch.id,
+            service: ch.service,
+            formattedService: formatService(ch.service),
+            username: ch.name ?? "",
+            avatar: ch.avatar ?? null,
+          });
+        }
+      }
+
+      res.json({ success: true, connected: true, data: channels });
     } catch (error) {
       sendError(res, error, "Failed to fetch Buffer profiles");
     }
   });
 
+  // Schedule one post on one channel. The legacy REST API took
+  // `profile_ids[]` and fanned out server-side; Buffer's GraphQL
+  // `createPost` mutation is per-channel, so callers post once per
+  // channel. `scheduledAt` (ISO 8601) → `mode: customScheduled` with a
+  // `dueAt`; omit it for `mode: addToQueue`.
   app.post("/api/buffer/post", async (req, res) => {
     try {
       const user = requireUser(req);
-      const { text, profileIds, scheduledAt } = req.body ?? {};
+      const { text, channelId, scheduledAt } = req.body ?? {};
       if (!text || typeof text !== "string") {
         return res.status(400).json({ success: false, error: "text is required" });
       }
-      if (!Array.isArray(profileIds) || profileIds.length === 0) {
-        return res.status(400).json({ success: false, error: "profileIds is required" });
+      if (!channelId || typeof channelId !== "string") {
+        return res.status(400).json({ success: false, error: "channelId is required" });
       }
       const [row] = await db
         .select({ token: users.bufferAccessToken })
@@ -116,23 +213,51 @@ export function setupBufferRoutes(app: Express): void {
           .json({ success: false, error: "Buffer is not connected. Connect it first." });
       }
       const accessToken = decryptToken(row.token);
-      const form = new URLSearchParams();
-      form.set("text", text);
-      for (const pid of profileIds) form.append("profile_ids[]", String(pid));
-      if (scheduledAt) form.set("scheduled_at", new Date(scheduledAt).toISOString());
-      form.set("access_token", accessToken);
-      const resp = await fetch("https://api.bufferapp.com/1/updates/create.json", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: form.toString(),
-      });
-      const data = await resp.json();
-      if (!resp.ok || (data as any)?.success === false) {
-        return res
-          .status(502)
-          .json({ success: false, error: (data as any)?.message || "Buffer post failed" });
+
+      const variables: Record<string, unknown> = {
+        input: {
+          channelId,
+          text,
+          schedulingType: "automatic",
+          ...(scheduledAt
+            ? { mode: "customScheduled", dueAt: new Date(scheduledAt).toISOString() }
+            : { mode: "addToQueue" }),
+        },
+      };
+      const mutation = `
+        mutation CreatePost($input: CreatePostInput!) {
+          createPost(input: $input) {
+            ... on PostActionSuccess { post { id text dueAt } }
+            ... on MutationError { message }
+          }
+        }
+      `;
+
+      let result;
+      try {
+        result = await bufferGraphQL<{
+          createPost:
+            | { post: { id: string; text: string; dueAt: string | null } }
+            | { message: string };
+        }>(accessToken, mutation, variables);
+      } catch {
+        return res.status(502).json({ success: false, error: "Buffer post failed" });
       }
-      res.json({ success: true, data });
+      if (!result.resp.ok) {
+        return res.status(502).json({ success: false, error: "Buffer post failed" });
+      }
+      const topLevelError = result.body.errors?.[0];
+      if (topLevelError) {
+        return res.status(502).json({ success: false, error: topLevelError.message });
+      }
+      const payload = result.body.data?.createPost;
+      if (!payload) {
+        return res.status(502).json({ success: false, error: "Buffer post failed" });
+      }
+      if ("message" in payload) {
+        return res.status(502).json({ success: false, error: payload.message });
+      }
+      res.json({ success: true, data: payload });
     } catch (error) {
       sendError(res, error, "Failed to post to Buffer");
     }

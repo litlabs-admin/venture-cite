@@ -110,13 +110,13 @@ export default function BufferConnectDialog({ connected }: BufferConnectDialogPr
         <DialogHeader>
           <DialogTitle>Connect Buffer</DialogTitle>
           <DialogDescription>
-            Generate an access token in Buffer's developer dashboard, then paste it below. We store
-            it encrypted and use it only to publish on your behalf.
+            Create an API key in Buffer Settings → API, then paste it below. We store it encrypted
+            and use it only to publish on your behalf.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <a
-            href="https://buffer.com/developers/api"
+            href="https://publish.buffer.com/settings/api"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-blue-600 hover:underline"
@@ -125,7 +125,7 @@ export default function BufferConnectDialog({ connected }: BufferConnectDialogPr
           </a>
           <Input
             type="password"
-            placeholder="Paste your Buffer access token"
+            placeholder="Paste your Buffer API key"
             value={token}
             onChange={(e) => {
               setToken(e.target.value);
