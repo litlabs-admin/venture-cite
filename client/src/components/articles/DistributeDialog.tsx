@@ -297,13 +297,29 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
           </Button>
         </div>
 
-        {!bufferConnected && (
+        {!bufferConnected ? (
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3 mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm">
               <Link2 className="w-4 h-4 text-blue-600" />
               <span className="text-foreground">Connect Buffer to post directly</span>
             </div>
             <BufferConnectDialog connected={false} />
+          </div>
+        ) : (
+          <div
+            className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg p-3 mb-3 flex items-center justify-between gap-3"
+            data-testid="banner-buffer-connected"
+          >
+            <div className="flex items-center gap-2 text-sm">
+              <Link2 className="w-4 h-4 text-green-600" />
+              <span className="text-foreground">
+                Buffer connected ·{" "}
+                {bufferProfiles.length === 0
+                  ? "no channels found"
+                  : `${bufferProfiles.length} channel${bufferProfiles.length === 1 ? "" : "s"}`}
+              </span>
+            </div>
+            <BufferConnectDialog connected={true} />
           </div>
         )}
 
