@@ -219,28 +219,33 @@ export default function Citations() {
     let cancelled = false;
     let cursor = 0;
     let activeRunId: string | null = null;
+    let advanceInFlight = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const tick = async () => {
       if (cancelled) return;
       try {
-        // Fire /advance and /state in parallel: /advance drives the run
-        // forward (server-side slice) while /state surfaces the latest
-        // progress to the UI. On Vercel the polling browser is the only
-        // thing pushing a long-running citation run to completion.
+        // /state polls every tick to refresh the UI. /advance drives the
+        // run forward server-side and is gated to a single in-flight call
+        // per run — without that gate, a 25s slice + 1s tick produces ~25
+        // concurrent /advance lambdas all racing to claim the same pairs,
+        // causing duplicate geo_rankings rows and inflated totalChecks.
         const stateResp = apiRequest(
           "GET",
           `/api/brands/${selectedBrandId}/citation-runs/state?since=${cursor}`,
         );
 
-        if (activeRunId) {
-          // Fire-and-forget; the response shape is just {done, status}
-          // and we'll see the effects via the next /state poll.
+        if (activeRunId && !advanceInFlight) {
+          advanceInFlight = true;
           apiRequest(
             "POST",
             `/api/brands/${selectedBrandId}/citation-runs/${activeRunId}/advance`,
             {},
-          ).catch(() => {});
+          )
+            .catch(() => {})
+            .finally(() => {
+              advanceInFlight = false;
+            });
         }
 
         const r = await stateResp;

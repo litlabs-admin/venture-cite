@@ -10,6 +10,7 @@ import { openaiBreaker, openrouterBreaker } from "./lib/circuitBreaker";
 import { analyzeResponse, deriveSentiment, type TrackedEntity } from "./lib/responseAnalyzer";
 import { detectBrandAndCompetitors, matchEntity } from "./lib/brandMatcher";
 import { findSelfCitationsInText } from "./lib/trackedContentMatcher";
+import { dynamicLockNamespaces, withDynamicAdvisoryLock } from "./lib/advisoryLock";
 import type { TrackedContentUrl } from "@shared/schema";
 
 // ChatGPT citation checks go through the direct OpenAI client.
@@ -1296,11 +1297,26 @@ export async function advanceCitationRun(
     return { done: true, status: run.status };
   }
   try {
-    const result = await runBrandPrompts(run.brandId, undefined, {
+    // Per-run advisory lock so that concurrent /advance calls (the
+    // browser polling loop alone can fire one every second under load)
+    // can't double-process the same (prompt, platform) pairs and insert
+    // duplicate geo_rankings rows. If another slice is mid-flight we
+    // return the run's current status so the caller can keep polling.
+    const lockResult = await withDynamicAdvisoryLock(
+      dynamicLockNamespaces.citationRunSlice,
       runId,
-      resume: true,
-      deadlineMs,
-    });
+      "citation-run-slice",
+      () =>
+        runBrandPrompts(run.brandId, undefined, {
+          runId,
+          resume: true,
+          deadlineMs,
+        }),
+    );
+    if (!lockResult.ran) {
+      return { done: false, status: run.status };
+    }
+    const result = lockResult.result;
     return { done: result.done, status: result.done ? "succeeded" : "running" };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
