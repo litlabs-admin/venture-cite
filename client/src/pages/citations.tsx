@@ -218,6 +218,7 @@ export default function Citations() {
     if (!selectedBrandId || !hasActive) return;
     let cancelled = false;
     let cursor = 0;
+    let activeRunId: string | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const tick = async () => {
@@ -232,13 +233,12 @@ export default function Citations() {
           `/api/brands/${selectedBrandId}/citation-runs/state?since=${cursor}`,
         );
 
-        const headlineRunId = liveProgress?.runId;
-        if (headlineRunId) {
+        if (activeRunId) {
           // Fire-and-forget; the response shape is just {done, status}
           // and we'll see the effects via the next /state poll.
           apiRequest(
             "POST",
-            `/api/brands/${selectedBrandId}/citation-runs/${headlineRunId}/advance`,
+            `/api/brands/${selectedBrandId}/citation-runs/${activeRunId}/advance`,
             {},
           ).catch(() => {});
         }
@@ -270,6 +270,7 @@ export default function Citations() {
           cursor = json.data.since || cursor;
           const headline = json.data.runs[0];
           if (headline) {
+            activeRunId = headline.done ? null : headline.runId;
             setLiveProgress({
               runId: headline.runId,
               progressPct: headline.progressPct,
@@ -303,7 +304,6 @@ export default function Citations() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBrandId, hasActive]);
 
   // Pick the most recent in-flight run as the one we surface on screen.
