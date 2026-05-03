@@ -20,7 +20,7 @@ import helmet from "helmet";
 import { v4 as uuidv4 } from "uuid";
 import type { Server } from "http";
 import { registerRoutes } from "./routes";
-import { log } from "./vite";
+import { log } from "./log";
 import { WebhookHandlers } from "./webhookHandlers";
 import { logger, requestContext, sanitizeLogBody } from "./lib/logger";
 
