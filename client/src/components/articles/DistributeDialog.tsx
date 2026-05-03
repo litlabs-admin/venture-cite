@@ -5,7 +5,7 @@
 // tab switches within a session — closing the dialog still resets.
 // Buffer profile match only auto-fires on unambiguous matches.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Dialog,
@@ -19,14 +19,25 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
-import { Loader2, FileText, Share2, Clock, Pencil, Send, Link2 } from "lucide-react";
+import { Loader2, FileText, Share2, Clock, Pencil, Link2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import BufferConnectDialog from "./BufferConnectDialog";
+import PlatformPostButton from "./PlatformPostButton";
 
-const DISTRIBUTION_PLATFORMS = ["LinkedIn", "Medium", "Reddit", "Quora"];
+const DISTRIBUTION_PLATFORMS = [
+  "LinkedIn",
+  "Twitter",
+  "Facebook",
+  "Instagram",
+  "Medium",
+  "Reddit",
+  "Quora",
+];
+
+const BUFFER_SUPPORTED_PLATFORMS = new Set(["LinkedIn", "Twitter", "Facebook", "Instagram"]);
 
 type DistributeView = "generate" | "results" | "history";
 
@@ -34,14 +45,22 @@ interface DistributeDialogProps {
   articleId: string;
 }
 
+type GeneratedRow = {
+  platform: string;
+  status: string;
+  content?: string;
+  distributionId?: string;
+  platformPostId?: string | null;
+};
+
 export default function DistributeDialog({ articleId }: DistributeDialogProps) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<DistributeView>("generate");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
-  const [generatedContent, setGeneratedContent] = useState<
-    Array<{ platform: string; status: string; content?: string }>
-  >([]);
+  const [generatedContent, setGeneratedContent] = useState<GeneratedRow[]>([]);
+  const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
+  const [bufferConnectOpen, setBufferConnectOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
@@ -53,7 +72,7 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
     enabled: open,
   });
   const history = (historyData?.data || []).filter(
-    (d: any) => d.status === "success" && d.metadata?.content?.trim(),
+    (d: any) => (d.status === "success" || d.status === "scheduled") && d.metadata?.content?.trim(),
   );
 
   const { data: bufferData } = useQuery<{
@@ -67,34 +86,75 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
   const bufferConnected = bufferData?.connected ?? false;
   const bufferProfiles = bufferData?.data ?? [];
 
-  const postToBufferMutation = useMutation({
-    mutationFn: async ({ text, channelId }: { text: string; channelId: string }) => {
-      const response = await apiRequest("POST", "/api/buffer/post", { text, channelId });
-      return response.json();
+  // Per-distribution-row Buffer post mutation. Server stamps the row's
+  // platform_post_id on success; we mirror that locally for instant UI
+  // feedback, then invalidate /distributions/:articleId so any future
+  // dialog reopen reads the persisted value.
+  const postDistributionMutation = useMutation({
+    mutationFn: async ({
+      distributionId,
+      channelId,
+    }: {
+      distributionId: string;
+      channelId: string;
+    }) => {
+      const r = await apiRequest("POST", `/api/distributions/${distributionId}/buffer-post`, {
+        channelId,
+      });
+      const json = await r.json();
+      return { status: r.status, body: json };
     },
-    onSuccess: () =>
-      toast({
-        title: "Queued in Buffer!",
-        description: "Your post has been added to the Buffer queue.",
-      }),
-    onError: () =>
-      toast({
-        title: "Buffer post failed",
-        description: "Could not post to Buffer. Check your connection.",
-        variant: "destructive",
-      }),
+    onSuccess: ({ status, body }, vars) => {
+      if (status === 200 && body?.success) {
+        setGeneratedContent((prev) =>
+          prev.map((c) =>
+            c.distributionId === vars.distributionId
+              ? { ...c, platformPostId: body.data.platformPostId }
+              : c,
+          ),
+        );
+        setCardErrors((prev) => {
+          const next = { ...prev };
+          delete next[vars.distributionId];
+          return next;
+        });
+        queryClient.invalidateQueries({ queryKey: [`/api/distributions/${articleId}`] });
+        toast({
+          title: "Queued in Buffer",
+          description: "Will publish at the next slot in your Buffer schedule for this channel.",
+        });
+        return;
+      }
+      if (status === 403 && body?.error === "not_connected") {
+        queryClient.invalidateQueries({ queryKey: ["/api/buffer/profiles"] });
+        toast({
+          title: "Buffer is disconnected",
+          description: "Reconnect to post.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setCardErrors((prev) => ({
+        ...prev,
+        [vars.distributionId]: body?.error ?? "Buffer post failed",
+      }));
+    },
+    onError: (_err, vars) => {
+      setCardErrors((prev) => ({
+        ...prev,
+        [vars.distributionId]: "Network error — try again",
+      }));
+    },
   });
 
-  // Wave 7: only auto-match if there's exactly one Buffer profile whose
-  // service contains the platform name. Multiple matches → don't pick;
-  // user can extend the UI to show a profile picker if needed.
-  const matchBufferProfile = (platform: string) => {
+  // Returns every Buffer channel matching this platform. Caller decides
+  // what to do with 0 / 1 / >1 — see PlatformPostButton.
+  const matchBufferChannels = (platform: string) => {
     const p = platform.toLowerCase();
-    const matches = bufferProfiles.filter(
+    return bufferProfiles.filter(
       (bp) =>
         bp.service?.toLowerCase().includes(p) || bp.formattedService?.toLowerCase().includes(p),
     );
-    return matches.length === 1 ? matches[0] : null;
   };
 
   const distributeMutation = useMutation({
@@ -106,7 +166,18 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
     },
     onSuccess: async (data) => {
       const successCount = data.data.filter((r: any) => r.status === "success").length;
-      setGeneratedContent(data.data);
+      // Merge new platform results into existing cards rather than
+      // replacing — a partial regeneration (e.g. just Twitter) must not
+      // erase a previously-posted LinkedIn card.
+      setGeneratedContent((prev) => {
+        const incoming = new Map<string, GeneratedRow>();
+        for (const row of data.data as GeneratedRow[]) incoming.set(row.platform, row);
+        const merged: GeneratedRow[] = prev.map((row) => incoming.get(row.platform) ?? row);
+        for (const row of data.data as GeneratedRow[]) {
+          if (!prev.some((p) => p.platform === row.platform)) merged.push(row);
+        }
+        return merged;
+      });
       setView("results");
       await refetchHistory();
       toast({
@@ -137,6 +208,36 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
       toast({ title: "Error", description: "Could not save edits.", variant: "destructive" }),
   });
 
+  // Hydrate generatedContent from /distributions/:articleId on open so
+  // posted-state survives across dialog close/reopen. Picks the most
+  // recent row per platform that has content saved.
+  useEffect(() => {
+    if (!open) return;
+    if (!historyData?.data || generatedContent.length > 0) return;
+    const latestByPlatform = new Map<string, any>();
+    for (const d of historyData.data) {
+      if (d.status !== "success" && d.status !== "scheduled") continue;
+      if (!d.metadata?.content) continue;
+      const existing = latestByPlatform.get(d.platform);
+      if (!existing || new Date(d.createdAt) > new Date(existing.createdAt)) {
+        latestByPlatform.set(d.platform, d);
+      }
+    }
+    if (latestByPlatform.size === 0) return;
+    setGeneratedContent(
+      Array.from(latestByPlatform.values()).map(
+        (d): GeneratedRow => ({
+          platform: d.platform,
+          status: "success",
+          content: d.metadata.content,
+          distributionId: d.id,
+          platformPostId: d.platformPostId ?? null,
+        }),
+      ),
+    );
+    setView("results");
+  }, [open, historyData, generatedContent.length]);
+
   const distributeLoadingMessage = useLoadingMessages(distributeMutation.isPending, [
     "Reading your article...",
     "Adapting for each platform...",
@@ -166,6 +267,7 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
     platform: string,
     content: string,
     timestamp?: string,
+    platformPostId?: string | null,
   ) => (
     <div
       key={id ?? platform}
@@ -203,25 +305,25 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
           >
             Copy
           </Button>
-          {bufferConnected &&
-            (() => {
-              const match = matchBufferProfile(platform);
-              if (!match) return null;
-              return (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() =>
-                    postToBufferMutation.mutate({ text: content, channelId: match.id })
-                  }
-                  disabled={postToBufferMutation.isPending}
-                  data-testid={`button-buffer-${platform.toLowerCase()}`}
-                >
-                  <Send className="w-3 h-3 mr-1" />
-                  Post to Buffer
-                </Button>
-              );
-            })()}
+          {BUFFER_SUPPORTED_PLATFORMS.has(platform) && (
+            <PlatformPostButton
+              platform={platform}
+              distributionId={id ?? undefined}
+              platformPostId={platformPostId}
+              bufferConnected={bufferConnected}
+              matches={matchBufferChannels(platform)}
+              isPosting={
+                postDistributionMutation.isPending &&
+                postDistributionMutation.variables?.distributionId === id
+              }
+              error={id ? cardErrors[id] : undefined}
+              onPost={(channelId) => {
+                if (!id) return;
+                postDistributionMutation.mutate({ distributionId: id, channelId });
+              }}
+              onConnectClick={() => setBufferConnectOpen(true)}
+            />
+          )}
         </div>
       </div>
       {id && editingId === id ? (
@@ -303,7 +405,11 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
               <Link2 className="w-4 h-4 text-blue-600" />
               <span className="text-foreground">Connect Buffer to post directly</span>
             </div>
-            <BufferConnectDialog connected={false} />
+            <BufferConnectDialog
+              connected={false}
+              open={bufferConnectOpen}
+              onOpenChange={setBufferConnectOpen}
+            />
           </div>
         ) : (
           <div
@@ -380,7 +486,13 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
           <div className="space-y-4">
             {generatedContent.map((item) =>
               item.content ? (
-                platformCard(null, item.platform, item.content)
+                platformCard(
+                  item.distributionId ?? null,
+                  item.platform,
+                  item.content,
+                  undefined,
+                  item.platformPostId ?? null,
+                )
               ) : (
                 <div key={item.platform} className="border rounded-lg p-4">
                   <Badge variant="destructive">{item.platform}</Badge>
@@ -414,7 +526,13 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
               </div>
             ) : (
               history.map((d: any) =>
-                platformCard(d.id, d.platform, d.metadata.content, d.distributedAt),
+                platformCard(
+                  d.id,
+                  d.platform,
+                  d.metadata.content,
+                  d.distributedAt,
+                  d.platformPostId ?? null,
+                ),
               )
             )}
           </div>

@@ -35,6 +35,7 @@ import {
 } from "../lib/ownership";
 import { parsePagination } from "../lib/pagination";
 import { aiLimitMiddleware, openai, sendError } from "../lib/routesShared";
+import { postToBuffer } from "../lib/bufferPost";
 
 export function setupArticlesRoutes(app: Express): void {
   const ARTICLE_WRITE_FIELDS = [
@@ -372,7 +373,7 @@ export function setupArticlesRoutes(app: Express): void {
       const platformsRaw = Array.isArray(req.body?.platforms) ? req.body.platforms : [];
       const platforms = platformsRaw
         .filter((p: unknown): p is string => typeof p === "string")
-        .slice(0, 5);
+        .slice(0, 7);
       if (platforms.length === 0) {
         return res.status(400).json({ success: false, error: "platforms array is required" });
       }
@@ -444,6 +445,47 @@ ${brand ? `Brand: ${brand.companyName}` : ""}
 
 Article title: ${articleTitle}
 Content: ${articleContent}`,
+              Twitter: `Convert this article into a single Twitter/X post.
+Hard constraint: total post must be ≤ 280 characters including hashtags. Do not exceed.
+Include:
+- A strong hook in the first sentence
+- 1–2 highly relevant hashtags
+- No preamble, no "Here's a post:" — output the post text only
+${brand ? `Brand: ${brand.companyName}` : ""}
+
+Article title: ${articleTitle}
+Content: ${articleContent}
+
+Reminder: total length ≤ 280 characters.`,
+              Facebook: `Convert this article into a Facebook post.
+Hard constraint: total post must be ≤ 2000 characters. Aim for under 1500 for engagement.
+Include:
+- A scroll-stopping opening sentence
+- 2–4 short paragraphs (Facebook engagement falls off past 2000 chars)
+- 1–2 emojis where natural, not forced
+- 3–5 relevant hashtags at the end
+- Conversational tone, not corporate
+${brand ? `Brand: ${brand.companyName}` : ""}
+
+Article title: ${articleTitle}
+Content: ${articleContent}
+
+Reminder: total length ≤ 2000 characters.`,
+              Instagram: `Convert this article into an Instagram caption.
+Hard constraints:
+- Total caption ≤ 2200 characters
+- The first 125 characters are critical — that's what shows before the "more" cut. Front-load the hook there.
+Include:
+- An attention-grabbing hook in the first 125 characters
+- Body paragraphs separated by blank lines (use line breaks, no markdown)
+- Up to 30 relevant hashtags grouped together at the end on a separate line, after a "." or "•••" separator
+- Friendly, authentic tone
+${brand ? `Brand: ${brand.companyName}` : ""}
+
+Article title: ${articleTitle}
+Content: ${articleContent}
+
+Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
             };
 
             const promptContent = platformPrompts[platform] || platformPrompts["LinkedIn"];
@@ -481,10 +523,15 @@ Content: ${articleContent}`,
             await storage.updateDistribution(distribution.id, {
               status: "success",
               distributedAt: new Date(),
-              platformPostId: `${platform.toLowerCase()}_${article.id}_${Date.now()}`,
               metadata: { content: formattedContent },
             });
-            return { platform, status: "success" as const, content: formattedContent };
+            return {
+              platform,
+              status: "success" as const,
+              content: formattedContent,
+              distributionId: distribution.id,
+              platformPostId: null as string | null,
+            };
           } catch (apiError) {
             await storage.updateDistribution(distribution.id, {
               status: "failed",
@@ -502,6 +549,58 @@ Content: ${articleContent}`,
       res.json({ success: true, data: results });
     } catch (error) {
       sendError(res, error, "Failed to distribute article");
+    }
+  });
+
+  // Post a previously-generated distribution row to Buffer. The row
+  // already holds the platform-adapted copy in `metadata.content`; we
+  // call Buffer's createPost via the shared helper, then stamp the real
+  // post id back onto the row so the UI can show "Posted ✓" across
+  // dialog reloads.
+  app.post("/api/distributions/:distributionId/buffer-post", async (req, res) => {
+    try {
+      const user = requireUser(req);
+      const distribution = await storage.getDistributionById(req.params.distributionId);
+      if (!distribution) {
+        return res.status(404).json({ success: false, error: "not_found" });
+      }
+      try {
+        await requireArticle(distribution.articleId, user.id);
+      } catch {
+        // 404 not 403 — anti-enumeration. CLAUDE.md.
+        return res.status(404).json({ success: false, error: "not_found" });
+      }
+      const { channelId } = req.body ?? {};
+      if (!channelId || typeof channelId !== "string") {
+        return res.status(400).json({ success: false, error: "channelId is required" });
+      }
+      const content = (distribution.metadata as { content?: string } | null)?.content;
+      if (!content || typeof content !== "string" || !content.trim()) {
+        return res.status(400).json({ success: false, error: "no_content" });
+      }
+      const result = await postToBuffer(user.id, channelId, content);
+      if (result.ok) {
+        await storage.updateDistribution(distribution.id, {
+          platformPostId: result.postId,
+          status: "scheduled",
+          distributedAt: new Date(),
+        });
+        return res.json({
+          success: true,
+          data: { platformPostId: result.postId },
+        });
+      }
+      if (result.code === "not_connected") {
+        return res.status(403).json({ success: false, error: "not_connected" });
+      }
+      if (result.code === "rejected") {
+        return res
+          .status(502)
+          .json({ success: false, error: result.message ?? "Buffer rejected the post" });
+      }
+      return res.status(502).json({ success: false, error: "buffer_unreachable" });
+    } catch (error) {
+      sendError(res, error, "Failed to post distribution to Buffer");
     }
   });
 

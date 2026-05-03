@@ -19,6 +19,7 @@ import { db } from "../db";
 import { users } from "@shared/schema";
 import { requireUser } from "../lib/ownership";
 import { encryptToken, decryptToken } from "../lib/tokenCipher";
+import { postToBuffer } from "../lib/bufferPost";
 import { sendError } from "../lib/routesShared";
 
 const BUFFER_GRAPHQL_ENDPOINT = "https://api.buffer.com";
@@ -202,62 +203,21 @@ export function setupBufferRoutes(app: Express): void {
       if (!channelId || typeof channelId !== "string") {
         return res.status(400).json({ success: false, error: "channelId is required" });
       }
-      const [row] = await db
-        .select({ token: users.bufferAccessToken })
-        .from(users)
-        .where(eq(users.id, user.id))
-        .limit(1);
-      if (!row?.token) {
+      const result = await postToBuffer(user.id, channelId, text, scheduledAt);
+      if (result.ok) {
+        return res.json({ success: true, data: { postId: result.postId } });
+      }
+      if (result.code === "not_connected") {
         return res
           .status(403)
           .json({ success: false, error: "Buffer is not connected. Connect it first." });
       }
-      const accessToken = decryptToken(row.token);
-
-      const variables: Record<string, unknown> = {
-        input: {
-          channelId,
-          text,
-          schedulingType: "automatic",
-          ...(scheduledAt
-            ? { mode: "customScheduled", dueAt: new Date(scheduledAt).toISOString() }
-            : { mode: "addToQueue" }),
-        },
-      };
-      const mutation = `
-        mutation CreatePost($input: CreatePostInput!) {
-          createPost(input: $input) {
-            ... on PostActionSuccess { post { id text dueAt } }
-            ... on MutationError { message }
-          }
-        }
-      `;
-
-      let result;
-      try {
-        result = await bufferGraphQL<{
-          createPost:
-            | { post: { id: string; text: string; dueAt: string | null } }
-            | { message: string };
-        }>(accessToken, mutation, variables);
-      } catch {
-        return res.status(502).json({ success: false, error: "Buffer post failed" });
+      if (result.code === "rejected") {
+        return res
+          .status(502)
+          .json({ success: false, error: result.message ?? "Buffer post failed" });
       }
-      if (!result.resp.ok) {
-        return res.status(502).json({ success: false, error: "Buffer post failed" });
-      }
-      const topLevelError = result.body.errors?.[0];
-      if (topLevelError) {
-        return res.status(502).json({ success: false, error: topLevelError.message });
-      }
-      const payload = result.body.data?.createPost;
-      if (!payload) {
-        return res.status(502).json({ success: false, error: "Buffer post failed" });
-      }
-      if ("message" in payload) {
-        return res.status(502).json({ success: false, error: payload.message });
-      }
-      res.json({ success: true, data: payload });
+      return res.status(502).json({ success: false, error: "Buffer post failed" });
     } catch (error) {
       sendError(res, error, "Failed to post to Buffer");
     }

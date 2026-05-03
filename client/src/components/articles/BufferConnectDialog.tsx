@@ -28,11 +28,27 @@ import { Loader2 } from "lucide-react";
 
 interface BufferConnectDialogProps {
   connected: boolean;
+  // Optional controlled mode. When both `open` and `onOpenChange` are
+  // passed, the dialog defers to the parent for open state. This lets
+  // sibling buttons (e.g. PlatformPostButton's "Connect Buffer to post")
+  // open the dialog without owning its own trigger.
+  open?: boolean;
+  onOpenChange?: (next: boolean) => void;
 }
 
-export default function BufferConnectDialog({ connected }: BufferConnectDialogProps) {
+export default function BufferConnectDialog({
+  connected,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: BufferConnectDialogProps) {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined && controlledOnOpenChange !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (isControlled) controlledOnOpenChange!(next);
+    else setInternalOpen(next);
+  };
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
 

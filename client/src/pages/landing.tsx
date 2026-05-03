@@ -147,12 +147,6 @@ function MockDashboard() {
         </nav>
       </aside>
       <main className="landing-mock-dashboard-main">
-        <div className="landing-mock-dashboard-chrome">
-          <span className="landing-mock-dashboard-dot" />
-          <span className="landing-mock-dashboard-dot" />
-          <span className="landing-mock-dashboard-dot" />
-          <span className="landing-mock-dashboard-url">venturecite.com/dashboard</span>
-        </div>
         <div className="landing-mock-dashboard-greeting">
           <h3>Good Morning, Team</h3>
           <p>Your AI visibility is climbing today</p>
@@ -421,8 +415,8 @@ const pillars = [
   },
   {
     num: "05",
-    title: "SOC2-Grade Security",
-    desc: "Encrypted at rest and in transit. Built on infrastructure your security team will sign off on.",
+    title: "Competitor Benchmarks",
+    desc: "See how your AI visibility stacks against competitors — by engine, prompt, and topic — so you know exactly where to push.",
   },
   {
     num: "06",
@@ -592,7 +586,6 @@ export default function Landing2() {
           <Link href="/">
             <a className="landing-nav-brand">
               <img src={logoPath} alt="VentureCite" />
-              <span>VentureCite</span>
             </a>
           </Link>
 
@@ -890,7 +883,7 @@ export default function Landing2() {
       </section>
 
       {/* ═════ ROI CALCULATOR ═════ */}
-      <section id="roi" className="landing-section">
+      <section id="roi" className="landing-section landing-roi-section">
         <div className="landing-roi">
           <div className="landing-section-head landing-reveal">
             <Badge label="Calculate Your ROI" />
@@ -898,54 +891,78 @@ export default function Landing2() {
             <RevealText
               as="p"
               className="landing-body"
-              text="Estimate your potential revenue from AI search citations."
+              text="Drag the slider to see how your traffic translates into AI citations and revenue."
               baseDelay={80}
             />
           </div>
 
           <div className="landing-roi-card landing-reveal">
-            <div className="landing-roi-grid">
-              <div className="landing-roi-slider-side">
-                <label className="landing-roi-slider-label">Your Monthly Website Traffic</label>
-                <Slider
-                  value={monthlyTraffic}
-                  onValueChange={setMonthlyTraffic}
-                  min={1000}
-                  max={500000}
-                  step={1000}
-                  className="landing-roi-slider"
-                />
-                <div className="landing-roi-traffic-value">
-                  {monthlyTraffic[0].toLocaleString()} visitors/month
-                </div>
-                <p className="landing-roi-slider-help">
-                  Based on industry averages for AI citation conversion rates.
-                </p>
+            <div className="landing-roi-hero">
+              <span className="landing-roi-hero-label">Estimated annual revenue uplift</span>
+              <div className="landing-roi-hero-value">
+                <span className="landing-roi-hero-currency">$</span>
+                <span className="landing-roi-hero-num">{annualValue.toLocaleString()}</span>
+                <span className="landing-roi-hero-period">/yr</span>
               </div>
+              <span className="landing-roi-hero-sub">
+                at {monthlyTraffic[0].toLocaleString()} visitors / month
+              </span>
+            </div>
 
-              <div className="landing-roi-results-side">
-                <div className="landing-roi-result">
-                  <div className="landing-roi-result-label">Estimated Monthly AI Citations</div>
-                  <div className="landing-roi-result-value">
-                    {estimatedCitations.toLocaleString()}
-                  </div>
-                </div>
-                <div className="landing-roi-result">
-                  <div className="landing-roi-result-label">Estimated Monthly Value</div>
-                  <div className="landing-roi-result-value">
-                    ${estimatedRevenue.toLocaleString()}
-                  </div>
-                </div>
-                <div className="landing-roi-result is-highlight">
-                  <div className="landing-roi-result-label">Estimated Annual Value</div>
-                  <div className="landing-roi-result-value">${annualValue.toLocaleString()}</div>
-                </div>
+            <div className="landing-roi-flow">
+              <div className="landing-roi-step">
+                <span className="landing-roi-step-tag">Traffic</span>
+                <span className="landing-roi-step-value">{monthlyTraffic[0].toLocaleString()}</span>
+                <span className="landing-roi-step-unit">visitors / mo</span>
+              </div>
+              <div className="landing-roi-arrow" aria-hidden="true">
+                <span />
+                <span />
+              </div>
+              <div className="landing-roi-step">
+                <span className="landing-roi-step-tag">Citations</span>
+                <span className="landing-roi-step-value">
+                  {estimatedCitations.toLocaleString()}
+                </span>
+                <span className="landing-roi-step-unit">AI citations / mo</span>
+              </div>
+              <div className="landing-roi-arrow" aria-hidden="true">
+                <span />
+                <span />
+              </div>
+              <div className="landing-roi-step is-revenue">
+                <span className="landing-roi-step-tag">Revenue</span>
+                <span className="landing-roi-step-value">${estimatedRevenue.toLocaleString()}</span>
+                <span className="landing-roi-step-unit">monthly value</span>
               </div>
             </div>
 
-            <div className="landing-roi-cta">
+            <div className="landing-roi-control">
+              <div className="landing-roi-control-head">
+                <span className="landing-roi-control-label">Adjust monthly traffic</span>
+                <span className="landing-roi-control-value">
+                  {monthlyTraffic[0].toLocaleString()}
+                </span>
+              </div>
+              <Slider
+                value={monthlyTraffic}
+                onValueChange={setMonthlyTraffic}
+                min={1000}
+                max={500000}
+                step={1000}
+                className="landing-roi-slider"
+              />
+              <div className="landing-roi-control-ticks">
+                <span>1K</span>
+                <span>100K</span>
+                <span>250K</span>
+                <span>500K</span>
+              </div>
+            </div>
+
+            <div className="landing-roi-cta-wrap">
               <Link href="/register">
-                <a className="landing-btn landing-btn-primary">
+                <a className="landing-btn landing-btn-primary landing-roi-cta">
                   Start Capturing This Value
                   <ArrowRight size={16} />
                 </a>
@@ -1094,13 +1111,6 @@ export default function Landing2() {
               </div>
             ))}
           </div>
-
-          <div className="landing-faq-contact-card landing-reveal">
-            <span className="landing-faq-contact-text">Still have questions?</span>
-            <a href="mailto:engineering@litlabs.io" className="landing-btn landing-btn-primary">
-              Email us
-            </a>
-          </div>
         </div>
       </section>
 
@@ -1129,50 +1139,53 @@ export default function Landing2() {
       {/* ═════ FOOTER ═════ */}
       <footer className="landing-footer">
         <div className="landing-footer-inner">
-          <div className="landing-footer-top">
-            <Link href="/">
-              <a className="landing-footer-brand">
-                <img src={logoPath} alt="VentureCite" />
-                <span>VentureCite</span>
-              </a>
-            </Link>
-            <div className="landing-footer-social">
-              {socials.map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={s.label}
-                >
-                  <SocialIcon d={s.d} />
+          <div className="landing-footer-grid">
+            <div className="landing-footer-brand-col">
+              <Link href="/">
+                <a className="landing-footer-brand">
+                  <img src={logoPath} alt="VentureCite" />
                 </a>
-              ))}
+              </Link>
+              <p className="landing-footer-tagline">
+                Get cited by AI search engines. Track every mention. Optimize every prompt.
+              </p>
+              <div className="landing-footer-social">
+                {socials.map((s) => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={s.label}
+                  >
+                    <SocialIcon d={s.d} />
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <div className="landing-footer-links-col">
+              <span className="landing-footer-col-title">Product</span>
+              <a href="#why-venturecite">Why VentureCite</a>
+              <a href="#core-features">Features</a>
+              <a href="#product-pillars">Pillars</a>
+              <a href="#roi">ROI Calculator</a>
+              <a href="#faq">FAQ</a>
+            </div>
+
+            <div className="landing-footer-links-col">
+              <span className="landing-footer-col-title">Legal</span>
+              <a href="/privacy">Privacy Policy</a>
+              <a href="#">Terms &amp; Conditions</a>
             </div>
           </div>
 
-          <div className="landing-footer-divider" />
-
-          <div className="landing-footer-bottom">
-            <p className="landing-footer-copy">© 2025 VentureCite. All rights reserved.</p>
-            <div className="landing-footer-cols">
-              <div className="landing-footer-col">
-                <span className="landing-footer-col-title">Product</span>
-                <a href="#why-venturecite">Why</a>
-                <a href="#core-features">Features</a>
-                <a href="#product-pillars">Pillars</a>
-                <a href="#faq">FAQ</a>
-              </div>
-              <div className="landing-footer-col">
-                <span className="landing-footer-col-title">Company</span>
-                <a href="mailto:engineering@litlabs.io">Contact</a>
-              </div>
-              <div className="landing-footer-col">
-                <span className="landing-footer-col-title">Legal</span>
-                <a href="/privacy">Privacy Policy</a>
-                <a href="#">Terms &amp; Conditions</a>
-              </div>
-            </div>
+          <div className="landing-footer-strip">
+            <span className="landing-footer-copy">© 2026 VentureCite. All rights reserved.</span>
+            <span className="landing-footer-meta">
+              <span className="landing-footer-meta-dot" aria-hidden="true" />
+              Built for the AI search era
+            </span>
           </div>
         </div>
       </footer>
