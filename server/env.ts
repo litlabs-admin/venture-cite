@@ -10,16 +10,11 @@ import { z } from "zod";
 // Auto-resolve the public app URL so a fresh deploy works without manual
 // APP_URL config. Order:
 //   1. APP_URL (explicit override — wins when set)
-//   2. VERCEL_URL (auto-injected by Vercel — *.vercel.app)
-//   3. RENDER_EXTERNAL_URL (auto-injected by Render)
-//   4. http://localhost:5000 in dev
-//
-// Vercel injects VERCEL_URL without the protocol, so we prepend https://.
-// On Render, RENDER_EXTERNAL_URL is already a full https URL.
+//   2. VERCEL_URL (auto-injected by Vercel — *.vercel.app, no protocol)
+//   3. http://localhost:5000 in dev
 const resolvedAppUrl =
   process.env.APP_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-  process.env.RENDER_EXTERNAL_URL ||
   (process.env.NODE_ENV === "production" ? undefined : "http://localhost:5000");
 if (resolvedAppUrl) process.env.APP_URL = resolvedAppUrl;
 

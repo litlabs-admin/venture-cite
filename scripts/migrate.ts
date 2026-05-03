@@ -9,8 +9,8 @@
 // pooler (port 6543) which rotates backend connections between queries
 // and doesn't preserve session-level state (advisory locks, prepared
 // statements, etc.). Migrations need a session connection, so they
-// prefer DATABASE_DIRECT_URL when set. Local dev / Render keep the
-// single DATABASE_URL.
+// prefer DATABASE_DIRECT_URL when set. Local dev keeps the single
+// DATABASE_URL.
 
 import { logger } from "../server/lib/logger";
 

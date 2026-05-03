@@ -44,7 +44,6 @@ vi.mock("../../server/storage", () => ({
     createRevision: stubs.createRevision,
     getUser: stubs.getUser,
     getBrandById: stubs.getBrandById,
-    appendStreamBuffer: vi.fn(),
   },
 }));
 vi.mock("../../server/lib/usageLimit", () => ({

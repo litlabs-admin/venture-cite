@@ -49,10 +49,10 @@ export default function Citations() {
   const prompts = promptsData?.data || [];
 
   // Wave 9: POST /run is now async (returns ~100ms with runId). Completion
-  // arrives entirely via the live channel (SSE + polling status gate); the
-  // mutation toast just confirms the run started. Two-tab races receive 409
-  // with the existing runId — surfaced as an "already running" toast rather
-  // than an error.
+  // arrives via the polling /citation-runs/state channel + active-runs gate;
+  // the mutation toast just confirms the run started. Two-tab races receive
+  // 409 with the existing runId — surfaced as an "already running" toast
+  // rather than an error.
   const runMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/run`, {});
@@ -169,9 +169,9 @@ export default function Citations() {
     "Analyzing responses for brand mentions...",
   ]);
 
-  // Live progress state, primarily fed by SSE. Falls back to the polled
-  // active-runs query when SSE isn't available (e.g. server still spinning
-  // up after deploy). The page just shows whatever it has.
+  // Live progress state, fed by /citation-runs/state polling. Falls back to
+  // the active-runs gate query if the run completes between polls so the
+  // page just shows whatever it has.
   const [liveProgress, setLiveProgress] = useState<{
     runId: string;
     progressPct: number;
@@ -188,7 +188,7 @@ export default function Citations() {
   // stuck pendingRunId can't keep the banner up forever.
   const [pendingRunId, setPendingRunId] = useState<string | null>(null);
 
-  // Reset live state on brand switch — both SSE-fed liveProgress and the
+  // Reset live state on brand switch — both polled liveProgress and the
   // optimistic pendingRunId. Without the second, switching brand mid-run
   // would keep showing the old brand's optimistic banner until 30s timed
   // out.
@@ -308,10 +308,11 @@ export default function Citations() {
 
   // Pick the most recent in-flight run as the one we surface on screen.
   // active-runs is sorted desc by startedAt server-side.
-  // Wave 9: progressPct comes from the polling gate when SSE hasn't
-  // delivered a `progress` event yet, but totalChecks/totalCited stay
-  // unset (we hide the count line below until SSE fills them in,
-  // instead of showing a misleading "0 cited / 0 checks so far").
+  // Wave 9: progressPct comes from the active-runs gate when the
+  // /citation-runs/state poll hasn't delivered an update yet, but
+  // totalChecks/totalCited stay unset (we hide the count line below
+  // until the state poll fills them in, instead of showing a misleading
+  // "0 cited / 0 checks so far").
   // Wave 9.2: when pendingRunId is set but the gate hasn't seen the
   // run yet (the ~8s window between kickoff and the next gate poll),
   // synthesize a 0% headline so the banner shows immediately.
@@ -449,8 +450,8 @@ export default function Citations() {
       </Card>
 
       {/* Live progress banner — shown only while a citation run is in
-          flight for this brand. SSE feeds progress %; the polled status
-          gate provides the gating boolean. */}
+          flight for this brand. /citation-runs/state polling feeds the
+          progress %; the active-runs gate provides the gating boolean. */}
       {showBanner && headlineProgress && (
         <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30">
           <CardContent className="pt-6">
@@ -465,10 +466,10 @@ export default function Citations() {
                 </span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                {/* Wave 9: hide the count line until SSE fills in real
-                    numbers (initial state is totalChecks=-1 from the polling
-                    fallback). Avoids the misleading "0 cited / 0 checks so
-                    far" flash for ~8s after Run is clicked. */}
+                {/* Wave 9: hide the count line until /citation-runs/state
+                    fills in real numbers (initial state is totalChecks=-1
+                    from the active-runs fallback). Avoids the misleading
+                    "0 cited / 0 checks so far" flash for ~8s after Run. */}
                 {headlineProgress.totalChecks > 0 && (
                   <span className="text-xs text-muted-foreground">
                     {headlineProgress.totalCited} cited / {headlineProgress.totalChecks} checks

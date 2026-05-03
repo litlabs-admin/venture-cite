@@ -123,7 +123,7 @@ export async function runOnboardingAutopilot(
 }
 
 // Resume any autopilots that were in-flight when the prior process
-// stopped. On Render this fires on boot via setImmediate (best-effort,
+// stopped. Locally this fires on boot via setImmediate (best-effort,
 // fire-and-forget). On Vercel it's invoked from the daily cron with a
 // deadline so the function returns before the platform timeout — the
 // next cron tick picks up whichever autopilots didn't finish today.
@@ -148,15 +148,15 @@ export async function resumeInFlightAutopilots(deadlineMs?: number): Promise<voi
       const { id, user_id } = row;
       resumedCount += 1;
       if (deadlineMs !== undefined) {
-        // Vercel: drive autopilot inline so we know it actually ran
-        // before the lambda terminates.
+        // Cron path: drive autopilot inline so we know it actually ran
+        // before the function terminates.
         try {
           await runOnboardingAutopilot(id, user_id, { deadlineMs });
         } catch (err) {
           logger.warn({ err, brandId: id }, "onboardingAutopilot: inline resume failed");
         }
       } else {
-        // Render: detach so boot stays fast.
+        // Local boot path: detach so boot stays fast.
         setImmediate(() => {
           void runOnboardingAutopilot(id, user_id);
         });

@@ -9,6 +9,7 @@ build
 out
 server/public
 *.tsbuildinfo
+api/index.js
 
 # ─── Environment variables — NEVER commit ───────────────────────
 .env

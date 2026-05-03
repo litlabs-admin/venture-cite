@@ -335,12 +335,16 @@ export const contentGenerationJobs = pgTable(
     requestPayload: jsonb("request_payload").notNull(),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
     errorMessage: text("error_message"),
-    // Wave 7: streaming + refund support.
-    // streamBuffer accumulates token deltas as the worker streams from OpenAI;
-    // the SSE handler tails this column. errorKind classifies failures so
-    // refundArticleQuota knows whether to refund (transient infra) or not
-    // (user error / budget). refundedAt is set once the refund is applied,
-    // making the refund idempotent.
+    // Wave 7: refund + legacy streaming support.
+    // streamBuffer was the token accumulation column for the prior
+    // Chat-Completions streaming worker. Vercel migration (Wave 9.5)
+    // replaced that with the OpenAI Responses API in background mode,
+    // which doesn't write here. The column is preserved so the slice
+    // runner can detect "legacy in-flight" jobs (streamBuffer populated,
+    // openaiResponseId NULL) and fail them cleanly so users retry.
+    // errorKind classifies failures so refundArticleQuota knows whether
+    // to refund (transient infra) or not (user error / budget).
+    // refundedAt is set once the refund is applied (idempotent).
     streamBuffer: text("stream_buffer").default(""),
     errorKind: text("error_kind"), // 'budget'|'circuit'|'openai_5xx'|'openai_429'|'timeout'|'invalid_input'|'unknown'
     refundedAt: timestamp("refunded_at"),

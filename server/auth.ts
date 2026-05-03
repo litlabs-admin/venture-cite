@@ -71,19 +71,17 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   if (ctx) ctx.userId = dbUser.id;
   Sentry.setUser({ id: dbUser.id });
 
-  // Lazy-eval workflow tick: replaces the 30s global cron (dropped for
-  // serverless compat). On Vercel we use waitUntil() so the tick runs
-  // *after* the response is sent (zero added request latency), bounded
-  // by maxDuration. On Render the .catch() promise is detached the
-  // standard way. advanceRun is idempotent and the helper debounces.
+  // Lazy-eval workflow tick: replaces the global cron (dropped for
+  // serverless compat). waitUntil() runs the tick *after* the response
+  // is sent (zero added request latency), bounded by the function's
+  // maxDuration. Locally @vercel/functions' waitUntil is a no-op shim,
+  // so the detached promise just runs in the background. advanceRun is
+  // idempotent and the helper debounces.
   const tickPromise = maybeTickActiveRunsForUser(dbUser.id).catch((err) => {
     logger.warn({ err, userId: dbUser.id }, "auth: maybeTickActiveRunsForUser failed");
   });
-  if (process.env.VERCEL) {
-    const { waitUntil } = await import("@vercel/functions");
-    waitUntil(tickPromise);
-  }
-  // On non-Vercel, the promise is already running; nothing more to do.
+  const { waitUntil } = await import("@vercel/functions");
+  waitUntil(tickPromise);
 
   next();
 };
@@ -177,32 +175,10 @@ const PUBLIC_API_ROUTES = new Set<string>([
   "POST /api/cron/daily-orchestrator",
 ]);
 
-// Routes whose handlers do their own auth (e.g. legacy SSE endpoints
-// which couldn't send Authorization headers from EventSource and instead
-// validated a token from the query string). The handler MUST do the
-// verify itself — we just skip the global Bearer guard.
-//
-// Vercel migration: SSE endpoints were converted to polling (Authorization
-// header works for fetch). This array is now empty but kept in place for
-// future self-authenticated routes.
-const SELF_AUTHED_PREFIXES: Array<{ method: string; prefix: string; suffix: string }> = [];
-
-function isSelfAuthed(method: string, path: string): boolean {
-  for (const r of SELF_AUTHED_PREFIXES) {
-    if (method === r.method && path.startsWith(r.prefix) && path.endsWith(r.suffix)) {
-      // Make sure there's something between prefix and suffix (the id).
-      const idLen = path.length - r.prefix.length - r.suffix.length;
-      if (idLen > 0) return true;
-    }
-  }
-  return false;
-}
-
 export const requireAuthForApi: RequestHandler = (req, res, next) => {
   if (!req.path.startsWith("/api/")) return next();
   const key = `${req.method} ${req.path}`;
   if (PUBLIC_API_ROUTES.has(key)) return next();
-  if (isSelfAuthed(req.method, req.path)) return next();
   return isAuthenticated(req, res, next);
 };
 

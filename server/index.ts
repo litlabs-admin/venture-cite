@@ -1,10 +1,9 @@
-// Local dev / Render entry point.
+// Local dev entry point (`npm run dev` / `npm start`).
 //
-// Vercel migration: most middleware + route registration moved to
-// server/app.ts so the same configured app instance is reused by both
-// the long-running Node server (this file) and the Vercel function
-// (api/index.ts). Boot side-effects (migrations, scheduler, autopilot
-// resume) only run here — Vercel handles them via the daily cron.
+// Vercel uses server/vercelEntry.ts instead — this file never runs on
+// Vercel. Boot side-effects (migrations, scheduler, autopilot resume)
+// only run here; on Vercel the daily cron orchestrator handles the
+// equivalents.
 
 import { app, prepareApp } from "./app";
 import { Sentry } from "./instrument";
@@ -13,20 +12,13 @@ import { setupStripeProducts } from "./setupProducts";
 import { pool } from "./db";
 import { initScheduler } from "./scheduler";
 import { applyMigrations } from "./lib/migrationRunner";
+import { reconcileOrphanCitationRuns } from "./lib/citationReconciliation";
+import { resumeInFlightAutopilots } from "./lib/onboardingAutopilot";
 import { logger } from "./lib/logger";
 
 (async () => {
-  // On Vercel, migrations run during build via `npm run db:migrate`. On
-  // local dev / Render we apply on boot so a fresh checkout doesn't need
-  // a separate migrate step.
-  if (!process.env.VERCEL) {
-    await applyMigrations();
-  }
-
-  if (!process.env.VERCEL) {
-    const { reconcileOrphanCitationRuns } = await import("./lib/citationReconciliation");
-    await reconcileOrphanCitationRuns();
-  }
+  await applyMigrations();
+  await reconcileOrphanCitationRuns();
 
   if (process.env.STRIPE_SECRET_KEY) {
     setupStripeProducts().catch((err) => {
@@ -37,17 +29,8 @@ import { logger } from "./lib/logger";
 
   const server = await prepareApp();
 
-  // Vercel migration: in-process schedulers and the polling content
-  // worker have been replaced by:
-  //   - One daily Vercel cron firing /api/cron/daily-orchestrator
-  //   - Lazy-eval workflow tick on every authenticated request
-  //   - Client-driven /api/content-jobs/:jobId/advance
-  // These node-cron jobs only run on local dev / Render.
-  if (!process.env.VERCEL) {
-    initScheduler();
-    const { resumeInFlightAutopilots } = await import("./lib/onboardingAutopilot");
-    void resumeInFlightAutopilots();
-  }
+  initScheduler();
+  void resumeInFlightAutopilots();
 
   if (app.get("env") === "development") {
     await setupVite(app, server);

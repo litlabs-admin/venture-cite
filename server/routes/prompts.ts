@@ -286,15 +286,13 @@ export function setupPromptsRoutes(app: Express): void {
   });
 
   // Run all 10 stored prompts against each platform and persist results.
-  // Wave 9: async kickoff. Previously this awaited runBrandPrompts in-line
-  // (30-120s of held-open HTTP — blew through every reverse-proxy idle
-  // timeout and produced lying "Check failed" toasts on successful runs).
-  // We now create the citation_runs row synchronously, schedule the run on
-  // setImmediate, and return the runId. Client switches entirely to the
-  // SSE/polling channel for completion. The partial unique index from
-  // migration 0035 guarantees only one in-flight run per brand — duplicate
-  // kickoffs (e.g. two tabs racing) get 409 with the existing runId so the
-  // UI can join the existing stream rather than starting a duplicate.
+  // Async kickoff: we create the citation_runs row synchronously, then
+  // run a deadline-bounded slice (see citationChecker.kickoffBrandPromptsRun)
+  // and return the runId. The client tracks completion via the
+  // /citation-runs/state polling channel and drives any remainder via
+  // /advance. The partial unique index from migration 0035 guarantees
+  // only one in-flight run per brand — duplicate kickoffs (two tabs
+  // racing) get 409 with the existing runId so the UI joins it.
   app.post("/api/brand-prompts/:brandId/run", aiLimitMiddleware, async (req, res) => {
     try {
       const user = requireUser(req);
@@ -424,23 +422,12 @@ export function setupPromptsRoutes(app: Express): void {
     }
   });
 
-  // SSE stream of run progress + per-ranking events for the active brand.
-  // The Citations page subscribes when a run is live. EventSource can't
-  // send Authorization headers, so auth happens via ?token=<JWT> validated
-  // inline (and the path is in SELF_AUTHED_PREFIXES so the global Bearer
-  // guard skips it).
-  //
-  // Polling-based — the handler ticks every SSE_TICK_MS and emits:
-  //   - `progress` whenever progressPct/totalChecks/totalCited change
-  //   - `ranking` for new geo_rankings rows since the last tick
-  //   - `complete` when the run reaches a terminal status
-  // Connection is capped at SSE_MAX_DURATION_MS so a hung tab doesn't
-  // hold a slot forever; the client reconnects.
-  // Vercel migration: replaces the prior SSE endpoint
-  // (/api/brands/:brandId/citation-events). Client polls every ~1s with
-  // its `?since=<unixMs>` cursor; server returns the per-run progress
-  // snapshot plus rankings created since the cursor. `done: true` on the
-  // run's slot signals the client to stop polling that run.
+  // Vercel migration: per-run progress snapshot for client polling.
+  // Replaces the prior SSE endpoint (/api/brands/:brandId/citation-events).
+  // Client polls every ~1s with its `?since=<unixMs>` cursor; server
+  // returns each active run's progressPct/totalChecks/totalCited plus any
+  // geo_rankings rows created since the cursor. `done: true` on a run's
+  // slot signals the client to stop polling that run.
   app.get("/api/brands/:brandId/citation-runs/state", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -522,9 +509,8 @@ export function setupPromptsRoutes(app: Express): void {
         return res.status(404).json({ success: false, error: "Brand not found" });
       }
       const runId = req.params.runId;
-      // 8s slice deadline keeps us safely under the function timeout
-      // even on Vercel Hobby (60s cap). On Render this just bounds the
-      // single-call work; the rest is handled by the next /advance.
+      // 8s slice deadline keeps us safely under the 60s Vercel function
+      // cap. The next /advance picks up where this one left off.
       const result = await advanceCitationRun(runId, Date.now() + 8000);
       res.json({
         success: true,

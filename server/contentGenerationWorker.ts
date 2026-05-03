@@ -1,16 +1,17 @@
 // Content-generation slice runner.
 //
-// Vercel migration: the prior background polling worker was replaced by
-// runArticleSlice(jobId, deadline) which is invoked by:
+// Vercel migration / Wave 9.5: the prior Chat Completions streaming
+// worker was replaced by runArticleSlice(jobId, deadline), invoked by:
 //   - POST /api/content-jobs/:jobId/advance — user-driven, ~8s budget
 //   - the daily cron orchestrator's drain step — server-driven, longer
 //     budget
 //
-// Each call streams tokens into stream_buffer, persists progress, and
-// returns. If the deadline trips mid-stream the partial buffer is kept
-// so the next /advance can either resume (continuation prompt) or the
-// user can copy what they have. Idle and total-stream watchdogs still
-// apply for genuine stalls vs the deliberate slice cutoff.
+// First call kicks off an OpenAI Responses run with `background: true,
+// store: true` — the work runs on OpenAI's infrastructure, decoupled
+// from our 60s function ceiling. The response_id is persisted on the
+// job. Subsequent /advance calls poll openai.responses.retrieve() and
+// finalize the article when status="completed". Single LLM call per
+// article; no continuation prompts, no token streaming, no seams.
 
 import OpenAI from "openai";
 import { storage } from "./storage";
@@ -44,22 +45,10 @@ export type GenerationPayload = {
   contentStyle?: "b2b" | "b2c";
 };
 
-class JobCancelledError extends Error {
-  constructor() {
-    super("Job was cancelled by user");
-    this.name = "JobCancelledError";
-  }
-}
-
-function isJobCancelledError(e: unknown): e is JobCancelledError {
-  return e instanceof JobCancelledError;
-}
-
 // Map a thrown error into one of the classifications the refund helper
 // understands. Be conservative: only refund for things we're sure are infra
 // problems, not user-input or quota issues.
 function classifyError(err: unknown): ErrorKind {
-  if (isJobCancelledError(err)) return "cancelled";
   if (isBudgetExceededError(err)) return "budget";
   if (isCircuitOpenError(err)) return "circuit";
   const e = err as { status?: number; code?: string; name?: string } | undefined;
@@ -321,17 +310,15 @@ export async function runArticleSlice(jobId: string, deadlineMs: number): Promis
   } catch (err) {
     const errorKind = classifyError(err);
     const message = err instanceof Error ? err.message : String(err);
-    const cancelled = isJobCancelledError(err);
     await storage.updateContentJob(job.id, {
-      status: cancelled ? "cancelled" : "failed",
+      status: "failed",
       errorMessage: message.slice(0, 500),
       errorKind,
       completedAt: new Date(),
     } as never);
     if (job.articleId) {
       try {
-        if (cancelled) await storage.setArticleDraft(job.articleId);
-        else await storage.setArticleFailed(job.articleId);
+        await storage.setArticleFailed(job.articleId);
       } catch {
         // best-effort
       }
@@ -341,9 +328,7 @@ export async function runArticleSlice(jobId: string, deadlineMs: number): Promis
     } catch {
       // logged separately; never throw out
     }
-    if (cancelled) {
-      logger.info({ jobId: job.id, userId: job.userId }, "content slice cancelled by user");
-    } else if (errorKind === "budget") {
+    if (errorKind === "budget") {
       logger.info({ jobId: job.id, userId: job.userId, message }, "content slice rejected: budget");
     } else if (errorKind === "circuit") {
       logger.warn(
@@ -359,7 +344,7 @@ export async function runArticleSlice(jobId: string, deadlineMs: number): Promis
     }
     return {
       done: true,
-      status: cancelled ? "cancelled" : "failed",
+      status: "failed",
       errorKind,
       message: message.slice(0, 500),
     };
@@ -428,7 +413,8 @@ export async function enqueueContentGenerationJob(
     requestPayload: { ...payload, articleId: article.id, brandId } as never,
   } as schema.InsertContentGenerationJob);
 
-  // Link job onto the article so the SSE handler can find it via the article.
+  // Link the job onto the article so the client polling code can find
+  // the current job_id from articles.job_id without a separate lookup.
   await db
     .update(schema.articles)
     .set({ jobId: job.id, updatedAt: new Date() })

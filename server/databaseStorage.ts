@@ -4425,16 +4425,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.articles.id, articleId));
   }
 
-  async appendStreamBuffer(jobId: string, delta: string): Promise<void> {
-    // Atomic concat — multiple worker writes never trample each other.
-    await db
-      .update(schema.contentGenerationJobs)
-      .set({
-        streamBuffer: sql`COALESCE(${schema.contentGenerationJobs.streamBuffer}, '') || ${delta}`,
-      })
-      .where(eq(schema.contentGenerationJobs.id, jobId));
-  }
-
   async createRevision(input: InsertArticleRevision): Promise<ArticleRevision> {
     const result = await db.insert(schema.articleRevisions).values(input).returning();
     return result[0];

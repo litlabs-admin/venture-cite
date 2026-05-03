@@ -145,16 +145,12 @@ export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: num
   return { sent, skipped };
 }
 
-// Per-brand auto-citation: runs daily at 6 AM UTC, checks each brand's
-// individual schedule (off/weekly/biweekly/monthly) and preferred day.
-// Re-runs the locked tracked-prompt set and refreshes suggestions.
-// Wave 9.2: hourly cron so the per-brand auto_citation_hour gate can
-// actually fire. The legacy "0 6 * * *" schedule combined with the
-// hour gate (`currentHour >= autoCitationHour`) caused any brand with
-// auto_citation_hour ≥ 7 to be silently skipped forever — the cron
-// only ran once a day at 06:00 UTC, which always failed the gate.
-// Env override preserved so anyone running a custom cron keeps it.
-const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 * * * *"; // hourly check
+// Per-brand auto-citation: in production this fires from the daily
+// Vercel cron (server/routes/cron.ts → runAutoCitationJob with a
+// deadline). Locally, initScheduler runs it on this hourly cron so dev
+// behaviour matches prod. Wave 9.5: hour-of-day gate removed — see
+// isBrandDueForCitation.
+const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 * * * *";
 
 function isBrandDueForCitation(brand: {
   autoCitationSchedule: string;
@@ -293,11 +289,11 @@ const MENTION_SCAN_CRON = process.env.MENTION_SCAN_CRON || "0 9 * * 1"; // Monda
 const LISTICLE_SCAN_CRON = process.env.LISTICLE_SCAN_CRON || "0 11 * * 1"; // Monday 11 AM UTC
 const FACT_REFRESH_CRON = process.env.FACT_REFRESH_CRON || "0 10 1 * *"; // 1st of month 10 AM UTC
 
-// Vercel migration: every per-brand iteration accepts a deadline so the
-// daily orchestrator can bail out cleanly before the function timeout.
-// Brands that didn't get processed today get retried tomorrow — natural
-// backoff via the per-brand "lastXxxAt" timestamps the callers already
-// stamp. On Render (no deadline), the loop runs to completion as before.
+// Every per-brand iteration accepts a deadline so the daily orchestrator
+// can bail out cleanly before the function timeout. Brands that didn't
+// get processed today get retried tomorrow — natural backoff via the
+// per-brand "lastXxxAt" timestamps the callers already stamp. Without a
+// deadline (local dev cron) the loop runs to completion.
 type RunForEveryBrandOptions = {
   deadlineMs?: number;
 };

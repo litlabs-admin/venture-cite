@@ -1168,18 +1168,16 @@ export async function runBrandPrompts(
 
 // ---- Wave 9: async kickoff path ----------------------------------------
 //
-// `runBrandPrompts` blocks for the entire run (10 prompts × 5 platforms can
-// take 30-120s of held-open HTTP). Reverse proxies (Cloudflare 100s, Render
-// 100s, AWS ALB 60s) idle-timeout long before that, returning a 502 to the
-// browser even though the run continues server-side. The user then sees a
-// "Check failed" toast for a successful run.
+// `runBrandPrompts` can take 30-120s for a full run (10 prompts × 5
+// platforms). Vercel's 60s function cap forces us to bound the kickoff
+// path: we run inline up to a deadline, then return what's done; the
+// client's /advance polling loop drives the remainder to completion.
 //
-// `kickoffBrandPromptsRun` is the new front door: it synchronously creates
-// the citation_runs row (which hits the partial unique index from migration
-// 0035 — duplicate concurrent kickoffs throw a 23505 we surface as 409),
-// then schedules the actual run on `setImmediate` and returns the runId.
-// HTTP handler returns ~100ms regardless of run size; the client subscribes
-// to SSE / polls the active-runs gate for completion.
+// `kickoffBrandPromptsRun` is the front door: it synchronously creates
+// the citation_runs row (the partial unique index from migration 0035
+// makes duplicate concurrent kickoffs throw a 23505 we surface as 409),
+// then runs the deadline-bounded slice and returns the runId. The
+// client polls /state to render progress.
 
 export type KickoffResult =
   | { ok: true; runId: string }
@@ -1237,54 +1235,27 @@ export async function kickoffBrandPromptsRun(
     }
   }
 
-  // On Render / local dev: detach so the kickoff response returns
-  // immediately and the run completes in the background.
-  // On Vercel: the lambda terminates shortly after the response, killing
-  // setImmediate work. Instead, run synchronously up to a deadline that
-  // keeps us inside the function timeout. If the run finishes within
-  // that window the kickoff returns done; if not, the run stays in
-  // 'running' state and the client's /advance polling drives it to
-  // completion.
-  if (process.env.VERCEL) {
-    // Leave 8s of headroom under the 60s function cap so the response
-    // can still flush.
-    const deadlineMs = Date.now() + 50_000;
+  // Run synchronously up to a deadline that keeps us inside the function
+  // timeout. If the run finishes within that window the kickoff returns
+  // done; if not, the run stays in 'running' state and the client's
+  // /advance polling drives it to completion. Leaves 10s of headroom
+  // under the 60s function cap so the response can still flush.
+  const deadlineMs = Date.now() + 50_000;
+  try {
+    await runBrandPrompts(brandId, platforms, { ...options, runId, deadlineMs });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ err, brandId, runId }, "citation.run.kickoff_inline_failed");
     try {
-      await runBrandPrompts(brandId, platforms, { ...options, runId, deadlineMs });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.error({ err, brandId, runId }, "citation.run.kickoff_inline_failed");
-      try {
-        await storage.updateCitationRun(runId, {
-          status: "failed",
-          progressPct: 100,
-          completedAt: new Date(),
-          errorMessage: msg.slice(0, 500),
-        } as never);
-      } catch (writeErr) {
-        logger.error({ err: writeErr, runId }, "citation.run.failure_write_failed");
-      }
+      await storage.updateCitationRun(runId, {
+        status: "failed",
+        progressPct: 100,
+        completedAt: new Date(),
+        errorMessage: msg.slice(0, 500),
+      } as never);
+    } catch (writeErr) {
+      logger.error({ err: writeErr, runId }, "citation.run.failure_write_failed");
     }
-  } else {
-    setImmediate(() => {
-      runBrandPrompts(brandId, platforms, {
-        ...options,
-        runId,
-      }).catch(async (err) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        logger.error({ err, brandId, runId }, "citation.run.detached_failed");
-        try {
-          await storage.updateCitationRun(runId, {
-            status: "failed",
-            progressPct: 100,
-            completedAt: new Date(),
-            errorMessage: msg.slice(0, 500),
-          } as never);
-        } catch (writeErr) {
-          logger.error({ err: writeErr, runId }, "citation.run.failure_write_failed");
-        }
-      });
-    });
   }
 
   return { ok: true, runId };

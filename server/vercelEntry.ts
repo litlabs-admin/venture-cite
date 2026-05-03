@@ -1,11 +1,11 @@
 // Vercel function entry — single function handles all /api/* routes plus
-// /health (per the rewrites in vercel.json). Falls back to the same
-// Express app the local dev / Render server uses, so behavior is
-// identical except for the boot side-effects (which Vercel handles via
-// the daily cron orchestrator instead of in-process schedulers).
+// /health (per the rewrites in vercel.json). Reuses the same Express app
+// the local-dev server uses, so behavior is identical except for the
+// boot side-effects (which Vercel handles via the daily cron
+// orchestrator instead of in-process schedulers).
 
 import type { IncomingMessage, ServerResponse } from "http";
-import { app, prepareApp } from "../server/app";
+import { app, prepareApp } from "./app";
 
 // Cache the readiness promise across warm invocations on the same
 // lambda. prepareApp is idempotent internally (returns the same Promise

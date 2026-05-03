@@ -724,7 +724,6 @@ export interface IStorage {
   setArticleReady(articleId: string, content: string, title: string | null): Promise<void>;
   setArticleFailed(articleId: string): Promise<void>;
   setArticleDraft(articleId: string): Promise<void>;
-  appendStreamBuffer(jobId: string, delta: string): Promise<void>;
   // Article revisions (Auto-Improve + manual edits + restore).
   createRevision(input: InsertArticleRevision): Promise<ArticleRevision>;
   listRevisions(articleId: string, limit?: number): Promise<ArticleRevision[]>;

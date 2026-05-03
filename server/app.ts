@@ -1,13 +1,12 @@
 // Shared Express app builder + lifecycle helpers.
 //
-// Vercel migration: extracted from server/index.ts so the same app
-// instance is reused by:
-//   - server/index.ts (local dev / Render deploy: app.listen)
-//   - api/index.ts    (Vercel function default export)
+// The same configured app instance is reused by:
+//   - server/index.ts        (local dev: app.listen)
+//   - server/vercelEntry.ts  (Vercel function default export)
 //
 // Boot side-effects (migrations, scheduler, autopilot resume) only run
-// on local dev and are kicked from server/index.ts. The Vercel daily
-// cron handles them server-side via /api/cron/daily-orchestrator.
+// on local dev and are kicked from server/index.ts. On Vercel the daily
+// cron orchestrator (/api/cron/daily-orchestrator) handles them.
 
 import "dotenv/config";
 import "./env";
@@ -108,7 +107,6 @@ log(`CORS allowlist: ${allowedOrigins.join(", ") || "(none)"}`);
 // a per-deploy EXTRA_CORS_ORIGINS list. Production should still pin
 // APP_URL to the real domain so browsers refuse spoofed previews.
 function isVercelPreview(origin: string): boolean {
-  if (!process.env.VERCEL) return false;
   try {
     const u = new URL(origin);
     return u.protocol === "https:" && u.hostname.endsWith(".vercel.app");
@@ -143,11 +141,11 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
   try {
     const sig = Array.isArray(signature) ? signature[0] : signature;
     if (!Buffer.isBuffer(req.body)) {
-      // On Vercel, this fires if the runtime pre-parsed the body before
-      // Express saw the stream — would mean signature verification can
-      // never succeed. Log loudly so it surfaces on first deploy.
+      // Fires if Vercel pre-parsed the body before Express saw the
+      // stream — would mean signature verification can never succeed.
+      // Log loudly so it surfaces on first deploy.
       logger.error(
-        { bodyType: typeof req.body, isVercel: !!process.env.VERCEL },
+        { bodyType: typeof req.body },
         "Stripe webhook: req.body is not a Buffer (raw-body parsing broken)",
       );
       return res.status(500).json({ error: "Webhook processing error" });

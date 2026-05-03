@@ -12,8 +12,10 @@
 //   GET  /api/content-jobs/active            — caller's most recent in-flight
 //                                               or recently-finished job
 //   GET  /api/content-jobs/:jobId            — poll a single job (JSON)
-//   GET  /api/content-jobs/:jobId/stream     — SSE: tail stream_buffer live
-//   POST /api/content-jobs/:jobId/cancel     — mark cancelled; worker bails
+//   GET  /api/content-jobs/:jobId/state      — poll status + phase + elapsedMs
+//   POST /api/content-jobs/:jobId/advance    — drive one slice of OpenAI
+//                                               Responses run (Vercel migration)
+//   POST /api/content-jobs/:jobId/cancel     — mark cancelled; next /advance bails
 //   POST /api/articles/:id/improve           — Auto-Improve: 1 rewrite pass,
 //                                               creates a revision, bumps
 //                                               version, no fork.
@@ -297,12 +299,12 @@ export function setupContentRoutes(app: Express): void {
   // ── Advance a job by one slice (Vercel migration) ─────────────────────────
   //
   // The browser drives generation by calling /advance in a loop until
-  // `done: true`. Each call processes ~8s of OpenAI streaming (deadline
-  // chosen to fit comfortably under Vercel Hobby's 10s function cap),
-  // persists tokens to stream_buffer, and returns. The runArticleSlice
-  // helper handles success / cancellation / retryable failure / refund
-  // bookkeeping internally; the route just enforces ownership and the
-  // per-call lock (last_advance_started_at).
+  // /state returns `done: true`. The first call kicks off an OpenAI
+  // Responses run (background mode) and stores the response_id; later
+  // calls poll openai.responses.retrieve until the run completes,
+  // failed, or was cancelled. The runArticleSlice helper handles all
+  // success / failure / refund bookkeeping; the route just enforces
+  // ownership and the per-call lock (last_advance_started_at).
   app.post("/api/content-jobs/:jobId/advance", async (req, res) => {
     try {
       const user = requireUser(req);

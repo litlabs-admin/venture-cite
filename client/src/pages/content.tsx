@@ -5,11 +5,13 @@
 // (if the user has one). /content/:articleId loads that article directly.
 //
 // One source of truth: the article row itself. status='draft' shows the
-// form; status='generating' shows the streaming preview; status='ready'
+// form; status='generating' shows the phase-indicator skeleton; status='ready'
 // shows the editor. No more content_drafts table, no more 4-way PATCH race.
 //
-// Generation: SSE stream when the tab is focused (live tokens), poll
-// fallback when blurred. The worker writes to articles.content on success,
+// Generation (Vercel migration / Wave 9.5): the OpenAI Responses API in
+// background mode runs the work on OpenAI's infra. Client polls /state for
+// status + phase + elapsedMs, drives /advance to kick off and progress the
+// run. articles.content is filled by the server when the run completes,
 // so a user who navigates away and back picks up the finished article from
 // the article row directly.
 //
