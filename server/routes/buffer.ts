@@ -1,15 +1,16 @@
-// Buffer (social publishing) integration routes (Wave 5.1).
+// Buffer (social publishing) integration routes — bring-your-own-key.
 //
-// OAuth callback persists the access token AES-encrypted (see
-// server/lib/tokenCipher.ts); the profiles + post endpoints decrypt
-// it just-in-time for the upstream Buffer API call.
+// Users generate an access token in Buffer's developer dashboard
+// (https://buffer.com/developers/api), paste it into the Connect dialog,
+// and we validate + persist it AES-256-GCM encrypted via tokenCipher.
+// No platform-owned OAuth app, no client_id / client_secret, no
+// callback URL.
 //
 // Routes:
-//   GET    /api/auth/buffer            — start OAuth (302 to Buffer)
-//   GET    /api/auth/buffer/callback   — OAuth callback, persists token
-//   GET    /api/buffer/profiles        — list connected social profiles
-//   POST   /api/buffer/post            — schedule / publish a post
-//   DELETE /api/auth/buffer            — disconnect (clears token)
+//   POST   /api/buffer/connect       — validate + persist a user-supplied token
+//   GET    /api/buffer/profiles      — list connected social profiles
+//   POST   /api/buffer/post          — schedule / publish a post
+//   DELETE /api/buffer/connection    — clear the stored token
 
 import type { Express } from "express";
 import { eq } from "drizzle-orm";
@@ -20,69 +21,46 @@ import { encryptToken, decryptToken } from "../lib/tokenCipher";
 import { sendError } from "../lib/routesShared";
 
 export function setupBufferRoutes(app: Express): void {
-  app.get("/api/auth/buffer", async (req, res) => {
-    const clientId = process.env.BUFFER_CLIENT_ID;
-    const redirectUri =
-      process.env.BUFFER_REDIRECT_URI || `${process.env.APP_URL || ""}/api/auth/buffer/callback`;
-    if (!clientId) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Buffer integration is not configured. Contact support." });
-    }
-    const authUrl = `https://bufferapp.com/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-    res.redirect(authUrl);
-  });
-
-  app.get("/api/auth/buffer/callback", async (req, res) => {
+  // Validate a user-supplied Buffer access token by calling Buffer's
+  // /user.json (cheapest authenticated endpoint). If it succeeds, encrypt
+  // and store the token. If Buffer says 401, surface invalid_token so the
+  // UI can prompt the user to re-check the token they pasted.
+  app.post("/api/buffer/connect", async (req, res) => {
     try {
       const user = requireUser(req);
-      const { code } = req.query;
-      if (!code || typeof code !== "string") {
-        return res.status(400).send("Missing authorization code");
-      }
-      const clientId = process.env.BUFFER_CLIENT_ID;
-      const clientSecret = process.env.BUFFER_CLIENT_SECRET;
-      const redirectUri =
-        process.env.BUFFER_REDIRECT_URI || `${process.env.APP_URL || ""}/api/auth/buffer/callback`;
-      if (!clientId || !clientSecret) {
-        return res.status(503).send("Buffer integration is not configured");
+      const raw = (req.body ?? {}).accessToken;
+      const accessToken = typeof raw === "string" ? raw.trim() : "";
+      if (!accessToken) {
+        return res.status(400).json({ success: false, error: "missing_token" });
       }
 
-      const tokenResp = await fetch("https://api.bufferapp.com/1/oauth2/token.json", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-          code,
-          grant_type: "authorization_code",
-        }).toString(),
-      });
-
-      if (!tokenResp.ok) {
-        return res.status(502).send("Failed to exchange Buffer authorization code");
+      let bufferResp: Response;
+      try {
+        bufferResp = await fetch(
+          `https://api.bufferapp.com/1/user.json?access_token=${encodeURIComponent(accessToken)}`,
+        );
+      } catch {
+        return res.status(502).json({ success: false, error: "buffer_unreachable" });
       }
-      const tokenData = (await tokenResp.json()) as { access_token?: string };
-      if (!tokenData.access_token) {
-        return res.status(502).send("Buffer did not return an access token");
+      if (bufferResp.status === 401) {
+        return res.status(400).json({ success: false, error: "invalid_token" });
+      }
+      if (!bufferResp.ok) {
+        return res.status(502).json({ success: false, error: "buffer_unreachable" });
       }
 
-      // Encrypt the OAuth token before persisting. A DB breach must not
-      // expose live Buffer credentials capable of posting / deleting on
-      // user social accounts.
       await db
         .update(users)
-        .set({ bufferAccessToken: encryptToken(tokenData.access_token) })
+        .set({ bufferAccessToken: encryptToken(accessToken) })
         .where(eq(users.id, user.id));
-
-      const appUrl = process.env.APP_URL || "";
-      res.redirect(`${appUrl}/articles?buffer=connected`);
+      res.json({ success: true });
     } catch (error) {
-      sendError(res, error, "Buffer OAuth failed");
+      sendError(res, error, "Failed to connect Buffer");
     }
   });
 
+  // Existing endpoints — unchanged from the OAuth-era implementation,
+  // re-pasted here because we are replacing the file wholesale.
   app.get("/api/buffer/profiles", async (req, res) => {
     try {
       const user = requireUser(req);
@@ -127,7 +105,6 @@ export function setupBufferRoutes(app: Express): void {
       if (!Array.isArray(profileIds) || profileIds.length === 0) {
         return res.status(400).json({ success: false, error: "profileIds is required" });
       }
-
       const [row] = await db
         .select({ token: users.bufferAccessToken })
         .from(users)
@@ -138,14 +115,12 @@ export function setupBufferRoutes(app: Express): void {
           .status(403)
           .json({ success: false, error: "Buffer is not connected. Connect it first." });
       }
-
       const accessToken = decryptToken(row.token);
       const form = new URLSearchParams();
       form.set("text", text);
       for (const pid of profileIds) form.append("profile_ids[]", String(pid));
       if (scheduledAt) form.set("scheduled_at", new Date(scheduledAt).toISOString());
       form.set("access_token", accessToken);
-
       const resp = await fetch("https://api.bufferapp.com/1/updates/create.json", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -163,7 +138,7 @@ export function setupBufferRoutes(app: Express): void {
     }
   });
 
-  app.delete("/api/auth/buffer", async (req, res) => {
+  app.delete("/api/buffer/connection", async (req, res) => {
     try {
       const user = requireUser(req);
       await db.update(users).set({ bufferAccessToken: null }).where(eq(users.id, user.id));

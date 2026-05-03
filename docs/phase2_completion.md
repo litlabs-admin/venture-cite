@@ -1773,3 +1773,322 @@ Notes for whoever inherits this:
 - GitHub disables scheduled workflows after 60 days of repo inactivity. Push any commit (even a comment) every 8 weeks to keep the cron alive.
 - Public repo = unlimited Actions minutes; private repo = 2,000/month free, ~720 burned at this cadence (still fits, but other workflows share the budget).
 - Once the service moves to a paid Render tier (or off Render entirely), the workflow becomes redundant and should be removed.
+
+## Wave 10 — Vercel Hobby single-path migration
+
+Scope: move the entire app off Render's always-on Node process onto Vercel Hobby. No dual-path code, no `process.env.VERCEL` conditionals, no Render fallback — a single deployment target. Constraints accepted up front: 60s function cap, 1 cron/day, ephemeral filesystem, no in-process schedulers or workers.
+
+### 10.1 Single Express function via pre-bundled entry
+
+`api/index.ts` is the source-controlled function entry Vercel discovers natively. It is a six-line stub that re-exports the default handler from `api/_bundle.js` — a self-contained ESM bundle produced by the build step from `server/vercelEntry.ts`. The bundle is gitignored.
+
+The stub-imports-bundle pattern is a workaround for two Vercel quirks discovered the hard way:
+
+1. Vercel's node-file-trace doesn't reliably resolve extensionless ESM imports (`from "./routes"`) through the `server/` tree, so a directly-deployed `api/index.ts` that imports `../server/app` fails with `ERR_MODULE_NOT_FOUND` at runtime.
+2. Vercel validates the `functions` glob in `vercel.json` _before_ running `buildCommand`. A function file that only exists post-build (e.g. esbuild output written to `api/index.js`) fails the pre-build validation with "doesn't match any Serverless Functions inside the api directory."
+
+Pre-bundling `server/vercelEntry.ts` → `api/_bundle.js` and having `api/index.ts` re-export from it satisfies both constraints: discovery sees a real source file, NFT only has to trace one bundled file, and runtime imports work because the bundle is self-contained.
+
+### 10.2 Build pipeline
+
+`package.json` `build` runs four steps in sequence:
+
+```
+npm run db:migrate
+  && vite build
+  && esbuild server/index.ts ... --outdir=dist           (local-dev entry; for `npm start`)
+  && esbuild server/vercelEntry.ts ... --outfile=api/_bundle.js   (Vercel function bundle)
+```
+
+Migrations run at build time (`scripts/migrate.ts`) so the lambda never owns migration responsibility. An advisory lock around `applyMigrations` prevents two concurrent Vercel builds racing on the migration table.
+
+### 10.3 vercel.json
+
+Single function, single cron, SPA fallback rewrite:
+
+```json
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/public",
+  "functions": {
+    "api/index.ts": { "maxDuration": 60, "memory": 1024, "includeFiles": "api/_bundle.js" }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/health", "destination": "/api/index" },
+    { "source": "/webhooks/(.*)", "destination": "/api/index" },
+    {
+      "source": "/((?!api|webhooks|health|assets|fonts|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "crons": [{ "path": "/api/cron/daily-orchestrator", "schedule": "0 6 * * *" }]
+}
+```
+
+`includeFiles: "api/_bundle.js"` ships the bundle into the lambda even though it isn't directly imported via NFT-traceable static analysis (the stub uses a dynamic-looking `export { default } from "./_bundle.js"` that NFT can't always resolve through the build artifact).
+
+### 10.4 Daily cron orchestrator
+
+`POST /api/cron/daily-orchestrator` ([server/routes/cron.ts](server/routes/cron.ts)) replaces the in-process node-cron scheduler. Authenticated by Vercel's auto-injected `Authorization: Bearer <CRON_SECRET>` header (or the manual `x-cron-secret` header for triggering from the dashboard).
+
+Runs each sub-job serially with crash isolation; budgets the wall clock and skips remaining steps when the budget is exhausted so the function returns under 60s. Sub-jobs:
+
+1. `failStuckContentJobs` (60-min stale)
+2. `reconcileOrphanCitationRuns`
+3. `resumeInFlightAutopilots` (deadline-bounded so it returns; remainder picked up tomorrow)
+4. `runAccountPurgeJob`, `runBrandPurgeJob`
+5. `runAutoCitationJob` — hour-of-day filter dropped (degraded from "9 AM UTC respected" to "fires at 06:00 UTC"; documented degradation)
+6. Day-of-week-gated: `runCompetitorDiscoveryJob`, `runMentionScanJob`, `runListicleScanJob`, `runWeeklyCatchupKickoff` on Mondays; `runWeeklyReportJob` on Sundays
+7. Day-of-month-gated: `runFactRefreshJob` on the 1st
+
+Test coverage: [tests/unit/cronOrchestrator.test.ts](tests/unit/cronOrchestrator.test.ts) — auth gate (no secret / wrong secret / Bearer / x-cron-secret) + per-step results array shape.
+
+### 10.5 Lazy evaluation replaces sub-daily crons
+
+Two former in-process crons collapsed into demand-driven ticks:
+
+**Workflow tick** — was a 30s cron `WORKFLOW_TICK_CRON`. Now `maybeTickActiveRunsForUser(userId)` ([server/lib/workflowEngine.ts](server/lib/workflowEngine.ts)) fires from the `attachUserIfPresent` middleware via `waitUntil`. Per-user debounce table `workflow_tick_state` prevents stampedes on parallel requests. Workflows only progress when something changes; those changes always come back through HTTP, so ticking on every authenticated request advances stuck runs within seconds.
+
+**Weekly digest aggregator** — was a 5-min cron. Now `tryEmitWeeklyDigestForUser(userId)` ([server/lib/weeklyDigestEmitter.ts](server/lib/weeklyDigestEmitter.ts)) runs inside `tickActiveRuns`/`advanceRun` whenever a `weekly_catchup` run reaches a terminal status. The 6-day stamp on `users.lastWeeklyReportSentAt` is the dedup; concurrent firings race harmlessly because `UPDATE ... WHERE lastWeeklyReportSentAt < now() - interval '6 days'` is atomic.
+
+### 10.6 Postgres-backed rate-limit buckets
+
+Rate-limit state moved from per-process `Map` to the `rate_limit_buckets` table (migration `0043_rate_limit_buckets.sql`). `tryAcquire(provider, scopeId)` and `acquireOrWait(provider, scopeId)` now do `BEGIN; SELECT ... FOR UPDATE; compute refill; UPDATE; COMMIT;` per acquire. Necessary because Vercel lambdas don't share memory.
+
+Test suite ([tests/unit/rateLimitBuckets.test.ts](tests/unit/rateLimitBuckets.test.ts)) was rewritten to spin up a real Postgres test path; semantics tests (capacity, refill rate, blocking, scope isolation) preserved.
+
+### 10.7 Content generation worker — client-driven /advance with section chunking
+
+The polling content worker (`server/contentGenerationWorker.ts`) lost its `setTimeout` polling loop. Replaced by `POST /api/content-jobs/:jobId/advance` ([server/routes/content.ts](server/routes/content.ts)):
+
+1. Auth + ownership.
+2. Claim the job with `SELECT ... FOR UPDATE NOWAIT`.
+3. Compute deadline = `Date.now() + 8000`.
+4. `generateArticleSliceForJob(job, deadline)` — works on the next pending section (BOFU long-form is broken into intro / comparison / FAQ / conclusion; FAQ batches are one section per item). Each section is one OpenAI call, expected to complete under 8s. Persists `current_section`, `completed_sections`, `section_plan` (migration `0044_content_job_sectioning.sql`).
+5. Returns `{status, contentLength, done, error?}`. Client polls `/advance` then `/state` in a loop until `done:true`.
+
+If the user navigates away mid-generation, the job sits in `pending`/`running` until the daily cron's `failStuckContentJobs(60min)` cleans it up.
+
+### 10.8 SSE replaced by polling
+
+Two streams converted from EventSource to interval polling:
+
+- **Content stream** — old: `/api/content-jobs/:jobId/stream` SSE. New: `GET /api/content-jobs/:jobId/state?since=<n>` returns `{ status, streamBuffer, contentLength, error?, done }`. Client polls every 500ms while the tab is visible, 4s while hidden. Tail-only: `?since=<n>` lets the client request only the slice of `streamBuffer` past its cursor.
+- **Citation events** — old: `/api/brands/:brandId/citation-events` SSE + a `Map<userId, Set<stream>>` with a 3-stream-per-user cap. New: `GET /api/brands/:brandId/citation-runs/state?since=<rankingId>` returns the active runs' status + progress + any `geo_rankings` rows newer than the cursor. Client polls every 1s. The cap and the in-memory map are gone (polling is cheap; no need to limit it).
+
+Trade-off: token-by-token SSE feel becomes 500ms-chunked. Imperceptible for long-form BOFU; slightly chunky for short FAQ items. Documented as accepted degradation.
+
+### 10.9 Citation kickoff: detached → inline-with-deadline
+
+`kickoffBrandPromptsRun` ([server/citationChecker.ts](server/citationChecker.ts)) used `setImmediate(() => runBrandPrompts(...))` to fire-and-forget the citation work behind the kickoff request. On Vercel that detached work gets killed when the lambda terminates ~60s after responding.
+
+Replaced with an inline call gated by a deadline — kickoff returns `runId` immediately as before (the work is sliced and progress-bounded), but the lambda stays alive for as much of the run as fits under the function cap. Whatever doesn't finish is picked up by the client's `/advance` polling, the same pattern as content generation.
+
+### 10.10 Boot-path migrations and worker init removed
+
+`server/index.ts` (now the local-dev entry only) keeps `applyMigrations()` + `initScheduler()` + `initContentGenerationWorker()` for `npm run dev`. None of those run on Vercel because Vercel uses `server/vercelEntry.ts` instead — Vercel imports the Express app, not the IIFE that boots it.
+
+`reconcileOrphanCitationRuns` and `resumeInFlightAutopilots` moved into the daily cron orchestrator. They're best-effort recoveries; running them daily instead of on-boot adds at most a 24h reconciliation window, acceptable.
+
+### 10.11 DB pool sized for serverless
+
+[server/db.ts](server/db.ts) pool: `max: 1`, `idleTimeoutMillis: 5_000` on Vercel; `max: 10`, `idleTimeoutMillis: 30_000` locally. Combined with switching `DATABASE_URL` on Vercel to Supabase's transaction pooler (port 6543, `aws-0-<region>.pooler.supabase.com`), this avoids exhausting Postgres connections under cold-start storms — the pooler is what holds the warm connections to Postgres; lambdas hold one short-lived connection to the pooler.
+
+### 10.12 Vite dev-only import isolation
+
+`server/vite.ts` imports `vite` (which transitively imports `rollup`'s native bindings). Bundling that file into the Vercel lambda dragged `@rollup/rollup-linux-x64-gnu` into the runtime require path; Vercel doesn't ship that native binary and the function crashed with `MODULE_NOT_FOUND` on cold start.
+
+Fix: extracted the `log()` helper to its own file `server/log.ts`. `server/app.ts` now imports `log` from `./log`, not from `./vite`. `server/vite.ts` re-exports `log` so existing dev-only imports in `server/index.ts` still work. Bundle no longer references `vite` or `rollup` (verified with grep).
+
+### 10.13 Render-specific code removed
+
+Per the migration plan's "no dual paths" rule:
+
+- All `process.env.VERCEL` / `!process.env.VERCEL` conditionals deleted.
+- `RENDER_EXTERNAL_URL` removed from [server/env.ts](server/env.ts); URL detection now `APP_URL → VERCEL_URL → http://localhost:5000`.
+- `setImmediate(() => ...)` detach paths in citation kickoff and onboarding autopilot replaced with deadline-bounded inline runs.
+- `.github/workflows/keep-alive.yml` deleted (Vercel doesn't sleep).
+- `health` endpoint dropped its `pg_advisory_lock(1)` round-trip (advisory locks don't help on serverless and add contention under cold-start storms); now just `SELECT 1`.
+
+### 10.14 Files
+
+| File                                         | Change                                                                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `api/index.ts`                               | NEW. Eight-line stub that re-exports `default` from `./_bundle.js`.                                                            |
+| `server/vercelEntry.ts`                      | NEW. Bundled root for Vercel. Imports `app` + `prepareApp` from `./app`, returns the Express handler.                          |
+| `server/app.ts`                              | NEW. Extracted Express app builder from former `server/index.ts`. Both dev entry and `vercelEntry` import from here.           |
+| `server/index.ts`                            | Slimmed. Local-dev only: imports the app, calls `app.listen(port)`, runs migrations + worker + scheduler.                      |
+| `server/log.ts`                              | NEW. Lifted out of `server/vite.ts` so `server/app.ts` doesn't transitively import vite/rollup.                                |
+| `server/vite.ts`                             | Re-exports `log` from `./log` for backward compat with `server/index.ts`.                                                      |
+| `server/routes/cron.ts`                      | NEW. Daily orchestrator endpoint with budget-aware step scheduler.                                                             |
+| `server/lib/migrationRunner.ts`              | Extracted from former `server/index.ts`. Wraps `applyMigrations` in `pg_advisory_lock(54321)` so concurrent builds don't race. |
+| `scripts/migrate.ts`                         | NEW. Standalone migration runner invoked by `npm run db:migrate` at build time.                                                |
+| `vercel.json`                                | NEW. Function definition + rewrites + daily cron.                                                                              |
+| `migrations/0043_rate_limit_buckets.sql`     | NEW. `(provider, scope_id)` PK, `tokens NUMERIC`, `last_refill_at`.                                                            |
+| `migrations/0044_content_job_sectioning.sql` | NEW. `current_section`, `completed_sections`, `section_plan` columns.                                                          |
+| `migrations/0045_workflow_tick_state.sql`    | NEW. Per-user debounce row for the lazy workflow tick.                                                                         |
+| `server/lib/rateLimitBuckets.ts`             | Rewritten. Postgres-backed `tryAcquire`/`acquireOrWait`.                                                                       |
+| `server/lib/workflowEngine.ts`               | Added `maybeTickActiveRunsForUser`, `tryEmitWeeklyDigestForUser`.                                                              |
+| `server/auth.ts`                             | Fire-and-forget tick after JWT verify, via `waitUntil`.                                                                        |
+| `server/routes/content.ts`                   | Dropped SSE handler. Added `/state` and `/advance`.                                                                            |
+| `server/routes/prompts.ts`                   | Dropped SSE handler + `sseStreams` Map + 3-stream cap. Added `/state` and `/advance`.                                          |
+| `server/contentGenerationWorker.ts`          | Dropped polling loop. Added `generateArticleSliceForJob`. `failStuckContentJobs` retained but called from cron.                |
+| `server/citationChecker.ts`                  | Dropped `setImmediate` detach. `kickoffBrandPromptsRun` now deadline-bounded inline. Added `advanceCitationRun`.               |
+| `server/db.ts`                               | Vercel-aware pool: `max: 1` / `5s idle` on Vercel, `max: 10` / `30s idle` locally.                                             |
+| `server/env.ts`                              | `RENDER_EXTERNAL_URL` removed. URL inference is `APP_URL → VERCEL_URL → localhost`.                                            |
+| `server/scheduler.ts`                        | `initScheduler` is a no-op. Job functions stay as named exports for the cron orchestrator.                                     |
+| `client/src/pages/content.tsx`               | Polling consumer instead of EventSource.                                                                                       |
+| `client/src/pages/citations.tsx`             | Polling consumer; `/advance` + `/state` driven from a single timer.                                                            |
+| `package.json`                               | `build` now runs `db:migrate && vite build && esbuild dev-entry && esbuild vercel-entry`.                                      |
+| `.gitignore`                                 | `api/_bundle.js`.                                                                                                              |
+| `.github/workflows/keep-alive.yml`           | DELETED.                                                                                                                       |
+
+### 10.15 Tests
+
+Existing 217 tests preserved. New: [tests/unit/cronOrchestrator.test.ts](tests/unit/cronOrchestrator.test.ts) (5 tests covering auth gate + per-step result shape).
+
+### 10.16 Accepted degradations
+
+| Feature                      | Before                | After                                         | Notes                                                                                                      |
+| ---------------------------- | --------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Auto-citation hour-of-day    | 9 AM UTC respected    | 06:00 UTC daily                               | Dropped from cron day-of-week filter as a trade-off for the 1-cron Hobby cap.                              |
+| Workflow tick latency        | 30s cap               | "Up to next user request"                     | OK — workflows already async; users hit endpoints often.                                                   |
+| Weekly digest emission       | 5-min cron            | Triggered by next `weekly_catchup` completion | Effectively the same.                                                                                      |
+| SSE token-stream feel        | Token-by-token        | 500ms chunks                                  | Imperceptible for long content; mildly chunky for short.                                                   |
+| Long generations >5 min      | Single Render handler | Section-chunked across `/advance` calls       | If a single section exceeds 8s, the slice retries that section. Acceptable in observed BOFU data.          |
+| In-flight autopilot recovery | Resumes on every boot | Resumes daily via cron                        | Edge case: a user starting onboarding right after deploy waits up to 24h if their lambda crashes mid-flow. |
+
+### 10.17 Out of scope (deferred)
+
+- Multi-region or edge function exploration (Hobby has limited edge support).
+- Migration of OpenRouter-backed providers (Claude / Gemini / Perplexity / DeepSeek) onto OpenAI's Responses API background mode for full off-request execution. Only OpenAI's own SDK supports background mode today.
+- Splitting `server/databaseStorage.ts` (124 KB, 14% of the bundle) and `shared/schema.ts` (76 KB, 8.4%) by domain. Wave 5 territory in CLAUDE.md; cold-start parse cost remains.
+
+---
+
+## Wave 11 — Citation runs concurrency + duplication hardening
+
+After the Vercel migration shipped, citation runs exhibited two visible symptoms:
+
+1. **`totalChecks` drifting above the prompt × platform cap.** A 50-pair brand showed "61 checks". Latest Results card disagreed with the live banner — 27/29 vs 41/61.
+2. **Cascading 504s on `/advance`** during a single run, then the run stalling.
+
+Root cause analysis — both symptoms came from the same defect: nothing was preventing concurrent slices for the same run.
+
+### 11.1 Symptom 1: client polling fired /advance every 1s without waiting
+
+The polling effect in [client/src/pages/citations.tsx](client/src/pages/citations.tsx) called `/advance` fire-and-forget on each tick. With each `/advance` taking up to 25s server-side, ~25 concurrent lambdas were racing on the same run, all loading existing rankings into `alreadyDone`, all queueing the still-pending pairs, all inserting into `geo_rankings` (which had no unique constraint on `(run_id, brand_prompt_id, ai_platform)`). Duplicates accumulated; `totalChecks` = `geo_rankings` count went past the cap.
+
+Compounding bug: the effect's closure also captured a stale `liveProgress` from React state. The deps array was `[selectedBrandId, hasActive]` (not `liveProgress`), so the closure's `liveProgress?.runId` stayed undefined forever. `/advance` was never fired at all on the very first run after kickoff — the only progress was from kickoff's inline 50s deadline-bounded slice (8 checks before timeout), then the run stalled.
+
+**Fix** ([client/src/pages/citations.tsx](client/src/pages/citations.tsx)):
+
+- Track `activeRunId` and `advanceInFlight` in closure-local variables that the tick mutates. Reads from the `/state` response, not from React state.
+- Skip the `/advance` call if `advanceInFlight === true`. Only one `/advance` per browser tab is ever in flight per run.
+
+### 11.2 Symptom 2: server-side concurrency
+
+The client-side gate fixes a single tab. It doesn't protect against multi-tab polling, the cron drain colliding with browser polling, or any future caller. Added a per-run Postgres advisory lock around `runBrandPrompts(resume:true)`:
+
+[server/lib/advisoryLock.ts](server/lib/advisoryLock.ts) — new helper `withDynamicAdvisoryLock(namespace, entityId, label, fn)`. Hashes the entity ID (a UUID) into the int4 keyspace Postgres advisory locks accept, takes a session-level lock with `pg_try_advisory_lock(namespace, key)`. Returns `{ran: false}` if the lock is busy; the caller treats that as a successful skip.
+
+Namespace `dynamicLockNamespaces.citationRunSlice` (`920001`) reserved for citation slices. Wraps `runBrandPrompts(resume:true)` inside `advanceCitationRun` ([server/citationChecker.ts](server/citationChecker.ts)). Concurrent `/advance` calls for the same run now serialize at the lock; the second caller returns the run's current status and the client keeps polling until the first slice releases.
+
+### 11.3 Symptom 3: progress accounting was per-slice, not cumulative
+
+`bumpCitationRunProgress` was writing `pct = completedCount / totalTasks * 100` — but on a resume, `totalTasks` is `queue.length` after filtering out `alreadyDone`. So a slice that picked up 5 remaining pairs after 25 had been done in earlier slices wrote `pct = 100, totalChecks = 5`, then the UI banner showed "5 cited / 5 checks — 20%" while the actual DB had 30 rankings.
+
+**Fix** ([server/citationChecker.ts](server/citationChecker.ts)):
+
+- On resume, capture `resumedChecks` and `resumedCited` from the existing rankings.
+- `bumpProgressIfDue` writes cumulative numbers: `cumulativeDone = resumedChecks + completedCount`, `cumulativeTotal = resumedChecks + totalTasks`, `cumulativeCited = resumedCited + totalCited`.
+- Finalize re-queries `getGeoRankingsByRunId` (when resuming) so the `citation_runs` row's `totalChecks` / `totalCited` / `citationRate` / `platformBreakdown` reflect the full run, not just the closing slice.
+
+### 11.4 504 cascade root cause
+
+The advisory lock was correctly serializing slices, but each slice was still occasionally running past 60s. With `CONCURRENCY = 5` workers and Perplexity occasionally returning at 18s, the worst-case timeline was: 25s deadline + 18s in-flight tail + cold start + response flush ≈ 60s. Some slices crossed it.
+
+**Fix:** lowered both deadlines to leave consistent ~30s headroom under the 60s cap:
+
+- `kickoffBrandPromptsRun` deadline: 50s → 40s → 30s ([server/citationChecker.ts](server/citationChecker.ts)).
+- `/advance` deadline: 8s → 25s → 30s ([server/routes/prompts.ts](server/routes/prompts.ts)).
+
+The user pushed back on the iterative tuning — correctly — pointing out that a 60s function cap can't reliably wrap an unbounded number of LLM calls with high variance. The architecturally correct answer is to move the work off the request path entirely (worker process polling a queue, OpenAI Responses API background mode, etc.). That's deferred to a future wave; the deadline tightening here is a stop-gap that makes the existing design behave under observed worst-case latency.
+
+### 11.5 Files
+
+| File                             | Change                                                                                                                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `client/src/pages/citations.tsx` | Polling effect tracks `activeRunId` + `advanceInFlight` in closure; reads runId from `/state` response, not React state.                                                                                           |
+| `server/lib/advisoryLock.ts`     | NEW helper `withDynamicAdvisoryLock` for per-entity locks; namespace `citationRunSlice` reserved.                                                                                                                  |
+| `server/citationChecker.ts`      | `advanceCitationRun` wraps slice in advisory lock. Resume captures `resumedChecks` / `resumedCited`. `bumpProgressIfDue` writes cumulative numbers. Finalize re-queries rankings. Kickoff deadline lowered to 30s. |
+| `server/routes/prompts.ts`       | `/advance` deadline raised to 30s (from 8s) to match.                                                                                                                                                              |
+
+### 11.6 Verification
+
+- `npx tsc --noEmit` — 0 errors.
+- All 217 existing tests still pass.
+- Live verification post-deploy: progress bar matches Latest Results card; `totalChecks` does not exceed prompt × platform cap; no 504s under sustained polling.
+
+### 11.7 Known caveats
+
+- Pre-existing rows in `citation_runs` (runs that completed before this fix) may have inflated `totalChecks` / `totalCited` persisted on the row from the duplicate-write era. The History tab shows these as-is. A one-time SQL backfill that recomputes from `geo_rankings` (deduped by latest `checked_at` per `(run_id, brand_prompt_id, ai_platform)`) is available on request but not run yet.
+- If a lambda is force-killed mid-slice (504), the underlying advisory lock is held by a dead Postgres connection until TCP keepalive times out (typically 1–2 min on Supabase pooler). During that window all `/advance` calls for that run return `ran: false` and the run appears stalled. The next `/advance` after the keepalive succeeds. If this becomes user-visible, switch from session-level advisory locks to a row-based lock with explicit TTL.
+
+---
+
+## Wave 12 — Buffer bring-your-own-key
+
+Replaced the platform-owned Buffer OAuth integration with a bring-your-own-key flow.
+
+### 12.1 Why
+
+The OAuth integration required the platform to maintain a Buffer-registered OAuth app, ship `BUFFER_CLIENT_ID` / `BUFFER_CLIENT_SECRET` env vars, and host a callback route. Buffer has no public path for end-user-issued tokens via the platform's app — every Buffer user who wants API access already creates their own developer app in Buffer's dashboard. Routing through the platform's app added zero value and added one OAuth route on the lambda surface.
+
+The new flow: users generate an access token in Buffer's developer dashboard themselves, paste it into a small Connect dialog, server validates it against Buffer's `/user.json` and stores it AES-256-GCM encrypted (existing `tokenCipher` helpers, unchanged). Profile listing and posting work exactly as before — only the token's origin changed.
+
+### 12.2 Server
+
+Full rewrite of [server/routes/buffer.ts](server/routes/buffer.ts):
+
+- `POST /api/buffer/connect` — body `{accessToken}`. Trims, rejects empty with `400 missing_token`. Calls Buffer `/user.json`. On 200, encrypts and persists. On 401, `400 invalid_token`. On other non-2xx or network error, `502 buffer_unreachable`.
+- `GET /api/buffer/profiles` — unchanged.
+- `POST /api/buffer/post` — unchanged.
+- `DELETE /api/buffer/connection` — replaces the old `DELETE /api/auth/buffer`. Path renamed for namespace consistency.
+- Deleted: `GET /api/auth/buffer`, `GET /api/auth/buffer/callback`, `DELETE /api/auth/buffer`.
+
+`server/env.ts` — dropped `BUFFER_CLIENT_ID`, `BUFFER_CLIENT_SECRET`, `BUFFER_REDIRECT_URI` and the cross-field `.refine()` that tied them to `BUFFER_ENCRYPTION_KEY`. The encryption key remains optional (lazy-loaded by `tokenCipher`); deployments not using Buffer don't need to set it.
+
+### 12.3 Client
+
+[client/src/components/articles/BufferConnectDialog.tsx](client/src/components/articles/BufferConnectDialog.tsx) — new component. Masked `<input type="password">` for the token, "Where do I get this?" link to `https://buffer.com/developers/api`, validation error mapping (`missing_token` / `invalid_token` / `buffer_unreachable`). On success, closes the dialog, invalidates the `/api/buffer/profiles` query so the profile picker repopulates, toasts. Disconnect path is implemented in the component for future reuse from a settings page but not currently wired into any UI.
+
+[client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) — replaced the `<a href="/api/auth/buffer">Connect Buffer</a>` link with `<BufferConnectDialog connected={false} />`. The dialog is the only UI affected; the surrounding profile picker and post composer continue to consume `/api/buffer/profiles` and `/api/buffer/post` unchanged.
+
+### 12.4 Files
+
+| File                                                     | Change                                                                                                                               |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `server/routes/buffer.ts`                                | Rewritten. New `POST /api/buffer/connect`, renamed delete to `DELETE /api/buffer/connection`, OAuth routes deleted.                  |
+| `server/env.ts`                                          | Buffer OAuth env vars + cross-field refine removed.                                                                                  |
+| `.env.example`                                           | Buffer block rewritten for BYOK; only `BUFFER_ENCRYPTION_KEY` remains.                                                               |
+| `docs/feature_flows.md`                                  | Three stale OAuth references cleaned up; env-var table row + one obsolete `APP_URL: Buffer OAuth callback default` row removed.      |
+| `client/src/components/articles/BufferConnectDialog.tsx` | NEW. Masked input + validation + error mapping + success/disconnect mutations.                                                       |
+| `client/src/components/articles/DistributeDialog.tsx`    | OAuth `<a href>` replaced with `<BufferConnectDialog />`.                                                                            |
+| `tests/unit/bufferConnect.test.ts`                       | NEW. 8 tests: scaffold, connect success, missing-token, whitespace-only, invalid token (Buffer 401), 5xx, network error, disconnect. |
+
+### 12.5 Database
+
+No schema change. `users.buffer_access_token` reused. Existing OAuth-connected users' encrypted tokens still decrypt correctly with the same `BUFFER_ENCRYPTION_KEY`; their connections continue to work until they explicitly disconnect or paste a new token.
+
+### 12.6 Tests
+
+8 new tests in [tests/unit/bufferConnect.test.ts](tests/unit/bufferConnect.test.ts). 217 → 224 total (one pre-existing ssrf network-timeout failure unrelated to this work).
+
+### 12.7 Out of scope
+
+- Token rotation reminders / expiry banners (Buffer access tokens don't expire).
+- A separate Buffer-settings page outside `DistributeDialog`.
+- A migration shim for users connected via the deleted OAuth flow — they reconnect with a manually-generated token. Acceptable per the user's decision.
+- Caching the profile list locally (existing `/profiles` route fetches on demand; layering a cache is premature).

@@ -509,12 +509,13 @@ export function setupPromptsRoutes(app: Express): void {
         return res.status(404).json({ success: false, error: "Brand not found" });
       }
       const runId = req.params.runId;
-      // 25s slice deadline. Workers can be mid-LLM-call when the
-      // deadline trips (Perplexity / Gemini regularly return in 10–12s),
-      // so we need ~25s of worst-case worker tail headroom under the
-      // 60s Vercel function cap. The next /advance picks up where this
-      // one left off.
-      const result = await advanceCitationRun(runId, Date.now() + 25000);
+      // 30s slice deadline. The advisory lock inside advanceCitationRun
+      // serializes concurrent calls. Worst-case timeline under the 60s
+      // Vercel cap: ~3s cold start + ~2s slice setup (run+rankings load)
+      // + 30s of work + ~20s LLM tail (Perplexity has been observed
+      // returning at 18s) + ~2s response flush = ~57s. Going higher
+      // pushes us into 504 territory.
+      const result = await advanceCitationRun(runId, Date.now() + 30000);
       res.json({
         success: true,
         data: { runId, done: result.done, status: result.status },

@@ -1257,12 +1257,11 @@ export async function kickoffBrandPromptsRun(
   // Run synchronously up to a deadline that keeps us inside the function
   // timeout. If the run finishes within that window the kickoff returns
   // done; if not, the run stays in 'running' state and the client's
-  // /advance polling drives it to completion. Leaves ~20s of headroom
-  // under the 60s function cap: workers can be mid-call when the
-  // deadline trips, and the slowest LLM (Perplexity, Gemini) regularly
-  // takes 10–12s to return. Cold-start + response flush eats another
-  // few seconds.
-  const deadlineMs = Date.now() + 40_000;
+  // /advance polling drives it to completion. ~30s budget keeps us
+  // safely under the 60s function cap: ~3s cold start + ~2s setup +
+  // 30s of work + up to 20s LLM-call tail (Perplexity occasionally
+  // returns at 18s) + ~2s response flush = ~57s.
+  const deadlineMs = Date.now() + 30_000;
   try {
     await runBrandPrompts(brandId, platforms, { ...options, runId, deadlineMs });
   } catch (err) {

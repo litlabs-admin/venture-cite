@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { Loader2, FileText, Share2, Clock, Pencil, Send, Link2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import BufferConnectDialog from "./BufferConnectDialog";
 
 const DISTRIBUTION_PLATFORMS = ["LinkedIn", "Medium", "Reddit", "Quora"];
 
@@ -302,9 +303,7 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
               <Link2 className="w-4 h-4 text-blue-600" />
               <span className="text-foreground">Connect Buffer to post directly</span>
             </div>
-            <Button asChild variant="outline" size="sm" data-testid="button-connect-buffer">
-              <a href="/api/auth/buffer">Connect Buffer</a>
-            </Button>
+            <BufferConnectDialog connected={false} />
           </div>
         )}
 
