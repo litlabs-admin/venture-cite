@@ -509,9 +509,12 @@ export function setupPromptsRoutes(app: Express): void {
         return res.status(404).json({ success: false, error: "Brand not found" });
       }
       const runId = req.params.runId;
-      // 8s slice deadline keeps us safely under the 60s Vercel function
-      // cap. The next /advance picks up where this one left off.
-      const result = await advanceCitationRun(runId, Date.now() + 8000);
+      // 25s slice deadline. Workers can be mid-LLM-call when the
+      // deadline trips (Perplexity / Gemini regularly return in 10–12s),
+      // so we need ~25s of worst-case worker tail headroom under the
+      // 60s Vercel function cap. The next /advance picks up where this
+      // one left off.
+      const result = await advanceCitationRun(runId, Date.now() + 25000);
       res.json({
         success: true,
         data: { runId, done: result.done, status: result.status },

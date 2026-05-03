@@ -505,12 +505,20 @@ export async function runBrandPrompts(
   // (prompt, platform) pairs that already have a geo_ranking row from a
   // prior slice. Build a quick set of "<promptId>::<platform>" keys.
   const alreadyDone = new Set<string>();
+  // Cumulative counts across prior slices, so progress percent + totalChecks
+  // + totalCited reflect the whole run, not just this slice. Without these,
+  // every /advance call resets the visible numbers (the bug where the
+  // progress bar shows "5/5 — 20%" for a run that already has 28 rankings).
+  let resumedChecks = 0;
+  let resumedCited = 0;
   if (options.resume) {
     try {
       const existing = await storage.getGeoRankingsByRunId(citationRun.id);
       for (const r of existing) {
         alreadyDone.add(`${r.brandPromptId}::${r.aiPlatform}`);
+        if (r.isCited) resumedCited += 1;
       }
+      resumedChecks = existing.length;
     } catch (err) {
       logger.warn(
         { err, runId: citationRun.id },
@@ -1007,9 +1015,12 @@ export async function runBrandPrompts(
     const dueByCount = tasksSinceBump >= PROGRESS_BUMP_EVERY;
     const dueByTime = now - lastBumpAt >= PROGRESS_BUMP_INTERVAL_MS;
     if (!force && !dueByCount && !dueByTime) return;
-    const pct = Math.min(99, Math.floor((completedCount / Math.max(1, totalTasks)) * 100));
+    const cumulativeDone = resumedChecks + completedCount;
+    const cumulativeTotal = resumedChecks + totalTasks;
+    const cumulativeCited = resumedCited + totalCited;
+    const pct = Math.min(99, Math.floor((cumulativeDone / Math.max(1, cumulativeTotal)) * 100));
     try {
-      await storage.bumpCitationRunProgress(citationRun.id, pct, rankings.length, totalCited);
+      await storage.bumpCitationRunProgress(citationRun.id, pct, cumulativeDone, cumulativeCited);
       lastBumpAt = now;
       tasksSinceBump = 0;
     } catch (err) {
@@ -1068,10 +1079,17 @@ export async function runBrandPrompts(
   }
 
   // Finalize the run row with aggregate totals + per-platform breakdown.
-  const totalChecks = rankings.length;
-  const citationRate = totalChecks > 0 ? Math.round((totalCited / totalChecks) * 100) : 0;
+  // Re-query so totals reflect the entire run, not just this slice — on
+  // Vercel a multi-slice resume run only has the final slice's rankings
+  // in the local `rankings` array.
+  const allRankings = options.resume
+    ? await storage.getGeoRankingsByRunId(citationRun.id).catch(() => rankings)
+    : rankings;
+  const totalChecks = allRankings.length;
+  const finalTotalCited = allRankings.reduce((n, r) => n + (r.isCited === 1 ? 1 : 0), 0);
+  const citationRate = totalChecks > 0 ? Math.round((finalTotalCited / totalChecks) * 100) : 0;
   const platformMap = new Map<string, { cited: number; checks: number }>();
-  for (const r of rankings) {
+  for (const r of allRankings) {
     const entry = platformMap.get(r.aiPlatform) || { cited: 0, checks: 0 };
     entry.checks += 1;
     if (r.isCited === 1) entry.cited += 1;
@@ -1092,7 +1110,7 @@ export async function runBrandPrompts(
 
   await storage.updateCitationRun(citationRun.id, {
     totalChecks,
-    totalCited,
+    totalCited: finalTotalCited,
     citationRate,
     completedAt: new Date(),
     platformBreakdown,
@@ -1238,9 +1256,12 @@ export async function kickoffBrandPromptsRun(
   // Run synchronously up to a deadline that keeps us inside the function
   // timeout. If the run finishes within that window the kickoff returns
   // done; if not, the run stays in 'running' state and the client's
-  // /advance polling drives it to completion. Leaves 10s of headroom
-  // under the 60s function cap so the response can still flush.
-  const deadlineMs = Date.now() + 50_000;
+  // /advance polling drives it to completion. Leaves ~20s of headroom
+  // under the 60s function cap: workers can be mid-call when the
+  // deadline trips, and the slowest LLM (Perplexity, Gemini) regularly
+  // takes 10–12s to return. Cold-start + response flush eats another
+  // few seconds.
+  const deadlineMs = Date.now() + 40_000;
   try {
     await runBrandPrompts(brandId, platforms, { ...options, runId, deadlineMs });
   } catch (err) {
