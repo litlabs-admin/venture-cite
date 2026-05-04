@@ -12,6 +12,8 @@ import {
   uniqueIndex,
   boolean,
   primaryKey,
+  uuid,
+  date,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -536,6 +538,11 @@ export const geoRankings = pgTable(
     citationContext: text("citation_context"),
     citingOutletUrl: text("citing_outlet_url"),
     citingOutletName: text("citing_outlet_name"),
+    // Phase 3: list of all URLs the LLM cited in its response
+    // (vs. citingOutletUrl which is the single matcher-derived URL).
+    // Set by citationChecker via extractCitedUrls(responseText). Capped
+    // at 20 entries application-side. Existing rows stay null.
+    citedUrls: text("cited_urls").array(),
     sentiment: text("sentiment").default("neutral"),
     sentimentScore: numeric("sentiment_score", { precision: 3, scale: 2 }).default("0"),
     // Richer quality signals promoted from deprecated citation_quality table.
@@ -1960,3 +1967,44 @@ export const insertCompetitorFaviconSchema = createInsertSchema(competitorFavico
 });
 export type CompetitorFavicon = typeof competitorFavicons.$inferSelect;
 export type InsertCompetitorFavicon = z.infer<typeof insertCompetitorFaviconSchema>;
+
+export const chatbotMessages = pgTable(
+  "chatbot_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    brandId: varchar("brand_id").references(() => brands.id, { onDelete: "set null" }),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    model: text("model"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userCreatedIdx: index("chatbot_messages_user_created_idx").on(t.userId, t.createdAt.desc()),
+  }),
+);
+
+export const chatbotTokenUsage = pgTable(
+  "chatbot_token_usage",
+  {
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    usageDate: date("usage_date").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    messageCount: integer("message_count").notNull().default(0),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.usageDate] }),
+  }),
+);
+
+export type ChatbotMessage = typeof chatbotMessages.$inferSelect;
+export type InsertChatbotMessage = typeof chatbotMessages.$inferInsert;
+export type ChatbotTokenUsage = typeof chatbotTokenUsage.$inferSelect;
+export type InsertChatbotTokenUsage = typeof chatbotTokenUsage.$inferInsert;

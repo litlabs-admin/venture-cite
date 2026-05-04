@@ -38,6 +38,7 @@ import {
   Pencil,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
@@ -267,6 +268,7 @@ export default function CompetitorsPage() {
             </Button>
           ) : undefined
         }
+        explainer={pageExplainers.competitors}
       />
 
       {/* Brand selector — competitors/leaderboard are scoped to a single brand */}

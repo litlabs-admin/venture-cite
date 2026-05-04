@@ -46,6 +46,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import type {
   Listicle,
   BofuContent,
@@ -708,6 +709,7 @@ export default function GeoTools() {
               </Link>
             </div>
           }
+          explainer={pageExplainers.geoTools}
         />
 
         {selectedBrandId ? (

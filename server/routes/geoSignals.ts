@@ -11,7 +11,7 @@ import { eq, and } from "drizzle-orm";
 import { createHash } from "crypto";
 import { requireUser, requireBrand } from "../lib/ownership";
 import { MODELS } from "../lib/modelConfig";
-import { openai, aiLimitMiddleware, MAX_CONTENT_LENGTH } from "../lib/routesShared";
+import { openai, aiLimitMiddleware, MAX_CONTENT_LENGTH, asyncHandler } from "../lib/routesShared";
 import { safeFetchText } from "../lib/ssrf";
 import { db } from "../db";
 import { articles, brands, schemaAudits } from "@shared/schema";
@@ -28,6 +28,7 @@ import {
   STOPWORDS,
 } from "../lib/geoSignalsScoring";
 
+import { captureAndFlush } from "../lib/sentryReport";
 const SCHEMA_FIELD_REQUIREMENTS: Record<string, { required: string[]; recommended: string[] }> = {
   Article: {
     required: ["headline", "author", "datePublished"],
@@ -512,91 +513,104 @@ function urlHashOf(url: string): string {
 }
 
 export function setupGeoSignalsRoutes(app: Express): void {
-  app.post("/api/geo-signals/analyze", async (req, res) => {
-    try {
-      requireUser(req);
-      const { content, targetQuery, articleUpdatedAt, schemaCompleteness } = req.body ?? {};
-      if (
-        !content ||
-        typeof content !== "string" ||
-        !targetQuery ||
-        typeof targetQuery !== "string"
-      ) {
-        return res.status(400).json({ success: false, error: "Content and target query required" });
-      }
-      if (content.length > MAX_CONTENT_LENGTH) {
-        return res
-          .status(413)
-          .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
-      }
+  app.post(
+    "/api/geo-signals/analyze",
+    asyncHandler(async (req, res) => {
+      try {
+        requireUser(req);
+        const { content, targetQuery, articleUpdatedAt, schemaCompleteness } = req.body ?? {};
+        if (
+          !content ||
+          typeof content !== "string" ||
+          !targetQuery ||
+          typeof targetQuery !== "string"
+        ) {
+          return res
+            .status(400)
+            .json({ success: false, error: "Content and target query required" });
+        }
+        if (content.length > MAX_CONTENT_LENGTH) {
+          return res
+            .status(413)
+            .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
+        }
 
-      const result = await computeSignals(
-        content,
-        targetQuery,
-        typeof articleUpdatedAt === "string" ? articleUpdatedAt : undefined,
-        typeof schemaCompleteness === "number" ? schemaCompleteness : undefined,
-      );
-      res.json({
-        success: true,
-        data: {
-          signals: result.signals,
-          overallScore: result.overallScore,
-          termCoverageRatio: result.termCoverageRatio,
-          questionHeadingFraction: result.questionHeadingFraction,
-          wordCount: result.wordCount,
-        },
-      });
-    } catch (err) {
-      logger.error({ err }, "geo-signals/analyze failed");
-      res.status(500).json({ success: false, error: "Failed to analyze signals" });
-    }
-  });
-
-  app.post("/api/geo-signals/chunk-analysis", async (req, res) => {
-    try {
-      requireUser(req);
-      const { content } = req.body ?? {};
-      if (!content || typeof content !== "string") {
-        return res.status(400).json({ success: false, error: "Content required" });
+        const result = await computeSignals(
+          content,
+          targetQuery,
+          typeof articleUpdatedAt === "string" ? articleUpdatedAt : undefined,
+          typeof schemaCompleteness === "number" ? schemaCompleteness : undefined,
+        );
+        res.json({
+          success: true,
+          data: {
+            signals: result.signals,
+            overallScore: result.overallScore,
+            termCoverageRatio: result.termCoverageRatio,
+            questionHeadingFraction: result.questionHeadingFraction,
+            wordCount: result.wordCount,
+          },
+        });
+      } catch (err) {
+        logger.error({ err }, "geo-signals/analyze failed");
+        captureAndFlush(err, { tags: { source: "geoSignals.ts:551" } });
+        res.status(500).json({ success: false, error: "Failed to analyze signals" });
       }
-      if (content.length > MAX_CONTENT_LENGTH) {
-        return res
-          .status(413)
-          .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
-      }
+    }),
+  );
 
-      const { chunks, stats } = computeChunks(content);
-      res.json({ success: true, data: { chunks, stats } });
-    } catch (err) {
-      logger.error({ err }, "geo-signals/chunk-analysis failed");
-      res.status(500).json({ success: false, error: "Failed to analyze chunks" });
-    }
-  });
+  app.post(
+    "/api/geo-signals/chunk-analysis",
+    asyncHandler(async (req, res) => {
+      try {
+        requireUser(req);
+        const { content } = req.body ?? {};
+        if (!content || typeof content !== "string") {
+          return res.status(400).json({ success: false, error: "Content required" });
+        }
+        if (content.length > MAX_CONTENT_LENGTH) {
+          return res
+            .status(413)
+            .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
+        }
 
-  app.post("/api/geo-signals/optimize-chunks", aiLimitMiddleware, async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const { content, brandId } = req.body ?? {};
-      if (!content || typeof content !== "string") {
-        return res.status(400).json({ success: false, error: "Content required" });
+        const { chunks, stats } = computeChunks(content);
+        res.json({ success: true, data: { chunks, stats } });
+      } catch (err) {
+        logger.error({ err }, "geo-signals/chunk-analysis failed");
+        captureAndFlush(err, { tags: { source: "geoSignals.ts:572" } });
+        res.status(500).json({ success: false, error: "Failed to analyze chunks" });
       }
-      if (content.length > MAX_CONTENT_LENGTH) {
-        return res
-          .status(413)
-          .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
-      }
+    }),
+  );
 
-      let brand;
-      if (brandId && typeof brandId === "string") {
-        brand = await requireBrand(brandId, user.id);
-      }
+  app.post(
+    "/api/geo-signals/optimize-chunks",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const { content, brandId } = req.body ?? {};
+        if (!content || typeof content !== "string") {
+          return res.status(400).json({ success: false, error: "Content required" });
+        }
+        if (content.length > MAX_CONTENT_LENGTH) {
+          return res
+            .status(413)
+            .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
+        }
 
-      const response = await openai.chat.completions.create({
-        model: MODELS.misc,
-        messages: [
-          {
-            role: "system",
-            content: `You are a GEO content optimization expert. Restructure content into AI-extractable chunks following these rules:
+        let brand;
+        if (brandId && typeof brandId === "string") {
+          brand = await requireBrand(brandId, user.id);
+        }
+
+        const response = await openai.chat.completions.create({
+          model: MODELS.misc,
+          messages: [
+            {
+              role: "system",
+              content: `You are a GEO content optimization expert. Restructure content into AI-extractable chunks following these rules:
 1. Each section should be ~375 words (500 tokens max)
 2. Start each section with a question-based H2 heading (e.g., "## What is X?" or "## How does Y work?")
 3. Follow each heading with a direct 2-3 sentence answer
@@ -604,320 +618,334 @@ export function setupGeoSignalsRoutes(app: Express): void {
 5. End sections with clear, factual conclusions
 6. Maintain natural flow between sections
 ${brand ? `Brand context: ${brand.name}, Industry: ${brand.industry}` : ""}`,
-          },
-          {
-            role: "user",
-            content: `Restructure this content into AI-optimized chunks:\n\n${content}`,
-          },
-        ],
-        max_tokens: 4000,
-        temperature: 0.7,
-      });
-
-      const optimizedContent = response.choices[0]?.message?.content || content;
-      res.json({ success: true, data: { optimizedContent } });
-    } catch (err) {
-      logger.error({ err }, "geo-signals/optimize-chunks failed");
-      res.status(500).json({ success: false, error: "Failed to optimize chunks" });
-    }
-  });
-
-  app.post("/api/geo-signals/schema-audit", async (req, res) => {
-    try {
-      requireUser(req);
-      const { url } = req.body ?? {};
-      if (!url || typeof url !== "string") {
-        return res.status(400).json({ success: false, error: "URL required" });
-      }
-
-      const normalised = normaliseUrl(url);
-      const hash = urlHashOf(normalised);
-
-      const cachedRows = await db
-        .select()
-        .from(schemaAudits)
-        .where(eq(schemaAudits.urlHash, hash))
-        .limit(1);
-      const cached = cachedRows[0];
-      const sevenDays = 7 * 24 * 60 * 60 * 1000;
-      if (
-        cached &&
-        cached.fetchedAt &&
-        Date.now() - new Date(cached.fetchedAt).getTime() < sevenDays
-      ) {
-        const payload = cached.schemas as {
-          schemas: unknown;
-          additionalTypes: string[];
-          totalSchemasFound: number;
-        };
-        return res.json({
-          success: true,
-          data: {
-            url: cached.url,
-            fetched: true,
-            schemas: payload.schemas,
-            additionalTypes: payload.additionalTypes ?? cached.additionalTypes ?? [],
-            totalSchemasFound: payload.totalSchemasFound ?? 0,
-            cachedAt: cached.fetchedAt,
-          },
+            },
+            {
+              role: "user",
+              content: `Restructure this content into AI-optimized chunks:\n\n${content}`,
+            },
+          ],
+          max_tokens: 4000,
+          temperature: 0.7,
         });
-      }
 
-      let html = "";
-      let fetchError: string | null = null;
-      try {
-        const result = await safeFetchText(normalised, {
-          maxBytes: 2 * 1024 * 1024,
-          timeoutMs: 15_000,
-          headers: { "User-Agent": "VentureCite-SchemaAudit/1.0" },
-        });
-        if (result.status >= 200 && result.status < 300) {
-          html = result.text;
-        } else {
-          fetchError = `Target returned HTTP ${result.status}`;
-        }
+        const optimizedContent = response.choices[0]?.message?.content || content;
+        res.json({ success: true, data: { optimizedContent } });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to fetch URL";
-        if (/private|not allowed|resolve|Invalid URL|http/i.test(msg)) {
-          return res.status(400).json({
-            success: false,
-            error: "This URL isn't reachable (private host or invalid).",
+        logger.error({ err }, "geo-signals/optimize-chunks failed");
+        captureAndFlush(err, { tags: { source: "geoSignals.ts:621" } });
+        res.status(500).json({ success: false, error: "Failed to optimize chunks" });
+      }
+    }),
+  );
+
+  app.post(
+    "/api/geo-signals/schema-audit",
+    asyncHandler(async (req, res) => {
+      try {
+        requireUser(req);
+        const { url } = req.body ?? {};
+        if (!url || typeof url !== "string") {
+          return res.status(400).json({ success: false, error: "URL required" });
+        }
+
+        const normalised = normaliseUrl(url);
+        const hash = urlHashOf(normalised);
+
+        const cachedRows = await db
+          .select()
+          .from(schemaAudits)
+          .where(eq(schemaAudits.urlHash, hash))
+          .limit(1);
+        const cached = cachedRows[0];
+        const sevenDays = 7 * 24 * 60 * 60 * 1000;
+        if (
+          cached &&
+          cached.fetchedAt &&
+          Date.now() - new Date(cached.fetchedAt).getTime() < sevenDays
+        ) {
+          const payload = cached.schemas as {
+            schemas: unknown;
+            additionalTypes: string[];
+            totalSchemasFound: number;
+          };
+          return res.json({
+            success: true,
+            data: {
+              url: cached.url,
+              fetched: true,
+              schemas: payload.schemas,
+              additionalTypes: payload.additionalTypes ?? cached.additionalTypes ?? [],
+              totalSchemasFound: payload.totalSchemasFound ?? 0,
+              cachedAt: cached.fetchedAt,
+            },
           });
         }
-        fetchError = msg;
-      }
 
-      const nodesByType = html ? parseJsonLdFromHtml(html) : new Map<string, object[]>();
-      const schemas = Object.entries(SCHEMA_FIELD_REQUIREMENTS).map(([schemaType, spec]) => {
-        const instances = nodesByType.get(schemaType) ?? [];
-        const present = instances.length > 0;
-        const { completeness, populatedFields, missingFields } = present
-          ? measureSchemaCompleteness(instances, spec.required, spec.recommended)
-          : {
-              completeness: 0,
-              populatedFields: [],
-              missingFields: [...spec.required, ...spec.recommended],
-            };
-        return {
-          schemaType,
-          present,
-          completenessPercent: Math.round(completeness * 100),
-          populatedFields,
-          missingFields,
-          required: spec.required,
-          recommended: spec.recommended,
-        };
-      });
-
-      const catalogueSet = new Set(Object.keys(SCHEMA_FIELD_REQUIREMENTS));
-      const additionalTypes = Array.from(nodesByType.keys()).filter((t) => !catalogueSet.has(t));
-      const completenessByType: Record<string, number> = {};
-      for (const s of schemas) {
-        if (s.present) completenessByType[s.schemaType] = s.completenessPercent / 100;
-      }
-      const totalSchemasFound = nodesByType.size;
-      const responsePayload = {
-        url: normalised,
-        fetched: !fetchError,
-        fetchError,
-        schemas,
-        additionalTypes,
-        totalSchemasFound,
-        cachedAt: null as Date | null,
-      };
-
-      if (!fetchError) {
+        let html = "";
+        let fetchError: string | null = null;
         try {
-          await db
-            .insert(schemaAudits)
-            .values({
-              urlHash: hash,
-              url: normalised,
-              schemas: { schemas, additionalTypes, totalSchemasFound },
-              additionalTypes,
-              completenessByType,
-            })
-            .onConflictDoUpdate({
-              target: schemaAudits.urlHash,
-              set: {
+          const result = await safeFetchText(normalised, {
+            maxBytes: 2 * 1024 * 1024,
+            timeoutMs: 15_000,
+            headers: { "User-Agent": "VentureCite-SchemaAudit/1.0" },
+          });
+          if (result.status >= 200 && result.status < 300) {
+            html = result.text;
+          } else {
+            fetchError = `Target returned HTTP ${result.status}`;
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Failed to fetch URL";
+          if (/private|not allowed|resolve|Invalid URL|http/i.test(msg)) {
+            return res.status(400).json({
+              success: false,
+              error: "This URL isn't reachable (private host or invalid).",
+            });
+          }
+          fetchError = msg;
+        }
+
+        const nodesByType = html ? parseJsonLdFromHtml(html) : new Map<string, object[]>();
+        const schemas = Object.entries(SCHEMA_FIELD_REQUIREMENTS).map(([schemaType, spec]) => {
+          const instances = nodesByType.get(schemaType) ?? [];
+          const present = instances.length > 0;
+          const { completeness, populatedFields, missingFields } = present
+            ? measureSchemaCompleteness(instances, spec.required, spec.recommended)
+            : {
+                completeness: 0,
+                populatedFields: [],
+                missingFields: [...spec.required, ...spec.recommended],
+              };
+          return {
+            schemaType,
+            present,
+            completenessPercent: Math.round(completeness * 100),
+            populatedFields,
+            missingFields,
+            required: spec.required,
+            recommended: spec.recommended,
+          };
+        });
+
+        const catalogueSet = new Set(Object.keys(SCHEMA_FIELD_REQUIREMENTS));
+        const additionalTypes = Array.from(nodesByType.keys()).filter((t) => !catalogueSet.has(t));
+        const completenessByType: Record<string, number> = {};
+        for (const s of schemas) {
+          if (s.present) completenessByType[s.schemaType] = s.completenessPercent / 100;
+        }
+        const totalSchemasFound = nodesByType.size;
+        const responsePayload = {
+          url: normalised,
+          fetched: !fetchError,
+          fetchError,
+          schemas,
+          additionalTypes,
+          totalSchemasFound,
+          cachedAt: null as Date | null,
+        };
+
+        if (!fetchError) {
+          try {
+            await db
+              .insert(schemaAudits)
+              .values({
+                urlHash: hash,
                 url: normalised,
                 schemas: { schemas, additionalTypes, totalSchemasFound },
                 additionalTypes,
                 completenessByType,
-                fetchedAt: new Date(),
-              },
-            });
-        } catch (err) {
-          logger.warn({ err }, "schema-audit: failed to upsert cache");
+              })
+              .onConflictDoUpdate({
+                target: schemaAudits.urlHash,
+                set: {
+                  url: normalised,
+                  schemas: { schemas, additionalTypes, totalSchemasFound },
+                  additionalTypes,
+                  completenessByType,
+                  fetchedAt: new Date(),
+                },
+              });
+          } catch (err) {
+            logger.warn({ err }, "schema-audit: failed to upsert cache");
+          }
         }
+
+        res.json({ success: true, data: responsePayload });
+      } catch (err) {
+        logger.error({ err }, "geo-signals/schema-audit failed");
+        const msg = err instanceof Error ? err.message : "Failed to audit schema";
+        captureAndFlush(err, { tags: { source: "geoSignals.ts:759" } });
+        res.status(500).json({ success: false, error: msg });
       }
+    }),
+  );
 
-      res.json({ success: true, data: responsePayload });
-    } catch (err) {
-      logger.error({ err }, "geo-signals/schema-audit failed");
-      const msg = err instanceof Error ? err.message : "Failed to audit schema";
-      res.status(500).json({ success: false, error: msg });
-    }
-  });
-
-  app.get("/api/geo-signals/schema-completeness/:articleId", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const articleId = req.params.articleId;
-      const rows = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
-      const article = rows[0];
-      if (!article) {
-        return res.status(404).json({ success: false, error: "Article not found" });
+  app.get(
+    "/api/geo-signals/schema-completeness/:articleId",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const articleId = req.params.articleId;
+        const rows = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
+        const article = rows[0];
+        if (!article) {
+          return res.status(404).json({ success: false, error: "Article not found" });
+        }
+        const brandRows = await db
+          .select()
+          .from(brands)
+          .where(and(eq(brands.id, article.brandId), eq(brands.userId, user.id)))
+          .limit(1);
+        const brand = brandRows[0];
+        if (!brand) {
+          return res.status(404).json({ success: false, error: "Article not found" });
+        }
+        // Wave 7: articles no longer have a slug. Use the user-supplied
+        // externalUrl (the article's URL on their own site) as the source
+        // of truth. If unset, schema audit isn't possible — return null.
+        if (!article.externalUrl) {
+          return res.json({ success: true, data: { completeness: null } });
+        }
+        const url = normaliseUrl(article.externalUrl);
+        const hash = urlHashOf(url);
+        const cached = (
+          await db.select().from(schemaAudits).where(eq(schemaAudits.urlHash, hash)).limit(1)
+        )[0];
+        if (!cached) {
+          return res.json({ success: true, data: { completeness: null } });
+        }
+        const map = (cached.completenessByType ?? {}) as Record<string, number>;
+        const values = Object.values(map);
+        const completeness =
+          values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
+        res.json({
+          success: true,
+          data: { completeness, cachedAt: cached.fetchedAt, byType: map },
+        });
+      } catch (err) {
+        logger.error({ err }, "geo-signals/schema-completeness failed");
+        captureAndFlush(err, { tags: { source: "geoSignals.ts:805" } });
+        res.status(500).json({ success: false, error: "Failed to read schema completeness" });
       }
-      const brandRows = await db
-        .select()
-        .from(brands)
-        .where(and(eq(brands.id, article.brandId), eq(brands.userId, user.id)))
-        .limit(1);
-      const brand = brandRows[0];
-      if (!brand) {
-        return res.status(404).json({ success: false, error: "Article not found" });
+    }),
+  );
+
+  app.post(
+    "/api/geo-signals/pipeline-simulation",
+    asyncHandler(async (req, res) => {
+      try {
+        requireUser(req);
+        const { content, query, articleUpdatedAt, schemaCompleteness } = req.body ?? {};
+        if (!content || typeof content !== "string" || !query || typeof query !== "string") {
+          return res.status(400).json({ success: false, error: "Content and query required" });
+        }
+        if (content.length > MAX_CONTENT_LENGTH) {
+          return res
+            .status(413)
+            .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
+        }
+
+        const signalsResult = await computeSignals(
+          content,
+          query,
+          typeof articleUpdatedAt === "string" ? articleUpdatedAt : undefined,
+          typeof schemaCompleteness === "number" ? schemaCompleteness : undefined,
+        );
+        const { chunks, stats } = computeChunks(content);
+
+        const contentLower = content.toLowerCase();
+        const qLower = query.toLowerCase();
+        const terms = stopwordFilterQuery(query);
+        const verbatimMatch = contentLower.includes(qLower);
+        const firstPara = (content.split(/\n\n+/)[0] ?? "").toLowerCase();
+        const firstParaHasQueryWord = terms.length > 0 && terms.some((w) => firstPara.includes(w));
+        const firstParaVerbatim = firstPara.includes(qLower);
+
+        const prepareScore = Math.min(
+          100,
+          Math.round(
+            (verbatimMatch ? 20 : 0) +
+              signalsResult.termCoverageRatio * 30 +
+              (firstParaVerbatim ? 50 : firstParaHasQueryWord ? 25 : 0),
+          ),
+        );
+
+        const extractable = stats.totalChunks > 0 ? stats.extractableChunks / stats.totalChunks : 0;
+        const retrieveScore = Math.min(
+          100,
+          Math.round(
+            signalsResult.termCoverageRatio * 35 +
+              signalsResult.questionHeadingFraction * 25 +
+              extractable * 40,
+          ),
+        );
+
+        const signalScore = signalsResult.overallScore;
+
+        const hasRichChunk = chunks.some(
+          (c) =>
+            c.hasHeading &&
+            c.hasDirectAnswer &&
+            typeof c.rawContent === "string" &&
+            c.rawContent.length >= 200,
+        );
+        const hasLink = /\bhttps?:\/\/\S+/i.test(content);
+        const byline = detectBylines(content);
+        const serveScore = Math.min(
+          100,
+          (hasRichChunk ? 50 : 0) + (hasLink ? 30 : 0) + (byline.found ? 20 : 0),
+        );
+
+        const statusOf = (s: number): "pass" | "warning" | "fail" =>
+          s >= 70 ? "pass" : s >= 40 ? "warning" : "fail";
+
+        const stages = [
+          {
+            stage: "Prepare",
+            status: statusOf(prepareScore),
+            score: prepareScore,
+            details: [
+              `Verbatim query match: ${verbatimMatch ? "yes" : "no"}`,
+              `Query-term coverage: ${Math.round(signalsResult.termCoverageRatio * 100)}%`,
+              `Direct answer in first paragraph: ${firstParaVerbatim ? "verbatim" : firstParaHasQueryWord ? "partial" : "none"}`,
+            ],
+          },
+          {
+            stage: "Retrieve",
+            status: statusOf(retrieveScore),
+            score: retrieveScore,
+            details: [
+              `Term coverage ratio: ${signalsResult.termCoverageRatio.toFixed(2)}`,
+              `Question-style headings: ${Math.round(signalsResult.questionHeadingFraction * 100)}%`,
+              `Extractable chunks: ${stats.extractableChunks}/${stats.totalChunks}`,
+            ],
+          },
+          {
+            stage: "Signal",
+            status: statusOf(signalScore),
+            score: signalScore,
+            details: [
+              `6-signal overall score: ${signalScore}/100`,
+              "Matches Tab 1 scorecard exactly",
+            ],
+          },
+          {
+            stage: "Serve",
+            status: statusOf(serveScore),
+            score: serveScore,
+            details: [
+              `Rich citable chunk (heading + direct answer + >=200 chars): ${hasRichChunk ? "yes" : "no"}`,
+              `Outbound http(s) links: ${hasLink ? "yes" : "no"}`,
+              `Byline / author attribution: ${byline.found ? "yes" : "no"}`,
+            ],
+          },
+        ];
+        res.json({ success: true, data: { stages, query } });
+      } catch (err) {
+        logger.error({ err }, "geo-signals/pipeline-simulation failed");
+        captureAndFlush(err, { tags: { source: "geoSignals.ts:920" } });
+        res.status(500).json({ success: false, error: "Failed to simulate pipeline" });
       }
-      // Wave 7: articles no longer have a slug. Use the user-supplied
-      // externalUrl (the article's URL on their own site) as the source
-      // of truth. If unset, schema audit isn't possible — return null.
-      if (!article.externalUrl) {
-        return res.json({ success: true, data: { completeness: null } });
-      }
-      const url = normaliseUrl(article.externalUrl);
-      const hash = urlHashOf(url);
-      const cached = (
-        await db.select().from(schemaAudits).where(eq(schemaAudits.urlHash, hash)).limit(1)
-      )[0];
-      if (!cached) {
-        return res.json({ success: true, data: { completeness: null } });
-      }
-      const map = (cached.completenessByType ?? {}) as Record<string, number>;
-      const values = Object.values(map);
-      const completeness =
-        values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
-      res.json({
-        success: true,
-        data: { completeness, cachedAt: cached.fetchedAt, byType: map },
-      });
-    } catch (err) {
-      logger.error({ err }, "geo-signals/schema-completeness failed");
-      res.status(500).json({ success: false, error: "Failed to read schema completeness" });
-    }
-  });
-
-  app.post("/api/geo-signals/pipeline-simulation", async (req, res) => {
-    try {
-      requireUser(req);
-      const { content, query, articleUpdatedAt, schemaCompleteness } = req.body ?? {};
-      if (!content || typeof content !== "string" || !query || typeof query !== "string") {
-        return res.status(400).json({ success: false, error: "Content and query required" });
-      }
-      if (content.length > MAX_CONTENT_LENGTH) {
-        return res
-          .status(413)
-          .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
-      }
-
-      const signalsResult = await computeSignals(
-        content,
-        query,
-        typeof articleUpdatedAt === "string" ? articleUpdatedAt : undefined,
-        typeof schemaCompleteness === "number" ? schemaCompleteness : undefined,
-      );
-      const { chunks, stats } = computeChunks(content);
-
-      const contentLower = content.toLowerCase();
-      const qLower = query.toLowerCase();
-      const terms = stopwordFilterQuery(query);
-      const verbatimMatch = contentLower.includes(qLower);
-      const firstPara = (content.split(/\n\n+/)[0] ?? "").toLowerCase();
-      const firstParaHasQueryWord = terms.length > 0 && terms.some((w) => firstPara.includes(w));
-      const firstParaVerbatim = firstPara.includes(qLower);
-
-      const prepareScore = Math.min(
-        100,
-        Math.round(
-          (verbatimMatch ? 20 : 0) +
-            signalsResult.termCoverageRatio * 30 +
-            (firstParaVerbatim ? 50 : firstParaHasQueryWord ? 25 : 0),
-        ),
-      );
-
-      const extractable = stats.totalChunks > 0 ? stats.extractableChunks / stats.totalChunks : 0;
-      const retrieveScore = Math.min(
-        100,
-        Math.round(
-          signalsResult.termCoverageRatio * 35 +
-            signalsResult.questionHeadingFraction * 25 +
-            extractable * 40,
-        ),
-      );
-
-      const signalScore = signalsResult.overallScore;
-
-      const hasRichChunk = chunks.some(
-        (c) =>
-          c.hasHeading &&
-          c.hasDirectAnswer &&
-          typeof c.rawContent === "string" &&
-          c.rawContent.length >= 200,
-      );
-      const hasLink = /\bhttps?:\/\/\S+/i.test(content);
-      const byline = detectBylines(content);
-      const serveScore = Math.min(
-        100,
-        (hasRichChunk ? 50 : 0) + (hasLink ? 30 : 0) + (byline.found ? 20 : 0),
-      );
-
-      const statusOf = (s: number): "pass" | "warning" | "fail" =>
-        s >= 70 ? "pass" : s >= 40 ? "warning" : "fail";
-
-      const stages = [
-        {
-          stage: "Prepare",
-          status: statusOf(prepareScore),
-          score: prepareScore,
-          details: [
-            `Verbatim query match: ${verbatimMatch ? "yes" : "no"}`,
-            `Query-term coverage: ${Math.round(signalsResult.termCoverageRatio * 100)}%`,
-            `Direct answer in first paragraph: ${firstParaVerbatim ? "verbatim" : firstParaHasQueryWord ? "partial" : "none"}`,
-          ],
-        },
-        {
-          stage: "Retrieve",
-          status: statusOf(retrieveScore),
-          score: retrieveScore,
-          details: [
-            `Term coverage ratio: ${signalsResult.termCoverageRatio.toFixed(2)}`,
-            `Question-style headings: ${Math.round(signalsResult.questionHeadingFraction * 100)}%`,
-            `Extractable chunks: ${stats.extractableChunks}/${stats.totalChunks}`,
-          ],
-        },
-        {
-          stage: "Signal",
-          status: statusOf(signalScore),
-          score: signalScore,
-          details: [
-            `6-signal overall score: ${signalScore}/100`,
-            "Matches Tab 1 scorecard exactly",
-          ],
-        },
-        {
-          stage: "Serve",
-          status: statusOf(serveScore),
-          score: serveScore,
-          details: [
-            `Rich citable chunk (heading + direct answer + >=200 chars): ${hasRichChunk ? "yes" : "no"}`,
-            `Outbound http(s) links: ${hasLink ? "yes" : "no"}`,
-            `Byline / author attribution: ${byline.found ? "yes" : "no"}`,
-          ],
-        },
-      ];
-      res.json({ success: true, data: { stages, query } });
-    } catch (err) {
-      logger.error({ err }, "geo-signals/pipeline-simulation failed");
-      res.status(500).json({ success: false, error: "Failed to simulate pipeline" });
-    }
-  });
+    }),
+  );
 }

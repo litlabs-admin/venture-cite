@@ -2092,3 +2092,515 @@ No schema change. `users.buffer_access_token` reused. Existing OAuth-connected u
 - A separate Buffer-settings page outside `DistributeDialog`.
 - A migration shim for users connected via the deleted OAuth flow — they reconnect with a manually-generated token. Acceptable per the user's decision.
 - Caching the profile list locally (existing `/profiles` route fetches on demand; layering a cache is premature).
+
+## Wave 13 — Buffer v1 REST → GraphQL migration
+
+After Wave 12 shipped, real-world testing revealed Buffer had retired the v1 REST API (`api.bufferapp.com/1/`). Every paste of a fresh API key returned `400 invalid_token` because Buffer's `/user.json` endpoint no longer exists. Buffer's current public API is GraphQL at `https://api.buffer.com` with `Authorization: Bearer <key>` auth, and keys are now generated at `https://publish.buffer.com/settings/api` (not the legacy `developers/api` page). Wave 12 implemented BYOK against an API surface that was already gone — this wave migrates everything to the live GraphQL API.
+
+### 13.1 Endpoint rewrites ([server/routes/buffer.ts](server/routes/buffer.ts))
+
+All three Buffer-facing routes rewritten against the GraphQL endpoint. A new `bufferGraphQL()` helper inside the file centralizes the POST-with-Bearer pattern and JSON parsing.
+
+- **`POST /api/buffer/connect`** — validates by issuing a minimal `{ account { id } }` query. 200 with `data.account.id` non-null = valid; HTTP 401 OR a top-level `errors[].extensions.code === "UNAUTHORIZED"` / `"FORBIDDEN"` = `invalid_token`; everything else = `buffer_unreachable`. The 200-with-UNAUTHORIZED case is GraphQL-specific (REST APIs use HTTP status; GraphQL APIs use 200 + errors[]) and the most common failure mode for a wrong-account or revoked key.
+- **`GET /api/buffer/profiles`** — was a single `GET /1/profiles.json`; is now two queries: `{ account { organizations { id } } }` to discover the org list, then `channels(input: { organizationId })` for each. Buffer's data model exposes channels under organizations rather than a flat profile list. The response shape returned to the client is intentionally identical to the legacy REST mapping (`{id, service, formattedService, username, avatar}`) so `DistributeDialog`'s existing matcher logic kept working without UI changes. `formattedService` is synthesized from `service` (`"twitter"` → `"Twitter"`, `"google_business"` → `"Google Business"`).
+- **`POST /api/buffer/post`** — was a `POST /1/updates/create.json` with `profile_ids[]`; is now a `createPost` mutation per channel. The route's contract changed from `profileIds: string[]` to `channelId: string` (one channel per request — multi-channel becomes a client-side loop, which is what the existing call site already did with single-element arrays).
+
+### 13.2 Documentation cleanup
+
+`.env.example` Buffer block rewritten to point at `https://publish.buffer.com/settings/api` and to mention the GraphQL endpoint.
+
+`docs/feature_flows.md` — five stale references hunted down: the env-var row referencing `BUFFER_CLIENT_ID/SECRET/REDIRECT_URI`, an obsolete `APP_URL: Buffer OAuth callback default` row, a "What happens when you click Post to Buffer" section narrating the v1 REST flow, two narrative phrases ("user's stored Buffer OAuth token" / "OAuth token for Buffer posting"), and a "Buffer connection" section with v1 REST code samples. All replaced with GraphQL equivalents documenting the new `createPost` mutation and the channel-via-organization fetch pattern.
+
+### 13.3 Tests
+
+[tests/unit/bufferConnect.test.ts](tests/unit/bufferConnect.test.ts) updated for the GraphQL response shape (URL `https://api.buffer.com`, `Authorization: Bearer` header, `data.account.id` in success body). Two new test cases:
+
+- 200 OK with `errors[].extensions.code === "UNAUTHORIZED"` → `invalid_token`. Locks in the GraphQL idiom.
+- 200 OK with `data.account: null` → `buffer_unreachable`. Guards against silently succeeding when the account query returns nothing useful.
+
+10 buffer tests passing (217 → 224 → 227 across the migration).
+
+### 13.4 Connected-state strip in DistributeDialog
+
+After successfully connecting, the disconnect-side strip with the Connect button got replaced with a green "Buffer connected · N channel(s)" strip that includes a "Disconnect Buffer" button — so the user has a confirmation that the connection landed and a one-click way to switch keys. ([client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx)).
+
+### 13.5 Files
+
+| File                                                     | Change                                                                                                                                                                                                      |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/buffer.ts`                                | Full rewrite. New `bufferGraphQL()` helper; `formatService()` slug-to-display helper; all three routes (`/connect`, `/profiles`, `/post`) issue GraphQL queries/mutations against `https://api.buffer.com`. |
+| `client/src/components/articles/DistributeDialog.tsx`    | Profile-picker matcher unchanged (the kept-identical response shape is why). Connected-state green strip added; `<a href="/api/auth/buffer">` link removed (stale even pre-GraphQL).                        |
+| `client/src/components/articles/BufferConnectDialog.tsx` | Copy + helper link updated to `https://publish.buffer.com/settings/api`; placeholder "Paste your Buffer API key".                                                                                           |
+| `tests/unit/bufferConnect.test.ts`                       | All assertions updated for GraphQL endpoint + Bearer auth + JSON response body shape; +2 tests for UNAUTHORIZED-in-200 and missing-account paths.                                                           |
+| `.env.example`                                           | Buffer block rewritten.                                                                                                                                                                                     |
+| `docs/feature_flows.md`                                  | Buffer flow narration replaced with GraphQL equivalents; v1 REST code samples removed.                                                                                                                      |
+
+### 13.6 Observed timeline
+
+The connect bug → fix loop took about a day:
+
+- Initial Wave 12 ship: paste → 400 invalid_token (silent — the v1 REST endpoint just rejects everything)
+- Buffer's developer docs were the smoking gun: their published API spec is GraphQL-only.
+- Migration ship: paste → 200 → channel list visible immediately.
+
+Lesson worth recording: when a third-party integration starts failing for "no obvious reason," check the third party's current API docs before assuming the bug is on your side. v1 REST was deprecated for ~12 months before retirement; older blog posts and StackOverflow answers still reference it as canonical.
+
+---
+
+## Wave 14 — Distribute: direct-post to Buffer + expanded platforms + posted-state persistence
+
+The Distribute panel previously generated platform-adapted copy for LinkedIn / Medium / Reddit / Quora and stopped there — the user copied each card's text and pasted it into Buffer manually. With BYOK working, the natural next step was a one-click Post-to-Buffer button per card. Three additions in this wave:
+
+1. **Three new prompt templates** (Twitter / Facebook / Instagram) with per-platform character limits embedded as hard constraints in the prompt itself.
+2. **Per-card "Add to Buffer Queue" button** with a four-state machine (already-queued / not-connected / disabled-no-channel / queueable) and a popover channel picker for the multiple-matches case.
+3. **Posted-state persistence** — repurposing the existing `distributions.platform_post_id` column properly so closing and reopening the Distribute dialog still shows which cards have been queued.
+
+### 14.1 Server-side: prompts and the new endpoint
+
+**Three new prompt templates** added to `platformPrompts` inside `POST /api/distribute/:articleId` ([server/routes/articles.ts](server/routes/articles.ts)). Each one bakes the platform's hard limit directly into the prompt as a literal "Hard constraint:" sentence plus a final-line reminder, so the LLM treats it as non-negotiable and we don't need a post-process step:
+
+- **Twitter:** ≤ 280 characters total. Punchy hook, 1–2 hashtags, no preamble.
+- **Facebook:** ≤ 2000 characters (engagement falls off past that). 2–4 short paragraphs, 1–2 emojis, 3–5 hashtags.
+- **Instagram:** ≤ 2200 characters total, but the **first 125 characters** must contain the hook (that's what shows before Instagram's "more" cut). Up to 30 hashtags grouped at the end.
+
+The platform cap raised from 5 → 7 to fit the new set ([server/routes/articles.ts:375](server/routes/articles.ts#L375)).
+
+**Pre-existing fake-stamp bug fixed.** The old generation handler stamped `distributions.platform_post_id` with a synthetic `<service>_<articleId>_<timestamp>` string at generation time — but `platform_post_id` is meant to hold the real third-party post id. The new direct-post UI correctly treats any non-null `platform_post_id` as "this row has been posted to Buffer," so every existing generated row showed as "Posted ✓" falsely. Migration `0046_clear_fake_distribution_post_ids.sql` clears those synthetic strings via a regex match (`^(linkedin|medium|reddit|quora|twitter|facebook|instagram)_[0-9a-f-]+_[0-9]+$`) — real Buffer post ids don't match the pattern so legitimate posts are preserved. The generation handler also stops writing the synthetic value going forward.
+
+**New shared helper [server/lib/bufferPost.ts](server/lib/bufferPost.ts):** extracted `postToBuffer(userId, channelId, text, scheduledAt?)` returning `{ok:true, postId} | {ok:false, code: "not_connected"|"rejected"|"unreachable", message?}`. Both `/api/buffer/post` and the new endpoint go through it. Default mode is `addToQueue` (Buffer fills the next slot from the user's per-channel posting schedule); `scheduledAt` switches to `customScheduled` with a `dueAt`. Top-level GraphQL `errors[]` are surfaced as `rejected` with the upstream message verbatim instead of being lumped with `unreachable`, so the inline UI error tells the user exactly what Buffer rejected (e.g. "Tweet too long") rather than a generic 502.
+
+**New endpoint `POST /api/distributions/:distributionId/buffer-post`** ([server/routes/articles.ts](server/routes/articles.ts)). Body `{channelId}`. Verifies article ownership (`requireArticle`) — 404 not 403 on miss per the anti-enumeration rule. Reads the row's `metadata.content`; 400 `no_content` if missing/empty. Calls `postToBuffer`; on success stamps `platform_post_id` with the Buffer post id, flips `status` to `scheduled`, sets `distributed_at`, returns 200 `{success:true, data:{platformPostId}}`. On failure preserves the row and returns the right error code.
+
+The existing `/api/buffer/post` route became a thin shim over `postToBuffer` so all three callers share one code path.
+
+### 14.2 Client-side: PlatformPostButton + DistributeDialog rewiring
+
+**New component [client/src/components/articles/PlatformPostButton.tsx](client/src/components/articles/PlatformPostButton.tsx):** self-contained four-state machine.
+
+| State            | Trigger                 | Label                            | Action                                                         |
+| ---------------- | ----------------------- | -------------------------------- | -------------------------------------------------------------- |
+| Already queued   | `platformPostId` truthy | `Queued ✓ View in Buffer`        | Opens `https://publish.buffer.com/queue` in new tab            |
+| Not connected    | `!bufferConnected`      | `Connect Buffer to post`         | Opens controlled `<BufferConnectDialog>` instance              |
+| No channel match | `matches.length === 0`  | `Add to Buffer Queue` (disabled) | Tooltip: "No {platform} channel in your Buffer"                |
+| Single match     | `matches.length === 1`  | `Add to Buffer Queue`            | Posts to that channel                                          |
+| Multiple matches | `matches.length > 1`    | `Add to Buffer Queue ▾`          | Popover lists each matching channel by username; click → posts |
+
+While a post is in flight: spinner + "Posting…", button disabled. On Buffer rejection (e.g. content over the platform's character limit), the upstream message renders inline below the button — the user can edit copy and retry without losing the rest of their cards.
+
+The set of platforms the button renders for: **LinkedIn, Twitter, Facebook, Instagram**. Medium / Reddit / Quora cards keep their existing Edit / Copy actions only — Buffer doesn't support those services, and no Post-to-Buffer button means no false hope.
+
+**`BufferConnectDialog` extended to optional controlled mode.** When both `open` and `onOpenChange` props are passed, the dialog defers to the parent for open state instead of using its internal `useState`. This lets the per-card "Connect Buffer to post" button (rendered when `!bufferConnected`) open the same dialog instance that lives in the top connection strip. Default uncontrolled behavior preserved for existing call sites.
+
+**[DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) — five wiring changes:**
+
+1. **Platform list** widened from 4 → 7. Buffer-supported first, copy-only after: `["LinkedIn", "Twitter", "Facebook", "Instagram", "Medium", "Reddit", "Quora"]`. A constant `BUFFER_SUPPORTED_PLATFORMS` gates the new button.
+2. **`generatedContent` row type widened** to carry `distributionId` and `platformPostId`. The `/api/distribute/:articleId` response was extended to return both per-row, so freshly-generated cards have what the new button needs without an extra round-trip.
+3. **Per-platform merge instead of replace** in `distributeMutation.onSuccess`. Previously `setGeneratedContent(data.data)` overwrote the array — generating Twitter alone after a previous LinkedIn run would erase the LinkedIn card and its queued state. The new code merges by platform: incoming rows replace same-platform existing ones; new platforms append; untouched platforms persist.
+4. **Hydrate from history on dialog open.** A new `useEffect` reads `historyData` (the existing `GET /api/distributions/:articleId` response), groups by platform, picks the most recent successful row per platform, and seeds `generatedContent` if it's empty. Closing the dialog (which resets `generatedContent` to `[]`) and reopening rehydrates the same cards — the user never loses track of what's queued.
+5. **History tab filter widened** to include `status: "scheduled"` rows (the new "queued in Buffer" status), not just `"success"`.
+
+The old `postToBufferMutation` (which targeted the legacy `/api/buffer/post` with arbitrary text) is replaced by `postDistributionMutation`, which calls the new distribution-scoped endpoint and stores per-card error messages in a `cardErrors` state map. On success: optimistic local update of `platformPostId`, invalidate `/api/distributions/:articleId` so the next refetch confirms it, toast "Queued in Buffer".
+
+### 14.3 Tests
+
+New [tests/unit/distributionBufferPost.test.ts](tests/unit/distributionBufferPost.test.ts) with six cases covering the new endpoint:
+
+1. Success — distribution exists, ownership confirmed, `postToBuffer` returns `{ok:true, postId}` → 200 with `platformPostId` stamped on the row.
+2. Buffer not connected — `postToBuffer` returns `{ok:false, code:"not_connected"}` → 403, no DB write.
+3. No content — distribution row's `metadata.content` is missing/empty → 400 `no_content`, no Buffer call.
+4. Distribution not owned — `requireArticle` throws → 404 `not_found` (not 403; anti-enumeration).
+5. Buffer rejection — `postToBuffer` returns `{ok:false, code:"rejected", message:"Tweet too long."}` → 502 with the upstream message verbatim.
+6. Buffer unreachable — `postToBuffer` returns `{ok:false, code:"unreachable"}` → 502 `buffer_unreachable`.
+
+All 233 tests pass (227 → 233, +6 from the new endpoint).
+
+### 14.4 Files
+
+| File                                                     | Change                                                                                                                                                                                                                                                                                                                                                                                             |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/articles.ts`                              | 3 new prompts (Twitter/Facebook/Instagram) inside `platformPrompts`; cap `slice(0,5)` → `slice(0,7)`; removed fake `platformPostId` stamp at generation time; generate response now returns `distributionId` and `platformPostId: null` per row; new `POST /api/distributions/:distributionId/buffer-post` route.                                                                                  |
+| `server/routes/buffer.ts`                                | `/api/buffer/post` reduced to a thin shim over `postToBuffer`.                                                                                                                                                                                                                                                                                                                                     |
+| `server/lib/bufferPost.ts`                               | NEW. Shared helper `postToBuffer(userId, channelId, text, scheduledAt?)`. Default `mode: addToQueue`; surfaces upstream `errors[]` as `rejected` with message; logs the failure body server-side for debugging.                                                                                                                                                                                    |
+| `migrations/0046_clear_fake_distribution_post_ids.sql`   | NEW. One-shot UPDATE clearing synthetic `platform_post_id` strings via regex; preserves real Buffer post ids.                                                                                                                                                                                                                                                                                      |
+| `client/src/components/articles/PlatformPostButton.tsx`  | NEW. Four-state per-card button with channel-picker popover.                                                                                                                                                                                                                                                                                                                                       |
+| `client/src/components/articles/BufferConnectDialog.tsx` | Optional controlled-mode props (`open`, `onOpenChange`); existing uncontrolled behavior preserved.                                                                                                                                                                                                                                                                                                 |
+| `client/src/components/articles/DistributeDialog.tsx`    | Platform list widened to 7; matcher changed to return all matches (was filtering to single match silently); generate-onSuccess merges by platform; hydrate-from-history `useEffect`; history filter widened for `status: "scheduled"`; per-card `<PlatformPostButton>` mounted on Buffer-supported cards; controlled `<BufferConnectDialog>` instance opened by per-card "Connect Buffer to post". |
+| `tests/unit/distributionBufferPost.test.ts`              | NEW. 6 tests covering the new endpoint's branches.                                                                                                                                                                                                                                                                                                                                                 |
+
+### 14.5 Queue timing
+
+`mode: addToQueue` lets Buffer pick the slot from the user's per-channel posting schedule (configured at `https://publish.buffer.com/account/posting-schedule`). The platform does **not** set queue timing — that's the entire point of queue mode. If a channel has no posting schedule configured in Buffer, queued posts sit in the queue indefinitely until the user adds a schedule or moves them to a custom time inside Buffer's web app. The toast description ("Will publish at the next slot in your Buffer schedule for this channel.") makes this explicit.
+
+The helper still accepts an optional `scheduledAt` ISO string and switches to `mode: customScheduled` with a `dueAt`, so adding a per-card date picker later is a UI-only change.
+
+### 14.6 Out of scope
+
+- Per-card scheduling UI (date picker → `mode: customScheduled`). Helper supports it; UI doesn't surface it yet.
+- Server-side dedup of double-clicks. Buffer doesn't dedup; cost > benefit at this scale.
+- Image / media attachments on posts. Generated copy is text-only; Buffer's `createPost` mutation supports `assets` but neither generation nor the dialog produces media.
+- Client-side character-count preview before submit. The prompt enforces; Buffer enforces again on accept; we display Buffer's error message verbatim on rejection.
+- Buffer Idea / draft mode.
+- Twitter thread / multi-tweet support.
+- Buffer post performance analytics. Buffer's own dashboard handles it.
+- Refactoring the inline prompt strings into named exports for testability. Tried during planning; the file is already large and the constraint phrases live in plain sight in code review. Skipped.
+
+---
+
+## Wave 15 — Production-readiness pass: SSRF + asyncHandler + Sentry capture-and-flush + console sweep
+
+Driven by the items flagged in `PRODUCTION_PLAN.md` Workstream B. Five discrete fixes, all additive and shape-preserving — no response bodies changed, no try/catch removed, no architectural rewrites. The codebase still serves the same JSON to clients; the difference is what happens server-side when something goes wrong.
+
+### 15.1 SSRF on the Slack webhook test endpoint
+
+**Problem.** `POST /api/alerts/test/:settingId` did `fetch(setting.slackWebhookUrl, ...)` after only checking `url.hostname.endsWith("slack.com")`. Two bypasses existed:
+
+1. Attacker-controlled subdomains that happen to end with `slack.com` (or someone's tenant subdomain on Slack's infra) — the `endsWith` check passes them.
+2. **DNS rebinding** — `legit.slack.com` resolves to a public IP at validation time (passes the hostname check) and to `127.0.0.1` or `169.254.169.254` (AWS metadata) when the actual `fetch` runs milliseconds later.
+
+**Fix.** Two layers in [server/routes/intelligence.ts](server/routes/intelligence.ts):
+
+1. A strict regex pinning the canonical Slack incoming-webhook shape: `^https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]+$`. Enforced at all three sites (create, update, test). Closes the subdomain-padding bypass.
+2. `assertSafeUrl()` from [server/lib/ssrf.ts](server/lib/ssrf.ts) called immediately before the `fetch`. It DNS-resolves and rejects private/loopback/link-local/CGNAT/metadata IPs at fetch time. Closes DNS rebinding.
+
+The 3 prior `endsWith("slack.com")` checks at the create / update / test sites all collapse into a single shared `isValidSlackWebhookUrl()` helper.
+
+### 15.2 `console.*` → `logger` in `server/auth.ts`
+
+Four `console.warn` / `console.error` calls in [server/auth.ts](server/auth.ts) (`attachUserIfPresent` JWT-verify path; forgot-password error path) replaced with `logger.warn` / `logger.error` from the existing Pino instance. Errors are passed as `{ err }` so Pino's serializer extracts the stack and the redact list (`authorization`, `cookie`, `password`, `token`, …) auto-scrubs sensitive fields. Per the `CLAUDE.md` rule that no `console.*` should appear in server code.
+
+### 15.3 Centralized `asyncHandler` + Sentry capture in `sendError`
+
+Two structural problems before this wave:
+
+1. The global Express error handler in [server/app.ts:356-375](server/app.ts#L356-L375) calls `Sentry.captureException` for any 5xx — but only for **uncaught** errors. Most route handlers use a `try { … } catch (e) { sendError(...) }` pattern that swallows the error before it ever reaches the global handler. Result: ~200 caught 5xx responses were invisible in Sentry.
+2. A handful of handlers had no top-level `try/catch` at all — a thrown error in those leaked as an unhandled rejection. Specifically: [logoProxy.ts:18](server/routes/logoProxy.ts#L18), [content.ts:490](server/routes/content.ts#L490), [content.ts:557](server/routes/content.ts#L557), and [onboarding.ts:101](server/routes/onboarding.ts#L101) (the SSE stream).
+
+**`asyncHandler`** ([server/lib/asyncHandler.ts](server/lib/asyncHandler.ts), 10 lines): wraps an async handler and forwards any thrown error / rejected promise to `next(err)`. Lives in its own file so utility callers (e.g. [server/routes/cron.ts](server/routes/cron.ts)) can import it without dragging in the singleton OpenAI client that [server/lib/routesShared.ts](server/lib/routesShared.ts) instantiates at module load. `routesShared` re-exports it so the 20+ route modules that already import from there don't need an import change.
+
+**`sendError` patched** in [server/lib/routesShared.ts](server/lib/routesShared.ts) and [server/routes.ts](server/routes.ts) (the legacy monolith carries a verbatim copy of the helper): logs via the structured logger AND calls `captureAndFlush` (see §15.7) for any `status >= 500`. Skips capture when `sendOwnershipError` short-circuited (those are 401/404, not 5xx). Tags the event with `source: "sendError"` and the fallback string. ~200 caller sites covered with one edit.
+
+### 15.4 Wrap every route handler with `asyncHandler` (additive)
+
+134 handlers across 21 route files. Every `app.<verb>("/x", async (req, res) => {…})` became `app.<verb>("/x", asyncHandler(async (req, res) => {…}))`. The handler body — including its existing try/catch and `sendError` calls — is **not modified**; the wrapper only adds a safety net for the rare path where an error escapes the inner catch.
+
+The 5 previously-unprotected handlers (§15.3) are now safe. Every future regression where a thrown error escapes a `try` is also covered.
+
+A small codemod (`scripts/wrap-handlers.mjs`, deleted after use) did the mechanical wrapping with brace-aware scanning, idempotent against re-runs. Two multi-line handlers ([prompts.ts:92-108](server/routes/prompts.ts#L92), [analytics.ts:1333](server/routes/analytics.ts#L1333)) the codemod missed were fixed by hand.
+
+Two test mocks needed `asyncHandler` added because they stub `routesShared`: [bufferConnect.test.ts](tests/unit/bufferConnect.test.ts) and [distributionBufferPost.test.ts](tests/unit/distributionBufferPost.test.ts). Both got a pass-through `asyncHandler: (fn) => fn` so the tests don't exercise the unhandled-rejection path.
+
+### 15.5 Inline `Sentry.captureException` at the raw `res.status(500)` sites that bypass `sendError`
+
+49 sites — mostly older handlers (auth registration paths, billing, analytics, intelligence, content, etc.) — write the response directly via `res.status(500).json(...)` without going through `sendError`, so the §15.3 patch doesn't cover them. Each got an inline `Sentry.captureException(error, { tags: { source: "<file>:<line>" } })` immediately before the response. Response shape preserved exactly — the agent endpoint's non-standard `{ success, error, task }` shape at [agent.ts:208](server/routes/agent.ts#L208) is left intact.
+
+A second small codemod (`scripts/add-sentry-capture.mjs`, deleted after use) inserted these by walking each `res.status(500)` site, finding the nearest `} catch (X)` above it to identify the error variable, and inserting the capture line at the matching indent. Idempotent (skips sites that already have `Sentry.captureException` within 6 lines or `sendError` within 10 lines).
+
+### 15.6 `console.*` sweep across `server/`
+
+62 `console.{log,warn,error}` calls across 15 files converted to `logger.{info,warn,error}`. Two-pass codemod: a single-line shape pass plus a multi-line shape pass for the `console.X(\n  \`template\`,\n err instanceof Error ? err.message : err,\n);` pattern that's everywhere in [server/citationChecker.ts](server/citationChecker.ts) and the brand routes. Pino's existing redact list (`server/lib/logger.ts:62-85`) auto-scrubs sensitive fields so no per-call `{ err }` object had to be hand-curated for safety.
+
+**Skipped on purpose** (3 files):
+
+- [server/log.ts](server/log.ts) — 10-line dev-mode timestamp formatter. Its single `console.log` _is_ its purpose.
+- [server/lib/aiLogger.ts](server/lib/aiLogger.ts) — its docstring states _"Writes to console only — no files — so it works on Vercel's ephemeral filesystem. Safe to leave on in production; noisy but cheap."_ Intentional LLM-trace stdout output that callers grep for. Converting to Pino would change the format.
+- [server/setupProducts.ts](server/setupProducts.ts) — CLI script invoked manually (`tsx server/setupProducts.ts`). 9 `console.log` calls are intentional CLI UX.
+
+Final state: `grep "console\\." server/` returns hits only in the three skip-list files.
+
+### 15.7 Sentry flush via `waitUntil` — fixes the serverless event-loss caveat
+
+Sentry's transport queues events in-process and flushes them asynchronously. On Vercel serverless that queue is fragile: the function freezes the moment the response goes out, so any queued event that hadn't been transmitted is lost. Result before this fix: Sentry would receive _some_ of the events from §15.3–15.5 — the ones that happened to flush before the function suspended — and silently drop the rest. Hard to debug because there's no error: the captures happen, the queue just never empties.
+
+**Fix.** [server/lib/sentryReport.ts](server/lib/sentryReport.ts) (new):
+
+```ts
+export function captureAndFlush(err, ctx = {}) {
+  Sentry.captureException(err, ctx);
+  // 2s upper bound — long enough to clear a normal queue, short
+  // enough to never approach the function's max duration.
+  waitUntil(Sentry.flush(2000).catch(() => {}));
+}
+```
+
+`waitUntil` from `@vercel/functions` keeps the function alive _after_ the response is sent (zero added request latency, bounded by `maxDuration`). Outside Vercel (`npm run dev`, long-running Node), `waitUntil` is a shim that runs the promise in the background — safe in every environment.
+
+Applied via codemod (`scripts/swap-to-flush.mjs`, deleted after use) to every `Sentry.captureException(...)` call in the request/cron lifecycle: 33 pre-existing direct callers + 41 of the 46 inline sites added in §15.5 (the other 5 were in `server/routes.ts` which the script also covered). Total 74 sites converted in addition to the two `sendError` helpers and the global error handler.
+
+**Sites left calling `Sentry.captureException` directly** (intentional):
+
+- [server/lib/sentryReport.ts](server/lib/sentryReport.ts) — defines the wrapper.
+- [server/index.ts:26](server/index.ts#L26) — boot path. On Vercel this never runs in a request; on local dev the long-running process flushes naturally.
+- [server/auth.ts](server/auth.ts) — `Sentry.setUser({ id })` (not an exception capture, doesn't need flushing).
+
+**18 unused `Sentry` imports** dropped from files where every direct call was swapped to the helper. The files still report errors to Sentry — just indirectly via the helper. The dropped imports were dead code that ESLint flagged. A second small codemod (`scripts/drop-unused-sentry.mjs`, deleted after use) walked the candidate list, simulated removing the import, and only removed it when no other `Sentry.X` reference remained in the file.
+
+**Two test mocks updated**: [contentGenerationResponses.test.ts](tests/unit/contentGenerationResponses.test.ts) and [cronOrchestrator.test.ts](tests/unit/cronOrchestrator.test.ts) extended their `Sentry` stub from `{ captureException: vi.fn() }` to `{ captureException: vi.fn(), flush: vi.fn(async () => true) }` so the helper's `Sentry.flush(2000)` call doesn't throw inside the mock.
+
+### 15.8 Files
+
+| File                                                                                                                                                                                                                         | Change                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/lib/asyncHandler.ts`                                                                                                                                                                                                 | NEW. Tiny wrapper that forwards thrown errors to `next(err)`.                                                                                                                                                       |
+| `server/lib/sentryReport.ts`                                                                                                                                                                                                 | NEW. `captureAndFlush(err, ctx)` — capture + `waitUntil(Sentry.flush(2000))`.                                                                                                                                       |
+| `server/lib/routesShared.ts`                                                                                                                                                                                                 | `sendError` now logs via Pino and calls `captureAndFlush` for 5xx. Re-exports `asyncHandler`.                                                                                                                       |
+| `server/routes.ts`                                                                                                                                                                                                           | Same `sendError` patch on the legacy duplicate. 11 handlers wrapped. 5 inline `Sentry.captureException` added at raw 500 sites, then swapped to `captureAndFlush`. One `console.error` (waitlist) → `logger.error`. |
+| `server/app.ts`                                                                                                                                                                                                              | Global error handler now calls `captureAndFlush` (was `Sentry.captureException`). 3 webhook captures (Stripe / Shopify / Resend) swapped to `captureAndFlush`.                                                      |
+| `server/auth.ts`                                                                                                                                                                                                             | 4 `console.*` → `logger.*`. 3 inline `Sentry.captureException` at registration error paths added then swapped to `captureAndFlush`.                                                                                 |
+| `server/routes/intelligence.ts`                                                                                                                                                                                              | SSRF fix at the Slack webhook test endpoint (regex + `assertSafeUrl`). asyncHandler wrap. 10 `Sentry.captureException` added then swapped to `captureAndFlush`. 1 console → logger.                                 |
+| `server/routes/{logoProxy,cron,unsubscribe,billing,revenue,userAccount,onboarding,dashboard,community,geoSignals,analytics,brands,prompts,articles,publications,buffer,content,contentTypes,agent}.ts`                       | asyncHandler wrap on every handler (134 total). Per-file inline Sentry captures + `captureAndFlush` swaps + `console.*` → `logger.*` per the breakdown above.                                                       |
+| `server/{contentGenerationWorker,scheduler,webhookHandlers,citationChecker,emailService}.ts` and `server/lib/{audit,onboardingAutopilot,weeklyDigestEmitter,workflowEngine,factExtractor,listicleScanner,mentionScanner}.ts` | Existing `Sentry.captureException` calls swapped to `captureAndFlush` (these all run inside the daily cron's serverless function). Misc `console.*` → `logger.*` (19 calls in `citationChecker.ts` alone).          |
+| `tests/unit/bufferConnect.test.ts`, `tests/unit/distributionBufferPost.test.ts`                                                                                                                                              | Mock `routesShared` extended with `asyncHandler: (fn) => fn` pass-through.                                                                                                                                          |
+| `tests/unit/contentGenerationResponses.test.ts`, `tests/unit/cronOrchestrator.test.ts`                                                                                                                                       | Mock `instrument` extended with `Sentry.flush: vi.fn(async () => true)`.                                                                                                                                            |
+
+### 15.9 Verification
+
+- `npm run check`: clean.
+- `npm test`: 233/233 passing (no new tests added; this wave is structural — every existing test still passes against the new wiring).
+- `npx eslint server/`: 0 errors. ~368 warnings, all pre-existing `@typescript-eslint/no-explicit-any` style hits unchanged from baseline.
+- `grep "console\\." server/`: only the 3 skip-list files match.
+- `grep "app\\.(get|post|put|patch|delete)" server/routes/`: every match has `asyncHandler(` after the route verb (or after a middleware identifier). No bare `async (req, res)`.
+- `grep "Sentry\\.captureException" server/`: only the three intentional sites listed in §15.7.
+
+### 15.10 Vercel Hobby compatibility
+
+All changes are within the Hobby plan envelope:
+
+- No new functions, no new cron entries, no `vercel.json` changes — still 1 daily cron at `/api/cron/daily-orchestrator`.
+- No new env vars required. `SENTRY_DSN` remains optional; if unset, every `captureAndFlush` is a no-op (and `waitUntil` of a no-op is also a no-op).
+- No new dependencies. `@vercel/functions` was already in `package.json` (used by [server/auth.ts:80-84](server/auth.ts#L80-L84)).
+- Bundle size grew by a few KB. Function size is far below the 250 MB cap.
+- Per-request cost neutral or positive. `asyncHandler` adds sub-microsecond overhead. Pino is ~5× faster than `console.*`. Sentry capture is queued; `waitUntil` keeps the function warm only on error paths and only for ≤2s.
+
+### 15.11 Out of scope
+
+- The remaining items in `PRODUCTION_PLAN.md` Workstream A (chatbot, public articles directory, citation locations, CMS integration, lead magnets, services menu, agency dashboard) — those are product-feature work, separately scoped.
+- Sentry release tagging in CI (PR-time `SENTRY_RELEASE = git rev-parse HEAD`) — small CI tweak, deferred.
+- Source-map upload to Sentry on production builds — deferred.
+- Centralized `HttpError` class so handlers can `throw new HttpError(500, "Failed to X")` and let the global handler do everything. Would let us delete the per-handler try/catch entirely. Tempting but riskier than this wave's additive approach; deferred until we have evidence the current pattern is causing real bugs.
+- A retry-on-flush-failure layer for Sentry. The 2s `waitUntil` budget is generous for normal load; if Sentry's ingest is itself down, dropping the event is the right behavior (the global handler already logged it via Pino).
+
+---
+
+## Wave 16 — Phase 0: Pre-flight cleanup (production-readiness foundation)
+
+First slice of the comprehensive Workstream-A+C product plan (`docs/superpowers/specs/2026-05-04-implement-workstream-a-and-c-design.md`). Phase 0 is the foundation that every subsequent phase builds on — Sentry observability live, server hardened, database safety verified, RUNBOOK expanded.
+
+### 16.1 Sentry account setup (manual, deferred to user)
+
+Sentry org/project signup + DSN + auth-token in Vercel env vars deferred to user's manual session. Code is fully wired (`@sentry/react` already installed + initialized in `client/src/lib/sentry.ts`, server-side `@sentry/node` initialized in `server/instrument.ts`, gated on `SENTRY_DSN`). All capture/flush plumbing from Wave 15 + every new capture site added in this wave is no-op until DSN is provided.
+
+### 16.2 Server hardening
+
+- **B1.5 cap `competitorDetections` Map** at 5000 entries via new `addCompetitorDetection(map, id, platform, delta, onCapHit?)` helper exported from [server/citationChecker.ts](server/citationChecker.ts). Caller in `runCitationCheck` deduplicates `onCapHit` to one warn per run via local `competitorDetectionsCapWarned` boolean. 4 unit tests cover sub-cap accept, at-cap reject, post-cap update-existing, and caller-deduplication pattern.
+- **B3.1 rate limit on `/api/alerts/test/:settingId`** ([server/routes/intelligence.ts:823](server/routes/intelligence.ts#L823)) — added `aiLimitMiddleware`. Closes Slack-webhook flooding abuse vector that the Wave 15 SSRF fix did not (SSRF blocked the destination but not request volume).
+- **B1.6 chart safety comment** at [client/src/components/ui/chart.tsx:75](client/src/components/ui/chart.tsx#L75) — code comment locks in the rationale for `dangerouslySetInnerHTML` (input is hardcoded `THEMES` + caller-supplied static `config`, no user input).
+
+### 16.3 Observability
+
+- **`@sentry/vite-plugin` installed + configured** in [vite.config.ts](vite.config.ts). `build.sourcemap: 'hidden'` generates source maps without exposing them publicly via `sourceMappingURL` comments. The plugin uploads them to Sentry on prod builds gated by `SENTRY_AUTH_TOKEN`. Local builds without the token skip upload silently.
+- **Client-side console sweep** — 5 `console.*` calls remaining in client code routed to `Sentry.captureException` from `@/lib/sentry`:
+  - [client/src/components/ErrorBoundary.tsx](client/src/components/ErrorBoundary.tsx) — React tree crashes now visible without users emailing support
+  - [client/src/lib/authStore.ts](client/src/lib/authStore.ts) — 2 auth-flow failures
+  - [client/src/components/intelligence/ShareOfAnswerTab.tsx](client/src/components/intelligence/ShareOfAnswerTab.tsx) — 1 mutation error
+  - [client/src/pages/reset-password.tsx](client/src/pages/reset-password.tsx) — 1 session error
+- **CSP rationale comment** added to [server/app.ts](server/app.ts) explaining why `styleSrc` includes `'unsafe-inline'` (Recharts injects per-chart theme styles via `dangerouslySetInnerHTML` at component-render time).
+
+### 16.4 Database / migration safety
+
+- **`drizzle-kit check` clean** — no schema drift between Drizzle ORM and database.
+- **Full audit of all 47 migrations** (escalated from spec's "last 5" per user request for production-grade rigor). Found 1 P1 issue: `migrations/0011_prompt_generations.sql:11` was missing `IF NOT EXISTS` on `CREATE INDEX`. Theoretical risk only (the `applyMigrations()` runner uses `schema_migrations` table to skip already-applied migrations on re-boot), but matters for partial-restore scenarios. **Fixed inline.** All other 46 migrations are exemplary — consistent `IF NOT EXISTS`, idempotent data mutations, FK columns indexed, dedup-before-unique-index pattern.
+
+### 16.5 Operational readiness
+
+- **RUNBOOK expansion** ([docs/RUNBOOK.md](docs/RUNBOOK.md), gitignored via `*.md`) — appended four sections: schema state + migration audit findings, 5 incident scenarios (DB pool exhaustion, Stripe webhook signature failures, OpenAI/OpenRouter 429, LLM budget exceeded, stuck content jobs), backup-and-restore procedure for Supabase Free, status page placeholder.
+- **B8.5 backup drill / B8.6 status page** deferred to user's manual session (requires Supabase staging project + `pg_dump`/`psql` installed locally; Better Stack signup + landing footer edit).
+
+### 16.6 Files
+
+| File                                                                                                    | Change                                                                                         |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `server/citationChecker.ts`                                                                             | New `addCompetitorDetection` helper exported; in-place mutation replaced; cap warning wired    |
+| `tests/unit/competitorDetectionsCap.test.ts`                                                            | NEW. 4 tests covering cap behavior + caller deduplication pattern                              |
+| `server/routes/intelligence.ts`                                                                         | `aiLimitMiddleware` applied to `/api/alerts/test/:settingId`                                   |
+| `client/src/components/ui/chart.tsx`                                                                    | Safety comment on `dangerouslySetInnerHTML`                                                    |
+| `vite.config.ts`                                                                                        | `@sentry/vite-plugin` + `build.sourcemap: 'hidden'`                                            |
+| `package.json` + `package-lock.json`                                                                    | `@sentry/vite-plugin` devDependency added                                                      |
+| `client/src/components/ErrorBoundary.tsx`, `authStore.ts`, `ShareOfAnswerTab.tsx`, `reset-password.tsx` | 5 `console.*` → `Sentry.captureException`                                                      |
+| `server/app.ts`                                                                                         | CSP `'unsafe-inline'` rationale comment                                                        |
+| `migrations/0011_prompt_generations.sql`                                                                | `CREATE INDEX` → `CREATE INDEX IF NOT EXISTS`                                                  |
+| `docs/RUNBOOK.md`                                                                                       | Schema state, migration audit, 5 incident scenarios, backup procedure, status page placeholder |
+
+### 16.7 Verification
+
+- `npm run check` clean. `npm test` 237/237 (233 baseline + 4 new from competitorDetections cap test). 0 lint errors.
+- `grep -rE "console\.(log|warn|error|info)" client/src/` returns 0 matches. `server/` matches only the 3 deliberate skip-list files (`log.ts` dev formatter, `aiLogger.ts` LLM tracer, `setupProducts.ts` CLI script).
+- Vite prod build verified: source maps generated, no `sourceMappingURL` referenced in shipped JS.
+- Drizzle schema and DB agree.
+
+---
+
+## Wave 17 — Phase 1: Onboarding ring + expectations timeline
+
+Two small dashboard-visible wins that immediately answer Ben's "users get lost" and "can't tell when results will come" complaints from the meeting transcript. Builds on Phase 0's clean foundation.
+
+### 17.1 Onboarding ring
+
+- **Single source of truth** — extracted the 4-step `STEPS` array (was inline in [client/src/components/SidebarOnboarding.tsx](client/src/components/SidebarOnboarding.tsx)) into [client/src/lib/onboardingSteps.ts](client/src/lib/onboardingSteps.ts) along with `OnboardingData` type, `isOnboardingComplete(data)`, `completedStepCount(data)`. Eliminates the "two definitions" trap before adding the second consumer.
+- **`OnboardingProgressRing` component** at [client/src/components/dashboard/OnboardingProgressRing.tsx](client/src/components/dashboard/OnboardingProgressRing.tsx) reuses the existing `VisibilityGauge` SVG ring. Reads from three TanStack Query caches (`/api/onboarding-status`, `/api/brands`, `/api/articles`); renders skeleton when any is loading; renders nothing when any errors; auto-dismisses + writes localStorage when all 4 steps complete.
+- **localStorage scoping** by `user.id` (`venturecite-onboarding-ring-dismissed:${user.id}`) — the existing `clearAllVentureCiteStorage()` from [client/src/lib/clientStorage.ts](client/src/lib/clientStorage.ts) wipes any `venturecite-*` prefixed key on logout, so cross-user-on-shared-browser leak is automatically prevented.
+- **Sidebar widget complement** — when complete, [SidebarOnboarding.tsx](client/src/components/SidebarOnboarding.tsx) renders a tiny "✓ Setup complete" condensed trigger instead of the in-progress version. Click still opens the same Dialog with all 4 steps checkmarked (read-only celebration view).
+- **4 RTL tests** at [tests/unit/OnboardingProgressRing.test.tsx](tests/unit/OnboardingProgressRing.test.tsx) — skeleton state, partial-data state, auto-dismiss + localStorage write, user.id-scoped dismissal (no cross-account leak).
+
+### 17.2 Expectations timeline
+
+- **`ResultsTimeline` component** at [client/src/components/dashboard/ResultsTimeline.tsx](client/src/components/dashboard/ResultsTimeline.tsx) — static horizontal 4-milestone timeline (Day 0 / Week 1 / Week 2-3 / Week 4+) with current-week highlight derived from `min(brand.createdAt)` for the user. Computes `daysSinceOldest` from `/api/brands` query; clamps to `[0, 365]`; `currentMilestoneIndex` returns 0–3.
+- **`EmptyResultsHero` component** at [client/src/components/citations/EmptyResultsHero.tsx](client/src/components/citations/EmptyResultsHero.tsx) — replaces the citations page's generic empty state with the 1–2 week LLM lag explainer. Wired into [ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx) when `totalChecks === 0`. CTA gated by `hasPrompts && !runMutation.isPending` (don't surface "Run a check" when there's nothing to run or one's in flight).
+- **Weekly digest email** ([server/emailService.ts](server/emailService.ts) `WeeklyDigestPayload` extended with `weekN: number | null`; [server/lib/weeklyDigestEmitter.ts](server/lib/weeklyDigestEmitter.ts) extends `userBrands.select` with `createdAt`, computes `weekN` from oldest brand, passes to `sendWeeklyDigest`). Email body now reads "Week of X · Week N since you started VentureCite" (uses `weekN + 1` for human-friendly counting).
+- **3 RTL tests** at [tests/unit/ResultsTimeline.test.tsx](tests/unit/ResultsTimeline.test.tsx) — correct milestone for 16-day-old brand (Week 2-3), brand-new clamps to Day 0, oldest-brand selection across multiple brands.
+
+### 17.3 Test infrastructure (one-time investment paying off Phase 1+)
+
+- Installed `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `happy-dom` to devDependencies.
+- Extended [vitest.config.ts](vitest.config.ts): added `react()` plugin, `.test.tsx` matching, `setupFiles: ["./tests/setup.ts"]`. Server tests stay on `node` env; React component tests opt into `// @vitest-environment happy-dom` per-file pragma.
+- New [tests/setup.ts](tests/setup.ts) imports `@testing-library/jest-dom/vitest` matchers and registers global `afterEach(cleanup)` (required because `globals: false` disables RTL's auto-cleanup).
+
+### 17.4 Three deviations fixed inline
+
+After parallel-agent execution, three minor deviations were flagged and fixed:
+
+1. **`SidebarOnboarding.tsx` had both `isComplete` and `complete`** computing the same boolean two ways — collapsed to single `isComplete = isOnboardingComplete(data)`.
+2. **Email `weekNLine` styling tokens** were `color:#666;margin:0 0 24px` (per plan) but original line used `color:#6b7280;margin:0 0 20px` — restored original to avoid email-design churn.
+3. **`runLoadingMessage` prop on `ResultsTab`** was unused after the empty-state refactor — dropped from the type and from the parent's prop pass at `citations.tsx:561`.
+
+### 17.5 Wouter v3 cleanups (additional)
+
+After Phase 1 finished, two new files used the deprecated Wouter v2 nested-`<a>` pattern (`<Link href="..."><a className="...">...</a></Link>`). On Wouter v3.3.5 this emits console warnings in strict mode. Fixed in `OnboardingProgressRing.tsx` (2 sites) using v3-style `<Link href="..." className="...">children</Link>` directly.
+
+### 17.6 Verification
+
+- `npm run check` clean. `npm test` 244/244 (237 + 7 new RTL tests). 0 lint errors.
+- Manual smoke: dashboard renders ring + timeline; new-user account shows "0/4 steps" and "Day 0"; account with all 4 done shows "You're set 🎉" once then auto-dismisses; sidebar widget shows "Setup complete ✓" indicator. Mobile (375px) stacks correctly.
+
+---
+
+## Wave 18 — Phase 2: Per-page explainers + glossary + sidebar reorder
+
+Introduces the most reusable infrastructure of the entire product plan. The `pageExplainers.ts` config becomes a referenceable knowledge base that the upcoming chatbot (Wave 20) imports to ground its answers, and that empty states (later wave) reference for fall-back copy. Single source of truth across many surfaces.
+
+### 18.1 PageHeader extension + GeoConceptBadge
+
+- **`PageHeader.tsx`** ([client/src/components/PageHeader.tsx](client/src/components/PageHeader.tsx)) extended with optional `explainer?: PageExplainer` prop. When present, renders an `(i)` Info icon button next to the title that opens a Radix Popover with summary + optional prerequisites + optional expectedOutcome + optional related-concept badge. Backward-compatible — existing callers without the prop work unchanged.
+- **`PageExplainer` type** exported from `PageHeader.tsx`:
+  ```ts
+  export type PageExplainer = {
+    summary: string; // required
+    prerequisites?: string;
+    expectedOutcome?: string;
+    relatedConcept?: "GEO" | "AEO" | "SEO";
+  };
+  ```
+- **`GeoConceptBadge` component** ([client/src/components/GeoConceptBadge.tsx](client/src/components/GeoConceptBadge.tsx)) — inline pill that hover-cards a definition + click-jumps to `/glossary#<concept>` anchor. Uses existing Radix `HoverCard` + `Badge`. Three concepts: GEO, AEO, SEO.
+
+### 18.2 Centralized pageExplainers config + 26-page wiring
+
+- **[client/src/lib/pageExplainers.ts](client/src/lib/pageExplainers.ts)** — single export `pageExplainers` const with explainer entries for all 26 authenticated pages. Adding/editing copy across the app is a one-file edit.
+- **26 page files modified** — each gets one `import { pageExplainers } from "@/lib/pageExplainers"` line + one `explainer={pageExplainers.<key>}` prop on its `<PageHeader>` call site (28 total call sites including loading/empty variants on `home.tsx` and `content.tsx`).
+- **Why centralized:** chatbot system prompt (Wave 20) will import this same map to keep its answers in sync with what users see in the popovers; empty states (later wave) fall back to `pageExplainers[page].expectedOutcome` for generic copy. Prevents "the popover says X but the chatbot says Y" drift.
+
+### 18.3 Public `/glossary` route
+
+- **[client/src/pages/glossary.tsx](client/src/pages/glossary.tsx)** — public route (no `<AuthenticatedRoute>` wrapper) with three sections: GEO (Generative Engine Optimization), AEO (Answer Engine Optimization), SEO (Search Engine Optimization). Each section: definition, why it matters, how VentureCite covers it, related pages.
+- **SEO surface** — inline `useEffect` sets `<title>` and `<meta name="description">` (matches existing codebase pattern, no React Helmet dep). JSON-LD `DefinedTermSet` schema injected via `dangerouslySetInnerHTML` for AI engines + Google rich-results.
+- **Lazy-loaded** via render-prop pattern matching the existing `/privacy` route (the only other lazy public route). Avoids loading the glossary code on initial paint for authenticated users.
+- **Anchor links** — each section uses `id={term.id}` + `scroll-mt-16` so deep-links (`/glossary#geo`, `/glossary#aeo`, `/glossary#seo`) work. The `GeoConceptBadge` uses these.
+
+### 18.4 Sidebar reorder into workflow sequence
+
+- **[client/src/components/Sidebar.tsx](client/src/components/Sidebar.tsx)** — 5 NAV\_\* arrays restructured into Setup → Create → Measure → Grow → Optimize order:
+  - **Setup**: Dashboard, Brands, AI Visibility (moved from Tools — it's a one-time setup checklist, not a tool)
+  - **Create**: Content, Articles (moved from Main — it's an output of Create, not Setup), Keywords
+  - **Measure**: Citations (moved from Tools), GEO Analytics, AI Intelligence, Reports (moved from Optimize)
+  - **Grow**: Community, Opportunities, Competitors
+  - **Optimize**: GEO Tools, Signals, Crawler Check, FAQ Manager, Fact Sheet
+- **No URL changes** — bookmarks still work. Section labels updated to "Setup / Create / Measure / Grow / Optimize" so the workflow order is communicated at a glance.
+
+### 18.5 Wouter v3 cleanups (additional)
+
+After Phase 2 shipped, the new `glossary.tsx` (Phase 2) and `OnboardingProgressRing.tsx` (Phase 1) used the deprecated Wouter v2 nested-`<a>` pattern. Fixed both via parallel agents — `<Link href="..." className="...">children</Link>` directly. Pre-existing usage in `landing.tsx` left for a project-wide cleanup pass later.
+
+### 18.6 Files (highlights)
+
+| File                                        | Change                                                  |
+| ------------------------------------------- | ------------------------------------------------------- |
+| `client/src/components/PageHeader.tsx`      | Optional `explainer` prop + (i) icon + Popover          |
+| `client/src/components/GeoConceptBadge.tsx` | NEW. Inline GEO/AEO/SEO pill with hover-card            |
+| `client/src/lib/pageExplainers.ts`          | NEW. 26-page explainer config                           |
+| `client/src/pages/glossary.tsx`             | NEW. Public route with JSON-LD                          |
+| `client/src/App.tsx`                        | Public `/glossary` route registered                     |
+| `client/src/components/Sidebar.tsx`         | NAV\_\* arrays reordered into workflow sequence         |
+| 26 page files                               | One `import` + one `explainer={...}` prop addition each |
+
+### 18.7 Verification
+
+- `npm run check` clean. `npm test` 244/244 (no new tests — layout-only per convention). 0 lint errors.
+- Manual smoke: every authenticated page has the `(i)` icon next to its title; click → popover with the right copy. Glossary renders publicly with anchor jumps + JSON-LD in DOM. Sidebar shows new workflow grouping.
+
+---
+
+## Wave 19 — Phase 3: Citation locations (highlight + snippet strip + URL extraction)
+
+Self-contained to the citations pages. Directly answers Ben's literal complaint from the meeting: "it didn't tell me where the citations were or what they were."
+
+### 19.1 Brand-mention highlighting
+
+- **Custom rehype plugin** at [client/src/lib/highlightTermsRehype.ts](client/src/lib/highlightTermsRehype.ts) — `createHighlightPlugin(terms): Plugin<[], Root>` factory. Walks hast text nodes (NOT markdown source — that would corrupt links/code blocks); skips text inside `<code>`, `<pre>`, `<a>`. Splits matched text into `[text, mark, text, mark, ...]` and replaces in parent's children.
+- **Lookaround word-boundary** — replaced standard `\b` with `(?<![A-Za-z0-9_])(...)(?![A-Za-z0-9_])` because `\b` doesn't match terms ending in non-word chars like "C++" (the `+` is already a non-word char, so there's no "boundary"). Lookaround handles both standard names AND symbol-laden ones.
+- **Sanitize schema extended** ([client/src/components/SafeMarkdown.tsx](client/src/components/SafeMarkdown.tsx)) — `defaultSchema.tagNames` extended with `"mark"` so the sanitizer doesn't strip the highlighting tags. `Pluggable[]` type from `unified` used to type the plugin array (mutable, not `as const`, to match React-Markdown's expected shape).
+- **Wired through** [PlatformResultCard.tsx](client/src/components/citations/PlatformResultCard.tsx) (new `highlightTerms` prop) and [ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx) + [HistoryTab.tsx](client/src/components/citations/HistoryTab.tsx) (each calls `useBrandSelection()` to derive `highlightTerms = [selectedBrand.name, ...nameVariations]` then passes down).
+- **6 unit tests** at [tests/unit/highlightTermsRehype.test.ts](tests/unit/highlightTermsRehype.test.ts) — case-insensitive word-boundary matching, code/link skipping, regex char escaping (C++), longest-first multi-term preference, empty terms no-op, 50-term cap.
+
+### 19.2 "Cited mentions" snippet strip
+
+- **`extractSnippet` helper** at [client/src/lib/extractSnippet.ts](client/src/lib/extractSnippet.ts) — `extractSnippet(text, terms, radius = 200): string`. Returns ±radius chars around the FIRST matching term across all candidates; "…" boundaries when truncated; longest-first term preference; returns leading 2\*radius chars + "…" when no match. Pure function, 6 unit tests.
+- **`CitedMentionsStrip` component** at [client/src/components/citations/CitedMentionsStrip.tsx](client/src/components/citations/CitedMentionsStrip.tsx) — horizontal scrollable strip of cards rendered above the per-platform stats card when `totalCited > 0`. Each card: platform pill, truncated prompt, snippet (extracted on the fly from `fullResponse` if available, falling back to saved `citationContext`).
+- **Wired into [ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx)** — flattens `results.byPrompt[].platforms[]` into a `CitedMention[]` filtered to `isCited && (fullResponse || snippet)`.
+
+### 19.3 Source URL extraction — schema + extractor + UI
+
+- **Migration `0047_geo_rankings_cited_urls.sql`** — `ALTER TABLE geo_rankings ADD COLUMN IF NOT EXISTS cited_urls TEXT[]`. Backward-compatible (nullable, existing rows stay null).
+- **Drizzle schema** ([shared/schema.ts](shared/schema.ts)) — `citedUrls: text("cited_urls").array()` added to `geoRankings`.
+- **`extractCitedUrls` server helper** at [server/lib/urlExtractor.ts](server/lib/urlExtractor.ts) — pure function. Captures both markdown links `[text](url)` and plain URLs via single regex; strips trailing punctuation (NOT `?` since URLs commonly end with query strings); validates http/https + hostname-with-dot; dedupe-case-insensitive on hostname + exact on path/search; cap 20 URLs × 2048 chars each. 8 unit tests.
+- **Perplexity structured-citations capture** ([server/citationChecker.ts](server/citationChecker.ts)) — discovered during the Task 6 investigation that Perplexity (via OpenRouter) returns a top-level `citations: string[]` field that we were dropping. Now defensively read via `(chatResponse as any).citations`, threaded through `runOne`'s `attemptFetch` helper, and merged with text-extracted URLs at the `createGeoRanking` site (single dedupe + cap pass via the same `extractCitedUrls` call). Other platforms' `structuredCitations: []` collapses to text-only behavior.
+- **Cited-URLs pill list** rendered in [PlatformResultCard.tsx](client/src/components/citations/PlatformResultCard.tsx) below the SafeMarkdown content when `result.citedUrls?.length > 0`. Each pill is an `<a target="_blank" rel="noopener noreferrer">` with `hostname` as the visible label and full URL in `title`. The `rel="noopener noreferrer"` is critical — these URLs come from external AI output and must not be allowed to script the parent window or leak referrer.
+
+### 19.4 Files
+
+| File                                                                                        | Change                                                                 |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `client/src/lib/highlightTermsRehype.ts`                                                    | NEW. Rehype plugin factory                                             |
+| `client/src/components/SafeMarkdown.tsx`                                                    | Allow `<mark>` in sanitize schema; type plugins array as `Pluggable[]` |
+| `client/src/lib/extractSnippet.ts`                                                          | NEW. Pure function for snippet extraction                              |
+| `client/src/components/citations/CitedMentionsStrip.tsx`                                    | NEW. Horizontal scrollable strip                                       |
+| `client/src/components/citations/PlatformResultCard.tsx`                                    | `highlightTerms` prop + `citedUrls` rendering                          |
+| `client/src/components/citations/ResultsTab.tsx`                                            | `useBrandSelection`-derived highlightTerms + `<CitedMentionsStrip>`    |
+| `client/src/components/citations/HistoryTab.tsx`                                            | Same `highlightTerms` wiring                                           |
+| `server/lib/urlExtractor.ts`                                                                | NEW. Pure function for URL extraction                                  |
+| `server/citationChecker.ts`                                                                 | Capture Perplexity structured citations + merge + write `citedUrls`    |
+| `shared/schema.ts`                                                                          | `citedUrls: text("cited_urls").array()` on `geoRankings`               |
+| `migrations/0047_geo_rankings_cited_urls.sql`                                               | NEW. Idempotent column add                                             |
+| `tests/unit/highlightTermsRehype.test.ts`, `extractSnippet.test.ts`, `urlExtractor.test.ts` | NEW. 6 + 6 + 8 = 20 unit tests                                         |
+
+### 19.5 Verification
+
+- `npm run check` clean. `npm test` 264/264 (244 + 20 new). 0 lint errors. `drizzle-kit check` "Everything's fine".
+- Per-write CPU cost: <5 ms additional per `geo_rankings` INSERT (regex + URL parsing). Negligible vs. the 2–10s the LLM call took.
+- DB storage long-term: ~20 MB at 100x current scale. Supabase Free 500 MB still safe through pre-launch.
+
+### 19.6 Out of scope (for follow-ups)
+
+- Backfilling `cited_urls` for pre-migration rows — only new citation runs from this point onward populate the column. Old rows render without the pill list section.
+- Pulling page titles (only hostnames render in pills) — would require a separate fetch per URL, expensive.
+- Filtering URL list to "authoritative" sources — every URL the LLM cited is rendered; quality scoring is separate.
+- "Click strip card → scroll-to-accordion-row" interaction — `CitedMentionsStrip` supports the `onClick` prop but it's left unwired in `ResultsTab` for now.
+
+---

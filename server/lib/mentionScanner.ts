@@ -7,6 +7,7 @@ import { brandNameWarning } from "./brandNameAmbiguity";
 import { acquireOrWait } from "./rateLimitBuckets";
 import { type ScanReport, emptyReport } from "./scanReport";
 
+import { logger } from "./logger";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   timeout: 30_000,
@@ -172,7 +173,7 @@ export async function scanBrandMentions(brandId: string): Promise<ScanReport> {
     }
   }
 
-  console.log(
+  logger.info(
     `[mentionScanner] brand=${brandId} found=${report.found} inserted=${report.inserted} dup=${report.skippedDuplicate} failed=${report.failed.length}`,
   );
   return report;

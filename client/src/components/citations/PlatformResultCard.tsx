@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import SafeMarkdown from "@/components/SafeMarkdown";
+import { createHighlightPlugin } from "@/lib/highlightTermsRehype";
 import { useToast } from "@/hooks/use-toast";
 
 export type PlatformResult = {
@@ -25,6 +26,9 @@ export type PlatformResult = {
   // Wave 9: optional — when present, lets the "Open in chat" link send the
   // user directly to a fresh chat with the same prompt pre-filled.
   prompt?: string;
+  /** Phase 3: list of URLs the LLM cited in its response. Null on
+   *  rows written before migration 0047. */
+  citedUrls?: string[] | null;
 };
 
 // Wave 9: known-platform palette stays explicit so the brand colors look
@@ -68,7 +72,13 @@ const PLATFORM_DEEP_LINKS: Record<string, ((prompt: string) => string) | null> =
 // One card per platform result inside the by-prompt accordion. Shows a clear
 // status pill, a short snippet, and an expand control to reveal the full
 // markdown-rendered AI response.
-export function PlatformResultCard({ result }: { result: PlatformResult }) {
+export function PlatformResultCard({
+  result,
+  highlightTerms = [],
+}: {
+  result: PlatformResult;
+  highlightTerms?: string[];
+}) {
   const [expanded, setExpanded] = useState(false);
   const { toast } = useToast();
   const colorClass = colorClassForPlatform(result.platform);
@@ -213,7 +223,36 @@ export function PlatformResultCard({ result }: { result: PlatformResult }) {
           {expanded && (
             <div className="px-4 py-3 bg-muted/20 border-t max-h-[480px] overflow-y-auto">
               <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-pre:text-xs">
-                <SafeMarkdown>{result.fullResponse}</SafeMarkdown>
+                <SafeMarkdown rehypePlugins={[createHighlightPlugin(highlightTerms)]}>
+                  {result.fullResponse}
+                </SafeMarkdown>
+                {result.citedUrls && result.citedUrls.length > 0 && (
+                  <div className="mt-4 border-t pt-3">
+                    <p className="text-xs text-muted-foreground mb-2">Sources cited in response</p>
+                    <div className="flex flex-wrap gap-2">
+                      {result.citedUrls.map((url) => {
+                        let hostname = url;
+                        try {
+                          hostname = new URL(url).hostname;
+                        } catch {
+                          // Defensive — render the raw URL if URL parsing fails.
+                        }
+                        return (
+                          <a
+                            key={url}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs px-2 py-1 rounded bg-secondary hover:bg-accent transition-colors"
+                            title={url}
+                          >
+                            {hostname}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

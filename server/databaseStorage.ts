@@ -92,6 +92,7 @@ import {
   type InsertCitationRun,
   type ArticleRevision,
   type InsertArticleRevision,
+  type ChatbotMessage,
 } from "@shared/schema";
 
 export class DatabaseStorage implements IStorage {
@@ -4446,5 +4447,66 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.articleRevisions.id, revisionId))
       .limit(1);
     return result[0];
+  }
+
+  async getChatbotHistory(userId: string, limit = 10): Promise<ChatbotMessage[]> {
+    const rows = await db
+      .select()
+      .from(schema.chatbotMessages)
+      .where(eq(schema.chatbotMessages.userId, userId))
+      .orderBy(desc(schema.chatbotMessages.createdAt))
+      .limit(limit);
+    // Reverse so oldest is first (chronological order for the LLM context).
+    return rows.reverse();
+  }
+
+  async insertChatbotMessage(msg: {
+    userId: string;
+    brandId?: string | null;
+    role: "user" | "assistant";
+    content: string;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    model?: string | null;
+  }): Promise<ChatbotMessage> {
+    const [row] = await db
+      .insert(schema.chatbotMessages)
+      .values({
+        userId: msg.userId,
+        brandId: msg.brandId ?? null,
+        role: msg.role,
+        content: msg.content,
+        inputTokens: msg.inputTokens ?? null,
+        outputTokens: msg.outputTokens ?? null,
+        model: msg.model ?? null,
+      })
+      .returning();
+    return row;
+  }
+
+  async pruneChatbotMessages(): Promise<{ deletedByAge: number; deletedByCap: number }> {
+    // 30-day TTL.
+    const ageRes = await db.execute(sql`
+      delete from public.chatbot_messages
+      where created_at < now() - interval '30 days'
+      returning id
+    `);
+    const ageR = ageRes as unknown as { rows?: unknown[] } & unknown[];
+    const deletedByAge = ageR.rows?.length ?? ageR.length ?? 0;
+
+    // Per-user soft cap of 100 messages, keeping newest.
+    const capRes = await db.execute(sql`
+      with ranked as (
+        select id, row_number() over (partition by user_id order by created_at desc) as rn
+        from public.chatbot_messages
+      )
+      delete from public.chatbot_messages
+      where id in (select id from ranked where rn > 100)
+      returning id
+    `);
+    const capR = capRes as unknown as { rows?: unknown[] } & unknown[];
+    const deletedByCap = capR.rows?.length ?? capR.length ?? 0;
+
+    return { deletedByAge, deletedByCap };
   }
 }

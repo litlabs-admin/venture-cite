@@ -30,6 +30,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import { useSearch } from "wouter";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import type { OutreachCampaign, PublicationTarget, OutreachEmail } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -445,6 +446,7 @@ export default function Outreach() {
           title="Outreach"
           description="Discover publications, find contacts, and manage outreach campaigns"
           actions={brands.length > 0 ? <BrandSelector /> : null}
+          explainer={pageExplainers.outreach}
         />
 
         {!selectedBrandId ? (

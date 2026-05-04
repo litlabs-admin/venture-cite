@@ -21,12 +21,12 @@ import { eq } from "drizzle-orm";
 import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS } from "./lib/modelConfig";
 import { logger } from "./lib/logger";
-import { Sentry } from "./instrument";
 import { assertWithinBudget, recordSpend, isBudgetExceededError, type Tier } from "./lib/llmBudget";
 import { openaiBreaker, isCircuitOpenError } from "./lib/circuitBreaker";
 import { refundArticleQuota, type ErrorKind } from "./lib/usageLimit";
 import type { ContentGenerationJob } from "@shared/schema";
 
+import { captureAndFlush } from "./lib/sentryReport";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   timeout: 120_000, // streaming runs longer than non-streaming
@@ -337,7 +337,7 @@ export async function runArticleSlice(jobId: string, deadlineMs: number): Promis
       );
     } else {
       logger.error({ err, jobId: job.id, errorKind }, "content slice failed");
-      Sentry.captureException(err, {
+      captureAndFlush(err, {
         tags: { source: "contentSlice", errorKind },
         extra: { jobId: job.id, userId: job.userId },
       });

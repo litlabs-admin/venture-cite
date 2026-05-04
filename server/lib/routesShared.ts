@@ -10,6 +10,14 @@ import rateLimit from "express-rate-limit";
 import type { Request, Response } from "express";
 import { attachAiLogger } from "./aiLogger";
 import { sendOwnershipError } from "./ownership";
+import { logger } from "./logger";
+import { captureAndFlush } from "./sentryReport";
+
+// Re-export so the 20+ route modules that already import asyncHandler
+// from "../lib/routesShared" keep working unchanged. Utility modules
+// that don't need the OpenAI singleton (e.g. cron.ts) should import
+// directly from "../lib/asyncHandler" to avoid loading this module.
+export { asyncHandler } from "./asyncHandler";
 
 // Singleton OpenAI client used by the routes layer. The contentGeneration
 // worker has its own instance because it runs on a separate event loop
@@ -53,11 +61,20 @@ export const aiLimitMiddleware = rateLimit({
 // present, otherwise returns a generic 500 and logs the underlying error
 // server-side. This keeps stack traces and internal messages out of
 // production responses.
+//
+// 5xx responses are also reported to Sentry from this single bottleneck
+// (~200 caller sites), tagged with the fallback string for filterability.
+// 401/404 ownership errors short-circuit before reaching the capture path.
 export function sendError(res: Response, err: unknown, fallback: string, status = 500): void {
   if (sendOwnershipError(res, err)) return;
   const isProd = process.env.NODE_ENV === "production";
   const message = isProd ? fallback : err instanceof Error ? err.message : fallback;
-  if (err) console.error("[routes]", fallback, err);
+  if (err) {
+    logger.error({ err, fallback }, `[routes] ${fallback}`);
+    if (status >= 500) {
+      captureAndFlush(err, { tags: { source: "sendError", fallback } });
+    }
+  }
   res.status(status).json({ success: false, error: message });
 }
 

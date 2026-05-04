@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { Menu } from "lucide-react";
 import Sidebar, { SidebarContent } from "./Sidebar";
+import EducationAssistant from "./EducationAssistant";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import logoPath from "@assets/logo.png";
@@ -44,6 +45,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8 py-6">{children}</div>
         </main>
       </div>
+      <EducationAssistant />
     </div>
   );
 }

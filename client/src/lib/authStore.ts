@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { Sentry } from "@/lib/sentry";
 
 // Returns the current access token, auto-refreshing if close to expiry.
 // Relies on supabase-js's built-in session persistence + refresh.
@@ -9,7 +10,7 @@ export async function getAccessToken(): Promise<string | null> {
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token ?? null;
   } catch (err) {
-    console.warn("[authStore] getSession failed:", err);
+    Sentry.captureException(err, { tags: { source: "authStore.getSession" } });
     return null;
   }
 }
@@ -20,7 +21,7 @@ export async function setSession(tokens: { access_token: string; refresh_token: 
     refresh_token: tokens.refresh_token,
   });
   if (error) {
-    console.error("[authStore] setSession failed:", error.message);
+    Sentry.captureException(error, { tags: { source: "authStore.setSession" } });
     throw error;
   }
 }

@@ -72,6 +72,10 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 
   return (
     <style
+      // Safe: input is the hardcoded THEMES record (defined above) + the
+      // caller-supplied static `config` object — never user-controlled
+      // input. This is the shadcn chart-theming pattern from the upstream
+      // component. See tracking note in PRODUCTION_PLAN.md (B1.6).
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
           .map(

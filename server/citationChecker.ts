@@ -11,6 +11,7 @@ import { analyzeResponse, deriveSentiment, type TrackedEntity } from "./lib/resp
 import { detectBrandAndCompetitors, matchEntity } from "./lib/brandMatcher";
 import { findSelfCitationsInText } from "./lib/trackedContentMatcher";
 import { dynamicLockNamespaces, withDynamicAdvisoryLock } from "./lib/advisoryLock";
+import { extractCitedUrls } from "./lib/urlExtractor";
 import type { TrackedContentUrl } from "@shared/schema";
 
 // ChatGPT citation checks go through the direct OpenAI client.
@@ -45,6 +46,34 @@ export const DEFAULT_CITATION_PLATFORMS = [
   "Claude",
   "Gemini",
 ] as const;
+
+// Cap on per-run competitor map size. Vercel Hobby has 1024 MB memory; a
+// runaway run with thousands of competitors × dozens of platforms could
+// approach that limit. Cap surfaces the issue (via onCapHit) instead of
+// silently degrading. Updates to existing competitors always work; only
+// NEW competitor IDs beyond the cap are dropped.
+const COMPETITOR_DETECTIONS_CAP = 5000;
+
+export function addCompetitorDetection(
+  map: Map<string, Map<string, number>>,
+  competitorId: string,
+  platform: string,
+  delta = 1,
+  onCapHit?: () => void,
+): void {
+  const existing = map.get(competitorId);
+  if (existing) {
+    existing.set(platform, (existing.get(platform) || 0) + delta);
+    return;
+  }
+  if (map.size >= COMPETITOR_DETECTIONS_CAP) {
+    if (onCapHit) onCapHit();
+    return;
+  }
+  const fresh = new Map<string, number>();
+  fresh.set(platform, delta);
+  map.set(competitorId, fresh);
+}
 
 // LLM-judged citation detector. The string matcher is only a cheap pre-filter:
 // if NO brand variant appears anywhere in the response, skip the LLM call
@@ -115,7 +144,7 @@ export async function checkForCitation(
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[citationChecker] judge call failed —`, msg);
+    logger.error({ msg: msg }, `[citationChecker] judge call failed —`);
     // Wave 8: judge failure no longer flips matcher-yes to no. The
     // matcher already determined the brand is named in the response; we
     // record isCited=true with no rank/relevance enrichment.
@@ -212,6 +241,7 @@ export async function runPlatformCitationCheck(
   rank: number | null;
   relevance: number | null;
   responseText: string;
+  structuredCitations: string[];
   error?: string;
 }> {
   const { skipJudge = false } = opts;
@@ -246,9 +276,20 @@ export async function runPlatformCitationCheck(
       });
     }
     const responseText = chatResponse.choices[0].message.content || "";
-    if (skipJudge) return { isCited: false, rank: null, relevance: null, responseText };
+    // ChatGPT (direct OpenAI) doesn't return a top-level structured-citations
+    // array, so always empty here. Phase 3 structured-citation capture is
+    // Perplexity-specific (in the OpenRouter branch below).
+    const structuredCitations: string[] = [];
+    if (skipJudge)
+      return { isCited: false, rank: null, relevance: null, responseText, structuredCitations };
     const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
-    return { isCited: r.isCited, rank: r.rank, relevance: r.relevance, responseText };
+    return {
+      isCited: r.isCited,
+      rank: r.rank,
+      relevance: r.relevance,
+      responseText,
+      structuredCitations,
+    };
   }
 
   const openrouterModel = OPENROUTER_MODEL_BY_PLATFORM[platform];
@@ -258,6 +299,7 @@ export async function runPlatformCitationCheck(
       rank: null,
       relevance: null,
       responseText: "",
+      structuredCitations: [],
       error: `Unknown citation platform: ${platform}`,
     };
   }
@@ -268,6 +310,7 @@ export async function runPlatformCitationCheck(
       rank: null,
       relevance: null,
       responseText: "",
+      structuredCitations: [],
       error: `${platform} check skipped — OPENROUTER_API_KEY is not configured.`,
     };
   }
@@ -293,9 +336,26 @@ export async function runPlatformCitationCheck(
     });
   }
   const responseText = chatResponse.choices[0]?.message?.content || "";
-  if (skipJudge) return { isCited: false, rank: null, relevance: null, responseText };
+  // Phase 3: Perplexity (via OpenRouter) returns a top-level `citations`
+  // array of source URLs alongside the response content. Other platforms
+  // (ChatGPT/Claude/Gemini/DeepSeek) don't return this field, so we
+  // capture defensively. The URLs end up merged with text-extracted URLs
+  // at the geo_rankings INSERT site.
+  const structuredCitations: string[] = Array.isArray((chatResponse as any).citations)
+    ? ((chatResponse as any).citations as unknown[]).filter(
+        (c): c is string => typeof c === "string",
+      )
+    : [];
+  if (skipJudge)
+    return { isCited: false, rank: null, relevance: null, responseText, structuredCitations };
   const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
-  return { isCited: r.isCited, rank: r.rank, relevance: r.relevance, responseText };
+  return {
+    isCited: r.isCited,
+    rank: r.rank,
+    relevance: r.relevance,
+    responseText,
+    structuredCitations,
+  };
 }
 
 // Runs every stored prompt for a brand across each platform and persists a
@@ -401,23 +461,20 @@ export async function runBrandPrompts(
       }
     }
   } catch (err) {
-    console.warn(
-      `[citationChecker] failed to build domain occurrence map:`,
-      err instanceof Error ? err.message : err,
-    );
+    logger.warn({ err: err }, `[citationChecker] failed to build domain occurrence map:`);
   }
 
   // Load competitors once so every task can pre-filter responses against them.
   // getCompetitors defaults to excluding deletedAt rows — ignored competitors
   // are soft-deleted too, so they're already filtered.
   const competitors = await storage.getCompetitors(brandId).catch((err) => {
-    console.warn(
+    logger.warn(
+      { err: err },
       `[citationChecker] getCompetitors failed — proceeding without competitor tracking:`,
-      err instanceof Error ? err.message : err,
     );
     return [];
   });
-  console.log(
+  logger.info(
     `[citationChecker] loaded ${competitors.length} active competitors for brand ${brandId}`,
   );
 
@@ -435,6 +492,7 @@ export async function runBrandPrompts(
   const stampedThisRun = new Set<string>();
 
   const competitorDetections = new Map<string, Map<string, number>>(); // competitorId → platform → cited count
+  let competitorDetectionsCapWarned = false; // fires once per run if we hit the 5000-competitor cap
   // Platforms where we've already done auto-discovery of new competitors
   // this run — once per (runId, platform) to cap LLM cost at ~5 extra
   // calls per run total.
@@ -535,7 +593,7 @@ export async function runBrandPrompts(
     }
   });
 
-  console.log(
+  logger.info(
     `[citationChecker] ${options.resume ? "resuming" : "starting"} ${prompts.length} prompts × ${cappedPlatforms.length} platforms = ${queue.length} pending checks (concurrency=${CONCURRENCY}${options.resume ? `, ${alreadyDone.size} already done` : ""})`,
   );
 
@@ -551,13 +609,18 @@ export async function runBrandPrompts(
   const runOne = async (task: Task): Promise<void> => {
     const { bp, promptIdx, platform } = task;
     let responseText = "";
+    let structuredCitations: string[] = [];
     let fetchError: string | null = null;
     const started = Date.now();
 
     // 1. Fetch the platform response with a single retry on transient failure
     // (rate limit, breaker trip, network blip). skipJudge=true — analyzer
     // below does all citation judgment in one merged call.
-    const attemptFetch = async (): Promise<{ text: string; error: string | null }> => {
+    const attemptFetch = async (): Promise<{
+      text: string;
+      structuredCitations: string[];
+      error: string | null;
+    }> => {
       try {
         const r = await runPlatformCitationCheck(
           platform,
@@ -569,9 +632,17 @@ export async function runBrandPrompts(
           brand.userId ?? undefined,
           { skipJudge: true },
         );
-        return { text: r.responseText || "", error: r.error ?? null };
+        return {
+          text: r.responseText || "",
+          structuredCitations: r.structuredCitations ?? [],
+          error: r.error ?? null,
+        };
       } catch (apiError) {
-        return { text: "", error: apiError instanceof Error ? apiError.message : "API error" };
+        return {
+          text: "",
+          structuredCitations: [],
+          error: apiError instanceof Error ? apiError.message : "API error",
+        };
       }
     };
 
@@ -583,14 +654,15 @@ export async function runBrandPrompts(
       else if (retry.error) attempt = retry;
     }
     responseText = attempt.text;
+    structuredCitations = attempt.structuredCitations;
     if (attempt.error) fetchError = attempt.error;
     if (fetchError) {
-      console.error(
+      logger.error(
+        { fetchError: fetchError },
         `[citationChecker] prompt ${promptIdx} ${platform} FAILED after retry in ${Date.now() - started}ms —`,
-        fetchError,
       );
     } else {
-      console.log(
+      logger.info(
         `[citationChecker] prompt ${promptIdx} ${platform} fetched in ${Date.now() - started}ms`,
       );
     }
@@ -633,9 +705,9 @@ export async function runBrandPrompts(
       try {
         analysis = await analyzeResponse({ responseText, trackedEntities });
       } catch (err) {
-        console.warn(
+        logger.warn(
+          { err: err },
           `[citationChecker] analyzer failed for prompt ${promptIdx} ${platform}:`,
-          err instanceof Error ? err.message : err,
         );
       }
     }
@@ -838,15 +910,21 @@ export async function runBrandPrompts(
             sentiment: deriveSentiment(compRelevance, true),
           } as any);
         } catch (err) {
-          console.warn(
+          logger.warn(
+            { err: err },
             `[citationChecker] competitor_geo_rankings insert failed for ${comp.name}:`,
-            err instanceof Error ? err.message : err,
           );
         }
 
-        const perPlatform = competitorDetections.get(comp.id) || new Map<string, number>();
-        perPlatform.set(platform, (perPlatform.get(platform) || 0) + 1);
-        competitorDetections.set(comp.id, perPlatform);
+        addCompetitorDetection(competitorDetections, comp.id, platform, 1, () => {
+          if (!competitorDetectionsCapWarned) {
+            competitorDetectionsCapWarned = true;
+            logger.warn(
+              { brandId, runId: citationRun.id, cap: 5000 },
+              "citationChecker: competitorDetections cap hit — additional competitors dropped from this run",
+            );
+          }
+        });
       }
 
       // 5. Auto-discovery — upsert analyzer.untracked brands as new
@@ -906,14 +984,14 @@ export async function runBrandPrompts(
             } as any);
             inserted += 1;
           } catch (err) {
-            console.warn(
+            logger.warn(
+              { err: err },
               `[citationChecker] auto-discovery upsert failed for ${name}:`,
-              err instanceof Error ? err.message : err,
             );
           }
         }
         if (inserted > 0 || dropped > 0) {
-          console.log(
+          logger.info(
             `[citationChecker] auto-discovery ${platform}: inserted=${inserted}, dropped=${dropped}`,
           );
         }
@@ -922,6 +1000,16 @@ export async function runBrandPrompts(
 
     // 6. Write the brand's geo_ranking row (always — denominator for
     // citation-rate) and brand_mentions on cited responses.
+    // Phase 3: capture URLs the LLM cited in its response. We feed
+    // extractCitedUrls a synthetic input that prepends Perplexity's
+    // structured `citations: string[]` (when present) to the response text
+    // so dedupe + cap semantics apply uniformly across both sources. For
+    // non-Perplexity platforms structuredCitations is [], so this collapses
+    // to text-only extraction.
+    const citedUrlsInput = structuredCitations.length
+      ? `${structuredCitations.join(" ")} ${responseText}`
+      : responseText;
+    const citedUrls = extractCitedUrls(citedUrlsInput);
     try {
       const row = await storage.createGeoRanking({
         articleId: null,
@@ -933,6 +1021,7 @@ export async function runBrandPrompts(
         isCited: isCited ? 1 : 0,
         citationContext,
         citingOutletUrl,
+        citedUrls,
         sourceType,
         authorityScore,
         relevanceScore: relevance,
@@ -941,7 +1030,7 @@ export async function runBrandPrompts(
       } as any);
       rankings.push(row);
       if (isCited) totalCited += 1;
-      console.log(
+      logger.info(
         `[citationChecker] prompt ${promptIdx} ${platform} saved at ${Date.now() - started}ms — cited=${isCited}`,
       );
 
@@ -987,14 +1076,14 @@ export async function runBrandPrompts(
         } catch (mentionErr) {
           const msg = mentionErr instanceof Error ? mentionErr.message : String(mentionErr);
           if (!/duplicate key|unique/i.test(msg)) {
-            console.warn(`[citationChecker] brand mention insert failed — ${msg}`);
+            logger.warn(`[citationChecker] brand mention insert failed — ${msg}`);
           }
         }
       }
     } catch (dbErr) {
-      console.error(
+      logger.error(
+        { dbErr: dbErr },
         `[citationChecker] prompt ${promptIdx} ${platform} DB insert failed —`,
-        dbErr instanceof Error ? dbErr.message : dbErr,
       );
     }
   };
@@ -1126,7 +1215,7 @@ export async function runBrandPrompts(
     disagreementCount,
   } as any);
 
-  console.log(
+  logger.info(
     `[citationChecker] run ${citationRun.id} complete — ${totalCited}/${totalChecks} cited (${citationRate}%)`,
   );
 
@@ -1146,10 +1235,7 @@ export async function runBrandPrompts(
           runId: citationRun.id,
         } as any);
       } catch (err) {
-        console.warn(
-          `[citationChecker] competitor snapshot insert failed:`,
-          err instanceof Error ? err.message : err,
-        );
+        logger.warn({ err: err }, `[citationChecker] competitor snapshot insert failed:`);
       }
     }
   }
@@ -1160,10 +1246,7 @@ export async function runBrandPrompts(
     const { recordCurrentMetrics } = await import("./lib/metricsSnapshot");
     await recordCurrentMetrics(brandId, { citationRate, totalChecks, totalCited });
   } catch (err) {
-    console.warn(
-      `[citationChecker] metrics snapshot failed:`,
-      err instanceof Error ? err.message : err,
-    );
+    logger.warn({ err: err }, `[citationChecker] metrics snapshot failed:`);
   }
 
   // 3. Hallucination detection — compare each cited response against the
@@ -1176,10 +1259,7 @@ export async function runBrandPrompts(
     // claimedStatement no longer appears in this run's responses.
     await reverifyHallucinationsForRun(brandId, rankings);
   } catch (err) {
-    console.warn(
-      `[citationChecker] hallucination detection failed:`,
-      err instanceof Error ? err.message : err,
-    );
+    logger.warn({ err: err }, `[citationChecker] hallucination detection failed:`);
   }
 
   return { totalChecks, totalCited, rankings, runId: citationRun.id, done: true };

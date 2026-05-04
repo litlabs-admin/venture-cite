@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -156,6 +157,7 @@ export default function GeoAnalytics() {
         title="GEO Analytics"
         description="AI Visibility Score, Share of Voice, and Sentiment Analysis"
         actions={brands.length > 0 ? <BrandSelector showIndustry /> : null}
+        explainer={pageExplainers.geoAnalytics}
       />
 
       {brandsLoading && brands.length === 0 ? (

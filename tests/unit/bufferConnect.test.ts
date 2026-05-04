@@ -49,6 +49,9 @@ vi.mock("../../server/lib/routesShared", () => ({
   sendError: (res: any, _err: unknown, msg: string) => {
     res.status(500).json({ success: false, error: msg });
   },
+  // Pass-through wrapper — production version forwards thrown errors
+  // to next(); tests don't exercise the unhandled-rejection path.
+  asyncHandler: (fn: any) => fn,
 }));
 
 const fetchStub = vi.fn();

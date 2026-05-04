@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import {
   CheckCircle2,
   Circle,
@@ -951,6 +952,7 @@ export default function AIVisibility() {
       <PageHeader
         title="AI Engine Visibility Recommendations"
         description="Step-by-step checklists to get your brand cited by each major AI search engine"
+        explainer={pageExplainers.aiVisibility}
       />
 
       <div className="flex flex-wrap gap-4 mb-8 items-center justify-between">

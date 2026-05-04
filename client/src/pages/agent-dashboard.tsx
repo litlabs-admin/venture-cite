@@ -23,6 +23,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import { Link, useLocation, useSearch } from "wouter";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import {
   Dialog,
   DialogContent,
@@ -762,6 +763,7 @@ export default function AgentDashboard() {
           title="AI Agent"
           description="Autonomous GEO optimization with intelligent automation"
           actions={brands.length > 0 ? <BrandSelector /> : null}
+          explainer={pageExplainers.agentDashboard}
         />
 
         {!selectedBrandId ? (

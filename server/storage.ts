@@ -89,6 +89,7 @@ import {
   type PromptGeneration,
   type ArticleRevision,
   type InsertArticleRevision,
+  type ChatbotMessage,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -728,6 +729,18 @@ export interface IStorage {
   createRevision(input: InsertArticleRevision): Promise<ArticleRevision>;
   listRevisions(articleId: string, limit?: number): Promise<ArticleRevision[]>;
   getRevisionById(revisionId: string): Promise<ArticleRevision | undefined>;
+  // Chatbot (Phase 5): conversation history + message inserts + nightly prune.
+  getChatbotHistory(userId: string, limit?: number): Promise<ChatbotMessage[]>;
+  insertChatbotMessage(msg: {
+    userId: string;
+    brandId?: string | null;
+    role: "user" | "assistant";
+    content: string;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    model?: string | null;
+  }): Promise<ChatbotMessage>;
+  pruneChatbotMessages(): Promise<{ deletedByAge: number; deletedByCap: number }>;
 }
 
 import { DatabaseStorage } from "./databaseStorage";

@@ -8,6 +8,7 @@ import { brandNameWarning } from "./brandNameAmbiguity";
 import { type ScanReport, emptyReport } from "./scanReport";
 import type { Brand, Listicle } from "@shared/schema";
 
+import { logger } from "./logger";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   timeout: 45_000,
@@ -266,7 +267,7 @@ export async function scanBrandListicles(brandId: string): Promise<ScanReport> {
     }
   }
 
-  console.log(
+  logger.info(
     `[listicleScanner] brand=${brandId} found=${report.found} inserted=${report.inserted} dup=${report.skippedDuplicate} filt=${report.skippedFiltered} failed=${report.failed.length} reverified=${reverified}`,
   );
   return report;

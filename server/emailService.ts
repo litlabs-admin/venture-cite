@@ -105,7 +105,7 @@ export async function sendOutreachEmailViaResend(params: {
 
 export async function sendWeeklyVisibilityReport(data: WeeklyReportData): Promise<boolean> {
   if (!resend) {
-    console.warn("[email] Resend not configured — skipping weekly report");
+    logger.warn("[email] Resend not configured — skipping weekly report");
     return false;
   }
 
@@ -271,6 +271,11 @@ export type WeeklyDigestBrandBrief = {
 export type WeeklyDigestPayload = {
   user: { id: string; email: string; firstName?: string | null };
   brandBriefs: WeeklyDigestBrandBrief[];
+  /** Whole weeks since the user's oldest brand was created. Null if no
+   *  brands exist (rare for users who get this email at all). 0 means
+   *  brand created in the same week as send; rendered as "Week 1" via
+   *  +1 in the email body for human-friendly counting. */
+  weekN: number | null;
 };
 
 export async function sendWeeklyDigest(
@@ -294,6 +299,12 @@ export async function sendWeeklyDigest(
   const { user, brandBriefs } = digestPayload;
   const greeting = user.firstName ? `Hi ${user.firstName},` : "Hi,";
   const weekOf = new Date().toLocaleDateString();
+  // Match the original line's styling tokens exactly so we don't churn
+  // the email design — only the content gets the optional "Week N" suffix.
+  const weekNLine =
+    digestPayload.weekN === null
+      ? `<p style="color:#6b7280;margin:0 0 20px">Week of ${weekOf}</p>`
+      : `<p style="color:#6b7280;margin:0 0 20px">Week of ${weekOf} · Week ${digestPayload.weekN + 1} since you started VentureCite</p>`;
   const n = brandBriefs.length;
   const subject = `Your VentureCite Weekly Digest — ${n} brand${n === 1 ? "" : "s"}`;
 
@@ -342,7 +353,7 @@ export async function sendWeeklyDigest(
   const html = `<!doctype html>
 <html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#1a1a1a">
   <h1 style="color:#111827;margin:0 0 8px">Your VentureCite Weekly Digest</h1>
-  <p style="color:#6b7280;margin:0 0 20px">Week of ${weekOf}</p>
+  ${weekNLine}
   <p>${greeting}</p>
   <p>Here's the state of your ${n} brand${n === 1 ? "" : "s"} this week.</p>
   ${brandSections}

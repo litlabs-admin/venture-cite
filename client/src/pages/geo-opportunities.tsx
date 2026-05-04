@@ -14,6 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import {
@@ -110,6 +111,7 @@ export default function GeoOpportunities() {
         title="GEO Opportunities"
         description="Discover where to post content for maximum AI visibility"
         actions={brands.length > 0 ? <BrandSelector showIndustry /> : null}
+        explainer={pageExplainers.geoOpportunities}
       />
 
       {isLoading ? (

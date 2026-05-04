@@ -44,6 +44,7 @@ import {
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 
@@ -279,6 +280,7 @@ export default function BrandFactSheet() {
       <PageHeader
         title="Brand Fact Sheet"
         description="Define verified facts about your brand to detect AI hallucinations and ensure accurate information."
+        explainer={pageExplainers.brandFactSheet}
       />
 
       <Card className="mb-6">

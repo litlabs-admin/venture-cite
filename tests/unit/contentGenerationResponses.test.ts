@@ -65,7 +65,7 @@ vi.mock("../../server/lib/modelConfig", () => ({
   MODELS: { contentGeneration: "gpt-4o-mini" },
 }));
 vi.mock("../../server/instrument", () => ({
-  Sentry: { captureException: vi.fn() },
+  Sentry: { captureException: vi.fn(), flush: vi.fn(async () => true) },
 }));
 vi.mock("../../server/db", () => ({
   db: {},

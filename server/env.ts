@@ -34,6 +34,10 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
 
   // Optional — features degrade if absent, but shouldn't block boot.
+  // OPENROUTER_API_KEY is optional in core, but REQUIRED at runtime for the
+  // chatbot endpoint. The endpoint throws a clear error if missing — easier
+  // to debug than a process-startup hard-fail in environments that don't
+  // use the chatbot.
   OPENROUTER_API_KEY: z.string().optional(),
   PUBLIC_BASE_URL: z.string().url().optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),

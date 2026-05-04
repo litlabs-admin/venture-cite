@@ -37,6 +37,7 @@ import {
 import type { PromptPortfolio } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Sentry } from "@/lib/sentry";
 
 export default function ShareOfAnswerTab({ selectedBrandId }: { selectedBrandId: string }) {
   const { toast } = useToast();
@@ -129,7 +130,7 @@ export default function ShareOfAnswerTab({ selectedBrandId }: { selectedBrandId:
       toast({ title: "Prompt added successfully" });
     },
     onError: (error: any) => {
-      console.error("Prompt creation error:", error);
+      Sentry.captureException(error, { tags: { source: "share-of-answer.prompt-create" } });
       toast({
         title: "Failed to create prompt",
         description: error.message || "Unknown error",

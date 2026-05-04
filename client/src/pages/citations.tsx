@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import {
   Sparkles,
   Play,
@@ -364,6 +365,7 @@ export default function Citations() {
       <PageHeader
         title="AI Citations"
         description="Track how often AI engines cite your brand when users ask them strategic questions."
+        explainer={pageExplainers.citations}
       />
 
       {/* Brand selector + Run Check button */}
@@ -558,7 +560,6 @@ export default function Citations() {
               selectedBrandId={selectedBrandId}
               hasPrompts={hasPrompts}
               runMutation={runMutation}
-              runLoadingMessage={runLoadingMessage}
             />
           )}
 

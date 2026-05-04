@@ -23,6 +23,7 @@ import { registerRoutes } from "./routes";
 import { log } from "./log";
 import { WebhookHandlers } from "./webhookHandlers";
 import { logger, requestContext, sanitizeLogBody } from "./lib/logger";
+import { captureAndFlush } from "./lib/sentryReport";
 
 export const app = express();
 
@@ -49,6 +50,11 @@ app.use(
         frameSrc: ["js.stripe.com"],
         connectSrc,
         imgSrc,
+        // 'unsafe-inline' is required because Recharts injects per-chart
+        // theme styles via dangerouslySetInnerHTML at component-render
+        // time (see client/src/components/ui/chart.tsx). Tightening this
+        // to a nonce-based policy is on the post-launch backlog if a
+        // security audit requires it.
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       },
@@ -154,7 +160,7 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
     res.status(200).json({ received: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Stripe webhook error");
-    Sentry.captureException(error, { tags: { source: "stripe-webhook" } });
+    captureAndFlush(error, { tags: { source: "stripe-webhook" } });
     res.status(400).json({ error: "Webhook processing error" });
   }
 });
@@ -196,7 +202,7 @@ app.post(
       res.status(200).json({ received: true });
     } catch (error: unknown) {
       logger.error({ err: error }, "Shopify webhook error");
-      Sentry.captureException(error, { tags: { source: "shopify-webhook" } });
+      captureAndFlush(error, { tags: { source: "shopify-webhook" } });
       res.status(500).json({ error: "Webhook processing error" });
     }
   },
@@ -269,7 +275,7 @@ app.post(
       res.status(200).json({ received: true });
     } catch (err) {
       logger.error({ err }, "Resend webhook handler error");
-      Sentry.captureException(err, { tags: { source: "resend-webhook" } });
+      captureAndFlush(err, { tags: { source: "resend-webhook" } });
       res.status(500).json({ error: "Webhook processing error" });
     }
   },
@@ -367,7 +373,7 @@ export function prepareApp(): Promise<Server> {
         `request failed: ${req.method} ${req.path}`,
       );
       if (status >= 500) {
-        Sentry.captureException(err, {
+        captureAndFlush(err, {
           tags: { source: "global-error-handler", path: req.path, method: req.method },
         });
       }

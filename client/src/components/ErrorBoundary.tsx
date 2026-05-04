@@ -20,10 +20,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: { componentStack?: string }) {
-    console.error("[ErrorBoundary]", error, info.componentStack);
+    // Route to Sentry so unhandled React tree crashes are visible without
+    // requiring the user to email support. componentStack goes into the
+    // event context for debuggability.
     Sentry.captureException(error, {
-      tags: { source: "ErrorBoundary" },
-      contexts: { react: { componentStack: info.componentStack ?? "" } },
+      tags: { source: "react-error-boundary" },
+      contexts: { react: { componentStack: info.componentStack } },
     });
   }
 

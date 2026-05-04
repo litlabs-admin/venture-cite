@@ -22,7 +22,13 @@ import {
   getUserBrandIds,
   pickFields,
 } from "../lib/ownership";
-import { aiLimitMiddleware, openai, safeParseJson, sendError } from "../lib/routesShared";
+import {
+  aiLimitMiddleware,
+  openai,
+  safeParseJson,
+  sendError,
+  asyncHandler,
+} from "../lib/routesShared";
 
 export function setupCommunityRoutes(app: Express): void {
   // ============ Community Engagement Routes ============
@@ -42,106 +48,124 @@ export function setupCommunityRoutes(app: Express): void {
     "postedAt",
   ] as const;
 
-  app.get("/api/community-posts", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const { brandId, platform, status } = req.query;
-      if (brandId && typeof brandId === "string") {
-        const posts = await storage.getCommunityPosts(brandId, {
+  app.get(
+    "/api/community-posts",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const { brandId, platform, status } = req.query;
+        if (brandId && typeof brandId === "string") {
+          const posts = await storage.getCommunityPosts(brandId, {
+            platform: platform as string | undefined,
+            status: status as string | undefined,
+          });
+          return res.json({ success: true, data: posts });
+        }
+        const brandIds = await getUserBrandIds(user.id);
+        const all = await storage.getCommunityPosts(undefined, {
           platform: platform as string | undefined,
           status: status as string | undefined,
         });
-        return res.json({ success: true, data: posts });
+        const posts = all.filter((p: any) => p.brandId && brandIds.has(p.brandId));
+        res.json({ success: true, data: posts });
+      } catch (error) {
+        sendError(res, error, "Failed to fetch community posts");
       }
-      const brandIds = await getUserBrandIds(user.id);
-      const all = await storage.getCommunityPosts(undefined, {
-        platform: platform as string | undefined,
-        status: status as string | undefined,
-      });
-      const posts = all.filter((p: any) => p.brandId && brandIds.has(p.brandId));
-      res.json({ success: true, data: posts });
-    } catch (error) {
-      sendError(res, error, "Failed to fetch community posts");
-    }
-  });
+    }),
+  );
 
-  app.post("/api/community-posts", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const body = pickFields<any>(req.body, COMMUNITY_POST_WRITE_FIELDS);
-      if (!body.brandId || typeof body.brandId !== "string") {
-        return res.status(400).json({ success: false, error: "brandId is required" });
+  app.post(
+    "/api/community-posts",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const body = pickFields<any>(req.body, COMMUNITY_POST_WRITE_FIELDS);
+        if (!body.brandId || typeof body.brandId !== "string") {
+          return res.status(400).json({ success: false, error: "brandId is required" });
+        }
+        await requireBrand(body.brandId, user.id);
+        if (!body.platform || !body.groupName || !body.content) {
+          return res
+            .status(400)
+            .json({ success: false, error: "platform, groupName, and content are required" });
+        }
+        const post = await storage.createCommunityPost(body as any);
+        res.json({ success: true, data: post });
+      } catch (error) {
+        sendError(res, error, "Failed to create community post");
       }
-      await requireBrand(body.brandId, user.id);
-      if (!body.platform || !body.groupName || !body.content) {
-        return res
-          .status(400)
-          .json({ success: false, error: "platform, groupName, and content are required" });
-      }
-      const post = await storage.createCommunityPost(body as any);
-      res.json({ success: true, data: post });
-    } catch (error) {
-      sendError(res, error, "Failed to create community post");
-    }
-  });
+    }),
+  );
 
-  app.get("/api/community-posts/:id", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const post = await requireCommunityPost(req.params.id, user.id);
-      res.json({ success: true, data: post });
-    } catch (error) {
-      sendError(res, error, "Failed to fetch community post");
-    }
-  });
-
-  app.patch("/api/community-posts/:id", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      await requireCommunityPost(req.params.id, user.id);
-      const update = pickFields<any>(req.body, COMMUNITY_POST_WRITE_FIELDS);
-      if (update.brandId && typeof update.brandId === "string") {
-        await requireBrand(update.brandId, user.id);
+  app.get(
+    "/api/community-posts/:id",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const post = await requireCommunityPost(req.params.id, user.id);
+        res.json({ success: true, data: post });
+      } catch (error) {
+        sendError(res, error, "Failed to fetch community post");
       }
-      // Drizzle's timestamp columns default to mode "date" and reject ISO
-      // strings, so coerce incoming `postedAt` before passing to the DAO.
-      if (typeof update.postedAt === "string") {
-        const d = new Date(update.postedAt);
-        update.postedAt = Number.isNaN(d.getTime()) ? null : d;
-      }
-      const post = await storage.updateCommunityPost(req.params.id, update as any);
-      if (!post) return res.status(404).json({ success: false, error: "Post not found" });
-      res.json({ success: true, data: post });
-    } catch (error) {
-      sendError(res, error, "Failed to update community post");
-    }
-  });
+    }),
+  );
 
-  app.delete("/api/community-posts/:id", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      await requireCommunityPost(req.params.id, user.id);
-      const deleted = await storage.deleteCommunityPost(req.params.id);
-      if (!deleted) return res.status(404).json({ success: false, error: "Post not found" });
-      res.json({ success: true });
-    } catch (error) {
-      sendError(res, error, "Failed to delete community post");
-    }
-  });
+  app.patch(
+    "/api/community-posts/:id",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        await requireCommunityPost(req.params.id, user.id);
+        const update = pickFields<any>(req.body, COMMUNITY_POST_WRITE_FIELDS);
+        if (update.brandId && typeof update.brandId === "string") {
+          await requireBrand(update.brandId, user.id);
+        }
+        // Drizzle's timestamp columns default to mode "date" and reject ISO
+        // strings, so coerce incoming `postedAt` before passing to the DAO.
+        if (typeof update.postedAt === "string") {
+          const d = new Date(update.postedAt);
+          update.postedAt = Number.isNaN(d.getTime()) ? null : d;
+        }
+        const post = await storage.updateCommunityPost(req.params.id, update as any);
+        if (!post) return res.status(404).json({ success: false, error: "Post not found" });
+        res.json({ success: true, data: post });
+      } catch (error) {
+        sendError(res, error, "Failed to update community post");
+      }
+    }),
+  );
+
+  app.delete(
+    "/api/community-posts/:id",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        await requireCommunityPost(req.params.id, user.id);
+        const deleted = await storage.deleteCommunityPost(req.params.id);
+        if (!deleted) return res.status(404).json({ success: false, error: "Post not found" });
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to delete community post");
+      }
+    }),
+  );
 
   // AI-powered community group discovery
-  app.post("/api/community-discover", aiLimitMiddleware, async (req, res) => {
-    try {
-      requireUser(req);
-      const { brandName, industry, keywords, platform } = req.body ?? {};
+  app.post(
+    "/api/community-discover",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        requireUser(req);
+        const { brandName, industry, keywords, platform } = req.body ?? {};
 
-      if (!brandName || !industry) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Brand name and industry are required" });
-      }
+        if (!brandName || !industry) {
+          return res
+            .status(400)
+            .json({ success: false, error: "Brand name and industry are required" });
+        }
 
-      const prompt = `You are a community marketing expert. Find relevant online communities where the brand "${brandName}" in the "${industry}" industry should be active to build citations and authority for AI search engines.
+        const prompt = `You are a community marketing expert. Find relevant online communities where the brand "${brandName}" in the "${industry}" industry should be active to build citations and authority for AI search engines.
 
 ${keywords?.length ? `Target keywords: ${keywords.join(", ")}` : ""}
 ${platform ? `Focus on platform: ${platform}` : "Include Reddit, Quora, Hacker News, and niche forums"}
@@ -160,51 +184,55 @@ Return a JSON array of 10-15 community groups with this structure:
 
 Only return the JSON array, no other text.`;
 
-      const completion = await openai.chat.completions.create({
-        model: MODELS.misc,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-      });
+        const completion = await openai.chat.completions.create({
+          model: MODELS.misc,
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+          temperature: 0.7,
+        });
 
-      const parsed = safeParseJson<any>(completion.choices[0].message.content);
-      const groups = Array.isArray(parsed) ? parsed : parsed?.groups || parsed?.communities || [];
+        const parsed = safeParseJson<any>(completion.choices[0].message.content);
+        const groups = Array.isArray(parsed) ? parsed : parsed?.groups || parsed?.communities || [];
 
-      res.json({ success: true, data: groups });
-    } catch (error) {
-      sendError(res, error, "Failed to discover communities");
-    }
-  });
+        res.json({ success: true, data: groups });
+      } catch (error) {
+        sendError(res, error, "Failed to discover communities");
+      }
+    }),
+  );
 
   // AI-powered community post generation
-  app.post("/api/community-generate", aiLimitMiddleware, async (req, res) => {
-    try {
-      requireUser(req);
-      const { brandName, brandDescription, platform, groupName, topic, postType, tone } =
-        req.body ?? {};
+  app.post(
+    "/api/community-generate",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        requireUser(req);
+        const { brandName, brandDescription, platform, groupName, topic, postType, tone } =
+          req.body ?? {};
 
-      if (!brandName || !platform || !groupName || !topic) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Brand name, platform, group, and topic are required" });
-      }
+        if (!brandName || !platform || !groupName || !topic) {
+          return res
+            .status(400)
+            .json({ success: false, error: "Brand name, platform, group, and topic are required" });
+        }
 
-      const platformGuidelines: Record<string, string> = {
-        reddit:
-          "Reddit values authentic, helpful content. Never be overtly promotional. Share genuine expertise. Use the community's language style. Add value first, mention brand naturally only if relevant. Follow subreddit rules.",
-        quora:
-          "Quora rewards detailed, expert answers. Cite sources, share personal experience, be thorough. You can mention your brand as a relevant example but the answer should be valuable standalone.",
-        hackernews:
-          "Hacker News values technical depth, original insights, and contrarian thinking. Be substantive. Avoid marketing language entirely. Focus on technical merit and data.",
-        forum:
-          "Forum posts should be helpful and community-oriented. Build reputation through consistent, valuable contributions. Never spam.",
-        discord:
-          "Discord is conversational. Be helpful, concise, and friendly. Share expertise naturally in conversations.",
-        slack:
-          "Slack communities value professional, concise contributions. Share actionable insights and resources.",
-      };
+        const platformGuidelines: Record<string, string> = {
+          reddit:
+            "Reddit values authentic, helpful content. Never be overtly promotional. Share genuine expertise. Use the community's language style. Add value first, mention brand naturally only if relevant. Follow subreddit rules.",
+          quora:
+            "Quora rewards detailed, expert answers. Cite sources, share personal experience, be thorough. You can mention your brand as a relevant example but the answer should be valuable standalone.",
+          hackernews:
+            "Hacker News values technical depth, original insights, and contrarian thinking. Be substantive. Avoid marketing language entirely. Focus on technical merit and data.",
+          forum:
+            "Forum posts should be helpful and community-oriented. Build reputation through consistent, valuable contributions. Never spam.",
+          discord:
+            "Discord is conversational. Be helpful, concise, and friendly. Share expertise naturally in conversations.",
+          slack:
+            "Slack communities value professional, concise contributions. Share actionable insights and resources.",
+        };
 
-      const prompt = `You are an expert community marketer. Generate a ${postType || "post"} for ${platform} in the "${groupName}" group/community.
+        const prompt = `You are an expert community marketer. Generate a ${postType || "post"} for ${platform} in the "${groupName}" group/community.
 
 Brand: ${brandName}
 ${brandDescription ? `Brand description: ${brandDescription}` : ""}
@@ -232,20 +260,21 @@ Return a JSON object with:
 
 Only return the JSON object, no other text.`;
 
-      const completion = await openai.chat.completions.create({
-        model: MODELS.misc,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.8,
-      });
+        const completion = await openai.chat.completions.create({
+          model: MODELS.misc,
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+          temperature: 0.8,
+        });
 
-      const result = safeParseJson<any>(completion.choices[0].message.content) ?? {
-        content: completion.choices[0].message.content || "",
-      };
+        const result = safeParseJson<any>(completion.choices[0].message.content) ?? {
+          content: completion.choices[0].message.content || "",
+        };
 
-      res.json({ success: true, data: result });
-    } catch (error) {
-      sendError(res, error, "Failed to generate community content");
-    }
-  });
+        res.json({ success: true, data: result });
+      } catch (error) {
+        sendError(res, error, "Failed to generate community content");
+      }
+    }),
+  );
 }

@@ -14,9 +14,10 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users } from "@shared/schema";
 import { logger } from "../lib/logger";
-import { Sentry } from "../instrument";
 import { verifyUnsubscribeToken, type UnsubscribeList } from "../lib/unsubscribeToken";
+import { asyncHandler } from "../lib/routesShared";
 
+import { captureAndFlush } from "../lib/sentryReport";
 // Maps a list name to the user-table column that controls subscription.
 // Add new lists here as they're introduced.
 const LIST_TO_COLUMN: Record<UnsubscribeList, "weeklyReportEnabled"> = {
@@ -43,70 +44,79 @@ async function applyUnsubscribe(userId: string, list: UnsubscribeList): Promise<
 export function setupUnsubscribeRoutes(app: Express) {
   // POST = RFC 8058 one-click. Mail clients send an empty body with
   //        Content-Type: application/x-www-form-urlencoded.
-  app.post("/api/unsubscribe", async (req, res) => {
-    try {
-      const token = String(req.query.token ?? "");
-      const verified = verifyUnsubscribeToken(token);
-      if (!verified) {
-        return res.status(400).json({ success: false, error: "Invalid or expired link." });
+  app.post(
+    "/api/unsubscribe",
+    asyncHandler(async (req, res) => {
+      try {
+        const token = String(req.query.token ?? "");
+        const verified = verifyUnsubscribeToken(token);
+        if (!verified) {
+          return res.status(400).json({ success: false, error: "Invalid or expired link." });
+        }
+        const { ok } = await applyUnsubscribe(verified.userId, verified.list);
+        if (!ok) {
+          return res.status(400).json({ success: false, error: "Unknown list." });
+        }
+        logger.info(
+          { userId: verified.userId, list: verified.list },
+          "unsubscribe: applied (POST)",
+        );
+        return res.status(200).json({ success: true });
+      } catch (err) {
+        logger.error({ err }, "unsubscribe POST failed");
+        captureAndFlush(err, { tags: { source: "unsubscribe-post" } });
+        return res.status(500).json({ success: false, error: "Failed to process unsubscribe." });
       }
-      const { ok } = await applyUnsubscribe(verified.userId, verified.list);
-      if (!ok) {
-        return res.status(400).json({ success: false, error: "Unknown list." });
-      }
-      logger.info({ userId: verified.userId, list: verified.list }, "unsubscribe: applied (POST)");
-      return res.status(200).json({ success: true });
-    } catch (err) {
-      logger.error({ err }, "unsubscribe POST failed");
-      Sentry.captureException(err, { tags: { source: "unsubscribe-post" } });
-      return res.status(500).json({ success: false, error: "Failed to process unsubscribe." });
-    }
-  });
+    }),
+  );
 
   // GET = browser landing page. Returns a small HTML confirmation so the
   // user gets visual feedback when they click the link manually.
-  app.get("/api/unsubscribe", async (req, res) => {
-    try {
-      const token = String(req.query.token ?? "");
-      const verified = verifyUnsubscribeToken(token);
-      if (!verified) {
+  app.get(
+    "/api/unsubscribe",
+    asyncHandler(async (req, res) => {
+      try {
+        const token = String(req.query.token ?? "");
+        const verified = verifyUnsubscribeToken(token);
+        if (!verified) {
+          return res
+            .status(400)
+            .type("html")
+            .send(
+              htmlPage(
+                "Invalid link",
+                "This unsubscribe link is invalid or has been corrupted. " +
+                  "If you received this in error, manage your email preferences in account settings.",
+              ),
+            );
+        }
+        await applyUnsubscribe(verified.userId, verified.list);
+        logger.info({ userId: verified.userId, list: verified.list }, "unsubscribe: applied (GET)");
         return res
-          .status(400)
           .type("html")
           .send(
             htmlPage(
-              "Invalid link",
-              "This unsubscribe link is invalid or has been corrupted. " +
-                "If you received this in error, manage your email preferences in account settings.",
+              "You're unsubscribed",
+              `You won't receive any more <strong>${escape(verified.list.replace("_", " "))}</strong> emails. ` +
+                "You can re-enable them anytime from your account settings.",
+            ),
+          );
+      } catch (err) {
+        logger.error({ err }, "unsubscribe GET failed");
+        captureAndFlush(err, { tags: { source: "unsubscribe-get" } });
+        return res
+          .status(500)
+          .type("html")
+          .send(
+            htmlPage(
+              "Something went wrong",
+              "We couldn't process your unsubscribe right now. Please try the link again, " +
+                "or update your preferences in account settings.",
             ),
           );
       }
-      await applyUnsubscribe(verified.userId, verified.list);
-      logger.info({ userId: verified.userId, list: verified.list }, "unsubscribe: applied (GET)");
-      return res
-        .type("html")
-        .send(
-          htmlPage(
-            "You're unsubscribed",
-            `You won't receive any more <strong>${escape(verified.list.replace("_", " "))}</strong> emails. ` +
-              "You can re-enable them anytime from your account settings.",
-          ),
-        );
-    } catch (err) {
-      logger.error({ err }, "unsubscribe GET failed");
-      Sentry.captureException(err, { tags: { source: "unsubscribe-get" } });
-      return res
-        .status(500)
-        .type("html")
-        .send(
-          htmlPage(
-            "Something went wrong",
-            "We couldn't process your unsubscribe right now. Please try the link again, " +
-              "or update your preferences in account settings.",
-          ),
-        );
-    }
-  });
+    }),
+  );
 }
 
 function htmlPage(title: string, body: string): string {

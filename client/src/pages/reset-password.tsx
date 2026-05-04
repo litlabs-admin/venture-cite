@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, Check, X, CheckCircle } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
 import { supabase } from "@/lib/supabase";
+import { Sentry } from "@/lib/sentry";
 import { Helmet } from "react-helmet-async";
 
 export default function ResetPassword() {
@@ -38,7 +39,7 @@ export default function ResetPassword() {
         setHasSession(!!data.session);
       } catch (err) {
         if (cancelled) return;
-        console.warn("[reset-password] getSession failed:", err);
+        Sentry.captureException(err, { tags: { source: "reset-password.getSession" } });
         setHasSession(false);
       }
     })();

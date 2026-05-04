@@ -36,31 +36,36 @@ import SidebarOnboarding from "@/components/SidebarOnboarding";
 
 // ─── Nav definitions ─────────────────────────────────────────────────────────
 
+// Setup: brand identity + checklist before doing anything else.
 const NAV_MAIN = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/brands", label: "Brands", icon: Building2 },
-  { href: "/articles", label: "Articles", icon: FileText },
-];
-
-const NAV_TOOLS = [
-  { href: "/content", label: "Content", icon: PenLine },
-  { href: "/citations", label: "Citations", icon: Link2 },
-  { href: "/keyword-research", label: "Keywords", icon: Search },
   { href: "/ai-visibility", label: "AI Visibility", icon: ScanEye },
 ];
 
+// Create: produce the content that AI engines will eventually cite.
+const NAV_TOOLS = [
+  { href: "/content", label: "Content", icon: PenLine },
+  { href: "/articles", label: "Articles", icon: FileText },
+  { href: "/keyword-research", label: "Keywords", icon: Search },
+];
+
+// Measure: see what's working — analytics that report citation outcomes.
 const NAV_ANALYTICS = [
+  { href: "/citations", label: "Citations", icon: Link2 },
   { href: "/geo-analytics", label: "GEO Analytics", icon: BarChart3 },
   { href: "/ai-intelligence", label: "AI Intelligence", icon: Brain },
   { href: "/client-reports", label: "Reports", icon: ClipboardList },
 ];
 
+// Grow: outreach + competitive intel that compound citation growth.
 const NAV_GROWTH = [
-  { href: "/opportunities", label: "Opportunities", icon: Lightbulb },
   { href: "/community", label: "Community", icon: Users },
+  { href: "/opportunities", label: "Opportunities", icon: Lightbulb },
   { href: "/competitors", label: "Competitors", icon: Swords },
 ];
 
+// Optimize: dial-in technical signals that boost citation quality.
 const NAV_OPTIMIZE = [
   { href: "/geo-tools", label: "GEO Tools", icon: Wrench },
   { href: "/geo-signals", label: "Signals", icon: Radio },
@@ -141,7 +146,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Scrollable nav */}
       <nav className="flex-1 overflow-y-auto py-2">
-        <SectionLabel label="Main" />
+        <SectionLabel label="Setup" />
         {NAV_MAIN.map((item) => (
           <NavItem
             key={item.href}
@@ -151,7 +156,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           />
         ))}
 
-        <SectionLabel label="Tools" />
+        <SectionLabel label="Create" />
         {NAV_TOOLS.map((item) => (
           <NavItem
             key={item.href}
@@ -161,7 +166,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           />
         ))}
 
-        <SectionLabel label="Analytics" />
+        <SectionLabel label="Measure" />
         {NAV_ANALYTICS.map((item) => (
           <NavItem
             key={item.href}
@@ -171,7 +176,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           />
         ))}
 
-        <SectionLabel label="Growth" />
+        <SectionLabel label="Grow" />
         {NAV_GROWTH.map((item) => (
           <NavItem
             key={item.href}

@@ -42,6 +42,7 @@ const CommunityEngagement = lazy(() => import("@/pages/community-engagement"));
 const Settings = lazy(() => import("@/pages/settings"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Welcome = lazy(() => import("@/pages/welcome"));
+const Glossary = lazy(() => import("@/pages/glossary"));
 
 function RouteSpinner() {
   return (
@@ -203,6 +204,13 @@ function Router() {
         {() => (
           <Suspense fallback={<RouteSpinner />}>
             <Privacy />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/glossary">
+        {() => (
+          <Suspense fallback={<RouteSpinner />}>
+            <Glossary />
           </Suspense>
         )}
       </Route>

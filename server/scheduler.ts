@@ -18,6 +18,7 @@ import { supabaseAdmin } from "./supabase";
 import { startRun } from "./lib/workflowEngine";
 import { tryEmitWeeklyDigestForUser } from "./lib/weeklyDigestEmitter";
 
+import { captureAndFlush } from "./lib/sentryReport";
 const WEEKLY_CRON = process.env.WEEKLY_REPORT_CRON || "0 8 * * 0";
 const MAX_BRANDS_PER_USER = Number(process.env.WEEKLY_MAX_BRANDS_PER_USER || 3);
 
@@ -136,7 +137,7 @@ export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: num
       }
     } catch (err) {
       logger.error({ err, userId: user.id }, "weekly report failed");
-      Sentry.captureException(err, { tags: { source: "scheduler.weekly-report" } });
+      captureAndFlush(err, { tags: { source: "scheduler.weekly-report" } });
       skipped += 1;
     }
   }
@@ -270,7 +271,7 @@ export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
         // ignore — Sentry capture below covers operational visibility.
       }
       logger.error({ err, brandId: brand.id }, "auto-citation failed for brand");
-      Sentry.captureException(err, {
+      captureAndFlush(err, {
         tags: { source: "scheduler.auto-citation" },
         extra: { brandId: brand.id },
       });
@@ -327,7 +328,7 @@ async function runForEveryBrand(
       ok += 1;
     } catch (err) {
       logger.error({ err, job: label, brandId: b.id }, `${label} failed for brand`);
-      Sentry.captureException(err, {
+      captureAndFlush(err, {
         tags: { source: `scheduler.${label}` },
         extra: { brandId: b.id },
       });
@@ -417,7 +418,7 @@ export async function runAccountPurgeJob(): Promise<{ purged: number; failed: nu
       purged += 1;
     } catch (err) {
       logger.error({ err, userId: user.id }, "user.purge failed");
-      Sentry.captureException(err, {
+      captureAndFlush(err, {
         tags: { source: "scheduler.account-purge" },
         extra: { userId: user.id },
       });
@@ -461,7 +462,7 @@ export async function runBrandPurgeJob(): Promise<{ purged: number; failed: numb
       purged += 1;
     } catch (err) {
       logger.error({ err, brandId: brand.id }, "brand.purge failed");
-      Sentry.captureException(err, {
+      captureAndFlush(err, {
         tags: { source: "scheduler.brand-purge" },
         extra: { brandId: brand.id },
       });
@@ -575,7 +576,7 @@ function cronCrashGuard(jobName: string, fn: () => Promise<unknown>): () => void
   return () => {
     fn().catch((err) => {
       logger.error({ err, job: jobName }, `${jobName} cron crashed`);
-      Sentry.captureException(err, { tags: { source: `scheduler.${jobName}` } });
+      captureAndFlush(err, { tags: { source: `scheduler.${jobName}` } });
     });
   };
 }

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS prompt_generations (
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
 
-CREATE INDEX prompt_generations_brand_id_idx ON prompt_generations(brand_id);
+CREATE INDEX IF NOT EXISTS prompt_generations_brand_id_idx ON prompt_generations(brand_id);
 
 -- Add generation tracking and soft-archive to brand_prompts
 ALTER TABLE brand_prompts ADD COLUMN IF NOT EXISTS generation_id VARCHAR REFERENCES prompt_generations(id) ON DELETE SET NULL;

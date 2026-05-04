@@ -18,6 +18,28 @@ export const DAILY_TOKEN_CAP: Record<Tier, number> = {
   admin: -1,
 };
 
+// Per-user chatbot token cap per day. -1 = unlimited (admin).
+// Chatbot messages are MUCH smaller than article generation — typical
+// 200–800 tokens per turn. Caps tuned so worst-case spend stays
+// reasonable per tier (free=$4.50/mo, pro=$22/mo, enterprise=$75/mo).
+export const CHATBOT_DAILY_TOKEN_CAP: Record<Tier, number> = {
+  free: 15_000,
+  beta: 30_000,
+  pro: 75_000,
+  enterprise: 250_000,
+  admin: -1,
+};
+
+// Per-user chatbot messages per hour. Two-axis cap (token + count) so
+// a small budget can't be drained by spamming 1-token messages.
+export const CHATBOT_MESSAGES_PER_HOUR: Record<Tier, number> = {
+  free: 20,
+  beta: 30,
+  pro: 60,
+  enterprise: 120,
+  admin: 1000,
+};
+
 // Rough cents-per-1k-tokens (input / output). Used for est_cost_cents
 // in the api_costs row — analytics-only, not part of the cap. Update
 // when prices change; missing models get a generic fallback.
@@ -30,6 +52,8 @@ const PRICING_PER_1K_TOKENS_CENTS: Record<string, { in: number; out: number }> =
   // Anthropic via OpenRouter
   "claude-3-5-sonnet": { in: 0.3, out: 1.5 },
   "claude-3-haiku": { in: 0.025, out: 0.125 },
+  "claude-sonnet-4.5": { in: 0.3, out: 1.5 },
+  "anthropic/claude-sonnet-4.5": { in: 0.3, out: 1.5 },
 };
 
 const FALLBACK_PRICING = { in: 0.1, out: 0.4 };

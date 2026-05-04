@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Newspaper, Clock } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 
 export default function PublicationIntelligence() {
   return (
@@ -19,6 +20,7 @@ export default function PublicationIntelligence() {
             Coming Soon
           </Badge>
         }
+        explainer={pageExplainers.publicationIntelligence}
       />
 
       <Card data-testid="card-coming-soon">

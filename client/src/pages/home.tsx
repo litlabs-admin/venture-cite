@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import type { BrandMention } from "@shared/schema";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import VisibilityGauge from "@/components/dashboard/VisibilityGauge";
@@ -47,6 +48,9 @@ import BrandEntityStrength, {
   type EntityStrengthData,
 } from "@/components/dashboard/BrandEntityStrength";
 import VerbatimResponseCard from "@/components/dashboard/VerbatimResponseCard";
+import OnboardingProgressRing from "@/components/dashboard/OnboardingProgressRing";
+import ResultsTimeline from "@/components/dashboard/ResultsTimeline";
+import RecommendationsPanel from "@/components/dashboard/RecommendationsPanel";
 
 interface HeroData {
   visibilityScore: number;
@@ -438,6 +442,7 @@ export default function Home() {
         <PageHeader
           title="AI Visibility Report"
           description="Track how often AI engines cite your brand."
+          explainer={pageExplainers.dashboard}
         />
         <Card>
           <CardContent className="py-16 text-center">
@@ -543,7 +548,16 @@ export default function Home() {
             </Link>
           </div>
         }
+        explainer={pageExplainers.dashboard}
       />
+
+      {/* Onboarding ring (auto-hides when complete + dismissed) and "what
+          to expect" timeline. Both render above the hero row regardless of
+          whether the user has citation data yet — the ring helps new users
+          finish setup, and the timeline sets expectations for everyone. */}
+      <OnboardingProgressRing />
+      <ResultsTimeline />
+      <RecommendationsPanel />
 
       {noCitationData ? (
         <Card>

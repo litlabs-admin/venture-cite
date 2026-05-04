@@ -451,10 +451,7 @@ export async function refreshScrapedFacts(
           } as any);
           updated += 1;
         } catch (err) {
-          console.warn(
-            `[factExtractor] refresh update failed:`,
-            err instanceof Error ? err.message : err,
-          );
+          logger.warn({ err: err }, `[factExtractor] refresh update failed:`);
         }
       } else {
         try {

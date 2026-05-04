@@ -5,11 +5,11 @@ import type { AgentTask, WorkflowRun } from "@shared/schema";
 import { storage } from "../storage";
 import { workflowStorage } from "../storage/workflowStorage";
 import { logger } from "./logger";
-import { Sentry } from "../instrument";
 import type { AgentTaskType } from "./agentTaskSchemas";
 import { executeAgentTask } from "./agentTaskExecutor";
 import { runArticleSlice } from "../contentGenerationWorker";
 
+import { captureAndFlush } from "./sentryReport";
 export type StepStatus =
   | "pending"
   | "awaiting_approval"
@@ -843,7 +843,7 @@ export async function tickActiveRuns(): Promise<void> {
       await advanceRun(r.id);
     } catch (err) {
       logger.error({ err, runId: r.id }, "workflow: advanceRun threw");
-      Sentry.captureException(err, {
+      captureAndFlush(err, {
         tags: { source: "workflowEngine.tick" },
         extra: { runId: r.id },
       });
@@ -876,7 +876,7 @@ export async function maybeTickActiveRunsForUser(userId: string): Promise<void> 
       await advanceRun(r.id);
     } catch (err) {
       logger.error({ err, runId: r.id, userId }, "workflow: lazy advanceRun threw");
-      Sentry.captureException(err, {
+      captureAndFlush(err, {
         tags: { source: "workflowEngine.lazyTick" },
         extra: { runId: r.id, userId },
       });

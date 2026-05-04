@@ -18,6 +18,7 @@ import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import { useLocation } from "wouter";
 import type { KeywordResearch } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
@@ -163,6 +164,7 @@ export default function KeywordResearchPage() {
       <PageHeader
         title="AI Keyword Research"
         description="Discover keywords that will get your brand cited by AI search engines"
+        explainer={pageExplainers.keywordResearch}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">

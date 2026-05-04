@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { HelpCircle, Loader2, Sparkles, Plus, Target, X, TrendingUp } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import BeginnerTips from "@/components/content/BeginnerTips";
 import UsageWidget from "@/components/content/UsageWidget";
 import DraftToolbar from "@/components/content/DraftToolbar";
@@ -505,6 +506,7 @@ export default function Content() {
           <PageHeader
             title="AI Content Generation"
             description="Generate SEO-optimized content for AI search engines"
+            explainer={pageExplainers.content}
           />
           <Card>
             <CardContent className="py-12 text-center">
@@ -551,6 +553,7 @@ export default function Content() {
         <PageHeader
           title="AI Content Generation"
           description="Generate SEO-optimized content for AI search engines"
+          explainer={pageExplainers.content}
         />
 
         <DraftToolbar

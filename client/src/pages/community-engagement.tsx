@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import type { CommunityPost } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -311,6 +312,7 @@ export default function CommunityEngagement() {
         title="Community Engagement"
         description="Find and engage with Reddit, Quora, and forum communities to build brand citations"
         actions={brands.length > 0 ? <BrandSelector className="w-64" /> : null}
+        explainer={pageExplainers.community}
       />
 
       <div className="flex flex-wrap items-center gap-4 mb-6">

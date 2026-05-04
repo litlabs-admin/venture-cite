@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import { Bot, TrendingUp, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 
 interface GeoRanking {
@@ -79,6 +80,7 @@ export default function GeoRankingsPage() {
       <PageHeader
         title="GEO Rankings"
         description="Track your content performance across AI platforms"
+        explainer={pageExplainers.geoRankings}
       />
 
       <Card data-testid="banner-live-mode">

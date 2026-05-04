@@ -64,6 +64,8 @@ import { safeFetchText } from "./lib/ssrf";
 import { encryptToken, decryptToken } from "./lib/tokenCipher";
 import { logAudit } from "./lib/audit";
 import { logger } from "./lib/logger";
+import { Sentry } from "./instrument";
+import { captureAndFlush } from "./lib/sentryReport";
 import { withArticleQuota, withBrandQuota, isUsageLimitError } from "./lib/usageLimit";
 import type { Tier } from "./lib/llmPricing";
 import { parsePagination } from "./lib/pagination";
@@ -88,6 +90,8 @@ import { setupAgentRoutes } from "./routes/agent";
 import { setupGeoSignalsRoutes } from "./routes/geoSignals";
 import { setupCommunityRoutes } from "./routes/community";
 import { setupCronRoutes } from "./routes/cron";
+import { setupAssistantRoutes } from "./routes/assistant";
+import { asyncHandler } from "./lib/asyncHandler";
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -131,7 +135,12 @@ function sendError(res: Response, err: unknown, fallback: string, status = 500):
   if (sendOwnershipError(res, err)) return;
   const isProd = process.env.NODE_ENV === "production";
   const message = isProd ? fallback : err instanceof Error ? err.message : fallback;
-  if (err) console.error("[routes]", fallback, err);
+  if (err) {
+    logger.error({ err, fallback }, `[routes] ${fallback}`);
+    if (status >= 500) {
+      captureAndFlush(err, { tags: { source: "sendError", fallback } });
+    }
+  }
   res.status(status).json({ success: false, error: message });
 }
 
@@ -204,121 +213,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.param("brandId", brandIdParamHandler);
 
   // Usage tracking API endpoints
-  app.get("/api/usage", async (req, res) => {
-    try {
-      const user = (req as any).user;
-      if (!user) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
+  app.get(
+    "/api/usage",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = (req as any).user;
+        if (!user) {
+          return res.status(401).json({ success: false, error: "Not authenticated" });
+        }
+
+        const usage = await storage.getUserUsage(user.id);
+        const tier = (user.accessTier || "free") as keyof typeof usageLimits;
+        const limits = usageLimits[tier] || usageLimits.free;
+
+        res.json({
+          success: true,
+          data: {
+            articlesUsed: usage?.articlesUsed || 0,
+            articlesLimit: limits.articlesPerMonth,
+            articlesRemaining:
+              limits.articlesPerMonth === -1
+                ? -1
+                : Math.max(0, limits.articlesPerMonth - (usage?.articlesUsed || 0)),
+            brandsUsed: usage?.brandsUsed || 0,
+            brandsLimit: limits.maxBrands,
+            brandsRemaining:
+              limits.maxBrands === -1
+                ? -1
+                : Math.max(0, limits.maxBrands - (usage?.brandsUsed || 0)),
+            resetDate: usage?.resetDate,
+            tier: user.accessTier || "free",
+          },
+        });
+      } catch (error: any) {
+        captureAndFlush(error, { tags: { source: "routes.ts:243" } });
+        res.status(500).json({ success: false, error: error.message });
       }
-
-      const usage = await storage.getUserUsage(user.id);
-      const tier = (user.accessTier || "free") as keyof typeof usageLimits;
-      const limits = usageLimits[tier] || usageLimits.free;
-
-      res.json({
-        success: true,
-        data: {
-          articlesUsed: usage?.articlesUsed || 0,
-          articlesLimit: limits.articlesPerMonth,
-          articlesRemaining:
-            limits.articlesPerMonth === -1
-              ? -1
-              : Math.max(0, limits.articlesPerMonth - (usage?.articlesUsed || 0)),
-          brandsUsed: usage?.brandsUsed || 0,
-          brandsLimit: limits.maxBrands,
-          brandsRemaining:
-            limits.maxBrands === -1 ? -1 : Math.max(0, limits.maxBrands - (usage?.brandsUsed || 0)),
-          resetDate: usage?.resetDate,
-          tier: user.accessTier || "free",
-        },
-      });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
+    }),
+  );
 
   // User preferences — notification toggles, Buffer connection status
-  app.patch("/api/user/preferences", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const { weeklyReportEnabled } = req.body ?? {};
-      if (typeof weeklyReportEnabled !== "boolean") {
-        return res
-          .status(400)
-          .json({ success: false, error: "weeklyReportEnabled must be boolean" });
+  app.patch(
+    "/api/user/preferences",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const { weeklyReportEnabled } = req.body ?? {};
+        if (typeof weeklyReportEnabled !== "boolean") {
+          return res
+            .status(400)
+            .json({ success: false, error: "weeklyReportEnabled must be boolean" });
+        }
+        const { db } = await import("./db");
+        const { eq } = await import("drizzle-orm");
+        const schema = await import("@shared/schema");
+        await db
+          .update(schema.users)
+          .set({ weeklyReportEnabled: weeklyReportEnabled ? 1 : 0 })
+          .where(eq(schema.users.id, user.id));
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to update preferences");
       }
-      const { db } = await import("./db");
-      const { eq } = await import("drizzle-orm");
-      const schema = await import("@shared/schema");
-      await db
-        .update(schema.users)
-        .set({ weeklyReportEnabled: weeklyReportEnabled ? 1 : 0 })
-        .where(eq(schema.users.id, user.id));
-      res.json({ success: true });
-    } catch (error) {
-      sendError(res, error, "Failed to update preferences");
-    }
-  });
+    }),
+  );
 
-  app.get("/api/user/preferences", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const { db } = await import("./db");
-      const { eq } = await import("drizzle-orm");
-      const schema = await import("@shared/schema");
-      const [row] = await db
-        .select({
-          weeklyReportEnabled: schema.users.weeklyReportEnabled,
-          bufferConnected: schema.users.bufferAccessToken,
-        })
-        .from(schema.users)
-        .where(eq(schema.users.id, user.id))
-        .limit(1);
-      res.json({
-        success: true,
-        data: {
-          weeklyReportEnabled: (row?.weeklyReportEnabled ?? 1) === 1,
-          bufferConnected: !!row?.bufferConnected,
-        },
-      });
-    } catch (error) {
-      sendError(res, error, "Failed to fetch preferences");
-    }
-  });
+  app.get(
+    "/api/user/preferences",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const { db } = await import("./db");
+        const { eq } = await import("drizzle-orm");
+        const schema = await import("@shared/schema");
+        const [row] = await db
+          .select({
+            weeklyReportEnabled: schema.users.weeklyReportEnabled,
+            bufferConnected: schema.users.bufferAccessToken,
+          })
+          .from(schema.users)
+          .where(eq(schema.users.id, user.id))
+          .limit(1);
+        res.json({
+          success: true,
+          data: {
+            weeklyReportEnabled: (row?.weeklyReportEnabled ?? 1) === 1,
+            bufferConnected: !!row?.bufferConnected,
+          },
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to fetch preferences");
+      }
+    }),
+  );
 
   // Waitlist signup (public - no auth required)
-  app.post("/api/waitlist", async (req, res) => {
-    try {
-      const { email, source } = req.body;
+  app.post(
+    "/api/waitlist",
+    asyncHandler(async (req, res) => {
+      try {
+        const { email, source } = req.body;
 
-      if (!email || typeof email !== "string") {
-        return res.status(400).json({ success: false, error: "Email is required" });
+        if (!email || typeof email !== "string") {
+          return res.status(400).json({ success: false, error: "Email is required" });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          return res.status(400).json({ success: false, error: "Invalid email format" });
+        }
+
+        const { pool } = await import("./db");
+        const normalizedEmail = email.toLowerCase().trim();
+        const emailSource = source || "landing";
+
+        await pool.query(
+          `INSERT INTO waitlist (email, source) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING`,
+          [normalizedEmail, emailSource],
+        );
+
+        res.json({ success: true, message: "Successfully joined the waitlist!" });
+      } catch (error: any) {
+        logger.error({ err: error }, "Waitlist error");
+        if (error.code === "23505") {
+          res.json({ success: true, message: "You're already on the waitlist!" });
+        } else {
+          captureAndFlush(error, { tags: { source: "routes.ts:325" } });
+          res.status(500).json({ success: false, error: "Failed to join waitlist" });
+        }
       }
-
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({ success: false, error: "Invalid email format" });
-      }
-
-      const { pool } = await import("./db");
-      const normalizedEmail = email.toLowerCase().trim();
-      const emailSource = source || "landing";
-
-      await pool.query(
-        `INSERT INTO waitlist (email, source) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING`,
-        [normalizedEmail, emailSource],
-      );
-
-      res.json({ success: true, message: "Successfully joined the waitlist!" });
-    } catch (error: any) {
-      console.error("Waitlist error:", error);
-      if (error.code === "23505") {
-        res.json({ success: true, message: "You're already on the waitlist!" });
-      } else {
-        res.status(500).json({ success: false, error: "Failed to join waitlist" });
-      }
-    }
-  });
+    }),
+  );
 
   // Helper function to check usage limits
   async function checkUsageLimit(
@@ -348,212 +373,235 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Beta invite code validation — redeems for the current authenticated user.
   // userId is NEVER taken from request body (was an IDOR vulnerability).
-  app.post("/api/beta/validate", async (req, res) => {
-    try {
-      const user = (req as any).user;
-      const { code } = req.body;
+  app.post(
+    "/api/beta/validate",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = (req as any).user;
+        const { code } = req.body;
 
-      if (!code || typeof code !== "string") {
-        return res.status(400).json({ success: false, error: "Invite code is required" });
+        if (!code || typeof code !== "string") {
+          return res.status(400).json({ success: false, error: "Invite code is required" });
+        }
+
+        const inviteCode = await storage.useBetaInviteCode(code);
+
+        if (!inviteCode) {
+          return res.status(400).json({ success: false, error: "Invalid or expired invite code" });
+        }
+
+        await storage.updateUserStripeInfo(user.id, { accessTier: inviteCode.accessTier });
+
+        res.json({ success: true, accessTier: inviteCode.accessTier });
+      } catch (error: any) {
+        captureAndFlush(error, { tags: { source: "routes.ts:377" } });
+        res.status(500).json({ success: false, error: error.message });
       }
-
-      const inviteCode = await storage.useBetaInviteCode(code);
-
-      if (!inviteCode) {
-        return res.status(400).json({ success: false, error: "Invalid or expired invite code" });
-      }
-
-      await storage.updateUserStripeInfo(user.id, { accessTier: inviteCode.accessTier });
-
-      res.json({ success: true, accessTier: inviteCode.accessTier });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
+    }),
+  );
 
   // Admin: Create beta invite codes
-  app.post("/api/beta/codes", isAdmin, async (req, res) => {
-    try {
-      const { code, maxUses, accessTier, expiresAt } = req.body;
+  app.post(
+    "/api/beta/codes",
+    isAdmin,
+    asyncHandler(async (req, res) => {
+      try {
+        const { code, maxUses, accessTier, expiresAt } = req.body;
 
-      const validTiers = ["free", "beta", "pro", "enterprise", "admin"];
-      const tier = accessTier && validTiers.includes(accessTier) ? accessTier : "beta";
-      const uses = typeof maxUses === "number" && maxUses > 0 ? maxUses : 10;
+        const validTiers = ["free", "beta", "pro", "enterprise", "admin"];
+        const tier = accessTier && validTiers.includes(accessTier) ? accessTier : "beta";
+        const uses = typeof maxUses === "number" && maxUses > 0 ? maxUses : 10;
 
-      const inviteCode = await storage.createBetaInviteCode({
-        code:
-          code && typeof code === "string"
-            ? code.toUpperCase()
-            : Math.random().toString(36).substring(2, 10).toUpperCase(),
-        maxUses: uses,
-        accessTier: tier,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
-      });
-      await logAudit(req, {
-        action: "admin.beta_code.create",
-        entityType: "beta_invite_code",
-        entityId: inviteCode.id,
-        after: inviteCode,
-      });
-      res.json({ success: true, data: inviteCode });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
+        const inviteCode = await storage.createBetaInviteCode({
+          code:
+            code && typeof code === "string"
+              ? code.toUpperCase()
+              : Math.random().toString(36).substring(2, 10).toUpperCase(),
+          maxUses: uses,
+          accessTier: tier,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+        });
+        await logAudit(req, {
+          action: "admin.beta_code.create",
+          entityType: "beta_invite_code",
+          entityId: inviteCode.id,
+          after: inviteCode,
+        });
+        res.json({ success: true, data: inviteCode });
+      } catch (error: any) {
+        captureAndFlush(error, { tags: { source: "routes.ts:407" } });
+        res.status(500).json({ success: false, error: error.message });
+      }
+    }),
+  );
 
   // Get all beta codes (admin)
-  app.get("/api/beta/codes", isAdmin, async (_req, res) => {
-    try {
-      const codes = await storage.getAllBetaInviteCodes();
-      res.json({ success: true, data: codes });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
+  app.get(
+    "/api/beta/codes",
+    isAdmin,
+    asyncHandler(async (_req, res) => {
+      try {
+        const codes = await storage.getAllBetaInviteCodes();
+        res.json({ success: true, data: codes });
+      } catch (error: any) {
+        captureAndFlush(error, { tags: { source: "routes.ts:417" } });
+        res.status(500).json({ success: false, error: error.message });
+      }
+    }),
+  );
 
   // Get dashboard analytics — scoped to the authenticated user. Aggregates
   // across brands they own so one logged-in user cannot see another's data.
-  app.get("/api/dashboard", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const allBrands = await storage.getBrandsByUserId(user.id);
-      // Optional ?brandId= filter — when provided, every metric below is
-      // scoped to that single brand. Without it, metrics aggregate across
-      // every brand the user owns (legacy behaviour).
-      const brandIdFilter = typeof req.query.brandId === "string" ? req.query.brandId : "";
-      const scopedBrands = brandIdFilter
-        ? allBrands.filter((b) => b.id === brandIdFilter)
-        : allBrands;
-      const brandIds = new Set(scopedBrands.map((b) => b.id));
-      const allArticles = await storage.getArticles();
-      const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
-      const totalArticles = articles.length;
+  app.get(
+    "/api/dashboard",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const allBrands = await storage.getBrandsByUserId(user.id);
+        // Optional ?brandId= filter — when provided, every metric below is
+        // scoped to that single brand. Without it, metrics aggregate across
+        // every brand the user owns (legacy behaviour).
+        const brandIdFilter = typeof req.query.brandId === "string" ? req.query.brandId : "";
+        const scopedBrands = brandIdFilter
+          ? allBrands.filter((b) => b.id === brandIdFilter)
+          : allBrands;
+        const brandIds = new Set(scopedBrands.map((b) => b.id));
+        const allArticles = await storage.getArticles();
+        const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
+        const totalArticles = articles.length;
 
-      // Real Phase 1 citation metrics come from geo_rankings rows tied to the
-      // user's brand_prompts. Aggregate across every brand the user owns and
-      // keep only the latest row per (prompt, platform) pair so re-runs don't
-      // double-count.
-      const promptIdsByBrand = await Promise.all(
-        Array.from(brandIds).map((bid) => storage.getBrandPromptsByBrandId(bid)),
-      );
-      const allPromptIds = promptIdsByBrand.flat().map((p) => p.id);
-      let totalCitations = 0;
-      let totalChecks = 0;
-      if (allPromptIds.length > 0) {
-        const rankings = await storage.getGeoRankingsByBrandPromptIds(allPromptIds);
-        const latestByKey = new Map<string, (typeof rankings)[number]>();
-        for (const r of rankings) {
-          const key = `${r.brandPromptId}__${r.aiPlatform}`;
-          const existing = latestByKey.get(key);
-          if (!existing || r.checkedAt > existing.checkedAt) latestByKey.set(key, r);
-        }
-        for (const r of Array.from(latestByKey.values())) {
-          totalChecks += 1;
-          if (r.isCited === 1) totalCitations += 1;
-        }
-      }
-      const citationRate = totalChecks > 0 ? Math.round((totalCitations / totalChecks) * 100) : 0;
-
-      res.json({
-        success: true,
-        data: {
-          totalCitations,
-          totalChecks,
-          citationRate,
-          totalArticles,
-          totalBrands: allBrands.length,
-          weeklyGrowth: 0,
-          avgPosition: 0,
-          monthlyTraffic: 0,
-        },
-      });
-    } catch (error) {
-      sendError(res, error, "Failed to fetch dashboard data");
-    }
-  });
-
-  // Onboarding status for new user checklist — scoped to the caller.
-  app.get("/api/onboarding-status", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const brands = await storage.getBrandsByUserId(user.id);
-      const brandIds = new Set(brands.map((b) => b.id));
-      const allArticles = await storage.getArticles();
-      const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
-      const citations = await storage.getCitationsByUserId(user.id);
-
-      // Also count any cited geo_rankings — the automated Phase 1 flow
-      // writes there instead of the legacy `citations` table, so without
-      // this check users who've run prompt checks would never see the
-      // "Track your first citation" step flip to done.
-      let citedRankingsCount = 0;
-      let citationRunsCount = 0;
-      if (brandIds.size > 0) {
+        // Real Phase 1 citation metrics come from geo_rankings rows tied to the
+        // user's brand_prompts. Aggregate across every brand the user owns and
+        // keep only the latest row per (prompt, platform) pair so re-runs don't
+        // double-count.
         const promptIdsByBrand = await Promise.all(
           Array.from(brandIds).map((bid) => storage.getBrandPromptsByBrandId(bid)),
         );
-        const promptIds = promptIdsByBrand.flat().map((p) => p.id);
-        if (promptIds.length > 0) {
-          const rankings = await storage.getGeoRankingsByBrandPromptIds(promptIds);
-          citedRankingsCount = rankings.filter((r) => r.isCited === 1).length;
+        const allPromptIds = promptIdsByBrand.flat().map((p) => p.id);
+        let totalCitations = 0;
+        let totalChecks = 0;
+        if (allPromptIds.length > 0) {
+          const rankings = await storage.getGeoRankingsByBrandPromptIds(allPromptIds);
+          const latestByKey = new Map<string, (typeof rankings)[number]>();
+          for (const r of rankings) {
+            const key = `${r.brandPromptId}__${r.aiPlatform}`;
+            const existing = latestByKey.get(key);
+            if (!existing || r.checkedAt > existing.checkedAt) latestByKey.set(key, r);
+          }
+          for (const r of Array.from(latestByKey.values())) {
+            totalChecks += 1;
+            if (r.isCited === 1) totalCitations += 1;
+          }
         }
-        // Count citation runs across all brands — completing the step
-        // when the user *runs* their first check, not only when something
-        // is actually cited.
-        const runsByBrand = await Promise.all(
-          Array.from(brandIds).map((bid) => storage.getCitationRunsByBrandId(bid, 1)),
-        );
-        citationRunsCount = runsByBrand.reduce((acc, rs) => acc + rs.length, 0);
+        const citationRate = totalChecks > 0 ? Math.round((totalCitations / totalChecks) * 100) : 0;
+
+        res.json({
+          success: true,
+          data: {
+            totalCitations,
+            totalChecks,
+            citationRate,
+            totalArticles,
+            totalBrands: allBrands.length,
+            weeklyGrowth: 0,
+            avgPosition: 0,
+            monthlyTraffic: 0,
+          },
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to fetch dashboard data");
       }
+    }),
+  );
 
-      // Server-side onboarding flags — persisted on the users row so they
-      // sync across browsers/devices (localStorage doesn't).
-      const userRow = await storage.getUser(user.id);
+  // Onboarding status for new user checklist — scoped to the caller.
+  app.get(
+    "/api/onboarding-status",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brands = await storage.getBrandsByUserId(user.id);
+        const brandIds = new Set(brands.map((b) => b.id));
+        const allArticles = await storage.getArticles();
+        const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
+        const citations = await storage.getCitationsByUserId(user.id);
 
-      res.json({
-        success: true,
-        data: {
-          brands,
-          articles,
-          citations,
-          citedRankingsCount,
-          citationRunsCount,
-          hasArticles: articles.length > 0,
-          visibilityVisited: Boolean(userRow?.visibilityGuideVisitedAt),
-          visibilityVisitedAt: userRow?.visibilityGuideVisitedAt ?? null,
-          visibilityStarted: false,
-          // Wave 4.7: cross-device-synced onboarding flags. Empty object
-          // for fresh accounts; the PATCH /api/onboarding/state endpoint
-          // is what writes into this.
-          onboardingState: userRow?.onboardingState ?? {},
-        },
-      });
-    } catch (error) {
-      sendError(res, error, "Failed to fetch onboarding status");
-    }
-  });
+        // Also count any cited geo_rankings — the automated Phase 1 flow
+        // writes there instead of the legacy `citations` table, so without
+        // this check users who've run prompt checks would never see the
+        // "Track your first citation" step flip to done.
+        let citedRankingsCount = 0;
+        let citationRunsCount = 0;
+        if (brandIds.size > 0) {
+          const promptIdsByBrand = await Promise.all(
+            Array.from(brandIds).map((bid) => storage.getBrandPromptsByBrandId(bid)),
+          );
+          const promptIds = promptIdsByBrand.flat().map((p) => p.id);
+          if (promptIds.length > 0) {
+            const rankings = await storage.getGeoRankingsByBrandPromptIds(promptIds);
+            citedRankingsCount = rankings.filter((r) => r.isCited === 1).length;
+          }
+          // Count citation runs across all brands — completing the step
+          // when the user *runs* their first check, not only when something
+          // is actually cited.
+          const runsByBrand = await Promise.all(
+            Array.from(brandIds).map((bid) => storage.getCitationRunsByBrandId(bid, 1)),
+          );
+          citationRunsCount = runsByBrand.reduce((acc, rs) => acc + rs.length, 0);
+        }
+
+        // Server-side onboarding flags — persisted on the users row so they
+        // sync across browsers/devices (localStorage doesn't).
+        const userRow = await storage.getUser(user.id);
+
+        res.json({
+          success: true,
+          data: {
+            brands,
+            articles,
+            citations,
+            citedRankingsCount,
+            citationRunsCount,
+            hasArticles: articles.length > 0,
+            visibilityVisited: Boolean(userRow?.visibilityGuideVisitedAt),
+            visibilityVisitedAt: userRow?.visibilityGuideVisitedAt ?? null,
+            visibilityStarted: false,
+            // Wave 4.7: cross-device-synced onboarding flags. Empty object
+            // for fresh accounts; the PATCH /api/onboarding/state endpoint
+            // is what writes into this.
+            onboardingState: userRow?.onboardingState ?? {},
+          },
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to fetch onboarding status");
+      }
+    }),
+  );
 
   // Mark the "View the AI Visibility Guide" onboarding step as complete
   // server-side. Idempotent — first call stamps the timestamp, subsequent
   // calls are no-ops. Synced across devices via the users table.
-  app.post("/api/onboarding/visibility-visited", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const current = await storage.getUser(user.id);
-      if (!current?.visibilityGuideVisitedAt) {
-        const { eq } = await import("drizzle-orm");
-        const { db } = await import("./db");
-        const schema = await import("@shared/schema");
-        await db
-          .update(schema.users)
-          .set({ visibilityGuideVisitedAt: new Date() })
-          .where(eq(schema.users.id, user.id));
+  app.post(
+    "/api/onboarding/visibility-visited",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const current = await storage.getUser(user.id);
+        if (!current?.visibilityGuideVisitedAt) {
+          const { eq } = await import("drizzle-orm");
+          const { db } = await import("./db");
+          const schema = await import("@shared/schema");
+          await db
+            .update(schema.users)
+            .set({ visibilityGuideVisitedAt: new Date() })
+            .where(eq(schema.users.id, user.id));
+        }
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to mark visibility visited");
       }
-      res.json({ success: true });
-    } catch (error) {
-      sendError(res, error, "Failed to mark visibility visited");
-    }
-  });
+    }),
+  );
 
   // Comprehensive platform metrics — scoped to the authenticated user's
   // brands / articles / tasks / campaigns / rankings.
@@ -562,115 +610,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // failed source doesn't blank the entire dashboard. Each source falls
   // back to an empty list and surfaces a flag in `degraded` so the
   // frontend can show a "couldn't load X" badge per card.
-  app.get("/api/platform-metrics", async (req, res) => {
-    try {
-      const user = requireUser(req);
-      const brands = await storage.getBrandsByUserId(user.id);
-      const brandIds = new Set(brands.map((b) => b.id));
-      const [articlesRes, tasksRes, campaignsRes, rankingsRes] = await Promise.allSettled([
-        storage.getArticles(),
-        storage.getAgentTasks(),
-        storage.getOutreachCampaigns(),
-        storage.getGeoRankings(),
-      ]);
+  app.get(
+    "/api/platform-metrics",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brands = await storage.getBrandsByUserId(user.id);
+        const brandIds = new Set(brands.map((b) => b.id));
+        const [articlesRes, tasksRes, campaignsRes, rankingsRes] = await Promise.allSettled([
+          storage.getArticles(),
+          storage.getAgentTasks(),
+          storage.getOutreachCampaigns(),
+          storage.getGeoRankings(),
+        ]);
 
-      const degraded: Record<string, true> = {};
-      const unwrap = <T>(r: PromiseSettledResult<T[]>, label: string): T[] => {
-        if (r.status === "fulfilled") return r.value;
-        degraded[label] = true;
-        logger.warn({ err: r.reason, source: label }, "platform-metrics: source failed");
-        return [];
-      };
+        const degraded: Record<string, true> = {};
+        const unwrap = <T>(r: PromiseSettledResult<T[]>, label: string): T[] => {
+          if (r.status === "fulfilled") return r.value;
+          degraded[label] = true;
+          logger.warn({ err: r.reason, source: label }, "platform-metrics: source failed");
+          return [];
+        };
 
-      const allArticles = unwrap(articlesRes, "articles");
-      const allTasks = unwrap(tasksRes, "tasks");
-      const allCampaigns = unwrap(campaignsRes, "campaigns");
-      const allGeoRankings = unwrap(rankingsRes, "geoRankings");
+        const allArticles = unwrap(articlesRes, "articles");
+        const allTasks = unwrap(tasksRes, "tasks");
+        const allCampaigns = unwrap(campaignsRes, "campaigns");
+        const allGeoRankings = unwrap(rankingsRes, "geoRankings");
 
-      const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
-      const tasks = allTasks.filter((t: any) => t.brandId && brandIds.has(t.brandId));
-      const campaigns = allCampaigns.filter((c: any) => c.brandId && brandIds.has(c.brandId));
-      const articleIds = new Set(articles.map((a) => a.id));
-      const geoRankings = allGeoRankings.filter(
-        (r: any) => r.articleId && articleIds.has(r.articleId),
-      );
+        const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
+        const tasks = allTasks.filter((t: any) => t.brandId && brandIds.has(t.brandId));
+        const campaigns = allCampaigns.filter((c: any) => c.brandId && brandIds.has(c.brandId));
+        const articleIds = new Set(articles.map((a) => a.id));
+        const geoRankings = allGeoRankings.filter(
+          (r: any) => r.articleId && articleIds.has(r.articleId),
+        );
 
-      // Calculate content production stats
-      const now = new Date();
-      const oneWeekAgo = new Date(now.getTime() - ANALYTICS_WINDOWS.week * MS_PER_DAY);
-      const oneMonthAgo = new Date(now.getTime() - ANALYTICS_WINDOWS.month * MS_PER_DAY);
+        // Calculate content production stats
+        const now = new Date();
+        const oneWeekAgo = new Date(now.getTime() - ANALYTICS_WINDOWS.week * MS_PER_DAY);
+        const oneMonthAgo = new Date(now.getTime() - ANALYTICS_WINDOWS.month * MS_PER_DAY);
 
-      const articlesThisWeek = articles.filter((a) => new Date(a.createdAt) >= oneWeekAgo).length;
-      const articlesThisMonth = articles.filter((a) => new Date(a.createdAt) >= oneMonthAgo).length;
+        const articlesThisWeek = articles.filter((a) => new Date(a.createdAt) >= oneWeekAgo).length;
+        const articlesThisMonth = articles.filter(
+          (a) => new Date(a.createdAt) >= oneMonthAgo,
+        ).length;
 
-      // Calculate task stats
-      const completedTasks = tasks.filter((t) => t.status === "completed").length;
-      const pendingTasks = tasks.filter((t) => t.status === "pending").length;
-      const failedTasks = tasks.filter((t) => t.status === "failed").length;
-      const taskCompletionRate =
-        tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+        // Calculate task stats
+        const completedTasks = tasks.filter((t) => t.status === "completed").length;
+        const pendingTasks = tasks.filter((t) => t.status === "pending").length;
+        const failedTasks = tasks.filter((t) => t.status === "failed").length;
+        const taskCompletionRate =
+          tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
-      // Calculate outreach stats
-      const sentCampaigns = campaigns.filter(
-        (c) => c.status === "sent" || c.status === "responded",
-      ).length;
-      const successfulCampaigns = campaigns.filter(
-        (c) => c.status === "accepted" || c.status === "published",
-      ).length;
-      const outreachSuccessRate =
-        sentCampaigns > 0 ? Math.round((successfulCampaigns / sentCampaigns) * 100) : 0;
+        // Calculate outreach stats
+        const sentCampaigns = campaigns.filter(
+          (c) => c.status === "sent" || c.status === "responded",
+        ).length;
+        const successfulCampaigns = campaigns.filter(
+          (c) => c.status === "accepted" || c.status === "published",
+        ).length;
+        const outreachSuccessRate =
+          sentCampaigns > 0 ? Math.round((successfulCampaigns / sentCampaigns) * 100) : 0;
 
-      // Calculate citation stats
-      const totalCitations = geoRankings.filter((r) => r.isCited).length;
-      const citationRate =
-        geoRankings.length > 0 ? Math.round((totalCitations / geoRankings.length) * 100) : 0;
+        // Calculate citation stats
+        const totalCitations = geoRankings.filter((r) => r.isCited).length;
+        const citationRate =
+          geoRankings.length > 0 ? Math.round((totalCitations / geoRankings.length) * 100) : 0;
 
-      res.json({
-        success: true,
-        data: {
-          content: {
-            totalArticles: articles.length,
-            articlesThisWeek,
-            articlesThisMonth,
-            avgWordsPerArticle:
-              articles.length > 0
-                ? Math.round(
-                    articles.reduce((sum, a) => sum + (a.content?.split(/\s+/).length || 0), 0) /
-                      articles.length,
-                  )
-                : 0,
+        res.json({
+          success: true,
+          data: {
+            content: {
+              totalArticles: articles.length,
+              articlesThisWeek,
+              articlesThisMonth,
+              avgWordsPerArticle:
+                articles.length > 0
+                  ? Math.round(
+                      articles.reduce((sum, a) => sum + (a.content?.split(/\s+/).length || 0), 0) /
+                        articles.length,
+                    )
+                  : 0,
+            },
+            brands: {
+              total: brands.length,
+              withContent: brands.filter((b) => articles.some((a) => a.brandId === b.id)).length,
+            },
+            tasks: {
+              total: tasks.length,
+              completed: completedTasks,
+              pending: pendingTasks,
+              failed: failedTasks,
+              completionRate: taskCompletionRate,
+            },
+            outreach: {
+              totalCampaigns: campaigns.length,
+              sent: sentCampaigns,
+              successful: successfulCampaigns,
+              successRate: outreachSuccessRate,
+            },
+            citations: {
+              total: totalCitations,
+              checks: geoRankings.length,
+              citationRate,
+            },
           },
-          brands: {
-            total: brands.length,
-            withContent: brands.filter((b) => articles.some((a) => a.brandId === b.id)).length,
-          },
-          tasks: {
-            total: tasks.length,
-            completed: completedTasks,
-            pending: pendingTasks,
-            failed: failedTasks,
-            completionRate: taskCompletionRate,
-          },
-          outreach: {
-            totalCampaigns: campaigns.length,
-            sent: sentCampaigns,
-            successful: successfulCampaigns,
-            successRate: outreachSuccessRate,
-          },
-          citations: {
-            total: totalCitations,
-            checks: geoRankings.length,
-            citationRate,
-          },
-        },
-        // Empty when everything succeeded; otherwise per-source flags so
-        // the frontend can warn the user that a card is partial-data.
-        degraded: Object.keys(degraded).length > 0 ? degraded : undefined,
-      });
-    } catch (error) {
-      sendError(res, error, "Failed to fetch platform metrics");
-    }
-  });
+          // Empty when everything succeeded; otherwise per-source flags so
+          // the frontend can warn the user that a card is partial-data.
+          degraded: Object.keys(degraded).length > 0 ? degraded : undefined,
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to fetch platform metrics");
+      }
+    }),
+  );
 
   // Wave 5.1 domain splits: the rest of the routes live in per-domain
   // files under ./routes. Each mounts its own handlers; middleware above
@@ -686,6 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAgentRoutes(app);
   setupGeoSignalsRoutes(app);
   setupCommunityRoutes(app);
+  setupAssistantRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

@@ -9,6 +9,7 @@ import { logger, requestContext } from "./lib/logger";
 import { authRateKey } from "./lib/authRateKey";
 import { maybeTickActiveRunsForUser } from "./lib/workflowEngine";
 
+import { captureAndFlush } from "./lib/sentryReport";
 // Re-exported for callers that want to use the same keying scheme on
 // other endpoints (e.g. account-deletion in Wave 2).
 export { authRateKey };
@@ -196,7 +197,7 @@ export const attachUserIfPresent: RequestHandler = async (req, _res, next) => {
     const { data, error } = await supabaseAdmin.auth.getUser(token);
     if (error) {
       if (error.message && !/invalid jwt/i.test(error.message)) {
-        console.warn("[auth] JWT verify failed:", error.message);
+        logger.warn({ err: error }, "auth: attachUserIfPresent JWT verify failed");
       }
       return next();
     }
@@ -206,8 +207,8 @@ export const attachUserIfPresent: RequestHandler = async (req, _res, next) => {
     if (dbUser) {
       (req as any).user = dbUser;
     }
-  } catch (err: any) {
-    console.warn("[auth] attachUserIfPresent unexpected error:", err?.message || err);
+  } catch (err) {
+    logger.warn({ err }, "auth: attachUserIfPresent unexpected error");
   }
   next();
 };
@@ -325,6 +326,7 @@ export function setupAuth(app: Express) {
         expires_at: session.session.expires_at,
       });
     } catch (error: any) {
+      captureAndFlush(error, { tags: { source: "auth.ts:328" } });
       res.status(500).json({ success: false, error: error.message || "Registration failed" });
     }
   });
@@ -400,7 +402,7 @@ export function setupAuth(app: Express) {
       );
 
       if (error) {
-        console.error("[Auth] resetPasswordForEmail failed:", error.message);
+        logger.warn({ err: error }, "auth: resetPasswordForEmail failed");
       }
 
       // Always return success to avoid account enumeration.
@@ -408,8 +410,9 @@ export function setupAuth(app: Express) {
         success: true,
         message: "If an account exists with this email, you will receive a password reset link.",
       });
-    } catch (error: any) {
-      console.error("Forgot password error:", error);
+    } catch (err) {
+      logger.error({ err }, "auth: forgot password error");
+      captureAndFlush(err, { tags: { source: "auth.ts:413" } });
       res.status(500).json({ success: false, error: "Failed to process request" });
     }
   });

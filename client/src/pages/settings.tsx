@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 import { getAccessToken } from "@/lib/authStore";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import { Loader2 } from "lucide-react";
 
 type NotificationPreference = {
@@ -139,7 +140,11 @@ export default function Settings() {
 
   return (
     <div className="container max-w-3xl py-8 space-y-8">
-      <PageHeader title="Account settings" description="Manage your account and your data." />
+      <PageHeader
+        title="Account settings"
+        description="Manage your account and your data."
+        explainer={pageExplainers.settings}
+      />
 
       <section className="rounded-lg border p-6 space-y-3">
         <h2 className="text-lg font-semibold">Profile</h2>

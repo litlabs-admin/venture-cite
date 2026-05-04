@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import type { AiTrafficSession, AiSource } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -113,6 +114,7 @@ export default function AiTraffic() {
           title="AI Traffic"
           description="Track referral traffic from AI platforms"
           actions={brands.length > 0 ? <BrandSelector /> : null}
+          explainer={pageExplainers.aiTraffic}
         />
 
         {!selectedBrandId ? (

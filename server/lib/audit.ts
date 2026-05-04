@@ -4,6 +4,7 @@ import { auditLogs } from "@shared/schema";
 import { logger } from "./logger";
 import { Sentry } from "../instrument";
 
+import { captureAndFlush } from "./sentryReport";
 // Sensitive-operation audit log.
 //
 // Two ergonomic shapes:
@@ -63,7 +64,7 @@ export async function logAudit(req: Request, params: AuditParams): Promise<void>
   } catch (err) {
     // Don't throw — audit failure shouldn't fail the underlying request.
     logger.error({ err, action: params.action }, "audit: failed to write log row");
-    Sentry.captureException(err, { tags: { source: "audit-log" } });
+    captureAndFlush(err, { tags: { source: "audit-log" } });
   }
 }
 
@@ -94,6 +95,6 @@ export async function logSystemAudit(userId: string | null, params: AuditParams)
     });
   } catch (err) {
     logger.error({ err, action: params.action }, "audit: failed to write system log row");
-    Sentry.captureException(err, { tags: { source: "audit-log-system" } });
+    captureAndFlush(err, { tags: { source: "audit-log-system" } });
   }
 }

@@ -9,6 +9,7 @@ import { verifyShopifyHmac } from "./lib/shopifyWebhook";
 import { logSystemAudit } from "./lib/audit";
 import { dollarsToCents } from "@shared/money";
 
+import { captureAndFlush } from "./lib/sentryReport";
 // Map Stripe product names to access tiers
 function tierFromProduct(productName: string): string {
   const name = productName.toLowerCase();
@@ -97,7 +98,7 @@ export class WebhookHandlers {
               { err, subscriptionId: session.subscription },
               "stripe: failed to retrieve subscription for tier",
             );
-            Sentry.captureException(err, { tags: { source: "stripe-webhook.tier-lookup" } });
+            captureAndFlush(err, { tags: { source: "stripe-webhook.tier-lookup" } });
           }
         }
 
@@ -222,7 +223,7 @@ export class WebhookHandlers {
       orderData = JSON.parse(payload.toString("utf8")) as Record<string, unknown>;
     } catch (err) {
       logger.error({ err }, "shopify webhook: malformed JSON body");
-      Sentry.captureException(err, { tags: { source: "shopify-webhook.json-parse" } });
+      captureAndFlush(err, { tags: { source: "shopify-webhook.json-parse" } });
       throw err;
     }
 

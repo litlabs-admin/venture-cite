@@ -18,7 +18,6 @@
 
 import type { Express, Request, Response } from "express";
 import { logger } from "../lib/logger";
-import { Sentry } from "../instrument";
 import {
   runAccountPurgeJob,
   runBrandPurgeJob,
@@ -41,7 +40,9 @@ import { advanceCitationRun } from "../citationChecker";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import { and, inArray, lt } from "drizzle-orm";
+import { asyncHandler } from "../lib/asyncHandler";
 
+import { captureAndFlush } from "../lib/sentryReport";
 // Total wall-clock budget for the orchestrator. Function timeout is 60s
 // on Hobby; we leave 5s of headroom so the response can finalize.
 const ORCHESTRATOR_BUDGET_MS = 55_000;
@@ -57,6 +58,7 @@ const STEP_CAPS_MS = {
   "drain-pending-citation-runs": 10_000,
   "account-purge": 5_000,
   "brand-purge": 5_000,
+  "chatbot-prune": 5_000,
   "stripe-products-setup": 5_000,
   "auto-citation": 30_000,
   "competitor-discovery": 30_000,
@@ -128,7 +130,7 @@ class Orchestrator {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error({ err, step }, "cron.orchestrator: step failed");
-      Sentry.captureException(err, { tags: { source: "cron.orchestrator", step } });
+      captureAndFlush(err, { tags: { source: "cron.orchestrator", step } });
       this.results.push({
         step,
         ok: false,
@@ -207,86 +209,96 @@ async function failStuckContentJobsForOrchestrator(): Promise<{ failed: number }
 }
 
 export function setupCronRoutes(app: Express): void {
-  app.post("/api/cron/daily-orchestrator", async (req: Request, res: Response) => {
-    if (!isCronAuthorized(req)) {
-      return res.status(401).json({ success: false, error: "Not authorized" });
-    }
+  app.post(
+    "/api/cron/daily-orchestrator",
+    asyncHandler(async (req: Request, res: Response) => {
+      if (!isCronAuthorized(req)) {
+        return res.status(401).json({ success: false, error: "Not authorized" });
+      }
 
-    const today = new Date();
-    const dow = today.getUTCDay();
-    const dom = today.getUTCDate();
-    const isMonday = dow === 1;
-    const isSunday = dow === 0;
-    const isFirstOfMonth = dom === 1;
+      const today = new Date();
+      const dow = today.getUTCDay();
+      const dom = today.getUTCDate();
+      const isMonday = dow === 1;
+      const isSunday = dow === 0;
+      const isFirstOfMonth = dom === 1;
 
-    const orch = new Orchestrator(ORCHESTRATOR_BUDGET_MS);
+      const orch = new Orchestrator(ORCHESTRATOR_BUDGET_MS);
 
-    // Cheap maintenance first — these are millisecond-scale and run
-    // unconditionally so orphans get reconciled even on a fully-loaded
-    // cron tick.
-    await orch.run("fail-stuck-content-jobs", () => failStuckContentJobsForOrchestrator());
-    await orch.run("reconcile-orphan-citation-runs", () => reconcileOrphanCitationRuns());
-    await orch.run("resume-in-flight-autopilots", (deadline) => resumeInFlightAutopilots(deadline));
-    await orch.run("drain-pending-content-jobs", (deadline) => drainPendingContentJobs(deadline));
-    await orch.run("drain-pending-citation-runs", (deadline) => drainPendingCitationRuns(deadline));
+      // Cheap maintenance first — these are millisecond-scale and run
+      // unconditionally so orphans get reconciled even on a fully-loaded
+      // cron tick.
+      await orch.run("fail-stuck-content-jobs", () => failStuckContentJobsForOrchestrator());
+      await orch.run("reconcile-orphan-citation-runs", () => reconcileOrphanCitationRuns());
+      await orch.run("resume-in-flight-autopilots", (deadline) =>
+        resumeInFlightAutopilots(deadline),
+      );
+      await orch.run("drain-pending-content-jobs", (deadline) => drainPendingContentJobs(deadline));
+      await orch.run("drain-pending-citation-runs", (deadline) =>
+        drainPendingCitationRuns(deadline),
+      );
 
-    // Daily housekeeping (cheap).
-    await orch.run("account-purge", () => runAccountPurgeJob());
-    await orch.run("brand-purge", () => runBrandPurgeJob());
+      // Daily housekeeping (cheap).
+      await orch.run("account-purge", () => runAccountPurgeJob());
+      await orch.run("brand-purge", () => runBrandPurgeJob());
+      await orch.run("chatbot-prune", async () => {
+        return await storage.pruneChatbotMessages();
+      });
 
-    // Stripe product setup — was on boot, moved here so first Vercel
-    // deploy doesn't need a manual sync. setupStripeProducts is
-    // idempotent (skips existing products).
-    if (process.env.STRIPE_SECRET_KEY) {
-      await orch.run("stripe-products-setup", () => setupStripeProducts());
-    }
+      // Stripe product setup — was on boot, moved here so first Vercel
+      // deploy doesn't need a manual sync. setupStripeProducts is
+      // idempotent (skips existing products).
+      if (process.env.STRIPE_SECRET_KEY) {
+        await orch.run("stripe-products-setup", () => setupStripeProducts());
+      }
 
-    // Heavy iterations — pass the per-step deadline so they bail out of
-    // their per-brand loop when budget runs low. Brands not processed
-    // today carry their old `lastXxxAt` timestamps and get picked up on
-    // the next cron tick.
-    await orch.run("auto-citation", (deadline) => runAutoCitationJob(deadline));
+      // Heavy iterations — pass the per-step deadline so they bail out of
+      // their per-brand loop when budget runs low. Brands not processed
+      // today carry their old `lastXxxAt` timestamps and get picked up on
+      // the next cron tick.
+      await orch.run("auto-citation", (deadline) => runAutoCitationJob(deadline));
 
-    if (isMonday) {
-      await orch.run("competitor-discovery", (deadline) => runCompetitorDiscoveryJob(deadline));
-      await orch.run("mention-scan", (deadline) => runMentionScanJob(deadline));
-      await orch.run("listicle-scan", (deadline) => runListicleScanJob(deadline));
-      await orch.run("weekly-catchup-kickoff", () => runWeeklyCatchupKickoff());
-    }
+      if (isMonday) {
+        await orch.run("competitor-discovery", (deadline) => runCompetitorDiscoveryJob(deadline));
+        await orch.run("mention-scan", (deadline) => runMentionScanJob(deadline));
+        await orch.run("listicle-scan", (deadline) => runListicleScanJob(deadline));
+        await orch.run("weekly-catchup-kickoff", () => runWeeklyCatchupKickoff());
+      }
 
-    // Lazy-eval covers the per-user case; sweep catches lambda-killed
-    // weekly_catchup completions whose post-hook didn't fire.
-    await orch.run("weekly-digest-aggregator", () => runWeeklyDigestAggregator());
+      // Lazy-eval covers the per-user case; sweep catches lambda-killed
+      // weekly_catchup completions whose post-hook didn't fire.
+      await orch.run("weekly-digest-aggregator", () => runWeeklyDigestAggregator());
 
-    if (isFirstOfMonth) {
-      await orch.run("fact-refresh", (deadline) => runFactRefreshJob(deadline));
-    }
+      if (isFirstOfMonth) {
+        await orch.run("fact-refresh", (deadline) => runFactRefreshJob(deadline));
+      }
 
-    if (isSunday) {
-      await orch.run("weekly-report-legacy", () => runWeeklyReportJob());
-    }
+      if (isSunday) {
+        await orch.run("weekly-report-legacy", () => runWeeklyReportJob());
+      }
 
-    const failedSteps = orch.results.filter((r) => !r.ok).map((r) => r.step);
-    const skippedSteps = orch.results.filter((r) => r.skipped).map((r) => r.step);
-    logger.info(
-      {
-        steps: orch.results.length,
-        failed: failedSteps.length,
-        skipped: skippedSteps.length,
+      const failedSteps = orch.results.filter((r) => !r.ok).map((r) => r.step);
+      const skippedSteps = orch.results.filter((r) => r.skipped).map((r) => r.step);
+      logger.info(
+        {
+          steps: orch.results.length,
+          failed: failedSteps.length,
+          skipped: skippedSteps.length,
+          dow,
+          dom,
+          durationMs: ORCHESTRATOR_BUDGET_MS - orch.remainingMs(),
+        },
+        "cron.orchestrator complete",
+      );
+
+      res.json({
+        success: failedSteps.length === 0,
+        ranAt: today.toISOString(),
         dow,
         dom,
-        durationMs: ORCHESTRATOR_BUDGET_MS - orch.remainingMs(),
-      },
-      "cron.orchestrator complete",
-    );
-
-    res.json({
-      success: failedSteps.length === 0,
-      ranAt: today.toISOString(),
-      dow,
-      dom,
-      skippedDueToBudget: skippedSteps,
-      results: orch.results,
-    });
-  });
+        skippedDueToBudget: skippedSteps,
+        results: orch.results,
+      });
+    }),
+  );
 }

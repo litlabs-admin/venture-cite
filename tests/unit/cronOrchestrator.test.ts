@@ -85,7 +85,7 @@ vi.mock("../../server/db", () => ({
   pool: {},
 }));
 vi.mock("../../server/instrument", () => ({
-  Sentry: { captureException: vi.fn() },
+  Sentry: { captureException: vi.fn(), flush: vi.fn(async () => true) },
 }));
 
 const { setupCronRoutes } = await import("../../server/routes/cron");

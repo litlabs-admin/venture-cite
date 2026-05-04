@@ -15,6 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import {
   TrendingUp,
   TrendingDown,
@@ -114,6 +115,7 @@ export default function ClientReports() {
             </Button>
           </div>
         }
+        explainer={pageExplainers.clientReports}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">

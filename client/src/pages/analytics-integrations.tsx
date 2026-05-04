@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import { SiGoogle } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 
@@ -71,6 +72,7 @@ export default function AnalyticsIntegrations() {
       <PageHeader
         title="Analytics Integrations"
         description="Step-by-step setup guide to connect your Google Analytics and Search Console accounts"
+        explainer={pageExplainers.analyticsIntegrations}
       />
 
       <Card>

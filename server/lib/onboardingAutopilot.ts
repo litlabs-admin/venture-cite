@@ -2,11 +2,11 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
 import { logger } from "./logger";
-import { Sentry } from "../instrument";
 import { generateBrandPrompts } from "./promptGenerator";
 import { runBrandPrompts } from "../citationChecker";
 import type { Brand } from "@shared/schema";
 
+import { captureAndFlush } from "./sentryReport";
 const ACTIVE_STATUSES = new Set(["generating_prompts", "running_citations"]);
 
 async function setAutopilot(brandId: string, patch: Partial<Brand>): Promise<void> {
@@ -114,7 +114,7 @@ export async function runOnboardingAutopilot(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ err, brandId, userId }, "onboardingAutopilot: failed");
-    Sentry.captureException(err, { tags: { source: "onboarding-autopilot" } });
+    captureAndFlush(err, { tags: { source: "onboarding-autopilot" } });
     await setAutopilot(brandId, {
       autopilotStatus: "failed",
       autopilotError: message.slice(0, 1000),
@@ -165,6 +165,6 @@ export async function resumeInFlightAutopilots(deadlineMs?: number): Promise<voi
     logger.info({ resumedCount }, "onboardingAutopilot: resumed in-flight runs");
   } catch (err) {
     logger.error({ err }, "onboardingAutopilot: resume scan failed");
-    Sentry.captureException(err, { tags: { source: "onboarding-autopilot-resume" } });
+    captureAndFlush(err, { tags: { source: "onboarding-autopilot-resume" } });
   }
 }

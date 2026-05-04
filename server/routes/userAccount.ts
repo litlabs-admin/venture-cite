@@ -21,7 +21,7 @@ import { users } from "@shared/schema";
 import { logger } from "../lib/logger";
 import { logAudit } from "../lib/audit";
 import { authRateKey } from "../lib/authRateKey";
-import { Sentry } from "../instrument";
+import { asyncHandler } from "../lib/routesShared";
 import {
   NOTIFICATION_TYPES,
   getPreferences,
@@ -29,6 +29,7 @@ import {
   type NotificationType,
 } from "../lib/notificationPrefs";
 
+import { captureAndFlush } from "../lib/sentryReport";
 const GRACE_PERIOD_DAYS = 30;
 
 // User-id-keyed rate limit for the export endpoint. 1 per 24h per user
@@ -159,159 +160,173 @@ const deleteAccountRateLimit = rateLimit({
 });
 
 export function setupUserAccountRoutes(app: Express) {
-  app.post("/api/user/delete", deleteAccountRateLimit, async (req, res) => {
-    try {
-      const user = (req as unknown as { user?: { id: string; email: string | null } }).user;
-      if (!user) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
-      }
+  app.post(
+    "/api/user/delete",
+    deleteAccountRateLimit,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = (req as unknown as { user?: { id: string; email: string | null } }).user;
+        if (!user) {
+          return res.status(401).json({ success: false, error: "Not authenticated" });
+        }
 
-      const { password, confirm } = (req.body ?? {}) as {
-        password?: unknown;
-        confirm?: unknown;
-      };
+        const { password, confirm } = (req.body ?? {}) as {
+          password?: unknown;
+          confirm?: unknown;
+        };
 
-      if (typeof password !== "string" || password.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Password re-entry is required to delete the account.",
+        if (typeof password !== "string" || password.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: "Password re-entry is required to delete the account.",
+          });
+        }
+        if (confirm !== "DELETE") {
+          return res.status(400).json({
+            success: false,
+            error: "Confirmation phrase missing. Type DELETE to confirm.",
+          });
+        }
+        if (!user.email) {
+          return res.status(400).json({
+            success: false,
+            error: "Account has no email on file — contact support to delete.",
+          });
+        }
+
+        // Re-verify the password against Supabase to guard against session
+        // theft. Don't issue a new session — we just want the credential check.
+        const { error: signInErr } = await supabaseAdmin.auth.signInWithPassword({
+          email: user.email,
+          password,
         });
-      }
-      if (confirm !== "DELETE") {
-        return res.status(400).json({
-          success: false,
-          error: "Confirmation phrase missing. Type DELETE to confirm.",
+        if (signInErr) {
+          return res.status(401).json({ success: false, error: "Incorrect password." });
+        }
+
+        const now = new Date();
+        const scheduledFor = new Date(now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+
+        const [previous] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+
+        await db
+          .update(users)
+          .set({ deletedAt: now, deletionScheduledFor: scheduledFor })
+          .where(eq(users.id, user.id));
+
+        await logAudit(req, {
+          action: "user.delete.scheduled",
+          entityType: "user",
+          entityId: user.id,
+          before: previous ? { deletedAt: previous.deletedAt } : null,
+          after: { deletedAt: now.toISOString(), deletionScheduledFor: scheduledFor.toISOString() },
         });
-      }
-      if (!user.email) {
-        return res.status(400).json({
-          success: false,
-          error: "Account has no email on file — contact support to delete.",
+
+        logger.info(
+          { userId: user.id, scheduledFor: scheduledFor.toISOString() },
+          "user.delete: scheduled",
+        );
+
+        res.json({
+          success: true,
+          message: `Account deletion scheduled for ${scheduledFor.toISOString().slice(0, 10)}. Contact support before then to cancel.`,
+          scheduledFor: scheduledFor.toISOString(),
         });
+      } catch (err: unknown) {
+        logger.error({ err }, "user.delete failed");
+        captureAndFlush(err, { tags: { source: "user-delete" } });
+        res.status(500).json({ success: false, error: "Failed to schedule account deletion." });
       }
+    }),
+  );
 
-      // Re-verify the password against Supabase to guard against session
-      // theft. Don't issue a new session — we just want the credential check.
-      const { error: signInErr } = await supabaseAdmin.auth.signInWithPassword({
-        email: user.email,
-        password,
-      });
-      if (signInErr) {
-        return res.status(401).json({ success: false, error: "Incorrect password." });
+  app.get(
+    "/api/user/export",
+    exportRateLimit,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = (req as unknown as { user?: { id: string } }).user;
+        if (!user) {
+          return res.status(401).json({ success: false, error: "Not authenticated" });
+        }
+
+        const data = await buildUserExport(user.id);
+
+        await logAudit(req, {
+          action: "user.export",
+          entityType: "user",
+          entityId: user.id,
+        });
+
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="venturecite-export-${new Date().toISOString().slice(0, 10)}.json"`,
+        );
+        // Pretty-print so humans can browse the file in a text editor.
+        res.send(JSON.stringify(data, null, 2));
+      } catch (err: unknown) {
+        logger.error({ err }, "user.export failed");
+        captureAndFlush(err, { tags: { source: "user-export" } });
+        res.status(500).json({ success: false, error: "Failed to build export." });
       }
-
-      const now = new Date();
-      const scheduledFor = new Date(now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
-
-      const [previous] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
-
-      await db
-        .update(users)
-        .set({ deletedAt: now, deletionScheduledFor: scheduledFor })
-        .where(eq(users.id, user.id));
-
-      await logAudit(req, {
-        action: "user.delete.scheduled",
-        entityType: "user",
-        entityId: user.id,
-        before: previous ? { deletedAt: previous.deletedAt } : null,
-        after: { deletedAt: now.toISOString(), deletionScheduledFor: scheduledFor.toISOString() },
-      });
-
-      logger.info(
-        { userId: user.id, scheduledFor: scheduledFor.toISOString() },
-        "user.delete: scheduled",
-      );
-
-      res.json({
-        success: true,
-        message: `Account deletion scheduled for ${scheduledFor.toISOString().slice(0, 10)}. Contact support before then to cancel.`,
-        scheduledFor: scheduledFor.toISOString(),
-      });
-    } catch (err: unknown) {
-      logger.error({ err }, "user.delete failed");
-      Sentry.captureException(err, { tags: { source: "user-delete" } });
-      res.status(500).json({ success: false, error: "Failed to schedule account deletion." });
-    }
-  });
-
-  app.get("/api/user/export", exportRateLimit, async (req, res) => {
-    try {
-      const user = (req as unknown as { user?: { id: string } }).user;
-      if (!user) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
-      }
-
-      const data = await buildUserExport(user.id);
-
-      await logAudit(req, {
-        action: "user.export",
-        entityType: "user",
-        entityId: user.id,
-      });
-
-      res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="venturecite-export-${new Date().toISOString().slice(0, 10)}.json"`,
-      );
-      // Pretty-print so humans can browse the file in a text editor.
-      res.send(JSON.stringify(data, null, 2));
-    } catch (err: unknown) {
-      logger.error({ err }, "user.export failed");
-      Sentry.captureException(err, { tags: { source: "user-export" } });
-      res.status(500).json({ success: false, error: "Failed to build export." });
-    }
-  });
+    }),
+  );
 
   // Notification preferences (Wave 6.8).
-  app.get("/api/user/notification-preferences", async (req, res) => {
-    try {
-      const user = (req as unknown as { user?: { id: string } }).user;
-      if (!user) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
+  app.get(
+    "/api/user/notification-preferences",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = (req as unknown as { user?: { id: string } }).user;
+        if (!user) {
+          return res.status(401).json({ success: false, error: "Not authenticated" });
+        }
+        const prefs = await getPreferences(user.id);
+        res.json({
+          success: true,
+          data: prefs.map((p) => ({
+            type: p.type,
+            label: p.meta.label,
+            description: p.meta.description,
+            channel: p.meta.channel,
+            emailEnabled: p.emailEnabled,
+          })),
+        });
+      } catch (err: unknown) {
+        logger.error({ err }, "notification-preferences.get failed");
+        captureAndFlush(err, { tags: { source: "notification-prefs-get" } });
+        res.status(500).json({ success: false, error: "Failed to load preferences." });
       }
-      const prefs = await getPreferences(user.id);
-      res.json({
-        success: true,
-        data: prefs.map((p) => ({
-          type: p.type,
-          label: p.meta.label,
-          description: p.meta.description,
-          channel: p.meta.channel,
-          emailEnabled: p.emailEnabled,
-        })),
-      });
-    } catch (err: unknown) {
-      logger.error({ err }, "notification-preferences.get failed");
-      Sentry.captureException(err, { tags: { source: "notification-prefs-get" } });
-      res.status(500).json({ success: false, error: "Failed to load preferences." });
-    }
-  });
+    }),
+  );
 
-  app.patch("/api/user/notification-preferences", async (req, res) => {
-    try {
-      const user = (req as unknown as { user?: { id: string } }).user;
-      if (!user) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
+  app.patch(
+    "/api/user/notification-preferences",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = (req as unknown as { user?: { id: string } }).user;
+        if (!user) {
+          return res.status(401).json({ success: false, error: "Not authenticated" });
+        }
+        const { type, emailEnabled } = (req.body ?? {}) as {
+          type?: unknown;
+          emailEnabled?: unknown;
+        };
+        const validTypes = NOTIFICATION_TYPES.map((t) => t.key);
+        if (typeof type !== "string" || !validTypes.includes(type as NotificationType)) {
+          return res.status(400).json({ success: false, error: "Unknown notification type." });
+        }
+        if (typeof emailEnabled !== "boolean") {
+          return res.status(400).json({ success: false, error: "emailEnabled must be a boolean." });
+        }
+        await setPreference(user.id, type as NotificationType, emailEnabled);
+        res.json({ success: true });
+      } catch (err: unknown) {
+        logger.error({ err }, "notification-preferences.patch failed");
+        captureAndFlush(err, { tags: { source: "notification-prefs-patch" } });
+        res.status(500).json({ success: false, error: "Failed to update preferences." });
       }
-      const { type, emailEnabled } = (req.body ?? {}) as {
-        type?: unknown;
-        emailEnabled?: unknown;
-      };
-      const validTypes = NOTIFICATION_TYPES.map((t) => t.key);
-      if (typeof type !== "string" || !validTypes.includes(type as NotificationType)) {
-        return res.status(400).json({ success: false, error: "Unknown notification type." });
-      }
-      if (typeof emailEnabled !== "boolean") {
-        return res.status(400).json({ success: false, error: "emailEnabled must be a boolean." });
-      }
-      await setPreference(user.id, type as NotificationType, emailEnabled);
-      res.json({ success: true });
-    } catch (err: unknown) {
-      logger.error({ err }, "notification-preferences.patch failed");
-      Sentry.captureException(err, { tags: { source: "notification-prefs-patch" } });
-      res.status(500).json({ success: false, error: "Failed to update preferences." });
-    }
-  });
+    }),
+  );
 }

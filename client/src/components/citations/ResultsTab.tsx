@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -20,7 +19,6 @@ import {
 } from "@/components/ui/select";
 import {
   Sparkles,
-  Play,
   TrendingUp,
   CheckCircle2,
   Loader2,
@@ -29,6 +27,9 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { PlatformResultCard, type PlatformResult } from "./PlatformResultCard";
+import EmptyResultsHero from "./EmptyResultsHero";
+import CitedMentionsStrip, { type CitedMention } from "./CitedMentionsStrip";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 
 // Wave 9: minimum sample size before a platform competes for "Best
 // Platform". Without this, a platform with 1/1 cited (100%) beats one
@@ -62,15 +63,9 @@ type ResultsTabProps = {
   selectedBrandId: string;
   hasPrompts: boolean;
   runMutation: { mutate: () => void; isPending: boolean };
-  runLoadingMessage: string;
 };
 
-export default function ResultsTab({
-  selectedBrandId,
-  hasPrompts,
-  runMutation,
-  runLoadingMessage,
-}: ResultsTabProps) {
+export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }: ResultsTabProps) {
   // Wave 9: keep results in sync during a citation run by polling 6s
   // while one is active. TanStack dedupes the gate query so this is free.
   // Wave 9.1: when a fresh run is in flight, scope the query to rankings
@@ -100,6 +95,30 @@ export default function ResultsTab({
     refetchInterval: hasActive ? 6_000 : false,
   });
   const results = resultsData?.data;
+
+  // Phase 3: derive highlight terms from the selected brand so the
+  // PlatformResultCard can highlight brand mentions inside AI responses
+  // and the CitedMentionsStrip can extract snippets around them.
+  const { selectedBrand } = useBrandSelection();
+  const highlightTerms = selectedBrand
+    ? [selectedBrand.name, ...(selectedBrand.nameVariations ?? [])].filter(Boolean)
+    : [];
+
+  // Phase 3: flatten cited platform results into a single list for the
+  // CitedMentionsStrip. Each entry corresponds to one (prompt × platform)
+  // where isCited === true and we have something snippet-worthy to show.
+  const citedMentions: CitedMention[] = (results?.byPrompt ?? []).flatMap((promptRow) =>
+    (promptRow.platforms ?? [])
+      .filter((p) => p.isCited && (p.fullResponse || p.snippet))
+      .map((p) => ({
+        platform: p.platform,
+        prompt: promptRow.prompt,
+        fullResponse: p.fullResponse,
+        savedSnippet: p.snippet,
+        // Future enhancement: scroll-to or expand the matching accordion item.
+        onClick: undefined,
+      })),
+  );
 
   // Wave 9: best-platform requires a minimum sample so we don't celebrate
   // a 1/1=100% platform over an 8/10=80% one. Falls back to the top by
@@ -272,6 +291,13 @@ export default function ResultsTab({
         </Card>
       </div>
 
+      {/* Phase 3: Cited mentions strip — surface where the brand was
+          cited above the existing stats so users don't have to expand
+          every accordion to find them. Renders nothing when empty. */}
+      {citedMentions.length > 0 && (
+        <CitedMentionsStrip mentions={citedMentions} highlightTerms={highlightTerms} />
+      )}
+
       {/* Performance by Platform */}
       <Card>
         <CardHeader>
@@ -426,7 +452,11 @@ export default function ResultsTab({
                     ) : (
                       <div className="space-y-3">
                         {row.platforms.map((plat, j) => (
-                          <PlatformResultCard key={`${plat.platform}-${j}`} result={plat} />
+                          <PlatformResultCard
+                            key={`${plat.platform}-${j}`}
+                            result={plat}
+                            highlightTerms={highlightTerms}
+                          />
                         ))}
                       </div>
                     )}
@@ -438,52 +468,33 @@ export default function ResultsTab({
         </CardContent>
       </Card>
     </>
-  ) : (
+  ) : hasActive ? (
+    // Wave 9.1: when a fresh run just started, the since-filter
+    // initially returns 0 rankings (no platform has finished yet).
+    // Show in-progress messaging instead of the empty-state hero
+    // so users don't think the run failed. The hero returns once
+    // the active-runs gate flips back to false.
     <Card>
       <CardContent className="py-12 text-center">
-        {/* Wave 9.1: when a fresh run just started, the since-filter
-            initially returns 0 rankings (no platform has finished yet).
-            Show in-progress messaging instead of the "Run a check" CTA
-            so users don't think the run failed. The CTA returns once
-            the active-runs gate flips back to false. */}
-        {hasActive ? (
-          <>
-            <Loader2 className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3 animate-spin" />
-            <p className="text-muted-foreground mb-2">Citation run in progress…</p>
-            <p className="text-xs text-muted-foreground">
-              Results will appear here as each platform finishes — usually within a few seconds per
-              check.
-            </p>
-          </>
-        ) : (
-          <>
-            <Play className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-            <p className="text-muted-foreground mb-4">
-              No results yet. Run a citation check to see how AI engines mention your brand.
-            </p>
-            {hasPrompts && (
-              <Button
-                onClick={() => runMutation.mutate()}
-                disabled={runMutation.isPending}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                {runMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {runLoadingMessage}
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Run Check
-                  </>
-                )}
-              </Button>
-            )}
-          </>
-        )}
+        <Loader2 className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3 animate-spin" />
+        <p className="text-muted-foreground mb-2">Citation run in progress…</p>
+        <p className="text-xs text-muted-foreground">
+          Results will appear here as each platform finishes — usually within a few seconds per
+          check.
+        </p>
       </CardContent>
     </Card>
+  ) : (
+    // Phase 1: empty-state hero with the LLM re-index lag explainer
+    // (1–2 week delay) — same wording as the dashboard timeline so
+    // users get a consistent message wherever they land first.
+    <EmptyResultsHero
+      action={
+        hasPrompts && !runMutation.isPending
+          ? { label: "Run a check now", onClick: () => runMutation.mutate() }
+          : undefined
+      }
+    />
   );
 }
 

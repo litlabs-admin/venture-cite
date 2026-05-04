@@ -36,6 +36,7 @@ import {
   AreaChart,
 } from "recharts";
 import { PlatformResultCard, type PlatformResult } from "./PlatformResultCard";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
 
 type CitationRunEntry = {
   id: string;
@@ -114,6 +115,13 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
     refetchInterval: hasActive ? 6_000 : false,
   });
   const runHistory = historyData?.data || [];
+
+  // Phase 3: derive highlight terms from the selected brand so the
+  // PlatformResultCard inside each expanded run highlights brand mentions.
+  const { selectedBrand } = useBrandSelection();
+  const highlightTerms = selectedBrand
+    ? [selectedBrand.name, ...(selectedBrand.nameVariations ?? [])].filter(Boolean)
+    : [];
 
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   // Wave 9: filter dropdowns. Default chart view is "auto" so the trend
@@ -462,6 +470,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                                           <PlatformResultCard
                                             key={`${plat.platform}-${k}`}
                                             result={plat}
+                                            highlightTerms={highlightTerms}
                                           />
                                         ))}
                                       </div>

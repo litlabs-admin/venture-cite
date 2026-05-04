@@ -28,6 +28,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import type { FaqItem } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -208,6 +209,7 @@ export default function FaqManager() {
               </Link>
             )
           }
+          explainer={pageExplainers.faqManager}
         />
 
         {selectedBrandId && (

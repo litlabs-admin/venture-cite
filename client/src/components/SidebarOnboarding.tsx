@@ -11,75 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Rocket,
-  CheckCircle2,
-  Building2,
-  PenLine,
-  ScanEye,
-  Target,
-  ArrowRight,
-} from "lucide-react";
-
-interface OnboardingStep {
-  id: string;
-  title: string;
-  description: string;
-  link: string;
-  linkText: string;
-  icon: any;
-  checkFn: (data: any) => boolean;
-}
-
-const STEPS: OnboardingStep[] = [
-  {
-    id: "brand",
-    title: "Create your first brand",
-    description:
-      "Set up a brand profile so content can be personalized with your tone, values, and unique selling points.",
-    link: "/brands",
-    linkText: "Create brand",
-    icon: Building2,
-    checkFn: (d) => (d?.brands?.length || 0) > 0,
-  },
-  {
-    id: "content",
-    title: "Generate AI-optimized content",
-    description:
-      "Use the AI content generator to create articles designed to be cited by AI search engines.",
-    link: "/content",
-    linkText: "Create content",
-    icon: PenLine,
-    checkFn: (d) => Boolean(d?.hasArticles) || (d?.articles?.length || 0) > 0,
-  },
-  {
-    id: "visibility",
-    title: "View the AI Visibility Guide",
-    description:
-      "Step-by-step recommendations to optimize your presence across ChatGPT, Claude, and other AI engines.",
-    link: "/ai-visibility",
-    linkText: "View guide",
-    icon: ScanEye,
-    // Server-only — localStorage would leak across user accounts on the
-    // same browser (e.g. logout + new signup would see the step pre-done).
-    checkFn: (d) => Boolean(d?.visibilityVisited),
-  },
-  {
-    id: "citation",
-    title: "Run your first citation check",
-    description:
-      "Kick off an AI citation run so we can start tracking how often platforms mention your brand.",
-    link: "/citations",
-    linkText: "Run check",
-    icon: Target,
-    // Done the moment the user triggers their first run — no need to wait
-    // for an actual cited result.
-    checkFn: (d) =>
-      (d?.citationRunsCount || 0) > 0 ||
-      (d?.citations?.length || 0) > 0 ||
-      (d?.citedRankingsCount || 0) > 0,
-  },
-];
+import { Rocket, CheckCircle2, ArrowRight } from "lucide-react";
+import { STEPS, type OnboardingData, isOnboardingComplete } from "@/lib/onboardingSteps";
 
 const SEEN_KEY_PREFIX = "venturecite-onboarding-seen:";
 
@@ -117,7 +50,10 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
   const completed = STEPS.filter((s) => s.checkFn(data)).length;
   const total = STEPS.length;
   const progress = (completed / total) * 100;
-  const isComplete = completed === total;
+  // isComplete is computed locally for backward compat with the existing
+  // dialog UI; it matches isOnboardingComplete(data) exactly. Single
+  // source of truth via the assertion.
+  const isComplete = isOnboardingComplete(data as OnboardingData);
   const nextStepIndex = STEPS.findIndex((s) => !s.checkFn(data));
 
   // First-login auto-open: fires once per user per browser, keyed by user.id.
@@ -132,31 +68,44 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="group w-full text-left rounded-lg border border-border bg-card hover:border-foreground/20 hover:shadow-sm p-3 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        data-testid="sidebar-onboarding-trigger"
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            {isComplete ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-foreground" />
-            ) : (
-              <Rocket className="w-3.5 h-3.5 text-foreground" />
-            )}
+      {isComplete ? (
+        <Button
+          variant="ghost"
+          onClick={() => setOpen(true)}
+          className="w-full justify-start gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
+          aria-label="View completed onboarding"
+          data-testid="sidebar-onboarding-complete-button"
+        >
+          <CheckCircle2 className="h-4 w-4 text-green-500" aria-hidden="true" />
+          Setup complete
+        </Button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="group w-full text-left rounded-lg border border-border bg-card hover:border-foreground/20 hover:shadow-sm p-3 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid="sidebar-onboarding-trigger"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              {isComplete ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-foreground" />
+              ) : (
+                <Rocket className="w-3.5 h-3.5 text-foreground" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-foreground leading-tight tracking-tight">
+                {isComplete ? "You're all set" : "Getting started"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {isComplete ? `${total} of ${total} complete` : `${completed} of ${total} complete`}
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-foreground leading-tight tracking-tight">
-              {isComplete ? "You're all set" : "Getting started"}
-            </p>
-            <p className="text-[11px] text-muted-foreground">
-              {isComplete ? `${total} of ${total} complete` : `${completed} of ${total} complete`}
-            </p>
-          </div>
-        </div>
-        <Progress value={progress} className="h-1.5" />
-      </button>
+          <Progress value={progress} className="h-1.5" />
+        </button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">

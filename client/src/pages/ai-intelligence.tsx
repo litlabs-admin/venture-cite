@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Target, AlertTriangle, Brain, MessageSquare, Award, Users, History } from "lucide-react";
@@ -26,6 +27,7 @@ export default function AIIntelligence() {
         title="AI Intelligence"
         description="Share-of-Answer, Citation Quality, and Hallucination Detection"
         actions={brands.length > 0 ? <BrandSelector /> : null}
+        explainer={pageExplainers.aiIntelligence}
       />
 
       {!selectedBrandId ? (

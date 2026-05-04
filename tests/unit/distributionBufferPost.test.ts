@@ -65,6 +65,9 @@ vi.mock("../../server/lib/routesShared", () => ({
   // exercised by these tests, so an OpenAI stub is enough.
   openai: {} as unknown,
   aiLimitMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
+  // Pass-through wrapper — production version forwards thrown errors
+  // to next(); tests don't exercise the unhandled-rejection path.
+  asyncHandler: (fn: any) => fn,
 }));
 
 const { setupArticlesRoutes } = await import("../../server/routes/articles");

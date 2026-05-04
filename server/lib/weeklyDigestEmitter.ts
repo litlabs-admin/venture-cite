@@ -3,8 +3,7 @@ import { and, eq, gte, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { sendWeeklyDigest, isEmailConfigured, type WeeklyDigestBrandBrief } from "../emailService";
 import { logger } from "./logger";
-import { Sentry } from "../instrument";
-
+import { captureAndFlush } from "./sentryReport";
 const SIX_DAYS_MS = 6 * 24 * 60 * 60 * 1000;
 const LOOKBACK_MS = 25 * 60 * 60 * 1000;
 
@@ -62,7 +61,11 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
   }
 
   const userBrands = await db
-    .select({ id: schema.brands.id, name: schema.brands.name })
+    .select({
+      id: schema.brands.id,
+      name: schema.brands.name,
+      createdAt: schema.brands.createdAt,
+    })
     .from(schema.brands)
     .where(and(eq(schema.brands.userId, user.id), isNull(schema.brands.deletedAt)));
 
@@ -127,10 +130,23 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
   if (!sawAnyRun) return { sent: false, reason: "no_runs" };
   if (!allTerminal) return { sent: false, reason: "still_pending" };
 
+  const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+  let weekN: number | null = null;
+  if (userBrands.length > 0) {
+    const oldestMs = userBrands.reduce<number>((min, b) => {
+      const t = b.createdAt ? new Date(b.createdAt as unknown as string).getTime() : Date.now();
+      return t < min ? t : min;
+    }, Number.POSITIVE_INFINITY);
+    if (Number.isFinite(oldestMs)) {
+      weekN = Math.max(0, Math.floor((Date.now() - oldestMs) / MS_PER_WEEK));
+    }
+  }
+
   try {
     const ok = await sendWeeklyDigest(user.email, {
       user: { id: user.id, email: user.email, firstName: user.firstName ?? null },
       brandBriefs: briefs,
+      weekN,
     });
     if (ok) {
       await db
@@ -142,7 +158,7 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
     return { sent: false, reason: "send_failed" };
   } catch (err) {
     logger.error({ err, userId: user.id }, "weekly digest emit failed");
-    Sentry.captureException(err, { tags: { source: "weeklyDigestEmitter" } });
+    captureAndFlush(err, { tags: { source: "weeklyDigestEmitter" } });
     return { sent: false, reason: "send_failed" };
   }
 }

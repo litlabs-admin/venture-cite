@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { pageExplainers } from "@/lib/pageExplainers";
 import {
   Bot,
   CheckCircle2,
@@ -164,6 +165,7 @@ export default function CrawlerCheck() {
       <PageHeader
         title="Crawler Check"
         description="Verify if AI platforms can crawl your website for GEO visibility"
+        explainer={pageExplainers.crawlerCheck}
       />
 
       <Card className="mb-8">
