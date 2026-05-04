@@ -142,7 +142,12 @@ export default function OnboardingProgressRing() {
       <Card>
         <CardContent className="flex items-center gap-6 p-6">
           <div className="relative inline-flex items-center justify-center h-[160px] w-[160px]">
-            <VisibilityGauge score={100} size={160} fillColor="hsl(var(--chart-2, 142 71% 45%))" />
+            <VisibilityGauge
+              score={100}
+              size={160}
+              fillColor="hsl(var(--chart-2, 142 71% 45%))"
+              hideLabel
+            />
             <CheckCircle2 className="absolute h-12 w-12 text-green-500" aria-hidden="true" />
           </div>
           <div>
@@ -169,7 +174,7 @@ export default function OnboardingProgressRing() {
     <Card>
       <CardContent className="flex flex-col md:flex-row items-center gap-6 p-6">
         <div className="relative inline-flex items-center justify-center">
-          <VisibilityGauge score={progress} size={160} />
+          <VisibilityGauge score={progress} size={160} hideLabel />
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <div className="text-3xl font-bold leading-none">
               {completed}/{total}
