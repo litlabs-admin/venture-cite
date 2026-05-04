@@ -128,12 +128,12 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
 
   // ============ P1 (improvements) ============
 
-  // 6. Low citation rate → fact sheet improves accuracy.
+  // 6. Low citation rate → fact sheet enables hallucination detection.
   if (state.citationRate !== null && state.citationRate < LOW_CITATION_RATE) {
     recs.push({
       id: "add-brand-fact-sheet",
-      title: "Add a brand fact sheet to improve citation accuracy",
-      why: `Your citation rate is ${Math.round(state.citationRate * 100)}%. A fact sheet gives AI engines verified facts to cite, reducing hallucinated alternatives.`,
+      title: "Add a brand fact sheet to catch hallucinations",
+      why: `Your citation rate is ${Math.round(state.citationRate * 100)}%. A fact sheet lets VentureCite check AI responses for inaccurate claims about your brand.`,
       ctaLabel: "Add facts",
       ctaHref: `/brand-fact-sheet?brandId=${brandId}`,
       priority: "P1",
