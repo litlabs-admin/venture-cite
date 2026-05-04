@@ -87,6 +87,8 @@ import {
 // back to lucide-react's Linkedin for that platform.
 import { SiReddit, SiQuora, SiMedium } from "react-icons/si";
 const SiLinkedin = Linkedin;
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 // Wave 9.4: pretty-print scan reports as multi-line toast descriptions.
 // Hides zero-valued lines so a clean run shows just the meaningful ones.
@@ -282,7 +284,13 @@ export default function GeoTools() {
   const [mentionStatusFilter, setMentionStatusFilter] = useState<string>("all");
 
   // Listicle queries — server returns { success, data: Listicle[] }
-  const { data: listiclesData, isLoading: listiclesLoading } = useQuery<{
+  const {
+    data: listiclesData,
+    isLoading: listiclesLoading,
+    isError: listiclesIsError,
+    isRefetching: listiclesIsRefetching,
+    refetch: refetchListicles,
+  } = useQuery<{
     success: boolean;
     data: Listicle[];
   }>({
@@ -848,6 +856,12 @@ export default function GeoTools() {
                         <div className="text-center py-8">
                           <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
                         </div>
+                      ) : listiclesIsError ? (
+                        <ErrorState
+                          title="Couldn't load listicles"
+                          onRetry={() => refetchListicles()}
+                          isRetrying={listiclesIsRefetching}
+                        />
                       ) : listicles.length > 0 ? (
                         <div className="space-y-4">
                           <div className="flex items-center justify-between">
@@ -973,10 +987,7 @@ export default function GeoTools() {
                             })}
                         </div>
                       ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <List className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>No listicles yet. Click Discover to scan.</p>
-                        </div>
+                        <EmptyState icon={List} title="No listicles yet. Click Discover to scan." />
                       )}
                     </CardContent>
                   </Card>

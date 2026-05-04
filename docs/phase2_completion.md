@@ -2604,3 +2604,359 @@ Self-contained to the citations pages. Directly answers Ben's literal complaint 
 - "Click strip card → scroll-to-accordion-row" interaction — `CitedMentionsStrip` supports the `onClick` prop but it's left unwired in `ResultsTab` for now.
 
 ---
+
+## Wave 20 — Phase 4: Recommendations Engine (A6)
+
+**Status:** Complete
+**Date:** 2026-05-04
+
+### 20.1 What was built
+
+**Pure rules engine** at [server/lib/recommendationsEngine.ts](server/lib/recommendationsEngine.ts) — `getRecommendations(state: RecommendationState): Recommendation[]`. 11 deterministic rules (P0/P1/P2), output capped at 5, P0 first. Zero side effects, zero LLM cost per pageview.
+
+**Endpoint** `GET /api/brands/:brandId/recommendations` added to [server/routes/dashboard.ts](server/routes/dashboard.ts) — loads 6 data points via `Promise.all`, calls engine, returns `{ success: true, data: recommendations }`. Typical latency 50–100 ms.
+
+**`RecommendationsPanel` component** at [client/src/components/dashboard/RecommendationsPanel.tsx](client/src/components/dashboard/RecommendationsPanel.tsx) — P0 cards (red accent, not dismissible), P1 cards (amber, 7-day soft-hide), P2 cards (subtle, dismissible). Dismiss state keyed by `venturecite-recs-dismissed:${user.id}`.
+
+**Mounted** in [client/src/pages/home.tsx](client/src/pages/home.tsx) below `OnboardingProgressRing` and `ResultsTimeline`.
+
+### 20.2 Type contracts
+
+```ts
+type RecommendationPriority = "P0" | "P1" | "P2";
+type RecommendationCategory = "setup" | "content" | "citations" | "signals" | "growth";
+type Recommendation = {
+  id: string;
+  title: string;
+  why: string;
+  ctaLabel: string;
+  ctaHref: string;
+  priority: RecommendationPriority;
+  category: RecommendationCategory;
+  dismissible: boolean;
+};
+```
+
+### 20.3 Files
+
+| File                                                       | Change                                         |
+| ---------------------------------------------------------- | ---------------------------------------------- |
+| `server/lib/recommendationsEngine.ts`                      | NEW. Pure rules engine                         |
+| `server/routes/dashboard.ts`                               | Added GET /api/brands/:brandId/recommendations |
+| `client/src/components/dashboard/RecommendationsPanel.tsx` | NEW. Panel component                           |
+| `client/src/pages/home.tsx`                                | Mount RecommendationsPanel                     |
+| `tests/unit/recommendationsEngine.test.ts`                 | NEW. 6 unit tests                              |
+
+### 20.4 Verification
+
+- `npm run check` clean. `npm test` 274/274. 0 lint errors.
+- Vercel Hobby: one new endpoint in existing function, no new function/cron/env var.
+
+---
+
+## Wave 21 — Phase 5: Chatbot / Education Assistant (A1)
+
+**Status:** Complete
+**Date:** 2026-05-04
+
+### 21.1 What was built (3 PRs)
+
+**PR 5.1 — Production baseline:** Migration, schema, OpenRouter client, knowledge base, budget system, storage layer, `POST /api/assistant/chat` endpoint (JSON response), `EducationAssistant` floating bubble, daily cron prune step.
+
+**PR 5.2 — SSE streaming:** Endpoint converted to Server-Sent Events (heartbeat every 15s, `req.on("close")` abort handling). Client uses `fetch + ReadableStream + TextDecoder`. Partial content persisted on stream abort. Validation/budget errors stay as JSON 4xx (before `flushHeaders()`).
+
+**PR 5.3 — Brand-aware context:** When `brandId` in request body, brand summary loaded in parallel with history and injected as a second system message AFTER the cached `SYSTEM_PROMPT` (preserves Anthropic prompt cache). Cache-control on index 0 only.
+
+### 21.2 New persistence
+
+| Table                 | Bounded by                                       |
+| --------------------- | ------------------------------------------------ |
+| `chatbot_messages`    | 30-day TTL + 100 msgs/user soft cap (daily cron) |
+| `chatbot_token_usage` | One row per user-per-day                         |
+
+### 21.3 Rate limits / caps (per `server/lib/llmPricing.ts`)
+
+| Tier       | Tokens/day | Messages/hour |
+| ---------- | ---------- | ------------- |
+| Free       | 15,000     | 20            |
+| Pro        | 75,000     | 60            |
+| Enterprise | 250,000    | 120           |
+
+### 21.4 Key design decisions
+
+- OpenAI SDK pointed at OpenRouter (`baseURL: "https://openrouter.ai/api/v1"`), model `anthropic/claude-sonnet-4.5`
+- System prompt (~3,500 tokens) uses `cache_control: { type: "ephemeral" }` — 90% discount on cache hits
+- Last 10 messages only (bounds context, prevents runaway cost)
+- Persist user message BEFORE OpenRouter call (preserves message on timeout)
+- 1 retry on 5xx/429 from OpenRouter (1s backoff)
+- Budget exceeded → 429 `{ code: "budget_exceeded", error: "..." }` (JSON, not SSE)
+- Stream abort → persist accumulated content, no Sentry event (abort is normal)
+- localStorage key `venturecite-chatbot-history:${user.id}` (auto-cleared on logout via `clearAllVentureCiteStorage()`)
+
+### 21.5 Files
+
+| File                                           | Change                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------- |
+| `migrations/0048_chatbot_messages.sql`         | NEW. chatbot_messages + chatbot_token_usage                                     |
+| `shared/schema.ts`                             | chatbotMessages + chatbotTokenUsage tables                                      |
+| `server/lib/llmPricing.ts`                     | CHATBOT_DAILY_TOKEN_CAP, CHATBOT_MESSAGES_PER_HOUR, Sonnet 4.5 pricing          |
+| `server/lib/openrouterClient.ts`               | NEW. Lazy singleton OpenAI-SDK client for OpenRouter                            |
+| `server/lib/chatbotKnowledge.ts`               | NEW. ~3,500-token GEO/AEO/SEO SYSTEM_PROMPT                                     |
+| `server/lib/chatbotBudget.ts`                  | NEW. tokensUsedToday, messagesLastHour, assertChatbotBudget, recordChatbotUsage |
+| `server/storage.ts`                            | getChatbotHistory, insertChatbotMessage, pruneChatbotMessages interfaces        |
+| `server/databaseStorage.ts`                    | Implementations (30-day TTL + 100-msg cap via raw SQL)                          |
+| `server/routes/assistant.ts`                   | NEW. POST /api/assistant/chat (SSE after PR 5.2, brand-aware after PR 5.3)      |
+| `server/routes.ts`                             | setupAssistantRoutes(app) call                                                  |
+| `server/routes/cron.ts`                        | chatbot-prune step (5,000 ms cap)                                               |
+| `server/env.ts`                                | OPENROUTER_API_KEY doc comment (required at runtime)                            |
+| `client/src/components/EducationAssistant.tsx` | NEW. Floating bubble → Sheet, SSE streaming, localStorage hydration             |
+| `client/src/components/AppLayout.tsx`          | Mount EducationAssistant                                                        |
+| `tests/unit/chatbotBudget.test.ts`             | NEW. 3 tests                                                                    |
+| `tests/unit/assistantChat.test.ts`             | NEW. 6 tests                                                                    |
+| `tests/unit/EducationAssistant.test.tsx`       | NEW. 6 tests                                                                    |
+| `tests/unit/cronOrchestrator.test.ts`          | Added pruneChatbotMessages stub                                                 |
+
+### 21.6 Verification
+
+- `npm run check` clean. `npm test` 289/289. 0 lint errors.
+- New env var: `OPENROUTER_API_KEY` (required at runtime for chatbot)
+- Vercel Hobby: one new endpoint + one cron step, no new function/cron entry.
+
+---
+
+## Wave 22 — Phase 6: Empty / Skeleton / Error States (C1+C2+C3)
+
+**Status:** Complete
+**Date:** 2026-05-04
+
+### 22.1 What was built (2 PRs)
+
+**PR 6.1 — Shared infrastructure + top 5 pages:**
+Three new shared components, then applied to `/dashboard`, `/citations`, `/articles`, `/content`, `/brands`.
+
+**PR 6.2 — Remaining 23 pages:**
+Mechanical sweep: `agent-dashboard`, `agent-run`, `ai-intelligence`, `ai-traffic`, `ai-visibility`, `analytics-integrations`, `brand-fact-sheet`, `client-reports`, `community-engagement`, `competitors`, `crawler-check`, `faq-manager`, `geo-analytics`, `geo-opportunities`, `geo-rankings`, `geo-signals`, `geo-tools`, `keyword-research`, `outreach`, `publication-intelligence`, `revenue-analytics`, `settings`, `welcome`.
+
+### 22.2 New shared components
+
+**[client/src/components/ui/empty-state.tsx](client/src/components/ui/empty-state.tsx)** — `EmptyState` — card with optional icon, title, description, primary action, secondary action. Consistent center-aligned layout matching existing `EmptyResultsHero` style.
+
+**[client/src/components/ui/error-state.tsx](client/src/components/ui/error-state.tsx)** — `ErrorState` — card with red-tinted icon, title, description, retry button (spins while `isRetrying`). `onRetry` is mandatory — forces every caller to wire refetch.
+
+**[client/src/lib/queryStates.ts](client/src/lib/queryStates.ts)** — `renderQueryState<T>()` — centralises the `isLoading → isError → isEmpty → data` branch pattern for future use.
+
+### 22.3 Pattern applied per page
+
+1. Destructure `isError`, `isRefetching`, `refetch` from existing `useQuery` calls.
+2. Add `<ErrorState>` with `onRetry` wired to `refetch` and contextual title.
+3. Replace inline empty cards with `<EmptyState>` — copy ported verbatim, CTAs preserved.
+
+Conservative skips (queries in subcomponents, mutation-driven flows, static pages with bespoke error UX): `ai-intelligence`, `ai-visibility`, `analytics-integrations`, `crawler-check`, `geo-signals`, `publication-intelligence`, `welcome`.
+
+### 22.4 Files
+
+| File                                       | Change                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| `client/src/components/ui/empty-state.tsx` | NEW                                                                |
+| `client/src/components/ui/error-state.tsx` | NEW                                                                |
+| `client/src/lib/queryStates.ts`            | NEW                                                                |
+| ~22 page files                             | `ErrorState` + `EmptyState` wired per page (see per-agent reports) |
+
+### 22.5 Verification
+
+- `npm run check` clean. `npm test` 289/289 (no new tests at this layer per spec). 0 lint errors.
+- No server changes. No new env vars. No new migrations. Bundle delta: ~+13 KB.
+- Vercel Hobby: entirely client-side. No impact.
+
+---
+
+## Wave 23 — Phase 5 v2: Chatbot Multi-Thread Redesign + Anti-Hallucination
+
+**Goal:** Make the AI Tutor production-ready: separate chat threads (ChatGPT-style), branded UI, accurate persona, no hallucinated UI labels or stats.
+
+**Status:** Complete
+
+### 23.1 Background
+
+Phase 5 v1 shipped a single-bucket chat: every message lived in one `chatbot_messages` table scoped to `userId`. "New chat" hard-deleted everything. Users couldn't see, resume, or browse past conversations. The bot also drifted off-persona on its first message, hallucinated UI labels ("Edit Fact Sheet button", "Add Question modal"), invented brand stats (transaction volumes, customer counts), and misrepresented what each VentureCite page does.
+
+This wave fixed all of it end-to-end: data model, server API, client architecture, system prompt, brand-switch behavior.
+
+### 23.2 Auth bug fix (precursor)
+
+Before redesign, the chatbot was returning 401 on every send. Root cause: `EducationAssistant.tsx` used raw `fetch()` with `credentials: "include"` instead of attaching the Supabase JWT via `Authorization: Bearer` header. Per `CLAUDE.md`, this app authenticates via JWT — no cookies. Replaced with `getAccessToken()` + manual Bearer attachment (can't use `apiRequest()` because it consumes the response body, breaking SSE streaming).
+
+### 23.3 Data model
+
+**[migrations/0049_chatbot_threads.sql](migrations/0049_chatbot_threads.sql)** — additive, idempotent:
+
+```sql
+CREATE TABLE chatbot_threads (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  brand_id    VARCHAR REFERENCES brands(id) ON DELETE SET NULL,
+  title       TEXT NOT NULL DEFAULT 'New chat',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  archived_at TIMESTAMPTZ
+);
+ALTER TABLE chatbot_messages ADD COLUMN thread_id UUID NOT NULL
+  REFERENCES chatbot_threads(id) ON DELETE CASCADE;
+```
+
+Backfill: each existing user gets one "Earlier conversation" thread carrying all their pre-existing messages. No history lost. The `ALTER ... SET NOT NULL` runs _after_ backfill so the migration is safe to apply on data.
+
+Indexes: `(user_id, updated_at desc)` partial WHERE `archived_at is null` for the threads list; `(thread_id, created_at)` for transcript fetches; partial WHERE `archived_at is not null` for the prune job.
+
+Soft-delete via `archived_at`. Nightly prune (extended in `pruneChatbotMessages`) hard-deletes threads archived > 30 days. Messages still respect the existing 30-day TTL.
+
+### 23.4 Server API (six endpoints)
+
+**[server/routes/assistant.ts](server/routes/assistant.ts)** — fully rewritten:
+
+| Method   | Path                                  | Purpose                                                |
+| -------- | ------------------------------------- | ------------------------------------------------------ |
+| `GET`    | `/api/assistant/threads`              | List user's non-archived threads, newest-active first. |
+| `POST`   | `/api/assistant/threads`              | Create empty thread (`{brandId?}`).                    |
+| `GET`    | `/api/assistant/threads/:id/messages` | Transcript of one thread.                              |
+| `DELETE` | `/api/assistant/threads/:id`          | Soft-archive (sets `archived_at = now()`).             |
+| `POST`   | `/api/assistant/threads/:id/restore`  | Un-archive (clears `archived_at`).                     |
+| `POST`   | `/api/assistant/chat`                 | SSE chat — now requires `threadId` in body.            |
+
+All endpoints behind `isAuthenticated`. Thread endpoints enforce ownership via new `requireChatbotThread(id, userId)` helper in [server/lib/ownership.ts](server/lib/ownership.ts) — returns 404 (not 403) on miss per the project's anti-enumeration policy.
+
+**Auto-titling:** when a chat send hits a thread whose title is still `"New chat"`, the server sets the title to `truncate(firstUserMessage, 60)`. Free, deterministic, no second LLM call. Future upgrade: swap to a 1-call summarizer for nicer titles.
+
+**Touch-on-write:** every message insert calls `touchChatbotThread(threadId)` to bump `updated_at`. Drives the sort order in the history view.
+
+**Removed:** legacy `GET /api/assistant/history` and `DELETE /api/assistant/history` (replaced by thread endpoints). One-shot release; no compat shim needed since chatbot is internal-only at this stage.
+
+### 23.5 Storage layer
+
+**[server/databaseStorage.ts](server/databaseStorage.ts)** — eight new methods on `IStorage`:
+
+```ts
+listChatbotThreads(userId, limit=50): Promise<Array<ChatbotThread & {messageCount: number}>>
+getChatbotThread(threadId): Promise<ChatbotThread | undefined>
+createChatbotThread(userId, brandId?): Promise<ChatbotThread>
+archiveChatbotThread(threadId): Promise<void>
+restoreChatbotThread(threadId): Promise<void>
+setChatbotThreadTitle(threadId, title): Promise<void>
+touchChatbotThread(threadId): Promise<void>
+getChatbotThreadMessages(threadId, limit=200): Promise<ChatbotMessage[]>
+```
+
+`insertChatbotMessage()` signature now requires `threadId`. `getChatbotHistory(userId)` deleted — chat handler reads thread-scoped history via `getChatbotThreadMessages(threadId, 11)`. This means past sessions in _other_ threads no longer bleed into the current prompt — fixed the "bot greets twice because it sees old hi" bug observed in v1.
+
+### 23.6 Client architecture
+
+**New hook [client/src/hooks/useChatbot.ts](client/src/hooks/useChatbot.ts)** — single source of truth for chatbot data layer. Owns:
+
+- `threads` list (TanStack Query, key `["/api/assistant/threads"]`).
+- `activeThreadId` + auto-selects most recent thread on first open.
+- `messages` for the active thread (TanStack Query, key `["/api/assistant/threads", id, "messages"]`).
+- `send(text)` — handles thread auto-creation if none active, attaches Bearer JWT, streams SSE deltas with `AbortController` cancellation.
+- `stop()` — aborts in-flight stream.
+- `regenerate()` — drops last assistant message, resends last user message.
+- `newChat()` / `archiveThread` / `restoreThread` mutations with cache invalidation.
+- `brandSwitchNotice` — surfaces when user changes app-level brand mid-thread.
+
+**New components under [client/src/components/chatbot/](client/src/components/chatbot/):**
+
+- **`MessageBubble.tsx`** — user (right-aligned, primary tint) vs assistant (left-aligned, bot avatar, prose markdown). Hover-revealed Copy + Regenerate actions on assistant bubbles. Streaming cursor (`▍`) at end of in-flight response.
+- **`WelcomeState.tsx`** — branded greeting card + 2×2 starter grid (Concepts / How-to / Troubleshoot / Strategy).
+- **`HistoryView.tsx`** — past conversations list. Each row: title + relative time + message count. Active thread marked with check icon. Hover-revealed archive button. 5s undo toast on archive.
+
+**Shell [client/src/components/EducationAssistant.tsx](client/src/components/EducationAssistant.tsx)** — Sheet + view switcher (`thread` ↔ `history`) + header with active-thread chip + brand chip + ⋮ menu (New chat / Conversation history / Archive this chat). Composer is auto-grow textarea with char counter, Send button morphs into Stop button while streaming. Enter to send, Shift+Enter for newline.
+
+**LocalStorage cache dropped.** Server is the source of truth — multi-device safer, no sync conflicts.
+
+### 23.7 UI/UX flows
+
+**A. First-time user:** opens panel → `GET /threads` returns `[]` → welcome state shows. First send creates a thread implicitly via `POST /threads` then `POST /chat`.
+
+**B. Returning user:** opens panel → most recent thread auto-loads → transcript hydrates from server.
+
+**C. New chat:** ⋮ → "New chat" → `POST /threads` → transcript clears → composer focuses. Previous thread preserved untouched.
+
+**D. Resume old chat:** ⋮ → "Conversation history" → list view → click any row → switch to that thread.
+
+**E. Archive:** trash icon on row → `DELETE /threads/:id` → animates out → 5s undo toast. Click Undo → `POST /threads/:id/restore`.
+
+**F. Brand switch:** if user changes app-level brand AND active thread has messages under a different `brandId`, hook detaches the thread (so next send creates a fresh one under the new brand) and shows a sparkle-tinted notice in the panel: _"Brand changed — your next message will start a new chat."_ Empty/just-created threads aren't disturbed.
+
+### 23.8 Persona + anti-hallucination work
+
+**[server/lib/chatbotKnowledge.ts](server/lib/chatbotKnowledge.ts)** — system prompt rewritten over the course of the wave to fix three classes of bug surfaced during user testing:
+
+**Bug class 1 — Greeting on real questions.** Bot was greeting on "How do I get started?" because the v1 first-message rule was loose. Tightened to a strict whitelist of bare openers ("hi", "hello", "help", "who are you" etc.). Anything else, including "how do I get started", must answer directly. Even if past history shows greetings were given, the bot must not repeat one on a non-opener message.
+
+**Bug class 2 — Fabricated UI.** Bot invented buttons ("Edit Fact Sheet"), modals ("Add Question dialog"), and step-by-step click sequences that don't exist in the current UI. Fix: explicit `# Anti-hallucination rule (CRITICAL)` section forbidding invention of:
+
+- Button labels, link text, CTA copy
+- Section/tab/modal/accordion titles
+- Field/toggle/dropdown/column names
+- Brand stats (transaction volume, customer count, founding year, HQ) unless in the brand context block
+- Specific feature flows not described in the prompt itself
+
+Replacement guidance: describe outcomes at the page level ("Open the FAQ Manager and add the Q&As your customers ask"), never click sequences. If asked for exact buttons: "I can point you to the right page — the current UI is best seen by opening it."
+
+**Bug class 3 — Page-list drift.** v1's page list was wrong on multiple fronts: AI Visibility was described as a "fact-sheet/FAQ/schema checklist" (it's actually per-engine optimization steps), several real sidebar items (Keywords, Reports, Opportunities, GEO Tools, Crawler Check) were missing, and a fictional "Settings" entry was hallucinated into the list. Fix: cross-checked against [client/src/components/Sidebar.tsx](client/src/components/Sidebar.tsx) verbatim. The prompt's `# VentureCite sidebar — exhaustive page list` now matches the real 18-item sidebar exactly. Each entry has an accurate one-line description. Account/billing settings are explicitly noted as living in a user-menu dropdown, not the sidebar.
+
+**Removed unverifiable specifics:** no more "20%+ citation rate target", no more rigid "Week 1 / Week 2 / Week 4" timeline, no more "5–10 articles, 10–20 prompts" rigid counts. Reframed as directional principles tuned to user situation.
+
+### 23.9 Tests
+
+| File                                                                             | Status  | Coverage                                                                                                                     |
+| -------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| [tests/unit/chatbotThreads.test.ts](tests/unit/chatbotThreads.test.ts)           | NEW     | 6 tests — list/create/messages/archive/restore + 404 on bad UUID + ownership                                                 |
+| [tests/unit/assistantChat.test.ts](tests/unit/assistantChat.test.ts)             | UPDATED | All requests now pass `threadId`; new ownership + storage mocks added                                                        |
+| [tests/unit/EducationAssistant.test.tsx](tests/unit/EducationAssistant.test.tsx) | UPDATED | Welcome flow, thread creation on first send, budget exceeded card, auto-load most recent thread, Stop button while streaming |
+
+Final: **294/294 tests pass. Typecheck clean.**
+
+### 23.10 Files changed
+
+**Server:**
+
+- [migrations/0049_chatbot_threads.sql](migrations/0049_chatbot_threads.sql) — NEW
+- [shared/schema.ts](shared/schema.ts) — `chatbotThreads` table + `threadId` FK on `chatbotMessages`
+- [server/storage.ts](server/storage.ts) — `IStorage` thread interface
+- [server/databaseStorage.ts](server/databaseStorage.ts) — 8 new methods, `pruneChatbotMessages` extended
+- [server/lib/ownership.ts](server/lib/ownership.ts) — `requireChatbotThread`
+- [server/routes/assistant.ts](server/routes/assistant.ts) — full rewrite with 6 endpoints
+- [server/lib/chatbotKnowledge.ts](server/lib/chatbotKnowledge.ts) — system prompt rewritten
+
+**Client:**
+
+- [client/src/hooks/useChatbot.ts](client/src/hooks/useChatbot.ts) — NEW
+- [client/src/components/chatbot/MessageBubble.tsx](client/src/components/chatbot/MessageBubble.tsx) — NEW
+- [client/src/components/chatbot/WelcomeState.tsx](client/src/components/chatbot/WelcomeState.tsx) — NEW
+- [client/src/components/chatbot/HistoryView.tsx](client/src/components/chatbot/HistoryView.tsx) — NEW
+- [client/src/components/EducationAssistant.tsx](client/src/components/EducationAssistant.tsx) — full rewrite as shell
+
+**Tests:**
+
+- [tests/unit/chatbotThreads.test.ts](tests/unit/chatbotThreads.test.ts) — NEW
+- [tests/unit/assistantChat.test.ts](tests/unit/assistantChat.test.ts) — updated
+- [tests/unit/EducationAssistant.test.tsx](tests/unit/EducationAssistant.test.tsx) — updated
+
+### 23.11 Production characteristics
+
+- **Migration safety:** additive table + column, idempotent backfill. Worst-case rollback drops the new table + column; messages remain intact.
+- **Cost:** zero additional LLM calls per message (title via truncation). One extra Postgres write per chat (`touchChatbotThread`). Negligible.
+- **Bundle:** ~+10 KB for the new components + hook.
+- **A11y:** transcript has `role="log" aria-live="polite"`. History list is `role="listbox"` with `aria-selected` per row. All buttons labeled. Tooltips on Send/Stop. 44px touch targets.
+- **Mobile:** safe-area padding on composer. Auto-focus textarea on open. Auto-scroll to bottom on new content.
+- **Multi-device:** server is the source of truth. No localStorage cache to conflict.
+
+### 23.12 Deliberate non-goals
+
+- ❌ Thread search (Cmd+K). Defer until users have >20 threads on average.
+- ❌ Thread renaming UI. Auto-titles are good enough for v1.
+- ❌ Multi-device sync notifications. Server is SoT; eventual-consistency is fine.
+- ❌ Exporting threads. Defer.
+- ❌ Pinned/starred threads. YAGNI.
+- ❌ LLM-generated titles. Truncation is good enough; revisit when UX demands it.
+
+---

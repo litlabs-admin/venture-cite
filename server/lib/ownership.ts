@@ -214,6 +214,17 @@ export async function requireAlertSetting(
   return loadEntityThroughBrand(schema.alertSettings, id, userId, "Alert setting not found");
 }
 
+// Chatbot threads are user-owned directly via chatbot_threads.user_id.
+export async function requireChatbotThread(id: string, userId: string) {
+  const [row] = await db
+    .select()
+    .from(schema.chatbotThreads)
+    .where(and(eq(schema.chatbotThreads.id, id), eq(schema.chatbotThreads.userId, userId)))
+    .limit(1);
+  if (!row) throw new OwnershipError(404, "Conversation not found");
+  return row;
+}
+
 // Citations are user-owned directly via citations.userId.
 export async function requireCitation(id: string, userId: string) {
   const [row] = await db

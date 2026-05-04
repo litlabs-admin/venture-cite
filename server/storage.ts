@@ -90,6 +90,7 @@ import {
   type ArticleRevision,
   type InsertArticleRevision,
   type ChatbotMessage,
+  type ChatbotThread,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -729,10 +730,21 @@ export interface IStorage {
   createRevision(input: InsertArticleRevision): Promise<ArticleRevision>;
   listRevisions(articleId: string, limit?: number): Promise<ArticleRevision[]>;
   getRevisionById(revisionId: string): Promise<ArticleRevision | undefined>;
-  // Chatbot (Phase 5): conversation history + message inserts + nightly prune.
-  getChatbotHistory(userId: string, limit?: number): Promise<ChatbotMessage[]>;
+  // Chatbot threads (Phase 5 v2 — multi-thread).
+  listChatbotThreads(
+    userId: string,
+    limit?: number,
+  ): Promise<Array<ChatbotThread & { messageCount: number }>>;
+  getChatbotThread(threadId: string): Promise<ChatbotThread | undefined>;
+  createChatbotThread(userId: string, brandId?: string | null): Promise<ChatbotThread>;
+  archiveChatbotThread(threadId: string): Promise<void>;
+  restoreChatbotThread(threadId: string): Promise<void>;
+  setChatbotThreadTitle(threadId: string, title: string): Promise<void>;
+  touchChatbotThread(threadId: string): Promise<void>;
+  getChatbotThreadMessages(threadId: string, limit?: number): Promise<ChatbotMessage[]>;
   insertChatbotMessage(msg: {
     userId: string;
+    threadId: string;
     brandId?: string | null;
     role: "user" | "assistant";
     content: string;

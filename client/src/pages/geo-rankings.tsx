@@ -7,6 +7,8 @@ import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
 import { Bot, TrendingUp, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface GeoRanking {
   id: string;
@@ -26,7 +28,13 @@ interface Article {
 }
 
 export default function GeoRankingsPage() {
-  const { data: rankingsData, isLoading: rankingsLoading } = useQuery<{ data: GeoRanking[] }>({
+  const {
+    data: rankingsData,
+    isLoading: rankingsLoading,
+    isError: rankingsIsError,
+    isRefetching: rankingsIsRefetching,
+    refetch: refetchRankings,
+  } = useQuery<{ data: GeoRanking[] }>({
     queryKey: ["/api/geo-rankings"],
   });
 
@@ -213,6 +221,12 @@ export default function GeoRankingsPage() {
                 <Skeleton key={i} className="h-24 w-full" />
               ))}
             </div>
+          ) : rankingsIsError ? (
+            <ErrorState
+              title="Couldn't load rankings"
+              onRetry={() => refetchRankings()}
+              isRetrying={rankingsIsRefetching}
+            />
           ) : rankings.length > 0 ? (
             <div className="space-y-4">
               {rankings.map((ranking: GeoRanking) => {
@@ -268,13 +282,11 @@ export default function GeoRankingsPage() {
               })}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground mb-2">No rankings yet</p>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                Rankings will appear here when you check your articles for AI platform citations
-              </p>
-            </div>
+            <EmptyState
+              icon={Bot}
+              title="No rankings yet"
+              description="Rankings will appear here when you check your articles for AI platform citations"
+            />
           )}
         </CardContent>
       </Card>

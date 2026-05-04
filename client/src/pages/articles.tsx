@@ -43,6 +43,8 @@ import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
 import ViewEditDialog from "@/components/articles/ViewEditDialog";
 import DistributeDialog from "@/components/articles/DistributeDialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 import type { Article, Brand } from "@shared/schema";
 
 const STATUS_OPTIONS = [
@@ -117,10 +119,21 @@ export default function Articles() {
     },
   });
   const articles = articlesQuery.data?.data ?? [];
+  const {
+    isError: articlesIsError,
+    isRefetching: articlesIsRefetching,
+    refetch: refetchArticles,
+  } = articlesQuery;
 
-  const { data: brandsData } = useQuery<{ success: boolean; data: Brand[] }>({
+  const brandsQuery = useQuery<{ success: boolean; data: Brand[] }>({
     queryKey: ["/api/brands"],
   });
+  const { data: brandsData } = brandsQuery;
+  const {
+    isError: brandsIsError,
+    isRefetching: brandsIsRefetching,
+    refetch: refetchBrands,
+  } = brandsQuery;
   const brands = brandsData?.data ?? [];
   const brandsById = useMemo(() => {
     const m = new Map<string, Brand>();
@@ -225,19 +238,33 @@ export default function Articles() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
+        ) : articlesIsError ? (
+          <ErrorState
+            title="Couldn't load your articles"
+            onRetry={() => {
+              void refetchArticles();
+            }}
+            isRetrying={articlesIsRefetching}
+          />
+        ) : brandsIsError ? (
+          <ErrorState
+            title="Couldn't load your brands"
+            onRetry={() => {
+              void refetchBrands();
+            }}
+            isRetrying={brandsIsRefetching}
+          />
         ) : articles.length === 0 && statusFilter === "ready" ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">No articles yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Generate and save content to see your articles here.
-              </p>
-              <Link href="/content">
-                <Button>Create Your First Article</Button>
-              </Link>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={FileText}
+            title="No articles yet"
+            description="Generate and save content to see your articles here."
+            action={{
+              label: "Create Your First Article",
+              onClick: () => setLocation("/content"),
+              href: "/content",
+            }}
+          />
         ) : (
           <>
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">

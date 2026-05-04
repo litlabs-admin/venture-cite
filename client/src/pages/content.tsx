@@ -55,6 +55,8 @@ import KeywordChips from "@/components/content/KeywordChips";
 import IndustryCombobox from "@/components/content/IndustryCombobox";
 import BrandCombobox from "@/components/content/BrandCombobox";
 import { apiRequest } from "@/lib/queryClient";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 import { useToast } from "@/hooks/use-toast";
 import { useArticleAutoSave } from "@/hooks/useArticleAutoSave";
 import type { Article, Brand } from "@shared/schema";
@@ -115,7 +117,12 @@ export default function Content() {
 
   // ── Brands / usage / drafts list ──────────────────────────────────────────
 
-  const { data: brandsData } = useQuery<{ success: boolean; data: Brand[] }>({
+  const {
+    data: brandsData,
+    isError: brandsIsError,
+    isRefetching: brandsIsRefetching,
+    refetch: refetchBrands,
+  } = useQuery<{ success: boolean; data: Brand[] }>({
     queryKey: ["/api/brands"],
   });
   const brands = brandsData?.data ?? [];
@@ -125,7 +132,12 @@ export default function Content() {
     data: Usage;
   }>({ queryKey: ["/api/usage"] });
 
-  const { data: draftsData, refetch: refetchDrafts } = useQuery<{
+  const {
+    data: draftsData,
+    isError: draftsIsError,
+    isRefetching: draftsIsRefetching,
+    refetch: refetchDrafts,
+  } = useQuery<{
     success: boolean;
     data: Article[];
   }>({
@@ -499,6 +511,44 @@ export default function Content() {
 
   // ── Render gates ──────────────────────────────────────────────────────────
 
+  if (brandsIsError) {
+    return (
+      <TooltipProvider>
+        <div className="space-y-8">
+          <PageHeader
+            title="AI Content Generation"
+            description="Generate SEO-optimized content for AI search engines"
+            explainer={pageExplainers.content}
+          />
+          <ErrorState
+            title="Couldn't load your brands"
+            onRetry={() => refetchBrands()}
+            isRetrying={brandsIsRefetching}
+          />
+        </div>
+      </TooltipProvider>
+    );
+  }
+
+  if (draftsIsError) {
+    return (
+      <TooltipProvider>
+        <div className="space-y-8">
+          <PageHeader
+            title="AI Content Generation"
+            description="Generate SEO-optimized content for AI search engines"
+            explainer={pageExplainers.content}
+          />
+          <ErrorState
+            title="Couldn't load your drafts"
+            onRetry={() => refetchDrafts()}
+            isRetrying={draftsIsRefetching}
+          />
+        </div>
+      </TooltipProvider>
+    );
+  }
+
   if (brandsData && brands.length === 0) {
     return (
       <TooltipProvider>
@@ -508,18 +558,15 @@ export default function Content() {
             description="Generate SEO-optimized content for AI search engines"
             explainer={pageExplainers.content}
           />
-          <Card>
-            <CardContent className="py-12 text-center">
-              <h3 className="text-lg font-semibold mb-2">Add a brand first</h3>
-              <p className="text-muted-foreground mb-4">
-                Articles are tied to a brand so AI-citation tracking can attribute the result
-                correctly.
-              </p>
-              <Link href="/brands">
-                <Button>Add a brand</Button>
-              </Link>
-            </CardContent>
-          </Card>
+          <EmptyState
+            title="Add a brand first"
+            description="Articles are tied to a brand so AI-citation tracking can attribute the result correctly."
+            action={{
+              label: "Add a brand",
+              onClick: () => setLocation("/brands"),
+              href: "/brands",
+            }}
+          />
         </div>
       </TooltipProvider>
     );

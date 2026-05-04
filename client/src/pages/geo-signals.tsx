@@ -43,6 +43,7 @@ import { pageExplainers } from "@/lib/pageExplainers";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import type { Article, BrandPrompt } from "@shared/schema";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Sparkles,
   Loader2,
@@ -771,11 +772,11 @@ export default function GeoSignals() {
                 )}
 
                 {signalScores.length === 0 && !analyzeSignalsMutation.isPending && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="font-medium">Select an article and run analysis</p>
-                    <p className="text-sm">Get scores for the 6 content signals plus freshness</p>
-                  </div>
+                  <EmptyState
+                    icon={BarChart3}
+                    title="Select an article and run analysis"
+                    description="Get scores for the 6 content signals plus freshness"
+                  />
                 )}
               </CardContent>
             </Card>
@@ -1300,11 +1301,11 @@ export default function GeoSignals() {
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Code className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="font-medium">Enter a URL to audit schema markup</p>
-                    <p className="text-sm">Analyze how structured data affects AI visibility</p>
-                  </div>
+                  <EmptyState
+                    icon={Code}
+                    title="Enter a URL to audit schema markup"
+                    description="Analyze how structured data affects AI visibility"
+                  />
                 )}
               </CardContent>
             </Card>

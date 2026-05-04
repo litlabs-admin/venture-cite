@@ -15,6 +15,8 @@ import {
 import { DollarSign, ShoppingCart, TrendingUp, Sparkles, Loader2 } from "lucide-react";
 import { useState } from "react";
 import type { Brand, PurchaseEvent } from "@shared/schema";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface RevenueAnalytics {
   totalRevenue: number;
@@ -31,7 +33,13 @@ export default function RevenueAnalytics() {
     queryKey: ["/api/brands"],
   });
 
-  const { data: revenueData, isLoading } = useQuery<{ success: boolean; data: RevenueAnalytics }>({
+  const {
+    data: revenueData,
+    isLoading,
+    isError: revenueIsError,
+    isRefetching: revenueIsRefetching,
+    refetch: refetchRevenue,
+  } = useQuery<{ success: boolean; data: RevenueAnalytics }>({
     queryKey: ["/api/revenue/analytics", selectedBrand !== "all" ? selectedBrand : undefined],
     queryFn: async () => {
       const url =
@@ -87,6 +95,12 @@ export default function RevenueAnalytics() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : revenueIsError ? (
+        <ErrorState
+          title="Couldn't load revenue analytics"
+          onRetry={() => refetchRevenue()}
+          isRetrying={revenueIsRefetching}
+        />
       ) : (
         <>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -161,13 +175,11 @@ export default function RevenueAnalytics() {
                 </CardHeader>
                 <CardContent>
                   {Object.entries(analytics?.platformBreakdown || {}).length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No purchases tracked yet</p>
-                      <p className="text-sm mt-2">
-                        Connect your e-commerce platform to start tracking AI-driven sales
-                      </p>
-                    </div>
+                    <EmptyState
+                      icon={ShoppingCart}
+                      title="No purchases tracked yet"
+                      description="Connect your e-commerce platform to start tracking AI-driven sales"
+                    />
                   ) : (
                     <div className="space-y-4">
                       {Object.entries(analytics?.platformBreakdown || {})
@@ -206,10 +218,7 @@ export default function RevenueAnalytics() {
                 </CardHeader>
                 <CardContent>
                   {(analytics?.recentPurchases || []).length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No recent purchases</p>
-                    </div>
+                    <EmptyState icon={ShoppingCart} title="No recent purchases" />
                   ) : (
                     <div className="space-y-3">
                       {analytics?.recentPurchases.map((purchase) => (

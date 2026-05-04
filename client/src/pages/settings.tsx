@@ -17,6 +17,7 @@ import { getAccessToken } from "@/lib/authStore";
 import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
 import { Loader2 } from "lucide-react";
+import { ErrorState } from "@/components/ui/error-state";
 
 type NotificationPreference = {
   type: string;
@@ -34,7 +35,13 @@ export default function Settings() {
   const [confirm, setConfirm] = useState("");
 
   const prefsQueryKey = ["/api/user/notification-preferences"];
-  const { data: prefsData, isLoading: prefsLoading } = useQuery<{
+  const {
+    data: prefsData,
+    isLoading: prefsLoading,
+    isError: prefsIsError,
+    isRefetching: prefsIsRefetching,
+    refetch: refetchPrefs,
+  } = useQuery<{
     success: boolean;
     data: NotificationPreference[];
   }>({
@@ -167,6 +174,12 @@ export default function Settings() {
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>Loading preferences…</span>
           </div>
+        ) : prefsIsError ? (
+          <ErrorState
+            title="Couldn't load notification preferences"
+            onRetry={() => refetchPrefs()}
+            isRetrying={prefsIsRefetching}
+          />
         ) : preferences.length === 0 ? (
           <p className="text-sm text-muted-foreground">No notification types configured.</p>
         ) : (

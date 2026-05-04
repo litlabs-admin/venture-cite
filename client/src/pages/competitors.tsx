@@ -43,6 +43,7 @@ import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 import { Target } from "lucide-react";
 import { SiOpenai } from "react-icons/si";
 import type { Competitor, Brand } from "@shared/schema";
@@ -95,7 +96,13 @@ export default function CompetitorsPage() {
     ["/api/competitors/leaderboard", selectedBrandId],
   ]);
 
-  const { data: competitorsData, isLoading: isLoadingCompetitors } = useQuery<{
+  const {
+    data: competitorsData,
+    isLoading: isLoadingCompetitors,
+    isError: competitorsIsError,
+    isRefetching: competitorsIsRefetching,
+    refetch: refetchCompetitors,
+  } = useQuery<{
     success: boolean;
     data: Competitor[];
   }>({
@@ -118,7 +125,13 @@ export default function CompetitorsPage() {
     },
   });
 
-  const { data: leaderboardData, isLoading: isLoadingLeaderboard } = useQuery<{
+  const {
+    data: leaderboardData,
+    isLoading: isLoadingLeaderboard,
+    isError: leaderboardIsError,
+    isRefetching: leaderboardIsRefetching,
+    refetch: refetchLeaderboard,
+  } = useQuery<{
     success: boolean;
     data: LeaderboardEntry[];
   }>({
@@ -372,7 +385,13 @@ export default function CompetitorsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {isLoadingLeaderboard ? (
+                {leaderboardIsError ? (
+                  <ErrorState
+                    title="Couldn't load leaderboard"
+                    onRetry={() => refetchLeaderboard()}
+                    isRetrying={leaderboardIsRefetching}
+                  />
+                ) : isLoadingLeaderboard ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
@@ -516,7 +535,13 @@ export default function CompetitorsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {isLoadingCompetitors ? (
+                {competitorsIsError ? (
+                  <ErrorState
+                    title="Couldn't load competitors"
+                    onRetry={() => refetchCompetitors()}
+                    isRetrying={competitorsIsRefetching}
+                  />
+                ) : isLoadingCompetitors ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                   </div>

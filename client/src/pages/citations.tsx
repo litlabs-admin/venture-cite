@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   Sparkles,
   Play,
@@ -40,7 +41,13 @@ export default function Citations() {
   const { toast } = useToast();
   const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
 
-  const { data: promptsData, isLoading: promptsLoading } = useQuery<{
+  const {
+    data: promptsData,
+    isLoading: promptsLoading,
+    isError: promptsIsError,
+    isRefetching: promptsIsRefetching,
+    refetch: refetchPrompts,
+  } = useQuery<{
     success: boolean;
     data: BrandPrompt[];
   }>({
@@ -543,16 +550,24 @@ export default function Citations() {
           </div>
 
           {/* PROMPTS TAB */}
-          {activeTab === "prompts" && (
-            <PromptsTab
-              selectedBrandId={selectedBrandId}
-              selectedBrand={selectedBrand}
-              prompts={prompts}
-              promptsLoading={promptsLoading}
-              hasPrompts={hasPrompts}
-              promptsAgeLabel={promptsAgeLabel}
-            />
-          )}
+          {activeTab === "prompts" &&
+            (promptsIsError ? (
+              <ErrorState
+                title="Couldn't load prompts"
+                description="We hit an error fetching this brand's citation prompts."
+                onRetry={() => refetchPrompts()}
+                isRetrying={promptsIsRefetching}
+              />
+            ) : (
+              <PromptsTab
+                selectedBrandId={selectedBrandId}
+                selectedBrand={selectedBrand}
+                prompts={prompts}
+                promptsLoading={promptsLoading}
+                hasPrompts={hasPrompts}
+                promptsAgeLabel={promptsAgeLabel}
+              />
+            ))}
 
           {/* RESULTS TAB */}
           {activeTab === "results" && (

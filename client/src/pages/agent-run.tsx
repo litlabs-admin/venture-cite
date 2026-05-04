@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { WorkflowRun, WorkflowApproval } from "@shared/schema";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   ArrowLeft,
   CheckCircle,
@@ -372,7 +373,13 @@ export default function AgentRun() {
 
   const [selectedListicleIds, setSelectedListicleIds] = useState<Set<string> | null>(null);
 
-  const { data: runData, isLoading } = useQuery<{ data: RunDetail }>({
+  const {
+    data: runData,
+    isLoading,
+    isError: runError,
+    isRefetching: runRefetching,
+    refetch: refetchRun,
+  } = useQuery<{ data: RunDetail }>({
     queryKey: [`/api/workflow-runs/${runId}`],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/workflow-runs/${runId}`);
@@ -497,6 +504,17 @@ export default function AgentRun() {
     return (
       <div className="p-12 text-center">
         <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+      </div>
+    );
+  }
+  if (runError) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          title="Couldn't load this run"
+          onRetry={() => refetchRun()}
+          isRetrying={runRefetching}
+        />
       </div>
     );
   }

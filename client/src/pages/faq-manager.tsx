@@ -32,6 +32,8 @@ import { pageExplainers } from "@/lib/pageExplainers";
 import type { FaqItem } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   HelpCircle,
   Sparkles,
@@ -68,7 +70,13 @@ export default function FaqManager() {
   const [newCategory, setNewCategory] = useState("general");
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
-  const { data: faqsData, isLoading: faqsLoading } = useQuery<{ data: FaqItem[] }>({
+  const {
+    data: faqsData,
+    isLoading: faqsLoading,
+    isError: faqsIsError,
+    isRefetching: faqsIsRefetching,
+    refetch: refetchFaqs,
+  } = useQuery<{ data: FaqItem[] }>({
     queryKey: [`/api/faqs?brandId=${selectedBrandId}`],
     enabled: !!selectedBrandId,
   });
@@ -405,7 +413,13 @@ export default function FaqManager() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      {faqsLoading ? (
+                      {faqsIsError ? (
+                        <ErrorState
+                          title="Couldn't load FAQs"
+                          onRetry={() => refetchFaqs()}
+                          isRetrying={faqsIsRefetching}
+                        />
+                      ) : faqsLoading ? (
                         <div className="text-center py-8">
                           <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
                         </div>
@@ -548,10 +562,10 @@ export default function FaqManager() {
                           </div>
                         </ScrollArea>
                       ) : (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <HelpCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>No FAQs yet. Add one manually or use AI to generate.</p>
-                        </div>
+                        <EmptyState
+                          icon={HelpCircle}
+                          title="No FAQs yet. Add one manually or use AI to generate."
+                        />
                       )}
                     </CardContent>
                   </Card>

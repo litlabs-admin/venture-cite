@@ -36,6 +36,8 @@ import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface PlatformMetrics {
   mentions: number;
@@ -132,6 +134,9 @@ export default function GeoAnalytics() {
   const {
     data: analyticsResponse,
     isLoading: analyticsLoading,
+    isError: analyticsIsError,
+    isRefetching: analyticsIsRefetching,
+    refetch: refetchAnalytics,
     error,
   } = useQuery<{ success: boolean; data: GeoAnalyticsData }>({
     // Wave 9.3: use an explicit "all" sentinel when no run is active so
@@ -173,16 +178,11 @@ export default function GeoAnalytics() {
       ) : null}
 
       {!selectedBrandId ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Eye className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Select a Brand to View Analytics</h3>
-            <p className="text-muted-foreground">
-              Choose a brand above to see AI Visibility Score, Share of Voice, and Sentiment
-              Analysis
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Eye}
+          title="Select a Brand to View Analytics"
+          description="Choose a brand above to see AI Visibility Score, Share of Voice, and Sentiment Analysis"
+        />
       ) : analyticsLoading ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -193,12 +193,12 @@ export default function GeoAnalytics() {
           <Skeleton className="h-64" />
           <Skeleton className="h-48" />
         </div>
-      ) : error || !analytics ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-red-500">Failed to load analytics. Please try again.</p>
-          </CardContent>
-        </Card>
+      ) : analyticsIsError || error || !analytics ? (
+        <ErrorState
+          title="Couldn't load analytics"
+          onRetry={() => refetchAnalytics()}
+          isRetrying={analyticsIsRefetching}
+        />
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

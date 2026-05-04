@@ -35,6 +35,8 @@ import {
 import { SiOpenai, SiGoogle } from "react-icons/si";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 // Display-only badge metadata (icons + badge colors). Platform names
 // themselves are defined in @shared/constants; this just adds per-platform UI.
@@ -64,7 +66,13 @@ export default function ClientReports() {
   const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
   const [reportPeriod, setReportPeriod] = useState<string>("30");
 
-  const { data: metricsResponse, isLoading: metricsLoading } = useQuery<{
+  const {
+    data: metricsResponse,
+    isLoading: metricsLoading,
+    isError: metricsIsError,
+    isRefetching: metricsIsRefetching,
+    refetch: refetchMetrics,
+  } = useQuery<{
     success: boolean;
     data: ReportMetrics;
   }>({
@@ -157,16 +165,17 @@ export default function ClientReports() {
       </div>
 
       {!selectedBrandId ? (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Select a Brand to Generate Report</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Choose a brand above to see AI visibility metrics, citation tracking, and performance
-              insights.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={FileText}
+          title="Select a Brand to Generate Report"
+          description="Choose a brand above to see AI visibility metrics, citation tracking, and performance insights."
+        />
+      ) : metricsIsError ? (
+        <ErrorState
+          title="Couldn't load report"
+          onRetry={() => refetchMetrics()}
+          isRetrying={metricsIsRefetching}
+        />
       ) : metricsLoading ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -182,15 +191,11 @@ export default function ClientReports() {
           </div>
         </div>
       ) : !metrics ? (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <BarChart3 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No Data Available</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Start tracking your brand across AI platforms to generate reports.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={BarChart3}
+          title="No Data Available"
+          description="Start tracking your brand across AI platforms to generate reports."
+        />
       ) : (
         <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

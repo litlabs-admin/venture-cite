@@ -35,6 +35,8 @@ import {
 import type { AgentTask, BrandPrompt, WorkflowRun } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   Bot,
   Zap,
@@ -193,7 +195,13 @@ export default function AgentDashboard() {
   });
   const activeRuns = activeRunsData?.data || [];
 
-  const { data: allRunsData, isLoading: allRunsLoading } = useQuery<{ data: WorkflowRun[] }>({
+  const {
+    data: allRunsData,
+    isLoading: allRunsLoading,
+    isError: allRunsError,
+    isRefetching: allRunsRefetching,
+    refetch: refetchAllRuns,
+  } = useQuery<{ data: WorkflowRun[] }>({
     queryKey: ["/api/workflow-runs", { brandId: selectedBrandId, limit: 50 }],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/workflow-runs?brandId=${selectedBrandId}&limit=50`);
@@ -305,7 +313,13 @@ export default function AgentDashboard() {
     return `${m}m ${s % 60}s`;
   };
 
-  const { data: tasksData, isLoading: tasksLoading } = useQuery<{ data: AgentTask[] }>({
+  const {
+    data: tasksData,
+    isLoading: tasksLoading,
+    isError: tasksError,
+    isRefetching: tasksRefetching,
+    refetch: refetchTasks,
+  } = useQuery<{ data: AgentTask[] }>({
     queryKey: [
       "/api/agent-tasks",
       { brandId: selectedBrandId, status: taskFilter !== "all" ? taskFilter : undefined },
@@ -1369,20 +1383,23 @@ export default function AgentDashboard() {
                       <div className="text-center py-8">
                         <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
                       </div>
+                    ) : tasksError ? (
+                      <ErrorState
+                        title="Couldn't load tasks"
+                        onRetry={() => refetchTasks()}
+                        isRetrying={tasksRefetching}
+                      />
                     ) : tasks.length === 0 ? (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <Bot className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                        <h3 className="text-lg font-medium text-foreground mb-2">No Tasks Yet</h3>
-                        <p className="text-sm mb-4">
-                          Click "Create Task" above to assign work to the AI agent
-                        </p>
-                        <Button
-                          onClick={() => setShowCreateTask(true)}
-                          variant="outline"
-                          data-testid="button-create-task-empty"
-                        >
-                          <Plus className="w-4 h-4 mr-2" /> Create Your First Task
-                        </Button>
+                      <div data-testid="empty-tasks">
+                        <EmptyState
+                          icon={Bot}
+                          title="No Tasks Yet"
+                          description={'Click "Create Task" above to assign work to the AI agent'}
+                          action={{
+                            label: "Create Your First Task",
+                            onClick: () => setShowCreateTask(true),
+                          }}
+                        />
                       </div>
                     ) : (
                       <ScrollArea className="h-[400px]">
@@ -1547,11 +1564,18 @@ export default function AgentDashboard() {
                       <div className="text-center py-8">
                         <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
                       </div>
+                    ) : allRunsError ? (
+                      <ErrorState
+                        title="Couldn't load runs history"
+                        onRetry={() => refetchAllRuns()}
+                        isRetrying={allRunsRefetching}
+                      />
                     ) : allRuns.length === 0 ? (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <History className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                        <p>No runs yet. Start one from the Workflows tab.</p>
-                      </div>
+                      <EmptyState
+                        icon={History}
+                        title="No runs yet"
+                        description="Start one from the Workflows tab."
+                      />
                     ) : (
                       <div className="space-y-2">
                         {allRuns.map((run) => {

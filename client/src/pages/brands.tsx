@@ -66,6 +66,8 @@ import { Link } from "wouter";
 import { normalizeWebsite, safeExternalHref } from "@/lib/urlSafety";
 import BrandFormFields from "@/components/BrandFormFields";
 import DeleteBrandDialog from "@/components/DeleteBrandDialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 const formSchema = z.object({
   name: z.string().min(1, "Brand name is required"),
@@ -121,7 +123,13 @@ export default function Brands() {
   const [showManualForm, setShowManualForm] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState("");
 
-  const { data: brandsResponse, isLoading } = useQuery<{ success: boolean; data: Brand[] }>({
+  const {
+    data: brandsResponse,
+    isLoading,
+    isError,
+    isRefetching,
+    refetch,
+  } = useQuery<{ success: boolean; data: Brand[] }>({
     queryKey: ["/api/brands"],
   });
 
@@ -464,6 +472,13 @@ export default function Brands() {
             </Card>
           ))}
         </div>
+      ) : isError ? (
+        <ErrorState
+          title="Couldn't load your brands"
+          description="We hit a problem fetching your brand list. The issue has been logged — please try again."
+          onRetry={() => refetch()}
+          isRetrying={isRefetching}
+        />
       ) : brands && brands.length > 0 ? (
         <>
           <h2 className="text-lg font-semibold mb-4" data-testid="text-brands-heading">
@@ -594,16 +609,11 @@ export default function Brands() {
           </Card>
         </>
       ) : (
-        <Card data-testid="card-empty-state">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No brands yet</h3>
-            <p className="text-muted-foreground text-center mb-4 max-w-md">
-              Enter your website above and we'll create your brand profile automatically. This
-              powers all the AI optimization features in VentureCite.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Building2}
+          title="No brands yet"
+          description="Enter your website above and we'll create your brand profile automatically. This powers all the AI optimization features in VentureCite."
+        />
       )}
 
       <Dialog open={showManualForm} onOpenChange={setShowManualForm}>

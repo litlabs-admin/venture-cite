@@ -23,6 +23,8 @@ import { useLocation } from "wouter";
 import type { KeywordResearch } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   Search,
   Sparkles,
@@ -59,7 +61,13 @@ export default function KeywordResearchPage() {
   const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
   const [statusFilter, setStatusFilter] = usePersistedState<string>("vc_keywords_filter", "all");
 
-  const { data: keywordsData, isLoading: keywordsLoading } = useQuery<{
+  const {
+    data: keywordsData,
+    isLoading: keywordsLoading,
+    isError: keywordsIsError,
+    isRefetching: keywordsIsRefetching,
+    refetch: refetchKeywords,
+  } = useQuery<{
     success: boolean;
     data: KeywordResearch[];
   }>({
@@ -248,16 +256,17 @@ export default function KeywordResearchPage() {
       </div>
 
       {!selectedBrandId ? (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <Search className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">Select a Brand to Start</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Choose a brand above to discover AI-optimized keywords and generate content that gets
-              cited.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Search}
+          title="Select a Brand to Start"
+          description="Choose a brand above to discover AI-optimized keywords and generate content that gets cited."
+        />
+      ) : keywordsIsError ? (
+        <ErrorState
+          title="Couldn't load keywords"
+          onRetry={() => refetchKeywords()}
+          isRetrying={keywordsIsRefetching}
+        />
       ) : keywordsLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
@@ -275,25 +284,20 @@ export default function KeywordResearchPage() {
           ))}
         </div>
       ) : filteredKeywords.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <Sparkles className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">No Keywords Found</h3>
-            <p className="text-muted-foreground max-w-md mx-auto mb-4">
+        <EmptyState
+          icon={Sparkles}
+          title="No Keywords Found"
+          description={
+            <>
               Click "Discover Keywords with AI" to find high-opportunity keywords for{" "}
               {selectedBrand?.name}.
-            </p>
-            <Button
-              onClick={() => discoverMutation.mutate()}
-              disabled={discoverMutation.isPending}
-              className="bg-red-600 hover:bg-red-700"
-              data-testid="button-discover-empty-state"
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              Discover Keywords
-            </Button>
-          </CardContent>
-        </Card>
+            </>
+          }
+          action={{
+            label: "Discover Keywords",
+            onClick: () => discoverMutation.mutate(),
+          }}
+        />
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-between">

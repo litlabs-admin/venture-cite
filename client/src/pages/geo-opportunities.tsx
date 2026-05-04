@@ -17,6 +17,7 @@ import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   MessageSquare,
   HelpCircle,
@@ -89,7 +90,13 @@ const platformIcons: Record<string, JSX.Element> = {
 export default function GeoOpportunities() {
   const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
 
-  const { data: opportunitiesResponse, isLoading: oppsLoading } = useQuery<{
+  const {
+    data: opportunitiesResponse,
+    isLoading: oppsLoading,
+    isError: oppsIsError,
+    isRefetching: oppsIsRefetching,
+    refetch: refetchOpps,
+  } = useQuery<{
     success: boolean;
     data: OpportunitiesData;
   }>({
@@ -120,6 +127,12 @@ export default function GeoOpportunities() {
           <Skeleton className="h-64 w-full" />
           <Skeleton className="h-48 w-full" />
         </div>
+      ) : oppsIsError ? (
+        <ErrorState
+          title="Couldn't load opportunities"
+          onRetry={() => refetchOpps()}
+          isRetrying={oppsIsRefetching}
+        />
       ) : opportunities ? (
         <div className="space-y-6">
           {!opportunities.brand && (
@@ -516,11 +529,11 @@ export default function GeoOpportunities() {
           </Card>
         </div>
       ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Failed to load opportunities. Please try again.</p>
-          </CardContent>
-        </Card>
+        <ErrorState
+          title="Couldn't load opportunities"
+          onRetry={() => refetchOpps()}
+          isRetrying={oppsIsRefetching}
+        />
       )}
     </div>
   );

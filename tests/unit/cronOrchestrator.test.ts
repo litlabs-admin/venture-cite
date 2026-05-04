@@ -27,6 +27,7 @@ const stubs = vi.hoisted(() => ({
   refundArticleQuota: vi.fn(async () => undefined),
   listAdvanceablePendingJobs: vi.fn(async () => []),
   claimContentJobForSlice: vi.fn(async () => undefined),
+  pruneChatbotMessages: vi.fn(async () => ({ deletedByAge: 0, deletedByCap: 0 })),
   dbSelect: vi.fn(),
 }));
 
@@ -70,6 +71,7 @@ vi.mock("../../server/storage", () => ({
     setArticleFailed: stubs.setArticleFailed,
     listAdvanceablePendingJobs: stubs.listAdvanceablePendingJobs,
     claimContentJobForSlice: stubs.claimContentJobForSlice,
+    pruneChatbotMessages: stubs.pruneChatbotMessages,
   },
 }));
 vi.mock("../../server/db", () => ({

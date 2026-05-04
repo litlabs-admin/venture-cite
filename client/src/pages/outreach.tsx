@@ -31,6 +31,8 @@ import { Helmet } from "react-helmet-async";
 import { useSearch } from "wouter";
 import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 import type { OutreachCampaign, PublicationTarget, OutreachEmail } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -84,7 +86,13 @@ export default function Outreach() {
     emailType: "initial" as string,
   });
 
-  const { data: campaignsData, isLoading } = useQuery<{ data: OutreachCampaign[] }>({
+  const {
+    data: campaignsData,
+    isLoading,
+    isError: campaignsIsError,
+    isRefetching: campaignsIsRefetching,
+    refetch: refetchCampaigns,
+  } = useQuery<{ data: OutreachCampaign[] }>({
     queryKey: ["/api/outreach-campaigns", selectedBrandId],
     enabled: !!selectedBrandId,
   });
@@ -103,7 +111,13 @@ export default function Outreach() {
     enabled: !!selectedBrandId,
   });
 
-  const { data: emailsData, isLoading: emailsLoading } = useQuery<{ data: OutreachEmail[] }>({
+  const {
+    data: emailsData,
+    isLoading: emailsLoading,
+    isError: emailsIsError,
+    isRefetching: emailsIsRefetching,
+    refetch: refetchEmails,
+  } = useQuery<{ data: OutreachEmail[] }>({
     queryKey: ["/api/outreach-emails", selectedBrandId],
     enabled: !!selectedBrandId,
   });
@@ -450,13 +464,11 @@ export default function Outreach() {
         />
 
         {!selectedBrandId ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <Mail className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Select a Brand</h3>
-              <p className="text-muted-foreground">Choose a brand to manage outreach</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Mail}
+            title="Select a Brand"
+            description="Choose a brand to manage outreach"
+          />
         ) : (
           <Tabs defaultValue="discover" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3">
@@ -645,14 +657,18 @@ export default function Outreach() {
                     <div className="text-center py-8">
                       <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
                     </div>
+                  ) : emailsIsError ? (
+                    <ErrorState
+                      title="Couldn't load outreach emails"
+                      onRetry={() => refetchEmails()}
+                      isRetrying={emailsIsRefetching}
+                    />
                   ) : emails.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <MailPlus className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p className="font-medium">No emails yet</p>
-                      <p className="text-sm">
-                        Discover publications and compose emails to start outreach
-                      </p>
-                    </div>
+                    <EmptyState
+                      icon={MailPlus}
+                      title="No emails yet"
+                      description="Discover publications and compose emails to start outreach"
+                    />
                   ) : (
                     <ScrollArea className="h-[500px]">
                       <div className="space-y-4">
@@ -944,14 +960,18 @@ export default function Outreach() {
                     <div className="text-center py-8">
                       <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
                     </div>
+                  ) : campaignsIsError ? (
+                    <ErrorState
+                      title="Couldn't load outreach campaigns"
+                      onRetry={() => refetchCampaigns()}
+                      isRetrying={campaignsIsRefetching}
+                    />
                   ) : campaigns.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Send className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p className="font-medium">No outreach campaigns yet</p>
-                      <p className="text-sm">
-                        Create your first campaign to start building citations
-                      </p>
-                    </div>
+                    <EmptyState
+                      icon={Send}
+                      title="No outreach campaigns yet"
+                      description="Create your first campaign to start building citations"
+                    />
                   ) : (
                     <ScrollArea className="h-[500px]">
                       <div className="space-y-4">

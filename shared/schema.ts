@@ -1968,6 +1968,24 @@ export const insertCompetitorFaviconSchema = createInsertSchema(competitorFavico
 export type CompetitorFavicon = typeof competitorFavicons.$inferSelect;
 export type InsertCompetitorFavicon = z.infer<typeof insertCompetitorFaviconSchema>;
 
+export const chatbotThreads = pgTable(
+  "chatbot_threads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    brandId: varchar("brand_id").references(() => brands.id, { onDelete: "set null" }),
+    title: text("title").notNull().default("New chat"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => ({
+    userUpdatedIdx: index("chatbot_threads_user_updated_idx").on(t.userId, t.updatedAt.desc()),
+  }),
+);
+
 export const chatbotMessages = pgTable(
   "chatbot_messages",
   {
@@ -1975,6 +1993,9 @@ export const chatbotMessages = pgTable(
     userId: varchar("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => chatbotThreads.id, { onDelete: "cascade" }),
     brandId: varchar("brand_id").references(() => brands.id, { onDelete: "set null" }),
     role: text("role").notNull(),
     content: text("content").notNull(),
@@ -1985,6 +2006,7 @@ export const chatbotMessages = pgTable(
   },
   (t) => ({
     userCreatedIdx: index("chatbot_messages_user_created_idx").on(t.userId, t.createdAt.desc()),
+    threadCreatedIdx: index("chatbot_messages_thread_created_idx").on(t.threadId, t.createdAt),
   }),
 );
 
@@ -2006,5 +2028,7 @@ export const chatbotTokenUsage = pgTable(
 
 export type ChatbotMessage = typeof chatbotMessages.$inferSelect;
 export type InsertChatbotMessage = typeof chatbotMessages.$inferInsert;
+export type ChatbotThread = typeof chatbotThreads.$inferSelect;
+export type InsertChatbotThread = typeof chatbotThreads.$inferInsert;
 export type ChatbotTokenUsage = typeof chatbotTokenUsage.$inferSelect;
 export type InsertChatbotTokenUsage = typeof chatbotTokenUsage.$inferInsert;

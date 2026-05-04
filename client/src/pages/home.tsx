@@ -51,6 +51,8 @@ import VerbatimResponseCard from "@/components/dashboard/VerbatimResponseCard";
 import OnboardingProgressRing from "@/components/dashboard/OnboardingProgressRing";
 import ResultsTimeline from "@/components/dashboard/ResultsTimeline";
 import RecommendationsPanel from "@/components/dashboard/RecommendationsPanel";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface HeroData {
   visibilityScore: number;
@@ -444,21 +446,17 @@ export default function Home() {
           description="Track how often AI engines cite your brand."
           explainer={pageExplainers.dashboard}
         />
-        <Card>
-          <CardContent className="py-16 text-center">
-            <Brain className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">
-              Create a brand to get started
-            </h3>
-            <p className="text-muted-foreground max-w-md mx-auto mb-6">
+        <EmptyState
+          icon={Brain}
+          title="Create a brand to get started"
+          description={
+            <>
               Set up your first brand and we&apos;ll build a live AI visibility report showing where
               ChatGPT, Claude, Perplexity, and Gemini mention you — and where they don&apos;t.
-            </p>
-            <Link href="/brands">
-              <Button>Create your first brand</Button>
-            </Link>
-          </CardContent>
-        </Card>
+            </>
+          }
+          action={{ label: "Create your first brand", href: "/brands", onClick: () => {} }}
+        />
       </div>
     );
   }
@@ -560,182 +558,188 @@ export default function Home() {
       <RecommendationsPanel />
 
       {noCitationData ? (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <Play className="w-14 h-14 mx-auto text-primary mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Run your first citation check</h3>
-            <p className="text-muted-foreground max-w-md mx-auto mb-6">
-              Your dashboard comes alive once we&apos;ve queried AI engines for this brand. Takes
-              about 60 seconds on your first run.
-            </p>
-            <Link href="/citations">
-              <Button size="lg">
-                <Play className="w-4 h-4 mr-2" /> Start citation check
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Play}
+          title="Run your first citation check"
+          description="Your dashboard comes alive once we've queried AI engines for this brand. Takes about 60 seconds on your first run."
+          action={{ label: "Start citation check", href: "/citations", onClick: () => {} }}
+        />
       ) : (
         <>
           {/* ===== 1. HERO ROW ===== */}
-          <div className="grid gap-4 md:grid-cols-3">
-            {/* AI Visibility Score */}
-            <Card
-              data-testid="card-visibility-score"
-              className="relative shadow-sm border-border/60"
-            >
-              {isAutopilotDataPending && (
-                <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              )}
-              <CardContent className="p-5 flex flex-col h-full">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
-                  AI Visibility Score
-                </p>
-                <div className="flex-1 flex flex-col items-center justify-center py-2">
-                  {hero.isLoading ? (
-                    <Skeleton className="h-32 w-32 rounded-full" />
-                  ) : isAutopilotDataPending && heroData?.visibilityScore === undefined ? (
-                    <div className="h-[140px] w-[140px] rounded-full grid place-items-center text-5xl font-bold text-muted-foreground">
-                      —
-                    </div>
-                  ) : (
-                    <VisibilityGauge score={visibilityScoreAnim} size={140} />
-                  )}
-                </div>
-                <div className="mt-auto pt-2 text-center">
-                  {heroData ? (
-                    <>
-                      {heroData.visibilityDelta !== null && heroData.visibilityDelta !== 0 ? (
-                        <div className="flex items-center justify-center">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                              heroData.visibilityDelta > 0
-                                ? "bg-emerald-500/10 text-emerald-400"
-                                : "bg-destructive/10 text-destructive"
-                            }`}
-                          >
-                            {heroData.visibilityDelta > 0 ? (
-                              <ArrowUp className="w-3 h-3" />
-                            ) : (
-                              <ArrowDown className="w-3 h-3" />
-                            )}
-                            {heroData.visibilityDelta > 0 ? "+" : ""}
-                            {heroData.visibilityDelta} pts
-                          </span>
-                        </div>
-                      ) : null}
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Last scan:{" "}
-                        {formatRelativeTime(
-                          heroData.lastScanAt ?? selectedBrand?.autopilotCompletedAt ?? null,
-                        )}
-                      </p>
-                      {heroData.industryAvg !== null && (
-                        <p className="text-[11px] text-muted-foreground">
-                          Industry avg: {heroData.industryAvg}
+          {hero.isError ? (
+            <ErrorState
+              title="Couldn't load dashboard metrics"
+              onRetry={() => hero.refetch()}
+              isRetrying={hero.isRefetching}
+            />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              {/* AI Visibility Score */}
+              <Card
+                data-testid="card-visibility-score"
+                className="relative shadow-sm border-border/60"
+              >
+                {isAutopilotDataPending && (
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                )}
+                <CardContent className="p-5 flex flex-col h-full">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
+                    AI Visibility Score
+                  </p>
+                  <div className="flex-1 flex flex-col items-center justify-center py-2">
+                    {hero.isLoading ? (
+                      <Skeleton className="h-32 w-32 rounded-full" />
+                    ) : isAutopilotDataPending && heroData?.visibilityScore === undefined ? (
+                      <div className="h-[140px] w-[140px] rounded-full grid place-items-center text-5xl font-bold text-muted-foreground">
+                        —
+                      </div>
+                    ) : (
+                      <VisibilityGauge score={visibilityScoreAnim} size={140} />
+                    )}
+                  </div>
+                  <div className="mt-auto pt-2 text-center">
+                    {heroData ? (
+                      <>
+                        {heroData.visibilityDelta !== null && heroData.visibilityDelta !== 0 ? (
+                          <div className="flex items-center justify-center">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                                heroData.visibilityDelta > 0
+                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  : "bg-destructive/10 text-destructive"
+                              }`}
+                            >
+                              {heroData.visibilityDelta > 0 ? (
+                                <ArrowUp className="w-3 h-3" />
+                              ) : (
+                                <ArrowDown className="w-3 h-3" />
+                              )}
+                              {heroData.visibilityDelta > 0 ? "+" : ""}
+                              {heroData.visibilityDelta} pts
+                            </span>
+                          </div>
+                        ) : null}
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          Last scan:{" "}
+                          {formatRelativeTime(
+                            heroData.lastScanAt ?? selectedBrand?.autopilotCompletedAt ?? null,
+                          )}
                         </p>
-                      )}
-                    </>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
+                        {heroData.industryAvg !== null && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Industry avg: {heroData.industryAvg}
+                          </p>
+                        )}
+                      </>
+                    ) : null}
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* Share of AI Voice */}
-            <Card data-testid="card-share-of-voice" className="relative shadow-sm border-border/60">
-              {isAutopilotDataPending && (
-                <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              )}
-              <CardContent className="p-5 flex flex-col h-full">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
-                  Share of AI Voice
-                </p>
-                {leaderboard.isLoading ? (
-                  <Skeleton className="mt-4 h-14 w-24 mx-auto" />
-                ) : isAutopilotDataPending && !ownRow ? (
-                  <div className="mt-3 text-center">
-                    <div className="text-5xl font-bold text-muted-foreground leading-none">—</div>
-                    <p className="text-xs text-muted-foreground mt-1.5">
-                      of AI answers in your category mention you
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-3 text-center">
-                    <div className="text-5xl font-bold text-foreground leading-none">
-                      {shareOfVoiceAnim}
-                      <span className="text-2xl text-muted-foreground font-semibold">%</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1.5">
-                      of AI answers in your category mention you
-                    </p>
-                  </div>
+              {/* Share of AI Voice */}
+              <Card
+                data-testid="card-share-of-voice"
+                className="relative shadow-sm border-border/60"
+              >
+                {isAutopilotDataPending && (
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                 )}
-                <div className="mt-auto pt-4 space-y-1.5 text-xs">
-                  {topCompetitor ? (
-                    <div className="flex items-center justify-between text-muted-foreground">
-                      <span className="truncate">Top competitor · {topCompetitor.name}</span>
-                      <span className="font-medium text-foreground">
-                        {Math.round(topCompetitor.shareOfVoice)}%
-                      </span>
+                <CardContent className="p-5 flex flex-col h-full">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
+                    Share of AI Voice
+                  </p>
+                  {leaderboard.isLoading ? (
+                    <Skeleton className="mt-4 h-14 w-24 mx-auto" />
+                  ) : isAutopilotDataPending && !ownRow ? (
+                    <div className="mt-3 text-center">
+                      <div className="text-5xl font-bold text-muted-foreground leading-none">—</div>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        of AI answers in your category mention you
+                      </p>
                     </div>
                   ) : (
-                    <div className="text-muted-foreground text-center">No competitor data yet</div>
+                    <div className="mt-3 text-center">
+                      <div className="text-5xl font-bold text-foreground leading-none">
+                        {shareOfVoiceAnim}
+                        <span className="text-2xl text-muted-foreground font-semibold">%</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        of AI answers in your category mention you
+                      </p>
+                    </div>
                   )}
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span>Competitors tracked</span>
-                    <span className="font-medium text-foreground">
-                      {leaderboardRows.filter((e) => !e.isOwn).length}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Cited / Total */}
-            <Card data-testid="card-cited-total" className="relative shadow-sm border-border/60">
-              {isAutopilotDataPending && (
-                <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              )}
-              <CardContent className="p-5 flex flex-col h-full">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
-                  Cited / Total Checks
-                </p>
-                {hero.isLoading ? (
-                  <Skeleton className="mt-4 h-14 w-40 mx-auto" />
-                ) : isAutopilotDataPending && heroData?.citedChecks === undefined ? (
-                  <div className="mt-3 text-center">
-                    <div className="text-5xl font-bold text-muted-foreground leading-none">—</div>
-                  </div>
-                ) : (
-                  <div className="mt-3 text-center">
-                    <div className="leading-none">
-                      <span className="text-5xl font-bold text-foreground">{citedChecksAnim}</span>
-                      <span className="text-2xl font-semibold text-muted-foreground">
-                        {" "}
-                        / {heroData?.totalChecks ?? 0}
+                  <div className="mt-auto pt-4 space-y-1.5 text-xs">
+                    {topCompetitor ? (
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span className="truncate">Top competitor · {topCompetitor.name}</span>
+                        <span className="font-medium text-foreground">
+                          {Math.round(topCompetitor.shareOfVoice)}%
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground text-center">
+                        No competitor data yet
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Competitors tracked</span>
+                      <span className="font-medium text-foreground">
+                        {leaderboardRows.filter((e) => !e.isOwn).length}
                       </span>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1.5">
-                      {heroData?.citationRate ?? 0}% citation rate
-                    </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Cited / Total */}
+              <Card data-testid="card-cited-total" className="relative shadow-sm border-border/60">
+                {isAutopilotDataPending && (
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                 )}
-                <div className="mt-auto pt-4">
-                  <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all duration-700"
-                      style={{ width: `${heroData?.citationRate ?? 0}%` }}
-                    />
-                  </div>
-                  {heroData?.lastScanAt && (
-                    <p className="text-[11px] text-muted-foreground mt-2 text-center">
-                      Last scan {new Date(heroData.lastScanAt).toLocaleString()}
-                    </p>
+                <CardContent className="p-5 flex flex-col h-full">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
+                    Cited / Total Checks
+                  </p>
+                  {hero.isLoading ? (
+                    <Skeleton className="mt-4 h-14 w-40 mx-auto" />
+                  ) : isAutopilotDataPending && heroData?.citedChecks === undefined ? (
+                    <div className="mt-3 text-center">
+                      <div className="text-5xl font-bold text-muted-foreground leading-none">—</div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 text-center">
+                      <div className="leading-none">
+                        <span className="text-5xl font-bold text-foreground">
+                          {citedChecksAnim}
+                        </span>
+                        <span className="text-2xl font-semibold text-muted-foreground">
+                          {" "}
+                          / {heroData?.totalChecks ?? 0}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1.5">
+                        {heroData?.citationRate ?? 0}% citation rate
+                      </div>
+                    </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  <div className="mt-auto pt-4">
+                    <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all duration-700"
+                        style={{ width: `${heroData?.citationRate ?? 0}%` }}
+                      />
+                    </div>
+                    {heroData?.lastScanAt && (
+                      <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                        Last scan {new Date(heroData.lastScanAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* ===== 2. CITATION TREND (8 weeks) ===== */}
           <Section
@@ -743,7 +747,13 @@ export default function Home() {
             description="Weekly citation rate over the last 8 weeks"
             action={<SeeAllLink href="/citations" />}
           >
-            {trend.isLoading ? (
+            {trend.isError ? (
+              <ErrorState
+                title="Couldn't load citation trend"
+                onRetry={() => trend.refetch()}
+                isRetrying={trend.isRefetching}
+              />
+            ) : trend.isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : !trendHasData ? (
               <div className="relative h-64">
@@ -814,7 +824,13 @@ export default function Home() {
               </div>
             }
           >
-            {rankings.isLoading ? (
+            {rankings.isError ? (
+              <ErrorState
+                title="Couldn't load generative rankings"
+                onRetry={() => rankings.refetch()}
+                isRetrying={rankings.isRefetching}
+              />
+            ) : rankings.isLoading ? (
               <div className="grid gap-3 md:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Skeleton key={i} className="h-40 w-full" />
@@ -835,7 +851,13 @@ export default function Home() {
             description="Your score across each major AI platform"
             pendingDot={isAutopilotDataPending}
           >
-            {rankings.isLoading ? (
+            {rankings.isError ? (
+              <ErrorState
+                title="Couldn't load platform visibility"
+                onRetry={() => rankings.refetch()}
+                isRetrying={rankings.isRefetching}
+              />
+            ) : rankings.isLoading ? (
               <Skeleton className="h-40 w-full" />
             ) : (
               <div className="divide-y divide-border">
@@ -860,7 +882,13 @@ export default function Home() {
               </div>
             }
           >
-            {leaderboard.isLoading ? (
+            {leaderboard.isError ? (
+              <ErrorState
+                title="Couldn't load competitor leaderboard"
+                onRetry={() => leaderboard.refetch()}
+                isRetrying={leaderboard.isRefetching}
+              />
+            ) : leaderboard.isLoading ? (
               <Skeleton className="h-48 w-full" />
             ) : leaderboardRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">No competitor data yet.</p>
@@ -919,7 +947,13 @@ export default function Home() {
             description="% of AI answers in your category that mention each brand"
             action={<SeeAllLink href="/geo-analytics" />}
           >
-            {leaderboard.isLoading ? (
+            {leaderboard.isError ? (
+              <ErrorState
+                title="Couldn't load share of voice"
+                onRetry={() => leaderboard.refetch()}
+                isRetrying={leaderboard.isRefetching}
+              />
+            ) : leaderboard.isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : sovDonutData.length === 0 ? (
               <p className="text-sm text-muted-foreground">No share-of-voice data yet.</p>
@@ -978,7 +1012,13 @@ export default function Home() {
             description="Exact query types where each competitor beats you — your attack surface"
             action={<SeeAllLink href="/ai-intelligence" />}
           >
-            {gap.isLoading ? (
+            {gap.isError ? (
+              <ErrorState
+                title="Couldn't load competitor gap analysis"
+                onRetry={() => gap.refetch()}
+                isRetrying={gap.isRefetching}
+              />
+            ) : gap.isLoading ? (
               <Skeleton className="h-48 w-full" />
             ) : (
               <CompetitorGapMatrix
@@ -994,7 +1034,13 @@ export default function Home() {
               title="Prompt Coverage Map"
               description="How many AI queries in your category you appear in"
             >
-              {gap.isLoading ? (
+              {gap.isError ? (
+                <ErrorState
+                  title="Couldn't load prompt coverage"
+                  onRetry={() => gap.refetch()}
+                  isRetrying={gap.isRefetching}
+                />
+              ) : gap.isLoading ? (
                 <Skeleton className="h-48 w-full" />
               ) : (
                 <PromptCoverageMap
@@ -1007,7 +1053,13 @@ export default function Home() {
               title="Brand Entity Strength"
               description="How deeply AI models understand and trust your brand"
             >
-              {entity.isLoading ? (
+              {entity.isError ? (
+                <ErrorState
+                  title="Couldn't load brand entity strength"
+                  onRetry={() => entity.refetch()}
+                  isRetrying={entity.isRefetching}
+                />
+              ) : entity.isLoading ? (
                 <Skeleton className="h-48 w-full" />
               ) : entityData ? (
                 <BrandEntityStrength data={entityData} />
@@ -1134,7 +1186,15 @@ export default function Home() {
             title="Reddit Visibility"
             description="Your brand's presence in the communities AI platforms index most"
           >
-            <RedditVisibility mentions={redditRows} loading={redditMentions.isLoading} />
+            {redditMentions.isError ? (
+              <ErrorState
+                title="Couldn't load Reddit visibility"
+                onRetry={() => redditMentions.refetch()}
+                isRetrying={redditMentions.isRefetching}
+              />
+            ) : (
+              <RedditVisibility mentions={redditRows} loading={redditMentions.isLoading} />
+            )}
           </Section>
         </>
       )}

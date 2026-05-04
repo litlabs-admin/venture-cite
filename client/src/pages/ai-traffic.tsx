@@ -19,6 +19,8 @@ import type { AiTrafficSession, AiSource } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { apiRequest } from "@/lib/queryClient";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   BarChart3,
   TrendingUp,
@@ -38,7 +40,13 @@ export default function AiTraffic() {
   const { selectedBrandId, brands } = useBrandSelection();
   const [platformFilter, setPlatformFilter] = useState<string>("all");
 
-  const { data: trafficData, isLoading: trafficLoading } = useQuery<{ data: AiTrafficSession[] }>({
+  const {
+    data: trafficData,
+    isLoading: trafficLoading,
+    isError: trafficError,
+    isRefetching: trafficRefetching,
+    refetch: refetchTraffic,
+  } = useQuery<{ data: AiTrafficSession[] }>({
     queryKey: ["/api/ai-traffic", selectedBrandId, platformFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -50,7 +58,13 @@ export default function AiTraffic() {
     enabled: !!selectedBrandId,
   });
 
-  const { data: statsData, isLoading: statsLoading } = useQuery<{
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    isError: statsError,
+    isRefetching: statsRefetching,
+    refetch: refetchStats,
+  } = useQuery<{
     data: {
       totalSessions: number;
       totalPageViews: number;
@@ -118,32 +132,38 @@ export default function AiTraffic() {
         />
 
         {!selectedBrandId ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <BarChart3 className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Select a Brand</h3>
-              <p className="text-muted-foreground">Choose a brand to view AI traffic analytics</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={BarChart3}
+            title="Select a Brand"
+            description="Choose a brand to view AI traffic analytics"
+          />
+        ) : statsError ? (
+          <ErrorState
+            title="Couldn't load AI traffic"
+            onRetry={() => refetchStats()}
+            isRetrying={statsRefetching}
+          />
         ) : !statsLoading && (stats?.totalSessions ?? 0) === 0 ? (
           /* Ingestion hasn't happened yet — no tracking pixel, no
              analytics import. Rather than show a row of zero cards that
              looks broken, surface a single CTA that tells the user what
              to do. Keeps the page honest about state. */
-          <Card className="text-center py-16 border-dashed">
-            <CardContent className="max-w-md mx-auto">
-              <Activity className="w-16 h-16 mx-auto text-violet-500 mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Connect your analytics</h3>
-              <p className="text-muted-foreground mb-4">
-                To see AI referral traffic here, hook up Google Analytics, Plausible, or Shopify.
-                VentureCite filters sessions where the referrer is an AI platform (ChatGPT,
-                Perplexity, Gemini, etc.) and surfaces conversions + top landing pages.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                No integration yet — coming soon. For now this page will stay empty.
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Activity}
+            title="Connect your analytics"
+            description={
+              <>
+                <p>
+                  To see AI referral traffic here, hook up Google Analytics, Plausible, or Shopify.
+                  VentureCite filters sessions where the referrer is an AI platform (ChatGPT,
+                  Perplexity, Gemini, etc.) and surfaces conversions + top landing pages.
+                </p>
+                <p className="text-xs mt-2">
+                  No integration yet — coming soon. For now this page will stay empty.
+                </p>
+              </>
+            }
+          />
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -339,14 +359,18 @@ export default function AiTraffic() {
                   <div className="text-center py-8">
                     <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
                   </div>
+                ) : trafficError ? (
+                  <ErrorState
+                    title="Couldn't load traffic sessions"
+                    onRetry={() => refetchTraffic()}
+                    isRetrying={trafficRefetching}
+                  />
                 ) : sessions.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p className="font-medium">No traffic sessions yet</p>
-                    <p className="text-sm">
-                      Traffic will appear when visitors come from AI platforms
-                    </p>
-                  </div>
+                  <EmptyState
+                    icon={Users}
+                    title="No traffic sessions yet"
+                    description="Traffic will appear when visitors come from AI platforms"
+                  />
                 ) : (
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-3">

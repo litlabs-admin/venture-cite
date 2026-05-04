@@ -32,6 +32,7 @@ import { pageExplainers } from "@/lib/pageExplainers";
 import type { CommunityPost } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   Search,
   Plus,
@@ -119,7 +120,13 @@ export default function CommunityEngagement() {
   const postsQueryKey = selectedBrandId
     ? `/api/community-posts?brandId=${selectedBrandId}`
     : "/api/community-posts";
-  const { data: postsResponse, isLoading: postsLoading } = useQuery<{
+  const {
+    data: postsResponse,
+    isLoading: postsLoading,
+    isError: postsIsError,
+    isRefetching: postsIsRefetching,
+    refetch: refetchPosts,
+  } = useQuery<{
     success: boolean;
     data: CommunityPost[];
   }>({
@@ -698,6 +705,13 @@ export default function CommunityEngagement() {
           </TabsContent>
 
           <TabsContent value="drafts" className="space-y-3">
+            {postsIsError && !postsLoading && (
+              <ErrorState
+                title="Couldn't load community posts"
+                onRetry={() => refetchPosts()}
+                isRetrying={postsIsRefetching}
+              />
+            )}
             {postsLoading && (
               <div className="space-y-3">
                 {[1, 2].map((i) => (

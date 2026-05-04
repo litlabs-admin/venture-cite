@@ -47,6 +47,7 @@ import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface BrandFact {
   id: string;
@@ -110,7 +111,13 @@ export default function BrandFactSheet() {
   const brandAgeMs = brandCreatedAt ? Date.now() - new Date(brandCreatedAt).getTime() : Infinity;
   const shouldPollForScrape = brandAgeMs < 120_000; // 2 min
 
-  const { data: factsData, isLoading: factsLoading } = useQuery<{ data: BrandFact[] }>({
+  const {
+    data: factsData,
+    isLoading: factsLoading,
+    isError: factsIsError,
+    isRefetching: factsIsRefetching,
+    refetch: refetchFacts,
+  } = useQuery<{ data: BrandFact[] }>({
     queryKey: ["/api/brand-facts", selectedBrandId],
     enabled: !!selectedBrandId,
     refetchInterval: (query) => {
@@ -483,6 +490,12 @@ export default function BrandFactSheet() {
             <div className="flex items-center justify-center py-12">
               <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : factsIsError ? (
+            <ErrorState
+              title="Couldn't load brand facts"
+              onRetry={() => refetchFacts()}
+              isRetrying={factsIsRefetching}
+            />
           ) : facts.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-12 text-center">
