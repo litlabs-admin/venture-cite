@@ -17,6 +17,7 @@
 
 import { Router } from "express";
 import { z } from "zod";
+import { waitUntil } from "@vercel/functions";
 import { isAuthenticated } from "../auth";
 import { requireBrand, requireMentionOwnership } from "../lib/ownership";
 import { storage } from "../storage";
@@ -405,29 +406,31 @@ mentionsRouter.post("/scans/:brandId", isAuthenticated, async (req, res) => {
 
   const job = await storage.createScanJob({ brandId, userId, trigger: "manual" });
 
-  // Run synchronously and await completion before responding.
+  // Detach the scan via Vercel's `waitUntil` from `@vercel/functions`. This is
+  // the correct primitive for "fire-and-forget" work on serverless: Vercel
+  // keeps the function instance alive after the HTTP response is sent, up to
+  // the function's maxDuration (60 s on Hobby for our config). It is NOT the
+  // same as `res.waitUntil` (which doesn't exist on Express `res`) or
+  // `setImmediate` (which is dropped when the lambda freezes).
   //
-  // Why not detach: on Vercel (any plan, but especially Hobby), the serverless
-  // function instance is frozen / killed the moment the HTTP response is sent.
-  // `setImmediate` and `res.waitUntil` (which doesn't exist on Express `res`)
-  // both lose the work. Express + Vercel ≠ Edge runtime.
+  // We previously tried awaiting `runMentionScan` synchronously, but on
+  // Vercel cold-starts + outbound HTTP latency to Reddit/HN routinely pushed
+  // total request time past Hobby's 60 s ceiling, returning 504 to the client
+  // while the scan kept running in a now-orphaned function. With `waitUntil`,
+  // the client gets an immediate 202 and the scan completes in the background
+  // within the same function lifetime.
   //
-  // Reddit + HN scans finish in 5–30 s; Vercel Hobby allows 60 s per request,
-  // so awaiting here stays well within the limit. The client polls
-  // /scans/active anyway, so it can either consume the 200 response directly
-  // or notice the scan disappeared from active on the next poll — both paths
-  // work without UI changes.
-  try {
-    await runMentionScan(job.id);
-  } catch (err) {
-    captureAndFlush(err, {
-      tags: { source: "mention-scan-sync" },
-      extra: { scanId: job.id },
-    });
-    // The scan job row is already marked failed by runMentionScan's own
-    // catch — surface the scanId either way so the client can poll for
-    // status if it wants the error reason.
-  }
+  // Locally (`npm run dev`), `@vercel/functions`' `waitUntil` is a no-op
+  // wrapper that just kicks off the promise — the scan still runs because
+  // Node keeps the process alive.
+  waitUntil(
+    runMentionScan(job.id).catch((err) => {
+      captureAndFlush(err, {
+        tags: { source: "mention-scan-detached" },
+        extra: { scanId: job.id },
+      });
+    }),
+  );
 
   res.status(202).json({ scanId: job.id });
 });
