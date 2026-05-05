@@ -175,6 +175,8 @@ export const brands = pgTable(
     // (`deleted_at IS NULL`) keep deleted brands out of GET responses.
     deletedAt: timestamp("deleted_at"),
     deletionScheduledFor: timestamp("deletion_scheduled_for"),
+    // Mentions rebuild (0050): per-brand opt-in for daily auto-scan.
+    monitorMentions: boolean("monitor_mentions").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -986,6 +988,16 @@ export const brandMentions = pgTable(
     mentionedAt: timestamp("mentioned_at"),
     discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
     metadata: jsonb("metadata"),
+    // Mentions rebuild (0050): new columns for precise brand-mention monitor.
+    mentionLocation: text("mention_location").default("post"),
+    linkStatus: text("link_status").default("unknown"),
+    lastVerifiedAt: timestamp("last_verified_at"),
+    matchedVariation: text("matched_variation"),
+    matchedField: text("matched_field"),
+    source: text("source").default("scanner"),
+    scannerVersion: integer("scanner_version").default(2),
+    sentimentSource: text("sentiment_source").default("llm"),
+    engagementNormalized: integer("engagement_normalized"),
   },
   (table) => [index("brand_mentions_brand_id_idx").on(table.brandId)],
 );
@@ -2032,3 +2044,61 @@ export type ChatbotThread = typeof chatbotThreads.$inferSelect;
 export type InsertChatbotThread = typeof chatbotThreads.$inferInsert;
 export type ChatbotTokenUsage = typeof chatbotTokenUsage.$inferSelect;
 export type InsertChatbotTokenUsage = typeof chatbotTokenUsage.$inferInsert;
+
+// ─── Mentions rebuild (0050) ──────────────────────────────────────
+// scan_jobs: tracks each manual or cron-triggered mention scan per brand.
+// source_health: tracks per-(brand,source) consecutive failures + backoff.
+// sentiment_cache: content-hash-keyed cache for gpt-4o-mini sentiment calls.
+// See docs/superpowers/specs/2026-05-05-mentions-rebuild-design.md §3.2.
+
+export const scanJobs = pgTable("scan_jobs", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()::text`),
+  brandId: varchar("brand_id")
+    .notNull()
+    .references(() => brands.id, { onDelete: "cascade" }),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  trigger: text("trigger").notNull(), // 'manual' | 'cron'
+  status: text("status").notNull().default("queued"), // 'queued' | 'running' | 'complete' | 'failed'
+  perSource: jsonb("per_source").notNull().default({}),
+  totals: jsonb("totals").notNull().default({}),
+  error: text("error"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const sourceHealth = pgTable(
+  "source_health",
+  {
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    source: text("source").notNull(), // 'reddit' | 'hackernews' | 'quora'
+    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+    lastFailureAt: timestamp("last_failure_at"),
+    lastFailureReason: text("last_failure_reason"),
+    pausedUntil: timestamp("paused_until"),
+    lastSuccessfulScanAt: timestamp("last_successful_scan_at"),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.brandId, t.source] }),
+  }),
+);
+
+export const sentimentCache = pgTable("sentiment_cache", {
+  contentHash: text("content_hash").primaryKey(),
+  sentiment: text("sentiment").notNull(), // 'positive' | 'neutral' | 'negative'
+  sentimentScore: numeric("sentiment_score", { precision: 3, scale: 2 }).notNull(),
+  cachedAt: timestamp("cached_at").notNull().defaultNow(),
+});
+
+export type ScanJob = typeof scanJobs.$inferSelect;
+export type InsertScanJob = typeof scanJobs.$inferInsert;
+export type SourceHealth = typeof sourceHealth.$inferSelect;
+export type InsertSourceHealth = typeof sourceHealth.$inferInsert;
+export type SentimentCache = typeof sentimentCache.$inferSelect;
+export type InsertSentimentCache = typeof sentimentCache.$inferInsert;

@@ -22,7 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -33,28 +32,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
-import type {
-  Listicle,
-  BofuContent,
-  FaqItem,
-  BrandMention,
-  WikipediaMention,
-  Competitor,
-} from "@shared/schema";
+import type { Listicle, BofuContent, FaqItem, WikipediaMention, Competitor } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
@@ -74,21 +58,13 @@ import {
   Search,
   Plus,
   Trash2,
-  RefreshCw,
-  Globe,
-  MessageSquare,
-  Youtube,
-  Linkedin,
   Loader2,
   Check,
   X as XIcon,
 } from "lucide-react";
-// react-icons@5.6 removed SiLinkedin from the simple-icons set; we fall
-// back to lucide-react's Linkedin for that platform.
-import { SiReddit, SiQuora, SiMedium } from "react-icons/si";
-const SiLinkedin = Linkedin;
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import MentionsTab from "@/components/geo-tools/MentionsTab";
 
 // Wave 9.4: pretty-print scan reports as multi-line toast descriptions.
 // Hides zero-valued lines so a clean run shows just the meaningful ones.
@@ -107,20 +83,6 @@ const LISTICLE_STATUS_DISPLAY: Record<string, { label: string; className: string
   contacted: { label: "Contacted", className: "bg-blue-100 text-blue-800 hover:bg-blue-100" },
   won: { label: "Won", className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" },
   dropped: { label: "Dropped", className: "bg-gray-200 text-gray-600 hover:bg-gray-200" },
-};
-
-const MENTION_STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
-  new: { label: "New", className: "bg-slate-100 text-slate-700 hover:bg-slate-100" },
-  acknowledged: {
-    label: "Acknowledged",
-    className: "bg-blue-100 text-blue-800 hover:bg-blue-100",
-  },
-  replied: { label: "Replied", className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" },
-  false_positive: {
-    label: "False positive",
-    className: "bg-amber-100 text-amber-800 hover:bg-amber-100",
-  },
-  ignored: { label: "Ignored", className: "bg-gray-200 text-gray-600 hover:bg-gray-200" },
 };
 
 // Wave 9.4: header roll-up card. Single-line metric + descriptive
@@ -262,14 +224,12 @@ export default function GeoTools() {
   const [bofuCompetitors, setBofuCompetitors] = useState<string[]>([]);
   const [bofuKeyword, setBofuKeyword] = useState("");
   const [faqTopic, setFaqTopic] = useState("");
-  const [activeMention, setActiveMention] = useState<BrandMention | null>(null);
   // Wave 9.4: BOFU full-content sheet — replaces the prior 500-char preview.
   const [activeBofu, setActiveBofu] = useState<BofuContent | null>(null);
   const [bofuSheetOpen, setBofuSheetOpen] = useState(false);
   // Wave 9.4: manual-add dialogs.
   const [addListicleOpen, setAddListicleOpen] = useState(false);
   const [addWikipediaOpen, setAddWikipediaOpen] = useState(false);
-  const [addMentionOpen, setAddMentionOpen] = useState(false);
   // Wave 9.4: Wikipedia draft dialog.
   const [wikiDraft, setWikiDraft] = useState<{
     mentionId: string;
@@ -281,7 +241,6 @@ export default function GeoTools() {
   // is actually visible. "all" shows everything; the row badges still
   // display the current status regardless.
   const [listicleStatusFilter, setListicleStatusFilter] = useState<string>("all");
-  const [mentionStatusFilter, setMentionStatusFilter] = useState<string>("all");
 
   // Listicle queries — server returns { success, data: Listicle[] }
   const {
@@ -461,13 +420,6 @@ export default function GeoTools() {
     onError: () => toast({ title: "Failed to generate FAQs", variant: "destructive" }),
   });
 
-  // Brand mentions queries
-  const { data: mentionsData, isLoading: mentionsLoading } = useQuery({
-    queryKey: ["/api/brand-mentions", selectedBrandId],
-    enabled: !!selectedBrandId,
-    refetchInterval: liveInterval,
-  });
-
   // Wave 9.4: header roll-up cards. Single endpoint returns counts
   // across all five tabs + 30-day cited counts so users can answer
   // "is GEO Tools working?" at a glance.
@@ -490,24 +442,6 @@ export default function GeoTools() {
     refetchInterval: liveInterval,
   });
   const summary = summaryData?.data ?? null;
-
-  // Wave 9.4: status PATCH mutations for mentions + listicles. Each row
-  // gets an inline <Select>; this mutation drives it.
-  const updateMentionStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const r = await apiRequest("PATCH", `/api/brand-mentions/${id}`, { status });
-      return r.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/brand-mentions",
-      });
-      queryClient.invalidateQueries({
-        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/geo-tools/summary",
-      });
-    },
-    onError: () => toast({ title: "Failed to update mention status", variant: "destructive" }),
-  });
 
   const updateListicleStatusMutation = useMutation({
     mutationFn: async ({ id, outreachStatus }: { id: string; outreachStatus: string }) => {
@@ -584,37 +518,6 @@ export default function GeoTools() {
       }),
   });
 
-  const addBrandMentionMutation = useMutation({
-    mutationFn: async (body: {
-      brandId: string;
-      platform: string;
-      sourceUrl: string;
-      sourceTitle?: string;
-      mentionContext?: string;
-      sentiment?: string;
-    }) => {
-      const r = await apiRequest("POST", "/api/brand-mentions", body);
-      const data = await r.json();
-      if (!r.ok || data?.success === false) {
-        throw new Error(data?.error || "Failed to add mention");
-      }
-      return data;
-    },
-    onSuccess: () => {
-      setAddMentionOpen(false);
-      queryClient.invalidateQueries({
-        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/brand-mentions",
-      });
-      toast({ title: "Mention added" });
-    },
-    onError: (err: any) =>
-      toast({
-        title: "Failed to add mention",
-        description: err?.message || "Unknown error",
-        variant: "destructive",
-      }),
-  });
-
   // Wave 9.4: Wikipedia draft helper.
   const draftWikipediaMutation = useMutation({
     mutationFn: async (mentionId: string) => {
@@ -649,46 +552,6 @@ export default function GeoTools() {
     },
     onError: () => toast({ title: "Failed to update FAQ status", variant: "destructive" }),
   });
-
-  // Trigger an organic mention scan (Reddit / HN / citation-domain mining).
-  // Previously the tab only read cached mentions — if nothing had scanned
-  // yet the user saw permanent "no mentions" state with no path to fix it.
-  const scanMentionsMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/brand-mentions/scan/${selectedBrandId}`);
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      const r = data.data?.report ?? {};
-      const summary = formatReportLines({
-        Found: r.found ?? 0,
-        Inserted: r.inserted ?? data?.data?.inserted ?? 0,
-        Duplicates: r.skippedDuplicate ?? 0,
-        Failed: r.failed?.length ?? 0,
-      });
-      toast({
-        title: "Mentions scan complete",
-        description: [r.warning, summary].filter(Boolean).join("\n"),
-      });
-      queryClient.invalidateQueries({
-        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/brand-mentions",
-      });
-      queryClient.invalidateQueries({
-        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/geo-tools/summary",
-      });
-    },
-    onError: () => toast({ title: "Mentions scan failed", variant: "destructive" }),
-  });
-
-  const platformIcons: Record<string, any> = {
-    reddit: SiReddit,
-    youtube: Youtube,
-    quora: SiQuora,
-    linkedin: SiLinkedin,
-    medium: SiMedium,
-    forum: MessageSquare,
-    other: Globe,
-  };
 
   return (
     <>
@@ -1494,298 +1357,7 @@ export default function GeoTools() {
 
               {/* MENTIONS TAB */}
               <TabsContent value="mentions">
-                <div className="grid gap-6">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <Bell className="h-5 w-5 text-red-500" />
-                            Brand Mention Tracker
-                          </CardTitle>
-                          <CardDescription>
-                            Monitor brand mentions across Reddit, Hacker News, and Quora
-                          </CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setAddMentionOpen(true)}
-                            data-testid="button-add-mention"
-                          >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add manually
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => scanMentionsMutation.mutate()}
-                            disabled={!selectedBrandId || scanMentionsMutation.isPending}
-                            data-testid="button-scan-mentions"
-                          >
-                            {scanMentionsMutation.isPending ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="w-4 h-4 mr-2" /> Scan Now
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="bg-red-50 dark:bg-red-950/30 p-4 rounded-lg mb-6">
-                        <p className="text-sm text-red-700 dark:text-red-300">
-                          <strong>Track What AI Sees:</strong> Monitor how your brand is discussed
-                          on platforms that AI systems cite most. Reddit, Hacker News, and Quora are
-                          top sources AI systems cite.
-                        </p>
-                      </div>
-
-                      {mentionsLoading ? (
-                        <div className="text-center py-8">
-                          <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
-                        </div>
-                      ) : (
-                        (() => {
-                          const md = mentionsData as any;
-                          const stats = md?.stats || {
-                            total: 0,
-                            byPlatform: {},
-                            bySentiment: { positive: 0, neutral: 0, negative: 0 },
-                          };
-                          const mentions = Array.isArray(md?.data) ? md.data : [];
-                          return stats ? (
-                            <div className="space-y-6">
-                              {/* Stats */}
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <Card>
-                                  <CardContent className="pt-4">
-                                    <div className="text-2xl font-bold">{stats.total}</div>
-                                    <p className="text-sm text-muted-foreground">Total Mentions</p>
-                                  </CardContent>
-                                </Card>
-                                <Card>
-                                  <CardContent className="pt-4">
-                                    <div className="text-2xl font-bold text-green-600">
-                                      {stats.bySentiment.positive}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">Positive</p>
-                                  </CardContent>
-                                </Card>
-                                <Card>
-                                  <CardContent className="pt-4">
-                                    <div className="text-2xl font-bold text-muted-foreground">
-                                      {stats.bySentiment.neutral}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">Neutral</p>
-                                  </CardContent>
-                                </Card>
-                                <Card>
-                                  <CardContent className="pt-4">
-                                    <div className="text-2xl font-bold text-red-600">
-                                      {stats.bySentiment.negative}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">Negative</p>
-                                  </CardContent>
-                                </Card>
-                              </div>
-
-                              {/* Platform breakdown */}
-                              {Object.keys(stats.byPlatform).length > 0 && (
-                                <div>
-                                  <h3 className="font-semibold mb-3">By Platform</h3>
-                                  <div className="flex flex-wrap gap-2">
-                                    {Object.entries(stats.byPlatform).map(([platform, count]) => {
-                                      const Icon = platformIcons[platform] || Globe;
-                                      return (
-                                        <Badge
-                                          key={platform}
-                                          variant="outline"
-                                          className="flex items-center gap-1 py-1"
-                                        >
-                                          <Icon className="h-3 w-3" />
-                                          {platform}: {count as number}
-                                        </Badge>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Recent mentions */}
-                              {mentions.length > 0 ? (
-                                <div>
-                                  <div className="flex items-center justify-between mb-3">
-                                    <h3 className="font-semibold">
-                                      Recent Mentions ({mentions.length})
-                                    </h3>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs text-muted-foreground">
-                                        Filter by status
-                                      </span>
-                                      <Select
-                                        value={mentionStatusFilter}
-                                        onValueChange={setMentionStatusFilter}
-                                      >
-                                        <SelectTrigger
-                                          className="w-[160px] h-8 text-xs"
-                                          data-testid="select-mention-status-filter"
-                                        >
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="all">All</SelectItem>
-                                          <SelectItem value="new">New</SelectItem>
-                                          <SelectItem value="acknowledged">Acknowledged</SelectItem>
-                                          <SelectItem value="replied">Replied</SelectItem>
-                                          <SelectItem value="false_positive">
-                                            False positive
-                                          </SelectItem>
-                                          <SelectItem value="ignored">Ignored</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-                                  <div className="space-y-3">
-                                    {mentions
-                                      .filter((mention: BrandMention) => {
-                                        if (mentionStatusFilter === "all") return true;
-                                        const s = (mention as any).status ?? "new";
-                                        return s === mentionStatusFilter;
-                                      })
-                                      .slice(0, 25)
-                                      .map((mention: BrandMention) => {
-                                        const Icon = platformIcons[mention.platform] || Globe;
-                                        const preview = (mention.mentionContext || "").slice(
-                                          0,
-                                          140,
-                                        );
-                                        const status = (mention as any).status ?? "new";
-                                        const statusMeta =
-                                          MENTION_STATUS_DISPLAY[status] ??
-                                          MENTION_STATUS_DISPLAY.new;
-                                        return (
-                                          <Card
-                                            key={mention.id}
-                                            className="hover:bg-muted/40 transition-colors cursor-pointer"
-                                            onClick={() => setActiveMention(mention)}
-                                            data-testid={`mention-card-${mention.id}`}
-                                          >
-                                            <CardContent className="pt-4">
-                                              <div className="flex items-start gap-3">
-                                                <Icon className="h-5 w-5 mt-1 text-muted-foreground flex-shrink-0" />
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="font-medium line-clamp-1">
-                                                      {mention.sourceTitle || "Untitled"}
-                                                    </span>
-                                                    <Badge
-                                                      variant={
-                                                        mention.sentiment === "positive"
-                                                          ? "default"
-                                                          : mention.sentiment === "negative"
-                                                            ? "destructive"
-                                                            : "secondary"
-                                                      }
-                                                    >
-                                                      {mention.sentiment}
-                                                    </Badge>
-                                                    <Badge
-                                                      className={statusMeta.className}
-                                                      data-testid={`badge-mention-status-${mention.id}`}
-                                                    >
-                                                      {statusMeta.label}
-                                                    </Badge>
-                                                  </div>
-                                                  {preview && (
-                                                    <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                                                      {preview}
-                                                    </p>
-                                                  )}
-                                                  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                                                    <span>{mention.platform}</span>
-                                                    {mention.engagementScore != null && (
-                                                      <span>
-                                                        Engagement: {mention.engagementScore}
-                                                      </span>
-                                                    )}
-                                                    {mention.mentionedAt && (
-                                                      <span>
-                                                        {new Date(
-                                                          mention.mentionedAt,
-                                                        ).toLocaleDateString()}
-                                                      </span>
-                                                    )}
-                                                  </div>
-                                                </div>
-                                                <div
-                                                  className="flex-shrink-0"
-                                                  onClick={(e) => e.stopPropagation()}
-                                                >
-                                                  <Select
-                                                    value={status}
-                                                    onValueChange={(v) =>
-                                                      updateMentionStatusMutation.mutate({
-                                                        id: mention.id,
-                                                        status: v,
-                                                      })
-                                                    }
-                                                  >
-                                                    <SelectTrigger
-                                                      className="w-[140px] h-8 text-xs"
-                                                      data-testid={`select-mention-status-${mention.id}`}
-                                                    >
-                                                      <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="new">New</SelectItem>
-                                                      <SelectItem value="acknowledged">
-                                                        Acknowledged
-                                                      </SelectItem>
-                                                      <SelectItem value="replied">
-                                                        Replied
-                                                      </SelectItem>
-                                                      <SelectItem value="false_positive">
-                                                        False positive
-                                                      </SelectItem>
-                                                      <SelectItem value="ignored">
-                                                        Ignored
-                                                      </SelectItem>
-                                                    </SelectContent>
-                                                  </Select>
-                                                </div>
-                                              </div>
-                                            </CardContent>
-                                          </Card>
-                                        );
-                                      })}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-center py-8 text-muted-foreground">
-                                  <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                  <p>No mentions tracked yet for {selectedBrand?.name}</p>
-                                  <p className="text-sm mt-2">
-                                    Mentions will appear here as they're discovered
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                              <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                              <p>Select a brand to view mentions</p>
-                            </div>
-                          );
-                        })()
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                <MentionsTab brandId={selectedBrandId} />
               </TabsContent>
             </Tabs>
           </>
@@ -1835,15 +1407,6 @@ export default function GeoTools() {
         }
         pending={addWikipediaMutation.isPending}
       />
-      <ManualAddMentionDialog
-        open={addMentionOpen}
-        onOpenChange={setAddMentionOpen}
-        onSubmit={(payload) =>
-          selectedBrandId &&
-          addBrandMentionMutation.mutate({ ...payload, brandId: selectedBrandId })
-        }
-        pending={addBrandMentionMutation.isPending}
-      />
 
       {/* Wave 9.4: Wikipedia draft viewer. Read-only — copy + close. */}
       <Dialog
@@ -1890,118 +1453,6 @@ export default function GeoTools() {
           )}
         </DialogContent>
       </Dialog>
-
-      <Sheet
-        open={activeMention !== null}
-        onOpenChange={(o) => {
-          if (!o) setActiveMention(null);
-        }}
-      >
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-          {activeMention && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  {(() => {
-                    const key = activeMention.platform?.replace(/^ai:/, "") ?? "";
-                    const Icon = platformIcons[key] || Globe;
-                    return <Icon className="h-4 w-4" />;
-                  })()}
-                  <span className="capitalize">
-                    {activeMention.platform?.startsWith("ai:")
-                      ? activeMention.platform.replace(/^ai:/, "")
-                      : activeMention.platform}
-                  </span>
-                </SheetTitle>
-                <SheetDescription>
-                  {activeMention.authorUsername ? `by @${activeMention.authorUsername}` : null}
-                  {activeMention.authorUsername && activeMention.mentionedAt ? " · " : null}
-                  {activeMention.mentionedAt
-                    ? new Date(activeMention.mentionedAt).toLocaleString()
-                    : null}
-                </SheetDescription>
-              </SheetHeader>
-              {(() => {
-                // Citation-check results are persisted into brand_mentions with
-                // platform "ai:<engine>" and a synthetic ai:// URL that the
-                // browser can't open. Detect and render those as an in-panel
-                // full response with no "Open on" button.
-                const isAiMention =
-                  activeMention.platform?.startsWith("ai:") ||
-                  activeMention.sourceUrl?.startsWith("ai://");
-                const canOpenExternally =
-                  !isAiMention &&
-                  typeof activeMention.sourceUrl === "string" &&
-                  /^https?:\/\//i.test(activeMention.sourceUrl);
-                const platformLabel = isAiMention
-                  ? (activeMention.platform?.replace(/^ai:/, "") ?? "AI")
-                  : activeMention.platform;
-
-                return (
-                  <>
-                    <div className="mt-4 space-y-4">
-                      {activeMention.sourceTitle && (
-                        <h3 className="font-medium">{activeMention.sourceTitle}</h3>
-                      )}
-                      {activeMention.mentionContext && (
-                        <div
-                          className={
-                            isAiMention
-                              ? "text-sm whitespace-pre-wrap max-h-[60vh] overflow-y-auto rounded-md border p-3 bg-muted/30"
-                              : "text-sm whitespace-pre-wrap"
-                          }
-                        >
-                          {activeMention.mentionContext}
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        {isAiMention ? (
-                          <Badge variant="outline" className="capitalize">
-                            AI · {platformLabel}
-                          </Badge>
-                        ) : null}
-                        <Badge
-                          variant={
-                            activeMention.sentiment === "positive"
-                              ? "default"
-                              : activeMention.sentiment === "negative"
-                                ? "destructive"
-                                : "secondary"
-                          }
-                        >
-                          {activeMention.sentiment}
-                        </Badge>
-                        {activeMention.sentimentScore != null && (
-                          <Badge variant="outline">Score: {activeMention.sentimentScore}</Badge>
-                        )}
-                        {activeMention.engagementScore != null && (
-                          <Badge variant="outline">
-                            Engagement: {activeMention.engagementScore}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    {canOpenExternally ? (
-                      <SheetFooter className="mt-6">
-                        <Button asChild data-testid="button-open-mention-source">
-                          <a
-                            href={activeMention.sourceUrl!}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Open on <span className="capitalize">{platformLabel}</span>
-                            <ExternalLink className="h-4 w-4 ml-2" />
-                          </a>
-                        </Button>
-                      </SheetFooter>
-                    ) : null}
-                  </>
-                );
-              })()}
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </>
   );
 }
@@ -2217,131 +1668,6 @@ function ManualAddWikipediaDialog({
                 pageTitle: pageTitle.trim(),
                 pageUrl: pageUrl.trim(),
                 mentionType,
-              })
-            }
-          >
-            {pending ? "Adding..." : "Add"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-interface ManualAddMentionProps {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  onSubmit: (payload: {
-    platform: string;
-    sourceUrl: string;
-    sourceTitle?: string;
-    mentionContext?: string;
-    sentiment?: string;
-  }) => void;
-  pending: boolean;
-}
-
-function ManualAddMentionDialog({ open, onOpenChange, onSubmit, pending }: ManualAddMentionProps) {
-  const [platform, setPlatform] = useState("reddit");
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [sourceTitle, setSourceTitle] = useState("");
-  const [mentionContext, setMentionContext] = useState("");
-  const [sentiment, setSentiment] = useState<"positive" | "neutral" | "negative">("neutral");
-  const reset = () => {
-    setPlatform("reddit");
-    setSourceUrl("");
-    setSourceTitle("");
-    setMentionContext("");
-    setSentiment("neutral");
-  };
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        onOpenChange(o);
-        if (!o) reset();
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add a brand mention</DialogTitle>
-          <DialogDescription>
-            For mentions the scanner missed (Discord, Slack, blog comments, etc.).
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 py-2">
-          <div className="space-y-1">
-            <Label>Platform</Label>
-            <Select value={platform} onValueChange={setPlatform}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="reddit">Reddit</SelectItem>
-                <SelectItem value="hackernews">Hacker News</SelectItem>
-                <SelectItem value="quora">Quora</SelectItem>
-                <SelectItem value="linkedin">LinkedIn</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="forum">Forum</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Source URL</Label>
-            <Input
-              value={sourceUrl}
-              onChange={(e) => setSourceUrl(e.target.value)}
-              placeholder="https://reddit.com/r/saas/comments/..."
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Title (optional)</Label>
-            <Input
-              value={sourceTitle}
-              onChange={(e) => setSourceTitle(e.target.value)}
-              placeholder="Post or thread title"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Context (optional)</Label>
-            <Textarea
-              value={mentionContext}
-              onChange={(e) => setMentionContext(e.target.value)}
-              placeholder="Snippet of the mention text..."
-              rows={3}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Sentiment</Label>
-            <Select
-              value={sentiment}
-              onValueChange={(v: "positive" | "neutral" | "negative") => setSentiment(v)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="positive">Positive</SelectItem>
-                <SelectItem value="neutral">Neutral</SelectItem>
-                <SelectItem value="negative">Negative</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!sourceUrl.trim() || pending}
-            onClick={() =>
-              onSubmit({
-                platform,
-                sourceUrl: sourceUrl.trim(),
-                sourceTitle: sourceTitle.trim() || undefined,
-                mentionContext: mentionContext.trim() || undefined,
-                sentiment,
               })
             }
           >

@@ -89,6 +89,14 @@ const envSchema = z.object({
   // tokenCipher only loads it lazily, so deployments that don't use the
   // Buffer feature don't need to set it.
   BUFFER_ENCRYPTION_KEY: z.string().optional(),
+
+  // Reddit OAuth credentials for the Mentions feature.
+  // Create a Reddit script app at https://www.reddit.com/prefs/apps;
+  // required for the Mentions feature.
+  REDDIT_CLIENT_ID: z.string().min(1).optional(),
+  REDDIT_CLIENT_SECRET: z.string().min(1).optional(),
+  REDDIT_USERNAME: z.string().min(1).optional(),
+  REDDIT_PASSWORD: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

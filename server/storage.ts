@@ -91,6 +91,10 @@ import {
   type InsertArticleRevision,
   type ChatbotMessage,
   type ChatbotThread,
+  type ScanJob,
+  type SourceHealth,
+  type InsertSourceHealth,
+  type SentimentCache,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -753,6 +757,84 @@ export interface IStorage {
     model?: string | null;
   }): Promise<ChatbotMessage>;
   pruneChatbotMessages(): Promise<{ deletedByAge: number; deletedByCap: number }>;
+
+  // ─── Mentions rebuild (Task 7) ────────────────────────────────────────────
+
+  // Scan jobs
+  createScanJob(input: {
+    brandId: string;
+    userId: string;
+    trigger: "manual" | "cron";
+  }): Promise<ScanJob>;
+  getScanJob(id: string): Promise<(ScanJob & { brandName: string }) | undefined>;
+  getActiveScanJobForBrand(brandId: string): Promise<ScanJob | undefined>;
+  getActiveScanJobsForUser(userId: string): Promise<Array<ScanJob & { brandName: string }>>;
+  getLastCompletedScanForBrand(
+    brandId: string,
+  ): Promise<(ScanJob & { brandName: string }) | undefined>;
+  updateScanJob(
+    id: string,
+    patch: Partial<{
+      status: string;
+      perSource: unknown;
+      totals: unknown;
+      startedAt: Date;
+      completedAt: Date;
+      error: string;
+    }>,
+  ): Promise<void>;
+  pruneOldScanJobs(beforeDays: number): Promise<number>;
+  getMostRecentManualScanForBrand(brandId: string): Promise<ScanJob | undefined>;
+
+  // Source health
+  getSourceHealth(brandId: string, source: string): Promise<SourceHealth | undefined>;
+  upsertSourceHealth(input: InsertSourceHealth): Promise<void>;
+
+  // Sentiment cache
+  getCachedSentiment(contentHash: string): Promise<SentimentCache | undefined>;
+  upsertCachedSentiment(input: {
+    contentHash: string;
+    sentiment: string;
+    sentimentScore: string;
+  }): Promise<void>;
+  pruneOldSentimentCache(beforeDays: number): Promise<number>;
+
+  // Daily sentiment cap counter (Task 13 reference)
+  countSentimentCallsForBrandSince(brandId: string, since: Date): Promise<number>;
+
+  // Brand
+  setBrandMonitorMentions(brandId: string, enabled: boolean): Promise<void>;
+  listBrandsWithMentionMonitoring(): Promise<{ id: string; userId: string }[]>;
+
+  // Mention helpers (new additions — existing getBrandMentions/deleteBrandMention
+  // are kept for backward compat; new methods coexist until routes phase)
+  getBrandMention(id: string): Promise<BrandMention | undefined>;
+  deleteManyBrandMentions(ids: string[]): Promise<number>;
+  deleteAllMentionsForBrand(brandId: string): Promise<number>;
+  getOwnedMentionIds(ids: string[], userId: string): Promise<string[]>;
+  updateBrandMentionStatus(id: string, status: string): Promise<void>;
+  getMentionStatsForBrand(brandId: string): Promise<{
+    total: number;
+    byPlatform: Record<string, number>;
+    bySentiment: { positive: number; neutral: number; negative: number };
+    byStatus: Record<string, number>;
+  }>;
+
+  // Paginated list (replaces/augments getBrandMentions for new routes)
+  listMentionsForBrand(
+    brandId: string,
+    opts: {
+      cursor?: { discoveredAt: Date; id: string };
+      limit?: number;
+      status?: string;
+      platform?: string;
+      sentiment?: string;
+      from?: Date;
+      to?: Date;
+      q?: string;
+      sort?: "newest" | "oldest" | "engagement";
+    },
+  ): Promise<{ rows: BrandMention[]; nextCursor: { discoveredAt: Date; id: string } | null }>;
 }
 
 import { DatabaseStorage } from "./databaseStorage";

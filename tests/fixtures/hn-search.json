@@ -1,0 +1,46 @@
+{
+  "hits": [
+    {
+      "objectID": "12345",
+      "title": "Why we switched from Jira to Linear",
+      "story_text": "<p>We adopted Linear for our startup and the speed is incredible. Linear app changed how our team works.</p>",
+      "author": "pg",
+      "created_at": "2023-06-15T10:30:00Z",
+      "points": 142,
+      "num_comments": 38
+    },
+    {
+      "objectID": "99999",
+      "title": "Ask HN: Best productivity tools for remote teams?",
+      "story_text": "<p>Looking for recommendations on team collaboration tools. We use Notion and Slack currently.</p>",
+      "author": "dang",
+      "created_at": "2023-06-10T08:00:00Z",
+      "points": 55,
+      "num_comments": 72
+    },
+    {
+      "objectID": "67890",
+      "comment_text": "We migrated to Linear last quarter — the keyboard shortcuts alone saved our engineering team hours per week. Highly recommend linear app.",
+      "story_title": "Show HN: My Project Management Setup",
+      "author": "sama",
+      "created_at": "2023-06-20T14:45:00Z",
+      "points": null,
+      "num_comments": null
+    },
+    {
+      "objectID": "11111",
+      "title": "Announcing our new roadmap tool",
+      "story_text": "",
+      "author": "tptacek",
+      "created_at": "2023-06-18T09:00:00Z",
+      "points": 88,
+      "num_comments": 15
+    }
+  ],
+  "nbHits": 4,
+  "page": 0,
+  "nbPages": 1,
+  "hitsPerPage": 25,
+  "processingTimeMS": 12,
+  "query": "linear"
+}

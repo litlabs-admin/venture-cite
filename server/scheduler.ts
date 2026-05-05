@@ -9,7 +9,7 @@ import { sendWeeklyVisibilityReport, isEmailConfigured, type BrandReport } from 
 import { discoverCompetitors } from "./lib/competitorDiscovery";
 import { withAdvisoryLock, lockKeys } from "./lib/advisoryLock";
 import { refreshScrapedFacts } from "./lib/factExtractor";
-import { scanBrandMentions } from "./lib/mentionScanner";
+import { runMentionScan } from "./lib/runMentionScan";
 import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
 import { Sentry } from "./instrument";
@@ -351,9 +351,22 @@ export async function runCompetitorDiscoveryJob(deadlineMs?: number): Promise<vo
   );
 }
 export async function runMentionScanJob(deadlineMs?: number): Promise<void> {
-  await withAdvisoryLock(lockKeys.mentionScan, "mention-scan", () =>
-    runForEveryBrand("mention-scan", (bid) => scanBrandMentions(bid), { deadlineMs }),
-  );
+  void deadlineMs;
+  await withAdvisoryLock(lockKeys.mentionScan, "mention-scan", async () => {
+    const brands = await storage.listBrandsWithMentionMonitoring();
+    for (const b of brands) {
+      try {
+        const job = await storage.createScanJob({
+          brandId: b.id,
+          userId: b.userId,
+          trigger: "cron",
+        });
+        await runMentionScan(job.id);
+      } catch (err) {
+        logger.error({ err, brandId: b.id }, "cron.mention_scan.brand_failed");
+      }
+    }
+  });
 }
 export async function runListicleScanJob(deadlineMs?: number): Promise<void> {
   await withAdvisoryLock(lockKeys.listicleScan, "listicle-scan", () =>

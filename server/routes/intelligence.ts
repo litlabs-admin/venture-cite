@@ -9,7 +9,6 @@ import {
   requireUser,
   requireBrand,
   requireArticle,
-  requireBrandMention,
   requireHallucination,
   requireBrandFact,
   requireAiSource,
@@ -25,7 +24,6 @@ import { z } from "zod";
 import { assertTransition, InvalidStateTransitionError } from "../lib/statusTransitions";
 import { assertSafeUrl } from "../lib/ssrf";
 
-import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
 // Slack incoming webhooks have a fixed URL shape:
 // https://hooks.slack.com/services/T<workspace>/B<bot>/<token>
@@ -41,202 +39,9 @@ function isValidSlackWebhookUrl(raw: unknown): raw is string {
   return typeof raw === "string" && SLACK_WEBHOOK_RE.test(raw);
 }
 
+// Mention routes moved to server/routes/mentions.ts (mentions rebuild)
+
 export function setupIntelligenceRoutes(app: Express): void {
-  app.get(
-    "/api/brand-mentions/:brandId",
-    asyncHandler(async (req, res) => {
-      try {
-        const { brandId } = req.params;
-        const platform = req.query.platform as string;
-        const mentions = await storage.getBrandMentions(brandId, platform);
-
-        const stats = {
-          total: mentions.length,
-          byPlatform: {} as Record<string, number>,
-          bySentiment: { positive: 0, neutral: 0, negative: 0 },
-          totalEngagement: 0,
-        };
-
-        mentions.forEach((m) => {
-          stats.byPlatform[m.platform] = (stats.byPlatform[m.platform] || 0) + 1;
-          if (m.sentiment === "positive") stats.bySentiment.positive++;
-          else if (m.sentiment === "negative") stats.bySentiment.negative++;
-          else stats.bySentiment.neutral++;
-          stats.totalEngagement += m.engagementScore || 0;
-        });
-
-        res.json({ success: true, data: mentions, stats });
-      } catch (error) {
-        captureAndFlush(error, { tags: { source: "intelligence.ts:65" } });
-        res.status(500).json({ success: false, error: "Failed to fetch brand mentions" });
-      }
-    }),
-  );
-
-  const BRAND_MENTION_WRITE_FIELDS = [
-    "brandId",
-    "platform",
-    "sourceUrl",
-    "sourceTitle",
-    "mentionContext",
-    "sentiment",
-    "sentimentScore",
-    "engagementScore",
-    "authorUsername",
-    "isVerified",
-    "mentionedAt",
-    "metadata",
-  ] as const;
-
-  app.get(
-    "/api/brand-mentions",
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        const { brandId, platform } = req.query;
-        let mentions: any[];
-        if (brandId && typeof brandId === "string") {
-          mentions = await storage.getBrandMentions(brandId, platform as string);
-        } else {
-          const brandIds = await getUserBrandIds(user.id);
-          const all = await storage.getBrandMentions(undefined, platform as string);
-          mentions = all.filter((m: any) => m.brandId && brandIds.has(m.brandId));
-        }
-
-        const stats = {
-          total: mentions.length,
-          byPlatform: {} as Record<string, number>,
-          bySentiment: { positive: 0, neutral: 0, negative: 0 },
-          totalEngagement: 0,
-        };
-        mentions.forEach((m: any) => {
-          stats.byPlatform[m.platform] = (stats.byPlatform[m.platform] || 0) + 1;
-          if (m.sentiment === "positive") stats.bySentiment.positive++;
-          else if (m.sentiment === "negative") stats.bySentiment.negative++;
-          else stats.bySentiment.neutral++;
-          stats.totalEngagement += m.engagementScore || 0;
-        });
-
-        res.json({ success: true, data: { mentions, stats } });
-      } catch (error) {
-        sendError(res, error, "Failed to fetch brand mentions");
-      }
-    }),
-  );
-
-  app.post(
-    "/api/brand-mentions",
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        const body = pickFields<any>(req.body, BRAND_MENTION_WRITE_FIELDS);
-        if (!body.brandId || typeof body.brandId !== "string") {
-          return res.status(400).json({ success: false, error: "brandId is required" });
-        }
-        await requireBrand(body.brandId, user.id);
-        const mention = await storage.createBrandMention(body as any);
-        res.json({ success: true, data: mention });
-      } catch (error) {
-        sendError(res, error, "Failed to create brand mention");
-      }
-    }),
-  );
-
-  app.patch(
-    "/api/brand-mentions/:id",
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        await requireBrandMention(req.params.id, user.id);
-        const update = pickFields<any>(req.body, BRAND_MENTION_WRITE_FIELDS);
-        if (update.brandId && typeof update.brandId === "string") {
-          await requireBrand(update.brandId, user.id);
-        }
-        const mention = await storage.updateBrandMention(req.params.id, update as any);
-        if (!mention) return res.status(404).json({ success: false, error: "Mention not found" });
-        res.json({ success: true, data: mention });
-      } catch (error) {
-        sendError(res, error, "Failed to update brand mention");
-      }
-    }),
-  );
-
-  app.delete(
-    "/api/brand-mentions/:id",
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        await requireBrandMention(req.params.id, user.id);
-        const deleted = await storage.deleteBrandMention(req.params.id);
-        if (!deleted) return res.status(404).json({ success: false, error: "Mention not found" });
-        res.json({ success: true });
-      } catch (error) {
-        sendError(res, error, "Failed to delete brand mention");
-      }
-    }),
-  );
-
-  // Get mention alerts summary
-  app.get(
-    "/api/brand-mentions/alerts/:brandId",
-    asyncHandler(async (req, res) => {
-      try {
-        const brand = await storage.getBrandById(req.params.brandId);
-        if (!brand) {
-          return res.status(404).json({ success: false, error: "Brand not found" });
-        }
-
-        const mentions = await storage.getBrandMentions(brand.id);
-
-        // Get recent mentions (last 7 days)
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        const recentMentions = mentions.filter((m) => new Date(m.discoveredAt) > weekAgo);
-
-        // Calculate trends
-        const previousWeek = mentions.filter((m) => {
-          const date = new Date(m.discoveredAt);
-          return date <= weekAgo && date > new Date(weekAgo.getTime() - 7 * 24 * 60 * 60 * 1000);
-        });
-
-        const growth =
-          previousWeek.length > 0
-            ? (((recentMentions.length - previousWeek.length) / previousWeek.length) * 100).toFixed(
-                1,
-              )
-            : "0";
-
-        res.json({
-          success: true,
-          data: {
-            brand: { id: brand.id, name: brand.name },
-            thisWeek: recentMentions.length,
-            lastWeek: previousWeek.length,
-            growth: parseFloat(growth),
-            recentMentions: recentMentions.slice(0, 10),
-            platformBreakdown: recentMentions.reduce(
-              (acc, m) => {
-                acc[m.platform] = (acc[m.platform] || 0) + 1;
-                return acc;
-              },
-              {} as Record<string, number>,
-            ),
-            tips: [
-              "Set up alerts for brand name variations",
-              "Monitor competitor mentions for opportunities",
-              "Engage with positive mentions to amplify reach",
-              "Address negative mentions promptly",
-            ],
-          },
-        });
-      } catch (error) {
-        logger.error({ err: error }, "Alerts error");
-        captureAndFlush(error, { tags: { source: "intelligence.ts:211" } });
-        res.status(500).json({ success: false, error: "Failed to fetch alerts" });
-      }
-    }),
-  );
-
   // ================== PROMPT PORTFOLIO (Share-of-Answer) ==================
 
   const PROMPT_PORTFOLIO_WRITE_FIELDS = [

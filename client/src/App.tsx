@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/use-auth";
 import AppLayout from "@/components/AppLayout";
+import { ScanCompletionListener } from "@/components/ScanCompletionListener";
 
 // Eager: first-paint + auth flow. Everything else is lazy so the initial
 // bundle doesn't carry recharts / react-markdown / framer-motion etc.
@@ -226,6 +227,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <Toaster />
+            <ScanCompletionListener />
             <Router />
           </TooltipProvider>
         </QueryClientProvider>

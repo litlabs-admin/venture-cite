@@ -1033,53 +1033,6 @@ export async function runBrandPrompts(
       logger.info(
         `[citationChecker] prompt ${promptIdx} ${platform} saved at ${Date.now() - started}ms — cited=${isCited}`,
       );
-
-      // Brand mentions — semantic distinction from citations:
-      //   Citation = brand appeared in a ranked recommendation (geo_rankings.isCited=1)
-      //   Mention  = brand name appeared verbatim in the response at all,
-      //              even if only as a passing reference
-      // Wave 8: a mention row exists if AND ONLY IF the matcher hit. We
-      // used to gate this on the analyzer surfacing the brand (which
-      // included hallucinated mentions). Now mentions are tied to the
-      // same authoritative signal as citations.
-      //
-      // Synthetic URL makes every (run, prompt, platform) tuple unique so
-      // the (brand_id, platform, source_url) dedup index doesn't inflate
-      // on re-runs. `rank` is null when the brand was mentioned without
-      // being in a ranked list — UI filters on this to distinguish.
-      if (matcherBrandMatched) {
-        const syntheticUrl = citingOutletUrl || `ai://${platform}/${citationRun.id}/${bp.id}`;
-        const aiPlatformLabel = `ai:${platform}`;
-        try {
-          await storage.createBrandMention({
-            brandId,
-            platform: aiPlatformLabel,
-            sourceUrl: syntheticUrl,
-            sourceTitle: bp.prompt.slice(0, 500),
-            mentionContext: brandVerdict?.context?.slice(0, 2000) || responseText.slice(0, 2000),
-            sentiment: brandSentiment ?? "neutral",
-            sentimentScore:
-              relevance !== null
-                ? (Math.max(0, Math.min(100, relevance)) / 50 - 1).toFixed(2)
-                : "0",
-            engagementScore: null,
-            mentionedAt: new Date(),
-            metadata: {
-              runId: citationRun.id,
-              brandPromptId: bp.id,
-              rank,
-              // `cited` distinguishes a full citation from a passing
-              // mention when downstream code wants only the stronger signal.
-              cited: isCited,
-            },
-          } as any);
-        } catch (mentionErr) {
-          const msg = mentionErr instanceof Error ? mentionErr.message : String(mentionErr);
-          if (!/duplicate key|unique/i.test(msg)) {
-            logger.warn(`[citationChecker] brand mention insert failed — ${msg}`);
-          }
-        }
-      }
     } catch (dbErr) {
       logger.error(
         { dbErr: dbErr },

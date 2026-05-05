@@ -2960,3 +2960,122 @@ Final: **294/294 tests pass. Typecheck clean.**
 - ❌ LLM-generated titles. Truncation is good enough; revisit when UX demands it.
 
 ---
+
+## Track 24 — Mentions Tab post-rebuild fixes (2026-05-05)
+
+**Goal:** Stabilise the rebuilt Mentions feature after first round of real-user testing. Address Reddit query failures, Quora bot-blocking, broken UI controls, removal of half-working features, and a cross-machine clock-skew bug that made every relative timestamp display "about 6 hours ago".
+
+**Status:** Complete
+
+### 24.1 Reddit — HTTP 414 fix and per-variation looping
+
+**Problem.** Public-path Reddit search returned `414 URI Too Long` for any brand with two or more name variations. The query string concatenated all variations into one Lucene expression — `(title:"X" OR selftext:"X" OR title:"Y" OR selftext:"Y" ...)` — which after URL-encoding exceeded Reddit's ~2 KB cap on `/search.json`. RSS fallback hit the same limit. Result: `reddit: { found: 0, failed: true, reason: "414 (public + rss both blocked)" }` for every multi-variation brand on the unauthenticated path.
+
+**Fix.** Split the public path into one HTTP request per variation, preserving field-scoped Lucene syntax (`(title:"<variation>" OR selftext:"<variation>")`) — short, precise, and well under the URL limit. Stop iterating as soon as any variation returns matching mentions (no point spending more requests when we already have data). Hard cap at 100 mentions per scan as a safety net.
+
+| File                                 | Change                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/lib/sources/redditSource.ts` | Replaced single-call `scanViaPublic` with a per-variation loop. Per-variation rate-limit acquire (matches HN/Quora pattern). Stop-on-first-hit. `MAX_PUBLIC_MENTIONS = 100` enforced at every accumulation point. RSS fallback runs per variation. Failure surfaced only when every variation's JSON + RSS returned non-OK. |
+
+**OAuth path unchanged.** The OAuth host (`oauth.reddit.com`) accepts longer queries, and credentials avoid the IP-banning that motivated the fallback chain in the first place.
+
+### 24.2 Quora — removed from the Mentions feature
+
+**Problem.** Cloudflare blocks unauthenticated headless Chromium at the WAF layer (`pageTitle: "Just a moment..."` / `"Performing security verification"`). On the rare requests that get through, Quora serves the logged-out landing page with a "Sign in to continue" overlay instead of search results. Diagnostic logging (`quora.variation_diagnostics`) confirmed `rawLinks: 0` across both bot-challenge and login-wall paths — there is nothing to scrape without an authenticated session, which is fragile (cookies expire) and arguably ToS-violating.
+
+**Decision.** Remove Quora from the Mentions feature surface. Reddit + HN cover the bulk of brand-discussion volume; spending engineering time fighting Cloudflare to recover a low-yield third source is not worth it.
+
+| File                                                   | Change                                                                                                                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `server/lib/mentionScanner.ts`                         | Removed `quora` from `ScanReport.perSource`, removed Quora dispatch block, removed Quora from totals aggregation. Removed `normalizeEngagement` import (see 24.3). |
+| `client/src/components/geo-tools/ScanStatusPanel.tsx`  | Dropped `quora` from `SOURCES` array and `SOURCE_LABELS`. Updated 3-fail banner copy to "Reddit/HN paused — check status below."                                   |
+| `client/src/components/geo-tools/MentionsFilters.tsx`  | Removed Quora platform filter option.                                                                                                                              |
+| `client/src/components/geo-tools/AddMentionDialog.tsx` | Removed Quora from manual-add platform dropdown and helper text.                                                                                                   |
+
+**Intentionally not removed.** The DB column `MentionPlatform` type union still includes `"quora"` — historical mention rows in the DB still resolve. The orphaned `server/lib/sources/quoraSource.ts`, `tests/unit/quoraSource.test.ts`, and Quora references elsewhere in the codebase (citation checker, recommendation engine, glossary) are inert for the Mentions feature and unrelated to brand-mention scanning. Safe to delete in a separate cleanup pass.
+
+### 24.3 Engagement score — removed from the Mentions UI
+
+**Problem.** The 0–100 engagement score (Reddit: `log10(ups + comments * 2 + 1) * 25`, HN similar, Quora null) added complexity without delivering insight. Users could not act on it and the value distribution was bimodal (lots of zeros, a few high outliers).
+
+**Fix.** Removed engagement display from card and detail-sheet UI. New mention rows are written with NULL `engagement_score` / `engagement_normalized`. The DB columns and `EngagementDisplay` React component are left in place to avoid a migration and to keep historical rows readable.
+
+| File                                                     | Change                                                                                                                                |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/lib/mentionScanner.ts`                           | Removed `engagementScore` / `engagementNormalized` writes from `tryInsertBrandMention` payload. Removed `normalizeEngagement` import. |
+| `client/src/components/geo-tools/MentionCard.tsx`        | Removed `EngagementDisplay` from desktop and mobile layouts.                                                                          |
+| `client/src/components/geo-tools/MentionDetailSheet.tsx` | Removed engagement metadata row (both normalized and raw paths).                                                                      |
+
+### 24.4 Universal clock-skew fix — server-anchored relative time
+
+**Problem.** Every mention card and the "Last scan" panel displayed "about 6 hours ago" the moment they were inserted, even on a fresh scan. Investigation traced the issue across three independent layers:
+
+1. The `pg` driver parses `TIMESTAMP WITHOUT TIME ZONE` columns by interpreting the wall-clock string in the **Node process's local timezone**, not UTC. On a misconfigured host, a row written via `defaultNow()` (Postgres `now()` is UTC) and read back through `pg` produces a JS `Date` that's hours off.
+2. The DB host's `now()` was returning a UTC value 5–6 hours behind real UTC, independently of the pg parser issue. Tables that relied on `defaultNow()` inserted timestamps that were already wrong on disk.
+3. Even with both fixed, the client's `formatDistanceToNow(new Date(row.discoveredAt))` is sensitive to drift between DB host, Node host, and browser.
+
+**Fix attempts that proved insufficient:**
+
+- Added `pgTypes.setTypeParser(1114, val => new Date(val + "Z"))` in `server/db.ts` to force UTC parsing of timestamp columns. Helps for new reads but doesn't fix DB-host clock drift.
+- Switched `createScanJob` and `tryInsertBrandMention` to write `createdAt` / `discoveredAt` from `new Date()` on the Node side instead of relying on Postgres `defaultNow()`. Helps when the Node clock is correct but breaks if Node and DB disagree.
+
+**Final fix — server-anchored age in the response.** The only stable measurement is "how long ago did **this** server perceive this event," which cancels out skew between machines. On every Mentions API response that carries a user-visible relative timestamp, the server attaches `<field>AgeSeconds` computed as `Date.now() - row.timestamp.getTime()` on the request handler. The client renders relative-time labels from `ageSeconds` directly — `new Date()` anchoring on the browser is no longer in the codepath.
+
+| File                                                  | Change                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/db.ts`                                        | Added `pgTypes.setTypeParser(1114, val => new Date(val + "Z"))` to force UTC parsing of every `TIMESTAMP WITHOUT TIME ZONE` column at the wire level.                                                                                                                                                 |
+| `server/databaseStorage.ts`                           | `createScanJob` writes `createdAt: new Date()` explicitly. `tryInsertBrandMention` and `createBrandMention` default `discoveredAt` to `new Date()` if not provided.                                                                                                                                   |
+| `server/routes/mentions.ts`                           | Added `ageSeconds()` and `withAge()` helpers. Wired into `GET /:brandId` (adds `discoveredAtAgeSeconds`, `mentionedAtAgeSeconds`, `lastVerifiedAtAgeSeconds`), `GET /scans/active`, and `GET /scans/last/:brandId` (each adds `startedAtAgeSeconds`, `completedAtAgeSeconds`, `createdAtAgeSeconds`). |
+| `client/src/components/geo-tools/MentionCard.tsx`     | Added `formatAgeSeconds()` helper. Reads `discoveredAtAgeSeconds` from the row and renders via that helper. Falls back to `formatDistanceToNow` if the field is absent.                                                                                                                               |
+| `client/src/components/geo-tools/ScanStatusPanel.tsx` | Same `formatAgeSeconds()` helper. "Last scan" line now reads `completedAtAgeSeconds ?? createdAtAgeSeconds` from the scan job.                                                                                                                                                                        |
+
+**Why this is universal.** The browser's `Date.now()` is no longer used for relative time, the DB clock is no longer used for relative time, and the only clock that matters is the server's own — which has been working fine for every other feature. Absolute date displays (the detail sheet's "Mentioned: 28 April 2026") still pass through the original ISO string, so dates render normally.
+
+### 24.5 Daily auto-scan toggle — wrong endpoint
+
+**Problem.** Toggling "Daily auto-scan" did nothing. The switch flipped briefly then reverted. `handleToggleMonitor` was PATCHing `/api/brands/:brandId` with `{ monitorMentions: enabled }`, but the brands route does not accept that field — silent no-op. The local cache was also not invalidated, so the UI kept showing the old (false) value even if the write had succeeded.
+
+**Fix.**
+
+| File                                              | Change                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/components/geo-tools/MentionsTab.tsx` | Toggle now PATCHes the dedicated `/api/brand-mentions/brands/:brandId/monitor-mentions` endpoint with `{ enabled }`. Added `useQueryClient()` and `await queryClient.invalidateQueries({ queryKey: ["/api/brands"] })` after the write so the cached brand row re-fetches and the switch reflects the new state. |
+
+### 24.6 "+ Add variation" — no-op handler
+
+**Problem.** The "+ add variation" link inside the Searching-for line on the Scan Status panel did nothing. The `onAddVariation` prop was wired to `() => { /* lives in the brand settings page */ }` — a stub.
+
+**Fix.**
+
+| File                                              | Change                                                                                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/components/geo-tools/MentionsTab.tsx` | `onAddVariation` now calls `setLocation("/brands")` to navigate to the brands page where the name-variations editor lives. |
+
+### 24.7 Reddit query — 100-mention cap and stop-on-hit
+
+**Decision.** Stop iterating Reddit variations at the first one that returns mentions, and never accumulate beyond 100 mentions in a single scan. Avoids burning rate-limit tokens and keeps response times bounded.
+
+| File                                 | Change                                                                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `server/lib/sources/redditSource.ts` | `MAX_PUBLIC_MENTIONS = 100`. Loop breaks when `seen.size >= MAX_PUBLIC_MENTIONS` or when any variation produced ≥ 1 mention. |
+
+### 24.8 Quora diagnostic logging (then removed)
+
+Before the decision to drop Quora, added a `quora.variation_diagnostics` log line to distinguish login-wall (zero raw links + login-wall body markers) from gate-rejection (many raw links, none pass brand presence). The diagnostic confirmed Cloudflare bot-challenge and login-wall responses were the actual blockers, leading to the 24.2 decision. Logging code remains in `quoraSource.ts` for now since the file is orphaned.
+
+### How to verify
+
+1. **Reddit no longer 414s.** Run a manual scan on any brand with ≥ 2 name variations. `scan.complete` log line should show `reddit: { found: N, failed: false }` rather than `414`.
+2. **Quora is gone.** Mentions tab shows only Reddit and HN chips on the scan-status panel. Platform filter dropdown has only Reddit and Hacker News. Manual-add dialog has only Reddit and Hacker News.
+3. **Engagement score is gone.** Mention cards no longer show the 0/100 progress bar. Detail sheet has no Engagement row.
+4. **Relative time is correct.** Run a fresh scan. New mention cards display "just now" / "1 minute ago", not "about 6 hours ago." Inspect the API response at `/api/brand-mentions/<brandId>` — every row carries `discoveredAtAgeSeconds: <small-number>`.
+5. **Daily auto-scan toggle persists.** Click the switch on the Scan Status panel. Page → reload → state matches what you set.
+6. **+ add variation navigates.** Click the link. Browser navigates to `/brands`.
+
+### Deferred / not done
+
+- DB columns `engagement_score`, `engagement_normalized` not dropped. Requires a migration with risk of touching historical rows.
+- Orphaned files (`server/lib/sources/quoraSource.ts`, `tests/unit/quoraSource.test.ts`, `tests/unit/engagementScore.test.ts`, etc.) are inert but still on disk. Cleanup left for a follow-up pass.
+- DB host clock drift (the underlying root cause of the "6 hours ago" symptom) is not fixed at the infrastructure level. The server-anchored age approach makes the application immune to it for the Mentions feature; other features still write `defaultNow()`-based timestamps that may also be hours off on the same host. Out of scope for this track.
+
+---

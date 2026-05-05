@@ -264,6 +264,28 @@ export function pickFields<T extends Record<string, any>>(
   return out;
 }
 
+// requireMentionOwnership — resolves the mention row only when the caller owns
+// the brand it belongs to. Returns the mention row or null (never throws).
+// 404 on cross-tenant per anti-enumeration policy.
+export async function requireMentionOwnership(
+  mentionId: string,
+  userId: string,
+): Promise<typeof schema.brandMentions.$inferSelect | null> {
+  const [row] = await db
+    .select()
+    .from(schema.brandMentions)
+    .where(eq(schema.brandMentions.id, mentionId))
+    .limit(1);
+  if (!row) return null;
+  const [brand] = await db
+    .select({ id: schema.brands.id })
+    .from(schema.brands)
+    .where(and(eq(schema.brands.id, row.brandId), eq(schema.brands.userId, userId)))
+    .limit(1);
+  if (!brand) return null;
+  return row;
+}
+
 // Send OwnershipError as the right HTTP response. Call from a route catch.
 export function sendOwnershipError(res: import("express").Response, err: unknown): boolean {
   if (err instanceof OwnershipError) {

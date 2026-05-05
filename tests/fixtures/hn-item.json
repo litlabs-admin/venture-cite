@@ -1,0 +1,40 @@
+{
+  "id": 12345,
+  "type": "story",
+  "author": "alice",
+  "title": "Notion launches new feature",
+  "text": null,
+  "url": "https://example.com",
+  "points": 100,
+  "created_at": "2024-01-01T00:00:00Z",
+  "children": [
+    {
+      "id": 12346,
+      "type": "comment",
+      "author": "bob",
+      "text": "I love using Notion every day for my team's docs",
+      "points": null,
+      "created_at": "2024-01-01T01:00:00Z",
+      "children": [
+        {
+          "id": 12347,
+          "type": "comment",
+          "author": "carol",
+          "text": "totally agree, Notion is great",
+          "points": null,
+          "created_at": "2024-01-01T02:00:00Z",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": 12348,
+      "type": "comment",
+      "author": "dave",
+      "text": "I prefer other tools honestly",
+      "points": null,
+      "created_at": "2024-01-01T01:30:00Z",
+      "children": []
+    }
+  ]
+}

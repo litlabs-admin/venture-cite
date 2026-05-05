@@ -1,4 +1,17 @@
-import { eq, and, desc, asc, sql, gte, lte, or, ne, isNull, inArray } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  asc,
+  sql,
+  gte,
+  lte,
+  or,
+  ne,
+  isNull,
+  inArray,
+  getTableColumns,
+} from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -94,6 +107,10 @@ import {
   type InsertArticleRevision,
   type ChatbotMessage,
   type ChatbotThread,
+  type ScanJob,
+  type SourceHealth,
+  type InsertSourceHealth,
+  type SentimentCache,
 } from "@shared/schema";
 
 export class DatabaseStorage implements IStorage {
@@ -1988,7 +2005,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBrandMention(insertMention: InsertBrandMention): Promise<BrandMention> {
-    const result = await db.insert(schema.brandMentions).values(insertMention).returning();
+    const withDiscoveredAt = {
+      ...insertMention,
+      discoveredAt: insertMention.discoveredAt ?? new Date(),
+    };
+    const result = await db.insert(schema.brandMentions).values(withDiscoveredAt).returning();
     return result[0];
   }
 
@@ -2062,9 +2083,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async tryInsertBrandMention(insert: InsertBrandMention): Promise<BrandMention | null> {
+    // Force discoveredAt from the Node process's `new Date()` rather than
+    // letting Postgres default it via `now()`. The DB clock or session
+    // timezone can be hours off from real UTC, which made every mention
+    // display "about 6 hours ago" the moment it was inserted. JS Date
+    // is always an absolute UTC instant, independent of host config.
+    const withDiscoveredAt = { ...insert, discoveredAt: insert.discoveredAt ?? new Date() };
     const result = await db
       .insert(schema.brandMentions)
-      .values(insert)
+      .values(withDiscoveredAt)
       .onConflictDoNothing()
       .returning();
     return result[0] ?? null;
@@ -4592,5 +4619,481 @@ export class DatabaseStorage implements IStorage {
     `);
 
     return { deletedByAge, deletedByCap };
+  }
+
+  // ─── Mentions rebuild (Task 7) ────────────────────────────────────────────
+
+  // Scan jobs ----------------------------------------------------------------
+
+  async createScanJob(input: {
+    brandId: string;
+    userId: string;
+    trigger: "manual" | "cron";
+  }): Promise<ScanJob> {
+    // Explicit createdAt from JS Date avoids any DB/server timezone
+    // misconfiguration causing "6 hours ago" relative-time bugs. JS Date is
+    // an absolute UTC instant regardless of host TZ settings.
+    const [row] = await db
+      .insert(schema.scanJobs)
+      .values({
+        brandId: input.brandId,
+        userId: input.userId,
+        trigger: input.trigger,
+        status: "queued",
+        perSource: {},
+        totals: {},
+        createdAt: new Date(),
+      })
+      .returning();
+    return row;
+  }
+
+  async getScanJob(id: string): Promise<(ScanJob & { brandName: string }) | undefined> {
+    const [row] = await db
+      .select({ ...getTableColumns(schema.scanJobs), brandName: schema.brands.name })
+      .from(schema.scanJobs)
+      .leftJoin(schema.brands, eq(schema.scanJobs.brandId, schema.brands.id))
+      .where(eq(schema.scanJobs.id, id))
+      .limit(1);
+    if (!row) return undefined;
+    return { ...row, brandName: row.brandName ?? "" };
+  }
+
+  async getActiveScanJobForBrand(brandId: string): Promise<ScanJob | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.scanJobs)
+      .where(
+        and(
+          eq(schema.scanJobs.brandId, brandId),
+          or(eq(schema.scanJobs.status, "queued"), eq(schema.scanJobs.status, "running")),
+        ),
+      )
+      .orderBy(desc(schema.scanJobs.createdAt))
+      .limit(1);
+    return row;
+  }
+
+  async getActiveScanJobsForUser(userId: string): Promise<Array<ScanJob & { brandName: string }>> {
+    const rows = await db
+      .select({ ...getTableColumns(schema.scanJobs), brandName: schema.brands.name })
+      .from(schema.scanJobs)
+      .leftJoin(schema.brands, eq(schema.scanJobs.brandId, schema.brands.id))
+      .where(
+        and(
+          eq(schema.scanJobs.userId, userId),
+          or(eq(schema.scanJobs.status, "queued"), eq(schema.scanJobs.status, "running")),
+        ),
+      )
+      .orderBy(desc(schema.scanJobs.createdAt));
+    return rows.map((r) => ({ ...r, brandName: r.brandName ?? "" }));
+  }
+
+  async getLastCompletedScanForBrand(
+    brandId: string,
+  ): Promise<(ScanJob & { brandName: string }) | undefined> {
+    const [row] = await db
+      .select({ ...getTableColumns(schema.scanJobs), brandName: schema.brands.name })
+      .from(schema.scanJobs)
+      .leftJoin(schema.brands, eq(schema.scanJobs.brandId, schema.brands.id))
+      .where(and(eq(schema.scanJobs.brandId, brandId), eq(schema.scanJobs.status, "complete")))
+      .orderBy(desc(schema.scanJobs.completedAt))
+      .limit(1);
+    if (!row) return undefined;
+    return { ...row, brandName: row.brandName ?? "" };
+  }
+
+  async updateScanJob(
+    id: string,
+    patch: Partial<{
+      status: string;
+      perSource: unknown;
+      totals: unknown;
+      startedAt: Date;
+      completedAt: Date;
+      error: string;
+    }>,
+  ): Promise<void> {
+    await db.update(schema.scanJobs).set(patch).where(eq(schema.scanJobs.id, id));
+  }
+
+  async pruneOldScanJobs(beforeDays: number): Promise<number> {
+    const res = await db.execute(sql`
+      DELETE FROM scan_jobs
+      WHERE status IN ('complete', 'failed')
+        AND completed_at < now() - (${beforeDays} || ' days')::interval
+      RETURNING id
+    `);
+    const r = res as unknown as { rows?: unknown[] } & unknown[];
+    return r.rows?.length ?? (Array.isArray(r) ? r.length : 0);
+  }
+
+  async getMostRecentManualScanForBrand(brandId: string): Promise<ScanJob | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.scanJobs)
+      .where(and(eq(schema.scanJobs.brandId, brandId), eq(schema.scanJobs.trigger, "manual")))
+      .orderBy(desc(schema.scanJobs.createdAt))
+      .limit(1);
+    return row;
+  }
+
+  // Source health ------------------------------------------------------------
+
+  async getSourceHealth(brandId: string, source: string): Promise<SourceHealth | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.sourceHealth)
+      .where(and(eq(schema.sourceHealth.brandId, brandId), eq(schema.sourceHealth.source, source)))
+      .limit(1);
+    return row;
+  }
+
+  async upsertSourceHealth(input: InsertSourceHealth): Promise<void> {
+    await db
+      .insert(schema.sourceHealth)
+      .values(input)
+      .onConflictDoUpdate({
+        target: [schema.sourceHealth.brandId, schema.sourceHealth.source],
+        set: {
+          consecutiveFailures: input.consecutiveFailures ?? 0,
+          lastFailureAt: input.lastFailureAt ?? null,
+          lastFailureReason: input.lastFailureReason ?? null,
+          pausedUntil: input.pausedUntil ?? null,
+          lastSuccessfulScanAt: input.lastSuccessfulScanAt ?? null,
+        },
+      });
+  }
+
+  // Sentiment cache ----------------------------------------------------------
+
+  async getCachedSentiment(contentHash: string): Promise<SentimentCache | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.sentimentCache)
+      .where(eq(schema.sentimentCache.contentHash, contentHash))
+      .limit(1);
+    return row;
+  }
+
+  async upsertCachedSentiment(input: {
+    contentHash: string;
+    sentiment: string;
+    sentimentScore: string;
+  }): Promise<void> {
+    await db
+      .insert(schema.sentimentCache)
+      .values({
+        contentHash: input.contentHash,
+        sentiment: input.sentiment,
+        sentimentScore: input.sentimentScore,
+      })
+      .onConflictDoUpdate({
+        target: schema.sentimentCache.contentHash,
+        set: {
+          sentiment: input.sentiment,
+          sentimentScore: input.sentimentScore,
+          cachedAt: new Date(),
+        },
+      });
+  }
+
+  async pruneOldSentimentCache(beforeDays: number): Promise<number> {
+    const res = await db.execute(sql`
+      DELETE FROM sentiment_cache
+      WHERE cached_at < now() - (${beforeDays} || ' days')::interval
+      RETURNING content_hash
+    `);
+    const r = res as unknown as { rows?: unknown[] } & unknown[];
+    return r.rows?.length ?? (Array.isArray(r) ? r.length : 0);
+  }
+
+  // Daily sentiment cap counter ----------------------------------------------
+
+  async countSentimentCallsForBrandSince(brandId: string, since: Date): Promise<number> {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.brandMentions)
+      .where(
+        and(
+          eq(schema.brandMentions.brandId, brandId),
+          eq(schema.brandMentions.sentimentSource, "llm"),
+          gte(schema.brandMentions.discoveredAt, since),
+        ),
+      );
+    return row?.count ?? 0;
+  }
+
+  // Brand mention monitoring -------------------------------------------------
+
+  async setBrandMonitorMentions(brandId: string, enabled: boolean): Promise<void> {
+    await db
+      .update(schema.brands)
+      .set({ monitorMentions: enabled })
+      .where(eq(schema.brands.id, brandId));
+  }
+
+  async listBrandsWithMentionMonitoring(): Promise<{ id: string; userId: string }[]> {
+    const rows = await db
+      .select({ id: schema.brands.id, userId: schema.brands.userId })
+      .from(schema.brands)
+      .where(eq(schema.brands.monitorMentions, true));
+    // userId is nullable in the schema (historical design); brands with
+    // monitor_mentions=true must have a user, so cast is safe in practice.
+    return rows.map((r) => ({ id: r.id, userId: r.userId ?? "" }));
+  }
+
+  // Mention helpers ----------------------------------------------------------
+
+  async getBrandMention(id: string): Promise<BrandMention | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.brandMentions)
+      .where(eq(schema.brandMentions.id, id))
+      .limit(1);
+    return row;
+  }
+
+  async deleteManyBrandMentions(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await db
+      .delete(schema.brandMentions)
+      .where(inArray(schema.brandMentions.id, ids))
+      .returning({ id: schema.brandMentions.id });
+    return result.length;
+  }
+
+  async deleteAllMentionsForBrand(brandId: string): Promise<number> {
+    const result = await db
+      .delete(schema.brandMentions)
+      .where(eq(schema.brandMentions.brandId, brandId))
+      .returning({ id: schema.brandMentions.id });
+    return result.length;
+  }
+
+  async getOwnedMentionIds(ids: string[], userId: string): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const rows = await db
+      .select({ id: schema.brandMentions.id })
+      .from(schema.brandMentions)
+      .innerJoin(schema.brands, eq(schema.brandMentions.brandId, schema.brands.id))
+      .where(and(inArray(schema.brandMentions.id, ids), eq(schema.brands.userId, userId)));
+    return rows.map((r) => r.id);
+  }
+
+  async updateBrandMentionStatus(id: string, status: string): Promise<void> {
+    await db.update(schema.brandMentions).set({ status }).where(eq(schema.brandMentions.id, id));
+  }
+
+  async getMentionStatsForBrand(brandId: string): Promise<{
+    total: number;
+    byPlatform: Record<string, number>;
+    bySentiment: { positive: number; neutral: number; negative: number };
+    byStatus: Record<string, number>;
+  }> {
+    // Single-pass aggregate for total + sentiment breakdown.
+    const [agg] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        positive: sql<number>`count(*) filter (where sentiment = 'positive')::int`,
+        neutral: sql<number>`count(*) filter (where sentiment = 'neutral')::int`,
+        negative: sql<number>`count(*) filter (where sentiment = 'negative')::int`,
+      })
+      .from(schema.brandMentions)
+      .where(eq(schema.brandMentions.brandId, brandId));
+
+    // Per-platform breakdown.
+    const platformRows = await db
+      .select({
+        platform: schema.brandMentions.platform,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(schema.brandMentions)
+      .where(eq(schema.brandMentions.brandId, brandId))
+      .groupBy(schema.brandMentions.platform);
+
+    // Per-status breakdown.
+    const statusRows = await db
+      .select({
+        status: schema.brandMentions.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(schema.brandMentions)
+      .where(eq(schema.brandMentions.brandId, brandId))
+      .groupBy(schema.brandMentions.status);
+
+    const byPlatform: Record<string, number> = {};
+    for (const r of platformRows) {
+      if (r.platform) byPlatform[r.platform] = r.count;
+    }
+
+    const byStatus: Record<string, number> = {};
+    for (const r of statusRows) {
+      if (r.status) byStatus[r.status] = r.count;
+    }
+
+    return {
+      total: agg?.total ?? 0,
+      byPlatform,
+      bySentiment: {
+        positive: agg?.positive ?? 0,
+        neutral: agg?.neutral ?? 0,
+        negative: agg?.negative ?? 0,
+      },
+      byStatus,
+    };
+  }
+
+  // Paginated mention list ---------------------------------------------------
+
+  async listMentionsForBrand(
+    brandId: string,
+    opts: {
+      cursor?: { discoveredAt: Date; id: string };
+      limit?: number;
+      status?: string;
+      platform?: string;
+      sentiment?: string;
+      from?: Date;
+      to?: Date;
+      q?: string;
+      sort?: "newest" | "oldest" | "engagement";
+    },
+  ): Promise<{ rows: BrandMention[]; nextCursor: { discoveredAt: Date; id: string } | null }> {
+    const limit = Math.min(opts.limit ?? 25, 100);
+    const sort = opts.sort ?? "newest";
+
+    // Raw `SELECT *` returns snake_case column names; the rest of the app
+    // (Drizzle types + frontend) expects camelCase. Map at the boundary.
+    const mapRow = (r: Record<string, unknown>): BrandMention => ({
+      id: r.id as string,
+      brandId: r.brand_id as string,
+      platform: r.platform as string,
+      sourceUrl: r.source_url as string,
+      sourceTitle: (r.source_title as string | null) ?? null,
+      mentionContext: (r.mention_context as string | null) ?? null,
+      sentiment: (r.sentiment as string | null) ?? null,
+      sentimentScore: (r.sentiment_score as string | null) ?? null,
+      engagementScore: (r.engagement_score as number | null) ?? null,
+      authorUsername: (r.author_username as string | null) ?? null,
+      isVerified: r.is_verified as number,
+      mentionedAt: r.mentioned_at ? new Date(r.mentioned_at as string) : null,
+      discoveredAt: new Date(r.discovered_at as string),
+      metadata: (r.metadata ?? null) as BrandMention["metadata"],
+      status: r.status as string,
+      mentionLocation: (r.mention_location as string | null) ?? null,
+      linkStatus: (r.link_status as string | null) ?? null,
+      lastVerifiedAt: r.last_verified_at ? new Date(r.last_verified_at as string) : null,
+      matchedVariation: (r.matched_variation as string | null) ?? null,
+      matchedField: (r.matched_field as string | null) ?? null,
+      source: (r.source as string | null) ?? null,
+      scannerVersion: (r.scanner_version as number | null) ?? null,
+      sentimentSource: (r.sentiment_source as string | null) ?? null,
+      engagementNormalized: (r.engagement_normalized as number | null) ?? null,
+    });
+
+    // Build filter conditions.
+    // All filtering is applied inline via raw SQL templates in each sort branch
+    // (ILIKE across OR'd columns isn't expressible in Drizzle's ORM helpers).
+    let rows: BrandMention[];
+
+    if (sort === "engagement") {
+      // Keyset pagination on (engagement_normalized DESC, id ASC).
+      const cursorClause =
+        opts.cursor != null
+          ? sql`AND (engagement_normalized, id) < (
+              (SELECT engagement_normalized FROM brand_mentions WHERE id = ${opts.cursor.id}),
+              ${opts.cursor.id}
+            )`
+          : sql``;
+
+      const qFilter = opts.q
+        ? sql`AND (source_title ILIKE ${"%" + opts.q + "%"} OR mention_context ILIKE ${"%" + opts.q + "%"})`
+        : sql``;
+
+      const res = await db.execute(sql`
+        SELECT * FROM brand_mentions
+        WHERE brand_id = ${brandId}
+          ${opts.status ? sql`AND status = ${opts.status}` : sql``}
+          ${opts.platform ? sql`AND platform = ${opts.platform}` : sql``}
+          ${opts.sentiment ? sql`AND sentiment = ${opts.sentiment}` : sql``}
+          ${opts.from ? sql`AND discovered_at >= ${opts.from}` : sql``}
+          ${opts.to ? sql`AND discovered_at <= ${opts.to}` : sql``}
+          ${qFilter}
+          ${cursorClause}
+        ORDER BY engagement_normalized DESC NULLS LAST, id ASC
+        LIMIT ${limit + 1}
+      `);
+      const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]);
+      rows = (data as Record<string, unknown>[]).map(mapRow);
+    } else if (sort === "oldest") {
+      // Keyset on (discovered_at ASC, id ASC).
+      const cursorClause =
+        opts.cursor != null
+          ? sql`AND (discovered_at, id) > (${opts.cursor.discoveredAt}, ${opts.cursor.id})`
+          : sql``;
+
+      const qFilter = opts.q
+        ? sql`AND (source_title ILIKE ${"%" + opts.q + "%"} OR mention_context ILIKE ${"%" + opts.q + "%"})`
+        : sql``;
+
+      const res = await db.execute(sql`
+        SELECT * FROM brand_mentions
+        WHERE brand_id = ${brandId}
+          ${opts.status ? sql`AND status = ${opts.status}` : sql``}
+          ${opts.platform ? sql`AND platform = ${opts.platform}` : sql``}
+          ${opts.sentiment ? sql`AND sentiment = ${opts.sentiment}` : sql``}
+          ${opts.from ? sql`AND discovered_at >= ${opts.from}` : sql``}
+          ${opts.to ? sql`AND discovered_at <= ${opts.to}` : sql``}
+          ${qFilter}
+          ${cursorClause}
+        ORDER BY discovered_at ASC, id ASC
+        LIMIT ${limit + 1}
+      `);
+      const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]);
+      rows = (data as Record<string, unknown>[]).map(mapRow);
+    } else {
+      // Default: newest first — keyset on (discovered_at DESC, id DESC).
+      const cursorClause =
+        opts.cursor != null
+          ? sql`AND (discovered_at, id) < (${opts.cursor.discoveredAt}, ${opts.cursor.id})`
+          : sql``;
+
+      const qFilter = opts.q
+        ? sql`AND (source_title ILIKE ${"%" + opts.q + "%"} OR mention_context ILIKE ${"%" + opts.q + "%"})`
+        : sql``;
+
+      const res = await db.execute(sql`
+        SELECT * FROM brand_mentions
+        WHERE brand_id = ${brandId}
+          ${opts.status ? sql`AND status = ${opts.status}` : sql``}
+          ${opts.platform ? sql`AND platform = ${opts.platform}` : sql``}
+          ${opts.sentiment ? sql`AND sentiment = ${opts.sentiment}` : sql``}
+          ${opts.from ? sql`AND discovered_at >= ${opts.from}` : sql``}
+          ${opts.to ? sql`AND discovered_at <= ${opts.to}` : sql``}
+          ${qFilter}
+          ${cursorClause}
+        ORDER BY discovered_at DESC, id DESC
+        LIMIT ${limit + 1}
+      `);
+      const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]);
+      rows = (data as Record<string, unknown>[]).map(mapRow);
+    }
+
+    // Determine next cursor.
+    let nextCursor: { discoveredAt: Date; id: string } | null = null;
+    if (rows.length > limit) {
+      rows = rows.slice(0, limit);
+      const last = rows[rows.length - 1];
+      nextCursor = {
+        discoveredAt:
+          last.discoveredAt instanceof Date
+            ? last.discoveredAt
+            : new Date(last.discoveredAt as string),
+        id: last.id,
+      };
+    }
+
+    return { rows, nextCursor };
   }
 }

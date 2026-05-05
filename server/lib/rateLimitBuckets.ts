@@ -31,6 +31,8 @@ const CONFIGS: Record<string, BucketConfig> = {
   // Quora HTML scrape: our own throttle since they don't expose a
   // public API; be polite.
   quora: { capacity: 5, refillPerSec: 1 / 4 },
+  // Manual-add: 10 per user per minute (1 token per 6 seconds).
+  "manual-add": { capacity: 10, refillPerSec: 10 / 60 },
 };
 
 function applyRefill(tokens: number, lastRefill: Date, cfg: BucketConfig, now: number): number {

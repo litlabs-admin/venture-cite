@@ -1,0 +1,67 @@
+[
+  {
+    "kind": "Listing",
+    "data": {
+      "children": [
+        {
+          "kind": "t3",
+          "data": {
+            "id": "abc123",
+            "title": "Why we switched to Linear for project management",
+            "selftext": "We tried Jira and Asana but Linear has been a game-changer for our team.",
+            "permalink": "/r/projectmanagement/comments/abc123/why_we_switched_to_linear_for_project_management/",
+            "author": "devuser42",
+            "ups": 142,
+            "num_comments": 27,
+            "created_utc": 1714521600,
+            "over_18": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "Listing",
+    "data": {
+      "children": [
+        {
+          "kind": "t1",
+          "data": {
+            "id": "cmt001",
+            "body": "I agree, linear app is fantastic for engineering teams. The cycle planning feature alone is worth it.",
+            "author": "commentuser1",
+            "permalink": "/r/projectmanagement/comments/abc123/why_we_switched_to_linear_for_project_management/cmt001/",
+            "ups": 23,
+            "created_utc": 1714525200,
+            "replies": {
+              "kind": "Listing",
+              "data": {
+                "children": [
+                  {
+                    "kind": "t1",
+                    "data": {
+                      "id": "cmt002",
+                      "body": "Totally unrelated comment about spreadsheets and nothing else.",
+                      "author": "commentuser2",
+                      "permalink": "/r/projectmanagement/comments/abc123/why_we_switched_to_linear_for_project_management/cmt002/",
+                      "ups": 5,
+                      "created_utc": 1714526000,
+                      "replies": ""
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "kind": "more",
+          "data": {
+            "count": 5,
+            "children": ["cmt003", "cmt004"]
+          }
+        }
+      ]
+    }
+  }
+]

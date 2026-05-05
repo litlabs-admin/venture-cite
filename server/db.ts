@@ -1,8 +1,17 @@
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool, type PoolConfig } from "pg";
+import { Pool, type PoolConfig, types as pgTypes } from "pg";
 import fs from "node:fs";
 import * as schema from "@shared/schema";
 import { logger } from "./lib/logger";
+
+// Force `TIMESTAMP WITHOUT TIME ZONE` (oid 1114) to be parsed as UTC, not as
+// the Node process's local time. Without this, a DB value of "2026-05-05
+// 12:00:00" (which our app writes as `now()` — i.e. UTC) would be parsed by
+// pg as 12:00 in the server's local zone, producing a Date object that's
+// hours off. Result on the client: relative timestamps like "6 hours ago"
+// for events that just happened. Setting this once at boot fixes every
+// table that uses `timestamp()` without `{ withTimezone: true }`.
+pgTypes.setTypeParser(1114, (val: string) => (val === null ? null : new Date(val + "Z")));
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");

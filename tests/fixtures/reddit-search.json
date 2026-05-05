@@ -1,0 +1,57 @@
+{
+  "kind": "Listing",
+  "data": {
+    "after": null,
+    "dist": 3,
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "abc123",
+          "title": "Why we switched to Linear for project management",
+          "selftext": "We tried Jira and Asana but Linear has been a game-changer for our team. The speed and keyboard shortcuts are incredible.",
+          "permalink": "/r/projectmanagement/comments/abc123/why_we_switched_to_linear_for_project_management/",
+          "author": "devuser42",
+          "ups": 142,
+          "num_comments": 27,
+          "created_utc": 1714521600,
+          "over_18": false,
+          "removed_by_category": null,
+          "subreddit": "projectmanagement"
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "def456",
+          "title": "Best tools for software development in 2024",
+          "selftext": "Looking for recommendations on project management tools. Anyone have thoughts on Notion, Monday, or similar?",
+          "permalink": "/r/softwareengineering/comments/def456/best_tools_for_software_development_in_2024/",
+          "author": "techblogger99",
+          "ups": 89,
+          "num_comments": 14,
+          "created_utc": 1714435200,
+          "over_18": false,
+          "removed_by_category": null,
+          "subreddit": "softwareengineering"
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "ghi789",
+          "title": "NSFW: Discussion about Linear and adult content sites",
+          "selftext": "This post mentions Linear in an NSFW context.",
+          "permalink": "/r/nsfw_sub/comments/ghi789/nsfw_discussion/",
+          "author": "nsfwposter",
+          "ups": 5,
+          "num_comments": 2,
+          "created_utc": 1714348800,
+          "over_18": true,
+          "removed_by_category": null,
+          "subreddit": "nsfw_sub"
+        }
+      }
+    ]
+  }
+}
