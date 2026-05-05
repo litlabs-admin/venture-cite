@@ -1,7 +1,7 @@
 import { logger } from "./logger";
 
 const TOKEN_URL = "https://www.reddit.com/api/v1/access_token";
-export const REDDIT_USER_AGENT = `web:io.litlabs.venturecite:v1.0 (by /u/${process.env.REDDIT_USERNAME ?? "unknown"})`;
+export const REDDIT_USER_AGENT = "web:io.litlabs.venturecite:v1.0";
 
 let cached: { token: string; expiresAt: number } | null = null;
 

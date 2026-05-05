@@ -261,7 +261,23 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
         brandId={brandId}
         brandName={brandName}
         brandMonitorMentions={brand?.monitorMentions ?? false}
-        variations={brand?.nameVariations ?? []}
+        variations={(() => {
+          // Mirror server-side `collectVariations`: brand name first, then
+          // nameVariations, deduped case-insensitively, drop entries < 2 chars.
+          const all = [brand?.name, ...(brand?.nameVariations ?? [])];
+          const seen = new Set<string>();
+          const out: string[] = [];
+          for (const raw of all) {
+            if (typeof raw !== "string") continue;
+            const v = raw.trim();
+            if (v.length < 2) continue;
+            const key = v.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(v);
+          }
+          return out;
+        })()}
         activeScan={activeScan}
         lastCompletedScan={lastCompletedScan}
         scanCooldown={scanCooldown}

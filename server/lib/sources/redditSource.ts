@@ -131,7 +131,9 @@ export async function scanRedditSource(
   input: RedditScanInput,
 ): Promise<{ mentions: RedditMention[]; failed?: string }> {
   const useOAuth = hasRedditOAuthCredentials();
-  const t = input.sinceUnix === undefined ? "year" : "week";
+  // Match Reddit web search defaults: sort=relevance + t=all (no time filter).
+  // Brand monitoring should surface every mention, not just recent ones.
+  const t = "all";
 
   try {
     if (useOAuth) {
@@ -258,8 +260,11 @@ async function scanViaPublic(
     }
 
     // Field-scoped Lucene query for one variation. Short enough to avoid 414.
+    // sort=relevance matches Reddit's web-search default and surfaces older
+    // posts that brand monitors care about. sort=new excludes anything older
+    // than a few hours/days for low-volume brands.
     const q = `(title:"${variation}" OR selftext:"${variation}")`;
-    const jsonPath = `/search.json?q=${encodeURIComponent(q)}&sort=new&t=${t}&limit=25&restrict_sr=false`;
+    const jsonPath = `/search.json?q=${encodeURIComponent(q)}&sort=relevance&t=${t}&limit=25&restrict_sr=false`;
     const jsonRes = await redditPublicFetch(jsonPath);
 
     let foundForThisVariation = 0;
@@ -303,7 +308,7 @@ async function scanViaPublic(
     }
 
     // JSON failed (non-OK or unparseable) — try RSS fallback for this variation.
-    const rssPath = `/search.rss?q=${encodeURIComponent(q)}&sort=new&t=${t}`;
+    const rssPath = `/search.rss?q=${encodeURIComponent(q)}&sort=relevance&t=${t}`;
     const rssRes = await redditPublicFetch(rssPath);
     if (!rssRes.ok) {
       failures.push(`${jsonRes.status}/${rssRes.status} on "${variation}"`);

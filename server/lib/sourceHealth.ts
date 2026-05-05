@@ -13,34 +13,20 @@ import type { InsertSourceHealth } from "@shared/schema";
 
 export type HealthDecision = { skip: boolean; reason?: string };
 
-// Number of consecutive failures before a source is paused.
-const PAUSE_THRESHOLD = 3;
-
-// How long (ms) to pause a source after reaching the threshold.
-const PAUSE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
-
 // Maximum length stored for failure reason text.
 const MAX_REASON_LENGTH = 200;
 
 /**
- * Returns { skip: false } if the source should be scanned, or
- * { skip: true, reason } if it is paused.
+ * Always returns { skip: false }. The pause-on-consecutive-failures behavior
+ * was removed per product decision — every scan attempt should hit the
+ * source, regardless of past failures. Source-health rows are still written
+ * for observability, but pausedUntil is never honored.
  */
 export async function shouldSkipSource(
-  brandId: string,
-  source: string,
-  now: Date = new Date(),
+  _brandId: string,
+  _source: string,
+  _now: Date = new Date(),
 ): Promise<HealthDecision> {
-  const row = await storage.getSourceHealth(brandId, source);
-  if (!row) {
-    return { skip: false };
-  }
-  if (row.pausedUntil !== null && row.pausedUntil > now) {
-    return {
-      skip: true,
-      reason: `paused until ${row.pausedUntil.toISOString()}`,
-    };
-  }
   return { skip: false };
 }
 
@@ -74,8 +60,6 @@ export async function recordSourceFailure(
   const existing = await storage.getSourceHealth(brandId, source);
   const prevFailures = existing?.consecutiveFailures ?? 0;
   const newFailures = prevFailures + 1;
-  const pausedUntil =
-    newFailures >= PAUSE_THRESHOLD ? new Date(now.getTime() + PAUSE_DURATION_MS) : null;
 
   const input: InsertSourceHealth = {
     brandId,
@@ -83,7 +67,8 @@ export async function recordSourceFailure(
     consecutiveFailures: newFailures,
     lastFailureAt: now,
     lastFailureReason: reason.slice(0, MAX_REASON_LENGTH),
-    pausedUntil,
+    // Pause-on-failure removed — scans always run regardless of past failures.
+    pausedUntil: null,
     // Preserve the prior lastSuccessfulScanAt — do not overwrite it.
     lastSuccessfulScanAt: existing?.lastSuccessfulScanAt ?? null,
   };
