@@ -1,4 +1,4 @@
-export type MentionPlatform = "reddit" | "hackernews" | "quora";
+export type MentionPlatform = "reddit" | "hackernews";
 
 export function canonicalizeMentionUrl(platform: MentionPlatform, raw: string): string {
   let u: URL;
@@ -28,10 +28,6 @@ export function canonicalizeMentionUrl(platform: MentionPlatform, raw: string): 
     const id = u.searchParams.get("id");
     if (!id) return `${u.origin}${u.pathname.replace(/\/+$/, "")}`;
     return `${u.origin}${u.pathname.replace(/\/+$/, "")}?id=${id}`;
-  }
-
-  if (platform === "quora") {
-    return `${u.origin}${u.pathname.replace(/\/+$/, "").toLowerCase()}`;
   }
 
   return raw;

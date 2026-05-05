@@ -28,9 +28,6 @@ const CONFIGS: Record<string, BucketConfig> = {
   wikipedia: { capacity: 30, refillPerSec: 5 },
   // Hacker News (Algolia): generous, but cap to avoid surprise spikes.
   hackernews: { capacity: 30, refillPerSec: 5 },
-  // Quora HTML scrape: our own throttle since they don't expose a
-  // public API; be polite.
-  quora: { capacity: 5, refillPerSec: 1 / 4 },
   // Manual-add: 10 per user per minute (1 token per 6 seconds).
   "manual-add": { capacity: 10, refillPerSec: 10 / 60 },
 };

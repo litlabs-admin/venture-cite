@@ -88,8 +88,6 @@ function PlatformIcon({ platform, className }: { platform: string; className?: s
     case "hackernews":
     case "hacker_news":
       return <MessageSquare className={cn("h-4 w-4 text-orange-700", className)} />;
-    case "quora":
-      return <MessageSquare className={cn("h-4 w-4 text-red-600", className)} />;
     default:
       return <Globe className={cn("h-4 w-4 text-muted-foreground", className)} />;
   }
@@ -102,8 +100,6 @@ function platformLabel(platform: string): string {
     case "hackernews":
     case "hacker_news":
       return "Hacker News";
-    case "quora":
-      return "Quora";
     default:
       return platform;
   }

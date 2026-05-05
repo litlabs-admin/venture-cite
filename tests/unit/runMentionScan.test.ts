@@ -73,7 +73,6 @@ function makeReport() {
     perSource: {
       reddit: { found: 2, inserted: 2, duplicates: 0, failed: false },
       hackernews: { found: 1, inserted: 1, duplicates: 0, failed: false },
-      quora: { found: 0, inserted: 0, duplicates: 0, failed: false },
     },
     totals: { found: 3, inserted: 3, duplicates: 0, failedSources: 0 },
     inserted: 3,

@@ -2007,7 +2007,7 @@ export class DatabaseStorage implements IStorage {
   async createBrandMention(insertMention: InsertBrandMention): Promise<BrandMention> {
     const withDiscoveredAt = {
       ...insertMention,
-      discoveredAt: insertMention.discoveredAt ?? new Date(),
+      discoveredAt: (insertMention as { discoveredAt?: Date }).discoveredAt ?? new Date(),
     };
     const result = await db.insert(schema.brandMentions).values(withDiscoveredAt).returning();
     return result[0];
@@ -2088,7 +2088,10 @@ export class DatabaseStorage implements IStorage {
     // timezone can be hours off from real UTC, which made every mention
     // display "about 6 hours ago" the moment it was inserted. JS Date
     // is always an absolute UTC instant, independent of host config.
-    const withDiscoveredAt = { ...insert, discoveredAt: insert.discoveredAt ?? new Date() };
+    const withDiscoveredAt = {
+      ...insert,
+      discoveredAt: (insert as { discoveredAt?: Date }).discoveredAt ?? new Date(),
+    };
     const result = await db
       .insert(schema.brandMentions)
       .values(withDiscoveredAt)

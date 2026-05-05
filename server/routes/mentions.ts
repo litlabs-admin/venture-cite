@@ -67,7 +67,7 @@ const withAge = <T extends Record<string, unknown>>(
 };
 
 // --- Schemas ---
-const PLATFORMS = ["reddit", "hackernews", "quora"] as const;
+const PLATFORMS = ["reddit", "hackernews"] as const;
 const STATUSES = ["new", "acknowledged", "replied", "false_positive", "ignored"] as const;
 type Platform = (typeof PLATFORMS)[number];
 type Status = (typeof STATUSES)[number];
@@ -75,7 +75,6 @@ type Status = (typeof STATUSES)[number];
 const PLATFORM_HOSTS: Record<Platform, RegExp> = {
   reddit: /^([a-z0-9-]+\.)?reddit\.com$|^redd\.it$/i,
   hackernews: /^news\.ycombinator\.com$/i,
-  quora: /^([a-z0-9-]+\.)?quora\.com$/i,
 };
 
 const ManualAddSchema = z.object({
@@ -222,12 +221,10 @@ mentionsRouter.post("/", isAuthenticated, async (req, res) => {
   // timeout=0 → fail-fast (no waiting).
   const ok = await acquireOrWait("manual-add", userId, 0);
   if (!ok) {
-    return res
-      .status(429)
-      .json({
-        error: "rate_limited",
-        message: "Manual add limit reached (10/min). Try again shortly.",
-      });
+    return res.status(429).json({
+      error: "rate_limited",
+      message: "Manual add limit reached (10/min). Try again shortly.",
+    });
   }
 
   // SSRF-safe fetch
@@ -408,17 +405,29 @@ mentionsRouter.post("/scans/:brandId", isAuthenticated, async (req, res) => {
 
   const job = await storage.createScanJob({ brandId, userId, trigger: "manual" });
 
-  // Detach the actual work. waitUntil if available (Vercel), else setImmediate.
-  const ctx: (p: Promise<unknown>) => void =
-    (res as any).waitUntil ?? ((p: Promise<unknown>) => setImmediate(() => p.catch(() => {})));
-  ctx(
-    runMentionScan(job.id).catch((err) => {
-      captureAndFlush(err, {
-        tags: { source: "mention-scan-detached" },
-        extra: { scanId: job.id },
-      });
-    }),
-  );
+  // Run synchronously and await completion before responding.
+  //
+  // Why not detach: on Vercel (any plan, but especially Hobby), the serverless
+  // function instance is frozen / killed the moment the HTTP response is sent.
+  // `setImmediate` and `res.waitUntil` (which doesn't exist on Express `res`)
+  // both lose the work. Express + Vercel ≠ Edge runtime.
+  //
+  // Reddit + HN scans finish in 5–30 s; Vercel Hobby allows 60 s per request,
+  // so awaiting here stays well within the limit. The client polls
+  // /scans/active anyway, so it can either consume the 200 response directly
+  // or notice the scan disappeared from active on the next poll — both paths
+  // work without UI changes.
+  try {
+    await runMentionScan(job.id);
+  } catch (err) {
+    captureAndFlush(err, {
+      tags: { source: "mention-scan-sync" },
+      extra: { scanId: job.id },
+    });
+    // The scan job row is already marked failed by runMentionScan's own
+    // catch — surface the scanId either way so the client can poll for
+    // status if it wants the error reason.
+  }
 
   res.status(202).json({ scanId: job.id });
 });

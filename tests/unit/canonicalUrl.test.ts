@@ -29,12 +29,6 @@ describe("canonicalizeMentionUrl", () => {
     expect(a).not.toBe(b);
   });
 
-  it("Quora: lowercase slug, strip query, drop trailing slash", () => {
-    expect(
-      canonicalizeMentionUrl("quora", "https://www.quora.com/Some-Question-Title/?share=1"),
-    ).toBe("https://www.quora.com/some-question-title");
-  });
-
   it("returns input unchanged when URL is malformed", () => {
     expect(canonicalizeMentionUrl("reddit", "not a url")).toBe("not a url");
   });

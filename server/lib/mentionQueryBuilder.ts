@@ -6,7 +6,6 @@ export type BrandQueryInput = {
 export type ScanQueries = {
   reddit: string | null;
   hackernews: string | null;
-  quora: string | null;
   variations: string[];
 };
 
@@ -29,13 +28,12 @@ export function collectVariations(brand: BrandQueryInput): string[] {
 export function buildScanQueries(brand: BrandQueryInput): ScanQueries {
   const variations = collectVariations(brand);
   if (variations.length === 0) {
-    return { reddit: null, hackernews: null, quora: null, variations: [] };
+    return { reddit: null, hackernews: null, variations: [] };
   }
   const reddit = `(${variations.map((v) => `title:"${v}" OR selftext:"${v}"`).join(" OR ")})`;
   // HN Algolia: quoted phrase search returns 0 hits in HN's instance.
   // Send the primary brand name unquoted; the brand-presence gate enforces
   // precision against the returned content using all variations.
   const hackernews = variations[0];
-  const quora = variations.map((v) => `"${v}"`).join(" OR ");
-  return { reddit, hackernews, quora, variations };
+  return { reddit, hackernews, variations };
 }

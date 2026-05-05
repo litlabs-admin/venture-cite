@@ -28,7 +28,6 @@ import {
   AlertTriangle,
   MessageSquare,
   Globe,
-  HelpCircle,
   Trash2,
   Flag,
 } from "lucide-react";
@@ -119,11 +118,6 @@ function getPlatformConfig(platform: string): PlatformConfig {
       return {
         label: "Hacker News",
         icon: <Globe className="h-4 w-4 text-orange-600" />,
-      };
-    case "quora":
-      return {
-        label: "Quora",
-        icon: <HelpCircle className="h-4 w-4 text-red-600" />,
       };
     default:
       return {

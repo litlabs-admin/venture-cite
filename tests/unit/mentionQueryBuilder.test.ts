@@ -13,9 +13,6 @@ describe("buildScanQueries", () => {
   it("HN: unquoted primary brand name (gate handles variations)", () => {
     expect(buildScanQueries(brand).hackernews).toBe("Linear");
   });
-  it("Quora: OR-joined quoted phrases", () => {
-    expect(buildScanQueries(brand).quora).toBe(`"Linear" OR "linear app" OR "linear.app"`);
-  });
   it("dedupes case-variant variations", () => {
     const q = buildScanQueries({ name: "Linear", nameVariations: ["LINEAR", "Linear"] });
     expect(q.reddit).toBe(`(title:"Linear" OR selftext:"Linear")`);
@@ -26,6 +23,6 @@ describe("buildScanQueries", () => {
   });
   it("returns null for each source when no usable name", () => {
     const q = buildScanQueries({ name: "", nameVariations: [] });
-    expect(q).toEqual({ reddit: null, hackernews: null, quora: null, variations: [] });
+    expect(q).toEqual({ reddit: null, hackernews: null, variations: [] });
   });
 });
