@@ -17,6 +17,7 @@ import { logSystemAudit } from "./lib/audit";
 import { supabaseAdmin } from "./supabase";
 import { startRun } from "./lib/workflowEngine";
 import { tryEmitWeeklyDigestForUser } from "./lib/weeklyDigestEmitter";
+import { runTourEventsCleanupJob } from "./lib/tourCleanup";
 
 import { captureAndFlush } from "./lib/sentryReport";
 const WEEKLY_CRON = process.env.WEEKLY_REPORT_CRON || "0 8 * * 0";
@@ -605,6 +606,16 @@ export function initScheduler(): void {
   if (cron.validate(BRAND_PURGE_CRON)) {
     cron.schedule(BRAND_PURGE_CRON, cronCrashGuard("brand-purge", runBrandPurgeJob));
     logger.info({ cron: BRAND_PURGE_CRON }, "brand purge job scheduled");
+  }
+
+  // Daily tour events cleanup — retain 90 days.
+  const TOUR_EVENTS_CLEANUP_CRON = process.env.TOUR_EVENTS_CLEANUP_CRON || "0 2 * * *";
+  if (cron.validate(TOUR_EVENTS_CLEANUP_CRON)) {
+    cron.schedule(
+      TOUR_EVENTS_CLEANUP_CRON,
+      cronCrashGuard("tour-events-cleanup", runTourEventsCleanupJob),
+    );
+    logger.info({ cron: TOUR_EVENTS_CLEANUP_CRON }, "tour events cleanup scheduled");
   }
 
   // Auto-citation cron — always active, no RESEND_API_KEY needed.

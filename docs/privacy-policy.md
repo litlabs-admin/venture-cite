@@ -29,6 +29,10 @@ We collect the following categories of personal information:
 | Integration tokens   | Buffer OAuth access token (encrypted at rest, AES-256-GCM)                      | Posting to your social profiles when you ask us to |
 | Audit logs           | Action, IP, user agent for sensitive operations (deletes, subscription changes) | Compliance, fraud detection, dispute resolution    |
 
+We collect anonymous usage telemetry from in-app onboarding tours (tour ID,
+step viewed, completion / skip events) to improve product onboarding. This
+data is retained for 90 days and is not shared with third parties.
+
 We do **not** sell your personal information.
 
 ## 3. Subprocessors

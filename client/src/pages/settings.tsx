@@ -18,6 +18,7 @@ import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
 import { Loader2 } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
+import { useTourState, useTourStatePatch } from "@/hooks/useTourState";
 
 type NotificationPreference = {
   type: string;
@@ -33,6 +34,17 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+
+  const { state: tourState } = useTourState();
+  const { mutate: patchTour } = useTourStatePatch();
+  const wildcardSuppressed = (tourState.perUserSuppressed ?? []).includes("*");
+
+  const toggleWildcard = (next: boolean) => {
+    if (next) {
+      patchTour({ op: "suppress", tourId: "*" });
+    }
+    // No "off" path in v1 — see plan note (un-suppress is v2).
+  };
 
   const prefsQueryKey = ["/api/user/notification-preferences"];
   const {
@@ -210,6 +222,25 @@ export default function Settings() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <h2 className="text-base font-semibold">Onboarding tours</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Auto-firing tours appear on first visit to new pages. Manual replay via the "?" icon stays
+          available regardless of this setting.
+        </p>
+        <div className="flex items-center justify-between mt-4">
+          <label htmlFor="suppress-tours" className="text-sm font-medium">
+            Don't auto-show tours
+          </label>
+          <Switch
+            id="suppress-tours"
+            checked={wildcardSuppressed}
+            onCheckedChange={toggleWildcard}
+            disabled={wildcardSuppressed}
+          />
+        </div>
       </section>
 
       <section className="rounded-lg border border-destructive/40 p-6 space-y-4">

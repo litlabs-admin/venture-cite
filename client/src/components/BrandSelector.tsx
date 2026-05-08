@@ -43,7 +43,11 @@ export default function BrandSelector({
 
   return (
     <Select value={activeValue || undefined} onValueChange={handleChange}>
-      <SelectTrigger className={className} data-testid="select-brand">
+      <SelectTrigger
+        className={className}
+        data-testid="select-brand"
+        data-tour-id="sidebar.brandSelector"
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

@@ -835,6 +835,22 @@ export interface IStorage {
       sort?: "newest" | "oldest" | "engagement";
     },
   ): Promise<{ rows: BrandMention[]; nextCursor: { discoveredAt: Date; id: string } | null }>;
+
+  // Tour engine state + telemetry
+  getTourState(userId: string): Promise<Record<string, unknown>>;
+  patchTourState(
+    userId: string,
+    op: "markCompleted" | "markSkipped" | "suppress" | "clearBrand",
+    args: {
+      tourId?: string;
+      version?: number;
+      brandId?: string | null;
+      timestamp: string;
+    },
+  ): Promise<Record<string, unknown>>;
+  clearTourStateForBrand(brandId: string): Promise<void>;
+  recordTourEvents(events: import("@shared/schema").InsertTourEvent[]): Promise<number>;
+  deleteOldTourEvents(olderThan: Date): Promise<number>;
 }
 
 import { DatabaseStorage } from "./databaseStorage";

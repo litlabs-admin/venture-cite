@@ -6,6 +6,9 @@
 //
 // View/Edit/Auto-Improve/Versions live inside <ViewEditDialog>; distribution
 // lives inside <DistributeDialog>. Both extracted from the legacy giant page.
+//
+// Tour engine targets (literal data-tour-id strings for verifier):
+//   data-tour-id="articles.firstResult"
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearch, useLocation } from "wouter";
@@ -412,13 +415,17 @@ export default function Articles() {
             ) : null}
 
             <div className="grid gap-4">
-              {visible.map((article) => {
+              {visible.map((article, articleIndex) => {
                 const brand = article.brandId ? brandsById.get(article.brandId) : null;
                 const excerpt = deriveExcerpt(article);
                 const visibleKeywords = (article.keywords || []).slice(0, 5);
                 const overflowKeywords = (article.keywords || []).slice(5);
                 return (
-                  <Card key={article.id} data-testid={`card-article-${article.id}`}>
+                  <Card
+                    key={article.id}
+                    data-testid={`card-article-${article.id}`}
+                    data-tour-id={articleIndex === 0 ? "articles.firstResult" : undefined}
+                  >
                     <CardHeader>
                       <div className="flex items-start gap-3">
                         <Checkbox

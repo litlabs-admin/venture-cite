@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import PageHeader from "@/components/PageHeader";
+import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,7 +27,12 @@ export default function AIIntelligence() {
       <PageHeader
         title="AI Intelligence"
         description="Share-of-Answer, Citation Quality, and Hallucination Detection"
-        actions={brands.length > 0 ? <BrandSelector /> : null}
+        actions={
+          <div className="flex items-center gap-2">
+            {brands.length > 0 ? <BrandSelector /> : null}
+            <PageHeaderHelp tourId="ai-intelligence" pageLabel="AI Intelligence" />
+          </div>
+        }
         explainer={pageExplainers.aiIntelligence}
       />
 
@@ -41,7 +47,11 @@ export default function AIIntelligence() {
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-6 mb-6">
-            <TabsTrigger value="share-of-answer" data-testid="tab-share-of-answer">
+            <TabsTrigger
+              value="share-of-answer"
+              data-testid="tab-share-of-answer"
+              data-tour-id="aiIntel.tab.share"
+            >
               <Target className="w-4 h-4 mr-2" />
               Share-of-Answer
             </TabsTrigger>
@@ -53,7 +63,11 @@ export default function AIIntelligence() {
               <Award className="w-4 h-4 mr-2" />
               Citation Quality
             </TabsTrigger>
-            <TabsTrigger value="hallucinations" data-testid="tab-hallucinations">
+            <TabsTrigger
+              value="hallucinations"
+              data-testid="tab-hallucinations"
+              data-tour-id="aiIntel.tab.hallucinations"
+            >
               <AlertTriangle className="w-4 h-4 mr-2" />
               Hallucinations
             </TabsTrigger>

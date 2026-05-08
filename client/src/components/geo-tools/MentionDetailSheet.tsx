@@ -312,7 +312,7 @@ export default function MentionDetailSheet({
               )}
 
               {/* Mention context */}
-              <section aria-label="Mention content">
+              <section aria-label="Mention content" data-tour-id="mentions.detail.thread">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Content
                 </h3>

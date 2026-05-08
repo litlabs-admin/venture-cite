@@ -72,6 +72,7 @@ import { parsePagination } from "./lib/pagination";
 import { setupUserAccountRoutes } from "./routes/userAccount";
 import { setupUnsubscribeRoutes } from "./routes/unsubscribe";
 import { setupOnboardingRoutes } from "./routes/onboarding";
+import { setupTourRoutes } from "./routes/tours";
 import { setupLogoProxyRoutes } from "./routes/logoProxy";
 import { setupBrandRoutes } from "./routes/brands";
 import { setupBufferRoutes } from "./routes/buffer";
@@ -188,6 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Server-side onboarding flag store (Wave 4.7).
   setupOnboardingRoutes(app);
+  setupTourRoutes(app);
 
   // Logo/favicon image proxy — so scraped external images pass CSP.
   setupLogoProxyRoutes(app);

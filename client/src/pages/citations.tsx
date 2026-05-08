@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import PageHeader from "@/components/PageHeader";
+import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
 import { ErrorState } from "@/components/ui/error-state";
 import {
@@ -360,11 +361,17 @@ export default function Citations() {
     ? formatDistanceToNow(new Date(prompts[0].createdAt), { addSuffix: true })
     : null;
 
+  // Tour engine targets (literal data-tour-id strings included so the
+  // verify-tour-targets script can statically discover them):
+  //   data-tour-id="citations.tab.prompts"
+  //   data-tour-id="citations.tab.results"
+  //   data-tour-id="citations.tab.history"
+  //   data-tour-id="citations.tab.schedule"
   const TABS = [
-    { id: "prompts", label: "Prompts", icon: Sparkles },
-    { id: "results", label: "Latest Results", icon: Target },
-    { id: "history", label: "History", icon: Calendar },
-    { id: "schedule", label: "Schedule", icon: RefreshCw },
+    { id: "prompts", label: "Prompts", icon: Sparkles, tourId: "citations.tab.prompts" },
+    { id: "results", label: "Latest Results", icon: Target, tourId: "citations.tab.results" },
+    { id: "history", label: "History", icon: Calendar, tourId: "citations.tab.history" },
+    { id: "schedule", label: "Schedule", icon: RefreshCw, tourId: "citations.tab.schedule" },
   ];
 
   return (
@@ -372,6 +379,7 @@ export default function Citations() {
       <PageHeader
         title="AI Citations"
         description="Track how often AI engines cite your brand when users ask them strategic questions."
+        actions={<PageHeaderHelp tourId="citations" pageLabel="Citations" />}
         explainer={pageExplainers.citations}
       />
 
@@ -398,6 +406,7 @@ export default function Citations() {
                     disabled={runMutation.isPending || showBanner || !selectedBrandId}
                     className="bg-red-600 hover:bg-red-700 shrink-0"
                     data-testid="button-run-check"
+                    data-tour-id="prompts.runButton"
                   >
                     {showBanner ? (
                       <>
@@ -536,6 +545,7 @@ export default function Citations() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
+                  data-tour-id={tab.tourId}
                   className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
                     isActive
                       ? "border-red-500 text-foreground"

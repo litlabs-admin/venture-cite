@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import PageHeader from "@/components/PageHeader";
+import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
 import {
   CheckCircle2,
@@ -952,6 +953,7 @@ export default function AIVisibility() {
       <PageHeader
         title="AI Engine Visibility Recommendations"
         description="Step-by-step checklists to get your brand cited by each major AI search engine"
+        actions={<PageHeaderHelp tourId="ai-visibility" pageLabel="AI Visibility" />}
         explainer={pageExplainers.aiVisibility}
       />
 
@@ -1041,7 +1043,11 @@ export default function AIVisibility() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Accordion type="multiple" className="space-y-3">
+                <Accordion
+                  type="multiple"
+                  className="space-y-3"
+                  data-tour-id="aiVisibility.engineList"
+                >
                   {engine.steps.map((step, index) => {
                     const isCompleted = (completedSteps[engine.id] || []).includes(step.id);
                     return (

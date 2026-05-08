@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { MessageBubble } from "./chatbot/MessageBubble";
 import { WelcomeState } from "./chatbot/WelcomeState";
 import { HistoryView } from "./chatbot/HistoryView";
+import { subscribeOpenChatbotPrompt } from "../lib/openChatbotPrompt";
 
 type View = "thread" | "history";
 
@@ -45,6 +46,7 @@ function ChatTrigger({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       aria-label="Open AI Tutor"
+      data-tour-id="sidebar.chatbot"
       className={cn(
         "fixed bottom-6 right-6 z-40",
         "flex items-center gap-2 rounded-full pl-3 pr-4 h-12",
@@ -81,6 +83,14 @@ export default function EducationAssistant() {
   useEffect(() => {
     if (open) setView("thread");
   }, [open]);
+
+  // Listen for external open-with-prompt events (e.g. PageHeaderHelp fallback).
+  useEffect(() => {
+    return subscribeOpenChatbotPrompt((prompt) => {
+      setOpen(true);
+      setInput(prompt);
+    });
+  }, []);
 
   // Auto-scroll on new content.
   useEffect(() => {

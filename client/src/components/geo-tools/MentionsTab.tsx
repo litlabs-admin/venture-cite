@@ -69,6 +69,9 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
 // MentionsTab
 // ---------------------------------------------------------------------------
 
+// Tour engine targets (literal data-tour-id strings included so the
+// verify-tour-targets script can statically discover them):
+//   data-tour-id="mentions.firstResult"
 export default function MentionsTab({ brandId }: MentionsTabProps) {
   const [location, setLocation] = useLocation();
   const searchString = useSearch();
@@ -404,8 +407,12 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
           {/* The list */}
           {mentions.length > 0 && (
             <ul className="flex flex-col gap-2" aria-label="Mentions list">
-              {mentions.map((mention) => (
-                <li key={mention.id} className="flex items-start gap-2">
+              {mentions.map((mention, index) => (
+                <li
+                  key={mention.id}
+                  className="flex items-start gap-2"
+                  data-tour-id={index === 0 ? "mentions.firstResult" : undefined}
+                >
                   {/* Bulk-select checkbox */}
                   {bulkMode && (
                     <button

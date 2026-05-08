@@ -1,3 +1,5 @@
+// Tour engine targets (literal data-tour-id strings for verifier):
+//   data-tour-id="brands.firstRow"
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { queryClient, apiRequest, isApiError } from "@/lib/queryClient";
@@ -5,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
+import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -364,6 +367,7 @@ export default function Brands() {
       <PageHeader
         title="Brand Management"
         description="Your brand profiles power everything in VentureCite - content generation, AI tracking, and visibility optimization"
+        actions={<PageHeaderHelp tourId="brands" pageLabel="Brands" />}
         explainer={pageExplainers.brands}
       />
 
@@ -403,6 +407,7 @@ export default function Brands() {
                   disabled={createFromWebsiteMutation.isPending}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 px-6 flex-shrink-0"
                   data-testid="button-analyze-website"
+                  data-tour-id="brands.addButton"
                 >
                   {createFromWebsiteMutation.isPending ? (
                     <>
@@ -485,11 +490,12 @@ export default function Brands() {
             Your Brands ({brands.length})
           </h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {brands.map((brand) => (
+            {brands.map((brand, brandIndex) => (
               <Card
                 key={brand.id}
                 className="hover:shadow-lg transition-shadow"
                 data-testid={`card-brand-${brand.id}`}
+                data-tour-id={brandIndex === 0 ? "brands.firstRow" : undefined}
               >
                 <CardHeader>
                   <div className="flex justify-between items-start">

@@ -263,7 +263,7 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
         control={form.control}
         name="nameVariations"
         render={({ field }) => (
-          <FormItem>
+          <FormItem data-tour-id="brands.nameVariations">
             <FormLabel>Name Variations (for GEO Tracking)</FormLabel>
             <FormControl>
               <Input

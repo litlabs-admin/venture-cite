@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import type { BrandMention } from "@shared/schema";
 import PageHeader from "@/components/PageHeader";
+import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -544,6 +545,7 @@ export default function Home() {
                 <Sparkles className="w-4 h-4 mr-2" /> Create Content
               </Button>
             </Link>
+            <PageHeaderHelp tourId="dashboard" pageLabel="Dashboard" />
           </div>
         }
         explainer={pageExplainers.dashboard}
@@ -553,7 +555,9 @@ export default function Home() {
           to expect" timeline. Both render above the hero row regardless of
           whether the user has citation data yet — the ring helps new users
           finish setup, and the timeline sets expectations for everyone. */}
-      <OnboardingProgressRing />
+      <div data-tour-id="dashboard.progressRing">
+        <OnboardingProgressRing />
+      </div>
       <ResultsTimeline />
       <RecommendationsPanel />
 
@@ -574,7 +578,7 @@ export default function Home() {
               isRetrying={hero.isRefetching}
             />
           ) : (
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-3" data-tour-id="dashboard.stats">
               {/* AI Visibility Score */}
               <Card
                 data-testid="card-visibility-score"

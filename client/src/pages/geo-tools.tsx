@@ -1,3 +1,6 @@
+// Tour engine targets (literal data-tour-id strings for verifier):
+//   data-tour-id="listicles.firstResult"
+//   data-tour-id="faq.firstResult"
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +40,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import PageHeader from "@/components/PageHeader";
+import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
 import type { Listicle, BofuContent, FaqItem, WikipediaMention, Competitor } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
@@ -578,6 +582,7 @@ export default function GeoTools() {
                   <Sparkles className="h-4 w-4 mr-2" /> GEO Signals
                 </Button>
               </Link>
+              <PageHeaderHelp tourId="geo-tools" pageLabel="GEO Tools" />
             </div>
           }
           explainer={pageExplainers.geoTools}
@@ -623,7 +628,7 @@ export default function GeoTools() {
               </div>
             )}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-5 mb-6">
+              <TabsList className="grid w-full grid-cols-5 mb-6" data-tour-id="geoTools.tabs">
                 <TabsTrigger
                   value="listicles"
                   className="flex items-center gap-2"
@@ -660,6 +665,7 @@ export default function GeoTools() {
                   value="mentions"
                   className="flex items-center gap-2"
                   data-testid="tab-mentions"
+                  data-tour-id="geoTools.tab.mentions"
                 >
                   <Bell className="h-4 w-4" />
                   <span className="hidden sm:inline">Mentions</span>
@@ -761,7 +767,7 @@ export default function GeoTools() {
                               const s = (l as any).outreachStatus ?? "new";
                               return s === listicleStatusFilter;
                             })
-                            .map((l) => {
+                            .map((l, listicleIndex) => {
                               const competitors = Array.isArray(l.competitorsMentioned)
                                 ? l.competitorsMentioned
                                 : [];
@@ -770,7 +776,13 @@ export default function GeoTools() {
                               const statusMeta =
                                 LISTICLE_STATUS_DISPLAY[status] ?? LISTICLE_STATUS_DISPLAY.new;
                               return (
-                                <Card key={l.id} className="border-l-4 border-l-purple-500">
+                                <Card
+                                  key={l.id}
+                                  className="border-l-4 border-l-purple-500"
+                                  data-tour-id={
+                                    listicleIndex === 0 ? "listicles.firstResult" : undefined
+                                  }
+                                >
                                   <CardContent className="pt-4">
                                     <div className="flex items-start justify-between gap-4">
                                       <div className="flex-1 min-w-0">
@@ -1275,8 +1287,11 @@ export default function GeoTools() {
                         </div>
                       ) : (faqsData as any)?.data?.length > 0 ? (
                         <div className="space-y-4">
-                          {(faqsData as any).data.map((faq: FaqItem) => (
-                            <Card key={faq.id}>
+                          {(faqsData as any).data.map((faq: FaqItem, faqIndex: number) => (
+                            <Card
+                              key={faq.id}
+                              data-tour-id={faqIndex === 0 ? "faq.firstResult" : undefined}
+                            >
                               <CardContent className="pt-4">
                                 <div className="flex items-start justify-between">
                                   <div className="flex-1">

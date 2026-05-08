@@ -10,6 +10,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/use-auth";
 import AppLayout from "@/components/AppLayout";
 import { ScanCompletionListener } from "@/components/ScanCompletionListener";
+import { TourOrchestrator } from "./tours/engine/TourOrchestrator";
 
 // Eager: first-paint + auth flow. Everything else is lazy so the initial
 // bundle doesn't carry recharts / react-markdown / framer-motion etc.
@@ -228,6 +229,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <ScanCompletionListener />
+            <TourOrchestrator />
             <Router />
           </TooltipProvider>
         </QueryClientProvider>

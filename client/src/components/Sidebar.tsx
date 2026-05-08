@@ -146,55 +146,65 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Scrollable nav */}
       <nav className="flex-1 overflow-y-auto py-2">
-        <SectionLabel label="Setup" />
-        {NAV_MAIN.map((item) => (
-          <NavItem
-            key={item.href}
-            {...item}
-            active={activePath === item.href}
-            onNavigate={onNavigate}
-          />
-        ))}
+        <div data-tour-id="sidebar.group.setup">
+          <SectionLabel label="Setup" />
+          {NAV_MAIN.map((item) => (
+            <NavItem
+              key={item.href}
+              {...item}
+              active={activePath === item.href}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
 
-        <SectionLabel label="Create" />
-        {NAV_TOOLS.map((item) => (
-          <NavItem
-            key={item.href}
-            {...item}
-            active={activePath === item.href}
-            onNavigate={onNavigate}
-          />
-        ))}
+        <div data-tour-id="sidebar.group.create">
+          <SectionLabel label="Create" />
+          {NAV_TOOLS.map((item) => (
+            <NavItem
+              key={item.href}
+              {...item}
+              active={activePath === item.href}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
 
-        <SectionLabel label="Measure" />
-        {NAV_ANALYTICS.map((item) => (
-          <NavItem
-            key={item.href}
-            {...item}
-            active={activePath === item.href}
-            onNavigate={onNavigate}
-          />
-        ))}
+        <div data-tour-id="sidebar.group.measure">
+          <SectionLabel label="Measure" />
+          {NAV_ANALYTICS.map((item) => (
+            <NavItem
+              key={item.href}
+              {...item}
+              active={activePath === item.href}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
 
-        <SectionLabel label="Grow" />
-        {NAV_GROWTH.map((item) => (
-          <NavItem
-            key={item.href}
-            {...item}
-            active={activePath === item.href}
-            onNavigate={onNavigate}
-          />
-        ))}
+        <div data-tour-id="sidebar.group.grow">
+          <SectionLabel label="Grow" />
+          {NAV_GROWTH.map((item) => (
+            <NavItem
+              key={item.href}
+              {...item}
+              active={activePath === item.href}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
 
-        <SectionLabel label="Optimize" />
-        {NAV_OPTIMIZE.map((item) => (
-          <NavItem
-            key={item.href}
-            {...item}
-            active={activePath === item.href}
-            onNavigate={onNavigate}
-          />
-        ))}
+        <div data-tour-id="sidebar.group.optimize">
+          <SectionLabel label="Optimize" />
+          {NAV_OPTIMIZE.map((item) => (
+            <NavItem
+              key={item.href}
+              {...item}
+              active={activePath === item.href}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
       </nav>
 
       {/* Bottom: user */}

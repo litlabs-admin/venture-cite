@@ -2102,3 +2102,27 @@ export type SourceHealth = typeof sourceHealth.$inferSelect;
 export type InsertSourceHealth = typeof sourceHealth.$inferInsert;
 export type SentimentCache = typeof sentimentCache.$inferSelect;
 export type InsertSentimentCache = typeof sentimentCache.$inferInsert;
+
+export const tourEvents = pgTable("tour_events", {
+  id: varchar("id").primaryKey(),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  brandId: varchar("brand_id").references(() => brands.id, { onDelete: "set null" }),
+  tourId: text("tour_id").notNull(),
+  tourVersion: integer("tour_version").notNull(),
+  stepId: text("step_id"),
+  stepIndex: integer("step_index"),
+  eventType: text("event_type").notNull(),
+  triggerType: text("trigger_type"),
+  dwellMs: integer("dwell_ms"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  serverReceivedAt: timestamp("server_received_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const insertTourEventSchema = createInsertSchema(tourEvents).omit({
+  serverReceivedAt: true,
+});
+
+export type TourEvent = typeof tourEvents.$inferSelect;
+export type InsertTourEvent = z.infer<typeof insertTourEventSchema>;

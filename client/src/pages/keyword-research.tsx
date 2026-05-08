@@ -1,3 +1,5 @@
+// Tour engine targets (literal data-tour-id strings for verifier):
+//   data-tour-id="keywords.firstRow"
 import { useEffect, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -318,11 +320,12 @@ export default function KeywordResearchPage() {
             </Button>
           </div>
 
-          {filteredKeywords.map((keyword) => (
+          {filteredKeywords.map((keyword, keywordIndex) => (
             <Card
               key={keyword.id}
               className="hover:shadow-md transition-shadow"
               data-testid={`keyword-card-${keyword.id}`}
+              data-tour-id={keywordIndex === 0 ? "keywords.firstRow" : undefined}
             >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between gap-4">

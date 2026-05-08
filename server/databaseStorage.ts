@@ -6,12 +6,15 @@ import {
   sql,
   gte,
   lte,
+  lt,
   or,
   ne,
   isNull,
   inArray,
   getTableColumns,
 } from "drizzle-orm";
+import type { InsertTourEvent } from "@shared/schema";
+import type { KnownTourId, TourStateOp } from "./lib/tourRegistry";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -112,6 +115,9 @@ import {
   type InsertSourceHealth,
   type SentimentCache,
 } from "@shared/schema";
+
+export { applyTourStateOp } from "./lib/tourStateOps";
+import { applyTourStateOp } from "./lib/tourStateOps";
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
@@ -328,8 +334,83 @@ export class DatabaseStorage implements IStorage {
     // grace window. Application code should call softDeleteBrand
     // instead so users get a 30-day undo window. The FK cascade
     // (migrations/0003_fk_hardening.sql) cleans up child rows.
+    await this.clearTourStateForBrand(id);
     const result = await db.delete(schema.brands).where(eq(schema.brands.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getTourState(userId: string): Promise<Record<string, unknown>> {
+    const [row] = await db
+      .select({ onboardingState: schema.users.onboardingState })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+    const state = (row?.onboardingState ?? {}) as Record<string, unknown>;
+    const tours = (state.tours as Record<string, unknown> | undefined) ?? {};
+    return tours;
+  }
+
+  async patchTourState(
+    userId: string,
+    op: TourStateOp,
+    args: {
+      tourId?: KnownTourId;
+      version?: number;
+      brandId?: string | null;
+      timestamp: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    const [current] = await db
+      .select({ onboardingState: schema.users.onboardingState })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    const existing = (current?.onboardingState ?? {}) as Record<string, unknown>;
+    const tours = (existing.tours ?? {}) as Record<string, unknown>;
+    const next = applyTourStateOp(tours, op, args);
+
+    const merged = { ...existing, tours: next };
+
+    const [updated] = await db
+      .update(schema.users)
+      .set({ onboardingState: merged })
+      .where(eq(schema.users.id, userId))
+      .returning({ onboardingState: schema.users.onboardingState });
+
+    const newTours = ((updated?.onboardingState as Record<string, unknown> | undefined)?.tours ??
+      {}) as Record<string, unknown>;
+    return newTours;
+  }
+
+  async clearTourStateForBrand(brandId: string): Promise<void> {
+    // Strip perBrand[brandId] sub-tree from every user that has it.
+    // Called from deleteBrand and softDeleteBrand grace-window expiry.
+    await db.execute(sql`
+      UPDATE users
+      SET onboarding_state = jsonb_set(
+        onboarding_state,
+        '{tours,perBrand}',
+        COALESCE(onboarding_state->'tours'->'perBrand', '{}'::jsonb) - ${brandId}
+      )
+      WHERE onboarding_state->'tours'->'perBrand' ? ${brandId}
+    `);
+  }
+
+  async recordTourEvents(events: InsertTourEvent[]): Promise<number> {
+    if (events.length === 0) return 0;
+    await db
+      .insert(schema.tourEvents)
+      .values(events)
+      .onConflictDoNothing({ target: schema.tourEvents.id });
+    return events.length;
+  }
+
+  async deleteOldTourEvents(olderThan: Date): Promise<number> {
+    const result = await db.execute(sql`
+      DELETE FROM tour_events WHERE occurred_at < ${olderThan.toISOString()}
+    `);
+    return (result as unknown as { rowCount?: number }).rowCount ?? 0;
   }
 
   // Wave 4.5: schedule a brand for deletion in 30 days. Returns the
