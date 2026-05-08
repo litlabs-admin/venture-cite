@@ -39,7 +39,6 @@ const envSchema = z.object({
   // to debug than a process-startup hard-fail in environments that don't
   // use the chatbot.
   OPENROUTER_API_KEY: z.string().optional(),
-  PUBLIC_BASE_URL: z.string().url().optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   VITE_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   VITE_SUPABASE_URL: z.string().url().optional(),
