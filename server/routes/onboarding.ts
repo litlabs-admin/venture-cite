@@ -32,6 +32,8 @@ import { storage } from "../storage";
 import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
 import type { Tier } from "../lib/llmPricing";
 import { runOnboardingAutopilot } from "../lib/onboardingAutopilot";
+import { waitUntil } from "@vercel/functions";
+import { Sentry } from "../instrument";
 
 import { captureAndFlush } from "../lib/sentryReport";
 // Allowlist of field names the client can write into onboarding_state.
@@ -445,6 +447,24 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
         } catch (err) {
           logger.warn({ err, brandId: brand.id }, "autopilot: inline kickoff failed");
         }
+
+        // Plan 4 audit (BUG #28): setImmediate is unreliable on Vercel
+        // serverless — the lambda can suspend immediately after
+        // res.json() and drop the queued work. waitUntil keeps the
+        // function alive past the response (locally it's a no-op shim).
+        // BUG #10: also surface failures to Sentry so dropped
+        // fact-scrapes actually page someone.
+        waitUntil(
+          (async () => {
+            try {
+              const { scrapeBrandFacts } = await import("../lib/factExtractor");
+              await scrapeBrandFacts(brand.id);
+            } catch (err) {
+              logger.warn({ err, brandId: brand.id }, "Welcome-path fact scrape failed");
+              captureAndFlush(err, { tags: { source: "welcome-fact-scrape" } });
+            }
+          })(),
+        );
 
         res.json({ success: true, brandId: brand.id });
       } catch (err) {

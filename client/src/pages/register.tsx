@@ -18,6 +18,11 @@ import ventureCiteLogo from "@assets/logo.png";
 import { setSession } from "@/lib/authStore";
 import { Helmet } from "react-helmet-async";
 
+// Sessionstorage key that hands the verify-email page the address the
+// user just registered with — avoids a query-string param that could
+// leak into logs/referrers.
+const PENDING_VERIFY_EMAIL_KEY = "venturecite:pending-verify-email";
+
 export default function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -60,10 +65,29 @@ export default function Register() {
       return result;
     },
     onSuccess: async (data) => {
-      await setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
-      queryClient.setQueryData(["/api/auth/me"], data.user);
-      toast({ title: "Account created successfully!" });
-      setLocation("/");
+      // Plan 4 Task 3: register no longer issues a session. Instead the
+      // server flags requiresVerification and we route the user to the
+      // /verify-email screen until they click the link Supabase sent.
+      if (data?.requiresVerification) {
+        try {
+          sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, data.email ?? email);
+        } catch {
+          // sessionStorage may be unavailable (Safari private mode); the
+          // verify-email page falls back to a generic message in that
+          // case, which is still fine.
+        }
+        setLocation("/verify-email");
+        return;
+      }
+      // Legacy path — kept so an older server (or a future flag flip
+      // back) still works without breaking the client. Most installs
+      // will never hit this branch.
+      if (data?.access_token) {
+        await setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+        queryClient.setQueryData(["/api/auth/me"], data.user);
+        toast({ title: "Account created successfully!" });
+        setLocation("/");
+      }
     },
     onError: (error: Error) => {
       toast({ title: error.message, variant: "destructive" });

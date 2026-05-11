@@ -20,6 +20,18 @@ import { logger } from "./lib/logger";
   await applyMigrations();
   await reconcileOrphanCitationRuns();
 
+  // Plan 4 audit (BUG #14): our email verification flow assumes the
+  // Supabase project-level "Enable email confirmations" toggle is ON.
+  // If it's OFF, Supabase auto-confirms every account regardless of
+  // the `email_confirm: false` flag we pass to admin.createUser, and
+  // our verification gate is silently bypassed. This setting lives in
+  // the Supabase Dashboard, not in code — so log a boot-time reminder
+  // and document it in .env.example.
+  logger.info(
+    "Email verification requires Supabase Dashboard → Authentication → Providers → Email → 'Confirm email' to be ON. " +
+      "Also configure the project's Site URL (post-confirmation redirect) under Authentication → URL Configuration.",
+  );
+
   if (process.env.STRIPE_SECRET_KEY) {
     setupStripeProducts().catch((err) => {
       logger.error({ err }, "Stripe product setup failed");

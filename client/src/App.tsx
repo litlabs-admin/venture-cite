@@ -22,6 +22,7 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import VerifyEmail from "@/pages/verify-email";
 
 const Content = lazy(() => import("@/pages/content"));
 const Citations = lazy(() => import("@/pages/citations"));
@@ -146,6 +147,7 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/welcome">{() => <AuthenticatedBareRoute component={Welcome} />}</Route>
       <Route path="/dashboard">{() => <FirstRunGate component={Home} />}</Route>
       <Route path="/content">{() => <AuthenticatedRoute component={Content} />}</Route>

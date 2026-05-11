@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,9 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
 import { setSession } from "@/lib/authStore";
 import { Helmet } from "react-helmet-async";
@@ -25,6 +26,18 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [justVerified, setJustVerified] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verified") === "1") {
+      setJustVerified(true);
+      // Strip the query param so a refresh doesn't replay the banner.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("verified");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
@@ -80,6 +93,12 @@ export default function Login() {
           <CardDescription>Sign in to your VentureCite account</CardDescription>
         </CardHeader>
         <CardContent>
+          {justVerified && (
+            <Alert className="mb-4 border-chart-4/40 bg-chart-4/10">
+              <CheckCircle2 className="h-4 w-4 text-chart-4" />
+              <AlertDescription>Email verified. Please sign in to continue.</AlertDescription>
+            </Alert>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

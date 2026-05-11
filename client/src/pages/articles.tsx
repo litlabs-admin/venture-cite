@@ -46,6 +46,7 @@ import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
 import ViewEditDialog from "@/components/articles/ViewEditDialog";
 import DistributeDialog from "@/components/articles/DistributeDialog";
+import { AIGeneratedPill } from "@/components/AIGeneratedPill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import type { Article, Brand } from "@shared/schema";
@@ -441,7 +442,10 @@ export default function Articles() {
                             >
                               {article.title || "Untitled"}
                             </CardTitle>
-                            <StatusBadge status={article.status ?? "ready"} />
+                            <div className="flex items-center gap-2 shrink-0">
+                              {article.aiGenerated && <AIGeneratedPill />}
+                              <StatusBadge status={article.status ?? "ready"} />
+                            </div>
                           </div>
                           {excerpt && (
                             <p className="text-sm text-muted-foreground line-clamp-2">{excerpt}</p>
@@ -520,7 +524,12 @@ export default function Articles() {
                           autoOpen={editId === article.id}
                           onAutoOpenHandled={() => setLocation("/articles", { replace: true })}
                         />
-                        {article.status === "ready" && <DistributeDialog articleId={article.id} />}
+                        {article.status === "ready" && (
+                          <DistributeDialog
+                            articleId={article.id}
+                            aiGenerated={article.aiGenerated}
+                          />
+                        )}
                         {article.status === "draft" && (
                           <Link href={`/content/${article.id}`}>
                             <Button variant="outline" size="sm">

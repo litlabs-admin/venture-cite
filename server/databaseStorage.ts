@@ -4519,6 +4519,11 @@ export class DatabaseStorage implements IStorage {
         title: title ?? sql`${schema.articles.title}`, // keep existing title if caller passes null
         jobId: null,
         version: sql`${schema.articles.version} + 1`,
+        // Foundations Plan 4 Task 4: this is the only path that flips
+        // ai_generated=true. Manual creates (POST /api/articles) leave the
+        // default false, so the AI-disclosure pill only renders for worker
+        // output.
+        aiGenerated: true,
         updatedAt: new Date(),
       })
       .where(eq(schema.articles.id, articleId));

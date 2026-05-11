@@ -3079,3 +3079,818 @@ Before the decision to drop Quora, added a `quora.variation_diagnostics` log lin
 - DB host clock drift (the underlying root cause of the "6 hours ago" symptom) is not fixed at the infrastructure level. The server-anchored age approach makes the application immune to it for the Mentions feature; other features still write `defaultNow()`-based timestamps that may also be hours off on the same host. Out of scope for this track.
 
 ---
+
+## Track 25 — Foundations Plan 1: Faking-as-Real cleanup (2026-05-10)
+
+**Goal:** Remove every UI surface that lies to the user — dead buttons, fake platform options for systems we don't actually integrate with, fabricated metrics displayed as if measured, fake progress theatre, orphan-link CTAs that 404. First of six remediation plans against the Foundations spec at [docs/superpowers/specs/2026-05-10-foundations-design.md](./superpowers/specs/2026-05-10-foundations-design.md).
+
+**Status:** Complete
+
+### Background
+
+The Foundations audit (a per-page deep-dive recon across the entire authenticated app) catalogued 20 sub-items in spec §4.5 alone where the UI surfaced things that didn't work or didn't exist. Plan 1 covers 17 of those 20; items n/o/p (status-dot adoption on 4px-stripe rows) were deferred to Plan 2 because they require the `<StatusDot>` primitive that Plan 2 ships.
+
+### 25.1 Reports page cleanup
+
+**Problem.** Three buttons on the Reports page had no `onClick` handlers — Export PDF, Share, Schedule Weekly Report — they rendered but did nothing. Header copy said "Next update in 24 hours" but no scheduled regeneration existed; data was live each load.
+
+**Fix.**
+
+| File                                  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/client-reports.tsx` | Removed Export PDF button entirely (no CSV stand-in — export deferred). Removed Share button entirely (public-share infrastructure deferred). Replaced static Schedule button with a controlled `<Switch>` bound to the existing `weeklyReportEnabled` user preference via `PATCH /api/user/notification-preferences`. Replaced "Next update in 24 hours" copy with live "Last refreshed: Xm ago" rendered from the TanStack Query's `dataUpdatedAt` field. |
+
+The existing weekly-report cron at `server/scheduler.ts:511,573` already gated on `weeklyReportEnabled`, so wiring the toggle activated the existing flow with no server change. The `setPreference` helper dual-writes both `notification_preferences` and `users.weeklyReportEnabled`.
+
+### 25.2 Quora full purge
+
+**Problem.** Quora appeared as a supported platform across the UI (community engagement, geo-opportunities, distribute dialog) but no Quora scanner existed in `server/lib/mentionScanner.ts`. The geo-opportunities response carried a `quora` bucket driven by a hardcoded `INDUSTRY_QUORA_TOPICS` map in `server/routes/analytics.ts` — entirely fabricated content.
+
+**Fix.**
+
+| File                                                  | Change                                                                                                                                                                                                                          |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/community-engagement.tsx`           | Removed `SiQuora` import, `platformIcons.quora`, `platformColors.quora`, dropdown `<SelectItem value="quora">`, prompt branches keyed on `platform === "quora"`, best-practices Quora block, header copy mentions.              |
+| `client/src/pages/geo-opportunities.tsx`              | Removed Quora `<TabsTrigger>` + `<TabsContent>` blocks. Removed `quoraTopics` + `quoraCitationShare` from `OpportunitiesData` interface and the corresponding stat card. Updated tabs grid from `grid-cols-4` to `grid-cols-3`. |
+| `client/src/components/articles/DistributeDialog.tsx` | Removed `"Quora"` entry from `DISTRIBUTION_PLATFORMS`.                                                                                                                                                                          |
+| `server/routes/analytics.ts`                          | Deleted `INDUSTRY_QUORA_TOPICS` map (~lines 1327-1369). Deleted the `quora` response branch in `/api/geo-opportunities`. Removed `quoraCitationShare` from per-platform breakdown.                                              |
+| `client/src/lib/pageExplainers.ts`                    | "Reddit + Quora" → "Reddit + forum".                                                                                                                                                                                            |
+| `client/src/pages/glossary.tsx`                       | Stripped "Quora answers" from AEO definition and "Reddit + Quora" coverage line.                                                                                                                                                |
+| `server/lib/recommendationsEngine.ts`                 | Recommendation card title "Try Reddit/Quora outreach for AEO" → "Try Reddit outreach for AEO".                                                                                                                                  |
+
+**Intentionally kept.** `server/citationChecker.ts:182` mapping `quora.com → "community"` for source classification — harmless and orthogonal. DB enum entries in `shared/schema.ts` — historical data preservation.
+
+### 25.3 AI Visibility 404 quick-action audit
+
+**Problem.** Two `quickAction.link` values on `/ai-visibility` pointed at routes that don't exist in App.tsx — `/geo-rankings` and `/publications`. Clicking either took the user to a 404.
+
+**Fix.**
+
+| File                                 | Change                                                                                                                                                                                                                                                                      |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/ai-visibility.tsx` | At `~line 171`, dropped the entire `quickAction` field on the step pointing to `/publications` (no in-product equivalent yet — CTA button no longer renders). At `~line 513`, repointed `/geo-rankings` to `/citations` and relabeled "Track Rankings" → "Track Citations". |
+
+### 25.4 Content generation phase indicator — honest progress
+
+**Problem.** `server/routes/content.ts` had a `PHASE_BANDS` constant + `phaseFor()` function that rotated fake phase names ("Brainstorming themes" → "Drafting outline" → "Writing sections" → "Polishing") purely on elapsed milliseconds — no correlation to actual LLM work. There was also no way to cancel a running generation.
+
+**Fix.**
+
+| File                                            | Change                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/content.ts`                      | Deleted `PHASE_BANDS` constant and `phaseFor` function. `computeJobStatePayload` returns `{ status, done, errorMessage, elapsedSeconds }` (was `{ phase, elapsedMs }`). Added `POST /api/content/:articleId/cancel` route with ownership check via `requireArticle` (404 on miss, anti-enumeration). Cancellation refunds quota for previously-pending jobs and flips article back to draft. |
+| `client/src/pages/content.tsx`                  | Replaced fake phase label ("Brainstorming themes") with honest `Generating ({elapsedSeconds}s)`. Added Cancel button + `cancelMutation` hitting the new endpoint.                                                                                                                                                                                                                            |
+| `tests/unit/contentCancel.test.ts`              | **New** — 2 tests: happy-path cancel flips the job row to `cancelled` and article to draft; non-owned article returns 404 (anti-enumeration).                                                                                                                                                                                                                                                |
+| `tests/unit/contentGenerationResponses.test.ts` | Updated state-response shape assertion to expect `elapsedSeconds` instead of `phase`/`elapsedMs`.                                                                                                                                                                                                                                                                                            |
+
+The worker (`server/contentGenerationWorker.ts`) already re-reads job status at each `/advance` slice boundary (lines 284-298) and exits when status flips to anything other than `pending`/`running`, so setting `status = 'cancelled'` takes effect within ~7 seconds without modifying the worker.
+
+### 25.5 Keyword Research provenance
+
+**Problem.** Keyword Research displayed AI-fabricated numbers (search volume, difficulty, opportunity score, AI citation potential) as if they were measured. Vercel Hobby + no-external-services constraints rule out paid sources (DataForSEO / Ahrefs / Semrush) — honest labeling is the right shippable answer until paid-tier infrastructure lands.
+
+**Fix.**
+
+| File                                              | Change                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrations/0052_keyword_research_provenance.sql` | **New** — `ALTER TABLE keyword_research ADD COLUMN provenance TEXT NOT NULL DEFAULT 'ai-estimate'` + index on the column.                                                                                                                                                                                |
+| `shared/schema.ts`                                | Added `provenance: text("provenance").default("ai-estimate").notNull()` to `keywordResearch` table.                                                                                                                                                                                                      |
+| `server/routes/content.ts`                        | Insert path at `/api/keyword-research/discover` explicitly sets `provenance: "ai-estimate"`.                                                                                                                                                                                                             |
+| `client/src/pages/keyword-research.tsx`           | Added top-of-table `<Alert>` banner with `<Sparkles>` icon: "These figures are AI-estimated, not measured. Real search-volume integration is planned." Wrapped each numeric metric (Opportunity Score, AI Citation Potential, Search Volume, Difficulty) in a `<Tooltip>` with the same disclosure copy. |
+| `tests/unit/keywordResearchProvenance.test.ts`    | **New** — 3 tests: Drizzle column exists, Zod insert schema tolerates `provenance`, end-to-end behavioral test mocking `storage.createKeywordResearch` and asserting the route passes `provenance: "ai-estimate"` in the persisted payload.                                                              |
+
+### 25.6 AI_PLATFORMS split — 9 → 5
+
+**Problem.** `shared/constants.ts` exposed `AI_PLATFORMS` with 10 entries. `client/src/pages/geo-analytics.tsx` advertised "9 AI platforms" coverage. In reality `server/citationChecker.ts:42-48` only ran 5 engines: ChatGPT, Claude, Perplexity, Gemini, DeepSeek.
+
+**Fix.**
+
+| File                                 | Change                                                                                                                                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared/constants.ts`                | Split into `AI_PLATFORMS_ACTIVE` (5) and `AI_PLATFORMS_PLANNED` (the rest). Backwards-compat aliases `AI_PLATFORMS = AI_PLATFORMS_ACTIVE` (also `AI_PLATFORMS_CORE`) preserved so existing consumers compile. |
+| `client/src/pages/geo-analytics.tsx` | At `~line 228` and `~line 362`, replaced "9 AI platforms" copy with `{AI_PLATFORMS_ACTIVE.length} AI platforms ({AI_PLATFORMS_ACTIVE.join(", ")})` so the count self-updates as platforms come online.        |
+
+### 25.7 Per-platform icons on Competitors
+
+**Problem.** `client/src/pages/competitors.tsx:~496` rendered `<SiOpenai />` for every platform row — Claude, Gemini, Perplexity, DeepSeek all visually showed OpenAI's logo.
+
+**Fix.**
+
+| File                               | Change                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/competitors.tsx` | Added a `platformIcon` map keyed by lowercase platform name: `chatgpt → SiOpenai`, `claude → SiClaude`, `perplexity → SiPerplexity`, `gemini → SiGooglegemini`, `deepseek → Brain` (lucide fallback — no brand glyph available in the installed `react-icons` version). Unknown keys fall back to `Brain`. The unconditional `<SiOpenai />` row render became `<Icon className="..." />` with `Icon` resolved from the map. |
+
+### 25.8 Competitors Snapshot dialog deletion
+
+**Problem.** A "Snapshot" dialog at `competitors.tsx:~768-828` (triggered by a `<Plus />` icon in row actions ~line 651-655) asked the user to **type in a citation count manually** — pure fabricated-data entry contradicting the automated mining everywhere else.
+
+**Fix.**
+
+| File                               | Change                                                                                                                                                                                        |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/competitors.tsx` | Deleted the entire snapshot `<Dialog>` block, the `isSnapshotDialogOpen` / `selectedCompetitor` / `newSnapshot` state hooks, the `createSnapshotMutation`, and the `<Plus />` trigger button. |
+| `server/routes/publications.ts`    | Deleted `POST` and `GET` `/api/competitors/:id/snapshots` route handlers (no remaining client consumers). Removed unused `insertCompetitorCitationSnapshotSchema` import.                     |
+
+**DAO methods preserved.** `createCompetitorCitationSnapshot` / `getCompetitorCitationSnapshots` in `databaseStorage.ts` and `server/storage.ts` stay — still used by `server/citationChecker.ts:1184` to record real scan snapshots automatically. Only the manual-entry path was the lie.
+
+### 25.9 FAQ Manager JSON-LD viewer chrome
+
+**Problem.** The JSON-LD preview on the FAQ Manager Schema tab used `bg-slate-900` + `text-green-400` — a dark "terminal" aesthetic that broke the canonical light workspace.
+
+**Fix.**
+
+| File                               | Change                                                                                                                                                                                                |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/faq-manager.tsx` | Wrapper `bg-slate-900 rounded-lg` → `bg-muted border border-border rounded-md`. `<pre>` `text-green-400 text-sm font-mono` → `text-foreground text-sm font-mono`. JSON-LD generation logic untouched. |
+
+### 25.10 Discord / Slack / Industry Forum removal from Community Engagement
+
+**Problem.** `community-engagement.tsx` listed Discord and Slack as platform options. Neither has a scanner or posting integration. After Task 10, follow-up audit also flagged `forum` (Industry Forum) with no scanner backing.
+
+**Fix.**
+
+| File                                        | Change                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `client/src/pages/community-engagement.tsx` | Removed `discord` + `slack` + `forum` entries from `platformIcons` and `platformColors` maps. Removed the three `<SelectItem>` options. Only Reddit + Hacker News remain.                                                                                                                        |
+| `server/routes/community.ts`                | LLM prompt schema platform union narrowed from `"reddit" \| "quora" \| "hackernews" \| "forum" \| "discord" \| "slack"` to `"reddit" \| "hackernews"`. Removed Quora/forum/Discord/Slack entries from `platformGuidelines` map. Prompt fallback updated to "Reddit and Hacker News communities". |
+| `server/routes/articles.ts`                 | Removed Quora distribution prompt branch.                                                                                                                                                                                                                                                        |
+| `server/lib/modelConfig.ts`                 | Dropped Quora from a stale comment.                                                                                                                                                                                                                                                              |
+
+### 25.11 Citations schedule menu removal
+
+**Problem.** `/citations` exposed a Schedule tab letting users configure scan cadence (weekly / monthly / off). Per user decision (2026-05-10) this is a product decision, not a user setting — citation scans run weekly for every active brand.
+
+**Fix.**
+
+| File                                              | Change                                                                                                                                                                                                                                              |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/citations.tsx`                  | Removed `ScheduleTab` import. Schedule tab entry retained in the tab list (preserves `usePersistedState` keys) but now renders a `<Card>` with the static line "Citation scans run weekly for every brand."                                         |
+| `client/src/components/citations/ScheduleTab.tsx` | **Deleted** — sole consumer was the citations page.                                                                                                                                                                                                 |
+| `server/scheduler.ts`                             | Added exported `selectBrandsForCitationScan()` — queries every non-soft-deleted brand with no cadence-flag filter. `runAutoCitationJob` uses this selector. `isBrandDueForCitation()` rewritten to only enforce the "≥6 days since last run" floor. |
+| `server/routes/prompts.ts`                        | Deleted the `PATCH /api/brands/:brandId/citation-schedule` route handler.                                                                                                                                                                           |
+| `tests/unit/citationCronUnconditional.test.ts`    | **New** — asserts the WHERE clause built by `selectBrandsForCitationScan()` contains only `isNull(deleted_at)` with zero `and()` composition and zero `ne(autoCitationSchedule, ...)` gate.                                                         |
+
+**Dormant columns kept.** `autoCitationSchedule`, `autoCitationDay`, `autoCitationHour`, `autoCitationActive` on `brands` are preserved per spec (no destructive schema change).
+
+### 25.12 AI Intelligence Alerts removal
+
+**Problem.** Per user decision, the Alerts surface on `/ai-intelligence` is gone — the feature wasn't shipping value.
+
+**Fix.**
+
+| File                                               | Change                                                                                                                                                                                               |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/ai-intelligence.tsx`             | Removed `AlertsTab` import, `MessageSquare` icon import, the `<TabsTrigger value="alerts">`, and the corresponding `<TabsContent>`. Tabs grid `grid-cols-6` → `grid-cols-5`.                         |
+| `client/src/components/intelligence/AlertsTab.tsx` | **Deleted** — ~398 lines, sole consumer of the alerts surface.                                                                                                                                       |
+| `server/routes/intelligence.ts`                    | Removed `requireAlertSetting` + `aiLimitMiddleware` imports. Deleted ~255 lines: `GET/POST/PATCH/DELETE /api/alert-settings`, `GET /api/alert-history/:brandId`, `POST /api/alerts/test/:settingId`. |
+| `server/routes.ts`                                 | Removed unused `requireAlertSetting` import.                                                                                                                                                         |
+| `client/src/tours/pages/ai-intelligence.tour.ts`   | "Six lenses … alerts" → "Five lenses …".                                                                                                                                                             |
+| `server/lib/ownership.ts`                          | Follow-up: deleted the orphan `requireAlertSetting` ownership helper — zero callers after route removal.                                                                                             |
+
+**DB tables intact.** `alerts`, `alertSettings`, `alertHistory` table definitions in `shared/schema.ts` and their DAO methods stay — no destructive schema change. Drop deferred to a later migration once we're sure no other path reads them.
+
+### How to verify
+
+1. **Reports page.** No Export PDF or Share buttons. "Last refreshed: Xm ago" updates on refresh. Weekly toggle reflects pref and persists across reloads.
+2. **No Quora anywhere.** Community Engagement, Geo Opportunities, Distribute Dialog — no Quora option in any dropdown or tab.
+3. **AI Visibility quick-actions.** Every quick-action button lands on a real page; no 404s.
+4. **Content generation honest.** Status reads `Generating (Ns)` not "Drafting outline". Cancel button flips the job to `cancelled`.
+5. **Keyword Research labeled.** "AI-estimated, not measured" banner present; tooltips on every metric.
+6. **5 AI platforms claim.** Geo Analytics says "5 AI platforms (ChatGPT, Claude, Perplexity, Gemini, DeepSeek)".
+7. **Per-platform icons.** Each Competitors row shows a different glyph.
+8. **No snapshot dialog.** Competitors row actions have no `+` button.
+9. **FAQ JSON-LD viewer.** Schema tab renders JSON in neutral chrome, not green-on-black.
+10. **No Discord/Slack/forum in Community Engagement.** Dropdown has only Reddit + Hacker News.
+11. **No citation schedule UI.** Schedule tab shows the static "weekly" notice.
+12. **No Alerts surface.** /ai-intelligence has no Alerts tab. `/api/alert-settings` returns 404.
+
+### Pass criteria
+
+- [x] `npm run check` — clean (tsc + tour-target verification, 26 targets)
+- [x] New tests pass: `contentCancel`, `keywordResearchProvenance`, `citationCronUnconditional`
+- [x] No raw "Quora" / "Discord" / "Slack" / "forum" platform references in user-facing UI
+- [x] Migration `0052_keyword_research_provenance.sql` applies cleanly on boot
+
+---
+
+## Track 26 — Foundations Plan 2: Design system enforcement + primitives (2026-05-10)
+
+**Goal:** Stop the design-token divergence across the authenticated app. Tokens in [client/src/index.css](./client/src/index.css) and [.impeccable/design.json](./.impeccable/design.json) were already correct (vermillion primary, cool off-white background, JetBrains Mono / Inter, chart-1..5 ramp, shadow tiers) — but pages bypassed them at scale. Plan 2 enforces the tokens, ships six canonical primitive components, and lands the three Plan 1 leftovers (Status-Dot adoption on 4px-stripe rows).
+
+**Status:** Complete
+
+### Background
+
+A baseline audit found:
+
+- 5 `border-violet-600` route-loading spinners in App.tsx (violet isn't in the design system at all).
+- Page-wide violet identity in Brand Fact Sheet (~8 locations).
+- Hardcoded chart hex like `#3b82f6, #f97316, #eab308, #22c55e, #ef4444, #8b5cf6, #ec4899, #14b8a6, #a855f7, #f59e0b` in dashboard chart code.
+- 4 `bg-gradient-to-br from-purple-500/20 to-blue-500/20`-style cards on Geo Analytics (gradients explicitly forbidden by design.json).
+- ~12 unique empty-state implementations across pages, all hand-rolled.
+- KPI numerics rendered in `text-3xl font-semibold` everywhere instead of `font-mono tabular-nums`.
+- `truncate` used on description paragraphs (silently cuts copy) where `line-clamp-2` was required.
+
+### 26.1 Wave A — Six foundations primitives
+
+| File                                                 | Change                                                                                                                                                                                              |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/components/foundations/StatusDot.tsx`    | **New** — 8px filled dot. Tones: `success` (`bg-chart-4`), `warn` (`bg-chart-3`), `fail` (`bg-destructive`), `neutral` (`bg-muted-foreground`), `pending` (`bg-muted-foreground/40 animate-pulse`). |
+| `client/src/components/foundations/RouteSpinner.tsx` | **New** — Full-route loading spinner. `border-primary border-t-transparent` ring, centered, `role="status"`, screen-reader label.                                                                   |
+| `client/src/components/foundations/EmptyState.tsx`   | **New** — Canonical empty-state card. Optional Lucide icon + title + body (`line-clamp-3`) + optional CTA.                                                                                          |
+| `client/src/components/foundations/Section.tsx`      | **New** — Page section wrapper. Title + description (`line-clamp-2`) + optional meta-row slot + optional action slot.                                                                               |
+| `client/src/components/foundations/KPITile.tsx`      | **New** — Canonical KPI card. `font-mono tabular-nums` number, muted-foreground label, optional delta with tone (`up` → `text-chart-4`, `down` → `text-destructive`).                               |
+| `client/src/components/foundations/index.ts`         | **New** — Barrel export.                                                                                                                                                                            |
+| `client/src/App.tsx`                                 | Replaced 5 violet route-loading spinners with `<RouteSpinner />`. Removed the now-duplicate local `RouteSpinner` function that previously rendered violet chrome.                                   |
+
+**Skeleton primitive not duplicated.** `client/src/components/ui/skeleton.tsx` (shadcn) already exists; Plan 2 reuses it rather than shipping a second.
+
+### 26.2 Wave B — Page sweeps
+
+Twenty-two page files swept against a canonical token map. Each sweep replaced raw Tailwind palette (`bg-stone-*`, `text-violet-*`, `text-emerald-*`, etc.) with design tokens (`bg-background`, `text-primary`, `text-chart-4`, etc.), retired ambient `shadow-sm` on at-rest cards (per design.json "Flat-At-Rest"), converted `truncate` on description text to `line-clamp-2`, and removed every `bg-gradient-*` on authenticated routes.
+
+**Files swept:**
+
+- `client/src/pages/register.tsx`, `login.tsx`, `forgot-password.tsx`, `reset-password.tsx`, `welcome.tsx` (auth flow — 38 swaps total)
+- `client/src/pages/home.tsx` (dashboard — 10 chart hex → `CHART_COLORS = [hsl(var(--chart-1..5))]` array; 4 ambient shadows demoted; pending dots `bg-amber-500` → `bg-chart-3`; success badges `bg-emerald-500/10 text-emerald-400` → `bg-chart-4/10 text-chart-4`)
+- `client/src/pages/brand-fact-sheet.tsx` (9 violet → 0: 6 to `text-primary`, 1 to `border-primary`, 2 decorative cards demoted to `bg-muted/50 border-border`; dropped dark-mode violet variants since tokens auto-adapt)
+- `client/src/pages/citations.tsx` (`bg-red-600 hover:bg-red-700` primary CTA → `bg-primary hover:bg-primary/90`; active tab `border-red-500` → `border-primary`)
+- `client/src/pages/geo-analytics.tsx` (4 gradient cards → flat `bg-card border border-border` or `bg-muted`; ~16 palette swaps; `font-mono tabular-nums` on visibility-score, share-of-voice, and all four KPI tile numbers)
+- `client/src/pages/competitors.tsx` (Crown / Award / Medal / Trophy / TrendingUp icon colors mapped from yellow/gray/orange to `text-chart-3` and `text-chart-4`; `font-mono tabular-nums` on leaderboard citation count)
+- `client/src/pages/community-engagement.tsx` (~17 swaps — status/platform color maps to `bg-muted` + chart tokens; 4 stat cards adopted `<KPITile>`; Discover empty state adopted `<EmptyState>`)
+- `client/src/pages/geo-opportunities.tsx` (~8 swaps — two amber callout cards to `border-border bg-muted` + `text-chart-3`; Medium/Wikipedia neutral grays converted; recognizable third-party brand colors for Reddit/HN/YouTube/LinkedIn/PH intentionally kept as platform identifiers)
+- `client/src/pages/articles.tsx` (StatusBadge colors → `bg-muted text-chart-3` / `text-destructive`)
+- `client/src/pages/keyword-research.tsx` (score-color thresholds → `text-chart-4` / `text-chart-3` / `text-destructive`; two `bg-red-600` buttons → default `bg-primary`)
+- `client/src/pages/geo-signals.tsx` (~30 swaps — pipeline 48px stage badges kept full size with token swap rather than restructured to 8px StatusDot, per "don't restructure JSX" rule)
+- `client/src/pages/geo-tools.tsx` (4px `border-l-4 border-l-purple-500` listicle row → 1px `border-l border-border` + `<StatusDot tone="neutral">` at row start — **landing Plan 1 §4.5 item o**)
+- `client/src/pages/faq-manager.tsx` (4px colored left-borders → 1px hairline + score-driven `<StatusDot>` per FAQ item — **landing Plan 1 §4.5 item p**; gradient CTA `bg-gradient-to-r from-purple-600 to-blue-600` → `bg-primary`; 3 inline hex score values → chart tokens)
+- `client/src/pages/crawler-check.tsx` (~11 swaps — status icon helpers, badge variants, summary cards to chart tokens)
+- `client/src/pages/client-reports.tsx` (7 swaps including violet icons → primary, green-500 success dots → `bg-chart-4`, error badge `bg-red-500/20 text-red-400` → `bg-destructive/20 text-destructive`)
+- `client/src/pages/brands.tsx` (2 `truncate` description-style → `line-clamp-2` with `break-all` for long URLs)
+- `client/src/pages/settings.tsx` (delete-account section demoted from `border-destructive/40` → `border-border`; destructive intent now communicated solely by the `<Button variant="destructive">` CTA)
+
+**Pages with zero changes** (already token-clean from Plan 1 work or prior hygiene): `ai-intelligence.tsx`, `ai-visibility.tsx`, `content.tsx`, `glossary.tsx`, `privacy.tsx`.
+
+**Pages intentionally NOT swept** (out of scope): landing page (`landing.tsx`, `landing.css`, `text-gradient-red` utility) — separate marketing concern. Orphan pages (`outreach.tsx`, `ai-traffic.tsx`, `agent-dashboard.tsx`, etc.) — left alone per user decision.
+
+### 26.3 Out of scope deferrals on home.tsx (Plan 6 territory)
+
+Plan 2 applied tokens only on home.tsx. The following items were intentionally NOT touched because they involve behavioral gating (Pre-Data State rule) handled by Plan 6:
+
+- `SentimentCard` `text-emerald-400` / `text-amber-400` chrome
+- `PromptCoverageMap` `border-emerald-500/20 bg-emerald-500/5` chrome
+- Failed autopilot banner `truncate`
+- Hardcoded "Neutral" sentiment value, "AI Confidence Score" tile
+
+### 26.4 Child components not swept
+
+`client/src/components/dashboard/*`, `intelligence/*`, `citations/*`, etc. were NOT swept in Plan 2. Many KPI tiles and visualizations live there and likely contain remaining violet/raw-palette usage. Surfacing as a Plan 2.5 candidate.
+
+### How to verify
+
+1. **No violet on authenticated routes.** `grep -rn "violet" client/src/pages/` returns 0 matches.
+2. **No raw red CTAs.** `grep -rn "bg-red-6\|bg-red-7\|text-red-6\|text-red-7" client/src/pages/` returns minimal matches (only legitimate error-state `text-destructive` or form-error contexts).
+3. **No hardcoded chart hex on home.tsx.** `grep "#3b82f6\|#f97316" client/src/pages/home.tsx` returns 0 matches.
+4. **No gradients on authenticated routes.** `grep -rn "bg-gradient-to-" client/src/pages/` returns 0 matches.
+5. **Route load spinner is vermillion.** Navigate between any two routes; the spinner uses `border-primary`, not violet.
+6. **StatusDot adopted in geo-tools and faq-manager rows.** Listicle rows on /geo-tools and FAQ items on /faq-manager show a hairline left-border + 8px status dot instead of a 4px colored stripe.
+
+### Pass criteria
+
+- [x] `npm run check` clean
+- [x] Six primitive components shipped and importable from `@/components/foundations`
+- [x] 22 authenticated page files token-clean per the canonical map
+- [x] App.tsx route spinners use `<RouteSpinner />`
+
+---
+
+## Track 27 — Foundations Plan 3: Sidebar IA + Settings expansion (2026-05-12)
+
+**Goal:** Re-enable Account Settings, remove the vermillion left-stripe that competed with primary CTAs, and turn the Settings page into something a real customer can use — Billing via Stripe portal, Profile editor, Password change, Integrations panel.
+
+**Status:** Complete (with subsequent label revert — see 27.6)
+
+### 27.1 Sidebar IA fixes
+
+**Problem.**
+
+1. Account Settings dropdown item rendered with `disabled` — `/settings` route worked but had no entry point.
+2. Active nav items rendered an absolute 4px vermillion (`bg-primary`) left-stripe in addition to the dark-slate fill — explicitly forbidden by design.json and competed for accent budget.
+3. Six nav labels were ambiguous to a non-technical founder.
+
+**Fix.**
+
+| File                                | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `client/src/components/Sidebar.tsx` | Replaced `<DropdownMenuItem disabled>` with a clickable item that calls `navigate("/settings")` via wouter's `useLocation()` (plus `onNavigate?.()` to close the mobile sheet). Deleted the absolute-positioned `bg-primary` left-stripe span from the active nav-item render. Active state retains only the dark-slate fill (`bg-sidebar-primary text-sidebar-primary-foreground`). Initial label renames applied; subsequently reverted (see 27.6). Tour-target markers preserved (5 `data-tour-id` group markers verified). |
+
+### 27.2 Stripe billing portal route
+
+| File                                      | Change                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/billing.ts`                | Added `POST /api/billing/portal-session`. Looks up `dbUser.stripeCustomerId`; returns 400 with "No billing account on file. Subscribe to a plan first." if absent. Otherwise creates `stripe.billingPortal.sessions.create({ customer, return_url: `${APP_URL}/settings` })` and returns `{ success: true, url }`. 502 + log on Stripe SDK error. |
+| `tests/unit/billingPortalSession.test.ts` | **New** — 3 tests: 200 + url for user with `stripeCustomerId`, 400 for user without, 401 for unauthenticated.                                                                                                                                                                                                                                     |
+
+### 27.3 User profile + password routes
+
+| File                                      | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrations/0053_user_profile_fields.sql` | **New** — `ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT` (firstName / lastName already existed).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `shared/schema.ts`                        | Added `timezone: text("timezone")` to `users`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `server/routes/userAccount.ts`            | Added `PATCH /api/user/profile` — Zod schema accepts optional `firstName / lastName / timezone`; validates timezone against `Intl.supportedValuesOf("timeZone")`. Empty / whitespace-only firstName/lastName treated as "do not update" so the client cannot wipe a profile. Added `POST /api/user/password` — Zod schema requires `currentPassword` + `newPassword ≥ 8 chars`. Re-authenticates via `supabaseAdmin.auth.signInWithPassword` (matches existing login pattern). On success, calls `supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword })` and revokes other sessions via `supabaseAdmin.auth.admin.signOut(bearerToken, "others")` wrapped in try/catch. Audit-logged. |
+| `tests/unit/userProfileUpdate.test.ts`    | **New** — 3 tests: valid PATCH succeeds and persists; partial body accepted; invalid timezone returns 400.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `tests/unit/userPasswordChange.test.ts`   | **New** — 4 tests: valid change calls `updateUserById` and `signOut`; wrong currentPassword returns 401; newPassword < 8 chars returns 400; password change still 200s if `signOut` rejects.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+
+**Routes mount automatically.** Both `setupBillingRoutes(app)` and `setupUserAccountRoutes(app)` were already wired in `server/routes.ts:184,204`.
+
+### 27.4 Settings page expansion
+
+| File                            | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/settings.tsx` | Added four new Cards above the existing sections, in order: **Profile** (firstName / lastName / timezone Select sourced from `Intl.supportedValuesOf("timeZone")`), **Change password** (current / new / confirm with client-side validation), **Billing** (button bounces to `POST /api/billing/portal-session` then `window.location.href = url`), **Integrations** (Buffer tile with live connection status). Slack / Webhooks placeholder tiles initially included but removed per user decision (see 27.8) — only Buffer remains. The pre-existing trivial Profile `<section>` (just email display) was removed since the new ProfileSection subsumes it. |
+
+### 27.5 publicUserShape — include profile fields
+
+| File             | Change                                                                                                                                                                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/auth.ts` | Added `timezone: dbUser.timezone ?? null` to `publicUserShape`. Applied `?? null` coercion to `firstName` and `lastName` for consistent JSON serialization (absent values become `null`, not `undefined`). |
+
+### 27.6 Sidebar label rename revert
+
+**Decision.** Per user, the six label renames from 27.1 were reverted to originals.
+
+| File                                | Final labels                                                                                                                                                                                                                                                                                    |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/components/Sidebar.tsx` | Reverted: `/ai-visibility` "AI Visibility", `/geo-analytics` "GEO Analytics", `/client-reports` "Reports", `/geo-tools` "GEO Tools", `/geo-signals` "Signals", `/opportunities` "Opportunities". Account Settings dropdown stays enabled, vermillion stripe stays gone, tour markers preserved. |
+
+### 27.7 Removed older Stripe portal route
+
+**Decision.** Audit confirmed zero callers in `client/`, `shared/`, or `tests/` for the older `POST /api/stripe/portal` route. Removed alongside two stale header comments. New `POST /api/billing/portal-session` is the only portal entry point.
+
+### 27.8 Slack / Webhooks placeholders removed
+
+**Decision.** Initial Integrations Card included disabled "Coming soon" tiles for Slack and Webhooks. Per user, both removed — only Buffer remains.
+
+### How to verify
+
+1. **Account Settings reachable.** User-avatar dropdown → "Account settings" → lands on `/settings`.
+2. **No vermillion stripe.** Active sidebar item shows dark-slate fill only.
+3. **Sidebar labels.** Original set: AI Visibility, GEO Analytics, Reports, GEO Tools, Signals, Opportunities.
+4. **Profile saves and persists.** Edit fields → save → reload → values stay.
+5. **Profile won't wipe.** Clear firstName → save → reload → old firstName remains.
+6. **Password change works.** Wrong current → "Current password incorrect" toast. Correct + 8+ char new → success + other sessions revoked.
+7. **Billing portal opens.** Click Manage billing. Stripe portal if `stripeCustomerId` present; clean toast otherwise.
+8. **Integrations shows Buffer status.** Tile renders within ~50 ms (see Track 28 for the latency fix).
+
+### Pass criteria
+
+- [x] `npm run check` — clean, tour-targets 26/26
+- [x] 10 tests pass across `userProfileUpdate` (3), `userPasswordChange` (4), `billingPortalSession` (3)
+- [x] Migration `0053_user_profile_fields.sql` applies cleanly
+- [x] No raw palette violations introduced to `settings.tsx`
+
+---
+
+## Track 28 — Settings page bug audit + remediation (2026-05-12)
+
+**Goal:** Audit and fix every bug on the expanded Settings page. After Track 27 shipped, real-user testing surfaced "the settings page is full of bugs, nothing is properly working." This track is the end-to-end fix pass.
+
+**Status:** Complete
+
+### Background
+
+A read-only auditor agent inspected `settings.tsx`, `use-auth.ts`, `queryClient.ts`, `userAccount.ts`, `billing.ts`, `buffer.ts`, and the three new test files from Track 27. The audit catalogued 17 bugs grouped into 5 critical/high (root causes), 7 medium (data integrity / latency), and 5 low (cosmetic / minor).
+
+Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes (#3 invalidation race; #5 timezone Select edge case). 2 needed no work — verified OK on inspection (#9 portal POST without body; #15 notification preferences contract).
+
+### 28.1 Bug #1 + Bug #2 — `/api/auth/me` shape collision; missing `timezone` type
+
+**Symptom.** Profile fields always rendered empty regardless of saved values. Email showed "(no email)". Save still worked because the mutation read local state, but the form never reflected persisted values.
+
+**Root cause.** `client/src/hooks/use-auth.ts` registered a queryFn on `["/api/auth/me"]` that stored the **unwrapped user** object. `ProfileSection` in `settings.tsx` did its OWN `useQuery<{ success, user }>` on the same key, expecting the envelope shape — so `meData?.user` was always `undefined` because the cache held the user directly. The same `User` interface was missing `timezone` even though `publicUserShape` returned it.
+
+**Fix.**
+
+| File                            | Change                                                                                                                                                                                                                                                                  |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/hooks/use-auth.ts`  | Added `timezone?: string \| null` to the `User` interface.                                                                                                                                                                                                              |
+| `client/src/pages/settings.tsx` | Removed the duplicate `useQuery<AuthMeResponse>` and the `AuthMeResponse` type from `ProfileSection`. Now reads `user` from `useAuth()` directly. The seed `useEffect` for firstName/lastName/timezone works because the cached user has the correct (unwrapped) shape. |
+
+### 28.2 Bug #4 — Empty-string profile fields wiped the profile
+
+**Symptom.** Client always sent all three fields (`{ firstName, lastName, timezone }`). With Bug #1 active, the form rendered empty inputs and saving sent three empty strings — wiping the user's stored name on every save.
+
+**Fix.**
+
+| File                           | Change                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/userAccount.ts` | `PATCH /api/user/profile` now builds an `updates` object only including non-empty trimmed fields. Empty / whitespace-only firstName / lastName are skipped instead of written. If the resulting patch is empty, returns `{ success: true, noChange: true }` with HTTP 200 and skips the DB write. Timezone validation against `Intl.supportedValuesOf("timeZone")` preserved. |
+
+### 28.3 Bug #6 — Password re-auth used a Vite client-side env var on the server
+
+**Symptom.** Password change always returned 401 "Current password incorrect" in production — even on correct passwords.
+
+**Root cause.** The original implementation constructed a fresh user-context Supabase client inline with `createClient(process.env.SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? "")`. The `VITE_` prefix is a Vite client-side convention — the server has no special handling. In production where `.env.example` only defines `VITE_SUPABASE_ANON_KEY`, the server fell through to `SUPABASE_ANON_KEY ?? ""` and produced a Supabase client with an empty anon key. Every `signInWithPassword` call failed with an auth error.
+
+**Fix.**
+
+| File                                    | Change                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/userAccount.ts`          | Replaced the fresh-client construction with `supabaseAdmin.auth.signInWithPassword({ email: user.email, password: currentPassword })` — same pattern `server/auth.ts:342` uses for the regular login route. The service-role-keyed admin client supports password verification in current Supabase versions. No env-var fallback chain. No `@supabase/supabase-js` dynamic import. |
+| `tests/unit/userPasswordChange.test.ts` | Removed the unused `vi.mock("@supabase/supabase-js", ...)` block. Updated the `supabaseAdmin` mock so `auth.signInWithPassword` points to a stub the tests control. All 4 cases still pass.                                                                                                                                                                                        |
+
+### 28.4 Bug #8 — Zod validation errors rendered as `[object Object]`
+
+**Root cause.** Both routes returned `{ error: parsed.error.flatten() }` — `flatten()` returns an object, which the client toast tried to render as a string.
+
+**Fix.**
+
+| File                           | Change                                                                                                                                                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/userAccount.ts` | Both profile and password routes now build human-readable error strings: `parsed.error.errors.map(e => `${e.path.join(".")}: ${e.message}`).join("; ")`. Response shape is `{ success: false, error: <string> }`. |
+
+### 28.5 Bug #10 — Billing section had no plan state
+
+**Fix.**
+
+| File                            | Change                                                                                                                                               |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/settings.tsx` | `BillingSection` reads `useAuth().user?.accessTier` and renders "Current plan: <accessTier>" (falls back to "free") above the Manage billing button. |
+
+### 28.6 Bug #11 / #12 / #16 — `apiRequest` already throws on non-2xx; dead error branches; `"<status>: ..."` toast prefix
+
+**Root cause.** `apiRequest` in `queryClient.ts` calls `throwIfResNotOk(res)` before returning, throwing an `ApiError` with `message = "<status>: <body-text>"`. So every `if (!res.ok || json.success === false)` check after `apiRequest` was dead code — non-2xx responses already threw. Cleanup needed: surface `err.body.error` (the structured JSON error field) instead of `err.message` (the status-prefixed string).
+
+**Fix.**
+
+| File                            | Change                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------- |
+| `client/src/pages/settings.tsx` | Added `getApiErrorMessage(err: unknown, fallback: string)` helper at module scope. Prefers `(err as ApiError).body.error`, else strips the leading `\d+:\s*` prefix from `err.message`, else returns the fallback. Applied across `updateProfile`, `changePassword`, `openPortal`, `deleteMutation`, `exportMutation` onError handlers. Removed all dead `if (!res.ok |     | json.success === false)` branches in mutationFns. |
+
+### 28.7 Bug #12 — Buffer query crashed instead of returning "Not connected"
+
+**Fix.** Buffer status query rewritten to use raw `fetch` (not `apiRequest`, since the former throws on non-2xx). On any failure — network error, 5xx, parse error — returns `{ connected: false }` so the section renders cleanly.
+
+### 28.8 Bug #13 — Buffer status endpoint added
+
+**Symptom.** Settings page load took 500ms-2s+ because `/api/buffer/profiles` fans out to Buffer's GraphQL API per organization to list channels — just to render "Connected" / "Not connected".
+
+**Fix.**
+
+| File                                                     | Change                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/buffer.ts`                                | **New** `GET /api/buffer/status` — single-column inline DB read on `users.bufferAccessToken` (no decrypt, no external Buffer call). Returns `{ success: true, connected: boolean }`. On any DB error, logs `logger.warn` and returns `{ success: true, connected: false }`. |
+| `client/src/pages/settings.tsx`                          | `IntegrationsSection`'s Buffer query switched from `/api/buffer/profiles` to `/api/buffer/status`. Buffer tile now renders in < 50 ms.                                                                                                                                      |
+| `client/src/components/articles/BufferConnectDialog.tsx` | Invalidates BOTH `["/api/buffer/profiles"]` (existing) AND `["/api/buffer/status"]` (new) on connect / disconnect.                                                                                                                                                          |
+
+`/api/buffer/profiles` left intact for other consumers that legitimately need the channel list.
+
+### 28.9 Bug #14 — Buffer Connect button was hardcoded `disabled`
+
+**Fix.**
+
+| File                            | Change                                                                                                                                                                                                                                                                           |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/settings.tsx` | Replaced the hardcoded-disabled button with `<BufferConnectDialog connected={Boolean(buffer?.connected)} />`. The dialog handles both Connect (token entry) and Disconnect flows and (per 28.8) invalidates `["/api/buffer/status"]` so the Settings tile refreshes immediately. |
+
+### 28.10 Bug #7 — Other sessions stayed logged in after password change
+
+**Fix.**
+
+| File                                    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/userAccount.ts`          | After successful `updateUserById`, extracts the bearer token from `req.headers.authorization` (case-insensitive `Bearer ` strip) and calls `supabaseAdmin.auth.admin.signOut(jwt, "others")` (signature verified against `@supabase/auth-js/dist/main/GoTrueAdminApi.d.ts:54`). Wrapped in try/catch with `logger.warn` — revocation failure doesn't fail the password-change request. Skipped if bearer header is missing (every authenticated request carries one upstream of `isAuthenticated`). |
+| `tests/unit/userPasswordChange.test.ts` | Added `signOut` stub on `supabaseAdmin.auth.admin`. Test injects `Authorization: Bearer test-jwt-token`, asserts `signOut` called with `("test-jwt-token", "others")`. Additional case verifies request still returns 200 when `signOut` rejects.                                                                                                                                                                                                                                                   |
+
+### 28.11 Bug #17 — Export 429 client copy diverged from server message
+
+**Fix.**
+
+| File                            | Change                                                                                                                                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/settings.tsx` | Export mutation's 429 branch reads `(await res.json()).error` and throws with the server-provided message. Falls back to a default if JSON parsing fails. |
+
+### 28.12 Bugs verified OK (no work needed)
+
+- **#9** — `apiRequest("POST", url)` with no body works fine; Express handles missing-body POSTs cleanly.
+- **#15** — Notification preferences `useQuery({ queryKey: [...] })` with no queryFn relies on the project's `defaultQueryFn` set in `queryClient.ts:120`. Verified present.
+
+### 28.13 Bugs implicitly resolved
+
+- **#3** — Profile cache invalidation race after save. Resolved by #1.
+- **#5** — Timezone Select rendering blank. Resolved by #1.
+
+### 28.14 Deferred
+
+- The `User.accessTier` field is used for the plan label. No subscription detail (next renewal, price) is shown — Stripe owns that surface via the customer portal.
+- `supabaseAdmin.auth.admin.signOut(..., "global")` would log the user out everywhere including the current device. Chose `"others"` to preserve the current session, matching common UX expectations. Swap to `"global"` if security policy ever requires forced re-login after every password change.
+
+### How to verify
+
+1. **Profile loads with saved values.** Open `/settings`. firstName / lastName / timezone reflect what's persisted. Email displays correctly.
+2. **Profile save round-trips.** Edit → save → reload → values persist.
+3. **Profile won't wipe.** Clear firstName → save → reload → old firstName still present.
+4. **Password change works in production.** Correct current → success. Wrong current → clean "Current password incorrect" toast (no `"401: "` prefix).
+5. **Other devices log out.** Sign in on Device A and Device B. Change password on A. Refresh B → redirected to login.
+6. **Billing toast is clean.** User without `stripeCustomerId` clicks Manage billing → clean "No billing account on file." (no `"400: "` prefix).
+7. **Billing plan visible.** Plan label appears above the Manage billing button.
+8. **Buffer tile loads instantly.** `/settings` shows Buffer status in < 100 ms. `GET /api/buffer/status` returns immediately with no upstream Buffer API call.
+9. **Buffer Connect button works.** Click Connect → real `<BufferConnectDialog>` opens. Connect a token → Settings tile flips to "Connected" without manual refresh.
+10. **Export 429 message matches server.** Toast message matches what the server returns verbatim.
+
+### Pass criteria
+
+- [x] `npm run check` — clean, tour-targets 26/26
+- [x] 10 tests pass: `userProfileUpdate` (3), `userPasswordChange` (4, includes signOut), `billingPortalSession` (3)
+- [x] No `[object Object]` toasts
+- [x] No `"<status>: ..."` toast prefixes anywhere on the Settings page
+- [x] Buffer Settings tile renders without an external API call
+
+---
+
+## Track 29 — Foundations Plan 4: Bridges + Email verification + AI disclosure (2026-05-12)
+
+**Goal:** Close three independent gaps the Foundations spec calls out: two dead bridges in user flows (welcome → fact scrape, keyword research → content), missing email verification on signup, and missing AI-generation disclosure on articles.
+
+**Status:** Complete (with substantial follow-up audit + production-readiness remediation — see Track 30)
+
+### Background
+
+Three small product gaps from the Foundations spec §4.6 / §4.8 / §4.9:
+
+1. **Welcome path didn't fire fact-scrape.** Users who finished onboarding via `/welcome` landed on `/brand-fact-sheet` and polled every 3s for 2 minutes for facts that never arrived. The fact-scrape was wired to `POST /api/brands` and `POST /api/brands/from-website` but not to `POST /api/onboarding/confirm`.
+2. **Keyword Research → Content link was dead.** Clicking "Generate Content" on a keyword built `/content?keyword=...&industry=...&type=...&brandId=...` but `content.tsx` didn't parse any of those params — user landed on a blank draft.
+3. **No email verification.** `server/auth.ts` called `createUser({ email_confirm: true })`, skipping Supabase's email confirmation flow entirely. Anyone could register with anyone's email and be instantly logged in. No welcome email either.
+4. **No AI disclosure.** Generated articles carried no indicator that they were AI-written — both an FTC compliance gap and a trust-break for a product whose value prop is "AI-cited."
+
+### 29.1 Welcome → fact-scrape bridge
+
+**Fix.**
+
+| File                          | Change                                                                                                                                                                                                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `server/routes/onboarding.ts` | In the `/confirm` handler, immediately after `runOnboardingAutopilot(...)` returns, queue a fire-and-forget `scrapeBrandFacts(brand.id)` call wrapped in `.catch(...)` for `logger.warn`. Initially used `setImmediate` (changed to `waitUntil` in Track 30 for serverless compatibility). |
+
+`runOnboardingAutopilot` does NOT internally call `scrapeBrandFacts` (verified) — no double-fire. `scrapeBrandFacts` is idempotent (dedupes via existing brandFacts keys at `factExtractor.ts:267-272`) — safe to call from multiple paths.
+
+### 29.2 Keyword research → Content URL handoff
+
+**Fix.**
+
+| File                           | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/content.tsx` | Imported `useSearch` from wouter. Parsed `keyword / industry / type / brandId` URL params into a `seedParams` memo (returns `null` when no params present). Bootstrap effect: when `seedParams` is non-null AND no `articleId` in the route, POSTs `/api/articles/draft` with `brandId` (validated server-side against the user's brands), `industry`, `keywords: [keyword]`, `contentType: type`. The draft-hydration effect at content.tsx:250-263 then copies the fresh draft into form state. After `setLocation('/content/:id', { replace: true })` the URL params naturally drop off, so a refresh won't re-seed. In-progress drafts loaded via `/content/:id` are never touched. |
+
+**Security check.** `POST /api/articles/draft` already calls `requireBrand(brandId, user.id)` (`server/routes/articles.ts:106`) plus the global `enforceBrandOwnership` middleware. URL-tampered `brandId` (e.g., `?brandId=someone-elses-uuid`) is rejected — verified during audit.
+
+### 29.3 Email verification flow
+
+**Initial implementation (pre-audit).**
+
+| File                                     | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/auth.ts`                         | Flipped `createUser({ email_confirm: false })` (was `true`). Register handler returns `{ success: true, requiresVerification: true, email }` instead of issuing a session. Added `POST /api/auth/resend-verification` (mounted on `PUBLIC_API_ROUTES`). Two-layer rate limit: 60-second min gap per `${ip}:${email.toLowerCase().trim()}` via an in-memory `Map<string, number>` (returns 429), wrapped by `express-rate-limit` 3/hour per (IP, email). Calls `supabaseAdmin.auth.resend({ type: "signup", email })`. Anti-enumeration: always returns success for non-rate-limited paths regardless of whether the email exists or is already verified. Welcome-email trigger added to the login handler: when `dbUser.lastLoginAt === null`, dispatch `sendWelcomeEmail`. Initially used `setImmediate` (changed to `waitUntil` in Track 30). |
+| `server/lib/welcomeEmail.ts`             | **New.** Wraps the existing Resend client (matches the `emailService.ts` pattern of `new Resend(RESEND_API_KEY)`). Reuses `RESEND_FROM_ADDRESS` and `APP_URL` env vars — no new env required. Initial implementation: HTML body only (plain-text fallback + HTML-escape added in Track 30).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `migrations/0054_user_last_login_at.sql` | **New.** `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP`. Backfilled `last_login_at = NOW()` for every existing row so legacy accounts don't receive an unsolicited welcome email on next login. (Note: this column was repurposed in Track 30 — see 30.7.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `shared/schema.ts`                       | Added `lastLoginAt: timestamp("last_login_at")` to `users`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `client/src/pages/verify-email.tsx`      | **New.** "Check your email" landing page. Reads recipient email from `sessionStorage["venturecite:pending-verify-email"]` (set by register on submit). 60-second client-side cooldown timer + resend button hitting `POST /api/auth/resend-verification`. (sessionStorage-fallback + manual-email-input added in Track 30.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `client/src/pages/register.tsx`          | `onSuccess` branches on `requiresVerification`: sets the sessionStorage key, navigates to `/verify-email`. Legacy session-issuing path retained for backward compatibility with any unverified-flow accounts that might bypass the new gate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `client/src/App.tsx`                     | Registered `/verify-email` route OUTSIDE the auth gate (users haven't verified, so they don't have a valid session).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `tests/unit/emailVerification.test.ts`   | **New.** 4 cases (later updated in Track 30 to handle the atomic welcome gate + waitUntil + email_verified mirror): register returns `{ requiresVerification: true }` and never calls `signInWithPassword`; resend rate-limited (60-second second-call returns 429); welcome email fires once on first verified login (`lastLoginAt: null` → `lastLoginAt: NOW()`); welcome email does NOT fire on subsequent login.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+**Existing user impact.** The `email_confirm: false` flip only affects NEW signups going through our `createUser` admin call. Existing Supabase auth users keep their `auth.users.email_confirmed_at` value — typically `NOT NULL` for accounts created when the flag was `true`. Supabase always refuses login for unverified users regardless of our flag. No existing user gets retroactively locked out. The `last_login_at` backfill ensures none of them get an unsolicited welcome email on next login.
+
+### 29.4 AI disclosure
+
+**Fix.**
+
+| File                                                  | Change                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrations/0055_articles_ai_generated.sql`           | **New** (number bumped from 0054 to 0055 after a collision with the email-verification migration). `ALTER TABLE articles ADD COLUMN IF NOT EXISTS ai_generated BOOLEAN NOT NULL DEFAULT false`. Backfill `UPDATE articles SET ai_generated = true WHERE id IN (SELECT DISTINCT article_id FROM content_generation_jobs WHERE article_id IS NOT NULL)` — every article tied to a generation job marked as AI-generated. |
+| `shared/schema.ts`                                    | Added `aiGenerated: boolean("ai_generated").notNull().default(false)` to `articles`.                                                                                                                                                                                                                                                                                                                                   |
+| `server/databaseStorage.ts`                           | `setArticleReady` now `.set({ ..., aiGenerated: true })` — the SOLE worker path that flips the flag. `setArticleFailed`, `setArticleDraft`, `setArticleGeneratingFromDraft`, and manual `createArticle` (from `POST /api/articles`) all leave it alone — so the default `false` applies to user-authored articles. Verified during audit: no false positives possible.                                                 |
+| `client/src/components/AIGeneratedPill.tsx`           | **New.** `<span>` pill with `<Sparkles />` icon + "AI-generated" text in muted chrome (`bg-muted text-muted-foreground`). `aria-label="AI-generated content"`, icon `aria-hidden`.                                                                                                                                                                                                                                     |
+| `client/src/pages/articles.tsx`                       | Pill rendered next to `<StatusBadge>` in the row title row, gated on `article.aiGenerated`. DistributeDialog invoked from this page now receives `aiGenerated` prop.                                                                                                                                                                                                                                                   |
+| `client/src/components/articles/ViewEditDialog.tsx`   | Pill rendered inside `<DialogTitle>`, gated on `article.aiGenerated`.                                                                                                                                                                                                                                                                                                                                                  |
+| `client/src/components/articles/DistributeDialog.tsx` | Added optional `aiGenerated?: boolean` prop. Pill rendered inside `<DialogTitle>` when prop is true.                                                                                                                                                                                                                                                                                                                   |
+| `client/src/pages/content.tsx`                        | Pill rendered inside ReadyEditor `<CardTitle>`, gated on `article.aiGenerated`.                                                                                                                                                                                                                                                                                                                                        |
+| `tests/unit/articlesAIGenerated.test.ts`              | **New.** 2 cases: simulating the worker completing a job asserts the updated article row has `aiGenerated: true`; manual `POST /api/articles` keeps `aiGenerated: false`.                                                                                                                                                                                                                                              |
+
+**API response shape.** `GET /api/articles` returns Drizzle rows directly (no field-picking transformer) — `aiGenerated` is included automatically. Verified during audit.
+
+### How to verify (initial state, before Track 30 hardening)
+
+1. **Welcome path triggers fact-scrape.** Finish onboarding via `/welcome` → land on `/brand-fact-sheet` → facts populate within a few seconds (not 2-minute polling for nothing).
+2. **Keyword → Content seeds the draft.** `/keyword-research` → click "Generate Content" on a row → `/content` form lands populated with the keyword + industry + type, attached to the right brand.
+3. **New signup requires verification.** Register with a new email → land on `/verify-email`; Supabase sends a confirmation link; clicking it confirms the account; user can now log in.
+4. **Welcome email.** First successful login after verification triggers a welcome email via Resend.
+5. **AI pill on AI-generated articles only.** Articles list / view / distribute / content ready-state — pill appears on rows where `aiGenerated = true`; not on manually-created articles.
+
+### Pass criteria (initial)
+
+- [x] `npm run check` — clean, tour-targets 26/26
+- [x] 6 new tests pass: `emailVerification` (4), `articlesAIGenerated` (2)
+- [x] Migration collision resolved (0054 user_last_login_at, 0055 articles_ai_generated)
+
+**Note:** Track 30 below substantially hardens this work for production. The "initial" state shipped here had several silent failure modes on Vercel serverless and missed several industry-standard practices around email verification.
+
+---
+
+## Track 30 — Plan 4 audit + production-readiness remediation (2026-05-12)
+
+**Goal:** Audit every Plan 4 surface and make it production-ready against real users and industry standards.
+
+**Status:** Complete
+
+### Background
+
+The user flagged that the Settings page audit (Track 28) found 17 bugs in newly-shipped code; they wanted Plan 4 audited at the same depth. A read-only auditor inspected `server/auth.ts`, `server/routes/onboarding.ts`, `server/lib/welcomeEmail.ts`, the new client pages, both migrations, both tests, and cross-cutting concerns (Vercel serverless semantics, Supabase admin API signatures, env-var documentation).
+
+The audit catalogued 28+ findings across 4 categories:
+
+- **Critical (Vercel serverless / would silently fail in production):** 2
+- **High (security / production-readiness):** 6
+- **Medium (industry standards / UX edges):** 5
+- **Low / cosmetic / documentation:** 4
+- **Verified OK after inspection:** 11
+
+Of those, 14 were fixed in this track. The rest were either implicitly resolved by the fixes, intentionally deferred with documentation, or `verified-OK` non-bugs.
+
+### 30.1 BUGs #27 + #28 — `setImmediate` doesn't reliably execute on Vercel (CRITICAL)
+
+**Symptom.** `setImmediate(() => fn().catch(...))` in a request handler may be killed when the Vercel function instance suspends right after `res.json(...)`. Both the welcome-email dispatch AND the welcome-path fact-scrape — the exact things Plan 4 was meant to ship — could silently drop in production.
+
+**Root cause.** Serverless functions don't guarantee post-response execution unless work is explicitly tied to `waitUntil` from `@vercel/functions`. The codebase already imports `waitUntil` elsewhere (`server/auth.ts:86-87` area) for exactly this reason; Plan 4's initial implementation didn't follow the existing pattern.
+
+**Fix.**
+
+| File                          | Change                                                                                                                                                                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/auth.ts`              | Welcome-email dispatch in the login handler swapped from `setImmediate(() => sendWelcomeEmail(...).catch(...))` to `waitUntil(sendWelcomeEmail(...).catch((err) => { logger.warn(...); captureAndFlush(err, ...); }))`. |
+| `server/routes/onboarding.ts` | Welcome-path fact-scrape dispatch swapped to `waitUntil(scrapeBrandFacts(brand.id).catch((err) => { logger.warn(...); captureAndFlush(err, ...); }))`. Static `waitUntil` + Sentry imports added at top.                |
+
+Without these swaps, both background tasks would silently never run on Vercel — neither the user nor any log surface would indicate the failure.
+
+### 30.2 BUG #1 — Race on first-login welcome email (HIGH)
+
+**Symptom.** Two concurrent logins from the same user (page open in two tabs, double-clicked Login button, etc.) both observe `lastLoginAt === null` at JavaScript level. Both branches send welcome emails. User receives two welcome emails.
+
+**Root cause.** The original gate read `lastLoginAt`, set a JS flag, then later updated the DB row — a classic read-then-write race.
+
+**Fix.** Atomic conditional UPDATE. The "winner" is the request whose `UPDATE ... WHERE welcomed_at IS NULL RETURNING id` actually returns a row.
+
+| File                             | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/auth.ts` (login handler) | Refactored welcome-email gate to: `const updated = await db.update(users).set({ welcomedAt: new Date(), lastLoginAt: new Date() }).where(and(eq(users.id, user.id), isNull(users.welcomedAt))).returning({ id: users.id });`. Only when `updated.length > 0` does the welcome email fire. Race losers fall through to a plain `db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id))` so their `lastLoginAt` still updates correctly. Cuts the welcome from two queries to one in the winner case. |
+
+The atomic gate uses the new `welcomed_at` column (see 30.7) — `lastLoginAt` recovers its true "last login" semantics independently.
+
+### 30.3 BUG #2 — `public.users.email_verified` mirror never updates after verification (HIGH security/observability)
+
+**Symptom.** Our `public.users.email_verified` column is set by the `handle_new_user` DB trigger from `migrations/0001_auth_sync.sql`. That trigger fires on `INSERT` into `auth.users` but does NOT fire on `UPDATE OF email_confirmed_at`. So after a user clicks the Supabase verification link, `auth.users.email_confirmed_at` is set, but our mirror stays at `0` forever. Anything in the app reading `public.users.email_verified` for analytics or feature-gating sees stale data.
+
+**Fix.** App-level sync on every login. Chosen over rewriting the DB trigger because (a) it's idempotent, (b) doesn't require a risky trigger migration, (c) self-heals every login for accounts that verified previously.
+
+| File             | Change                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/auth.ts` | After `signInWithPassword` succeeds, if `data.user.email_confirmed_at` is set and `dbUser.emailVerified !== 1`, syncs the mirror to `1`. Runs every login but no-ops after the first sync. Acceptable that the mirror may be stale between verification and the user's first post-verification login — the real verification gate is Supabase's own `email_confirmed_at`, which is consulted via signInWithPassword. |
+
+### 30.4 BUG #6 — Resend rate-limit `Map` grew unbounded (MEDIUM DoS)
+
+**Symptom.** Every distinct `${ip}:${email}` registered or attempted to resend adds an entry. After a few thousand registrations the map grows to thousands of stale entries; in a long-running process this is a slow memory leak.
+
+**Fix.**
+
+| File             | Change                                                                                                                                                                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/auth.ts` | Added `evictStaleResendEntries(now)` function. Iterates the rate-limit `Map` (via `forEach` — TS lib target doesn't allow `for...of`) and deletes entries older than 1 hour. Called at the top of every resend handler invocation. Email key was already `.toLowerCase().trim()` normalized — verified. |
+
+### 30.5 BUGs #7 + #8 — Plain-text fallback + HTML-escape in welcome email (MEDIUM industry standard + HIGH security)
+
+**Symptom.**
+
+- Resend supports `html` + `text` parts; we only sent `html`. Plain-text fallback improves spam-filter scores and supports email clients that prefer text.
+- `firstName` was interpolated into the HTML body without escaping. A user registered with firstName `<script>` or `<img onerror=...>` would have those characters in an email signed by our DKIM. Even if mail clients strip scripts, malformed HTML from a brand domain is a trust signal — and outbound mail carrying attacker-controlled HTML is a brand-damage vector.
+
+**Fix.**
+
+| File                         | Change                                                                                                                                                                                                                                                          |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/lib/welcomeEmail.ts` | Added local `escapeHtml()` helper. HTML body uses `safeFirstName` (escaped); plain-text body uses raw firstName (no escape needed in text). Added a `text` field to the `resend.emails.send({ ... })` payload with a plain-text version of the welcome content. |
+
+### 30.6 BUG #10 — No Sentry capture / no flush on background-task failure (MEDIUM observability)
+
+**Symptom.** When the welcome email or fact-scrape failed, only `logger.warn` was called. Pino warns are file logs — no alerting signal. Worse: any Sentry capture inside a `waitUntil` block may not complete its outbound HTTP request before the Vercel function suspends.
+
+**Fix.**
+
+| File                                             | Change                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/auth.ts` + `server/routes/onboarding.ts` | Background catch handlers now call `captureAndFlush(err, { tags: { source: "welcome-email" } })` (or `source: "welcome-fact-scrape"`) — the existing `server/lib/sentryReport.ts` helper that schedules its own `waitUntil(Sentry.flush(2000))` so the capture survives serverless suspension. Both catch handlers `logger.warn` first, then `captureAndFlush`. |
+
+### 30.7 BUG #13 — `lastLoginAt` was semantically misleading after migration backfill (LOW debt, fixed cleanly)
+
+**Symptom.** The Plan 4 migration backfilled all existing users to `lastLoginAt = NOW()` so they wouldn't receive an unsolicited welcome email on their next login. But the column is named `lastLoginAt`, implying it tracks actual "last time this user logged in." Analytics / "last seen" / engagement tracking consumers would see wrong data for every existing user until they logged in again.
+
+**Fix.** Added a dedicated `welcomed_at` column whose ONLY job is gating the welcome email. `lastLoginAt` recovers true semantics.
+
+| File                                   | Change                                                                                                                                                                                                                                                                                   |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrations/0056_user_welcomed_at.sql` | **New.** `ALTER TABLE users ADD COLUMN IF NOT EXISTS welcomed_at TIMESTAMP`. Backfilled `welcomed_at = NOW()` for every existing row.                                                                                                                                                    |
+| `shared/schema.ts`                     | Added `welcomedAt: timestamp("welcomed_at")` to `users`.                                                                                                                                                                                                                                 |
+| `server/auth.ts`                       | Welcome-email gate now keys off `welcomed_at IS NULL` (set in the same atomic UPDATE from 30.2). `lastLoginAt` updates independently on every login.                                                                                                                                     |
+| `tests/unit/emailVerification.test.ts` | Test mocks updated: `makeDbUser` defaults `welcomedAt: null`; Drizzle update-chain mock supports `.returning()` + the conditional `isNull(welcomedAt)` gate semantics (winner returns `[{ id }]`, loser returns `[]`). Both welcome-email tests now seed/inspect `welcomedAt` correctly. |
+
+### 30.8 BUG #12 — Supabase verification redirect URL not configured (HIGH UX, partially fixable in code)
+
+**Symptom.** When Supabase sends the verification email after register, the confirmation link redirects to whatever's configured as the Supabase project's "Site URL." Without code-level configuration, that defaults to `http://localhost:3000` or the project's first registered redirect — not necessarily `${APP_URL}/login?verified=1`.
+
+**Fix (partial — Supabase SDK limitation).**
+
+| File             | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `server/auth.ts` | The `POST /api/auth/resend-verification` handler now passes `options: { emailRedirectTo: \`${APP_URL}/login?verified=1\` }`to`supabaseAdmin.auth.resend({ type: "signup", email, options: ... })`. Verified the resend SDK signature supports this. **For `supabaseAdmin.auth.admin.createUser`, the installed `@supabase/auth-js` `AdminUserAttributes`type (verified against`node_modules/@supabase/auth-js/dist/main/lib/types.d.ts:403`) has no `emailRedirectTo`/`redirectTo`field**, so the INITIAL registration confirmation link inherits the Supabase project's Site URL. Documented in`.env.example`near`APP_URL` so operators set Site URL correctly in the Supabase Dashboard. |
+
+A complete fix would require migrating registration from `supabaseAdmin.auth.admin.createUser` to client-side `supabase.auth.signUp({ options: { emailRedirectTo } })`. That's a real refactor (changes the security model — `signUp` is browser-callable; would need re-architecting how we hash & verify passwords pre-Supabase). Documented as a known limitation; the Dashboard Site URL workaround is acceptable for now.
+
+**Client-side companion fix.**
+
+| File                         | Change                                                                                                                                                                                                                                                                                                               |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/login.tsx` | On mount, parses `?verified=1` from the URL. Renders a one-time success banner: "Email verified. Please sign in to continue." (using design tokens `border-chart-4/40 bg-chart-4/10 text-chart-4` with `<CheckCircle2>` icon). Strips the param via `window.history.replaceState` after read — refresh won't replay. |
+
+### 30.9 BUG #14 — Supabase email-confirm setting documentation (HIGH operations)
+
+**Symptom.** Our `email_confirm: false` flag tells Supabase admin createUser to NOT auto-confirm. But Supabase ALSO has a project-level "Enable email confirmations" toggle. If that's OFF in the Dashboard, Supabase auto-confirms every new signup regardless of what our code says — the entire verification gate becomes moot.
+
+**Fix (documentation + boot warning).**
+
+| File              | Change                                                                                                                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/index.ts` | Boot-time `logger.info(...)` reminding operators to verify "Confirm email = ON" in Supabase Dashboard → Authentication → Email Templates, plus correct Site URL configuration.                                                              |
+| `.env.example`    | Expanded the `APP_URL` documentation block with Supabase Dashboard prerequisites: Confirm-email toggle on, Site URL set to `${APP_URL}` so confirmation links redirect correctly. No new env variable required (`APP_URL` already existed). |
+
+### 30.10 BUG #11 — `/verify-email` sessionStorage fallback (MEDIUM UX)
+
+**Symptom.** The verify-email page reads the recipient email from `sessionStorage["venturecite:pending-verify-email"]`. Three failure modes:
+
+1. **Safari private mode** — sessionStorage may throw or return null.
+2. **User closes the tab and returns later** — sessionStorage is cleared per-tab.
+3. **User navigates directly to `/verify-email`** without going through register.
+
+In any of these the page rendered with no email, no resend possible.
+
+**Fix.**
+
+| File                                | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/verify-email.tsx` | Split state into `storedEmail` (sessionStorage source) and `typedEmail` (manual fallback input). sessionStorage read wrapped in try/catch; on throw or empty, `storedEmail` stays null and the fallback UI renders an `<Input type="email">` with `EMAIL_RE` validation. Resend mutation uses whichever email is available (`emailToUse = storedEmail ?? typedEmail.trim()`). Resend button validates the email format AND respects the 60-second cooldown. Added an "Already verified? Sign in" link above the back-to-sign-in footer so users who completed verification via the email link in another tab can navigate to login without confusion. Design tokens preserved (`text-primary`, `bg-muted`, `text-muted-foreground`); no raw palette. |
+
+### 30.11 Items VERIFIED OK during the audit (no fix needed)
+
+- **Brand ownership on keyword→content draft creation.** `POST /api/articles/draft` calls `requireBrand(brandId, user.id)` plus the global `enforceBrandOwnership` middleware. URL-tampered `?brandId=someone-elses-uuid` is rejected.
+- **`aiGenerated` flag exclusivity.** Only `setArticleReady` flips it true. `setArticleFailed`, `setArticleDraft`, `setArticleGeneratingFromDraft`, and manual `createArticle` from `POST /api/articles` leave it false. No false positives possible.
+- **API GET handlers do not strip `aiGenerated`.** No response transformer applied to article reads — client receives the boolean correctly.
+- **`scrapeBrandFacts` idempotency.** Existing dedup logic in factExtractor handles double-call from the welcome-path bridge safely.
+- **`runOnboardingAutopilot` does not internally call `scrapeBrandFacts`.** No double-fire from the welcome-path addition.
+- **`/verify-email` route mounted outside the auth gate.** Users hitting it without a valid session can render the page.
+- **`POST /api/auth/resend-verification` added to `PUBLIC_API_ROUTES`** (server/auth.ts:165) — unauthenticated callers can resend.
+- **Email normalization is consistent.** `.toLowerCase().trim()` applied uniformly across register, login, resend.
+- **CSRF.** Auth endpoints rely on Bearer tokens (no cookies → no ambient credential → no CSRF surface). For public auth routes (`/api/auth/register`, `/login`, `/resend-verification`), CSRF doesn't apply.
+- **Migration sequence.** 0054 (last_login_at), 0055 (articles_ai_generated), 0056 (welcomed_at) — all independent and idempotent (`IF NOT EXISTS`).
+- **No new dependencies introduced.** `Resend`, `@vercel/functions`, Sentry helpers all already in `package.json`.
+- **Pill accessibility.** `aria-label="AI-generated content"`, Sparkles icon `aria-hidden`.
+- **Anti-enumeration on resend.** Same response shape for registered / unregistered / already-verified emails. Supabase `auth.resend` silently no-ops on the server side.
+- **Email-key normalization in rate-limit Map** uses `.toLowerCase().trim()` — different casings share the same bucket.
+- **`captureAndFlush` is safe inside an existing `waitUntil` block** — internally schedules its own `waitUntil(Sentry.flush(2000))`.
+
+### 30.12 Documented limitations (not coded)
+
+- **Initial registration confirmation email URL.** `supabaseAdmin.auth.admin.createUser` SDK doesn't accept `emailRedirectTo`. Registration confirmation links inherit the Supabase project's Site URL. Documented in `.env.example`.
+- **No retry / DLQ for welcome email.** If Resend is down at the exact moment of first verified login, the email never sends and `welcomedAt` is already set, so the user never receives one. Acceptable for low-criticality transactional email; surface via Sentry alert (now wired) if it becomes a pattern.
+
+### How to verify
+
+1. **Background tasks survive serverless suspension.** Onboarding confirm fires fact-scrape via `waitUntil`; first verified login fires welcome email via `waitUntil`. Both should complete on Vercel deployments without dropping. Verify via Sentry tags (`source: "welcome-email"`, `source: "welcome-fact-scrape"`) on any failure.
+2. **Double-login → single welcome.** Open register/verify-email in two tabs and trigger first login from both. Only ONE welcome email should arrive (verified via the atomic UPDATE returning a row in one request, empty array in the other).
+3. **`public.users.email_verified` self-heals.** After a user verifies and logs in once, their mirror row should read `email_verified = 1`. Before that login, the mirror may still be `0` — acceptable.
+4. **Welcome email is multipart.** Inspect a delivered welcome email's source; both `text/plain` and `text/html` parts present.
+5. **firstName XSS-safe.** Register with firstName `<script>alert(1)</script>`. The welcome email body should show literal `<script>alert(1)</script>` text (HTML-escaped), not execute.
+6. **Resend Map bounded.** After many resend calls, memory usage stays flat (entries older than 1 hour evicted automatically).
+7. **Verify URL redirects to login.** Trigger a resend; clicking the Supabase email link should land on `${APP_URL}/login?verified=1` — the banner ("Email verified. Please sign in.") renders, URL param strips after first read.
+8. **Verify-email page survives sessionStorage loss.** Open register in one tab, complete it, then open `/verify-email` in a fresh tab (no sessionStorage). The fallback `<Input>` should render; typing email + clicking Resend should hit the endpoint.
+9. **`welcomedAt` and `lastLoginAt` are independent.** Existing users have both set to the migration timestamp. New users on first login: both stamped. Subsequent logins: only `lastLoginAt` updates. Welcome email fires exactly once.
+
+### Pass criteria
+
+- [x] `npm run check` — clean, tour-targets 26/26
+- [x] 6 tests pass: `emailVerification` (4, updated for waitUntil + welcomedAt + email_verified mirror), `articlesAIGenerated` (2)
+- [x] No `setImmediate` for background work in any Plan 4 path — all swapped to `waitUntil`
+- [x] No XSS-able HTML interpolation in `welcomeEmail.ts`
+- [x] Resend rate-limit Map bounded
+- [x] Atomic welcome-email gate via SQL conditional UPDATE
+- [x] `public.users.email_verified` mirror syncs on every login
+- [x] Migrations 0054, 0055, 0056 all apply cleanly and are idempotent
+- [x] `.env.example` documents Supabase Dashboard prerequisites
+
+---

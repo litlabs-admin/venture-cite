@@ -21,6 +21,7 @@ import { Loader2, Eye, Pencil, Sparkles, History, Save } from "lucide-react";
 import MarkdownEditor from "@/components/content/MarkdownEditor";
 import SafeMarkdown from "@/components/SafeMarkdown";
 import RevisionDiff from "@/components/articles/RevisionDiff";
+import { AIGeneratedPill } from "@/components/AIGeneratedPill";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -198,7 +199,10 @@ export default function ViewEditDialog({
         </DialogTrigger>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{article.title || "Untitled"}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              <span>{article.title || "Untitled"}</span>
+              {article.aiGenerated && <AIGeneratedPill />}
+            </DialogTitle>
             <DialogDescription>Version {article.version}</DialogDescription>
           </DialogHeader>
 

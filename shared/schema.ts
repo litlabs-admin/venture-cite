@@ -55,6 +55,18 @@ export const users = pgTable("users", {
   // when this isn't 'active' so we don't keep blasting addresses that
   // hurt our domain reputation.
   emailStatus: text("email_status").default("active").notNull(),
+  // Wave 4 / Plan 4 Task 3: first non-null value is set on the user's
+  // first verified login. The welcome-email trigger fires exactly once
+  // (when this is NULL pre-login) and then this stamp is set. Existing
+  // rows are backfilled to NOW() in migration 0054 so we don't spam old
+  // accounts.
+  lastLoginAt: timestamp("last_login_at"),
+  // Plan 4 audit (BUG #13): dedicated welcome-email gate so
+  // `lastLoginAt` recovers its literal meaning. NULL = welcome email
+  // has not been sent yet; stamped atomically with the welcome-email
+  // dispatch on first login. Existing rows backfilled to NOW() in
+  // migration 0056 so we don't spam pre-existing accounts.
+  welcomedAt: timestamp("welcomed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -228,6 +240,10 @@ export const articles = pgTable(
     // cleanup migration.
     humanScore: integer("human_score"),
     passesAiDetection: integer("passes_ai_detection"),
+    // Foundations Plan 4 Task 4: true when the article body was produced by
+    // the content-generation worker. Manually-created articles (POST
+    // /api/articles) stay false. Powers the "AI-generated" disclosure pill.
+    aiGenerated: boolean("ai_generated").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     seoData: jsonb("seo_data"),

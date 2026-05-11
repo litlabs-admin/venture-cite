@@ -23,7 +23,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation, useRoute } from "wouter";
+import { Link, useLocation, useRoute, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -55,6 +55,7 @@ import UsageWidget from "@/components/content/UsageWidget";
 import DraftToolbar from "@/components/content/DraftToolbar";
 import MarkdownEditor from "@/components/content/MarkdownEditor";
 import KeywordChips from "@/components/content/KeywordChips";
+import { AIGeneratedPill } from "@/components/AIGeneratedPill";
 import IndustryCombobox from "@/components/content/IndustryCombobox";
 import BrandCombobox from "@/components/content/BrandCombobox";
 import { apiRequest } from "@/lib/queryClient";
@@ -118,6 +119,29 @@ export default function Content() {
   const [, params] = useRoute("/content/:articleId");
   const articleIdFromRoute = params?.articleId ?? null;
 
+  // Seed params from /content?keyword=...&industry=...&type=...&brandId=...
+  // Sent by the Keyword Research page when the user clicks "Generate Content"
+  // on a row. When present AND we're at bare /content (no article id yet),
+  // we create a fresh draft pre-populated with these values instead of
+  // recycling the most recent draft. See keyword-research.tsx → handleGenerateContent.
+  const searchString = useSearch();
+  const seedParams = useMemo(() => {
+    const p = new URLSearchParams(searchString);
+    const keyword = p.get("keyword");
+    const industry = p.get("industry");
+    const type = p.get("type");
+    const brandId = p.get("brandId");
+    const hasAny = !!(keyword || industry || type || brandId);
+    return hasAny
+      ? {
+          keyword: keyword ?? undefined,
+          industry: industry ?? undefined,
+          type: type ?? undefined,
+          brandId: brandId ?? undefined,
+        }
+      : null;
+  }, [searchString]);
+
   // ── Brands / usage / drafts list ──────────────────────────────────────────
 
   const {
@@ -163,17 +187,29 @@ export default function Content() {
     if (bootstrapping) return;
     setBootstrapping(true);
     (async () => {
-      const recent = drafts[0];
-      if (recent) {
-        setLocation(`/content/${recent.id}`, { replace: true });
-        return;
+      // If we have seed params from the Keyword Research handoff, always
+      // create a fresh draft pre-populated with them — don't reuse the
+      // most recent draft (the user explicitly asked to write about a
+      // specific keyword).
+      if (!seedParams) {
+        const recent = drafts[0];
+        if (recent) {
+          setLocation(`/content/${recent.id}`, { replace: true });
+          return;
+        }
       }
-      const defaultBrandId = brands[0].id;
+      const seedBrand =
+        seedParams?.brandId && brands.some((b) => b.id === seedParams.brandId)
+          ? brands.find((b) => b.id === seedParams.brandId)!
+          : brands[0];
+      const defaultBrandId = seedBrand.id;
       try {
         const resp = await apiRequest("POST", "/api/articles/draft", {
           brandId: defaultBrandId,
           contentStyle: "b2c",
-          industry: brands[0].industry ?? null,
+          industry: seedParams?.industry ?? seedBrand.industry ?? null,
+          keywords: seedParams?.keyword ? [seedParams.keyword] : undefined,
+          contentType: seedParams?.type ?? undefined,
         });
         const json = await resp.json();
         if (json?.data?.id) {
@@ -759,8 +795,11 @@ function ReadyEditor({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>{article.title || "Untitled"}</span>
+        <CardTitle className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className="truncate">{article.title || "Untitled"}</span>
+            {article.aiGenerated && <AIGeneratedPill />}
+          </span>
           <Link href={`/articles?edit=${article.id}`}>
             <Button variant="outline" size="sm">
               Open in Articles

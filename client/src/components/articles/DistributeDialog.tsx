@@ -26,6 +26,7 @@ import { Loader2, FileText, Share2, Clock, Pencil, Link2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import BufferConnectDialog from "./BufferConnectDialog";
 import PlatformPostButton from "./PlatformPostButton";
+import { AIGeneratedPill } from "@/components/AIGeneratedPill";
 
 const DISTRIBUTION_PLATFORMS = ["LinkedIn", "Twitter", "Facebook", "Instagram", "Medium", "Reddit"];
 
@@ -35,6 +36,10 @@ type DistributeView = "generate" | "results" | "history";
 
 interface DistributeDialogProps {
   articleId: string;
+  // Foundations Plan 4 Task 4: when true, render the AI-generated pill in
+  // the dialog header. Caller is the articles list which already has the
+  // article object in hand, so we pass through rather than refetching.
+  aiGenerated?: boolean;
 }
 
 type GeneratedRow = {
@@ -45,7 +50,7 @@ type GeneratedRow = {
   platformPostId?: string | null;
 };
 
-export default function DistributeDialog({ articleId }: DistributeDialogProps) {
+export default function DistributeDialog({ articleId, aiGenerated }: DistributeDialogProps) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<DistributeView>("generate");
@@ -356,7 +361,10 @@ export default function DistributeDialog({ articleId }: DistributeDialogProps) {
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Platform-Optimized Content</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            <span>Platform-Optimized Content</span>
+            {aiGenerated && <AIGeneratedPill />}
+          </DialogTitle>
           <DialogDescription>
             AI rewrites your article for each platform — copy and post manually.
           </DialogDescription>
