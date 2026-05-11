@@ -232,6 +232,27 @@ export function setupBufferRoutes(app: Express): void {
     }),
   );
 
+  // Cheap connection probe for the Settings page. /api/buffer/profiles
+  // hits Buffer's GraphQL API per-organization, which adds 500ms-2s of
+  // latency just to render "Connected" / "Not connected". This endpoint
+  // only checks whether a (encrypted) token row exists locally.
+  app.get(
+    "/api/buffer/status",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const [row] = await db
+          .select({ token: users.bufferAccessToken })
+          .from(users)
+          .where(eq(users.id, user.id))
+          .limit(1);
+        res.json({ success: true, connected: Boolean(row?.token) });
+      } catch (error) {
+        sendError(res, error, "Failed to check Buffer status");
+      }
+    }),
+  );
+
   app.delete(
     "/api/buffer/connection",
     asyncHandler(async (req, res) => {

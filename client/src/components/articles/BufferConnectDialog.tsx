@@ -64,6 +64,7 @@ export default function BufferConnectDialog({
         setToken("");
         setError(null);
         queryClient.invalidateQueries({ queryKey: ["/api/buffer/profiles"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/buffer/status"] });
         toast({ title: "Buffer connected" });
         return;
       }
@@ -87,6 +88,7 @@ export default function BufferConnectDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/buffer/profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buffer/status"] });
       toast({ title: "Buffer disconnected" });
     },
   });

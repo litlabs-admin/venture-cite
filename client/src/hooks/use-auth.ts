@@ -7,6 +7,7 @@ interface User {
   email: string | null;
   firstName: string | null;
   lastName: string | null;
+  timezone?: string | null;
   accessTier: string;
   profileImageUrl?: string | null;
   isAdmin?: boolean;

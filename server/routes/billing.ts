@@ -8,17 +8,56 @@
 //   GET  /api/stripe/publishable-key  — frontend bootstrap
 //   GET  /api/stripe/products         — sync'd products + prices for pricing page
 //   POST /api/stripe/checkout         — create checkout session (auth-gated)
-//   POST /api/stripe/portal           — open Stripe customer portal (auth-gated)
+//   POST /api/billing/portal-session  — open Stripe customer portal (auth-gated)
 
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
 import { asyncHandler } from "../lib/routesShared";
+import { isAuthenticated } from "../auth";
 
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
 export function setupBillingRoutes(app: Express): void {
+  // Foundations Plan 3 Task 2: Stripe customer-portal session for the
+  // expanded Settings page. Exposed under /api/billing/* so the new
+  // Settings UI has a stable contract.
+  app.post(
+    "/api/billing/portal-session",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      const sessionUser = (req as any).user;
+      if (!sessionUser) {
+        return res.status(401).json({ success: false, error: "Not authenticated" });
+      }
+      const dbUser = await storage.getUser(sessionUser.id);
+      if (!dbUser?.stripeCustomerId) {
+        return res.status(400).json({
+          success: false,
+          error: "No billing account on file. Subscribe to a plan first.",
+        });
+      }
+      try {
+        const { getUncachableStripeClient } = await import("../stripeClient");
+        const stripe = await getUncachableStripeClient();
+        const baseUrl = process.env.APP_URL || req.headers.origin || `http://${req.headers.host}`;
+        const session = await stripe.billingPortal.sessions.create({
+          customer: dbUser.stripeCustomerId,
+          return_url: `${baseUrl}/settings`,
+        });
+        return res.json({ success: true, url: session.url });
+      } catch (err: unknown) {
+        logger.error({ err, userId: sessionUser.id }, "billing.portal-session failed");
+        captureAndFlush(err, { tags: { source: "billing.portal-session" } });
+        return res.status(502).json({
+          success: false,
+          error: "Billing portal temporarily unavailable",
+        });
+      }
+    }),
+  );
+
   app.get(
     "/api/stripe/publishable-key",
     asyncHandler(async (_req, res) => {
@@ -145,39 +184,6 @@ export function setupBillingRoutes(app: Express): void {
         res.json({ success: true, url: session.url });
       } catch (error: any) {
         captureAndFlush(error, { tags: { source: "billing.ts:137" } });
-        res.status(500).json({ success: false, error: error.message });
-      }
-    }),
-  );
-
-  app.post(
-    "/api/stripe/portal",
-    asyncHandler(async (req, res) => {
-      try {
-        const sessionUser = (req as any).user;
-        if (!sessionUser) {
-          return res.status(401).json({ success: false, error: "Authentication required" });
-        }
-
-        const userId = sessionUser.id;
-        const user = await storage.getUser(userId);
-
-        if (!user?.stripeCustomerId) {
-          return res.status(400).json({ success: false, error: "No subscription found" });
-        }
-
-        const { getUncachableStripeClient } = await import("../stripeClient");
-        const stripe = await getUncachableStripeClient();
-        const baseUrl = process.env.APP_URL || req.headers.origin || `http://${req.headers.host}`;
-
-        const session = await stripe.billingPortal.sessions.create({
-          customer: user.stripeCustomerId,
-          return_url: `${baseUrl}/pricing`,
-        });
-
-        res.json({ success: true, url: session.url });
-      } catch (error: any) {
-        captureAndFlush(error, { tags: { source: "billing.ts:166" } });
         res.status(500).json({ success: false, error: error.message });
       }
     }),

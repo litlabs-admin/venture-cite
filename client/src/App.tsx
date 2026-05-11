@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import AppLayout from "@/components/AppLayout";
 import { ScanCompletionListener } from "@/components/ScanCompletionListener";
 import { TourOrchestrator } from "./tours/engine/TourOrchestrator";
+import { RouteSpinner } from "@/components/foundations";
 
 // Eager: first-paint + auth flow. Everything else is lazy so the initial
 // bundle doesn't carry recharts / react-markdown / framer-motion etc.
@@ -46,23 +47,11 @@ const Privacy = lazy(() => import("@/pages/privacy"));
 const Welcome = lazy(() => import("@/pages/welcome"));
 const Glossary = lazy(() => import("@/pages/glossary"));
 
-function RouteSpinner() {
-  return (
-    <div className="min-h-[40vh] flex items-center justify-center">
-      <div className="w-6 h-6 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
-}
-
 function HomePage() {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <RouteSpinner />;
   }
 
   // Authenticated users land here post-signup (register.tsx → setLocation("/")).
@@ -75,11 +64,7 @@ function AuthenticatedRoute({ component: Component }: { component: ComponentType
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <RouteSpinner />;
   }
 
   if (!isAuthenticated) {
@@ -102,11 +87,7 @@ function AuthenticatedBareRoute({ component: Component }: { component: Component
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <RouteSpinner />;
   }
 
   if (!isAuthenticated) {
@@ -133,11 +114,7 @@ function FirstRunGate({ component: Component }: { component: ComponentType }) {
   });
 
   if (isLoading || (isAuthenticated && brandsQuery.isLoading)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <RouteSpinner />;
   }
 
   if (!isAuthenticated) {

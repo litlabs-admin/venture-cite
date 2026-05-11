@@ -95,9 +95,9 @@ const AI_PLATFORM_ICONS: Record<string, JSX.Element> = {
 };
 
 function getVisibilityColor(score: number): string {
-  if (score >= 70) return "text-green-600";
-  if (score >= 40) return "text-yellow-600";
-  return "text-red-600";
+  if (score >= 70) return "text-chart-4";
+  if (score >= 40) return "text-chart-3";
+  return "text-destructive";
 }
 
 function getVisibilityLabel(score: number): string {
@@ -109,9 +109,9 @@ function getVisibilityLabel(score: number): string {
 }
 
 function getSentimentIcon(label: string) {
-  if (label === "Positive") return <ThumbsUp className="h-5 w-5 text-green-500" />;
-  if (label === "Negative") return <ThumbsDown className="h-5 w-5 text-red-500" />;
-  return <Meh className="h-5 w-5 text-gray-500" />;
+  if (label === "Positive") return <ThumbsUp className="h-5 w-5 text-chart-4" />;
+  if (label === "Negative") return <ThumbsDown className="h-5 w-5 text-destructive" />;
+  return <Meh className="h-5 w-5 text-muted-foreground" />;
 }
 
 export default function GeoAnalytics() {
@@ -204,7 +204,7 @@ export default function GeoAnalytics() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-bl-full" />
+              <div className="absolute top-0 right-0 w-24 h-24 bg-muted rounded-bl-full" />
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Eye className="h-4 w-4" />
@@ -214,7 +214,7 @@ export default function GeoAnalytics() {
               <CardContent>
                 <div className="flex items-end gap-3">
                   <span
-                    className={`text-5xl font-bold ${getVisibilityColor(analytics.overview.aiVisibilityScore)}`}
+                    className={`text-5xl font-bold font-mono tabular-nums ${getVisibilityColor(analytics.overview.aiVisibilityScore)}`}
                     data-testid="visibility-score"
                   >
                     {analytics.overview.aiVisibilityScore}
@@ -232,7 +232,7 @@ export default function GeoAnalytics() {
             </Card>
 
             <Card className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-green-500/20 to-teal-500/20 rounded-bl-full" />
+              <div className="absolute top-0 right-0 w-24 h-24 bg-muted rounded-bl-full" />
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <PieChart className="h-4 w-4" />
@@ -241,7 +241,10 @@ export default function GeoAnalytics() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-end gap-3">
-                  <span className="text-5xl font-bold text-green-600" data-testid="share-of-voice">
+                  <span
+                    className="text-5xl font-bold text-chart-4 font-mono tabular-nums"
+                    data-testid="share-of-voice"
+                  >
                     {analytics.overview.shareOfVoice}%
                   </span>
                 </div>
@@ -257,7 +260,7 @@ export default function GeoAnalytics() {
             </Card>
 
             <Card className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-bl-full" />
+              <div className="absolute top-0 right-0 w-24 h-24 bg-muted rounded-bl-full" />
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
@@ -272,15 +275,15 @@ export default function GeoAnalytics() {
                   </span>
                 </div>
                 <div className="flex gap-4 mt-3 text-sm">
-                  <span className="text-green-600">
+                  <span className="text-chart-4">
                     <ThumbsUp className="h-3 w-3 inline mr-1" />
                     {analytics.sentiment.percentages.positive}%
                   </span>
-                  <span className="text-gray-500">
+                  <span className="text-muted-foreground">
                     <Meh className="h-3 w-3 inline mr-1" />
                     {analytics.sentiment.percentages.neutral}%
                   </span>
-                  <span className="text-red-500">
+                  <span className="text-destructive">
                     <ThumbsDown className="h-3 w-3 inline mr-1" />
                     {analytics.sentiment.percentages.negative}%
                   </span>
@@ -298,11 +301,14 @@ export default function GeoAnalytics() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Citations</p>
-                    <p className="text-2xl font-bold" data-testid="total-citations">
+                    <p
+                      className="text-2xl font-bold font-mono tabular-nums"
+                      data-testid="total-citations"
+                    >
                       {analytics.overview.totalCitations}
                     </p>
                   </div>
-                  <Zap className="h-8 w-8 text-blue-500" />
+                  <Zap className="h-8 w-8 text-chart-1" />
                 </div>
               </CardContent>
             </Card>
@@ -311,11 +317,14 @@ export default function GeoAnalytics() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Mentions</p>
-                    <p className="text-2xl font-bold" data-testid="total-mentions">
+                    <p
+                      className="text-2xl font-bold font-mono tabular-nums"
+                      data-testid="total-mentions"
+                    >
                       {analytics.overview.totalMentions}
                     </p>
                   </div>
-                  <MessageSquare className="h-8 w-8 text-purple-500" />
+                  <MessageSquare className="h-8 w-8 text-chart-5" />
                 </div>
               </CardContent>
             </Card>
@@ -324,11 +333,14 @@ export default function GeoAnalytics() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Market Size</p>
-                    <p className="text-2xl font-bold" data-testid="market-size">
+                    <p
+                      className="text-2xl font-bold font-mono tabular-nums"
+                      data-testid="market-size"
+                    >
                       {analytics.overview.marketSize}
                     </p>
                   </div>
-                  <BarChart3 className="h-8 w-8 text-green-500" />
+                  <BarChart3 className="h-8 w-8 text-chart-4" />
                 </div>
               </CardContent>
             </Card>
@@ -337,11 +349,14 @@ export default function GeoAnalytics() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Competitors Tracked</p>
-                    <p className="text-2xl font-bold" data-testid="competitor-count">
+                    <p
+                      className="text-2xl font-bold font-mono tabular-nums"
+                      data-testid="competitor-count"
+                    >
                       {analytics.overview.competitorCount}
                     </p>
                   </div>
-                  <Users className="h-8 w-8 text-orange-500" />
+                  <Users className="h-8 w-8 text-chart-3" />
                 </div>
               </CardContent>
             </Card>
@@ -408,11 +423,13 @@ export default function GeoAnalytics() {
                             <div>
                               <p className="text-muted-foreground">Sentiment</p>
                               <div className="flex gap-1 text-xs">
-                                <span className="text-green-600">
-                                  +{metrics.sentiment.positive}
+                                <span className="text-chart-4">+{metrics.sentiment.positive}</span>
+                                <span className="text-muted-foreground">
+                                  /{metrics.sentiment.neutral}
                                 </span>
-                                <span className="text-gray-400">/{metrics.sentiment.neutral}</span>
-                                <span className="text-red-500">-{metrics.sentiment.negative}</span>
+                                <span className="text-destructive">
+                                  -{metrics.sentiment.negative}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -453,11 +470,11 @@ export default function GeoAnalytics() {
                             <span
                               className={`text-2xl font-bold w-8 ${
                                 index === 0
-                                  ? "text-yellow-500"
+                                  ? "text-chart-3"
                                   : index === 1
-                                    ? "text-gray-400"
+                                    ? "text-muted-foreground"
                                     : index === 2
-                                      ? "text-amber-600"
+                                      ? "text-chart-3"
                                       : "text-muted-foreground"
                               }`}
                             >
@@ -484,7 +501,7 @@ export default function GeoAnalytics() {
             </TabsContent>
           </Tabs>
 
-          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950">
+          <Card className="bg-card border border-border">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
@@ -495,7 +512,7 @@ export default function GeoAnalytics() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
                 <div>
                   <h4 className="font-semibold mb-2 flex items-center gap-2">
-                    <Eye className="h-4 w-4 text-blue-500" />
+                    <Eye className="h-4 w-4 text-chart-1" />
                     AI Visibility Score
                   </h4>
                   <p className="text-muted-foreground">
@@ -505,7 +522,7 @@ export default function GeoAnalytics() {
                 </div>
                 <div>
                   <h4 className="font-semibold mb-2 flex items-center gap-2">
-                    <PieChart className="h-4 w-4 text-green-500" />
+                    <PieChart className="h-4 w-4 text-chart-4" />
                     Share of Voice
                   </h4>
                   <p className="text-muted-foreground">
@@ -515,7 +532,7 @@ export default function GeoAnalytics() {
                 </div>
                 <div>
                   <h4 className="font-semibold mb-2 flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-amber-500" />
+                    <MessageSquare className="h-4 w-4 text-chart-3" />
                     Sentiment Analysis
                   </h4>
                   <p className="text-muted-foreground">

@@ -109,9 +109,6 @@ function NavItem({
         ].join(" ")}
         tabIndex={0}
       >
-        {active && (
-          <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] -ml-2 bg-primary rounded-r" />
-        )}
         <Icon className="w-4 h-4 shrink-0" />
         <span className="truncate">{label}</span>
       </div>
@@ -122,7 +119,7 @@ function NavItem({
 // ─── Shared content (used in both desktop aside and mobile Sheet) ────────────
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user, logout } = useAuth();
 
   const getInitials = () => {
@@ -233,7 +230,13 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <DropdownMenuContent side="top" align="end" className="w-56">
             <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled>
+            <DropdownMenuItem
+              onClick={() => {
+                navigate("/settings");
+                onNavigate?.();
+              }}
+              className="cursor-pointer"
+            >
               <Settings className="w-4 h-4 mr-2" />
               Account settings
             </DropdownMenuItem>

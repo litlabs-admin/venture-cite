@@ -59,7 +59,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Helmet>
         <title>Sign In - VentureCite</title>
         <meta name="robots" content="noindex" />
@@ -76,7 +76,7 @@ export default function Login() {
           <div className="flex justify-center mb-4">
             <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900">Welcome back</CardTitle>
+          <CardTitle className="text-2xl font-bold text-foreground">Welcome back</CardTitle>
           <CardDescription>Sign in to your VentureCite account</CardDescription>
         </CardHeader>
         <CardContent>
@@ -119,7 +119,7 @@ export default function Login() {
             <div className="flex justify-end">
               <a
                 href="/forgot-password"
-                className="text-sm text-red-600 hover:text-red-700"
+                className="text-sm text-primary hover:text-primary/90"
                 data-testid="link-forgot-password"
               >
                 Forgot password?
@@ -127,7 +127,7 @@ export default function Login() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-red-600 hover:bg-red-700"
+              className="w-full bg-primary hover:bg-primary/90"
               disabled={loginMutation.isPending}
               data-testid="button-login"
             >
@@ -143,11 +143,11 @@ export default function Login() {
           </form>
         </CardContent>
         <CardFooter className="justify-center">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             Don't have an account?{" "}
             <a
               href="/register"
-              className="text-red-600 hover:text-red-700 font-medium"
+              className="text-primary hover:text-primary/90 font-medium"
               data-testid="link-register"
             >
               Sign up

@@ -33,6 +33,7 @@ import type { CommunityPost } from "@shared/schema";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState, KPITile } from "@/components/foundations";
 import {
   Search,
   Plus,
@@ -80,15 +81,15 @@ const platformIcons: Record<string, JSX.Element> = {
 };
 
 const platformColors: Record<string, string> = {
-  reddit: "bg-orange-100 text-orange-800",
-  hackernews: "bg-orange-100 text-orange-700",
+  reddit: "bg-muted text-foreground",
+  hackernews: "bg-muted text-foreground",
 };
 
 const statusColors: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-800",
-  ready: "bg-blue-100 text-blue-800",
-  posted: "bg-green-100 text-green-800",
-  archived: "bg-yellow-100 text-yellow-800",
+  draft: "bg-muted text-muted-foreground",
+  ready: "bg-muted text-chart-1",
+  posted: "bg-muted text-chart-4",
+  archived: "bg-muted text-chart-3",
 };
 
 export default function CommunityEngagement() {
@@ -438,7 +439,7 @@ export default function CommunityEngagement() {
 
               {generatedContent && (
                 <div
-                  className="border rounded-lg p-4 space-y-3 bg-stone-50 dark:bg-gray-800"
+                  className="border border-border rounded-lg p-4 space-y-3 bg-muted"
                   data-testid="generated-content"
                 >
                   {generatedContent.title && (
@@ -449,7 +450,7 @@ export default function CommunityEngagement() {
                   )}
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Content</label>
-                    <div className="mt-1 p-3 bg-white dark:bg-gray-900 rounded border text-sm whitespace-pre-wrap">
+                    <div className="mt-1 p-3 bg-card rounded border border-border text-sm whitespace-pre-wrap">
                       {generatedContent.content}
                     </div>
                   </div>
@@ -461,7 +462,7 @@ export default function CommunityEngagement() {
                       <ul className="mt-1 text-sm space-y-1">
                         {generatedContent.tips.map((tip, i) => (
                           <li key={i} className="flex items-start gap-2">
-                            <CheckCircle2 className="w-3 h-3 mt-1 text-green-500 shrink-0" />
+                            <CheckCircle2 className="w-3 h-3 mt-1 text-chart-4 shrink-0" />
                             <span>{tip}</span>
                           </li>
                         ))}
@@ -532,41 +533,13 @@ export default function CommunityEngagement() {
 
           <TabsContent value="discover" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <Card>
-                <CardContent className="py-4 text-center">
-                  <div className="text-2xl font-bold text-red-600" data-testid="stat-total-groups">
-                    {discoveredGroups.length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Groups Found</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="py-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600" data-testid="stat-total-drafts">
-                    {draftPosts.length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Draft Posts</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="py-4 text-center">
-                  <div
-                    className="text-2xl font-bold text-green-600"
-                    data-testid="stat-total-posted"
-                  >
-                    {postedPosts.length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Posted</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="py-4 text-center">
-                  <div className="text-2xl font-bold text-purple-600" data-testid="stat-platforms">
-                    {new Set(posts.map((p) => p.platform)).size}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Platforms Active</p>
-                </CardContent>
-              </Card>
+              <KPITile label="Groups Found" value={discoveredGroups.length} />
+              <KPITile label="Draft Posts" value={draftPosts.length} />
+              <KPITile label="Posted" value={postedPosts.length} />
+              <KPITile
+                label="Platforms Active"
+                value={new Set(posts.map((p) => p.platform)).size}
+              />
             </div>
 
             {discoverMutation.isPending && (
@@ -578,41 +551,35 @@ export default function CommunityEngagement() {
             )}
 
             {discoveredGroups.length === 0 && !discoverMutation.isPending && (
-              <Card data-testid="empty-state-discover">
-                <CardContent className="py-12 text-center">
-                  <Search className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="font-medium text-muted-foreground">No communities discovered yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Click "Discover Communities" to find relevant Reddit and Hacker News groups for
-                    your brand
-                  </p>
-                  <Button
-                    onClick={handleDiscover}
-                    className="mt-4"
-                    size="sm"
-                    data-testid="button-discover-empty"
-                  >
-                    <Compass className="w-4 h-4 mr-2" />
-                    Discover Communities
-                  </Button>
-                </CardContent>
-              </Card>
+              <div data-testid="empty-state-discover">
+                <EmptyState
+                  icon={Search}
+                  title="No communities discovered yet"
+                  body='Click "Discover Communities" to find relevant Reddit and Hacker News groups for your brand'
+                  cta={
+                    <Button onClick={handleDiscover} size="sm" data-testid="button-discover-empty">
+                      <Compass className="w-4 h-4 mr-2" />
+                      Discover Communities
+                    </Button>
+                  }
+                />
+              </div>
             )}
 
             {discoveredGroups.length > 0 && (
               <div className="space-y-3">
                 {discoveredGroups.map((group, idx) => (
-                  <Card
-                    key={idx}
-                    className="hover:shadow-md transition-shadow"
-                    data-testid={`card-group-${idx}`}
-                  >
+                  <Card key={idx} className="transition-colors" data-testid={`card-group-${idx}`}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             {platformIcons[group.platform] || <Globe className="w-4 h-4" />}
-                            <Badge className={platformColors[group.platform] || "bg-gray-100"}>
+                            <Badge
+                              className={
+                                platformColors[group.platform] || "bg-muted text-foreground"
+                              }
+                            >
                               {group.platform}
                             </Badge>
                             <span className="font-semibold">{group.name}</span>
@@ -726,7 +693,9 @@ export default function CommunityEngagement() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
-                        <Badge className={platformColors[post.platform] || "bg-gray-100"}>
+                        <Badge
+                          className={platformColors[post.platform] || "bg-muted text-foreground"}
+                        >
                           {post.platform}
                         </Badge>
                         <span className="font-medium text-sm">{post.groupName}</span>
@@ -810,11 +779,13 @@ export default function CommunityEngagement() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
-                        <Badge className={platformColors[post.platform] || "bg-gray-100"}>
+                        <Badge
+                          className={platformColors[post.platform] || "bg-muted text-foreground"}
+                        >
                           {post.platform}
                         </Badge>
                         <span className="font-medium text-sm">{post.groupName}</span>
-                        <Badge className="bg-green-100 text-green-800">Posted</Badge>
+                        <Badge className="bg-muted text-chart-4">Posted</Badge>
                       </div>
                       {post.title && <p className="font-medium text-sm mt-1">{post.title}</p>}
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
@@ -825,7 +796,7 @@ export default function CommunityEngagement() {
                           href={post.postUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                          className="text-xs text-chart-1 hover:underline flex items-center gap-1 mt-1"
                         >
                           <ExternalLink className="w-3 h-3" /> View post
                         </a>
@@ -913,7 +884,7 @@ export default function CommunityEngagement() {
       <Card className="mt-6" data-testid="card-best-practices">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-amber-500" />
+            <AlertCircle className="w-5 h-5 text-chart-3" />
             Community Engagement Best Practices
           </CardTitle>
         </CardHeader>

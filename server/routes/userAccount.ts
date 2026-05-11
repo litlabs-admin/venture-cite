@@ -15,6 +15,7 @@ import type { Express, Request } from "express";
 import { eq, inArray } from "drizzle-orm";
 import rateLimit from "express-rate-limit";
 import { supabaseAdmin } from "../supabase";
+import { isAuthenticated } from "../auth";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import { users } from "@shared/schema";
@@ -297,6 +298,158 @@ export function setupUserAccountRoutes(app: Express) {
         logger.error({ err }, "notification-preferences.get failed");
         captureAndFlush(err, { tags: { source: "notification-prefs-get" } });
         res.status(500).json({ success: false, error: "Failed to load preferences." });
+      }
+    }),
+  );
+
+  // Foundations Plan 3 Task 2: profile update (firstName, lastName,
+  // timezone). Partial body allowed — only sent fields are written.
+  app.patch(
+    "/api/user/profile",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = (req as unknown as { user?: { id: string } }).user;
+        if (!user) {
+          return res.status(401).json({ success: false, error: "Not authenticated" });
+        }
+        const { z } = await import("zod");
+        const profileSchema = z.object({
+          firstName: z.string().trim().max(100).optional(),
+          lastName: z.string().trim().max(100).optional(),
+          timezone: z.string().optional(),
+        });
+        const parsed = profileSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          const errorMessage =
+            parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ") ||
+            "Invalid input";
+          return res.status(400).json({ success: false, error: errorMessage });
+        }
+        const { firstName, lastName, timezone } = parsed.data;
+
+        // Validate timezone against the runtime's IANA list. Older Node
+        // versions without supportedValuesOf are tolerated (no-op check).
+        if (timezone) {
+          const valid: string[] =
+            typeof (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
+              .supportedValuesOf === "function"
+              ? (
+                  Intl as unknown as { supportedValuesOf: (k: string) => string[] }
+                ).supportedValuesOf("timeZone")
+              : [];
+          if (valid.length > 0 && !valid.includes(timezone)) {
+            return res.status(400).json({ success: false, error: "Invalid timezone" });
+          }
+        }
+
+        // Empty-string firstName/lastName must NOT wipe the saved value.
+        // The client always sends all three fields; if its form briefly
+        // renders blank (e.g. before /auth/me hydrates), we'd overwrite
+        // the user's real name with "". Treat trimmed-empty as "skip".
+        const patch: Record<string, unknown> = {};
+        if (firstName && firstName.trim().length > 0) patch.firstName = firstName.trim();
+        if (lastName && lastName.trim().length > 0) patch.lastName = lastName.trim();
+        if (timezone) patch.timezone = timezone;
+
+        if (Object.keys(patch).length === 0) {
+          return res.status(200).json({ success: true, noChange: true });
+        }
+
+        patch.updatedAt = new Date();
+
+        await db.update(users).set(patch).where(eq(users.id, user.id));
+        res.json({ success: true });
+      } catch (err: unknown) {
+        logger.error({ err }, "user.profile.update failed");
+        captureAndFlush(err, { tags: { source: "user-profile-update" } });
+        res.status(500).json({ success: false, error: "Failed to update profile." });
+      }
+    }),
+  );
+
+  // Foundations Plan 3 Task 2: password change. Re-auths the user by
+  // signing in with the current password against a fresh user-context
+  // Supabase client (the admin client can't verify passwords), then
+  // updates via the admin API.
+  app.post(
+    "/api/user/password",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = (req as unknown as { user?: { id: string; email: string | null } }).user;
+        if (!user) {
+          return res.status(401).json({ success: false, error: "Not authenticated" });
+        }
+        const { z } = await import("zod");
+        const passwordSchema = z.object({
+          currentPassword: z.string().min(1, "Current password required"),
+          newPassword: z.string().min(8, "Password must be at least 8 characters"),
+        });
+        const parsed = passwordSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          const errorMessage =
+            parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ") ||
+            "Invalid input";
+          return res.status(400).json({ success: false, error: errorMessage });
+        }
+        if (!user.email) {
+          return res.status(400).json({
+            success: false,
+            error: "Account has no email on file — contact support.",
+          });
+        }
+        const { currentPassword, newPassword } = parsed.data;
+
+        // Re-auth using supabaseAdmin.auth.signInWithPassword — same
+        // pattern as the regular login route in server/auth.ts. The
+        // service-role key works here; constructing a fresh anon-key
+        // client was fragile (anon key isn't reliably present in the
+        // server-side env in production).
+        const { data: signInData, error: signInError } =
+          await supabaseAdmin.auth.signInWithPassword({
+            email: user.email,
+            password: currentPassword,
+          });
+        if (signInError || !signInData?.user) {
+          return res.status(401).json({ success: false, error: "Current password incorrect" });
+        }
+
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+          password: newPassword,
+        });
+        if (updateError) {
+          logger.error({ err: updateError, userId: user.id }, "user.password.update failed");
+          return res.status(502).json({ success: false, error: "Password update failed" });
+        }
+
+        // Revoke all OTHER sessions (every device except the one used to
+        // make this call). Without this, a stolen-then-rotated password
+        // leaves attacker tokens valid on other devices. Non-fatal — the
+        // password change itself succeeded; logging is enough on failure.
+        try {
+          const bearer = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+          if (bearer) {
+            await supabaseAdmin.auth.admin.signOut(bearer, "others");
+          }
+        } catch (revokeErr) {
+          logger.warn(
+            { err: revokeErr, userId: user.id },
+            "Failed to revoke other sessions after password change",
+          );
+        }
+
+        await logAudit(req, {
+          action: "user.password.changed",
+          entityType: "user",
+          entityId: user.id,
+        });
+
+        res.json({ success: true });
+      } catch (err: unknown) {
+        logger.error({ err }, "user.password.change failed");
+        captureAndFlush(err, { tags: { source: "user-password-change" } });
+        res.status(500).json({ success: false, error: "Failed to change password." });
       }
     }),
   );

@@ -162,10 +162,10 @@ export default function KeywordResearchPage() {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-400";
-    if (score >= 60) return "text-yellow-400";
-    if (score >= 40) return "text-orange-400";
-    return "text-red-400";
+    if (score >= 80) return "text-chart-4";
+    if (score >= 60) return "text-chart-3";
+    if (score >= 40) return "text-chart-3";
+    return "text-destructive";
   };
 
   return (
@@ -242,7 +242,7 @@ export default function KeywordResearchPage() {
             <Button
               onClick={() => discoverMutation.mutate()}
               disabled={!selectedBrandId || discoverMutation.isPending}
-              className="w-full bg-red-600 hover:bg-red-700"
+              className="w-full"
               data-testid="button-discover-keywords"
             >
               {discoverMutation.isPending ? (
@@ -338,7 +338,7 @@ export default function KeywordResearchPage() {
           {filteredKeywords.map((keyword, keywordIndex) => (
             <Card
               key={keyword.id}
-              className="hover:shadow-md transition-shadow"
+              className="transition-colors"
               data-testid={`keyword-card-${keyword.id}`}
               data-tour-id={keywordIndex === 0 ? "keywords.firstRow" : undefined}
             >
@@ -453,7 +453,7 @@ export default function KeywordResearchPage() {
                     <Button
                       size="sm"
                       onClick={() => handleGenerateContent(keyword)}
-                      className="bg-red-600 hover:bg-red-700"
+                      className=""
                       data-testid={`button-generate-content-${keyword.id}`}
                     >
                       <FileText className="h-4 w-4 mr-2" />
@@ -469,7 +469,7 @@ export default function KeywordResearchPage() {
                       size="sm"
                       variant="ghost"
                       onClick={() => deleteMutation.mutate(keyword.id)}
-                      className="text-muted-foreground hover:text-red-600"
+                      className="text-muted-foreground hover:text-destructive"
                       data-testid={`button-delete-keyword-${keyword.id}`}
                     >
                       <Trash2 className="h-4 w-4" />

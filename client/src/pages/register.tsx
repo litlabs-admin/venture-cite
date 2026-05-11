@@ -84,7 +84,7 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Helmet>
         <title>Create Account - VentureCite</title>
         <meta name="robots" content="noindex" />
@@ -101,7 +101,7 @@ export default function Register() {
           <div className="flex justify-center mb-4">
             <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900">Create your account</CardTitle>
+          <CardTitle className="text-2xl font-bold text-foreground">Create your account</CardTitle>
           <CardDescription>Start optimizing for AI search engines today</CardDescription>
         </CardHeader>
         <CardContent>
@@ -169,7 +169,7 @@ export default function Register() {
                   {passwordRequirements.map((req, i) => (
                     <li
                       key={i}
-                      className={`flex items-center gap-1 ${req.met ? "text-green-600" : "text-slate-500"}`}
+                      className={`flex items-center gap-1 ${req.met ? "text-chart-4" : "text-muted-foreground"}`}
                     >
                       {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                       {req.label}
@@ -190,14 +190,14 @@ export default function Register() {
                 data-testid="input-confirm-password"
               />
               {confirmPassword && !passwordsMatch && (
-                <p className="text-xs text-red-600 flex items-center gap-1">
+                <p className="text-xs text-destructive flex items-center gap-1">
                   <X className="h-3 w-3" /> Passwords do not match
                 </p>
               )}
             </div>
             <Button
               type="submit"
-              className="w-full bg-red-600 hover:bg-red-700"
+              className="w-full bg-primary hover:bg-primary/90"
               disabled={registerMutation.isPending || !allRequirementsMet || !passwordsMatch}
               data-testid="button-register"
             >
@@ -210,17 +210,17 @@ export default function Register() {
                 "Create account"
               )}
             </Button>
-            <p className="text-xs text-slate-500 text-center">
+            <p className="text-xs text-muted-foreground text-center">
               By signing up, you agree to our Terms of Service and Privacy Policy.
             </p>
           </form>
         </CardContent>
         <CardFooter className="justify-center">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             Already have an account?{" "}
             <a
               href="/login"
-              className="text-red-600 hover:text-red-700 font-medium"
+              className="text-primary hover:text-primary/90 font-medium"
               data-testid="link-login"
             >
               Sign in

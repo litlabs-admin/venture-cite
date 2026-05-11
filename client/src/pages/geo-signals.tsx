@@ -404,28 +404,28 @@ export default function GeoSignals() {
 
   const getScoreColor = (score: number, max: number) => {
     const percentage = (score / max) * 100;
-    if (percentage >= 80) return "text-green-500";
-    if (percentage >= 60) return "text-yellow-500";
-    if (percentage >= 40) return "text-orange-500";
-    return "text-red-500";
+    if (percentage >= 80) return "text-chart-4";
+    if (percentage >= 60) return "text-chart-3";
+    if (percentage >= 40) return "text-chart-3";
+    return "text-destructive";
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "excellent":
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-chart-4" />;
       case "good":
-        return <CheckCircle className="w-4 h-4 text-blue-500" />;
+        return <CheckCircle className="w-4 h-4 text-chart-1" />;
       case "needs_improvement":
-        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+        return <AlertTriangle className="w-4 h-4 text-chart-3" />;
       case "poor":
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="w-4 h-4 text-destructive" />;
       case "pass":
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-chart-4" />;
       case "warning":
-        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+        return <AlertTriangle className="w-4 h-4 text-chart-3" />;
       case "fail":
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="w-4 h-4 text-destructive" />;
       default:
         return null;
     }
@@ -704,7 +704,7 @@ export default function GeoSignals() {
                                           targetQuery === text ? "opacity-100" : "opacity-0"
                                         }`}
                                       />
-                                      <span className="truncate">{text}</span>
+                                      <span className="line-clamp-2">{text}</span>
                                     </CommandItem>
                                   );
                                 })}
@@ -811,11 +811,11 @@ export default function GeoSignals() {
                         </p>
                         <div className="space-y-2 text-muted-foreground">
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>1500+ words across clear sections</span>
                           </p>
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>Use both H2 for top sections and H3 for sub-points</span>
                           </p>
                         </div>
@@ -823,7 +823,7 @@ export default function GeoSignals() {
 
                       <div className="p-4 bg-muted/30 rounded-lg border">
                         <div className="flex items-center gap-2 mb-2">
-                          <Brain className="w-5 h-5 text-blue-500" />
+                          <Brain className="w-5 h-5 text-chart-1" />
                           <span className="font-semibold text-foreground text-base">
                             2. Semantic similarity to query
                           </span>
@@ -834,11 +834,11 @@ export default function GeoSignals() {
                         </p>
                         <div className="space-y-2 text-muted-foreground">
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>Answer the question directly in the first paragraph</span>
                           </p>
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>Use the query's concepts and related terminology naturally</span>
                           </p>
                         </div>
@@ -846,7 +846,7 @@ export default function GeoSignals() {
 
                       <div className="p-4 bg-muted/30 rounded-lg border">
                         <div className="flex items-center gap-2 mb-2">
-                          <Search className="w-5 h-5 text-green-500" />
+                          <Search className="w-5 h-5 text-chart-4" />
                           <span className="font-semibold text-foreground text-base">
                             3. Query-term coverage
                           </span>
@@ -857,7 +857,7 @@ export default function GeoSignals() {
                         </p>
                         <div className="space-y-2 text-muted-foreground">
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>
                               If the query is "best CRM for startups", the article should cover
                               "CRM" and "startups" explicitly
@@ -868,7 +868,7 @@ export default function GeoSignals() {
 
                       <div className="p-4 bg-muted/30 rounded-lg border">
                         <div className="flex items-center gap-2 mb-2">
-                          <Target className="w-5 h-5 text-yellow-500" />
+                          <Target className="w-5 h-5 text-chart-3" />
                           <span className="font-semibold text-foreground text-base">
                             4. Exact-phrase match
                           </span>
@@ -892,11 +892,11 @@ export default function GeoSignals() {
                         </p>
                         <div className="space-y-2 text-muted-foreground">
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>Start each section with a question-style H2</span>
                           </p>
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>
                               Follow each heading with a 2-3 sentence direct answer before adding
                               detail
@@ -907,7 +907,7 @@ export default function GeoSignals() {
 
                       <div className="p-4 bg-muted/30 rounded-lg border">
                         <div className="flex items-center gap-2 mb-2">
-                          <TrendingUp className="w-5 h-5 text-orange-500" />
+                          <TrendingUp className="w-5 h-5 text-chart-3" />
                           <span className="font-semibold text-foreground text-base">
                             6. Authority signals
                           </span>
@@ -919,15 +919,15 @@ export default function GeoSignals() {
                         </p>
                         <div className="space-y-2 text-muted-foreground">
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>Include a visible byline</span>
                           </p>
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>Cite ≥3 authoritative sources with outbound links</span>
                           </p>
                           <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
                             <span>
                               Run Schema Lab audit on this article's URL to contribute to this
                               signal
@@ -1021,7 +1021,7 @@ export default function GeoSignals() {
                       <p className="text-sm text-muted-foreground">Total Chunks</p>
                     </div>
                     <div className="p-4 bg-muted/30 rounded-lg text-center">
-                      <p className="text-2xl font-bold text-green-500">
+                      <p className="text-2xl font-bold text-chart-4">
                         {chunkStats.extractableChunks}
                       </p>
                       <p className="text-sm text-muted-foreground">Extractable</p>
@@ -1039,7 +1039,7 @@ export default function GeoSignals() {
                       {chunks.map((chunk, idx) => (
                         <div
                           key={idx}
-                          className={`p-4 rounded-lg border ${chunk.extractable ? "bg-emerald-500/10 border-emerald-500/30" : "bg-destructive/10 border-destructive/30"}`}
+                          className={`p-4 rounded-lg border ${chunk.extractable ? "bg-chart-4/10 border-chart-4/30" : "bg-destructive/10 border-destructive/30"}`}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
@@ -1052,10 +1052,7 @@ export default function GeoSignals() {
                             </div>
                             <div className="flex gap-2">
                               {chunk.hasHeading && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-emerald-600 border-emerald-500/50"
-                                >
+                                <Badge variant="outline" className="text-chart-4 border-chart-4/50">
                                   Has Heading
                                 </Badge>
                               )}
@@ -1178,14 +1175,14 @@ export default function GeoSignals() {
 
                 <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
                   <div className="text-center">
-                    <Search className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+                    <Search className="w-8 h-8 mx-auto text-chart-1 mb-2" />
                     <p className="font-medium text-foreground">Searchable</p>
                     <p className="text-xs text-muted-foreground">
                       Affects recall - whether AI can find you
                     </p>
                   </div>
                   <div className="text-center">
-                    <Database className="w-8 h-8 mx-auto text-green-500 mb-2" />
+                    <Database className="w-8 h-8 mx-auto text-chart-4 mb-2" />
                     <p className="font-medium text-foreground">Indexable</p>
                     <p className="text-xs text-muted-foreground">Affects filtering and ordering</p>
                   </div>
@@ -1224,7 +1221,7 @@ export default function GeoSignals() {
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             {schema.present ? (
-                              <CheckCircle className="w-5 h-5 text-green-500" />
+                              <CheckCircle className="w-5 h-5 text-chart-4" />
                             ) : (
                               <XCircle className="w-5 h-5 text-red-500" />
                             )}
@@ -1241,19 +1238,19 @@ export default function GeoSignals() {
                             <p className="text-xs text-muted-foreground">Searchable</p>
                             <p
                               className={
-                                schema.searchable ? "text-blue-500" : "text-muted-foreground"
+                                schema.searchable ? "text-chart-1" : "text-muted-foreground"
                               }
                             >
                               {schema.searchable ? "✓" : "—"}
                             </p>
                           </div>
                           <div
-                            className={`p-2 rounded text-center ${schema.indexable ? "bg-emerald-500/10" : ""}`}
+                            className={`p-2 rounded text-center ${schema.indexable ? "bg-chart-4/10" : ""}`}
                           >
                             <p className="text-xs text-muted-foreground">Indexable</p>
                             <p
                               className={
-                                schema.indexable ? "text-green-500" : "text-muted-foreground"
+                                schema.indexable ? "text-chart-4" : "text-muted-foreground"
                               }
                             >
                               {schema.indexable ? "✓" : "—"}
@@ -1354,11 +1351,11 @@ export default function GeoSignals() {
                         <div
                           className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
                             pipelineStages[idx]?.status === "pass"
-                              ? "bg-green-600"
+                              ? "bg-chart-4"
                               : pipelineStages[idx]?.status === "warning"
-                                ? "bg-yellow-600"
+                                ? "bg-chart-3"
                                 : pipelineStages[idx]?.status === "fail"
-                                  ? "bg-red-500"
+                                  ? "bg-destructive"
                                   : "bg-muted"
                           }`}
                         >
@@ -1446,8 +1443,8 @@ export default function GeoSignals() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg text-center">
-                    <Timer className="w-8 h-8 mx-auto text-green-500 mb-2" />
+                  <div className="p-4 bg-chart-4/10 border border-chart-4/30 rounded-lg text-center">
+                    <Timer className="w-8 h-8 mx-auto text-chart-4 mb-2" />
                     <p className="text-2xl font-bold text-foreground">
                       {
                         articles.filter((a) => {
@@ -1460,8 +1457,8 @@ export default function GeoSignals() {
                     </p>
                     <p className="text-sm text-muted-foreground">Fresh (&lt;30 days)</p>
                   </div>
-                  <div className="p-4 bg-yellow-900/20 border border-yellow-700 rounded-lg text-center">
-                    <Clock className="w-8 h-8 mx-auto text-yellow-500 mb-2" />
+                  <div className="p-4 bg-chart-3/10 border border-chart-3/30 rounded-lg text-center">
+                    <Clock className="w-8 h-8 mx-auto text-chart-3 mb-2" />
                     <p className="text-2xl font-bold text-foreground">
                       {
                         articles.filter((a) => {
@@ -1474,8 +1471,8 @@ export default function GeoSignals() {
                     </p>
                     <p className="text-sm text-muted-foreground">Aging (30-90 days)</p>
                   </div>
-                  <div className="p-4 bg-red-900/20 border border-red-700 rounded-lg text-center">
-                    <AlertTriangle className="w-8 h-8 mx-auto text-red-500 mb-2" />
+                  <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-center">
+                    <AlertTriangle className="w-8 h-8 mx-auto text-destructive mb-2" />
                     <p className="text-2xl font-bold text-foreground">
                       {
                         articles.filter((a) => {
@@ -1546,11 +1543,11 @@ export default function GeoSignals() {
                                 <span
                                   className={`text-sm font-medium ${
                                     status === "fresh"
-                                      ? "text-green-500"
+                                      ? "text-chart-4"
                                       : status === "aging"
-                                        ? "text-yellow-500"
+                                        ? "text-chart-3"
                                         : status === "stale"
-                                          ? "text-red-500"
+                                          ? "text-destructive"
                                           : "text-muted-foreground"
                                   }`}
                                 >
@@ -1595,9 +1592,9 @@ export default function GeoSignals() {
                       key={i}
                       className={
                         row.kind === "add"
-                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                          ? "bg-chart-4/15 text-chart-4"
                           : row.kind === "del"
-                            ? "bg-red-500/15 text-red-700 dark:text-red-300 line-through"
+                            ? "bg-destructive/15 text-destructive line-through"
                             : "text-muted-foreground"
                       }
                     >

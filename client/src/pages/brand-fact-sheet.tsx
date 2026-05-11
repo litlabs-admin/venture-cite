@@ -311,10 +311,10 @@ export default function BrandFactSheet() {
 
       {selectedBrand && (
         <>
-          <Card className="mb-6 border-violet-200 dark:border-violet-800 bg-violet-50/50 dark:bg-violet-900/10">
+          <Card className="mb-6 border-border bg-muted/50">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Globe className="w-5 h-5 text-violet-600" />
+                <Globe className="w-5 h-5 text-primary" />
                 Re-scrape Facts from Website
               </CardTitle>
               <CardDescription>
@@ -331,7 +331,7 @@ export default function BrandFactSheet() {
                       href={brandWebsite}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-violet-600 hover:underline break-all inline-flex items-center gap-1"
+                      className="text-sm text-primary hover:underline break-all inline-flex items-center gap-1"
                       data-testid="text-brand-website"
                     >
                       <ExternalLink className="w-3 h-3 flex-shrink-0" />
@@ -488,7 +488,7 @@ export default function BrandFactSheet() {
 
           {factsLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : factsIsError ? (
             <ErrorState
@@ -501,7 +501,7 @@ export default function BrandFactSheet() {
               <CardContent className="py-12 text-center">
                 {shouldPollForScrape ? (
                   <>
-                    <Loader2 className="w-12 h-12 mx-auto text-violet-500 mb-4 animate-spin" />
+                    <Loader2 className="w-12 h-12 mx-auto text-primary mb-4 animate-spin" />
                     <h3 className="text-lg font-semibold mb-2">
                       Auto-scraping facts from your website…
                     </h3>
@@ -550,7 +550,7 @@ export default function BrandFactSheet() {
                   <Card key={category.value}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-2">
-                        <CategoryIcon className="w-5 h-5 text-violet-600" />
+                        <CategoryIcon className="w-5 h-5 text-primary" />
                         <CardTitle className="text-lg">{category.label}</CardTitle>
                         <Badge variant="secondary" className="ml-auto">
                           {category.facts.length}
@@ -575,7 +575,7 @@ export default function BrandFactSheet() {
                                       )?.label
                                     : undefined) || fact.factKey}
                                 </span>
-                                <CheckCircle className="w-3 h-3 text-green-600" />
+                                <CheckCircle className="w-3 h-3 text-chart-4" />
                                 {fact.source === "scraped" && (
                                   <Badge
                                     variant="outline"
@@ -592,7 +592,7 @@ export default function BrandFactSheet() {
                                   href={fact.sourceUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-xs text-violet-600 hover:underline flex items-center gap-1 mt-1"
+                                  className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
                                 >
                                   <ExternalLink className="w-3 h-3" />
                                   Source
@@ -629,10 +629,10 @@ export default function BrandFactSheet() {
 
               <Separator className="my-8" />
 
-              <Card className="bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800">
+              <Card className="bg-muted/50 border-border">
                 <CardContent className="py-6">
                   <div className="flex items-start gap-4">
-                    <Shield className="w-10 h-10 text-violet-600 flex-shrink-0" />
+                    <Shield className="w-10 h-10 text-primary flex-shrink-0" />
                     <div>
                       <h3 className="font-semibold mb-1">How Fact Sheets Protect Your Brand</h3>
                       <p className="text-sm text-muted-foreground mb-3">

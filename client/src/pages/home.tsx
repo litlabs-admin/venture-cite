@@ -130,15 +130,15 @@ function Section({
   pendingDot?: boolean;
 }) {
   return (
-    <Card className="relative shadow-sm border-border/60">
+    <Card className="relative border-border/60">
       {pendingDot && (
-        <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+        <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
       )}
       <CardHeader className="flex-row items-start justify-between space-y-0 gap-4 pb-3">
         <div className="min-w-0">
           <CardTitle className="text-base font-semibold">{title}</CardTitle>
           {description && (
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{description}</p>
           )}
         </div>
         {action && <div className="shrink-0">{action}</div>}
@@ -245,16 +245,11 @@ function useDashboardQueries(
 // theme and read as "missing" next to the user's own brand. Ordered so
 // adjacent slices are perceptually distinct.
 const DONUT_COLORS = [
-  "#3b82f6", // blue
-  "#f97316", // orange
-  "#eab308", // yellow
-  "#22c55e", // green
-  "#ef4444", // red
-  "#8b5cf6", // violet
-  "#ec4899", // pink
-  "#14b8a6", // teal
-  "#a855f7", // purple
-  "#f59e0b", // amber
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
 export default function Home() {
@@ -580,12 +575,9 @@ export default function Home() {
           ) : (
             <div className="grid gap-4 md:grid-cols-3" data-tour-id="dashboard.stats">
               {/* AI Visibility Score */}
-              <Card
-                data-testid="card-visibility-score"
-                className="relative shadow-sm border-border/60"
-              >
+              <Card data-testid="card-visibility-score" className="relative border-border/60">
                 {isAutopilotDataPending && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
                 )}
                 <CardContent className="p-5 flex flex-col h-full">
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
@@ -610,7 +602,7 @@ export default function Home() {
                             <span
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
                                 heroData.visibilityDelta > 0
-                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  ? "bg-chart-4/10 text-chart-4"
                                   : "bg-destructive/10 text-destructive"
                               }`}
                             >
@@ -642,12 +634,9 @@ export default function Home() {
               </Card>
 
               {/* Share of AI Voice */}
-              <Card
-                data-testid="card-share-of-voice"
-                className="relative shadow-sm border-border/60"
-              >
+              <Card data-testid="card-share-of-voice" className="relative border-border/60">
                 {isAutopilotDataPending && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
                 )}
                 <CardContent className="p-5 flex flex-col h-full">
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
@@ -697,9 +686,9 @@ export default function Home() {
               </Card>
 
               {/* Cited / Total */}
-              <Card data-testid="card-cited-total" className="relative shadow-sm border-border/60">
+              <Card data-testid="card-cited-total" className="relative border-border/60">
                 {isAutopilotDataPending && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
                 )}
                 <CardContent className="p-5 flex flex-col h-full">
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">

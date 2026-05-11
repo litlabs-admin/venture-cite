@@ -56,24 +56,24 @@ export default function ForgotPassword() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="h-8 w-8 text-green-600" />
+              <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
+                <CheckCircle className="h-8 w-8 text-chart-4" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold text-slate-900">Check your email</CardTitle>
+            <CardTitle className="text-2xl font-bold text-foreground">Check your email</CardTitle>
             <CardDescription className="mt-2">
               If an account exists for <span className="font-medium">{email}</span>, you'll receive
               a password reset link shortly.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <div className="bg-slate-50 rounded-lg p-4 mb-4">
-              <Mail className="h-6 w-6 mx-auto text-slate-400 mb-2" />
-              <p className="text-sm text-slate-600">
+            <div className="bg-muted rounded-lg p-4 mb-4">
+              <Mail className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">
                 Don't see the email? Check your spam folder or try again.
               </p>
             </div>
@@ -92,7 +92,7 @@ export default function ForgotPassword() {
           <CardFooter className="justify-center">
             <a
               href="/login"
-              className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
+              className="text-sm text-primary hover:text-primary/90 flex items-center gap-1"
             >
               <ArrowLeft className="h-4 w-4" /> Back to sign in
             </a>
@@ -103,7 +103,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Helmet>
         <title>Reset Password - VentureCite</title>
         <meta name="robots" content="noindex" />
@@ -113,7 +113,7 @@ export default function ForgotPassword() {
           <div className="flex justify-center mb-4">
             <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900">Reset your password</CardTitle>
+          <CardTitle className="text-2xl font-bold text-foreground">Reset your password</CardTitle>
           <CardDescription>Enter your email and we'll send you a reset link</CardDescription>
         </CardHeader>
         <CardContent>
@@ -138,7 +138,7 @@ export default function ForgotPassword() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-red-600 hover:bg-red-700"
+              className="w-full bg-primary hover:bg-primary/90"
               disabled={forgotMutation.isPending}
               data-testid="button-send-reset"
             >
@@ -156,7 +156,7 @@ export default function ForgotPassword() {
         <CardFooter className="justify-center">
           <a
             href="/login"
-            className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
+            className="text-sm text-primary hover:text-primary/90 flex items-center gap-1"
           >
             <ArrowLeft className="h-4 w-4" /> Back to sign in
           </a>

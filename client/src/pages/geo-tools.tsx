@@ -43,6 +43,7 @@ import PageHeader from "@/components/PageHeader";
 import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
 import type { Listicle, BofuContent, FaqItem, WikipediaMention, Competitor } from "@shared/schema";
+import { StatusDot } from "@/components/foundations";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
@@ -83,10 +84,10 @@ function formatReportLines(items: Record<string, number | undefined>): string {
 // badges. Rendered on every row so users can see what they previously
 // selected without opening the dropdown.
 const LISTICLE_STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
-  new: { label: "New", className: "bg-slate-100 text-slate-700 hover:bg-slate-100" },
-  contacted: { label: "Contacted", className: "bg-blue-100 text-blue-800 hover:bg-blue-100" },
-  won: { label: "Won", className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" },
-  dropped: { label: "Dropped", className: "bg-gray-200 text-gray-600 hover:bg-gray-200" },
+  new: { label: "New", className: "bg-muted text-foreground hover:bg-muted" },
+  contacted: { label: "Contacted", className: "bg-chart-1/15 text-chart-1 hover:bg-chart-1/15" },
+  won: { label: "Won", className: "bg-chart-4/15 text-chart-4 hover:bg-chart-4/15" },
+  dropped: { label: "Dropped", className: "bg-muted text-muted-foreground hover:bg-muted" },
 };
 
 // Wave 9.4: header roll-up card. Single-line metric + descriptive
@@ -680,7 +681,7 @@ export default function GeoTools() {
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle className="flex items-center gap-2">
-                            <List className="h-5 w-5 text-purple-500" />
+                            <List className="h-5 w-5 text-chart-5" />
                             Listicle Tracker
                           </CardTitle>
                           <CardDescription>
@@ -713,8 +714,8 @@ export default function GeoTools() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg mb-6">
-                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <div className="bg-chart-1/10 p-4 rounded-lg mb-6">
+                        <p className="text-sm text-chart-1">
                           <strong>Why Listicles Matter:</strong> Getting included in "Best of"
                           articles is how brands rank #1 on ChatGPT. AI systems heavily cite these
                           curated lists.
@@ -778,19 +779,20 @@ export default function GeoTools() {
                               return (
                                 <Card
                                   key={l.id}
-                                  className="border-l-4 border-l-purple-500"
+                                  className="border-l border-border"
                                   data-tour-id={
                                     listicleIndex === 0 ? "listicles.firstResult" : undefined
                                   }
                                 >
                                   <CardContent className="pt-4">
                                     <div className="flex items-start justify-between gap-4">
+                                      <StatusDot tone="neutral" className="mt-2" />
                                       <div className="flex-1 min-w-0">
                                         <a
                                           href={l.url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="font-medium text-blue-600 hover:underline flex items-center gap-1"
+                                          className="font-medium text-chart-1 hover:underline flex items-center gap-1"
                                         >
                                           <span className="line-clamp-1">{l.title}</span>
                                           <ExternalLink className="h-3 w-3 flex-shrink-0" />
@@ -806,7 +808,7 @@ export default function GeoTools() {
                                             <Badge variant="outline">{l.sourcePublication}</Badge>
                                           )}
                                           {l.isIncluded === 1 ? (
-                                            <Badge className="bg-emerald-600 hover:bg-emerald-700">
+                                            <Badge className="bg-chart-4 hover:bg-chart-4/90">
                                               <CheckCircle className="h-3 w-3 mr-1" />
                                               Included at #{l.listPosition ?? "?"} /{" "}
                                               {l.totalListItems ?? "?"}
@@ -877,7 +879,7 @@ export default function GeoTools() {
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle className="flex items-center gap-2">
-                            <BookOpen className="h-5 w-5 text-blue-500" />
+                            <BookOpen className="h-5 w-5 text-chart-1" />
                             Wikipedia Monitor
                           </CardTitle>
                           <CardDescription>
@@ -909,8 +911,8 @@ export default function GeoTools() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="bg-orange-50 dark:bg-orange-950/30 p-4 rounded-lg mb-6">
-                        <p className="text-sm text-orange-700 dark:text-orange-300">
+                      <div className="bg-chart-3/10 p-4 rounded-lg mb-6">
+                        <p className="text-sm text-chart-3">
                           <strong>Wikipedia = 40% of AI Citations:</strong> It's the #2 most cited
                           source by AI systems after Reddit. Even a mention on a relevant Wikipedia
                           page can significantly boost your AI visibility.
@@ -930,7 +932,7 @@ export default function GeoTools() {
                           <Card>
                             <CardHeader>
                               <CardTitle className="text-base flex items-center gap-2">
-                                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                <CheckCircle className="h-4 w-4 text-chart-4" />
                                 You&apos;re already mentioned ({wikiExistingRows.length})
                               </CardTitle>
                             </CardHeader>
@@ -953,7 +955,7 @@ export default function GeoTools() {
                                           href={m.pageUrl}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="font-medium text-blue-600 hover:underline flex items-center gap-1"
+                                          className="font-medium text-chart-1 hover:underline flex items-center gap-1"
                                         >
                                           {m.pageTitle}
                                           <ExternalLink className="h-3 w-3" />
@@ -979,7 +981,7 @@ export default function GeoTools() {
                           <Card>
                             <CardHeader>
                               <CardTitle className="text-base flex items-center gap-2">
-                                <Target className="h-4 w-4 text-blue-600" />
+                                <Target className="h-4 w-4 text-chart-1" />
                                 Pages you could target ({wikiOpportunityRows.length})
                               </CardTitle>
                             </CardHeader>
@@ -1004,9 +1006,9 @@ export default function GeoTools() {
                                             href={m.pageUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="font-medium text-blue-600 hover:underline flex items-center gap-1 min-w-0"
+                                            className="font-medium text-chart-1 hover:underline flex items-center gap-1 min-w-0"
                                           >
-                                            <span className="truncate">{m.pageTitle}</span>
+                                            <span className="line-clamp-2">{m.pageTitle}</span>
                                             <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                           </a>
                                           <Button
@@ -1069,7 +1071,7 @@ export default function GeoTools() {
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-green-500" />
+                        <FileText className="h-5 w-5 text-chart-4" />
                         BOFU Content Generator
                       </CardTitle>
                       <CardDescription>
@@ -1078,8 +1080,8 @@ export default function GeoTools() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="bg-green-50 dark:bg-green-950/30 p-4 rounded-lg mb-6">
-                        <p className="text-sm text-green-700 dark:text-green-300">
+                      <div className="bg-chart-4/10 p-4 rounded-lg mb-6">
+                        <p className="text-sm text-chart-4">
                           <strong>80% BOFU Strategy:</strong> Comparison articles ("X vs Y") and
                           alternatives guides convert 80% better and get cited heavily by AI systems
                           for purchase decisions.
@@ -1186,20 +1188,20 @@ export default function GeoTools() {
                                         <Badge variant="outline">{content.contentType}</Badge>
                                         <Badge>{content.status ?? "draft"}</Badge>
                                         {content.publishedAt && (
-                                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                          <Badge className="bg-chart-4/15 text-chart-4 hover:bg-chart-4/15">
                                             Published
                                           </Badge>
                                         )}
                                         {recentlyCited && (
-                                          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                                          <Badge className="bg-chart-1/15 text-chart-1 hover:bg-chart-1/15">
                                             Cited recently
                                           </Badge>
                                         )}
                                       </div>
-                                      <h4 className="font-medium truncate">{content.title}</h4>
+                                      <h4 className="font-medium line-clamp-2">{content.title}</h4>
                                       <p className="text-xs text-muted-foreground mt-1">
                                         {content.publishedUrl ? (
-                                          <span className="truncate inline-block max-w-full">
+                                          <span className="line-clamp-2 inline-block max-w-full">
                                             {content.publishedUrl}
                                           </span>
                                         ) : (
@@ -1242,7 +1244,7 @@ export default function GeoTools() {
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <HelpCircle className="h-5 w-5 text-yellow-500" />
+                        <HelpCircle className="h-5 w-5 text-chart-3" />
                         FAQ Optimizer
                       </CardTitle>
                       <CardDescription>
@@ -1250,8 +1252,8 @@ export default function GeoTools() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="bg-yellow-50 dark:bg-yellow-950/30 p-4 rounded-lg mb-6">
-                        <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                      <div className="bg-chart-3/10 p-4 rounded-lg mb-6">
+                        <p className="text-sm text-chart-3">
                           <strong>FAQs = More Shots on Goal:</strong> AI engines frequently surface
                           FAQ sections in responses. Keep answers 40-60 words for optimal AI
                           summarization.
@@ -1295,7 +1297,7 @@ export default function GeoTools() {
                               <CardContent className="pt-4">
                                 <div className="flex items-start justify-between">
                                   <div className="flex-1">
-                                    <h4 className="font-medium text-blue-600">{faq.question}</h4>
+                                    <h4 className="font-medium text-chart-1">{faq.question}</h4>
                                     <p className="text-sm mt-2">{faq.answer}</p>
                                     <div className="flex gap-2 mt-3">
                                       <Badge variant="outline">{faq.category}</Badge>
@@ -1331,7 +1333,7 @@ export default function GeoTools() {
                                     <CheckCircle
                                       className={
                                         faq.isOptimized === 1
-                                          ? "h-5 w-5 text-green-500"
+                                          ? "h-5 w-5 text-chart-4"
                                           : "h-5 w-5 text-muted-foreground"
                                       }
                                     />
@@ -1348,7 +1350,7 @@ export default function GeoTools() {
                                     <ul className="text-xs space-y-1">
                                       {faq.optimizationTips.map((tip, i) => (
                                         <li key={i} className="flex items-start gap-1">
-                                          <Target className="h-3 w-3 mt-0.5 text-yellow-500" />
+                                          <Target className="h-3 w-3 mt-0.5 text-chart-3" />
                                           {tip}
                                         </li>
                                       ))}

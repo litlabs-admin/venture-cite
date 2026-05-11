@@ -18,8 +18,9 @@ function publicUserShape(dbUser: typeof users.$inferSelect) {
   return {
     id: dbUser.id,
     email: dbUser.email,
-    firstName: dbUser.firstName,
-    lastName: dbUser.lastName,
+    firstName: dbUser.firstName ?? null,
+    lastName: dbUser.lastName ?? null,
+    timezone: dbUser.timezone ?? null,
     accessTier: dbUser.accessTier,
     profileImageUrl: dbUser.profileImageUrl,
     isAdmin: dbUser.isAdmin === 1,

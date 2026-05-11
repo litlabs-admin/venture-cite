@@ -34,6 +34,7 @@ import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { StatusDot } from "@/components/foundations";
 import {
   HelpCircle,
   Sparkles,
@@ -186,8 +187,8 @@ export default function FaqManager() {
   const optimizedCount = faqs.filter((f) => f.isOptimized === 1).length;
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-500";
-    if (score >= 60) return "text-yellow-500";
+    if (score >= 80) return "text-chart-4";
+    if (score >= 60) return "text-chart-3";
     return "text-red-500";
   };
 
@@ -233,7 +234,7 @@ export default function FaqManager() {
                         {faqs.length}
                       </p>
                     </div>
-                    <HelpCircle className="h-8 w-8 text-blue-500 opacity-50" />
+                    <HelpCircle className="h-8 w-8 text-chart-1 opacity-50" />
                   </div>
                 </CardContent>
               </Card>
@@ -249,7 +250,7 @@ export default function FaqManager() {
                         {avgScore}%
                       </p>
                     </div>
-                    <Target className="h-8 w-8 text-purple-500 opacity-50" />
+                    <Target className="h-8 w-8 text-chart-5 opacity-50" />
                   </div>
                 </CardContent>
               </Card>
@@ -259,13 +260,13 @@ export default function FaqManager() {
                     <div>
                       <p className="text-sm text-muted-foreground">Optimized</p>
                       <p
-                        className="text-2xl font-bold text-green-500"
+                        className="text-2xl font-bold text-chart-4"
                         data-testid="text-optimized-count"
                       >
                         {optimizedCount}/{faqs.length}
                       </p>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
+                    <CheckCircle className="h-8 w-8 text-chart-4 opacity-50" />
                   </div>
                 </CardContent>
               </Card>
@@ -278,7 +279,7 @@ export default function FaqManager() {
                         {categories.length}
                       </p>
                     </div>
-                    <BookOpen className="h-8 w-8 text-orange-500 opacity-50" />
+                    <BookOpen className="h-8 w-8 text-chart-3 opacity-50" />
                   </div>
                 </CardContent>
               </Card>
@@ -427,135 +428,144 @@ export default function FaqManager() {
                         <ScrollArea className="h-[500px]">
                           <div className="space-y-4 pr-4">
                             {filteredFaqs.map((faq) => (
-                              <Card
-                                key={faq.id}
-                                className="border-l-4"
-                                style={{
-                                  borderLeftColor:
-                                    (faq.aiSurfaceScore || 0) >= 80
-                                      ? "#22c55e"
-                                      : (faq.aiSurfaceScore || 0) >= 60
-                                        ? "#eab308"
-                                        : "#ef4444",
-                                }}
-                              >
+                              <Card key={faq.id} className="border-l border-border">
                                 <CardContent className="pt-4">
-                                  {editingFaq?.id === faq.id ? (
-                                    <div className="space-y-3">
-                                      <Textarea
-                                        value={editQuestion}
-                                        onChange={(e) => setEditQuestion(e.target.value)}
-                                        rows={2}
-                                        data-testid={`input-edit-question-${faq.id}`}
-                                      />
-                                      <Textarea
-                                        value={editAnswer}
-                                        onChange={(e) => setEditAnswer(e.target.value)}
-                                        rows={4}
-                                        data-testid={`input-edit-answer-${faq.id}`}
-                                      />
-                                      <div className="flex gap-2">
-                                        <Button
-                                          size="sm"
-                                          onClick={() =>
-                                            updateFaqMutation.mutate({
-                                              id: faq.id,
-                                              data: { question: editQuestion, answer: editAnswer },
-                                            })
-                                          }
-                                          disabled={updateFaqMutation.isPending}
-                                          data-testid={`button-save-faq-${faq.id}`}
-                                        >
-                                          <Save className="h-4 w-4 mr-1" />
-                                          Save
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => setEditingFaq(null)}
-                                          data-testid={`button-cancel-edit-${faq.id}`}
-                                        >
-                                          <X className="h-4 w-4 mr-1" />
-                                          Cancel
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-start justify-between mb-2">
-                                        <h4
-                                          className="font-medium text-blue-600 flex-1"
-                                          data-testid={`text-faq-question-${faq.id}`}
-                                        >
-                                          {faq.question}
-                                        </h4>
-                                        <div className="flex gap-1 ml-2">
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className="h-7 w-7"
-                                            onClick={() => {
-                                              setEditingFaq(faq);
-                                              setEditQuestion(faq.question);
-                                              setEditAnswer(faq.answer);
-                                            }}
-                                            data-testid={`button-edit-faq-${faq.id}`}
-                                          >
-                                            <Edit className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className="h-7 w-7"
-                                            onClick={() => optimizeFaqMutation.mutate(faq.id)}
-                                            disabled={optimizeFaqMutation.isPending}
-                                            data-testid={`button-optimize-faq-${faq.id}`}
-                                          >
-                                            <Zap className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className="h-7 w-7 text-red-500 hover:text-red-600"
-                                            onClick={() => deleteFaqMutation.mutate(faq.id)}
-                                            data-testid={`button-delete-faq-${faq.id}`}
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
+                                  <div className="flex items-start gap-2">
+                                    <StatusDot
+                                      tone={
+                                        (faq.aiSurfaceScore || 0) >= 80
+                                          ? "success"
+                                          : (faq.aiSurfaceScore || 0) >= 60
+                                            ? "warn"
+                                            : "fail"
+                                      }
+                                      className="mt-2"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      {editingFaq?.id === faq.id ? (
+                                        <div className="space-y-3">
+                                          <Textarea
+                                            value={editQuestion}
+                                            onChange={(e) => setEditQuestion(e.target.value)}
+                                            rows={2}
+                                            data-testid={`input-edit-question-${faq.id}`}
+                                          />
+                                          <Textarea
+                                            value={editAnswer}
+                                            onChange={(e) => setEditAnswer(e.target.value)}
+                                            rows={4}
+                                            data-testid={`input-edit-answer-${faq.id}`}
+                                          />
+                                          <div className="flex gap-2">
+                                            <Button
+                                              size="sm"
+                                              onClick={() =>
+                                                updateFaqMutation.mutate({
+                                                  id: faq.id,
+                                                  data: {
+                                                    question: editQuestion,
+                                                    answer: editAnswer,
+                                                  },
+                                                })
+                                              }
+                                              disabled={updateFaqMutation.isPending}
+                                              data-testid={`button-save-faq-${faq.id}`}
+                                            >
+                                              <Save className="h-4 w-4 mr-1" />
+                                              Save
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => setEditingFaq(null)}
+                                              data-testid={`button-cancel-edit-${faq.id}`}
+                                            >
+                                              <X className="h-4 w-4 mr-1" />
+                                              Cancel
+                                            </Button>
+                                          </div>
                                         </div>
-                                      </div>
-                                      <p
-                                        className="text-sm text-muted-foreground mb-3"
-                                        data-testid={`text-faq-answer-${faq.id}`}
-                                      >
-                                        {faq.answer}
-                                      </p>
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <Badge variant="outline">{faq.category || "general"}</Badge>
-                                        <Badge variant={getScoreBadge(faq.aiSurfaceScore || 0)}>
-                                          AI Score: {faq.aiSurfaceScore || 0}%
-                                        </Badge>
-                                        {faq.isOptimized === 1 && (
-                                          <Badge className="bg-green-500">
-                                            <CheckCircle className="h-3 w-3 mr-1" />
-                                            Optimized
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      {faq.optimizationTips && faq.optimizationTips.length > 0 && (
-                                        <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs">
-                                          <p className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">
-                                            Optimization Tips:
+                                      ) : (
+                                        <>
+                                          <div className="flex items-start justify-between mb-2">
+                                            <h4
+                                              className="font-medium text-chart-1 flex-1"
+                                              data-testid={`text-faq-question-${faq.id}`}
+                                            >
+                                              {faq.question}
+                                            </h4>
+                                            <div className="flex gap-1 ml-2">
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="h-7 w-7"
+                                                onClick={() => {
+                                                  setEditingFaq(faq);
+                                                  setEditQuestion(faq.question);
+                                                  setEditAnswer(faq.answer);
+                                                }}
+                                                data-testid={`button-edit-faq-${faq.id}`}
+                                              >
+                                                <Edit className="h-4 w-4" />
+                                              </Button>
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="h-7 w-7"
+                                                onClick={() => optimizeFaqMutation.mutate(faq.id)}
+                                                disabled={optimizeFaqMutation.isPending}
+                                                data-testid={`button-optimize-faq-${faq.id}`}
+                                              >
+                                                <Zap className="h-4 w-4" />
+                                              </Button>
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="h-7 w-7 text-destructive hover:text-destructive/80"
+                                                onClick={() => deleteFaqMutation.mutate(faq.id)}
+                                                data-testid={`button-delete-faq-${faq.id}`}
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                          <p
+                                            className="text-sm text-muted-foreground mb-3"
+                                            data-testid={`text-faq-answer-${faq.id}`}
+                                          >
+                                            {faq.answer}
                                           </p>
-                                          <ul className="list-disc list-inside text-yellow-700 dark:text-yellow-300">
-                                            {faq.optimizationTips.map((tip, i) => (
-                                              <li key={i}>{tip}</li>
-                                            ))}
-                                          </ul>
-                                        </div>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <Badge variant="outline">
+                                              {faq.category || "general"}
+                                            </Badge>
+                                            <Badge variant={getScoreBadge(faq.aiSurfaceScore || 0)}>
+                                              AI Score: {faq.aiSurfaceScore || 0}%
+                                            </Badge>
+                                            {faq.isOptimized === 1 && (
+                                              <Badge className="bg-chart-4">
+                                                <CheckCircle className="h-3 w-3 mr-1" />
+                                                Optimized
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          {faq.optimizationTips &&
+                                            faq.optimizationTips.length > 0 && (
+                                              <div className="mt-3 p-2 bg-chart-3/10 rounded text-xs">
+                                                <p className="font-medium text-chart-3 mb-1">
+                                                  Optimization Tips:
+                                                </p>
+                                                <ul className="list-disc list-inside text-chart-3">
+                                                  {faq.optimizationTips.map((tip, i) => (
+                                                    <li key={i}>{tip}</li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            )}
+                                        </>
                                       )}
-                                    </>
-                                  )}
+                                    </div>
+                                  </div>
                                 </CardContent>
                               </Card>
                             ))}
@@ -577,7 +587,7 @@ export default function FaqManager() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-purple-500" />
+                      <Sparkles className="h-5 w-5 text-chart-5" />
                       AI FAQ Generator
                     </CardTitle>
                     <CardDescription>
@@ -623,7 +633,7 @@ export default function FaqManager() {
                             })
                           }
                           disabled={generateFaqsMutation.isPending}
-                          className="w-full bg-gradient-to-r from-purple-600 to-blue-600"
+                          className="w-full bg-primary"
                           size="lg"
                           data-testid="button-generate-faqs"
                         >
@@ -641,30 +651,30 @@ export default function FaqManager() {
                         </Button>
                       </div>
 
-                      <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4">
+                      <div className="bg-muted rounded-lg p-4">
                         <h4 className="font-medium mb-3 flex items-center gap-2">
                           <Target className="h-4 w-4" />
                           AI Optimization Features
                         </h4>
                         <ul className="space-y-2 text-sm">
                           <li className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                            <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
                             <span>Questions formatted for AI extraction (clear, specific)</span>
                           </li>
                           <li className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                            <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
                             <span>Answers optimized for 500-token chunk limits</span>
                           </li>
                           <li className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                            <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
                             <span>Structured for Schema.org FAQPage markup</span>
                           </li>
                           <li className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                            <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
                             <span>Brand context and tone integrated</span>
                           </li>
                           <li className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                            <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
                             <span>AI surface scoring for citation likelihood</span>
                           </li>
                         </ul>
@@ -691,7 +701,7 @@ export default function FaqManager() {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-green-600">
+                            <Badge variant="outline" className="text-chart-4">
                               <CheckCircle className="h-3 w-3 mr-1" />
                               {faqs.length} FAQs included
                             </Badge>
@@ -709,11 +719,9 @@ export default function FaqManager() {
                           </pre>
                         </div>
 
-                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                          <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
-                            How to Use This Schema
-                          </h4>
-                          <ol className="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                        <div className="bg-chart-1/10 rounded-lg p-4">
+                          <h4 className="font-medium text-chart-1 mb-2">How to Use This Schema</h4>
+                          <ol className="list-decimal list-inside text-sm text-chart-1 space-y-1">
                             <li>Copy the JSON-LD schema above</li>
                             <li>
                               Add it to your webpage inside a &lt;script
@@ -739,7 +747,7 @@ export default function FaqManager() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-yellow-500" />
+                      <Zap className="h-5 w-5 text-chart-3" />
                       Bulk Optimization
                     </CardTitle>
                     <CardDescription>
@@ -750,25 +758,21 @@ export default function FaqManager() {
                     <div className="space-y-6">
                       {/* Optimization Stats */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                        <Card className="bg-chart-4/10 border-chart-4/30">
                           <CardContent className="pt-4">
                             <div className="text-center">
-                              <p className="text-sm text-green-600 dark:text-green-400">
-                                High Score (80+)
-                              </p>
-                              <p className="text-3xl font-bold text-green-700 dark:text-green-300">
+                              <p className="text-sm text-chart-4">High Score (80+)</p>
+                              <p className="text-3xl font-bold text-chart-4">
                                 {faqs.filter((f) => (f.aiSurfaceScore || 0) >= 80).length}
                               </p>
                             </div>
                           </CardContent>
                         </Card>
-                        <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                        <Card className="bg-chart-3/10 border-chart-3/30">
                           <CardContent className="pt-4">
                             <div className="text-center">
-                              <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                                Medium Score (60-79)
-                              </p>
-                              <p className="text-3xl font-bold text-yellow-700 dark:text-yellow-300">
+                              <p className="text-sm text-chart-3">Medium Score (60-79)</p>
+                              <p className="text-3xl font-bold text-chart-3">
                                 {
                                   faqs.filter(
                                     (f) =>
@@ -779,13 +783,11 @@ export default function FaqManager() {
                             </div>
                           </CardContent>
                         </Card>
-                        <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                        <Card className="bg-destructive/10 border-destructive/30">
                           <CardContent className="pt-4">
                             <div className="text-center">
-                              <p className="text-sm text-red-600 dark:text-red-400">
-                                Low Score (&lt;60)
-                              </p>
-                              <p className="text-3xl font-bold text-red-700 dark:text-red-300">
+                              <p className="text-sm text-destructive">Low Score (&lt;60)</p>
+                              <p className="text-3xl font-bold text-destructive">
                                 {faqs.filter((f) => (f.aiSurfaceScore || 0) < 60).length}
                               </p>
                             </div>
@@ -796,7 +798,7 @@ export default function FaqManager() {
                       {/* Low Score FAQs */}
                       <div>
                         <h4 className="font-medium mb-3 flex items-center gap-2">
-                          <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                          <AlertTriangle className="h-4 w-4 text-chart-3" />
                           FAQs Needing Optimization
                         </h4>
                         {faqs.filter((f) => (f.aiSurfaceScore || 0) < 80).length > 0 ? (
@@ -832,7 +834,7 @@ export default function FaqManager() {
                           </div>
                         ) : (
                           <div className="text-center py-8 text-muted-foreground">
-                            <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                            <CheckCircle className="h-12 w-12 mx-auto mb-4 text-chart-4" />
                             <p>All FAQs are well-optimized!</p>
                           </div>
                         )}

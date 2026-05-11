@@ -92,10 +92,10 @@ export default function ResetPassword() {
 
   if (hasSession === false) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-slate-900">Invalid Reset Link</CardTitle>
+            <CardTitle className="text-2xl font-bold text-foreground">Invalid Reset Link</CardTitle>
             <CardDescription>
               This password reset link is invalid or has expired. Please request a new one.
             </CardDescription>
@@ -115,7 +115,7 @@ export default function ResetPassword() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
@@ -123,7 +123,7 @@ export default function ResetPassword() {
                 <CheckCircle className="h-8 w-8 text-foreground" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold text-slate-900">Password Reset!</CardTitle>
+            <CardTitle className="text-2xl font-bold text-foreground">Password Reset!</CardTitle>
             <CardDescription className="mt-2">
               Your password has been successfully reset. You can now sign in with your new password.
             </CardDescription>
@@ -146,7 +146,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Helmet>
         <title>Set New Password - VentureCite</title>
         <meta name="robots" content="noindex" />
@@ -156,7 +156,7 @@ export default function ResetPassword() {
           <div className="flex justify-center mb-4">
             <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900">Set new password</CardTitle>
+          <CardTitle className="text-2xl font-bold text-foreground">Set new password</CardTitle>
           <CardDescription>Create a strong password for your account</CardDescription>
         </CardHeader>
         <CardContent>
@@ -188,7 +188,7 @@ export default function ResetPassword() {
                   {passwordRequirements.map((req, i) => (
                     <li
                       key={i}
-                      className={`flex items-center gap-1 ${req.met ? "text-foreground" : "text-slate-500"}`}
+                      className={`flex items-center gap-1 ${req.met ? "text-chart-4" : "text-muted-foreground"}`}
                     >
                       {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                       {req.label}
@@ -237,7 +237,7 @@ export default function ResetPassword() {
           </form>
         </CardContent>
         <CardFooter className="justify-center">
-          <a href="/login" className="text-sm text-slate-600 hover:text-slate-800">
+          <a href="/login" className="text-sm text-muted-foreground hover:text-foreground">
             Remember your password? Sign in
           </a>
         </CardFooter>

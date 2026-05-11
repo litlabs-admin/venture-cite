@@ -403,7 +403,7 @@ export default function Citations() {
                       runMutation.mutate();
                     }}
                     disabled={runMutation.isPending || showBanner || !selectedBrandId}
-                    className="bg-red-600 hover:bg-red-700 shrink-0"
+                    className="bg-primary hover:bg-primary/90 shrink-0"
                     data-testid="button-run-check"
                     data-tour-id="prompts.runButton"
                   >
@@ -547,7 +547,7 @@ export default function Citations() {
                   data-tour-id={tab.tourId}
                   className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
                     isActive
-                      ? "border-red-500 text-foreground"
+                      ? "border-primary text-foreground"
                       : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                   }`}
                 >

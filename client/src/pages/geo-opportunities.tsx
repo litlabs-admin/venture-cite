@@ -77,10 +77,10 @@ const platformIcons: Record<string, JSX.Element> = {
   Reddit: <SiReddit className="h-5 w-5 text-orange-500" />,
   YouTube: <Youtube className="h-5 w-5 text-red-500" />,
   LinkedIn: <Linkedin className="h-5 w-5 text-blue-600" />,
-  Medium: <BookOpen className="h-5 w-5 text-gray-800 dark:text-gray-200" />,
+  Medium: <BookOpen className="h-5 w-5 text-foreground" />,
   "Hacker News": <SiYcombinator className="h-5 w-5 text-orange-500" />,
   "Product Hunt": <SiProducthunt className="h-5 w-5 text-orange-600" />,
-  Wikipedia: <SiWikipedia className="h-5 w-5 text-gray-600" />,
+  Wikipedia: <SiWikipedia className="h-5 w-5 text-muted-foreground" />,
 };
 
 export default function GeoOpportunities() {
@@ -132,9 +132,9 @@ export default function GeoOpportunities() {
       ) : opportunities ? (
         <div className="space-y-6">
           {!opportunities.brand && (
-            <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+            <Card className="border-border bg-muted">
               <CardContent className="p-4 flex items-start gap-3">
-                <Lightbulb className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                <Lightbulb className="w-5 h-5 text-chart-3 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm font-semibold text-foreground">
                     Industry benchmarks — select a brand to see your data
@@ -220,10 +220,10 @@ export default function GeoOpportunities() {
             </Card>
           </div>
 
-          <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+          <Card className="border-border bg-muted">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Lightbulb className="h-5 w-5 text-amber-500" />
+                <Lightbulb className="h-5 w-5 text-chart-3" />
                 Key Insight
               </CardTitle>
             </CardHeader>
@@ -237,7 +237,7 @@ export default function GeoOpportunities() {
                 {opportunities.brand ? " Your" : " Brand"} website{opportunities.brand ? "" : "s"}{" "}
                 account{opportunities.brand ? "s" : ""} for{" "}
                 {opportunities.keyStats.brandWebsiteCitationShare}% of citations.
-                <span className="text-amber-600 font-medium">
+                <span className="text-chart-3 font-medium">
                   {" "}
                   Focus your content strategy on community platforms!
                 </span>
@@ -329,7 +329,7 @@ export default function GeoOpportunities() {
                         data-testid={`link-subreddit-${sub.subreddit}`}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono font-semibold text-orange-600">
+                          <span className="font-mono font-semibold text-foreground">
                             {sub.subreddit}
                           </span>
                           <div className="flex items-center gap-2">
@@ -345,7 +345,7 @@ export default function GeoOpportunities() {
                     ))}
                   </div>
 
-                  <div className="mt-6 p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                  <div className="mt-6 p-4 bg-muted rounded-lg">
                     <h4 className="font-semibold mb-2 flex items-center gap-2">
                       <TrendingUp className="h-4 w-4" />
                       Reddit Success Tips

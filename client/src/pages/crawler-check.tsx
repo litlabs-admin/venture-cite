@@ -120,11 +120,11 @@ export default function CrawlerCheck() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "allowed":
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-5 w-5 text-chart-4" />;
       case "blocked":
-        return <XCircle className="h-5 w-5 text-red-500" />;
+        return <XCircle className="h-5 w-5 text-destructive" />;
       default:
-        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+        return <AlertTriangle className="h-5 w-5 text-chart-3" />;
     }
   };
 
@@ -132,25 +132,19 @@ export default function CrawlerCheck() {
     switch (status) {
       case "allowed":
         return (
-          <Badge
-            variant="outline"
-            className="border-green-500/30 text-green-600 dark:text-green-400"
-          >
+          <Badge variant="outline" className="border-chart-4/30 text-chart-4">
             Allowed
           </Badge>
         );
       case "blocked":
         return (
-          <Badge variant="outline" className="border-red-500/30 text-red-600 dark:text-red-400">
+          <Badge variant="outline" className="border-destructive/30 text-destructive">
             Blocked
           </Badge>
         );
       default:
         return (
-          <Badge
-            variant="outline"
-            className="border-yellow-500/30 text-yellow-600 dark:text-yellow-400"
-          >
+          <Badge variant="outline" className="border-chart-3/30 text-chart-3">
             Unknown
           </Badge>
         );
@@ -246,7 +240,7 @@ export default function CrawlerCheck() {
                   href={checkResult.robotsTxtUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-500 hover:underline flex items-center gap-1"
+                  className="text-sm text-chart-1 hover:underline flex items-center gap-1"
                 >
                   View robots.txt <ExternalLink className="h-3 w-3" />
                 </a>
@@ -262,25 +256,28 @@ export default function CrawlerCheck() {
                     <p className="text-sm text-muted-foreground">GEO Access Score</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-green-50 dark:bg-green-950">
+                <Card className="bg-chart-4/10">
                   <CardContent className="pt-4 text-center">
-                    <div className="text-3xl font-bold text-green-600" data-testid="allowed-count">
+                    <div className="text-3xl font-bold text-chart-4" data-testid="allowed-count">
                       {checkResult.summary.allowed}
                     </div>
                     <p className="text-sm text-muted-foreground">Allowed</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-red-50 dark:bg-red-950">
+                <Card className="bg-destructive/10">
                   <CardContent className="pt-4 text-center">
-                    <div className="text-3xl font-bold text-red-600" data-testid="blocked-count">
+                    <div
+                      className="text-3xl font-bold text-destructive"
+                      data-testid="blocked-count"
+                    >
                       {checkResult.summary.blocked}
                     </div>
                     <p className="text-sm text-muted-foreground">Blocked</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-yellow-50 dark:bg-yellow-950">
+                <Card className="bg-chart-3/10">
                   <CardContent className="pt-4 text-center">
-                    <div className="text-3xl font-bold text-yellow-600" data-testid="unknown-count">
+                    <div className="text-3xl font-bold text-chart-3" data-testid="unknown-count">
                       {checkResult.summary.unknown}
                     </div>
                     <p className="text-sm text-muted-foreground">Unknown</p>
@@ -314,9 +311,9 @@ export default function CrawlerCheck() {
           </Card>
 
           {checkResult.recommendations.length > 0 && (
-            <Card className="border-orange-200 dark:border-orange-900">
+            <Card className="border-chart-3/30">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-600">
+                <CardTitle className="flex items-center gap-2 text-chart-3">
                   <AlertTriangle className="h-5 w-5" />
                   Recommendations
                 </CardTitle>
@@ -324,7 +321,7 @@ export default function CrawlerCheck() {
               <CardContent>
                 <div className="space-y-4">
                   {checkResult.recommendations.map((rec, index) => (
-                    <div key={index} className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                    <div key={index} className="p-4 bg-chart-3/10 rounded-lg">
                       <pre className="whitespace-pre-wrap text-sm font-mono">{rec}</pre>
                       {rec.includes("User-agent:") && (
                         <Button
@@ -398,7 +395,7 @@ export default function CrawlerCheck() {
                             {blocked > 0 && (
                               <Badge
                                 variant="outline"
-                                className="border-red-500/30 text-red-600 dark:text-red-400"
+                                className="border-destructive/30 text-destructive"
                               >
                                 {blocked} blocked
                               </Badge>

@@ -309,9 +309,9 @@ export default function Welcome() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
       {scene === "input" && (
-        <Card className="w-full max-w-[480px] shadow-sm">
+        <Card className="w-full max-w-[480px]">
           <CardContent className="p-8">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               Let's find your brand
@@ -333,7 +333,7 @@ export default function Welcome() {
                 aria-invalid={!!inlineError}
               />
               {inlineError ? (
-                <p className="text-sm text-red-600" role="alert">
+                <p className="text-sm text-destructive" role="alert">
                   {inlineError}
                 </p>
               ) : null}
@@ -358,7 +358,7 @@ export default function Welcome() {
       )}
 
       {scene === "scraping" && (
-        <Card className="w-full max-w-[560px] shadow-sm">
+        <Card className="w-full max-w-[560px]">
           <CardContent className="p-8">
             <div className="flex items-center justify-between">
               <div className="inline-flex items-center gap-2 rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -381,8 +381,8 @@ export default function Welcome() {
                     <div className="mt-0.5 flex w-3 items-center justify-center">
                       {isLatest ? (
                         <span className="relative flex h-2 w-2">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-chart-4 opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-chart-4" />
                         </span>
                       ) : (
                         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
@@ -408,7 +408,7 @@ export default function Welcome() {
             </div>
 
             {scrapeError ? (
-              <div className="mt-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+              <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <div className="flex-1">
@@ -435,7 +435,7 @@ export default function Welcome() {
       )}
 
       {scene === "confirm" && scrapedData && (
-        <Card className="w-full max-w-[720px] shadow-sm my-8">
+        <Card className="w-full max-w-[720px] my-8">
           <CardContent className="p-8">
             <h2 className="text-2xl font-semibold tracking-tight">Does this look right?</h2>
             <p className="mt-1 text-sm text-muted-foreground">Tweak anything before we go live.</p>
@@ -446,7 +446,7 @@ export default function Welcome() {
                 <img
                   src={scrapedData.logoUrl}
                   alt="Brand logo"
-                  className="h-16 w-16 rounded-full object-cover border bg-white"
+                  className="h-16 w-16 rounded-full object-cover border bg-card"
                   onError={() => setLogoBroken(true)}
                 />
               ) : (

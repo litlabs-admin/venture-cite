@@ -537,7 +537,7 @@ export default function Brands() {
                         href={safeExternalHref(brand.website)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hover:underline truncate"
+                        className="hover:underline line-clamp-2 break-all"
                       >
                         {brand.website}
                       </a>
@@ -546,7 +546,7 @@ export default function Brands() {
                   {brand.targetAudience && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Target className="h-4 w-4" />
-                      <span className="truncate">{brand.targetAudience}</span>
+                      <span className="line-clamp-2">{brand.targetAudience}</span>
                     </div>
                   )}
                   {brand.tone && (

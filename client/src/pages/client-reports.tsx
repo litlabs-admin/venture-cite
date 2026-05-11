@@ -328,7 +328,7 @@ export default function ClientReports() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-violet-500" />
+                <BarChart3 className="h-5 w-5 text-primary" />
                 Performance by AI Platform
               </CardTitle>
               <CardDescription>Citations and mentions breakdown by platform</CardDescription>
@@ -371,8 +371,8 @@ export default function ClientReports() {
                           <Badge
                             className={
                               platform.trend >= 0
-                                ? "bg-green-500/20 text-green-500"
-                                : "bg-red-500/20 text-red-400"
+                                ? "bg-chart-4/20 text-chart-4"
+                                : "bg-destructive/20 text-destructive"
                             }
                           >
                             {platform.trend >= 0 ? (
@@ -397,7 +397,7 @@ export default function ClientReports() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-blue-500" />
+                  <FileText className="h-5 w-5 text-chart-1" />
                   Top Performing Content
                 </CardTitle>
                 <CardDescription>Content pieces generating the most AI citations</CardDescription>
@@ -417,7 +417,7 @@ export default function ClientReports() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-bold text-violet-500">{content.citations}</p>
+                        <p className="text-lg font-bold text-primary">{content.citations}</p>
                         <p className="text-xs text-muted-foreground">citations</p>
                       </div>
                     </div>
@@ -429,7 +429,7 @@ export default function ClientReports() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  <CheckCircle2 className="h-5 w-5 text-chart-4" />
                   Recommendations
                 </CardTitle>
                 <CardDescription>Actions to improve AI visibility</CardDescription>
@@ -442,8 +442,8 @@ export default function ClientReports() {
                       className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg"
                       data-testid={`recommendation-${i}`}
                     >
-                      <div className="p-1 bg-green-500/20 rounded">
-                        <ArrowUpRight className="h-4 w-4 text-green-500" />
+                      <div className="p-1 bg-chart-4/20 rounded">
+                        <ArrowUpRight className="h-4 w-4 text-chart-4" />
                       </div>
                       <p className="text-sm text-foreground">{rec}</p>
                     </div>

@@ -26,6 +26,7 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   firstName: text("first_name"),
   lastName: text("last_name"),
+  timezone: text("timezone"),
   profileImageUrl: text("profile_image_url"),
   accessTier: text("access_tier").default("free").notNull(),
   stripeCustomerId: text("stripe_customer_id"),

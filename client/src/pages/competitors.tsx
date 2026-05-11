@@ -234,9 +234,9 @@ export default function CompetitorsPage() {
   const leaderboard = leaderboardData?.data || [];
 
   const getRankIcon = (index: number) => {
-    if (index === 0) return <Crown className="w-5 h-5 text-yellow-500" />;
-    if (index === 1) return <Award className="w-5 h-5 text-gray-400" />;
-    if (index === 2) return <Medal className="w-5 h-5 text-orange-400" />;
+    if (index === 0) return <Crown className="w-5 h-5 text-chart-3" />;
+    if (index === 1) return <Award className="w-5 h-5 text-muted-foreground" />;
+    if (index === 2) return <Medal className="w-5 h-5 text-chart-3" />;
     return (
       <span className="w-5 h-5 flex items-center justify-center text-sm font-medium text-muted-foreground">
         #{index + 1}
@@ -356,7 +356,7 @@ export default function CompetitorsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-yellow-500" />
+                  <Trophy className="w-5 h-5 text-chart-3" />
                   GEO Leaderboard
                 </CardTitle>
                 <CardDescription>
@@ -414,7 +414,7 @@ export default function CompetitorsPage() {
                         </div>
                         <div className="text-right">
                           <div
-                            className="text-2xl font-bold"
+                            className="text-2xl font-bold font-mono tabular-nums"
                             data-testid={`text-citation-count-${index}`}
                           >
                             {entry.totalCitations}
@@ -445,7 +445,7 @@ export default function CompetitorsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-green-500" />
+                  <TrendingUp className="w-5 h-5 text-chart-4" />
                   Platform Breakdown
                 </CardTitle>
                 <CardDescription>Citations by AI platform for top performers</CardDescription>

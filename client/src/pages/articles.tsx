@@ -79,9 +79,9 @@ function StatusBadge({ status }: { status: string }) {
   if (status === "ready") return null;
   const cls =
     status === "generating"
-      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+      ? "bg-muted text-chart-3"
       : status === "failed"
-        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+        ? "bg-muted text-destructive"
         : "bg-muted text-muted-foreground";
   const label = status === "generating" ? "Generating…" : status === "failed" ? "Failed" : "Draft";
   return (
