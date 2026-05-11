@@ -32,11 +32,11 @@ const TERMS = [
     code: "AEO",
     name: "Answer Engine Optimization",
     definition:
-      "Optimizing for systems that give direct answers — Reddit threads, Quora answers, Wikipedia summaries, FAQ snippets — that AI engines often quote verbatim.",
+      "Optimizing for systems that give direct answers — Reddit threads, Wikipedia summaries, FAQ snippets — that AI engines often quote verbatim.",
     whyItMatters:
       "Users want answers, not link lists. Answer Engines (and AI summaries built on them) decide what gets surfaced based on signals like discussion engagement, structured FAQs, and authoritative sources. AEO captures attention before users ever reach a search results page.",
     howVentureCiteCovers: [
-      "Reddit + Quora outreach campaign tooling",
+      "Reddit + forum outreach campaign tooling",
       "FAQ Manager to author + optimize FAQs that AI engines extract verbatim",
       "Listicle scanner to find third-party listicles where you should be featured",
     ],

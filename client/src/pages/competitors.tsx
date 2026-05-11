@@ -25,17 +25,19 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
-  Plus,
-  Trophy,
-  TrendingUp,
-  Users,
-  Trash2,
-  ExternalLink,
-  Crown,
   Award,
-  Medal,
+  Brain,
+  Crown,
+  ExternalLink,
   EyeOff,
+  Medal,
   Pencil,
+  Plus,
+  Target,
+  Trash2,
+  TrendingUp,
+  Trophy,
+  Users,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
@@ -44,10 +46,18 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
-import { Target } from "lucide-react";
-import { SiOpenai } from "react-icons/si";
+import { SiOpenai, SiClaude, SiPerplexity, SiGooglegemini } from "react-icons/si";
+import type { ComponentType, SVGProps } from "react";
 import type { Competitor, Brand } from "@shared/schema";
 import { AI_PLATFORMS } from "@shared/constants";
+
+const platformIcon: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
+  chatgpt: SiOpenai,
+  claude: SiClaude,
+  perplexity: SiPerplexity,
+  gemini: SiGooglegemini,
+  deepseek: Brain,
+};
 
 interface LeaderboardEntry {
   name: string;
@@ -61,8 +71,6 @@ export default function CompetitorsPage() {
   const { toast } = useToast();
   const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isSnapshotDialogOpen, setIsSnapshotDialogOpen] = useState(false);
-  const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
   const [editingCompetitor, setEditingCompetitor] = useState<Competitor | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -77,7 +85,6 @@ export default function CompetitorsPage() {
     industry: "",
     description: "",
   });
-  const [newSnapshot, setNewSnapshot] = useState({ aiPlatform: "", citationCount: 0 });
 
   // Poll the competitors list for up to 2 minutes after the user creates
   // their first brand — async discovery runs server-side on brand-create
@@ -220,34 +227,6 @@ export default function CompetitorsPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to ignore competitor", variant: "destructive" });
-    },
-  });
-
-  const createSnapshotMutation = useMutation({
-    mutationFn: async (data: {
-      competitorId: string;
-      aiPlatform: string;
-      citationCount: number;
-    }) => {
-      return apiRequest("POST", `/api/competitors/${data.competitorId}/snapshots`, {
-        aiPlatform: data.aiPlatform,
-        citationCount: data.citationCount,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/competitors/leaderboard", selectedBrandId],
-      });
-      setIsSnapshotDialogOpen(false);
-      setSelectedCompetitor(null);
-      setNewSnapshot({ aiPlatform: "", citationCount: 0 });
-      toast({
-        title: "Citation Recorded",
-        description: "Competitor citation count has been updated.",
-      });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to record citation", variant: "destructive" });
     },
   });
 
@@ -490,10 +469,11 @@ export default function CompetitorsPage() {
 
                       if (platformData.length === 0) return null;
 
+                      const Icon = platformIcon[platform.toLowerCase()] ?? Brain;
                       return (
                         <div key={platform} className="p-3 rounded-lg border bg-muted/30">
                           <div className="flex items-center gap-2 mb-2">
-                            <SiOpenai className="w-4 h-4" />
+                            <Icon className="w-4 h-4" />
                             <span className="font-medium text-sm">{platform}</span>
                           </div>
                           <div className="space-y-1">
@@ -619,18 +599,6 @@ export default function CompetitorsPage() {
                               data-testid={`button-edit-competitor-${competitor.id}`}
                             >
                               <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedCompetitor(competitor);
-                                setIsSnapshotDialogOpen(true);
-                              }}
-                              title="Add citation snapshot"
-                              data-testid={`button-add-citation-${competitor.id}`}
-                            >
-                              <Plus className="w-4 h-4" />
                             </Button>
                             {discoveredBy && discoveredBy !== "manual" && (
                               <Button
@@ -760,68 +728,6 @@ export default function CompetitorsPage() {
               data-testid="button-save-edit-competitor"
             >
               {updateCompetitorMutation.isPending ? "Saving..." : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isSnapshotDialogOpen} onOpenChange={setIsSnapshotDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Record Citation Count</DialogTitle>
-            <DialogDescription>
-              Add a citation count for {selectedCompetitor?.name} on an AI platform
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>AI Platform</Label>
-              <Select
-                value={newSnapshot.aiPlatform}
-                onValueChange={(value) => setNewSnapshot({ ...newSnapshot, aiPlatform: value })}
-              >
-                <SelectTrigger data-testid="select-snapshot-platform">
-                  <SelectValue placeholder="Select platform" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AI_PLATFORMS.map((platform) => (
-                    <SelectItem key={platform} value={platform}>
-                      {platform}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="citationCount">Number of Citations</Label>
-              <Input
-                id="citationCount"
-                type="number"
-                min="0"
-                placeholder="e.g., 25"
-                value={newSnapshot.citationCount || ""}
-                onChange={(e) =>
-                  setNewSnapshot({ ...newSnapshot, citationCount: parseInt(e.target.value) || 0 })
-                }
-                data-testid="input-citation-count"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => {
-                if (selectedCompetitor) {
-                  createSnapshotMutation.mutate({
-                    competitorId: selectedCompetitor.id,
-                    aiPlatform: newSnapshot.aiPlatform,
-                    citationCount: newSnapshot.citationCount,
-                  });
-                }
-              }}
-              disabled={!newSnapshot.aiPlatform || createSnapshotMutation.isPending}
-              data-testid="button-submit-snapshot"
-            >
-              {createSnapshotMutation.isPending ? "Saving..." : "Save Citation"}
             </Button>
           </DialogFooter>
         </DialogContent>

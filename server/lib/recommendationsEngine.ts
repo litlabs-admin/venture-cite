@@ -218,7 +218,7 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
   if (state.communityPostCount === 0) {
     recs.push({
       id: "try-community-outreach",
-      title: "Try Reddit/Quora outreach for AEO",
+      title: "Try Reddit outreach for AEO",
       why: "Posts you make today can show up in AI answers within 4–8 weeks — direct AEO signal.",
       ctaLabel: "Open Community",
       ctaHref: `/community?brandId=${brandId}`,

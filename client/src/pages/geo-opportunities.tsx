@@ -20,7 +20,6 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { ErrorState } from "@/components/ui/error-state";
 import {
   MessageSquare,
-  HelpCircle,
   Youtube,
   Linkedin,
   BookOpen,
@@ -32,7 +31,7 @@ import {
   Users,
   BarChart3,
 } from "lucide-react";
-import { SiReddit, SiQuora, SiWikipedia, SiYcombinator, SiProducthunt } from "react-icons/si";
+import { SiReddit, SiWikipedia, SiYcombinator, SiProducthunt } from "react-icons/si";
 
 interface Platform {
   name: string;
@@ -63,13 +62,11 @@ interface OpportunitiesData {
   };
   platforms: Platform[];
   subreddits: Subreddit[];
-  quoraTopics: string[];
   contentIdeas?: ContentIdea[];
   industries?: string[];
   keyStats: {
     thirdPartyCitationShare: number;
     redditCitationShare: number;
-    quoraCitationShare: number;
     brandWebsiteCitationShare: number;
   };
   totalCitedRankings?: number;
@@ -78,7 +75,6 @@ interface OpportunitiesData {
 
 const platformIcons: Record<string, JSX.Element> = {
   Reddit: <SiReddit className="h-5 w-5 text-orange-500" />,
-  Quora: <SiQuora className="h-5 w-5 text-red-600" />,
   YouTube: <Youtube className="h-5 w-5 text-red-500" />,
   LinkedIn: <Linkedin className="h-5 w-5 text-blue-600" />,
   Medium: <BookOpen className="h-5 w-5 text-gray-800 dark:text-gray-200" />,
@@ -173,7 +169,7 @@ export default function GeoOpportunities() {
               </CardContent>
             </Card>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-3">
@@ -210,22 +206,6 @@ export default function GeoOpportunities() {
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Quora Citations
-                  </span>
-                  <SiQuora className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <p
-                  className="text-3xl font-semibold text-foreground tracking-tight"
-                  data-testid="stat-quora"
-                >
-                  {opportunities.keyStats.quoraCitationShare}%
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Brand Site Citations
                   </span>
                   <Target className="w-4 h-4 text-muted-foreground" />
@@ -253,7 +233,7 @@ export default function GeoOpportunities() {
                   {opportunities.keyStats.thirdPartyCitationShare}% of AI citations come from
                   third-party sources
                 </strong>{" "}
-                like Reddit and Quora.
+                like Reddit.
                 {opportunities.brand ? " Your" : " Brand"} website{opportunities.brand ? "" : "s"}{" "}
                 account{opportunities.brand ? "s" : ""} for{" "}
                 {opportunities.keyStats.brandWebsiteCitationShare}% of citations.
@@ -266,10 +246,9 @@ export default function GeoOpportunities() {
           </Card>
 
           <Tabs defaultValue="platforms" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="platforms">Platforms</TabsTrigger>
               <TabsTrigger value="reddit">Reddit</TabsTrigger>
-              <TabsTrigger value="quora">Quora</TabsTrigger>
               <TabsTrigger value="ideas">Content Ideas</TabsTrigger>
             </TabsList>
 
@@ -387,66 +366,6 @@ export default function GeoOpportunities() {
                       <li>
                         • <strong>Link strategically:</strong> Only add links when they genuinely
                         help the discussion
-                      </li>
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="quora" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <SiQuora className="h-5 w-5 text-red-600" />
-                    Recommended Quora Topics
-                    {opportunities.brand && (
-                      <Badge variant="outline">for {opportunities.brand.industry}</Badge>
-                    )}
-                  </CardTitle>
-                  <CardDescription>
-                    Follow these topics and answer questions to build authority
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-3 mb-6">
-                    {opportunities.quoraTopics.map((topic) => (
-                      <a
-                        key={topic}
-                        href={`https://quora.com/topic/${topic.replace(/\s+/g, "-")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-full hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
-                        data-testid={`link-quora-${topic}`}
-                      >
-                        <HelpCircle className="h-4 w-4 text-red-600" />
-                        <span className="font-medium">{topic}</span>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                      </a>
-                    ))}
-                  </div>
-
-                  <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      Quora Success Tips
-                    </h4>
-                    <ul className="text-sm space-y-2">
-                      <li>
-                        • <strong>Answer format:</strong> Keep core answer 40-60 words (optimal for
-                        AI summaries)
-                      </li>
-                      <li>
-                        • <strong>Add depth:</strong> Include detailed examples and context below
-                        the summary
-                      </li>
-                      <li>
-                        • <strong>Be consistent:</strong> Answer regularly to build topical
-                        authority
-                      </li>
-                      <li>
-                        • <strong>Target high-follower questions:</strong> More followers = more
-                        visibility
                       </li>
                     </ul>
                   </div>

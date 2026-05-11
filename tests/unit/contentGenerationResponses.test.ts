@@ -269,7 +269,7 @@ describe("runArticleSlice (Responses API)", () => {
 });
 
 describe("/state response shape", () => {
-  it("returns phase and elapsedMs when job is in_progress", async () => {
+  it("returns elapsedSeconds when job is in_progress (Foundations Plan 1, Task 4)", async () => {
     const { computeJobStatePayload } = await import("../../server/routes/content");
     const startedAt = new Date(Date.now() - 12_000); // 12s ago
     const payload = computeJobStatePayload({
@@ -281,8 +281,8 @@ describe("/state response shape", () => {
     } as never);
     expect(payload.done).toBe(false);
     expect(payload.status).toBe("running");
-    expect(payload.elapsedMs).toBeGreaterThanOrEqual(11_000);
-    expect(payload.phase).toMatch(/Brainstorming|Drafting|Writing|Polishing/);
+    expect(payload.elapsedSeconds).toBeGreaterThanOrEqual(11);
+    expect((payload as { phase?: string }).phase).toBeUndefined();
   });
 
   it("returns done:true when job is succeeded", async () => {

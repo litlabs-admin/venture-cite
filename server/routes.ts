@@ -53,7 +53,6 @@ import {
   requirePromptPortfolio,
   requireCitationQuality,
   requireKeywordResearch,
-  requireAlertSetting,
   requireCitation,
   getUserBrandIds,
   pickFields,

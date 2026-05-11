@@ -5,7 +5,7 @@ import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Target, AlertTriangle, Brain, MessageSquare, Award, Users, History } from "lucide-react";
+import { Target, AlertTriangle, Brain, Award, Users, History } from "lucide-react";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import ShareOfAnswerTab from "@/components/intelligence/ShareOfAnswerTab";
@@ -13,7 +13,6 @@ import CompetitorsTab from "@/components/intelligence/CompetitorsTab";
 import CitationQualityTab from "@/components/intelligence/CitationQualityTab";
 import HallucinationsTab from "@/components/intelligence/HallucinationsTab";
 import TrendsTab from "@/components/intelligence/TrendsTab";
-import AlertsTab from "@/components/intelligence/AlertsTab";
 
 export default function AIIntelligence() {
   const { selectedBrandId, brands } = useBrandSelection();
@@ -46,7 +45,7 @@ export default function AIIntelligence() {
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger
               value="share-of-answer"
               data-testid="tab-share-of-answer"
@@ -75,10 +74,6 @@ export default function AIIntelligence() {
               <History className="w-4 h-4 mr-2" />
               Trends
             </TabsTrigger>
-            <TabsTrigger value="alerts" data-testid="tab-alerts">
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Alerts
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="share-of-answer">
@@ -99,10 +94,6 @@ export default function AIIntelligence() {
 
           <TabsContent value="trends">
             <TrendsTab selectedBrandId={selectedBrandId} />
-          </TabsContent>
-
-          <TabsContent value="alerts">
-            <AlertsTab selectedBrandId={selectedBrandId} />
           </TabsContent>
         </Tabs>
       )}

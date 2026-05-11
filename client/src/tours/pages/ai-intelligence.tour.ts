@@ -11,7 +11,7 @@ export const aiIntelligenceTour: TourConfig = {
       id: "intro",
       title: "AI Intelligence",
       content:
-        "Six lenses on how AI engines treat your brand: share-of-answer, competitors, citation quality, hallucinations, trends, alerts.",
+        "Five lenses on how AI engines treat your brand: share-of-answer, competitors, citation quality, hallucinations, trends.",
     },
     {
       id: "share-tab",

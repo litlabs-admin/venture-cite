@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { db } from "./db";
-import { and, eq, gte, ne, isNull, isNotNull, lte } from "drizzle-orm";
+import { and, eq, gte, isNull, isNotNull, lte } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { runBrandPrompts } from "./citationChecker";
 import { generateSuggestedPrompts } from "./lib/suggestionGenerator";
@@ -154,56 +154,30 @@ export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: num
 // isBrandDueForCitation.
 const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 * * * *";
 
-function isBrandDueForCitation(brand: {
-  autoCitationSchedule: string;
-  autoCitationDay: number;
-  autoCitationHour?: number;
-  autoCitationActive?: boolean;
-  lastAutoCitationAt: Date | null;
-}): boolean {
-  if (brand.autoCitationSchedule === "off") return false;
-  // Wave 9: pause without losing the day/hour. autoCitationActive defaults
-  // to true, so existing brands continue to behave as before.
-  if (brand.autoCitationActive === false) return false;
-
-  const now = new Date();
-  const todayDow = now.getUTCDay(); // 0=Sun ... 6=Sat
-  const currentHour = now.getUTCHours();
-
-  // Only run on the user's chosen day of week
-  if (todayDow !== brand.autoCitationDay) return false;
-  // Wave 9.5: hour-of-day gate dropped. Vercel Hobby allows one cron per
-  // day, fired by the daily orchestrator at 06:00 UTC. Brand
-  // autoCitationHour is no longer respected at the cron layer; it remains
-  // in the schema for UI display only. Day-of-week is still honoured.
-  void currentHour;
-
+// Foundations Plan 1 Task 11: citation cadence is non-configurable.
+// Every active brand runs weekly. The auto_citation_* columns remain
+// dormant in the schema but are no longer consulted at the cron layer.
+// Gating is now purely "has it been ~1 week since last run?".
+function isBrandDueForCitation(brand: { lastAutoCitationAt: Date | null }): boolean {
   if (!brand.lastAutoCitationAt) return true; // never run before
-
+  const now = new Date();
   const daysSinceLast =
     (now.getTime() - brand.lastAutoCitationAt.getTime()) / (24 * 60 * 60 * 1000);
+  return daysSinceLast >= 6; // at least ~1 week
+}
 
-  switch (brand.autoCitationSchedule) {
-    case "weekly":
-      return daysSinceLast >= 6; // at least ~1 week
-    case "biweekly":
-      return daysSinceLast >= 13;
-    case "monthly":
-      return daysSinceLast >= 27;
-    default:
-      return false;
-  }
+// Selector for the citation-scan cron: every non-soft-deleted brand,
+// regardless of the legacy autoCitationSchedule/Active flags.
+export async function selectBrandsForCitationScan() {
+  return db.select().from(schema.brands).where(isNull(schema.brands.deletedAt));
 }
 
 export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
   logger.info("auto-citation job starting");
 
-  // Fetch all brands that have auto-citation enabled (not "off") and
-  // are not soft-deleted (Wave 4.5).
-  const scheduledBrands = await db
-    .select()
-    .from(schema.brands)
-    .where(and(ne(schema.brands.autoCitationSchedule, "off"), isNull(schema.brands.deletedAt)));
+  // Foundations Plan 1 Task 11: iterate every non-soft-deleted brand
+  // unconditionally. Cadence flags are no longer honoured.
+  const scheduledBrands = await selectBrandsForCitationScan();
 
   let ranCount = 0;
   let deferred = 0;

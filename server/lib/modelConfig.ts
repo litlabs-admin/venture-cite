@@ -53,7 +53,7 @@ export const MODELS = {
   citationDeepSeek: "deepseek/deepseek-v3.2",
 
   // ── Distribute Content (articles page → distribute dialog) ────────
-  // Rewrites an article for LinkedIn, Medium, Reddit, Quora.
+  // Rewrites an article for LinkedIn, Medium, Reddit.
   distribution: OPENAI_MINI_SNAPSHOT,
 
   // ── Everything else (not Phase 1) ─────────────────────────────────

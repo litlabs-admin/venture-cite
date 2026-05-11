@@ -1,0 +1,433 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-09T00:00:00Z",
+  "title": "Design System: VentureCite",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Vermillion Signal Red",
+        "canonical": "hsl(0, 75%, 45%)",
+        "tonalRamp": [
+          "#2a0707",
+          "#5a0e0e",
+          "#871717",
+          "#a51b1b",
+          "#c91f1f",
+          "#e04545",
+          "#f08585",
+          "#fbcaca"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Console Off-White",
+        "canonical": "hsl(220, 14%, 96%)",
+        "tonalRamp": [
+          "#0d0f13",
+          "#1c2028",
+          "#363c47",
+          "#5a606c",
+          "#888e98",
+          "#b1b5be",
+          "#d6d8de",
+          "#f4f5f7"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "hsl(0, 0%, 100%)",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#1f1f1f",
+          "#3d3d3d",
+          "#606060",
+          "#8a8a8a",
+          "#b3b3b3",
+          "#d8d8d8",
+          "#ffffff"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Surface Mute",
+        "canonical": "hsl(220, 14%, 94%)",
+        "tonalRamp": [
+          "#0d0f13",
+          "#1c2028",
+          "#363c47",
+          "#5a606c",
+          "#888e98",
+          "#b1b5be",
+          "#d6d8de",
+          "#eff0f3"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border Hairline",
+        "canonical": "hsl(220, 13%, 91%)",
+        "tonalRamp": [
+          "#0d0f13",
+          "#1c2028",
+          "#363c47",
+          "#5a606c",
+          "#888e98",
+          "#b1b5be",
+          "#cdd0d6",
+          "#e3e5ea"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Foreground Ink",
+        "canonical": "hsl(220, 20%, 10%)",
+        "tonalRamp": [
+          "#0a0d12",
+          "#141a23",
+          "#28323f",
+          "#48556b",
+          "#6b7790",
+          "#9ba3b4",
+          "#cdd1da",
+          "#eef0f4"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Muted Foreground",
+        "canonical": "hsl(220, 9%, 46%)",
+        "tonalRamp": [
+          "#0e0f12",
+          "#1d1f24",
+          "#383b43",
+          "#525660",
+          "#6b7280",
+          "#959aa4",
+          "#bfc2c9",
+          "#e8eaed"
+        ]
+      },
+      "destructive": {
+        "role": "status",
+        "displayName": "Destructive Red",
+        "canonical": "hsl(0, 84%, 60%)",
+        "tonalRamp": [
+          "#2a0707",
+          "#5e0f0f",
+          "#921818",
+          "#b82828",
+          "#dc3939",
+          "#ef4444",
+          "#f78989",
+          "#fcd0d0"
+        ]
+      },
+      "chart-2": {
+        "role": "data",
+        "displayName": "Slate",
+        "canonical": "hsl(220, 20%, 35%)",
+        "tonalRamp": [
+          "#0a0d12",
+          "#181e29",
+          "#252e3f",
+          "#323e54",
+          "#48556b",
+          "#6f7c93",
+          "#a0aabb",
+          "#d0d6e0"
+        ]
+      },
+      "chart-3": {
+        "role": "data",
+        "displayName": "Warm Tan",
+        "canonical": "hsl(30, 50%, 55%)",
+        "tonalRamp": [
+          "#1f1308",
+          "#3e2710",
+          "#5d3b18",
+          "#7c4f20",
+          "#a06937",
+          "#c69269",
+          "#deb89a",
+          "#f0dccb"
+        ]
+      },
+      "chart-4": {
+        "role": "data",
+        "displayName": "Verdant Green",
+        "canonical": "hsl(147, 50%, 42%)",
+        "tonalRamp": [
+          "#06140d",
+          "#0c281a",
+          "#133d27",
+          "#1a5234",
+          "#256e47",
+          "#36a169",
+          "#75c69b",
+          "#c4e7d3"
+        ]
+      },
+      "chart-5": {
+        "role": "data",
+        "displayName": "Magenta Pink",
+        "canonical": "hsl(341, 75%, 51%)",
+        "tonalRamp": [
+          "#2a0612",
+          "#570c25",
+          "#831238",
+          "#a8174a",
+          "#cc1f5e",
+          "#e23170",
+          "#ed7ba1",
+          "#f8c8d8"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headlines on marketing surfaces and top-of-empty-state moments. Tight tracking; the type does the work."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles in app screens — the 'you are here' type."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles, section headers, dialog headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default text. Tight enough for dense dashboards, comfortable for paragraphs."
+      },
+      "body-small": {
+        "displayName": "Body Small",
+        "purpose": "Table cells, dense lists, secondary descriptions."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Form labels, axis labels, badge text. Slightly tighter, slightly tracked."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Numeric values, IDs, code, citation URLs — wherever character alignment matters."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-2xs",
+        "value": "0px 1px 2px 0px hsl(220 20% 20% / 0.04)",
+        "purpose": "Hairline lift on inputs and ghost surfaces — barely perceptible."
+      },
+      {
+        "name": "shadow-xs",
+        "value": "0px 1px 3px 0px hsl(220 20% 20% / 0.06)",
+        "purpose": "Default card resting state."
+      },
+      {
+        "name": "shadow-sm",
+        "value": "0px 2px 4px 0px hsl(220 20% 20% / 0.06), 0px 1px 2px -1px hsl(220 20% 20% / 0.03)",
+        "purpose": "Hovered cards and minor elevation."
+      },
+      {
+        "name": "shadow-md",
+        "value": "0px 6px 10px -1px hsl(220 20% 20% / 0.08), 0px 4px 6px -2px hsl(220 20% 20% / 0.04)",
+        "purpose": "Popovers, dropdowns, command menus."
+      },
+      {
+        "name": "shadow-lg",
+        "value": "0px 10px 15px -3px hsl(220 20% 20% / 0.08), 0px 4px 6px -4px hsl(220 20% 20% / 0.04)",
+        "purpose": "Dialogs, drawers, sticky overlays."
+      },
+      {
+        "name": "shadow-xl",
+        "value": "0px 20px 25px -5px hsl(220 20% 20% / 0.10), 0px 8px 10px -6px hsl(220 20% 20% / 0.04)",
+        "purpose": "Reserved for full-screen modals and major overlays."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default easing for reveal, card-lift, and state transitions. Used on the .reveal and .card-lift utilities."
+      },
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Generic state transitions where ease-out-expo is too dramatic."
+      },
+      {
+        "name": "duration-fast",
+        "value": "200ms",
+        "purpose": "Hover, focus, and micro-state changes."
+      },
+      {
+        "name": "duration-base",
+        "value": "400ms",
+        "purpose": "Card lift, popover open, drawer slide."
+      },
+      {
+        "name": "duration-slow",
+        "value": "800ms",
+        "purpose": "Scroll-reveal entrances on long-form/marketing surfaces."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single most important action on a surface. One per screen.",
+      "html": "<button class=\"ds-btn-primary\">Generate report</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; background: #c91f1f; color: #ffffff; font-family: 'Inter', system-ui, sans-serif; font-size: 14px; font-weight: 500; border: none; border-radius: 6px; cursor: pointer; transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { background: #b81c1c; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #f4f5f7, 0 0 0 4px #c91f1f; } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The default 'do something' button when there isn't a single primary.",
+      "html": "<button class=\"ds-btn-outline\">View details</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; background: transparent; color: #141a23; font-family: 'Inter', system-ui, sans-serif; font-size: 14px; font-weight: 500; border: 1px solid #e3e5ea; border-radius: 6px; cursor: pointer; transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-outline:hover { background: #eff0f3; } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 2px #f4f5f7, 0 0 0 4px #c91f1f; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Tertiary actions inside dense surfaces — table row actions, toolbar buttons.",
+      "html": "<button class=\"ds-btn-ghost\">Cancel</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; background: transparent; color: #141a23; font-family: 'Inter', system-ui, sans-serif; font-size: 14px; font-weight: 500; border: none; border-radius: 6px; cursor: pointer; transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-ghost:hover { background: #eff0f3; } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 2px #f4f5f7, 0 0 0 4px #c91f1f; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Default form field. Workspace-fill 'well' rather than a raised piece.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search citations…\" />",
+      "css": ".ds-input { display: block; width: 280px; height: 40px; padding: 0 12px; background: #f4f5f7; color: #141a23; font-family: 'Inter', system-ui, sans-serif; font-size: 14px; border: 1px solid #e3e5ea; border-radius: 6px; transition: box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-input::placeholder { color: #6b7280; } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 2px #f4f5f7, 0 0 0 4px #c91f1f; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Default elevated surface for grouped content. Flat at rest.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">AI visibility</div><div class=\"ds-card-desc\">Where your brand appears across AI answer surfaces.</div><div class=\"ds-card-metric\"><span class=\"ds-card-num\">42</span><span class=\"ds-card-unit\">citations this week</span></div></div>",
+      "css": ".ds-card { display: flex; flex-direction: column; gap: 16px; width: 320px; padding: 24px; background: #ffffff; color: #141a23; border: 1px solid #e3e5ea; border-radius: 8px; box-shadow: 0px 1px 3px 0px hsl(220 20% 20% / 0.06); font-family: 'Inter', system-ui, sans-serif; } .ds-card-title { font-size: 20px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; } .ds-card-desc { font-size: 13px; color: #6b7280; line-height: 1.5; } .ds-card-metric { display: flex; align-items: baseline; gap: 8px; padding-top: 8px; border-top: 1px solid #e3e5ea; } .ds-card-num { font-family: 'JetBrains Mono', Monaco, Consolas, monospace; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; color: #141a23; } .ds-card-unit { font-size: 13px; color: #6b7280; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-secondary",
+      "description": "Default state pill — Surface Mute fill, foreground text. Brand red is reserved.",
+      "html": "<span class=\"ds-badge\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 10 10\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"5\" cy=\"5\" r=\"3\" fill=\"#36a169\"/></svg>Indexed</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; background: #eff0f3; color: #141a23; font-family: 'Inter', system-ui, sans-serif; font-size: 12px; font-weight: 600; line-height: 1.3; letter-spacing: 0.02em; border-radius: 9999px; }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "sidebar",
+      "description": "Persistent app navigation rail item. Active state uses the dark slate, not the brand accent.",
+      "html": "<nav class=\"ds-sidebar\"><a class=\"ds-nav-item\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M2 4h12M2 8h12M2 12h8\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>Citations</a><a class=\"ds-nav-item ds-nav-item-active\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M3 13L7 9L9 11L13 5\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>GEO Rankings</a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"2.5\" y=\"3.5\" width=\"11\" height=\"9\" rx=\"1.5\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>Articles</a></nav>",
+      "css": ".ds-sidebar { display: flex; flex-direction: column; gap: 2px; width: 240px; padding: 12px; background: #ffffff; border-right: 1px solid #e3e5ea; font-family: 'Inter', system-ui, sans-serif; } .ds-nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; color: #6b7280; font-size: 14px; font-weight: 500; text-decoration: none; border-radius: 6px; transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1), color 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-nav-item:hover { background: #eff0f3; color: #141a23; } .ds-nav-item-active { background: #191e29; color: #ffffff; } .ds-nav-item-active:hover { background: #191e29; color: #ffffff; }"
+    },
+    {
+      "name": "KPI Tile",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Signature dashboard primitive: number leads, label and delta follow. Tabular figures, mono for the number.",
+      "html": "<div class=\"ds-kpi\"><div class=\"ds-kpi-label\">AI Citations — last 7 days</div><div class=\"ds-kpi-value\">1,284</div><div class=\"ds-kpi-delta\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M6 2L9 7H3L6 2Z\" fill=\"#36a169\"/></svg>+12.4% vs prior period</div></div>",
+      "css": ".ds-kpi { display: flex; flex-direction: column; gap: 6px; width: 240px; padding: 20px 24px; background: #ffffff; border: 1px solid #e3e5ea; border-radius: 8px; font-family: 'Inter', system-ui, sans-serif; } .ds-kpi-label { font-size: 12px; font-weight: 500; letter-spacing: 0.02em; color: #6b7280; text-transform: none; } .ds-kpi-value { font-family: 'JetBrains Mono', Monaco, Consolas, monospace; font-size: 32px; font-weight: 600; line-height: 1.1; color: #141a23; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; } .ds-kpi-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: #36a169; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Operator's Console",
+    "overview": "VentureCite is an instrument, not a brochure. It exists to give marketing operators a calm, dense, trustworthy view of how brands appear inside AI answer surfaces — and what to do about it. The visual system reflects that: a near-monochrome workspace built on cool-tinted neutrals, an editorial sans-serif, restrained shadows, and one disciplined accent — a strong vermillion-leaning red — that earns its presence by appearing rarely and only on what matters most.\n\nThe system explicitly rejects the four reflex aesthetics of contemporary SaaS: the AI-tool cliché, the old-school SEO chrome, the generic SaaS template, and crypto/web3 maximalism. The look should sit alongside otterly.ai and peec.ai — clean, confident, data-forward — and feel like Linear's discipline meeting Stripe Press's editorial calm.\n\nDensity varies by surface: long-form pages breathe with editorial rhythm; operational dashboards tighten up for fast scanning. The accent is never decoration. Numbers come before conclusions. Every pixel reports.",
+    "keyCharacteristics": [
+      "Cool-tinted off-white workspace; pure-white cards; type at near-black",
+      "One saturated accent (vermillion red), used on ≤10% of any screen",
+      "Inter for everything except numeric/code (JetBrains Mono); no serif in chrome",
+      "Soft, low-contrast shadows for ambient lift, not drama",
+      "Moderate rounding (6–8px) — neither pill-soft nor brutalist-sharp",
+      "Light theme is canonical; dark theme is a peer, not a marketing aesthetic"
+    ],
+    "rules": [
+      {
+        "name": "The Earned-Accent Rule",
+        "body": "The vermillion red appears on ≤10% of any given screen. Its rarity is the point. If you find yourself reaching for it twice on the same surface, one of those uses is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The No-Pure-Black Rule",
+        "body": "#000 and #fff exist only on the card surface and inside icons. All text, borders, and backgrounds are tinted toward the cool neutral hue. Pure black is for ink-on-paper; we are on a screen.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status-Never-Brand Rule",
+        "body": "Destructive red and brand red are different values for a reason. Errors must never share the brand accent — confusing semantics for identity erodes both.",
+        "section": "colors"
+      },
+      {
+        "name": "The Sans-Only-In-Chrome Rule",
+        "body": "Inter handles every chrome surface. Long-form content (glossary entries, blog/report bodies) is the only place a serif may legitimately appear, and only inside the prose container.",
+        "section": "typography"
+      },
+      {
+        "name": "The 65–75ch Rule",
+        "body": "Body copy in long-form surfaces caps at 65–75 characters per line. Wider lines fail to read at scan speed; this is the editorial discipline, not a suggestion.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular-Numerals Rule",
+        "body": "Anywhere numbers stack vertically — tables, charts, ranking lists, KPIs — use mono or the tabular-nums feature. Proportional digits in a numeric column is a tell of carelessness.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-At-Rest Rule",
+        "body": "Operational surfaces (dashboard cards, list rows, sidebar items) sit flat at rest. Shadow appears only as a state change — hover, focus, drag, or genuine elevation. Ambient shadow on every card is the SaaS template tell; we don't do that.",
+        "section": "elevation"
+      },
+      {
+        "name": "The No-Glass Rule",
+        "body": "Glassmorphism is forbidden. backdrop-filter: blur may appear on full-viewport overlays (dialogs over content) and nowhere else. Translucent panels stacked on translucent panels is not depth — it's confusion.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do lead with the data. Numbers, ranks, and signals appear before any verdict copy — interpretation follows evidence.",
+      "Do use the brand red sparingly and only on what matters most: the primary CTA, the focus ring, the active rank indicator, the chart-1 series.",
+      "Do keep cards flat at rest. Shadows respond to state, not as ambient decoration.",
+      "Do pair every status color with an icon, label, or shape. Color is never the sole encoding.",
+      "Do use tabular-nums (or JetBrains Mono) anywhere numeric data stacks vertically.",
+      "Do keep long-form body copy inside a 65–75ch container with editorial spacing.",
+      "Do use the cool-tinted off-white (#f4f5f7) as the workspace and reserve pure white for elevated surfaces.",
+      "Do use Inter for all chrome; mono only for numeric/code.",
+      "Do respect prefers-reduced-motion everywhere — disable reveal, float, pulse-soft, marquee, and gradient-shift animations under that media query.",
+      "Do use the dark-slate active state (#191e29) for sidebar/nav active items in light mode — anchor with weight, not the brand accent."
+    ],
+    "donts": [
+      "Don't use gradient text. The text-gradient-red utility currently in client/src/index.css is a violation of this rule and should be retired; replace with solid text-primary plus weight or scale for emphasis.",
+      "Don't use purple-to-pink gradients, neon glow, glassmorphism, or sparkle/✨ iconography anywhere.",
+      "Don't ship a navy enterprise-blue dashboard, dense table-of-tables layouts, or every-metric-on-screen overload.",
+      "Don't lay out a marketing surface as a gradient hero + three identical feature cards + stock illustration trio.",
+      "Don't use saturated color decoratively. If a color isn't reporting a state or anchoring a primary action, it's wrong.",
+      "Don't use border-left greater than 1px as a colored accent stripe on cards, list items, callouts, or alerts.",
+      "Don't use pure #000 or #fff for text or workspace backgrounds. Tint toward the cool neutral hue.",
+      "Don't wrap everything in a card. Most lists, headers, and forms don't need a container — and nested cards are always wrong.",
+      "Don't reach for a modal as the first thought. Exhaust inline/progressive alternatives first.",
+      "Don't use em dashes or -- in product copy. Use commas, colons, semicolons, periods, or parentheses.",
+      "Don't animate CSS layout properties. Animate transform and opacity only.",
+      "Don't mix the destructive red and the brand red on the same surface — semantic and identity must stay distinct.",
+      "Don't add shadow-lg or shadow-xl to a resting card. Those shadows are reserved for genuine overlay surfaces.",
+      "Don't use the brand red as a fill on chips, callouts, or status pills as a default."
+    ]
+  }
+}

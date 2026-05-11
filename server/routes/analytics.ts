@@ -1167,18 +1167,6 @@ Consider:
         "More upvotes = stronger AI signal",
       ],
     },
-    quora: {
-      name: "Quora",
-      citationShare: 14.3,
-      description: "Q&A platform with strong AI training data partnerships",
-      strategy: "Answer long-tail questions that mirror how users talk to AI chatbots",
-      tips: [
-        "Target questions with high follower counts",
-        "Keep core answers 40-60 words (optimal for AI summaries)",
-        "Add detailed context/examples below",
-        "Answer consistently over months to build topical authority",
-      ],
-    },
     youtube: {
       name: "YouTube",
       citationShare: 18.8,
@@ -1323,51 +1311,6 @@ Consider:
     ],
   };
 
-  // Quora topic recommendations by industry
-  const INDUSTRY_QUORA_TOPICS: Record<string, string[]> = {
-    "Public Relations": [
-      "Public Relations",
-      "PR Strategies",
-      "Media Relations",
-      "Crisis Communications",
-      "Brand Management",
-      "Corporate Communications",
-      "Startup PR",
-    ],
-    Technology: [
-      "Technology Trends",
-      "Software Development",
-      "Artificial Intelligence",
-      "Cloud Computing",
-      "Cybersecurity",
-      "Tech Startups",
-    ],
-    Finance: [
-      "Finance",
-      "Investment Strategies",
-      "Personal Finance",
-      "Fintech",
-      "Venture Capital",
-      "Banking",
-    ],
-    Healthcare: [
-      "Healthcare Industry",
-      "Medical Technology",
-      "Digital Health",
-      "Health Startups",
-      "Telemedicine",
-    ],
-    "E-commerce": [
-      "E-commerce",
-      "Online Retail",
-      "Dropshipping",
-      "Amazon FBA",
-      "Shopify",
-      "Digital Marketing",
-    ],
-    default: ["Business Strategy", "Marketing", "Entrepreneurship", "Startups", "Small Business"],
-  };
-
   // Get GEO opportunities for a brand
   app.get(
     "/api/geo-opportunities/:brandId",
@@ -1380,11 +1323,10 @@ Consider:
 
         const industry = brand.industry || "default";
         const subreddits = INDUSTRY_SUBREDDITS[industry] || INDUSTRY_SUBREDDITS["default"];
-        const quoraTopics = INDUSTRY_QUORA_TOPICS[industry] || INDUSTRY_QUORA_TOPICS["default"];
 
         // Compute real citation-share breakdown from the brand's geo_rankings.
         // Every cited ranking carries `citingOutletUrl` / `citingOutletName`;
-        // aggregate by domain, then bucket into Reddit / Quora / own-site /
+        // aggregate by domain, then bucket into Reddit / own-site /
         // everything-else ("third-party") to replace the hardcoded defaults.
         const brandDomain = (brand.website || "")
           .toLowerCase()
@@ -1416,14 +1358,12 @@ Consider:
           }
         };
         let reddit = 0,
-          quora = 0,
           ownSite = 0,
           thirdParty = 0;
         for (const r of cited) {
           const domain = extractDomain(r.citingOutletUrl);
           if (!domain) continue;
           if (domain.includes("reddit.com")) reddit++;
-          else if (domain.includes("quora.com")) quora++;
           else if (brandDomain && domain.includes(brandDomain)) ownSite++;
           else thirdParty++;
         }
@@ -1431,9 +1371,8 @@ Consider:
         const keyStats =
           totalCited > 0
             ? {
-                thirdPartyCitationShare: pct(reddit + quora + thirdParty),
+                thirdPartyCitationShare: pct(reddit + thirdParty),
                 redditCitationShare: pct(reddit),
-                quoraCitationShare: pct(quora),
                 brandWebsiteCitationShare: pct(ownSite),
               }
             : {
@@ -1441,7 +1380,6 @@ Consider:
                 // citation check first" rather than misleading industry averages.
                 thirdPartyCitationShare: 0,
                 redditCitationShare: 0,
-                quoraCitationShare: 0,
                 brandWebsiteCitationShare: 0,
               };
 
@@ -1452,7 +1390,7 @@ Consider:
           contentIdeas.push({
             type: "How-to Guide",
             title: `How ${brand.products[0]} Can Help [Target Audience Problem]`,
-            platform: "Reddit/Quora",
+            platform: "Reddit",
             description: "Answer questions about solving problems your product addresses",
           });
         }
@@ -1483,7 +1421,7 @@ Consider:
         contentIdeas.push({
           type: "FAQ Response",
           title: `Common Questions About ${industry} Answered`,
-          platform: "Quora/Reddit",
+          platform: "Reddit",
           description: "Answer the questions your target audience asks",
         });
 
@@ -1496,7 +1434,6 @@ Consider:
               industry: brand.industry,
             },
             subreddits,
-            quoraTopics,
             contentIdeas,
             keyStats,
             totalCitedRankings: totalCited,
@@ -1511,7 +1448,6 @@ Consider:
                 if (!d) continue;
                 let key: string | null = null;
                 if (d.includes("reddit.com")) key = "reddit";
-                else if (d.includes("quora.com")) key = "quora";
                 else if (d.includes("youtube.com")) key = "youtube";
                 else if (d.includes("linkedin.com")) key = "linkedin";
                 else if (d.includes("medium.com")) key = "medium";
@@ -1532,7 +1468,7 @@ Consider:
                 .sort((a, b) => b.citationShare - a.citationShare);
             })(),
             strategyTips: [
-              "AI systems cite 91% from third-party sources - focus on Reddit, Quora, YouTube",
+              "AI systems cite 91% from third-party sources - focus on Reddit and YouTube",
               "Build karma/reputation before adding brand mentions",
               "Use balanced perspectives (pros + cons) - AI trusts authentic evaluations",
               "Question-response format is optimal for AI indexing",
@@ -1557,8 +1493,6 @@ Consider:
         const { industry = "default" } = req.query;
         const subreddits =
           INDUSTRY_SUBREDDITS[industry as string] || INDUSTRY_SUBREDDITS["default"];
-        const quoraTopics =
-          INDUSTRY_QUORA_TOPICS[industry as string] || INDUSTRY_QUORA_TOPICS["default"];
 
         res.json({
           success: true,
@@ -1567,16 +1501,14 @@ Consider:
               (a, b) => b.citationShare - a.citationShare,
             ),
             subreddits,
-            quoraTopics,
             industries: Object.keys(INDUSTRY_SUBREDDITS).filter((k) => k !== "default"),
             keyStats: {
               thirdPartyCitationShare: 91,
               redditCitationShare: 21,
-              quoraCitationShare: 14.3,
               brandWebsiteCitationShare: 9,
             },
             strategyTips: [
-              "AI systems cite 91% from third-party sources - focus on Reddit, Quora, YouTube",
+              "AI systems cite 91% from third-party sources - focus on Reddit and YouTube",
               "Build karma/reputation before adding brand mentions",
               "Use balanced perspectives (pros + cons) - AI trusts authentic evaluations",
               "Question-response format is optimal for AI indexing",

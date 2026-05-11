@@ -27,15 +27,7 @@ import { formatDistanceToNow } from "date-fns";
 import BufferConnectDialog from "./BufferConnectDialog";
 import PlatformPostButton from "./PlatformPostButton";
 
-const DISTRIBUTION_PLATFORMS = [
-  "LinkedIn",
-  "Twitter",
-  "Facebook",
-  "Instagram",
-  "Medium",
-  "Reddit",
-  "Quora",
-];
+const DISTRIBUTION_PLATFORMS = ["LinkedIn", "Twitter", "Facebook", "Instagram", "Medium", "Reddit"];
 
 const BUFFER_SUPPORTED_PLATFORMS = new Set(["LinkedIn", "Twitter", "Facebook", "Instagram"]);
 

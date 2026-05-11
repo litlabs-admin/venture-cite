@@ -168,7 +168,6 @@ const aiEngines: AIEngine[] = [
           "Pursue guest posting, expert commentary, and press coverage on industry publications with high domain authority.",
         priority: "medium",
         estimatedImpact: "Medium-High - Authority signals compound over time",
-        quickAction: { label: "Find Publications", link: "/publications" },
       },
       {
         id: "chatgpt-5",
@@ -511,7 +510,7 @@ const aiEngines: AIEngine[] = [
           "Focus on ranking for your target keywords in Google Search. Use Search Console to monitor and improve performance.",
         priority: "high",
         estimatedImpact: "Critical - Primary data source",
-        quickAction: { label: "Track Rankings", link: "/geo-rankings" },
+        quickAction: { label: "Track Citations", link: "/citations" },
       },
       {
         id: "gemini-2",

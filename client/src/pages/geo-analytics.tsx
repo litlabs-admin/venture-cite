@@ -38,6 +38,7 @@ import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { AI_PLATFORMS_ACTIVE } from "@shared/constants";
 
 interface PlatformMetrics {
   mentions: number;
@@ -224,7 +225,8 @@ export default function GeoAnalytics() {
                   {getVisibilityLabel(analytics.overview.aiVisibilityScore)}
                 </Badge>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Based on citations, mentions, and ranking across 9 AI platforms
+                  Based on citations, mentions, and ranking across {AI_PLATFORMS_ACTIVE.length} AI
+                  platforms ({AI_PLATFORMS_ACTIVE.join(", ")})
                 </p>
               </CardContent>
             </Card>
@@ -358,7 +360,10 @@ export default function GeoAnalytics() {
                     <BarChart3 className="h-5 w-5" />
                     Visibility by AI Platform
                   </CardTitle>
-                  <CardDescription>Performance metrics across all 9 AI platforms</CardDescription>
+                  <CardDescription>
+                    Performance metrics across all {AI_PLATFORMS_ACTIVE.length} AI platforms (
+                    {AI_PLATFORMS_ACTIVE.join(", ")})
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">

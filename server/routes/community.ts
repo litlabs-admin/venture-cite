@@ -168,11 +168,11 @@ export function setupCommunityRoutes(app: Express): void {
         const prompt = `You are a community marketing expert. Find relevant online communities where the brand "${brandName}" in the "${industry}" industry should be active to build citations and authority for AI search engines.
 
 ${keywords?.length ? `Target keywords: ${keywords.join(", ")}` : ""}
-${platform ? `Focus on platform: ${platform}` : "Include Reddit, Quora, Hacker News, and niche forums"}
+${platform ? `Focus on platform: ${platform}` : "Include Reddit and Hacker News communities"}
 
 Return a JSON array of 10-15 community groups with this structure:
 [{
-  "platform": "reddit" | "quora" | "hackernews" | "forum" | "discord" | "slack",
+  "platform": "reddit" | "hackernews",
   "name": "group/subreddit/space name",
   "url": "direct URL to the group",
   "members": "estimated member count string",
@@ -220,16 +220,8 @@ Only return the JSON array, no other text.`;
         const platformGuidelines: Record<string, string> = {
           reddit:
             "Reddit values authentic, helpful content. Never be overtly promotional. Share genuine expertise. Use the community's language style. Add value first, mention brand naturally only if relevant. Follow subreddit rules.",
-          quora:
-            "Quora rewards detailed, expert answers. Cite sources, share personal experience, be thorough. You can mention your brand as a relevant example but the answer should be valuable standalone.",
           hackernews:
             "Hacker News values technical depth, original insights, and contrarian thinking. Be substantive. Avoid marketing language entirely. Focus on technical merit and data.",
-          forum:
-            "Forum posts should be helpful and community-oriented. Build reputation through consistent, valuable contributions. Never spam.",
-          discord:
-            "Discord is conversational. Be helpful, concise, and friendly. Share expertise naturally in conversations.",
-          slack:
-            "Slack communities value professional, concise contributions. Share actionable insights and resources.",
         };
 
         const prompt = `You are an expert community marketer. Generate a ${postType || "post"} for ${platform} in the "${groupName}" group/community.

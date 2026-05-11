@@ -34,7 +34,6 @@ import { formatDistanceToNow } from "date-fns";
 import PromptsTab, { type BrandPrompt } from "@/components/citations/PromptsTab";
 import ResultsTab from "@/components/citations/ResultsTab";
 import HistoryTab from "@/components/citations/HistoryTab";
-import ScheduleTab from "@/components/citations/ScheduleTab";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 
@@ -591,9 +590,15 @@ export default function Citations() {
           {/* HISTORY TAB */}
           {activeTab === "history" && <HistoryTab selectedBrandId={selectedBrandId} />}
 
-          {/* SCHEDULE TAB */}
+          {/* SCHEDULE TAB — cadence is non-configurable; see scheduler.ts */}
           {activeTab === "schedule" && (
-            <ScheduleTab selectedBrandId={selectedBrandId} selectedBrand={selectedBrand} />
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">
+                  Citation scans run weekly for every brand.
+                </p>
+              </CardContent>
+            </Card>
           )}
         </>
       )}

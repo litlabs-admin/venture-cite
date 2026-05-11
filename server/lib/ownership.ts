@@ -207,13 +207,6 @@ export async function requireKeywordResearch(
   return loadEntityThroughBrand(schema.keywordResearch, id, userId, "Keyword research not found");
 }
 
-export async function requireAlertSetting(
-  id: string,
-  userId: string,
-): Promise<typeof schema.alertSettings.$inferSelect> {
-  return loadEntityThroughBrand(schema.alertSettings, id, userId, "Alert setting not found");
-}
-
 // Chatbot threads are user-owned directly via chatbot_threads.user_id.
 export async function requireChatbotThread(id: string, userId: string) {
   const [row] = await db

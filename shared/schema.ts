@@ -305,6 +305,7 @@ export const keywordResearch = pgTable(
     suggestedContentType: text("suggested_content_type").default("article"),
     relatedKeywords: text("related_keywords").array(),
     status: text("status").default("discovered").notNull(),
+    provenance: text("provenance").default("ai-estimate").notNull(),
     contentGenerated: integer("content_generated").default(0).notNull(),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
     discoveredAt: timestamp("discovered_at").defaultNow().notNull(),

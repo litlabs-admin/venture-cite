@@ -10,8 +10,11 @@
 //
 // Generation (Vercel migration / Wave 9.5): the OpenAI Responses API in
 // background mode runs the work on OpenAI's infra. Client polls /state for
-// status + phase + elapsedMs, drives /advance to kick off and progress the
-// run. articles.content is filled by the server when the run completes,
+// status + elapsedSeconds, drives /advance to kick off and progress the
+// run. The previous "phase label" (Brainstorming → Polishing) was fake
+// theatre uncorrelated with actual model progress — Foundations Plan 1
+// Task 4 replaced it with honest elapsed seconds + a Cancel button.
+// articles.content is filled by the server when the run completes,
 // so a user who navigates away and back picks up the finished article from
 // the article row directly.
 //
@@ -309,12 +312,11 @@ export default function Content() {
   const isGenerating = article?.status === "generating";
 
   // Vercel migration (Responses API): client polls /state every 1s for
-  // status + phase. Drives /advance every ~7s — first call kicks off the
-  // OpenAI Responses run; subsequent calls poll the run status. When
-  // /state.done arrives, we refetch the article (which now has final
+  // status + elapsedSeconds. Drives /advance every ~7s — first call kicks
+  // off the OpenAI Responses run; subsequent calls poll the run status.
+  // When /state.done arrives, we refetch the article (which now has final
   // content in articles.content) and stop polling.
-  const [phase, setPhase] = useState<string | null>(null);
-  const [elapsedMs, setElapsedMs] = useState<number>(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
   useEffect(() => {
     if (!isGenerating || !activeJobId) return;
@@ -332,13 +334,12 @@ export default function Content() {
             status: string;
             done: boolean;
             errorMessage: string | null;
-            phase?: string;
-            elapsedMs?: number;
+            elapsedSeconds?: number;
           };
         };
         if (json.success) {
-          if (json.data.phase) setPhase(json.data.phase);
-          if (typeof json.data.elapsedMs === "number") setElapsedMs(json.data.elapsedMs);
+          if (typeof json.data.elapsedSeconds === "number")
+            setElapsedSeconds(json.data.elapsedSeconds);
           if (json.data.done) {
             articleQuery.refetch();
             refetchUsage();
@@ -435,6 +436,20 @@ export default function Content() {
         description: err?.message ?? "Unknown error",
         variant: "destructive",
       });
+    },
+  });
+
+  // Cancel a running generation (Foundations Plan 1, Task 4). Marks the
+  // active job as cancelled server-side; the worker will notice on its
+  // next slice and refund the quota + flip the article back to draft.
+  const cancelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await apiRequest("POST", `/api/content/${id}/cancel`);
+      return r.json();
+    },
+    onSuccess: () => {
+      articleQuery.refetch();
+      refetchDrafts();
     },
   });
 
@@ -628,10 +643,19 @@ export default function Content() {
           <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-6">
             <div className="flex items-center gap-3">
               <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
-              <p className="text-sm font-medium">{phase ?? "Brainstorming themes"}</p>
-              <span className="ml-auto text-xs text-muted-foreground">
-                {Math.floor(elapsedMs / 1000)}s
-              </span>
+              <p className="text-sm font-medium text-muted-foreground">
+                Generating ({elapsedSeconds}s)
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+                onClick={() => article && cancelMutation.mutate(article.id)}
+                disabled={cancelMutation.isPending}
+                data-testid="cancel-generation-button"
+              >
+                Cancel
+              </Button>
             </div>
 
             <div className="space-y-3">

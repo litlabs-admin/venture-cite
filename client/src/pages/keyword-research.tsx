@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -48,6 +50,11 @@ const intentColors: Record<string, string> = {
   transactional: "bg-muted text-muted-foreground border-border",
   navigational: "bg-muted text-muted-foreground border-border",
 };
+
+// Banner copy differs (mentions "planned"); this constant only deduplicates
+// the per-metric tooltip copy that appears verbatim on four tooltips.
+const AI_ESTIMATED_TOOLTIP =
+  "AI-estimated, not measured. We don't yet integrate a real search-volume source.";
 
 const contentTypeLabels: Record<string, string> = {
   article: "Article",
@@ -302,6 +309,14 @@ export default function KeywordResearchPage() {
         />
       ) : (
         <div className="space-y-4">
+          <Alert className="mb-4" data-testid="alert-ai-estimated">
+            <Sparkles className="h-4 w-4" />
+            <AlertDescription>
+              These figures are AI-estimated, not measured. Real search-volume integration is
+              planned.
+            </AlertDescription>
+          </Alert>
+
           <div className="flex items-center justify-between">
             <p className="text-muted-foreground">
               Showing {filteredKeywords.length} keyword{filteredKeywords.length !== 1 ? "s" : ""}
@@ -350,47 +365,75 @@ export default function KeywordResearchPage() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Opportunity Score</p>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-lg font-bold ${getScoreColor(keyword.opportunityScore)}`}
-                            data-testid={`score-opportunity-${keyword.id}`}
-                          >
-                            {keyword.opportunityScore}
-                          </span>
-                          <Progress value={keyword.opportunityScore} className="h-2 flex-1" />
+                    <TooltipProvider delayDuration={200}>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Opportunity Score</p>
+                          <div className="flex items-center gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className={`text-lg font-bold inline-flex items-center gap-1 ${getScoreColor(keyword.opportunityScore)}`}
+                                  data-testid={`score-opportunity-${keyword.id}`}
+                                >
+                                  {keyword.opportunityScore}
+                                  <Sparkles className="h-3 w-3 text-muted-foreground" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
+                            </Tooltip>
+                            <Progress value={keyword.opportunityScore} className="h-2 flex-1" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            AI Citation Potential
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className={`text-lg font-bold inline-flex items-center gap-1 ${getScoreColor(keyword.aiCitationPotential)}`}
+                                  data-testid={`score-citation-${keyword.id}`}
+                                >
+                                  {keyword.aiCitationPotential}
+                                  <Sparkles className="h-3 w-3 text-muted-foreground" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
+                            </Tooltip>
+                            <Progress value={keyword.aiCitationPotential} className="h-2 flex-1" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Search Volume</p>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-lg font-bold text-foreground inline-flex items-center gap-1">
+                                {keyword.searchVolume ? keyword.searchVolume.toLocaleString() : "—"}
+                                <Sparkles className="h-3 w-3 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
+                          </Tooltip>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Difficulty</p>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-lg font-bold text-foreground inline-flex items-center gap-1">
+                                {keyword.difficulty || "—"}
+                                <Sparkles className="h-3 w-3 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
-
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">AI Citation Potential</p>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-lg font-bold ${getScoreColor(keyword.aiCitationPotential)}`}
-                            data-testid={`score-citation-${keyword.id}`}
-                          >
-                            {keyword.aiCitationPotential}
-                          </span>
-                          <Progress value={keyword.aiCitationPotential} className="h-2 flex-1" />
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Search Volume</p>
-                        <span className="text-lg font-bold text-foreground">
-                          {keyword.searchVolume ? keyword.searchVolume.toLocaleString() : "—"}
-                        </span>
-                      </div>
-
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Difficulty</p>
-                        <span className="text-lg font-bold text-foreground">
-                          {keyword.difficulty || "—"}
-                        </span>
-                      </div>
-                    </div>
+                    </TooltipProvider>
 
                     {keyword.relatedKeywords && keyword.relatedKeywords.length > 0 && (
                       <div className="mt-4">

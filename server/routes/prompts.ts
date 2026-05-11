@@ -407,38 +407,11 @@ export function setupPromptsRoutes(app: Express): void {
     }),
   );
 
-  // Update auto-citation schedule for a brand.
-  // Wave 9: accepts hour (0-23 UTC) and active (bool) in addition to the
-  // schedule + day fields. Hour controls when on the chosen day the run
-  // fires; active pauses the schedule without losing the day/hour pick.
-  app.patch(
-    "/api/brands/:brandId/citation-schedule",
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        const brand = await requireBrand(req.params.brandId, user.id);
-        const { schedule, day, hour, active } = req.body || {};
-        const validSchedules = ["off", "weekly", "biweekly", "monthly"];
-        if (schedule && !validSchedules.includes(schedule)) {
-          return res.status(400).json({
-            success: false,
-            error: "Invalid schedule. Must be one of: off, weekly, biweekly, monthly.",
-          });
-        }
-        const update: Record<string, any> = {};
-        if (schedule !== undefined) update.autoCitationSchedule = schedule;
-        if (day !== undefined) update.autoCitationDay = Math.max(0, Math.min(6, Number(day) || 0));
-        if (hour !== undefined)
-          update.autoCitationHour = Math.max(0, Math.min(23, Number(hour) || 0));
-        if (active !== undefined) update.autoCitationActive = Boolean(active);
-        await storage.updateBrand(brand.id, update);
-        const updated = await storage.getBrandById(brand.id);
-        res.json({ success: true, data: updated });
-      } catch (error) {
-        sendError(res, error, "Failed to update citation schedule");
-      }
-    }),
-  );
+  // Citation cadence is non-configurable: scans run weekly for every
+  // active brand via the auto-citation cron in server/scheduler.ts. The
+  // user-facing PATCH /citation-schedule route was removed in
+  // Foundations Plan 1 Task 11. The auto_citation_* columns remain in
+  // the schema as dormant fields.
 
   // Aggregated results for a brand's prompt runs.
   // Citation run history — returns all runs for the trend chart, newest first.

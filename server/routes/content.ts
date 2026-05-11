@@ -12,7 +12,8 @@
 //   GET  /api/content-jobs/active            — caller's most recent in-flight
 //                                               or recently-finished job
 //   GET  /api/content-jobs/:jobId            — poll a single job (JSON)
-//   GET  /api/content-jobs/:jobId/state      — poll status + phase + elapsedMs
+//   GET  /api/content-jobs/:jobId/state      — poll status + elapsedSeconds
+//   POST /api/content/:articleId/cancel      — cancel the article's active job
 //   POST /api/content-jobs/:jobId/advance    — drive one slice of OpenAI
 //                                               Responses run (Vercel migration)
 //   POST /api/content-jobs/:jobId/cancel     — mark cancelled; next /advance bails
@@ -55,27 +56,11 @@ import { runArticleSlice } from "../contentGenerationWorker";
 
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
-// Vercel migration: time-driven phase indicator. The Responses API
-// background mode doesn't expose intra-run progress, so we display a
-// believable "what the model is doing now" message based on elapsed
-// time. Engineering, not marketing — the phase boundaries are
-// approximate but the user-perceived smoothness matches what production
-// AI products (Notion AI, Cursor) ship.
-const PHASE_BANDS: Array<{ minMs: number; label: string }> = [
-  { minMs: 0, label: "Brainstorming themes" },
-  { minMs: 4_000, label: "Drafting outline" },
-  { minMs: 12_000, label: "Writing sections" },
-  { minMs: 25_000, label: "Polishing" },
-];
-
-function phaseFor(elapsedMs: number): string {
-  let label = PHASE_BANDS[0].label;
-  for (const band of PHASE_BANDS) {
-    if (elapsedMs >= band.minMs) label = band.label;
-  }
-  return label;
-}
-
+// Foundations Plan 1, Task 4: the previous time-driven "phase label"
+// (Brainstorming → Drafting → Writing → Polishing) was theatre — the
+// Responses API background mode doesn't expose intra-run progress, so
+// those labels were uncorrelated with what the model was actually doing.
+// We now show honest elapsed seconds only, plus a Cancel button.
 export function computeJobStatePayload(job: {
   status: string;
   streamBuffer: string | null;
@@ -86,8 +71,7 @@ export function computeJobStatePayload(job: {
   status: string;
   done: boolean;
   errorMessage: string | null;
-  phase?: string;
-  elapsedMs?: number;
+  elapsedSeconds?: number;
 } {
   const done = job.status !== "pending" && job.status !== "running";
   if (done) {
@@ -103,8 +87,7 @@ export function computeJobStatePayload(job: {
     status: job.status,
     done: false,
     errorMessage: job.errorMessage ?? null,
-    phase: phaseFor(elapsedMs),
-    elapsedMs,
+    elapsedSeconds: Math.round(elapsedMs / 1000),
   };
 }
 
@@ -401,6 +384,51 @@ export function setupContentRoutes(app: Express): void {
         res.json({ success: true, data: { status: "cancelled" } });
       } catch (error) {
         sendError(res, error, "Failed to cancel job");
+      }
+    }),
+  );
+
+  // ── Cancel by articleId (Foundations Plan 1, Task 4) ──────────────────────
+  //
+  // Convenience cancel keyed by article. Finds the article's active job
+  // (article.jobId) and applies the same cancel semantics as the
+  // job-level route above. Returns 404 (not 403) for non-owned articles
+  // per the anti-enumeration ownership convention.
+  app.post(
+    "/api/content/:articleId/cancel",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const article = await requireArticle(req.params.articleId, user.id);
+        const jobId = (article as { jobId?: string | null }).jobId ?? null;
+        if (!jobId) {
+          return res.json({ success: true, data: { status: article.status, noActiveJob: true } });
+        }
+        const job = await storage.getContentJobById(jobId, user.id);
+        if (!job) {
+          return res.json({ success: true, data: { status: article.status, noActiveJob: true } });
+        }
+        if (job.status !== "pending" && job.status !== "running") {
+          return res.json({
+            success: true,
+            data: { status: job.status, alreadyTerminal: true },
+          });
+        }
+        const wasPending = job.status === "pending";
+        await storage.updateContentJob(job.id, {
+          status: "cancelled",
+          completedAt: new Date(),
+        } as never);
+        if (wasPending) {
+          const { refundArticleQuota } = await import("../lib/usageLimit");
+          await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
+          if (job.articleId) {
+            await storage.setArticleDraft(job.articleId).catch(() => undefined);
+          }
+        }
+        res.json({ success: true, data: { status: "cancelled" } });
+      } catch (error) {
+        sendError(res, error, "Failed to cancel article generation");
       }
     }),
   );
@@ -792,6 +820,7 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
             suggestedContentType: kw.suggestedContentType || "article",
             relatedKeywords: Array.isArray(kw.relatedKeywords) ? kw.relatedKeywords : null,
             status: "discovered",
+            provenance: "ai-estimate",
             contentGenerated: 0,
             articleId: null,
           });

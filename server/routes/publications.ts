@@ -16,13 +16,11 @@
 //   POST /api/competitors
 //   GET  /api/competitors/:id
 //   DELETE /api/competitors/:id
-//   POST /api/competitors/:id/snapshots
-//   GET  /api/competitors/:id/snapshots
 //   GET  /api/competitors/:id/latest-citations
 
 import type { Express } from "express";
 import { storage } from "../storage";
-import { insertCompetitorSchema, insertCompetitorCitationSnapshotSchema } from "@shared/schema";
+import { insertCompetitorSchema } from "@shared/schema";
 import { requireUser, requireBrand, requireCompetitor, getUserBrandIds } from "../lib/ownership";
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
 
@@ -471,47 +469,6 @@ ${articleEntries}
         res.json({ success: true, message: "Competitor ignored" });
       } catch (error) {
         sendError(res, error, "Failed to ignore competitor");
-      }
-    }),
-  );
-
-  // Add citation snapshot for a competitor — ownership required.
-  app.post(
-    "/api/competitors/:id/snapshots",
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        const competitor = await requireCompetitor(req.params.id, user.id);
-        const competitorId = competitor.id;
-
-        const snapshotData = { ...req.body, competitorId };
-        const parsed = insertCompetitorCitationSnapshotSchema.safeParse(snapshotData);
-        if (!parsed.success) {
-          return res
-            .status(400)
-            .json({ success: false, error: "Invalid snapshot data", details: parsed.error });
-        }
-
-        const snapshot = await storage.createCompetitorCitationSnapshot(parsed.data);
-        res.json({ success: true, data: snapshot });
-      } catch (error) {
-        captureAndFlush(error, { tags: { source: "publications.ts:535" } });
-        res.status(500).json({ success: false, error: "Failed to create citation snapshot" });
-      }
-    }),
-  );
-
-  // Get citation snapshots for a competitor — ownership required.
-  app.get(
-    "/api/competitors/:id/snapshots",
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        await requireCompetitor(req.params.id, user.id);
-        const snapshots = await storage.getCompetitorCitationSnapshots(req.params.id);
-        res.json({ success: true, data: snapshots });
-      } catch (error) {
-        sendError(res, error, "Failed to fetch citation snapshots");
       }
     }),
   );

@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -19,14 +21,11 @@ import { pageExplainers } from "@/lib/pageExplainers";
 import {
   TrendingUp,
   TrendingDown,
-  Eye,
   PieChart,
   MessageSquare,
   Target,
   BarChart3,
   Calendar,
-  Download,
-  Share2,
   FileText,
   CheckCircle2,
   ArrowUpRight,
@@ -62,9 +61,19 @@ interface ReportMetrics {
   recommendations: string[];
 }
 
+type NotificationPreference = {
+  type: string;
+  label: string;
+  description: string;
+  channel: string;
+  emailEnabled: boolean;
+};
+
 export default function ClientReports() {
   const { selectedBrandId, brands, isLoading: brandsLoading } = useBrandSelection();
   const [reportPeriod, setReportPeriod] = useState<string>("30");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const {
     data: metricsResponse,
@@ -72,6 +81,7 @@ export default function ClientReports() {
     isError: metricsIsError,
     isRefetching: metricsIsRefetching,
     refetch: refetchMetrics,
+    dataUpdatedAt,
   } = useQuery<{
     success: boolean;
     data: ReportMetrics;
@@ -96,7 +106,58 @@ export default function ClientReports() {
     return `${prefix}${growth.toFixed(1)}%`;
   };
 
-  const hasHistoricalData = metrics?.previousBMF !== 0 || metrics?.previousSOV !== 0;
+  const lastRefreshedLabel = (() => {
+    if (!dataUpdatedAt) return "—";
+    const ageMs = Date.now() - dataUpdatedAt;
+    const ageMin = Math.round(ageMs / 60000);
+    if (ageMin < 1) return "just now";
+    if (ageMin < 60) return `${ageMin}m ago`;
+    return `${Math.round(ageMin / 60)}h ago`;
+  })();
+
+  // Weekly-report toggle — reuses the existing notification-preferences
+  // pattern from settings.tsx so the cron in server/scheduler.ts (which
+  // gates on users.weeklyReportEnabled) picks up the change.
+  const prefsQueryKey = ["/api/user/notification-preferences"];
+  const { data: prefsData } = useQuery<{
+    success: boolean;
+    data: NotificationPreference[];
+  }>({
+    queryKey: prefsQueryKey,
+  });
+  const weeklyPref = prefsData?.data.find((p) => p.type === "weekly_report");
+  const weeklyReportEnabled = weeklyPref?.emailEnabled ?? false;
+
+  const prefMutation = useMutation({
+    mutationFn: async (input: { type: string; emailEnabled: boolean }) => {
+      const res = await apiRequest("PATCH", "/api/user/notification-preferences", input);
+      return (await res.json()) as { success: boolean; error?: string };
+    },
+    onMutate: async ({ type, emailEnabled }) => {
+      await queryClient.cancelQueries({ queryKey: prefsQueryKey });
+      const prev = queryClient.getQueryData<{ success: boolean; data: NotificationPreference[] }>(
+        prefsQueryKey,
+      );
+      if (prev) {
+        queryClient.setQueryData(prefsQueryKey, {
+          ...prev,
+          data: prev.data.map((p) => (p.type === type ? { ...p, emailEnabled } : p)),
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, _input, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(prefsQueryKey, ctx.prev);
+      toast({
+        title: "Could not update preference",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: prefsQueryKey });
+    },
+  });
 
   return (
     <div className="space-y-8">
@@ -106,23 +167,6 @@ export default function ClientReports() {
       <PageHeader
         title="GEO Performance Report"
         description="AI visibility metrics and citation analytics"
-        actions={
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              data-testid="button-download-report"
-            >
-              <Download className="h-4 w-4" />
-              Export PDF
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" data-testid="button-share-report">
-              <Share2 className="h-4 w-4" />
-              Share
-            </Button>
-          </div>
-        }
         explainer={pageExplainers.clientReports}
       />
 
@@ -417,13 +461,23 @@ export default function ClientReports() {
                     Report Generated: {new Date().toLocaleDateString()}
                   </h3>
                   <p className="text-muted-foreground text-sm">
-                    Data reflects {reportPeriod}-day period. Next update in 24 hours.
+                    Data reflects {reportPeriod}-day period. Last refreshed: {lastRefreshedLabel}.
                   </p>
                 </div>
-                <div className="flex gap-3">
-                  <Button className="" data-testid="button-schedule-report">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="schedule-weekly-report"
+                    checked={weeklyReportEnabled}
+                    disabled={!weeklyPref || prefMutation.isPending}
+                    onCheckedChange={(checked) =>
+                      prefMutation.mutate({ type: "weekly_report", emailEnabled: checked })
+                    }
+                    data-testid="switch-schedule-report"
+                    aria-label="Schedule weekly report"
+                  />
+                  <Label htmlFor="schedule-weekly-report" className="cursor-pointer">
                     Schedule Weekly Report
-                  </Button>
+                  </Label>
                 </div>
               </div>
             </CardContent>

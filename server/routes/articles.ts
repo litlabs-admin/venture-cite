@@ -419,12 +419,10 @@ export function setupArticlesRoutes(app: Express): void {
         }
 
         if (!process.env.OPENAI_API_KEY) {
-          return res
-            .status(503)
-            .json({
-              success: false,
-              error: "Content formatting requires OpenAI API configuration.",
-            });
+          return res.status(503).json({
+            success: false,
+            error: "Content formatting requires OpenAI API configuration.",
+          });
         }
 
         const brand = article.brandId ? await storage.getBrandById(article.brandId) : null;
@@ -475,16 +473,6 @@ Content: ${articleContent}`,
 - Discussion questions at the end to encourage engagement
 - Suggested subreddits to post in (format: Suggested subreddits: r/sub1, r/sub2)
 ${brand ? `Brand: ${brand.companyName} (mention naturally, not as promotion)` : ""}
-
-Article title: ${articleTitle}
-Content: ${articleContent}`,
-                Quora: `Convert this article into a comprehensive Quora answer. Include:
-- A suggested question to answer
-- A direct, authoritative response
-- Supporting details and examples
-- Conversational yet knowledgeable tone
-- A brief mention of credentials/expertise
-${brand ? `Brand: ${brand.companyName}` : ""}
 
 Article title: ${articleTitle}
 Content: ${articleContent}`,

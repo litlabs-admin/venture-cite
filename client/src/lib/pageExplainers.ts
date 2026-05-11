@@ -72,7 +72,7 @@ export const pageExplainers = {
   },
   community: {
     summary:
-      "Reddit + Quora outreach — direct engagement that LLMs scrape into their training data.",
+      "Reddit + forum outreach — direct engagement that LLMs scrape into their training data.",
     expectedOutcome: "AEO tactic: posts you make today can show up in AI answers within 4–8 weeks.",
     relatedConcept: "AEO",
   },

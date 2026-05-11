@@ -703,8 +703,8 @@ export default function FaqManager() {
                           </Button>
                         </div>
 
-                        <div className="bg-slate-900 rounded-lg p-4 overflow-x-auto">
-                          <pre className="text-green-400 text-sm font-mono">
+                        <div className="bg-muted border border-border rounded-md p-4 overflow-x-auto">
+                          <pre className="text-foreground text-sm font-mono">
                             <code>{generateSchemaMarkup()}</code>
                           </pre>
                         </div>

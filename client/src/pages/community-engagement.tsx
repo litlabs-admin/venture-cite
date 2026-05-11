@@ -40,7 +40,6 @@ import {
   Copy,
   ExternalLink,
   Sparkles,
-  MessageSquare,
   Globe,
   Users,
   Target,
@@ -54,7 +53,7 @@ import {
   Compass,
   Pencil,
 } from "lucide-react";
-import { SiReddit, SiQuora } from "react-icons/si";
+import { SiReddit } from "react-icons/si";
 
 interface DiscoveredGroup {
   platform: string;
@@ -77,20 +76,12 @@ interface GeneratedContent {
 
 const platformIcons: Record<string, JSX.Element> = {
   reddit: <SiReddit className="w-4 h-4" />,
-  quora: <SiQuora className="w-4 h-4" />,
   hackernews: <Globe className="w-4 h-4 text-orange-500" />,
-  forum: <MessageSquare className="w-4 h-4" />,
-  discord: <MessageSquare className="w-4 h-4 text-indigo-500" />,
-  slack: <MessageSquare className="w-4 h-4 text-green-500" />,
 };
 
 const platformColors: Record<string, string> = {
   reddit: "bg-orange-100 text-orange-800",
-  quora: "bg-red-100 text-red-800",
   hackernews: "bg-orange-100 text-orange-700",
-  forum: "bg-blue-100 text-blue-800",
-  discord: "bg-indigo-100 text-indigo-800",
-  slack: "bg-green-100 text-green-800",
 };
 
 const statusColors: Record<string, string> = {
@@ -317,7 +308,7 @@ export default function CommunityEngagement() {
       </Helmet>
       <PageHeader
         title="Community Engagement"
-        description="Find and engage with Reddit, Quora, and forum communities to build brand citations"
+        description="Find and engage with Reddit and Hacker News communities to build brand citations"
         actions={brands.length > 0 ? <BrandSelector className="w-64" /> : null}
         explainer={pageExplainers.community}
       />
@@ -367,11 +358,7 @@ export default function CommunityEngagement() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="reddit">Reddit</SelectItem>
-                      <SelectItem value="quora">Quora</SelectItem>
                       <SelectItem value="hackernews">Hacker News</SelectItem>
-                      <SelectItem value="forum">Industry Forum</SelectItem>
-                      <SelectItem value="discord">Discord</SelectItem>
-                      <SelectItem value="slack">Slack Community</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -395,7 +382,7 @@ export default function CommunityEngagement() {
               <div>
                 <label className="text-sm font-medium">Community/Group Name</label>
                 <Input
-                  placeholder="e.g., r/marketing, Quora Marketing Space"
+                  placeholder="e.g., r/marketing, Hacker News"
                   value={generateForm.groupName}
                   onChange={(e) => setGenerateForm((f) => ({ ...f, groupName: e.target.value }))}
                   data-testid="input-gen-group"
@@ -596,8 +583,8 @@ export default function CommunityEngagement() {
                   <Search className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
                   <p className="font-medium text-muted-foreground">No communities discovered yet</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Click "Discover Communities" to find relevant Reddit, Quora, and forum groups
-                    for your brand
+                    Click "Discover Communities" to find relevant Reddit and Hacker News groups for
+                    your brand
                   </p>
                   <Button
                     onClick={handleDiscover}
@@ -946,19 +933,7 @@ export default function CommunityEngagement() {
             </div>
             <div className="space-y-2">
               <h4 className="font-medium flex items-center gap-2">
-                <SiQuora className="w-4 h-4 text-red-600" /> Quora
-              </h4>
-              <ul className="space-y-1 text-muted-foreground text-xs">
-                <li>Answer questions with detailed, expert responses</li>
-                <li>Include data, stats, and real examples</li>
-                <li>Mention brand naturally as a relevant example</li>
-                <li>Follow relevant Spaces for your industry</li>
-                <li>Build a complete profile with credentials</li>
-              </ul>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium flex items-center gap-2">
-                <Globe className="w-4 h-4 text-orange-500" /> Hacker News & Forums
+                <Globe className="w-4 h-4 text-orange-500" /> Hacker News
               </h4>
               <ul className="space-y-1 text-muted-foreground text-xs">
                 <li>Focus on technical depth and original insights</li>

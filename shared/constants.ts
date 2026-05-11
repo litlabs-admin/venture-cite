@@ -7,28 +7,38 @@
 
 // ---------------------------------------------------------------------------
 // AI platforms tracked for citation / visibility analytics.
-// Keep this sorted by business priority (most-queried first).
+// Split into ACTIVE (platforms we actually query via the citation runner — see
+// server/citationChecker.ts DEFAULT_CITATION_PLATFORMS) and PLANNED (platforms
+// we surface in UI scaffolding but don't yet produce data for). Do not claim
+// "9 platforms" anywhere user-facing — only ACTIVE produces data.
 // ---------------------------------------------------------------------------
-export const AI_PLATFORMS = [
+export const AI_PLATFORMS_ACTIVE = [
   "ChatGPT",
   "Claude",
   "Perplexity",
   "Gemini",
+  "DeepSeek",
+] as const;
+
+export const AI_PLATFORMS_PLANNED = [
   "Grok",
   "Microsoft Copilot",
   "Meta AI",
-  "DeepSeek",
   "Google AI",
   "Bing AI",
 ] as const;
 
-export type AiPlatform = (typeof AI_PLATFORMS)[number];
+// Backwards-compatible alias. New code should import AI_PLATFORMS_ACTIVE
+// directly. Kept pointing at ACTIVE so any remaining consumer renders only
+// platforms that actually produce data.
+export const AI_PLATFORMS = AI_PLATFORMS_ACTIVE;
 
-// Shorter subset used by client reports / compact badges where space is tight.
-// Reflects the platforms we actively run citation checks against. Microsoft
-// Copilot and Meta AI removed — not currently queried; DeepSeek added since
-// we run against it via OpenRouter.
-export const AI_PLATFORMS_CORE = ["ChatGPT", "Claude", "Perplexity", "Gemini", "DeepSeek"] as const;
+export type AiPlatform =
+  | (typeof AI_PLATFORMS_ACTIVE)[number]
+  | (typeof AI_PLATFORMS_PLANNED)[number];
+
+// Legacy alias retained — same set as AI_PLATFORMS_ACTIVE.
+export const AI_PLATFORMS_CORE = AI_PLATFORMS_ACTIVE;
 
 // ---------------------------------------------------------------------------
 // Citation scoring weights (server/routes.ts /api/geo-analytics).
