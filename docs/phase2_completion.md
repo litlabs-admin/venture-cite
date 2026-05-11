@@ -3894,3 +3894,139 @@ In any of these the page rendered with no email, no resend possible.
 - [x] `.env.example` documents Supabase Dashboard prerequisites
 
 ---
+
+## Track 31 — Plan 5: Recommendation engine persistence (§4.11) (2026-05-12)
+
+**Goal:** Silence the two false-positive recommendation rules (`#8 rerun-geo-signals`, `#9 complete-visibility-checklist`) by replacing the hardcoded `null / 0` inputs in `server/routes/dashboard.ts:574-579` with reads from real persistence tables. No new rules. No engine changes. Pure plumbing.
+
+**Status:** Complete (4 tasks + 7-bug production-readiness audit fixed in same track).
+
+### Background
+
+`server/lib/recommendationsEngine.ts` rules #8 and #9 had been firing as P1 dismissibles on every dashboard load because their inputs were always-null defaults:
+
+```ts
+// server/routes/dashboard.ts (before)
+lastSignalsScanAt: null,                  // rule #8 always fires
+visibilityChecklistCompleted: 0,          // rule #9 always fires (0 / 4 = 0%)
+visibilityChecklistTotal: 4,              // wrong; real total is 57
+```
+
+Dismissals had a 7-day TTL, so the recs reappeared forever. `visibility_progress` (migration 0008) was already half-wired client + server + storage — only the dashboard read was missing. `geo_signal_runs` did not exist.
+
+### 31.1 Task 1 — `geo_signal_runs` table + storage methods
+
+| File                                  | Change                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrations/0057_geo_signal_runs.sql` | NEW. `id, brand_id (FK CASCADE), article_id (FK SET NULL), ran_at DEFAULT NOW(), overall_score INTEGER, payload JSONB`. Index `(brand_id, ran_at DESC)` supports the `MAX(ran_at)` query on dashboard read. `gen_random_uuid()` works without `CREATE EXTENSION pgcrypto` on PG 13+ — matches the rest of the codebase.      |
+| `shared/schema.ts`                    | Added `geoSignalRuns` Drizzle table, `insertGeoSignalRunSchema`, `GeoSignalRun`, `InsertGeoSignalRun` types after the `visibilityProgress` block. `integer` and `jsonb` already imported. Index declared as `.on(table.brandId, table.ranAt.desc())` matching the SQL (drift-free).                                          |
+| `server/storage.ts`                   | `IStorage` interface gained `recordGeoSignalRun(run): Promise<GeoSignalRun>` and `getLastGeoSignalRunAt(brandId): Promise<Date \| null>`.                                                                                                                                                                                    |
+| `server/databaseStorage.ts`           | Implementations after `unsetVisibilityStep`. `getLastGeoSignalRunAt` normalizes the timestamp via `new Date(row.ranAt as string \| Date)` — matches the codebase convention at `databaseStorage.ts:2456,2709,2868,3647` and prevents `TypeError: .getTime is not a function` when pg returns the timestamp as an ISO string. |
+| `tests/unit/geoSignalRuns.test.ts`    | NEW, 3 cases: insert returns row; `getLastGeoSignalRunAt` returns null when no runs; returns the most recent `ranAt` for the brand.                                                                                                                                                                                          |
+
+### 31.2 Task 2 — Persist a row on every successful `POST /api/geo-signals/analyze`
+
+| File                                              | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/geoSignals.ts`                     | `POST /api/geo-signals/analyze` now pulls optional `brandId` and `articleId` from the request body. If `brandId` is a non-empty string, calls `requireBrand(brandId, user.id)` from `server/lib/ownership.ts` (same helper used at line 605 of the same file by the sibling `optimize-chunks` handler). On `OwnershipError`, returns 404 — anti-enumeration policy. After `computeSignals(...)` succeeds, calls `storage.recordGeoSignalRun({ brandId: brand.id, articleId, overallScore: Math.round(result.overallScore), payload })`. |
+| `client/src/pages/geo-signals.tsx`                | `analyzeSignalsMutation` type extended with `articleId?: string`. The mutate call in `handleAnalyzeArticle` now passes `articleId: selectedArticle.id` alongside the existing `brandId`. Back-compat preserved: ad-hoc analyze (no selected article/brand) still works — server skips the insert when `brandId` is absent.                                                                                                                                                                                                              |
+| `tests/unit/geoSignalsAnalyzePersistence.test.ts` | NEW, 3 cases: inserts row when user owns the brand; does NOT insert when `brandId` is omitted (response still 200 with signals); 404 + no insert when `brandId` belongs to a different user.                                                                                                                                                                                                                                                                                                                                            |
+
+### 31.3 Task 3 — Wire `dashboard.ts` to read both persistence sources
+
+| File                                               | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared/constants.ts`                              | NEW export `VISIBILITY_CHECKLIST_TOTAL = 57`. Manually counted from `client/src/pages/ai-visibility.tsx`'s `aiEngines` array: chatgpt 9 + claude 7 + perplexity 7 + google-ai 8 + gemini 7 + grok 7 + manus 7 + deepseek 5 = 57. The spec said "53" — used the actual code count per the "don't trust .md files" rule. Comment in `constants.ts` reminds future editors to keep in sync with `aiEngines`.                                                                                                                  |
+| `server/routes/dashboard.ts`                       | Recommendation handler around lines 540-590: `Promise.all` expanded to also fetch `storage.getVisibilityProgress(brandId)` and `storage.getLastGeoSignalRunAt(brandId)`. The `state` object's three hardcoded literals replaced: `lastSignalsScanAt: null` → `lastSignalsScanAt`; `visibilityChecklistCompleted: 0` → `visibilityChecklistCompleted: visibilityRows.length`; `visibilityChecklistTotal: 4` → `visibilityChecklistTotal: VISIBILITY_CHECKLIST_TOTAL`. Defensive-null comments deleted (they were now lies). |
+| `tests/unit/dashboardRecommendationInputs.test.ts` | NEW, 5 cases: plumbs through `lastSignalsScanAt`; passes null when no runs exist; passes `visibilityRows.length` as completed and `VISIBILITY_CHECKLIST_TOTAL` as total; rule #8 does NOT fire when last scan was 1 day ago; rule #9 does NOT fire when 30/57 (>50%) checklist items complete. P0 prerequisites mocked in (industry, articles, prompts, citation runs, ≥20% citation rate, ≥1 FAQ) so P1 rules can surface.                                                                                                |
+
+### 31.4 Production-readiness audit — 7 bugs fixed in same track
+
+After Tasks 1–3 landed, a thorough audit found 7 real bugs ranging from CRITICAL runtime crashes to LOW data-integrity gaps. All fixed inline; no separate track.
+
+#### 31.4.1 CRITICAL — Timestamp normalization
+
+**Symptom.** `recommendationsEngine.ts:166,174` calls `state.lastSignalsScanAt.getTime()`. node-postgres returns timestamps as either Date or string depending on driver configuration. If it returns a string in production, `.getTime()` throws `TypeError: .getTime is not a function` and the dashboard recommendation endpoint returns 500.
+
+**Fix.** `server/databaseStorage.ts` `getLastGeoSignalRunAt` returns `row?.ranAt ? new Date(row.ranAt as string | Date) : null`. Matches the codebase convention used pervasively elsewhere.
+
+#### 31.4.2 HIGH — Drizzle index `.desc()` drift
+
+**Symptom.** Migration SQL declared `ON geo_signal_runs(brand_id, ran_at DESC)` but Drizzle schema's `.on(table.brandId, table.ranAt)` defaulted to ASC. If anyone ever runs `drizzle-kit push` to regenerate, the index would silently be re-created as ASC. PG B-tree can scan ASC backwards for DESC queries so the bug was performance-invisible — but schema/SQL drift is a maintenance hazard.
+
+**Fix.** `shared/schema.ts` changed to `.on(table.brandId, table.ranAt.desc())`, matching the `.updatedAt.desc()` pattern at `shared/schema.ts:2046,2069`.
+
+#### 31.4.3 HIGH — Persistence failure must not fail the user request
+
+**Symptom.** If `recordGeoSignalRun` threw (DB down, FK violation, JSON serialization issue), the outer catch at `geoSignals.ts:588` returned a generic 500 "Failed to analyze signals" — discarding the computed signals the user actually wanted. The persistence is bookkeeping; the analyze RESULT is what the user paid the compute cost for.
+
+**Fix.** `server/routes/geoSignals.ts` wraps ONLY the `storage.recordGeoSignalRun(...)` call in its own try/catch: `logger.warn({ err, brandId }, "geo-signals/analyze persistence failed")` + `captureAndFlush(err, { tags: { source: "geoSignals.ts:recordGeoSignalRun" } })`. The response is always 200 with signals. `OwnershipError` from `requireBrand` still bubbles to the outer catch (must still 404 on cross-tenant).
+
+#### 31.4.4 HIGH — `OwnershipError` from `requireUser` was swallowed as 500
+
+**Symptom.** If `requireUser(req)` threw `OwnershipError` (auth failed), the outer catch at `geoSignals.ts:588` converted it to a generic 500 instead of 401. Same bug exists in sibling handlers in the file — but newly relevant because the audit caught it.
+
+**Fix.** Outer catch now has `if (err instanceof OwnershipError) return res.status(err.status).json(...)` at the top. Translates correctly: 401 for missing auth, 404 for cross-tenant brand. Generic 500 only for unexpected errors.
+
+#### 31.4.5 HIGH — `requireBrand` moved BEFORE `computeSignals` (fail-fast)
+
+**Symptom.** Foreign-brand requests paid the full embedding + scoring cost before getting their 404. Wasted compute, slow rejection, slight timing side-channel.
+
+**Fix.** `server/routes/geoSignals.ts` analyze handler: `const brand = await requireBrand(brandId, user.id)` runs BEFORE `computeSignals(...)` when `brandId` is supplied. The insert uses `brand.id`.
+
+#### 31.4.6 MEDIUM — Payload size cap
+
+**Symptom.** JSONB `payload` includes `signals[].recommendations[]` — strings derived from user-supplied `targetQuery` and content. With `MAX_CONTENT_LENGTH = 40_000` and large queries, a single row could approach tens of KB. Multiplied by spammy analyze calls, table growth is unbounded.
+
+**Fix.** Before insert, if `JSON.stringify(payload).length > 32_000`, log a warning and truncate each signal's `recommendations[]` to the first 3 entries while keeping the rest of the payload intact. Row stays useful, growth is bounded.
+
+#### 31.4.7 LOW — `articleId` cross-brand integrity
+
+**Symptom.** A user could pass `brandId: A, articleId: B` where article B belongs to a different brand the user also owns. The FK doesn't catch it (article B exists, user owns it). Result: misattributed analytics rows.
+
+**Fix.** When `articleId` is provided, the handler looks it up via `storage.getArticleById(articleId)` and keeps it only if `article.brandId === brand.id`. Mismatch or lookup-failure → `articleId = null` with a `logger.warn`. Best-effort data integrity; never fails the analyze.
+
+### 31.5 Items VERIFIED OK during the audit (no fix needed)
+
+- **`gen_random_uuid()` without `pgcrypto`.** Works on PG 13+ (now in core). Matches every other migration in the repo.
+- **`VISIBILITY_CHECKLIST_TOTAL = 57` correctness.** Counted 67 `id:` matches in `ai-visibility.tsx`, minus 2 interface field declarations, minus 8 engine ids = 57. Step ids are engine-prefixed (`chatgpt-1`, `claude-1`) so no cross-engine collisions. The `(brandId, engineId, stepId)` UNIQUE constraint in `visibility_progress` (migration 0008) prevents `getVisibilityProgress(brandId).length` from ever exceeding 57.
+- **FK cascade safety.** `brand_id ON DELETE CASCADE` (rows die with brand); `article_id ON DELETE SET NULL` matches Drizzle's `onDelete: "set null"`.
+- **`desc` import in `databaseStorage.ts`** — already at line 4.
+- **Test isolation.** All three new test files use `beforeEach` with `vi.clearAllMocks() / mockReset()`. No cross-test pollution.
+- **`Math.round(result.overallScore)` safety.** `computeSignals` clamps `overallScore` to a finite integer-range number via `Math.max(0, Math.min(100, ...))`. NaN cannot reach the rounding.
+- **Tour-target audit.** 26/26 targets present and unchanged. No tour-targeted elements modified.
+- **`recordGeoSignalRun` `.returning()` destructure.** Drizzle returns array; `const [row]` handles the single-insert case correctly.
+- **Backwards compatibility.** Existing callers that don't send `brandId` still receive `200 { success: true, data: { signals, ... } }`. Only the new `if (brandId)` branch persists.
+- **Migration 0057 lex order.** 0057 sorts after 0056_user_welcomed_at.sql. Index name unique across the schema.
+- **`visibility_progress` row count == completed-step count.** Unique constraint `(brand_id, engine_id, step_id)` guarantees no duplicates. `COUNT(*)` is the right read.
+- **`storage.getVisibilityProgress`, `setVisibilityStep`, `unsetVisibilityStep`** — pre-existing, already wired through `server/routes/prompts.ts` and consumed by `client/src/pages/ai-visibility.tsx`. No changes needed.
+
+### How to verify
+
+1. **Run dashboard recs on a brand with one signal scan.** `POST /api/geo-signals/analyze` with `{ brandId, articleId, content, targetQuery }` → returns 200 with signals. Confirm a `geo_signal_runs` row exists for that brand. Hit `GET /api/recommendations?brandId=...` → response does NOT contain a rec with `id: "rerun-geo-signals"`.
+2. **Run dashboard recs on a brand with >50% checklist done.** Toggle 30 visibility steps via the existing `/api/visibility-progress/:brandId` endpoint. Hit `GET /api/recommendations` → response does NOT contain `id: "complete-visibility-checklist"`.
+3. **Persistence failure resilience.** Force `recordGeoSignalRun` to throw (e.g., temporarily break the DB connection). The analyze response should still be 200 with signals; the failure surfaces in Sentry with `tags.source = "geoSignals.ts:recordGeoSignalRun"`.
+4. **Cross-tenant brand id.** Call analyze with `brandId` belonging to another user → 404, no insert, no compute cost (ownership check is now first).
+5. **Cross-brand article id.** Call analyze with `brandId: A, articleId: <belongs to brand B>` → 200 with signals; the row written has `article_id = null` and a `logger.warn` line.
+6. **Payload size cap.** Trigger an analyze run with content that produces > 32 KB of payload JSON. Confirm the row's `recommendations[]` is truncated to 3 entries per signal.
+7. **Timestamp normalization.** Verify dashboard recs handler does NOT throw `TypeError: .getTime is not a function` regardless of pg driver string-vs-Date config.
+
+### Pass criteria
+
+- [x] `migrations/0057_geo_signal_runs.sql` exists with correct DDL; index DESC.
+- [x] `shared/schema.ts` exports `geoSignalRuns`, `GeoSignalRun`, `InsertGeoSignalRun`; index declared `.desc()`.
+- [x] `server/databaseStorage.ts` has `recordGeoSignalRun` + `getLastGeoSignalRunAt` (timestamp-normalized).
+- [x] `server/routes/geoSignals.ts` analyze handler: ownership-first, signals-always-200, persistence wrapped in try/catch, OwnershipError translated, payload capped, articleId validated.
+- [x] `client/src/pages/geo-signals.tsx` mutation passes both `brandId` and `articleId`.
+- [x] `server/routes/dashboard.ts` reads from `getVisibilityProgress` + `getLastGeoSignalRunAt`. No `lastSignalsScanAt: null` literal remains. No `visibilityChecklistCompleted: 0`. No `visibilityChecklistTotal: 4`.
+- [x] `shared/constants.ts` exports `VISIBILITY_CHECKLIST_TOTAL = 57`.
+- [x] 11 new tests pass: `geoSignalRuns` (3), `geoSignalsAnalyzePersistence` (3), `dashboardRecommendationInputs` (5).
+- [x] `npm run check` — 0 errors, tour-targets 26/26.
+- [x] Full suite at documented baseline only (sourceHealth, redditSource, ssrf, citationCronUnconditional, tour integration/e2e) — no Plan 5 regressions.
+
+### Documented limitations
+
+- **No de-dup on `geo_signal_runs` inserts.** A user spamming "Analyze" gets multiple near-identical rows. Harmless for the `MAX(ran_at)` read; table growth is acceptable for now. A retention/cleanup job could be added if growth becomes a real issue.
+- **`requireBrand` adds one DB roundtrip per analyze when `brandId` is supplied.** Acceptable for current load; in-editor analyze is already user-debounced.
+
+---

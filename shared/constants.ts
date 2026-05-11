@@ -71,3 +71,14 @@ export const CONTENT_LIMITS = {
   maxArticleChars: 40_000,
   maxCitationResponseChars: 8_000,
 } as const;
+
+// ---------------------------------------------------------------------------
+// AI Visibility checklist total.
+//
+// Sum of `engine.steps.length` across every entry in `aiEngines` in
+// `client/src/pages/ai-visibility.tsx`. Surfaced server-side as the
+// denominator of the "AI Visibility checklist progress" recommendation
+// input (rule #9 `complete-visibility-checklist`). Keep this in lockstep
+// with that file — if you add/remove a step there, update this number.
+// ---------------------------------------------------------------------------
+export const VISIBILITY_CHECKLIST_TOTAL = 57;

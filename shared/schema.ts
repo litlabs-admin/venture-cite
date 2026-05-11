@@ -491,6 +491,35 @@ export const insertVisibilityProgressSchema = createInsertSchema(visibilityProgr
 export type VisibilityProgress = typeof visibilityProgress.$inferSelect;
 export type InsertVisibilityProgress = z.infer<typeof insertVisibilityProgressSchema>;
 
+// One row per "Analyze GEO Signals" run. Powers `lastSignalsScanAt`
+// input on the recommendations engine so rule #8 stops firing on
+// brands that have actually scanned.
+export const geoSignalRuns = pgTable(
+  "geo_signal_runs",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    articleId: varchar("article_id").references(() => articles.id, {
+      onDelete: "set null",
+    }),
+    ranAt: timestamp("ran_at").defaultNow().notNull(),
+    overallScore: integer("overall_score"),
+    payload: jsonb("payload"),
+  },
+  (table) => [index("geo_signal_runs_brand_id_ran_at_idx").on(table.brandId, table.ranAt.desc())],
+);
+
+export const insertGeoSignalRunSchema = createInsertSchema(geoSignalRuns).omit({
+  id: true,
+  ranAt: true,
+});
+export type GeoSignalRun = typeof geoSignalRuns.$inferSelect;
+export type InsertGeoSignalRun = z.infer<typeof insertGeoSignalRunSchema>;
+
 // One row per "Run Citation Check" click or weekly cron run. Stores the
 // aggregate totals so the trend chart can render without re-aggregating
 // every geo_rankings row.

@@ -34,6 +34,8 @@ import {
   type InsertGeoRanking,
   type BrandPrompt,
   type InsertBrandPrompt,
+  type GeoSignalRun,
+  type InsertGeoSignalRun,
   type ContentGenerationJob,
   type InsertContentGenerationJob,
   type Brand,
@@ -781,6 +783,21 @@ export class DatabaseStorage implements IStorage {
           eq(schema.visibilityProgress.stepId, stepId),
         ),
       );
+  }
+
+  async recordGeoSignalRun(run: InsertGeoSignalRun): Promise<GeoSignalRun> {
+    const [row] = await db.insert(schema.geoSignalRuns).values(run).returning();
+    return row;
+  }
+
+  async getLastGeoSignalRunAt(brandId: string): Promise<Date | null> {
+    const [row] = await db
+      .select({ ranAt: schema.geoSignalRuns.ranAt })
+      .from(schema.geoSignalRuns)
+      .where(eq(schema.geoSignalRuns.brandId, brandId))
+      .orderBy(desc(schema.geoSignalRuns.ranAt))
+      .limit(1);
+    return row?.ranAt ? new Date(row.ranAt as string | Date) : null;
   }
 
   async createCitationRun(run: InsertCitationRun): Promise<CitationRun> {

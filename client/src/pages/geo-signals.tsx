@@ -282,6 +282,7 @@ export default function GeoSignals() {
       content: string;
       targetQuery: string;
       brandId?: string;
+      articleId?: string;
       articleUpdatedAt?: string;
     }) => {
       const response = await apiRequest("POST", "/api/geo-signals/analyze", data);
@@ -438,6 +439,7 @@ export default function GeoSignals() {
         content: selectedArticle.content,
         targetQuery: targetQuery || selectedArticle.title || "",
         brandId: selectedBrandId,
+        articleId: selectedArticle.id,
         articleUpdatedAt: selectedArticle.updatedAt
           ? new Date(selectedArticle.updatedAt).toISOString()
           : undefined,

@@ -10,6 +10,8 @@ import type { Express } from "express";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "crypto";
 import { requireUser, requireBrand } from "../lib/ownership";
+import { OwnershipError } from "../lib/ownership";
+import { storage } from "../storage";
 import { MODELS } from "../lib/modelConfig";
 import { openai, aiLimitMiddleware, MAX_CONTENT_LENGTH, asyncHandler } from "../lib/routesShared";
 import { safeFetchText } from "../lib/ssrf";
@@ -517,8 +519,9 @@ export function setupGeoSignalsRoutes(app: Express): void {
     "/api/geo-signals/analyze",
     asyncHandler(async (req, res) => {
       try {
-        requireUser(req);
-        const { content, targetQuery, articleUpdatedAt, schemaCompleteness } = req.body ?? {};
+        const user = requireUser(req);
+        const { content, targetQuery, articleUpdatedAt, schemaCompleteness, brandId, articleId } =
+          req.body ?? {};
         if (
           !content ||
           typeof content !== "string" ||
@@ -535,12 +538,93 @@ export function setupGeoSignalsRoutes(app: Express): void {
             .json({ success: false, error: `Content exceeds ${MAX_CONTENT_LENGTH} characters` });
         }
 
+        // Resolve ownership BEFORE compute to fail-fast on cross-tenant
+        // requests instead of paying for embeddings + scoring first. 404 on
+        // miss per anti-enumeration policy (OwnershipError bubbles to the
+        // outer catch which translates it via sendOwnershipError).
+        let brand: Awaited<ReturnType<typeof requireBrand>> | null = null;
+        let resolvedArticleId: string | null = null;
+        if (typeof brandId === "string" && brandId.length > 0) {
+          brand = await requireBrand(brandId, user.id);
+
+          // Best-effort cross-brand integrity check: if caller passed an
+          // articleId, make sure it actually belongs to this brand. On
+          // mismatch (or article missing) we silently drop articleId rather
+          // than fail the analyze. The user still gets their signals.
+          if (typeof articleId === "string" && articleId.length > 0) {
+            try {
+              const article = await storage.getArticleById(articleId);
+              if (article && article.brandId === brand.id) {
+                resolvedArticleId = article.id;
+              } else {
+                logger.warn(
+                  { brandId: brand.id, articleId },
+                  "geo-signals/analyze: articleId does not belong to brand — dropping",
+                );
+              }
+            } catch (lookupErr) {
+              logger.warn(
+                { err: lookupErr, brandId: brand.id, articleId },
+                "geo-signals/analyze: article lookup failed — dropping articleId",
+              );
+            }
+          }
+        }
+
         const result = await computeSignals(
           content,
           targetQuery,
           typeof articleUpdatedAt === "string" ? articleUpdatedAt : undefined,
           typeof schemaCompleteness === "number" ? schemaCompleteness : undefined,
         );
+
+        // Persist a `geo_signal_runs` row when the caller passed a brandId
+        // they own. Persistence is best-effort — if the insert fails (DB
+        // hiccup, FK violation), the user still gets their signals.
+        if (brand) {
+          try {
+            let payload: Record<string, unknown> = {
+              signals: result.signals,
+              termCoverageRatio: result.termCoverageRatio,
+              questionHeadingFraction: result.questionHeadingFraction,
+              wordCount: result.wordCount,
+            };
+            // Defensive cap: JSONB payload size. If oversized, trim each
+            // signal's recommendations[] to the first 3 entries.
+            if (JSON.stringify(payload).length > 32_000) {
+              logger.warn(
+                { brandId: brand.id, originalSize: JSON.stringify(payload).length },
+                "geo-signals/analyze: payload exceeds 32k — truncating recommendations",
+              );
+              payload = {
+                signals: result.signals.map((s) => ({
+                  ...s,
+                  recommendations: s.recommendations.slice(0, 3),
+                })),
+                termCoverageRatio: result.termCoverageRatio,
+                questionHeadingFraction: result.questionHeadingFraction,
+                wordCount: result.wordCount,
+              };
+            }
+
+            await storage.recordGeoSignalRun({
+              brandId: brand.id,
+              articleId: resolvedArticleId,
+              overallScore:
+                typeof result.overallScore === "number" ? Math.round(result.overallScore) : null,
+              payload,
+            });
+          } catch (persistErr) {
+            logger.warn(
+              { err: persistErr, brandId: brand.id },
+              "geo-signals/analyze persistence failed",
+            );
+            captureAndFlush(persistErr, {
+              tags: { source: "geoSignals.ts:recordGeoSignalRun" },
+            });
+          }
+        }
+
         res.json({
           success: true,
           data: {
@@ -552,6 +636,9 @@ export function setupGeoSignalsRoutes(app: Express): void {
           },
         });
       } catch (err) {
+        if (err instanceof OwnershipError) {
+          return res.status(err.status).json({ success: false, error: err.message });
+        }
         logger.error({ err }, "geo-signals/analyze failed");
         captureAndFlush(err, { tags: { source: "geoSignals.ts:551" } });
         res.status(500).json({ success: false, error: "Failed to analyze signals" });

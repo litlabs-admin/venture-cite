@@ -14,6 +14,8 @@ import {
   type BrandPrompt,
   type InsertBrandPrompt,
   type VisibilityProgress,
+  type GeoSignalRun,
+  type InsertGeoSignalRun,
   type CitationRun,
   type InsertCitationRun,
   type ContentGenerationJob,
@@ -200,6 +202,10 @@ export interface IStorage {
   getVisibilityProgress(brandId: string): Promise<VisibilityProgress[]>;
   setVisibilityStep(brandId: string, engineId: string, stepId: string): Promise<void>;
   unsetVisibilityStep(brandId: string, engineId: string, stepId: string): Promise<void>;
+
+  // GEO Signal run history (powers `lastSignalsScanAt` recommendation input).
+  recordGeoSignalRun(run: InsertGeoSignalRun): Promise<GeoSignalRun>;
+  getLastGeoSignalRunAt(brandId: string): Promise<Date | null>;
 
   // Citation run history
   createCitationRun(run: InsertCitationRun): Promise<CitationRun>;

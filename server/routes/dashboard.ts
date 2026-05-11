@@ -13,7 +13,7 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { requireUser } from "../lib/ownership";
 import { sendError, asyncHandler } from "../lib/routesShared";
-import { AI_PLATFORMS_CORE } from "@shared/constants";
+import { AI_PLATFORMS_CORE, VISIBILITY_CHECKLIST_TOTAL } from "@shared/constants";
 import type { BrandPrompt, GeoRanking, Competitor } from "@shared/schema";
 import { getRecommendations, type RecommendationState } from "../lib/recommendationsEngine";
 
@@ -541,18 +541,25 @@ export function setupDashboardRoutes(app: Express): void {
         const brandId = brand.id;
 
         // Parallel-load all the count/state queries the engine needs.
-        // Defensive defaults inline for state we don't yet persist:
-        //   lastSignalsScanAt → null  (rule #8 fires as "never scanned")
-        //   visibilityChecklistProgress → { completed: 0, total: 4 }
-        const [articles, prompts, citationRuns, competitors, communityPosts, faqItems] =
-          await Promise.all([
-            storage.getArticlesByUserIdWithStatus(user.id, { brandId, limit: 100, offset: 0 }),
-            storage.getBrandPromptsByBrandId(brandId),
-            storage.getCitationRunsByBrandId(brandId, 100),
-            storage.getCompetitors(brandId),
-            storage.getCommunityPosts(brandId),
-            storage.getFaqItems(brandId),
-          ]);
+        const [
+          articles,
+          prompts,
+          citationRuns,
+          competitors,
+          communityPosts,
+          faqItems,
+          visibilityRows,
+          lastSignalsScanAt,
+        ] = await Promise.all([
+          storage.getArticlesByUserIdWithStatus(user.id, { brandId, limit: 100, offset: 0 }),
+          storage.getBrandPromptsByBrandId(brandId),
+          storage.getCitationRunsByBrandId(brandId, 100),
+          storage.getCompetitors(brandId),
+          storage.getCommunityPosts(brandId),
+          storage.getFaqItems(brandId),
+          storage.getVisibilityProgress(brandId),
+          storage.getLastGeoSignalRunAt(brandId),
+        ]);
 
         // Citation rate from the most recent COMPLETED run. Null if no runs
         // have completed yet. citation_runs orders newest-first per the
@@ -571,12 +578,9 @@ export function setupDashboardRoutes(app: Express): void {
           promptCount: prompts.length,
           citationRunCount: citationRuns.length,
           citationRate,
-          // No persisted last-scan timestamp yet — engine treats null as "never".
-          lastSignalsScanAt: null,
-          // No checklist-progress storage method yet — defensive default treats
-          // user as "haven't started" (engine recommends completing it).
-          visibilityChecklistCompleted: 0,
-          visibilityChecklistTotal: 4,
+          lastSignalsScanAt,
+          visibilityChecklistCompleted: visibilityRows.length,
+          visibilityChecklistTotal: VISIBILITY_CHECKLIST_TOTAL,
           competitorCount: competitors.length,
           communityPostCount: communityPosts.length,
           faqCount: faqItems.length,
