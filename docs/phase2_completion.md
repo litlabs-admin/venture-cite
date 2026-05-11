@@ -4030,3 +4030,191 @@ After Tasks 1–3 landed, a thorough audit found 7 real bugs ranging from CRITIC
 - **`requireBrand` adds one DB roundtrip per analyze when `brandId` is supplied.** Acceptable for current load; in-editor analyze is already user-debounced.
 
 ---
+
+## Track 32 — Plan 6: Day-0 alarm rule (§4.4) + Onboarding stack consolidation (§4.7) (2026-05-12)
+
+**Goal:** Stop the dashboard from rendering five red-toned "your brand is broken" panels on a brand-new account before any citation run completes, and collapse the six concurrent onboarding-guidance surfaces down to one canonical spine (`<RecommendationsPanel>`).
+
+**Status:** Complete (3 implementation tasks + 1 production-readiness audit fixing 10 bugs + 1 pre-existing Reddit wiring bug surfaced by user testing).
+
+### 32.1 §4.4 Pre-Data State — `hasMeasured` gate
+
+**Symptom (pre-fix).** A brand-new user signed up, clicked Dashboard, and immediately saw five destructive-red panels: "No Reddit presence found," "Recognition: Unknown," "Underexposed," `Absent` tags on prompt categories, red borders on every AI platform card. The product accused the user's brand of failure _before any citation run had completed_. design.json's "Operator's Console" north star ("Numbers come before conclusions") was inverted.
+
+**Solution.** Single derived boolean at the top of `client/src/pages/home.tsx`:
+
+```ts
+const hasMeasured =
+  (heroData?.totalChecks ?? 0) > 0 &&
+  heroData?.lastScanAt != null &&
+  autopilot?.status !== "running_citations" &&
+  autopilot?.status !== "generating_prompts" &&
+  autopilot?.status !== "pending";
+```
+
+Every destructive surface gates on `hasMeasured`. Pre-data state shows neutral chrome + honest copy ("Measuring your brand's visibility now…", "We'll surface recognition after your first citation scan completes", "Reddit scan runs weekly").
+
+| Surface                                              | Change                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `home.tsx:1070-1092` 3-tile sentiment grid           | Hardcoded "Overall Sentiment: Neutral" tile and duplicate "AI Confidence Score" tile both removed. When `hasMeasured`, only the Recognition tile renders. Otherwise: a single full-width neutral placeholder with copy that switches based on autopilot state ("Measuring now…" vs "We'll surface recognition after your first citation scan completes"). |
+| `home.tsx:1103-1116` "Gaps AI identifies"            | Gated on `hasMeasured`; pre-data state shows muted "Gaps will appear after your first citation scan."                                                                                                                                                                                                                                                     |
+| `home.tsx:1147-1162` "Underexposed" verbatim callout | Two branches: destructive paint when `hasMeasured`, neutral `border-border bg-muted/30` card with `Info` icon when not.                                                                                                                                                                                                                                   |
+| `home.tsx:1225-1279` `<PromptCoverageMap>`           | New `hasMeasured` prop; absent rows render neutral chrome with "Pending" label when false (instead of destructive "Absent").                                                                                                                                                                                                                              |
+| `home.tsx:1281-1329` `<RedditVisibility>`            | New `hasMeasured` prop; destructive "No Reddit presence found" card swapped for neutral "Reddit scan runs weekly" message. Brand Mentions number color demoted from destructive to muted when pre-data.                                                                                                                                                   |
+| `PlatformRankingCard.tsx`                            | New `hasMeasured` prop; cards render `border-border bg-muted/30` + "Pending" pill + "Pending" rank text instead of destructive chrome when no citation data yet AND not measured.                                                                                                                                                                         |
+| `RecommendationsPanel.tsx:28-32`                     | `PRIORITY_STYLES.P0` lost `border-red-500/30 bg-red-500/5`. All priorities now use neutral chrome (`border-border bg-card` for P0/P2, `border-border bg-muted/30` for P1). P0 rows gain a `<StatusDot tone="warn">` glyph before the priority label, and the CTA is a real `<Button>` (brand accent on the action, not the card).                         |
+
+### 32.2 §4.4 Autopilot Retry — server route + Retry button on banner
+
+**Symptom.** When onboarding autopilot failed, the orange banner showed an error message and a dismiss X. No way for the user to retry; only path was email support.
+
+**Solution.**
+
+| File                                  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/onboarding.ts:476-516` | NEW `POST /api/onboarding/autopilot-retry`. `requireUser` + `requireBrand` ownership (OwnershipError → 401/404 anti-enumeration). Atomic compare-and-swap via new storage method `transitionAutopilotFromFailedToPending(brandId)`. Returns 409 if CAS lost (status wasn't "failed"). On success: `logger.info` telemetry, then `waitUntil(runOnboardingAutopilot(brand.id, user.id, { deadlineMs: Date.now() + 50_000 }).catch(captureAndFlush))`. Rate-limited via `aiLimitMiddleware` to bound OpenAI/citation-run costs. |
+| `server/storage.ts`                   | `IStorage.transitionAutopilotFromFailedToPending(brandId): Promise<boolean>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `server/databaseStorage.ts:336-352`   | Implementation: Drizzle `update(brands).set({ autopilotStatus: "pending", autopilotError: null }).where(and(eq(brands.id, brandId), eq(brands.autopilotStatus, "failed"))).returning({id})`. Returns `result.length > 0`.                                                                                                                                                                                                                                                                                                    |
+| `home.tsx:280-303, 553-568`           | `retryAutopilotMutation` (`useMutation`) wires the Retry button on the failed-banner branch. `<Button size="sm" variant="outline">` with spinner + disabled during pending. On success: invalidate `["autopilot-status", selectedBrandId]` + toast "Retry started". On error: destructive toast.                                                                                                                                                                                                                             |
+
+### 32.3 §4.7 Onboarding stack consolidation
+
+**Symptom.** A first-time user landed on `/dashboard` with **six concurrent guidance UIs** visible at once: auto-opening welcome dialog (`SidebarOnboarding`), `<OnboardingProgressRing>` circular gauge, `<ResultsTimeline>` 4-tile strip (Day 0 / Week 1 / Week 2–3 / Week 4+), `<RecommendationsPanel>`, autopilot banner, and the global tour engine. They often contradicted each other.
+
+**Solution.** `<RecommendationsPanel>` (made correct by Plan 5) is the canonical spine. Demote the rest.
+
+| File                                       | Change                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client/src/pages/home.tsx`                | `<OnboardingProgressRing>` mount + import removed. `<ResultsTimeline />` → `<ResultsTimeline compact />`. `<RecommendationsPanel>` wrapped in `<div data-tour-id="dashboard.recommendations">`. Component files (`OnboardingProgressRing.tsx`, `ResultsTimeline.tsx`) stay on disk per spec — no destructive cleanup. |
+| `ResultsTimeline.tsx`                      | New `compact?: boolean` prop. When true, renders a single-line caption sourcing label + description from `MILESTONES[currentMilestoneIndex(ageDays)]` (single source of truth). Default `compact={false}` keeps the existing full-card path intact for any future caller.                                             |
+| `SidebarOnboarding.tsx`                    | Auto-opening first-login `useEffect` deleted. Unused `autoOpenReady` state, its init `useEffect`, `SEEN_KEY_PREFIX` constant, and now-unused `useEffect`/`useAuth` imports cleaned up. Widget on-click open still works.                                                                                              |
+| `client/src/tours/pages/dashboard.tour.ts` | `progress-ring` step retargeted from `dashboard.progressRing` (removed) to `dashboard.recommendations` (now wraps the spine). New copy: "What to do next — These are your highest-leverage next actions. Required items can't be dismissed." 26/26 tour targets preserved.                                            |
+
+### 32.4 Production-readiness audit — 10 bugs fixed in same track
+
+After Tasks 32.1–32.3 landed, a paranoid audit found 10 real bugs. All fixed inline.
+
+#### 32.4.1 CRITICAL — Autopilot status response envelope mismatch (PRE-EXISTING, surfaced by Plan 6)
+
+**Symptom.** `GET /api/onboarding/autopilot-status/:brandId` returned a flat shape `{ success, status, step, progress, error, startedAt, completedAt }` but `home.tsx` read `autopilotData?.data` expecting an envelope. `autopilot` was ALWAYS `undefined`. Consequence with Plan 6 changes: `hasMeasured` collapsed to `(totalChecks > 0 && lastScanAt != null)` (the autopilot guards never fired), the failed-autopilot banner never rendered, the Retry button was unreachable through the UI, and the completion toast never fired. Entire §4.4 gating was inert.
+
+**Fix.** `server/routes/onboarding.ts:518-528` now returns the canonical `{ success: true, data: { status, step, progress, error, startedAt, completedAt } }`. Grep across `client/`, `server/`, `tests/` confirmed `home.tsx` is the only consumer — no other surface had to change.
+
+#### 32.4.2 CRITICAL — Race condition + premature 200 on retry
+
+**Symptom.** Two simultaneous Retry clicks both passed the 409 check (status was still "failed" at moment of read), both fired `runOnboardingAutopilot` → double OpenAI calls + double citation runs. Worse: the route returned 200 BEFORE `runOnboardingAutopilot` flipped the status row from "failed" to "pending", so the client's immediate refetch still saw "failed" — the banner stayed visible and the user clicked Retry again.
+
+**Fix.** Atomic SQL compare-and-swap. New storage method `transitionAutopilotFromFailedToPending` does `UPDATE brands SET autopilot_status='pending', autopilot_error=NULL WHERE id=? AND autopilot_status='failed' RETURNING id`. The route calls this AFTER `requireBrand` ownership; on `length === 0` (the CAS lost), returns 409. Only after the CAS succeeds does it fire `waitUntil(runOnboardingAutopilot(...))`. Two parallel calls: only one wins; the other gets 409. Client's immediate refetch sees `"pending"` — banner morphs to "in progress", Retry disappears.
+
+#### 32.4.3 HIGH — `hasMeasured` was wrong proxy for Reddit scan completion
+
+**Symptom.** Reddit cron runs Mondays only (`server/scheduler.ts` `MENTION_SCAN_CRON = "0 9 * * 1"`). A brand created on a Tuesday with completed autopilot satisfies `hasMeasured = true` but won't have its first Reddit scan for up to 7 days. The destructive Reddit panel was firing on brands that hadn't actually been measured on Reddit yet — exactly what §4.4 was supposed to prevent.
+
+**Fix.** `home.tsx` derives `hasRedditScan = redditMentions.isFetched && !redditMentions.isError`. `<RedditVisibility>` receives `hasMeasured={hasMeasured && hasRedditScan}` so the destructive paint waits on Reddit-specific evidence, not citation-run evidence.
+
+#### 32.4.4 HIGH — No rate limit on autopilot retry
+
+**Symptom.** Each retry fires `generateBrandPrompts` (OpenAI) + a full citation run across 5 AI platforms. Without limiting, a buggy or malicious client can spam costs.
+
+**Fix.** `aiLimitMiddleware` (the same middleware used by `/api/onboarding/scrape-stream`) applied to `/api/onboarding/autopilot-retry`.
+
+#### 32.4.5 HIGH — Stale snippet bleed-through on PlatformRankingCard
+
+**Symptom.** When `!hasMeasured && !found`, the card showed "Pending" pill + "Pending" rank but still rendered the `latestSnippet` italic block underneath if a prior run wrote one. Header said one thing; body contradicted.
+
+**Fix.** `PlatformRankingCard.tsx:73` — snippet block gated on `hasMeasured && platform.latestSnippet`.
+
+#### 32.4.6 HIGH — ResultsTimeline compact label off-by-one
+
+**Symptom.** Compact mode computed `Math.floor(ageDays / 7) + 1` for the week label but the `MILESTONES` boundaries differ (Week 1 starts at day 7, Week 2–3 at day 14, Week 4+ at day 28). At `ageDays = 7`, the compact label said "Week 2" while `current.description` belonged to "Week 1" — two different milestones in the same sentence.
+
+**Fix.** `ResultsTimeline.tsx:80-87` uses `MILESTONES[currentMilestoneIndex(ageDays)].label` directly. Single source of truth.
+
+#### 32.4.7 HIGH — `<Button asChild><Link>` fragility in RecommendationsPanel
+
+**Symptom.** Radix Slot's child cloning pattern interacted oddly with wouter's `<Link>` in some edge cases. Existing codebase pattern at `empty-state.tsx:39-41` used a different approach.
+
+**Fix.** `RecommendationsPanel.tsx:191-194` swapped to `<Link href={...} asChild><Button size="sm">{rec.ctaLabel} →</Button></Link>` — Link is the slot wrapper, Button is the child. Wouter v3 supports `asChild`; SPA navigation now works reliably.
+
+#### 32.4.8 MEDIUM — No error gate on hero query
+
+**Symptom.** When `hero.isError`, `heroData` was undefined → `hasMeasured = false` → dashboard rendered Day-0 "waiting" copy even though the real problem was a 500. Misleading; impeded incident triage.
+
+**Fix.** `home.tsx:608-615` renders `<Alert variant="destructive">` "Couldn't load dashboard data — please refresh." above the recommendations when `hero.isError`. Other dashboard surfaces still render — failure is visible without blanking the page.
+
+#### 32.4.9 MEDIUM — Telemetry on retry usage
+
+**Fix.** `logger.info({ brandId, userId, prevStatus, prevError }, "autopilot retry triggered")` after the CAS succeeds. Enables product-side visibility into how often autopilot fails badly enough to need user-initiated retry.
+
+#### 32.4.10 MEDIUM — Tests didn't assert `waitUntil` invocation
+
+**Fix.** `tests/unit/autopilotRetry.test.ts` now asserts `expect(stubs.waitUntil).toHaveBeenCalledTimes(1)` on the success path. Regression guard against anyone refactoring out the Vercel-suspension protection.
+
+### 32.5 BONUS BUG — Dashboard Reddit count always 0 (PRE-EXISTING, surfaced by user testing)
+
+**Symptom.** User reported: "Dashboard says 0 Reddit mentions everywhere but the mentions tab shows lots of Reddit data for the same brand." Plan 6 audit had not caught it because the audit scope was Plan 6's new code; the bug lived in pre-existing wiring that Plan 6's neutral-chrome work made more obvious.
+
+**Root cause.** `home.tsx:235` typed the `redditMentions` query as `{ success: boolean; data: BrandMention[] }` and read `data?.data` at line 386. But `GET /api/brand-mentions/:brandId` returns `{ rows, nextCursor, stats }` (see `server/routes/mentions.ts:186`). The dashboard's `data?.data` was always undefined → `redditRows = []` → `mentionCount = 0` regardless of how many real Reddit rows existed. The mentions tab worked because `useMentions.ts:170` reads the actual `rows` field.
+
+**Fix.**
+
+| File                    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `home.tsx:235-249`      | TypeScript generic changed to `{ rows: BrandMention[]; nextCursor: string \| null; stats: unknown }`. `data?.data` → `data?.rows` at line 386.                                                                                                                                                                                                                                                                                                                   |
+| `home.tsx:235-249, 348` | Query key migrated from the string form `[/api/brand-mentions/${brandId}?platform=reddit]` to the canonical array form `["/api/brand-mentions", brandId, { platform: "reddit" }]` matching `useMentions.ts:59`'s `listKey`. Explicit `queryFn` because the default queryFn would treat the first key segment as the full URL; here the URL is built from path param + querystring. Live-refresh entry in `useCitationLiveRefresh` updated to the same array key. |
+
+**Cache invalidation now propagates across surfaces:**
+
+- Mentions tab triggers a scan → `useMentions.ts:237` invalidates `["/api/brand-mentions", brandId]` → TanStack prefix matching reaches the dashboard query → dashboard Reddit tile auto-refreshes.
+- `ScanCompletionListener.tsx:78`'s broader `["/api/brand-mentions"]` prefix invalidate also reaches both surfaces.
+- `useCitationLiveRefresh` still works (exact-match invalidation, key shape now aligned).
+
+### 32.6 Items VERIFIED OK during the audit (no fix needed)
+
+- **`autopilot.status === "idle"` not gating `hasMeasured`.** Correct intent: "idle" means no autopilot record exists for this brand — citation runs may have been triggered manually. Test at `tests/unit/dashboardPreDataState.test.ts` documents this case.
+- **TanStack 3s autopilot poll re-computing `hasMeasured`.** Desired behavior — `hasMeasured` flips automatically when autopilot completes.
+- **`SEEN_KEY_PREFIX` removal.** Grep confirmed no remaining references in `client/src/` or `server/`. Orphan localStorage keys for existing users are acceptable.
+- **`OnboardingProgressRing.tsx` left in tree.** Not mounted anywhere on disk verified by grep; dead code is harmless per spec.
+- **`waitUntil` import.** `@vercel/functions` already in `package.json`; locally it's a no-op shim. Correct.
+- **`OwnershipError.status`.** Confirmed at `server/lib/ownership.ts:8-14`; route correctly uses `err.status` returning 401 for missing user, 404 for missing brand.
+- **`heroData?.lastScanAt != null`.** Loose `!= null` intentional (catches both null and undefined). `lastScanAt` is a real `timestamp` column, can't be empty string.
+- **`<RedditVisibility>` URL regex.** `m.sourceUrl` is `notNull`; the case-insensitive `reddit\.com/r/` regex matches `old.reddit.com/r/...` substrings; `redd.it/...` short links yield no subreddit (acceptable — they don't carry one).
+- **`<Link href asChild><Button>` pattern.** Wouter v3 supports `asChild`; SPA navigation verified by mirroring `empty-state.tsx:39-41`.
+- **Migrations.** Plan 6 added no migrations.
+
+### How to verify
+
+1. **Brand-new account.** Sign up, complete `/welcome`, land on `/dashboard` while autopilot is still running. Confirm NO destructive red panels. Sentiment grid shows a single neutral placeholder. Gaps section says "Gaps will appear after your first citation scan." Reddit panel says "Reddit scan runs weekly."
+2. **Autopilot fails.** Force-fail the autopilot (or just observe naturally when an LLM call fails). Failed banner appears with a Retry button. Click it: spinner → toast "Retry started" → banner morphs to "in progress" within 2-3s (CAS flipped the status before the response returned). Click Retry a second time during retry: 409 (CAS rejects), destructive toast "Couldn't restart autopilot."
+3. **First citation run completes.** Banner disappears. `hasMeasured` flips. Recognition tile appears with real "Known"/"Unknown" status. Other surfaces shift to measured chrome.
+4. **Mentions tab → dashboard sync.** Open the mentions tab, kick off a Reddit scan. Once scan completes, navigate to `/dashboard` (or stay there — `useCitationLiveRefresh` ticks). Reddit tile count matches mentions-tab count. Subreddits count is right.
+5. **Hero query fails.** Stop the server mid-session. `/dashboard` shows a destructive `<Alert>` "Couldn't load dashboard data" but doesn't blank.
+6. **Onboarding dialog.** Sign up as a fresh user on a fresh browser profile. The `SidebarOnboarding` dialog does NOT auto-open. Click the widget → dialog opens as expected.
+7. **Tour.** Take the dashboard tour. Step 2 (formerly "Onboarding progress") highlights the recommendations spine with the new "What to do next" copy.
+
+### Pass criteria
+
+- [x] `hasMeasured` derivation lives in `home.tsx`; 18+ gate references across the page.
+- [x] Hardcoded "Neutral" sentiment tile and "AI Confidence Score" tile removed.
+- [x] All 6 destructive surfaces gated (Recognition, Gaps, Underexposed, PromptCoverageMap, RedditVisibility, PlatformRankingCard).
+- [x] `RecommendationsPanel.tsx` P0 no longer uses `border-red-500/30 bg-red-500/5`; neutral chrome + `<StatusDot tone="warn">` + brand-accent `<Button>`.
+- [x] `POST /api/onboarding/autopilot-retry` exists, atomic CAS, rate-limited, telemetered.
+- [x] Retry button rendered on failed-banner with mutation + invalidation.
+- [x] `<OnboardingProgressRing>` no longer mounted on `/dashboard`.
+- [x] `<ResultsTimeline compact />` single-line label uses `MILESTONES` as source of truth.
+- [x] `SidebarOnboarding` auto-open `useEffect` deleted; widget on-click still works.
+- [x] Tour `dashboard.progressRing` → `dashboard.recommendations`. 26/26 targets preserved.
+- [x] Server `autopilot-status` returns canonical `{ success, data }` envelope.
+- [x] Dashboard reads `redditMentions.data.rows` (not `.data.data`). Real Reddit counts appear.
+- [x] Dashboard `redditMentions` query key unified with `useMentions.ts` array key shape — invalidation propagates.
+- [x] 9 new tests pass: `dashboardPreDataState` (5), `autopilotRetry` (4).
+- [x] `npm run check` clean. 26/26 tour targets.
+- [x] Full suite at documented baseline only (sourceHealth, redditSource, ssrf, citationCronUnconditional, tour integration/e2e) — no Plan 6 regressions.
+
+### Documented limitations
+
+- **`<RedditVisibility>` `hasRedditScan` is a TanStack-state inference, not a server-vetted "last scan timestamp."** It uses `redditMentions.isFetched && !redditMentions.isError`. Edge case: if the query hasn't run yet (no brand selected, no network), `isFetched` is false and we render neutral chrome correctly. If a real `/api/brand-mentions/scans/last/:brandId` endpoint is wired later, this can be tightened.
+- **Plan 6 does not retire `OnboardingProgressRing.tsx` from the tree.** Per spec, only the mount is removed. The file is dead code; a future cleanup track should delete it once confirmed no other surface mounts it.
+- **`SEEN_KEY_PREFIX` orphan localStorage keys** remain for existing users who saw the old auto-open dialog. They're harmless. A migration could clear them in the logout sweep, but isn't required.
+
+---

@@ -19,7 +19,7 @@ import { safeFetchText } from "../lib/ssrf";
 import { scrapeLogoUrl } from "../lib/factExtractor";
 import { downloadAndStoreLogo } from "../lib/logoStorage";
 import crypto from "crypto";
-import { requireUser } from "../lib/ownership";
+import { requireUser, requireBrand, OwnershipError } from "../lib/ownership";
 import {
   aiLimitMiddleware,
   openai,
@@ -473,6 +473,57 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
     }),
   );
 
+  app.post(
+    "/api/onboarding/autopilot-retry",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const { brandId } = (req.body ?? {}) as { brandId?: unknown };
+        if (typeof brandId !== "string" || brandId.length === 0) {
+          return res.status(400).json({ success: false, error: "brandId required" });
+        }
+        // Ownership check first (404 anti-enumeration on miss).
+        const brand = await requireBrand(brandId, user.id);
+        // Atomic compare-and-swap: only transition the row when its
+        // current status is still "failed". Two simultaneous retries
+        // race here — only one wins; the loser gets 409. This also
+        // flips the row to "pending" BEFORE we return 200, so the
+        // client's immediate refetch sees the in-progress state
+        // instead of the stale "failed" banner.
+        const swapped = await storage.transitionAutopilotFromFailedToPending(brand.id);
+        if (!swapped) {
+          return res
+            .status(409)
+            .json({ success: false, error: "Autopilot is not in a failed state" });
+        }
+        logger.info(
+          {
+            brandId: brand.id,
+            userId: user.id,
+            prevStatus: brand.autopilotStatus,
+            prevError: brand.autopilotError,
+          },
+          "autopilot retry triggered",
+        );
+        // Use Vercel waitUntil so the retry survives serverless suspension
+        // after we respond. Matches the welcome→fact-scrape bridge pattern.
+        const deadlineMs = Date.now() + 50_000;
+        waitUntil(
+          runOnboardingAutopilot(brand.id, user.id, { deadlineMs }).catch((err) => {
+            captureAndFlush(err, { tags: { source: "onboarding.ts:autopilot-retry" } });
+          }),
+        );
+        return res.json({ success: true });
+      } catch (err) {
+        if (err instanceof OwnershipError) {
+          return res.status(err.status).json({ success: false, error: err.message });
+        }
+        return sendError(res, err, "Failed to retry autopilot");
+      }
+    }),
+  );
+
   app.get(
     "/api/onboarding/autopilot-status/:brandId",
     asyncHandler(async (req, res) => {
@@ -484,12 +535,14 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
         }
         res.json({
           success: true,
-          status: brand.autopilotStatus ?? "idle",
-          step: brand.autopilotStep ?? 0,
-          progress: brand.autopilotProgress ?? {},
-          error: brand.autopilotError ?? null,
-          startedAt: brand.autopilotStartedAt ?? null,
-          completedAt: brand.autopilotCompletedAt ?? null,
+          data: {
+            status: brand.autopilotStatus ?? "idle",
+            step: brand.autopilotStep ?? 0,
+            progress: brand.autopilotProgress ?? {},
+            error: brand.autopilotError ?? null,
+            startedAt: brand.autopilotStartedAt ?? null,
+            completedAt: brand.autopilotCompletedAt ?? null,
+          },
         });
       } catch (err) {
         sendError(res, err, "Failed to fetch autopilot status");

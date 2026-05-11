@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
@@ -29,6 +29,7 @@ import {
   Brain,
   ChevronDown,
   ChevronUp,
+  Info,
   MessageSquare,
   Play,
   Sparkles,
@@ -49,11 +50,11 @@ import BrandEntityStrength, {
   type EntityStrengthData,
 } from "@/components/dashboard/BrandEntityStrength";
 import VerbatimResponseCard from "@/components/dashboard/VerbatimResponseCard";
-import OnboardingProgressRing from "@/components/dashboard/OnboardingProgressRing";
 import ResultsTimeline from "@/components/dashboard/ResultsTimeline";
 import RecommendationsPanel from "@/components/dashboard/RecommendationsPanel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface HeroData {
   visibilityScore: number;
@@ -231,8 +232,21 @@ function useDashboardQueries(
     enabled,
     refetchInterval,
   });
-  const redditMentions = useQuery<{ success: boolean; data: BrandMention[] }>({
-    queryKey: [`/api/brand-mentions/${brandId}?platform=reddit`],
+  // Key shape matches useMentions (`["/api/brand-mentions", brandId, filters]`)
+  // so that ScanCompletionListener's prefix invalidation + useMentions's
+  // post-scan invalidation reach this query too. Explicit queryFn because the
+  // default queryFn treats the first key segment as the URL — here the URL has
+  // to include the brandId path param + platform filter.
+  const redditMentions = useQuery<{
+    rows: BrandMention[];
+    nextCursor: string | null;
+    stats: unknown;
+  }>({
+    queryKey: ["/api/brand-mentions", brandId, { platform: "reddit" }],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/brand-mentions/${brandId}?platform=reddit`);
+      return res.json();
+    },
     enabled,
     refetchInterval,
   });
@@ -258,6 +272,7 @@ export default function Home() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const completedToastFired = useRef(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: autopilotData } = useQuery<{ success: boolean; data: AutopilotStatusData }>({
     queryKey: ["autopilot-status", selectedBrandId],
@@ -275,6 +290,31 @@ export default function Home() {
     },
   });
   const autopilot = autopilotData?.data;
+
+  const retryAutopilotMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedBrandId) throw new Error("No brand selected");
+      const res = await apiRequest("POST", "/api/onboarding/autopilot-retry", {
+        brandId: selectedBrandId,
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to restart autopilot");
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["autopilot-status", selectedBrandId] });
+      toast({ title: "Retry started", description: "Re-running visibility setup…" });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Couldn't restart autopilot",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
   const isAutopilotActive =
     !!autopilot &&
     autopilot.status !== "completed" &&
@@ -314,7 +354,7 @@ export default function Home() {
     [`/api/dashboard/entity-strength/${selectedBrandId}`],
     [`/api/dashboard/citation-trend/${selectedBrandId}`],
     [`/api/competitors/leaderboard?brandId=${selectedBrandId}`],
-    [`/api/brand-mentions/${selectedBrandId}?platform=reddit`],
+    ["/api/brand-mentions", selectedBrandId, { platform: "reddit" }],
   ]);
 
   // Wave 9.2: scope dashboard ranking aggregates to the active run's
@@ -356,7 +396,7 @@ export default function Home() {
   const topCompetitor = leaderboardRows
     .filter((e) => !e.isOwn)
     .sort((a, b) => b.shareOfVoice - a.shareOfVoice)[0];
-  const redditRows = redditMentions.data?.data ?? [];
+  const redditRows = redditMentions.data?.rows ?? [];
 
   const noCitationData = !!selectedBrandId && !hero.isLoading && (heroData?.totalChecks ?? 0) === 0;
 
@@ -423,6 +463,25 @@ export default function Home() {
     if (platformsWithNoCitations >= 3) gaps.push("missing on multiple AI platforms");
     return gaps;
   }, [entityData, redditRows, platforms]);
+
+  // Day-0 alarm rule (§4.4): a surface may render destructive tone
+  // only when we have evidence the brand has actually been measured.
+  // "Measured" = a completed citation run exists AND the autopilot is
+  // not still mid-run. Drives gating throughout this page.
+  const hasMeasured =
+    (heroData?.totalChecks ?? 0) > 0 &&
+    heroData?.lastScanAt != null &&
+    autopilot?.status !== "running_citations" &&
+    autopilot?.status !== "generating_prompts" &&
+    autopilot?.status !== "pending";
+
+  // Reddit cron runs weekly (Mondays). A brand whose first measurement
+  // completed any other day still has no Reddit scan yet — so we need a
+  // signal independent of `hasMeasured` before flipping the Reddit panel
+  // to destructive tone. The mentions query already settles to a
+  // (possibly empty) data array once a scan has run; isFetched +
+  // !isError is the canonical "we have an answer" signal.
+  const hasRedditScan = redditMentions.isFetched && !redditMentions.isError;
 
   // ---------- Empty states ----------
   if (brandsLoading) {
@@ -512,6 +571,24 @@ export default function Home() {
                 Step {autopilot.step || 1}/3
               </span>
             )}
+            {isAutopilotFailed && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => retryAutopilotMutation.mutate()}
+                disabled={retryAutopilotMutation.isPending}
+                className="shrink-0"
+                data-testid="autopilot-retry"
+              >
+                {retryAutopilotMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Retrying…
+                  </>
+                ) : (
+                  "Retry"
+                )}
+              </Button>
+            )}
             <button
               type="button"
               onClick={() => setBannerDismissed(true)}
@@ -546,15 +623,19 @@ export default function Home() {
         explainer={pageExplainers.dashboard}
       />
 
-      {/* Onboarding ring (auto-hides when complete + dismissed) and "what
-          to expect" timeline. Both render above the hero row regardless of
-          whether the user has citation data yet — the ring helps new users
-          finish setup, and the timeline sets expectations for everyone. */}
-      <div data-tour-id="dashboard.progressRing">
-        <OnboardingProgressRing />
+      {/* Onboarding spine + a single-line "what to expect" caption. The
+          RecommendationsPanel is the canonical next-actions surface; the
+          timeline caption sets timing expectations for everyone. */}
+      <ResultsTimeline compact />
+      {hero.isError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>Couldn't load dashboard data — please refresh.</AlertDescription>
+        </Alert>
+      )}
+      <div data-tour-id="dashboard.recommendations">
+        <RecommendationsPanel />
       </div>
-      <ResultsTimeline />
-      <RecommendationsPanel />
 
       {noCitationData ? (
         <EmptyState
@@ -832,7 +913,7 @@ export default function Home() {
             ) : (
               <div className="grid gap-3 md:grid-cols-3">
                 {platforms.map((p) => (
-                  <PlatformRankingCard key={p.aiPlatform} platform={p} />
+                  <PlatformRankingCard key={p.aiPlatform} platform={p} hasMeasured={hasMeasured} />
                 ))}
               </div>
             )}
@@ -1039,6 +1120,7 @@ export default function Home() {
                 <PromptCoverageMap
                   categories={gapData?.categories ?? []}
                   rows={gapData?.rows ?? []}
+                  hasMeasured={hasMeasured}
                 />
               )}
             </Section>
@@ -1068,27 +1150,31 @@ export default function Home() {
             description="How AI perceives and positions your brand"
           >
             <div className="grid md:grid-cols-3 gap-4 mb-6">
-              <SentimentCard label="Overall Sentiment" value="Neutral" tone="amber" />
-              <SentimentCard
-                label="AI Confidence Score"
-                value={`${heroData?.visibilityScore ?? 0}/100`}
-                tone={
-                  (heroData?.visibilityScore ?? 0) >= 60
-                    ? "emerald"
-                    : (heroData?.visibilityScore ?? 0) >= 30
-                      ? "amber"
-                      : "destructive"
-                }
-              />
-              <SentimentCard
-                label="Recognition"
-                value={
-                  (heroData?.citedChecks ?? 0) > 0 && (heroData?.citationRate ?? 0) >= 20
-                    ? "Known"
-                    : "Unknown"
-                }
-                tone={(heroData?.citationRate ?? 0) >= 20 ? "emerald" : "destructive"}
-              />
+              {hasMeasured ? (
+                <>
+                  {/* Recognition only when measured. AI Confidence Score and
+                      hardcoded Neutral Sentiment are deferred to Spec 3. */}
+                  <SentimentCard
+                    label="Recognition"
+                    value={
+                      (heroData?.citedChecks ?? 0) > 0 && (heroData?.citationRate ?? 0) >= 20
+                        ? "Known"
+                        : "Unknown"
+                    }
+                    tone={(heroData?.citationRate ?? 0) >= 20 ? "emerald" : "destructive"}
+                  />
+                </>
+              ) : (
+                <div className="md:col-span-3 rounded-md border border-border bg-muted/30 px-4 py-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {autopilot?.status === "running_citations" ||
+                    autopilot?.status === "generating_prompts" ||
+                    autopilot?.status === "pending"
+                      ? "Measuring your brand's visibility now — this typically takes 1–2 minutes."
+                      : "We'll surface recognition, sentiment, and confidence after your first citation scan completes."}
+                  </p>
+                </div>
+              )}
             </div>
             {firstPlatformSnippet && firstPlatformSnippet.latestSnippet && (
               <div className="rounded-md border border-primary/20 bg-primary/5 p-4 mb-4">
@@ -1100,7 +1186,7 @@ export default function Home() {
                 </p>
               </div>
             )}
-            {gapsAiIdentifies.length > 0 && (
+            {hasMeasured && gapsAiIdentifies.length > 0 && (
               <div>
                 <div className="text-xs uppercase tracking-wide text-destructive mb-2">
                   Gaps AI identifies
@@ -1113,6 +1199,11 @@ export default function Home() {
                   ))}
                 </ul>
               </div>
+            )}
+            {!hasMeasured && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Gaps will appear after your first citation scan.
+              </p>
             )}
           </Section>
 
@@ -1144,22 +1235,32 @@ export default function Home() {
                 No verbatim responses yet — run a citation check to populate.
               </p>
             ) : !showVerbatim ? (
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm">
-                    <span className="font-semibold text-destructive">
-                      {selectedBrand?.name ?? "Your brand"}{" "}
-                      {(heroData?.citationRate ?? 0) < 50
-                        ? "is underexposed here."
-                        : "has mixed coverage."}{" "}
-                    </span>
-                    <span className="text-muted-foreground">
-                      Expand to see verbatim AI responses across {verbatimBlocks.length} platforms.
-                    </span>
+              hasMeasured ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm">
+                      <span className="font-semibold text-destructive">
+                        {selectedBrand?.name ?? "Your brand"}{" "}
+                        {(heroData?.citationRate ?? 0) < 50
+                          ? "is underexposed here."
+                          : "has mixed coverage."}{" "}
+                      </span>
+                      <span className="text-muted-foreground">
+                        Expand to see verbatim AI responses across {verbatimBlocks.length}{" "}
+                        platforms.
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-md border border-border bg-muted/30 p-4 flex items-start gap-3">
+                  <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-sm text-muted-foreground">
+                    Verbatim AI responses will populate after your first scan completes.
                   </p>
                 </div>
-              </div>
+              )
             ) : (
               <div className="space-y-3">
                 {verbatimBlocks.map((b, i) => (
@@ -1186,7 +1287,11 @@ export default function Home() {
                 isRetrying={redditMentions.isRefetching}
               />
             ) : (
-              <RedditVisibility mentions={redditRows} loading={redditMentions.isLoading} />
+              <RedditVisibility
+                mentions={redditRows}
+                loading={redditMentions.isLoading}
+                hasMeasured={hasMeasured && hasRedditScan}
+              />
             )}
           </Section>
         </>
@@ -1222,7 +1327,15 @@ function SentimentCard({
   );
 }
 
-function PromptCoverageMap({ categories, rows }: { categories: string[]; rows: GapMatrixRow[] }) {
+function PromptCoverageMap({
+  categories,
+  rows,
+  hasMeasured,
+}: {
+  categories: string[];
+  rows: GapMatrixRow[];
+  hasMeasured: boolean;
+}) {
   const brandRow = rows.find((r) => r.entityType === "brand");
   if (!brandRow || categories.length === 0) {
     return <p className="text-sm text-muted-foreground">No prompt coverage data yet.</p>;
@@ -1245,14 +1358,20 @@ function PromptCoverageMap({ categories, rows }: { categories: string[]; rows: G
         {categories.map((cat) => {
           const state = brandRow.cells[cat] ?? "unknown";
           const appears = state === "yes" || state === "partial";
+          const absentRowClasses = hasMeasured
+            ? "border-destructive/20 bg-destructive/5"
+            : "border-border bg-muted/30";
+          const absentLabelClasses = hasMeasured ? "text-destructive" : "text-muted-foreground";
+          const absentGlyphBg = hasMeasured
+            ? "bg-destructive/20 text-destructive"
+            : "bg-muted text-muted-foreground";
+          const absentLabel = hasMeasured ? "Absent" : "Pending";
           return (
             <li
               key={cat}
               className={
                 "flex items-center justify-between px-3 py-2 rounded-md border " +
-                (appears
-                  ? "border-emerald-500/20 bg-emerald-500/5"
-                  : "border-destructive/20 bg-destructive/5")
+                (appears ? "border-emerald-500/20 bg-emerald-500/5" : absentRowClasses)
               }
             >
               <span className="flex items-center gap-2 text-sm">
@@ -1261,14 +1380,18 @@ function PromptCoverageMap({ categories, rows }: { categories: string[]; rows: G
                     ✓
                   </span>
                 ) : (
-                  <span className="w-4 h-4 rounded-full bg-destructive/20 text-destructive grid place-items-center text-[10px]">
+                  <span
+                    className={
+                      "w-4 h-4 rounded-full grid place-items-center text-[10px] " + absentGlyphBg
+                    }
+                  >
                     !
                   </span>
                 )}
                 {cat}
               </span>
-              <span className={"text-xs " + (appears ? "text-emerald-400" : "text-destructive")}>
-                {appears ? "You appear" : "Absent"}
+              <span className={"text-xs " + (appears ? "text-emerald-400" : absentLabelClasses)}>
+                {appears ? "You appear" : absentLabel}
               </span>
             </li>
           );
@@ -1278,7 +1401,15 @@ function PromptCoverageMap({ categories, rows }: { categories: string[]; rows: G
   );
 }
 
-function RedditVisibility({ mentions, loading }: { mentions: BrandMention[]; loading: boolean }) {
+function RedditVisibility({
+  mentions,
+  loading,
+  hasMeasured,
+}: {
+  mentions: BrandMention[];
+  loading: boolean;
+  hasMeasured: boolean;
+}) {
   if (loading) return <Skeleton className="h-32 w-full" />;
   const communities = new Set<string>();
   for (const m of mentions) {
@@ -1300,7 +1431,7 @@ function RedditVisibility({ mentions, loading }: { mentions: BrandMention[]; loa
             Brand Mentions
           </p>
           <p
-            className={`text-2xl font-bold ${mentionCount > 0 ? "text-foreground" : "text-destructive"}`}
+            className={`text-2xl font-bold ${mentionCount > 0 ? "text-foreground" : hasMeasured ? "text-destructive" : "text-muted-foreground"}`}
           >
             {mentionCount}
           </p>
@@ -1314,16 +1445,25 @@ function RedditVisibility({ mentions, loading }: { mentions: BrandMention[]; loa
           <p className="text-[11px] text-muted-foreground mt-0.5">distinct communities</p>
         </div>
       </div>
-      {mentionCount === 0 && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-6 text-center">
-          <MessageSquare className="w-8 h-8 text-destructive mx-auto mb-2" />
-          <p className="font-semibold">No Reddit presence found</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Your brand has zero visibility on Reddit — a major source AI platforms use for
-            recommendations.
-          </p>
-        </div>
-      )}
+      {mentionCount === 0 &&
+        (hasMeasured ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-6 text-center">
+            <MessageSquare className="w-8 h-8 text-destructive mx-auto mb-2" />
+            <p className="font-semibold">No Reddit presence found</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Your brand has zero visibility on Reddit — a major source AI platforms use for
+              recommendations.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-md border border-border bg-muted/30 p-6 text-center">
+            <MessageSquare className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+            <p className="font-semibold text-foreground">Reddit scan runs weekly</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              We'll surface Reddit visibility here once the first scan has run for this brand.
+            </p>
+          </div>
+        ))}
     </div>
   );
 }

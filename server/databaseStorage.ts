@@ -331,6 +331,25 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  // Plan 6: atomic CAS from autopilot_status='failed' → 'pending'. The
+  // WHERE clause is what guarantees race safety — two simultaneous
+  // retries both reach the UPDATE, but only one row will match the
+  // "still failed" predicate; the other returns 0 rows. Caller maps
+  // false → 409. Also clears autopilotError so the stale failure
+  // message doesn't bleed into the new run.
+  async transitionAutopilotFromFailedToPending(brandId: string): Promise<boolean> {
+    const result = await db
+      .update(schema.brands)
+      .set({
+        autopilotStatus: "pending",
+        autopilotError: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(schema.brands.id, brandId), eq(schema.brands.autopilotStatus, "failed")))
+      .returning({ id: schema.brands.id });
+    return result.length > 0;
+  }
+
   async deleteBrand(id: string): Promise<boolean> {
     // Hard-delete primitive — used by the brand purge cron after the
     // grace window. Application code should call softDeleteBrand

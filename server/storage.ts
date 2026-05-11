@@ -137,6 +137,11 @@ export interface IStorage {
   // Wave 4.5: schedules deletion in `graceDays` days. The application
   // layer calls this; the cron-driven hard-delete uses deleteBrand.
   softDeleteBrand(id: string, graceDays?: number): Promise<Brand | undefined>;
+  // Plan 6: atomic compare-and-swap from autopilot_status='failed' →
+  // 'pending'. Returns true if the row transitioned, false if another
+  // caller already won the race (or the row was no longer failed).
+  // Powers the autopilot-retry endpoint's race-safe re-fire.
+  transitionAutopilotFromFailedToPending(brandId: string): Promise<boolean>;
 
   // Article methods
   createArticle(article: InsertArticle): Promise<Article>;

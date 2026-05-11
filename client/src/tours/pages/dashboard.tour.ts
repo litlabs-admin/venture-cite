@@ -15,10 +15,10 @@ export const dashboardTour: TourConfig = {
     },
     {
       id: "progress-ring",
-      target: "dashboard.progressRing",
+      target: "dashboard.recommendations",
       attachTo: "bottom",
-      title: "Onboarding progress",
-      content: "Track which setup steps you've completed. Click any step to jump there.",
+      title: "What to do next",
+      content: "These are your highest-leverage next actions. Required items can't be dismissed.",
     },
     {
       id: "stats",

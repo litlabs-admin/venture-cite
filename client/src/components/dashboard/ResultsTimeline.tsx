@@ -66,7 +66,7 @@ function oldestBrandAgeDays(brands: BrandLite[] | undefined): number | null {
   return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 }
 
-export default function ResultsTimeline() {
+export default function ResultsTimeline({ compact = false }: { compact?: boolean } = {}) {
   const { data: brandsResp } = useQuery<{
     success: boolean;
     data: BrandLite[];
@@ -75,6 +75,16 @@ export default function ResultsTimeline() {
   const brands = brandsResp?.data;
   const ageDays = oldestBrandAgeDays(brands);
   const currentIdx = currentMilestoneIndex(ageDays);
+  const current = MILESTONES[currentIdx];
+
+  if (compact) {
+    return (
+      <p className="text-xs text-muted-foreground px-1">
+        {current.label} — {current.description} First AI citations typically appear 1–2 weeks after
+        publish.
+      </p>
+    );
+  }
 
   return (
     <Card>

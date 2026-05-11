@@ -7,6 +7,8 @@ import { X, Info } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { StatusDot } from "@/components/foundations";
 
 const DISMISS_KEY_PREFIX = "venturecite-recs-dismissed:";
 const DISMISS_DURATION_DAYS = 7;
@@ -26,8 +28,11 @@ type Recommendation = {
 };
 
 const PRIORITY_STYLES: Record<RecommendationPriority, string> = {
-  P0: "border-red-500/30 bg-red-500/5",
-  P1: "border-amber-500/30 bg-amber-500/5",
+  // P0 is a blocker, not a failure — use neutral chrome with a status
+  // glyph instead of destructive paint. The action button below carries
+  // the brand accent.
+  P0: "border-border bg-card",
+  P1: "border-border bg-muted/30",
   P2: "border-border bg-card",
 };
 
@@ -172,6 +177,9 @@ export default function RecommendationsPanel() {
                 PRIORITY_STYLES[rec.priority],
               ].join(" ")}
             >
+              {rec.priority === "P0" && (
+                <StatusDot tone="warn" className="mt-1.5 shrink-0" aria-label="Required" />
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -180,12 +188,20 @@ export default function RecommendationsPanel() {
                 </div>
                 <p className="text-sm font-medium mt-1">{rec.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{rec.why}</p>
-                <Link
-                  href={rec.ctaHref}
-                  className="inline-block mt-2 text-xs font-medium text-primary hover:underline"
-                >
-                  {rec.ctaLabel} →
-                </Link>
+                {rec.priority === "P0" ? (
+                  <Link href={rec.ctaHref} asChild>
+                    <Button size="sm" className="mt-2">
+                      {rec.ctaLabel} →
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link
+                    href={rec.ctaHref}
+                    className="inline-block mt-2 text-xs font-medium text-primary hover:underline"
+                  >
+                    {rec.ctaLabel} →
+                  </Link>
+                )}
               </div>
               {rec.dismissible && (
                 <button

@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,16 +13,8 @@ import {
 import { Rocket, CheckCircle2, ArrowRight } from "lucide-react";
 import { STEPS, type OnboardingData, isOnboardingComplete } from "@/lib/onboardingSteps";
 
-const SEEN_KEY_PREFIX = "venturecite-onboarding-seen:";
-
 export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => void }) {
-  const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [autoOpenReady, setAutoOpenReady] = useState(false);
-
-  useEffect(() => {
-    setAutoOpenReady(true);
-  }, []);
 
   const { data: statusResp } = useQuery<{ success: boolean; data: any }>({
     queryKey: ["/api/onboarding-status"],
@@ -55,16 +46,6 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
   // source of truth via the assertion.
   const isComplete = isOnboardingComplete(data as OnboardingData);
   const nextStepIndex = STEPS.findIndex((s) => !s.checkFn(data));
-
-  // First-login auto-open: fires once per user per browser, keyed by user.id.
-  // Skips if already complete — no point greeting them with a finished list.
-  useEffect(() => {
-    if (!autoOpenReady || !user?.id || !statusResp || isComplete) return;
-    const seenKey = `${SEEN_KEY_PREFIX}${user.id}`;
-    if (localStorage.getItem(seenKey)) return;
-    localStorage.setItem(seenKey, new Date().toISOString());
-    setOpen(true);
-  }, [autoOpenReady, user?.id, statusResp, isComplete]);
 
   return (
     <>
