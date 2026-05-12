@@ -44,14 +44,26 @@ function useCounts(brandId: string | null): CountsResp {
     queryKey: ["/api/articles"],
     staleTime: 30_000,
   });
-  const { data: mentions } = useQuery<{ data: unknown[] }>({
-    queryKey: brandId ? [`/api/brand-mentions/${brandId}`] : ["__no_brand_mentions__"],
+  const { data: mentions } = useQuery<{
+    rows: unknown[];
+    nextCursor?: string | null;
+    stats?: unknown;
+  }>({
+    queryKey: brandId ? ["/api/brand-mentions", brandId] : ["__no_brand_mentions__"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/brand-mentions/${brandId}`);
+      return (await res.json()) as {
+        rows: unknown[];
+        nextCursor?: string | null;
+        stats?: unknown;
+      };
+    },
     enabled: !!brandId,
     staleTime: 30_000,
   });
   return {
     brands: brands?.data?.length ?? 0,
-    mentions: mentions?.data?.length ?? 0,
+    mentions: mentions?.rows?.length ?? 0,
     citations: 0, // Hook into citations cache when available; safe default for v1.
     articles: articles?.data?.length ?? 0,
     prompts: 0,

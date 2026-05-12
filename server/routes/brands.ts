@@ -39,6 +39,7 @@ import {
 
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
+import { waitUntil } from "@vercel/functions";
 export function setupBrandRoutes(app: Express): void {
   app.get(
     "/api/brands",
@@ -112,12 +113,10 @@ export function setupBrandRoutes(app: Express): void {
             });
           }
         } catch {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              error: "Please enter a valid URL (e.g., https://yoursite.com)",
-            });
+          return res.status(400).json({
+            success: false,
+            error: "Please enter a valid URL (e.g., https://yoursite.com)",
+          });
         }
 
         if (!process.env.OPENAI_API_KEY) {
@@ -262,32 +261,42 @@ Be specific and accurate based on the content. If you can't determine something,
           // discovery. Fire the same way POST /api/brands does — this
           // endpoint is the primary onboarding path, so without these the
           // Fact Sheet and Competitors pages stay empty on first login.
-          setImmediate(async () => {
-            try {
-              const { scrapeBrandFacts } = await import("../lib/factExtractor");
-              const n = await scrapeBrandFacts(brand.id);
-              logger.info(`[brand-create-from-website] scraped ${n} facts for brand ${brand.id}`);
-            } catch (err) {
-              logger.warn(
-                { err: err },
-                `[brand-create-from-website] fact scrape failed for ${brand.id}:`,
-              );
-            }
-          });
-          setImmediate(async () => {
-            try {
-              const { discoverCompetitors } = await import("../lib/competitorDiscovery");
-              const n = await discoverCompetitors(brand.id);
-              logger.info(
-                `[brand-create-from-website] discovered ${n} competitors for brand ${brand.id}`,
-              );
-            } catch (err) {
-              logger.warn(
-                { err: err },
-                `[brand-create-from-website] competitor discovery failed for ${brand.id}:`,
-              );
-            }
-          });
+          waitUntil(
+            (async () => {
+              try {
+                const { scrapeBrandFacts } = await import("../lib/factExtractor");
+                const n = await scrapeBrandFacts(brand.id);
+                logger.info(`[brand-create-from-website] scraped ${n} facts for brand ${brand.id}`);
+              } catch (err) {
+                logger.warn(
+                  { err, brandId: brand.id },
+                  `[brand-create-from-website] fact scrape failed`,
+                );
+                captureAndFlush(err, {
+                  tags: { source: "brands.ts:create-from-website-fact-scrape" },
+                });
+              }
+            })(),
+          );
+          waitUntil(
+            (async () => {
+              try {
+                const { discoverCompetitors } = await import("../lib/competitorDiscovery");
+                const n = await discoverCompetitors(brand.id);
+                logger.info(
+                  `[brand-create-from-website] discovered ${n} competitors for brand ${brand.id}`,
+                );
+              } catch (err) {
+                logger.warn(
+                  { err, brandId: brand.id },
+                  `[brand-create-from-website] competitor discovery failed`,
+                );
+                captureAndFlush(err, {
+                  tags: { source: "brands.ts:create-from-website-competitor-discovery" },
+                });
+              }
+            })(),
+          );
 
           res.json({ success: true, data: brand, analysisQuality });
         } catch (innerError) {
@@ -324,12 +333,10 @@ Be specific and accurate based on the content. If you can't determine something,
         const existingBrands = await storage.getBrandsByUserId(user.id);
         const nameLower = validatedData.name.toLowerCase();
         if (!req.body?.force && existingBrands.some((b) => b.name.toLowerCase() === nameLower)) {
-          return res
-            .status(409)
-            .json({
-              success: false,
-              error: `A brand named "${validatedData.name}" already exists.`,
-            });
+          return res.status(409).json({
+            success: false,
+            error: `A brand named "${validatedData.name}" already exists.`,
+          });
         }
 
         let brand: Awaited<ReturnType<typeof storage.createBrand>>;
@@ -359,25 +366,28 @@ Be specific and accurate based on the content. If you can't determine something,
         // Best-effort async automations: fact-sheet scrape + competitor discovery.
         // Failures log but don't block the response. setImmediate so the HTTP
         // response fires first.
-        setImmediate(async () => {
-          try {
-            const { scrapeBrandFacts } = await import("../lib/factExtractor");
-            await scrapeBrandFacts(brand.id);
-          } catch (err) {
-            logger.warn({ err: err }, `[brand-create] fact scrape failed for ${brand.id}:`);
-          }
-        });
-        setImmediate(async () => {
-          try {
-            const { discoverCompetitors } = await import("../lib/competitorDiscovery");
-            await discoverCompetitors(brand.id);
-          } catch (err) {
-            logger.warn(
-              { err: err },
-              `[brand-create] competitor discovery failed for ${brand.id}:`,
-            );
-          }
-        });
+        waitUntil(
+          (async () => {
+            try {
+              const { scrapeBrandFacts } = await import("../lib/factExtractor");
+              await scrapeBrandFacts(brand.id);
+            } catch (err) {
+              logger.warn({ err, brandId: brand.id }, `[brand-create] fact scrape failed`);
+              captureAndFlush(err, { tags: { source: "brands.ts:create-fact-scrape" } });
+            }
+          })(),
+        );
+        waitUntil(
+          (async () => {
+            try {
+              const { discoverCompetitors } = await import("../lib/competitorDiscovery");
+              await discoverCompetitors(brand.id);
+            } catch (err) {
+              logger.warn({ err, brandId: brand.id }, `[brand-create] competitor discovery failed`);
+              captureAndFlush(err, { tags: { source: "brands.ts:create-competitor-discovery" } });
+            }
+          })(),
+        );
 
         res.json({ success: true, data: brand });
       } catch (error) {

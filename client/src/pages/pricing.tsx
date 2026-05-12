@@ -157,7 +157,7 @@ export default function Pricing() {
         />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen bg-muted/30">
         <div className="container mx-auto px-4 py-12">
           <div className="mb-8">
             <Link
@@ -279,8 +279,8 @@ export default function Pricing() {
 
           <Card className="max-w-md mx-auto">
             <CardHeader className="text-center">
-              <div className="mx-auto w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-2">
-                <Gift className="w-6 h-6 text-white" />
+              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-2">
+                <Gift className="w-6 h-6 text-muted-foreground" />
               </div>
               <CardTitle>Have a Beta Invite Code?</CardTitle>
               <CardDescription>Enter your code to unlock beta access for free</CardDescription>

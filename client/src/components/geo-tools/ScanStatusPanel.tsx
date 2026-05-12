@@ -214,7 +214,7 @@ export function ScanStatusPanel({
       {consecutiveAutoFailures >= 3 && (
         <div
           role="alert"
-          className="flex items-center gap-2 rounded-t-lg bg-red-600 px-4 py-2 text-sm font-medium text-white"
+          className="flex items-center gap-2 rounded-t-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground"
         >
           <Bell className="h-4 w-4 shrink-0" />
           <AlertTriangle className="h-4 w-4 shrink-0" />

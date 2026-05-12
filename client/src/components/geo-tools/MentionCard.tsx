@@ -299,7 +299,7 @@ export default function MentionCard({
 
           {/* "Manual" badge */}
           {isManual && (
-            <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
+            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               Manual
             </span>
           )}
@@ -356,7 +356,7 @@ export default function MentionCard({
             </span>
           )}
           {isManual && (
-            <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
+            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               Manual
             </span>
           )}
