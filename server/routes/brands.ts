@@ -257,27 +257,8 @@ Be specific and accurate based on the content. If you can't determine something,
             return row;
           });
 
-          // Best-effort async automations: fact-sheet scrape + competitor
-          // discovery. Fire the same way POST /api/brands does — this
-          // endpoint is the primary onboarding path, so without these the
-          // Fact Sheet and Competitors pages stay empty on first login.
-          waitUntil(
-            (async () => {
-              try {
-                const { scrapeBrandFacts } = await import("../lib/factExtractor");
-                const n = await scrapeBrandFacts(brand.id);
-                logger.info(`[brand-create-from-website] scraped ${n} facts for brand ${brand.id}`);
-              } catch (err) {
-                logger.warn(
-                  { err, brandId: brand.id },
-                  `[brand-create-from-website] fact scrape failed`,
-                );
-                captureAndFlush(err, {
-                  tags: { source: "brands.ts:create-from-website-fact-scrape" },
-                });
-              }
-            })(),
-          );
+          // Best-effort async automations: competitor discovery. Fact-sheet
+          // scraping is now handled by the v2 orchestration flow (Plan 5).
           waitUntil(
             (async () => {
               try {
@@ -363,20 +344,8 @@ Be specific and accurate based on the content. If you can't determine something,
           throw innerError;
         }
 
-        // Best-effort async automations: fact-sheet scrape + competitor discovery.
-        // Failures log but don't block the response. setImmediate so the HTTP
-        // response fires first.
-        waitUntil(
-          (async () => {
-            try {
-              const { scrapeBrandFacts } = await import("../lib/factExtractor");
-              await scrapeBrandFacts(brand.id);
-            } catch (err) {
-              logger.warn({ err, brandId: brand.id }, `[brand-create] fact scrape failed`);
-              captureAndFlush(err, { tags: { source: "brands.ts:create-fact-scrape" } });
-            }
-          })(),
-        );
+        // Best-effort async automations: competitor discovery. Fact-sheet
+        // scraping is now handled by the v2 orchestration flow (Plan 5).
         waitUntil(
           (async () => {
             try {

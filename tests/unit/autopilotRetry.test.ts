@@ -107,9 +107,8 @@ vi.mock("../../server/lib/ssrf", () => ({
   safeFetchText: vi.fn(),
 }));
 
-vi.mock("../../server/lib/factExtractor", () => ({
+vi.mock("../../server/lib/logoScraper", () => ({
   scrapeLogoUrl: vi.fn(),
-  scrapeBrandFacts: vi.fn(),
 }));
 
 vi.mock("../../server/lib/logoStorage", () => ({

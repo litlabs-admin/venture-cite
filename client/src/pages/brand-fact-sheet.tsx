@@ -1,19 +1,15 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { Helmet } from "react-helmet-async";
+import { RefreshCw, Loader2, AlertTriangle } from "lucide-react";
+
+import { apiRequest } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -21,276 +17,386 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Plus,
-  Edit2,
-  Trash2,
-  CheckCircle,
-  FileText,
-  Building2,
-  DollarSign,
-  Users,
-  BarChart3,
-  Settings,
-  ExternalLink,
-  Shield,
-  Globe,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
-import { Link } from "wouter";
-import { Helmet } from "react-helmet-async";
+
 import PageHeader from "@/components/PageHeader";
-import { pageExplainers } from "@/lib/pageExplainers";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { pageExplainers } from "@/lib/pageExplainers";
+import { EmptyState } from "@/components/foundations/EmptyState";
 import { ErrorState } from "@/components/ui/error-state";
 
-interface BrandFact {
-  id: string;
-  brandId: string;
-  factCategory: string;
-  factKey: string;
-  factValue: string;
-  sourceUrl: string | null;
-  source: "manual" | "scraped";
-  lastVerified: string;
-  isActive: number;
-  createdAt: string;
-  updatedAt: string;
-}
+// Plan 2.3 hook — consume only.
+import { useScrapeRunStream } from "@/hooks/useScrapeRunStream";
 
-// Canonical categories shared with the auto-scraper (see
-// shared/factCategories.ts). Icons are a visual concern local to the page.
+// Plan 5 orchestration hooks + components.
+import { useScrapeOrchestration } from "@/hooks/useScrapeOrchestration";
+import { useSSEProgress } from "@/hooks/useSSEProgress";
+import { ScrapeProgressCardV2 } from "@/components/fact-sheet/ScrapeProgressCardV2";
+import { ManualPasteCard } from "@/components/fact-sheet/ManualPasteCard";
+
+// Plan 2.4 components.
+import { ConflictPair, type ConflictPairData } from "@/components/fact-sheet/ConflictPair";
+import { FactRow, type ResolvedFact } from "@/components/fact-sheet/FactRow";
+import { DomainGroupHeader } from "@/components/fact-sheet/DomainGroupHeader";
+import { DOMAINS, type Domain } from "@/components/fact-sheet/domainIcons";
+import { formatRelativeTime, daysSince } from "@/lib/formatRelativeTime";
+
+// Plan 2.5 components.
+import { PauseToggle } from "@/components/fact-sheet/PauseToggle";
+import { CostStatusBadge } from "@/components/fact-sheet/CostStatusBadge";
+import { ScrapePagesPanel } from "@/components/fact-sheet/ScrapePagesPanel";
 import {
-  FACT_CATEGORY_ORDER,
-  FACT_CATEGORY_LABELS,
-  FACT_CATEGORY_DESCRIPTIONS,
-  SUGGESTED_FACTS,
-  isKnownFactCategory,
-  type FactCategory,
-} from "@shared/factCategories";
+  ScrapeFailureState,
+  type ScrapeFailureKind,
+} from "@/components/fact-sheet/ScrapeFailureState";
+import type { BrandFactScrapePage } from "@shared/schema";
 
-const CATEGORY_ICONS: Record<FactCategory, typeof Building2> = {
-  founding: Building2,
-  funding: DollarSign,
-  team: Users,
-  products: Settings,
-  pricing: DollarSign,
-  locations: Globe,
-  achievements: BarChart3,
-  other: FileText,
+// Response shape from Plan 2.3 GET /api/brand-fact-sheet/diff
+type DiffResponse = {
+  conflicts: Partial<Record<Domain, ConflictPairData[]>>;
+  resolved: ResolvedFact[];
 };
 
-const FACT_CATEGORIES = FACT_CATEGORY_ORDER.map((value) => ({
-  value,
-  label: FACT_CATEGORY_LABELS[value],
-  icon: CATEGORY_ICONS[value],
-  description: FACT_CATEGORY_DESCRIPTIONS[value],
-}));
+// Response shape from Plan 2.3 GET /api/brand-fact-sheet/runs?brandId=…
+type ScrapeRun = {
+  id: string;
+  brandId: string;
+  status:
+    | "pending"
+    | "planning"
+    | "fetching"
+    | "extracting"
+    | "completed"
+    | "failed"
+    | "timeout"
+    | "slice_pending"
+    | "cancelled";
+  startedAt: string;
+  completedAt: string | null;
+  pagesFetched: number;
+  pagesPlanned: number;
+  factsExtracted: number;
+  triggeredBy: string;
+  errorKind: string | null;
+  errorMessage?: string | null;
+};
+
+// Response shape from Plan 2.3 GET /api/brand-fact-sheet/runs/:runId
+type ScrapeRunDetailResponse = {
+  success: boolean;
+  run: ScrapeRun & { errorMessage?: string | null };
+  pages: BrandFactScrapePage[];
+};
+
+const TERMINAL_FAILURE_STATUSES: ReadonlyArray<ScrapeRun["status"]> = ["failed", "timeout"];
+
+const ACTIVE_STATUSES: ReadonlyArray<ScrapeRun["status"]> = [
+  "pending",
+  "planning",
+  "fetching",
+  "extracting",
+  "slice_pending",
+];
+
+function diffHasNoConflicts(d: DiffResponse): boolean {
+  return Object.values(d.conflicts).every((pairs) => !pairs || pairs.length === 0);
+}
+
+function groupByDomain(facts: ResolvedFact[]): Record<Domain, ResolvedFact[]> {
+  const out = {} as Record<Domain, ResolvedFact[]>;
+  for (const d of DOMAINS) out[d] = [];
+  for (const f of facts) {
+    const key = (DOMAINS as readonly string[]).includes(f.domain as string)
+      ? (f.domain as Domain)
+      : ("identity" as Domain);
+    out[key].push(f);
+  }
+  return out;
+}
 
 export default function BrandFactSheet() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingFact, setEditingFact] = useState<BrandFact | null>(null);
-  const [newFact, setNewFact] = useState({
-    factCategory: "",
-    factKey: "",
-    factValue: "",
-    sourceUrl: "",
+  const [editingFact, setEditingFact] = useState<ResolvedFact | null>(null);
+
+  /* ---------- v2 orchestration ---------- */
+  const orchestration = useScrapeOrchestration();
+  const orchLiveProgress = useSSEProgress(orchestration.runId);
+
+  // Auto-invalidate facts query when orchestration completes with facts.
+  useEffect(() => {
+    if (orchestration.status === "completed" && orchestration.totalFacts > 0 && selectedBrandId) {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-facts", selectedBrandId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-fact-sheet/diff", { brandId: selectedBrandId }],
+      });
+    }
+  }, [orchestration.status, orchestration.totalFacts, selectedBrandId, queryClient]);
+
+  /* ---------- queries ---------- */
+  const runsQuery = useQuery<{ runs: ScrapeRun[] }>({
+    queryKey: ["/api/brand-fact-sheet/runs", { brandId: selectedBrandId }],
+    enabled: !!selectedBrandId,
   });
 
-  // Poll for facts for the first 2 minutes after a brand is created so the
-  // UI refreshes automatically once the async auto-scrape finishes.
-  // Once at least one fact appears, polling stops.
-  const brandCreatedAt = (selectedBrand as { createdAt?: string | Date | null } | null)?.createdAt;
-  const brandAgeMs = brandCreatedAt ? Date.now() - new Date(brandCreatedAt).getTime() : Infinity;
-  const shouldPollForScrape = brandAgeMs < 120_000; // 2 min
+  const diffQuery = useQuery<DiffResponse>({
+    queryKey: ["/api/brand-fact-sheet/diff", { brandId: selectedBrandId }],
+    enabled: !!selectedBrandId,
+  });
 
-  const {
-    data: factsData,
-    isLoading: factsLoading,
-    isError: factsIsError,
-    isRefetching: factsIsRefetching,
-    refetch: refetchFacts,
-  } = useQuery<{ data: BrandFact[] }>({
+  const resolvedQuery = useQuery<{ data: ResolvedFact[] }>({
     queryKey: ["/api/brand-facts", selectedBrandId],
     enabled: !!selectedBrandId,
-    refetchInterval: (query) => {
-      const rows = (query.state.data as { data?: BrandFact[] } | undefined)?.data;
-      if (rows && rows.length > 0) return false;
-      return shouldPollForScrape ? 3000 : false;
+  });
+
+  const runs = runsQuery.data?.runs ?? [];
+  const activeRun = runs.find((r) => ACTIVE_STATUSES.includes(r.status)) ?? null;
+  const latestCompleted = runs.find((r) => r.status === "completed") ?? null;
+  const latestRun = runs[0] ?? null;
+
+  /* ---------- SSE: live progress for active run ----------
+   * Plan 2.3 hook is parameter-less; call .start(runId) when an active run
+   * appears and .stop() on cleanup / when the run changes. Derive progress
+   * fields from the event stream.
+   */
+  const stream = useScrapeRunStream();
+  const activeRunId = activeRun?.id ?? null;
+
+  useEffect(() => {
+    if (!activeRunId) return;
+    stream.start(activeRunId);
+    return () => {
+      stream.stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRunId]);
+
+  const liveProgress = useMemo(() => {
+    let pagesDone: number | null = null;
+    let pagesTotal: number | null = null;
+    let currentPage: string | null = null;
+    let lastEvent: string | null = null;
+    let sawDone = false;
+    for (const evt of stream.events) {
+      lastEvent = evt.type;
+      if (evt.type === "page") {
+        currentPage = evt.url;
+      } else if (evt.type === "progress") {
+        pagesDone = evt.pagesDone;
+        pagesTotal = evt.pagesTotal;
+      } else if (evt.type === "done") {
+        sawDone = true;
+      }
+    }
+    return { pagesDone, pagesTotal, currentPage, lastEvent, sawDone };
+  }, [stream.events]);
+
+  // Invalidate queries when the stream signals new data or completion.
+  useEffect(() => {
+    if (!activeRunId) return;
+    if (liveProgress.lastEvent === "fact" || liveProgress.lastEvent === "done") {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-fact-sheet/diff", { brandId: selectedBrandId }],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-facts", selectedBrandId],
+      });
+    }
+    if (liveProgress.sawDone) {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-fact-sheet/runs", { brandId: selectedBrandId }],
+      });
+    }
+  }, [liveProgress.lastEvent, liveProgress.sawDone, activeRunId, selectedBrandId]);
+
+  /* ---------- mutations ---------- */
+  const acceptFactMutation = useMutation({
+    mutationFn: async (input: { factId: string; dismissOtherSide: boolean }) =>
+      apiRequest("POST", `/api/brand-fact-sheet/facts/${input.factId}/accept`, {
+        dismissOtherSide: input.dismissOtherSide,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-fact-sheet/diff", { brandId: selectedBrandId }],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-facts", selectedBrandId],
+      });
     },
   });
 
-  const facts = factsData?.data || [];
+  const dismissFactMutation = useMutation({
+    mutationFn: async (factId: string) =>
+      apiRequest("POST", `/api/brand-fact-sheet/facts/${factId}/dismiss`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-fact-sheet/diff", { brandId: selectedBrandId }],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-facts", selectedBrandId],
+      });
+    },
+  });
 
-  const createFactMutation = useMutation({
-    mutationFn: async (data: typeof newFact & { brandId: string }) => {
-      return apiRequest("POST", "/api/brand-facts", data);
+  const bulkAcceptMutation = useMutation({
+    mutationFn: async (body: { side: "user" | "scraped"; domain?: Domain }) => {
+      const runId = activeRun?.id ?? latestCompleted?.id ?? null;
+      return apiRequest("POST", "/api/brand-fact-sheet/facts/bulk-accept", {
+        brandId: selectedBrandId,
+        runId,
+        ...body,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/brand-facts", selectedBrandId] });
-      setIsAddDialogOpen(false);
-      setNewFact({ factCategory: "", factKey: "", factValue: "", sourceUrl: "" });
-      toast({ title: "Fact added", description: "Brand fact has been saved successfully." });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to add fact.", variant: "destructive" });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-fact-sheet/diff", { brandId: selectedBrandId }],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-facts", selectedBrandId],
+      });
     },
   });
 
   const updateFactMutation = useMutation({
-    mutationFn: async ({ id, ...data }: Partial<BrandFact> & { id: string }) => {
-      return apiRequest("PATCH", `/api/brand-facts/${id}`, data);
-    },
+    mutationFn: async (fact: ResolvedFact) =>
+      apiRequest("PATCH", `/api/brand-facts/${fact.id}`, {
+        subcategory: fact.subcategory,
+        factKey: fact.factKey,
+        factValue: fact.factValue,
+        sourceUrl: fact.sourceUrl,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/brand-facts", selectedBrandId] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-facts", selectedBrandId],
+      });
       setEditingFact(null);
       toast({ title: "Fact updated", description: "Brand fact has been updated." });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update fact.", variant: "destructive" });
-    },
-  });
-
-  const deleteFactMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/brand-facts/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/brand-facts", selectedBrandId] });
-      toast({ title: "Fact deleted", description: "Brand fact has been removed." });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to delete fact.", variant: "destructive" });
-    },
-  });
-
-  const rescrapeMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedBrandId) throw new Error("No brand selected");
-      const res = await apiRequest("POST", `/api/brand-facts/scrape/${selectedBrandId}`);
-      return res.json();
-    },
-    onSuccess: (result: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/brand-facts", selectedBrandId] });
-      const inserted = result?.data?.inserted ?? 0;
       toast({
-        title: inserted > 0 ? "Facts updated" : "No new facts",
-        description:
-          inserted > 0
-            ? `${inserted} new fact${inserted === 1 ? "" : "s"} scraped from your website.`
-            : "Your fact sheet is already up to date with what we can scrape.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Scrape failed",
-        description: "Could not scrape the website. Please try again.",
+        title: "Error",
+        description: "Failed to update fact.",
         variant: "destructive",
       });
     },
   });
 
-  const handleAddFact = () => {
-    if (!selectedBrandId || !newFact.factCategory || !newFact.factKey || !newFact.factValue) {
-      toast({
-        title: "Missing fields",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
+  /* ---------- diff handlers ---------- */
+  const handleUseMine = (pair: ConflictPairData) =>
+    acceptFactMutation.mutate({ factId: pair.userFact.id, dismissOtherSide: true });
+  const handleUseAI = (pair: ConflictPairData) =>
+    acceptFactMutation.mutate({ factId: pair.scrapedFact.id, dismissOtherSide: true });
+  const handleKeepBoth = (pair: ConflictPairData) => {
+    acceptFactMutation.mutate({ factId: pair.userFact.id, dismissOtherSide: false });
+    acceptFactMutation.mutate({ factId: pair.scrapedFact.id, dismissOtherSide: false });
+  };
+
+  /* ---------- "last scraped" subline ---------- */
+  const lastScrapedAt = latestCompleted?.completedAt ?? null;
+  const lastScrapedDays = daysSince(lastScrapedAt);
+  const lastScrapedColor =
+    lastScrapedDays === null
+      ? "text-muted-foreground"
+      : lastScrapedDays > 90
+        ? "text-chart-3"
+        : lastScrapedDays > 7
+          ? "text-muted-foreground"
+          : "text-foreground";
+
+  /* ---------- pause state (Plan 2.5 Task 6) ---------- */
+  const brandFactScrapeEnabled = selectedBrand?.factScrapeEnabled ?? true;
+  const [scrapeEnabled, setScrapeEnabled] = useState(true);
+  useEffect(() => {
+    setScrapeEnabled(brandFactScrapeEnabled);
+  }, [brandFactScrapeEnabled]);
+
+  /* ---------- per-page panel data (Plan 2.5 Task 8) ----------
+   * While streaming: derive from SSE `page` events (latest-by-url wins).
+   * After completion: pull from the run-detail endpoint.
+   */
+  const runDetailQuery = useQuery<ScrapeRunDetailResponse>({
+    queryKey: ["/api/brand-fact-sheet/runs", activeRunId],
+    enabled: !!activeRunId && !stream.isStreaming,
+  });
+
+  const streamPages: BrandFactScrapePage[] = useMemo(() => {
+    const byUrl = new Map<string, BrandFactScrapePage>();
+    for (const evt of stream.events) {
+      if (evt.type !== "page") continue;
+      // Stream `page` events carry a subset of BrandFactScrapePage fields; the
+      // remaining columns are filled with safe defaults so the panel can render.
+      const prev = byUrl.get(evt.url);
+      byUrl.set(evt.url, {
+        id: evt.id,
+        runId: activeRunId ?? "",
+        url: evt.url,
+        canonicalUrl: prev?.canonicalUrl ?? evt.url,
+        status: evt.status,
+        fetchedAt: prev?.fetchedAt ?? null,
+        bytes: evt.bytes ?? prev?.bytes ?? null,
+        statusCode: prev?.statusCode ?? null,
+        contentType: prev?.contentType ?? null,
+        lang: evt.lang ?? prev?.lang ?? null,
+        factCount: evt.factCount ?? prev?.factCount ?? 0,
+        llmCostCents: prev?.llmCostCents ?? 0,
+        errorKind: evt.errorKind ?? prev?.errorKind ?? null,
+        errorMessage: prev?.errorMessage ?? null,
+        excerpt: prev?.excerpt ?? null,
       });
-      return;
     }
-    createFactMutation.mutate({ ...newFact, brandId: selectedBrandId });
-  };
+    return Array.from(byUrl.values());
+  }, [stream.events, activeRunId]);
 
-  const handleUpdateFact = () => {
-    if (!editingFact) return;
-    updateFactMutation.mutate({
-      id: editingFact.id,
-      factCategory: editingFact.factCategory,
-      factKey: editingFact.factKey,
-      factValue: editingFact.factValue,
-      sourceUrl: editingFact.sourceUrl,
-    });
-  };
+  const displayPages: BrandFactScrapePage[] = stream.isStreaming
+    ? streamPages
+    : (runDetailQuery.data?.pages ?? []);
 
-  const scrapedFacts = facts.filter((f) => f.source === "scraped");
-  const manualFactsCount = facts.length - scrapedFacts.length;
-  const lastScrapedAt = scrapedFacts.reduce<Date | null>((acc, f) => {
-    const ts = new Date(f.lastVerified || f.createdAt);
-    if (Number.isNaN(ts.getTime())) return acc;
-    return !acc || ts > acc ? ts : acc;
-  }, null);
-  const formatRelative = (d: Date) => {
-    const diff = Date.now() - d.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    const days = Math.floor(hrs / 24);
-    if (days < 30) return `${days}d ago`;
-    return d.toLocaleDateString();
-  };
+  /* ---------- re-scrape disabled state ---------- */
+  const monthlyCapReached = false;
 
-  const brandWebsite = (selectedBrand as { website?: string | null } | null)?.website ?? "";
+  const rescrapeDisabledReason =
+    orchestration.status === "planning" ||
+    orchestration.status === "running" ||
+    orchestration.status === "aggregating"
+      ? "A scrape is already running."
+      : !scrapeEnabled
+        ? "Auto-scraping paused."
+        : monthlyCapReached
+          ? "Monthly scrape budget reached."
+          : null;
 
-  // Data-driven grouping: render every category we actually have data for,
-  // in canonical order first, then any unknown scraper categories last
-  // under their raw label. Previously the UI hardcoded 5 categories and
-  // silently dropped every scraped fact whose category wasn't in that
-  // list — so auto-scrape looked broken even when it populated rows.
-  const groupedFacts = (() => {
-    const byCategory = new Map<string, BrandFact[]>();
-    for (const f of facts) {
-      const arr = byCategory.get(f.factCategory) ?? [];
-      arr.push(f);
-      byCategory.set(f.factCategory, arr);
-    }
-    const canonical = FACT_CATEGORIES.filter((c) => byCategory.has(c.value)).map((c) => ({
-      ...c,
-      facts: byCategory.get(c.value) ?? [],
-    }));
-    const unknown = Array.from(byCategory.keys())
-      .filter((k) => !isKnownFactCategory(k))
-      .sort()
-      .map((k) => ({
-        value: k,
-        label: k.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()),
-        icon: FileText,
-        description: "",
-        facts: byCategory.get(k) ?? [],
-      }));
-    return [...canonical, ...unknown];
-  })();
+  /* ---------- terminal-failure detection (Plan 2.5 Task 9) ----------
+   * Mixed-success (some pages done, some failed) does NOT render the failure
+   * banner — only `failed`/`timeout` runs with an explicit error_kind do.
+   */
+  const isTerminalFailure =
+    !!latestRun && TERMINAL_FAILURE_STATUSES.includes(latestRun.status) && !!latestRun.errorKind;
 
-  const getCategoryIcon = (category: string) => {
-    const cat = FACT_CATEGORIES.find((c) => c.value === category);
-    if (cat) {
-      const Icon = cat.icon;
-      return <Icon className="w-4 h-4" />;
-    }
-    return <FileText className="w-4 h-4" />;
-  };
+  const failureErrorMessage =
+    latestRun?.errorMessage ?? runDetailQuery.data?.run?.errorMessage ?? null;
 
+  /* ---------- render ---------- */
   return (
     <div className="space-y-8">
       <Helmet>
         <title>Brand Fact Sheet - VentureCite</title>
       </Helmet>
+
       <PageHeader
         title="Brand Fact Sheet"
-        description="Define verified facts about your brand to detect AI hallucinations and ensure accurate information."
+        description="Verified facts about your brand — user-entered, AI-scraped, with side-by-side conflict resolution."
         explainer={pageExplainers.brandFactSheet}
       />
 
-      <Card className="mb-6">
+      {/* Brand selector */}
+      <Card>
         <CardHeader>
           <CardTitle className="text-lg">Select Brand</CardTitle>
           <CardDescription>Choose which brand to manage facts for</CardDescription>
@@ -298,7 +404,7 @@ export default function BrandFactSheet() {
         <CardContent>
           <BrandSelector className="w-full max-w-md" />
           {brands.length === 0 && (
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="mt-2 text-sm text-muted-foreground">
               No brands found.{" "}
               <Link href="/brands" className="text-primary hover:underline">
                 Create a brand first
@@ -311,350 +417,294 @@ export default function BrandFactSheet() {
 
       {selectedBrand && (
         <>
-          <Card className="mb-6 border-border bg-muted/50">
+          {/* HEADER SECTION — Task 8 */}
+          <Card data-tour-id="fact-sheet.header">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Globe className="w-5 h-5 text-primary" />
-                Re-scrape Facts from Website
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <RefreshCw className="h-5 w-5 text-primary" />
+                Scrape status
               </CardTitle>
               <CardDescription>
-                We automatically scrape your website when you create a brand and again each month.
-                Use this to re-scrape on demand — duplicate facts are skipped.
+                We re-scrape monthly. Re-scrape on demand — duplicates are skipped.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-xs text-muted-foreground mb-1">Website</div>
-                  {brandWebsite ? (
-                    <a
-                      href={brandWebsite}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline break-all inline-flex items-center gap-1"
-                      data-testid="text-brand-website"
-                    >
-                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                      {brandWebsite}
-                    </a>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">
-                      Add a website to your brand first.
-                    </span>
-                  )}
+            <CardContent className="space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 text-sm">
+                  <div className="text-xs text-muted-foreground">Last scraped</div>
+                  <div className={lastScrapedColor} data-testid="text-last-scraped">
+                    {lastScrapedAt ? formatRelativeTime(lastScrapedAt) : "Never"}
+                  </div>
                 </div>
-                <Button
-                  onClick={() => rescrapeMutation.mutate()}
-                  disabled={!brandWebsite || rescrapeMutation.isPending}
-                  data-testid="button-rescrape"
-                >
-                  {rescrapeMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Scraping…
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Re-scrape from Website
-                    </>
-                  )}
-                </Button>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-3">
+                    {selectedBrandId ? (
+                      <PauseToggle
+                        brandId={selectedBrandId}
+                        enabled={brandFactScrapeEnabled}
+                        onChange={setScrapeEnabled}
+                      />
+                    ) : null}
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            onClick={() => {
+                              if (!selectedBrandId) return;
+                              orchestration.start(selectedBrandId);
+                            }}
+                            disabled={
+                              !selectedBrandId ||
+                              orchestration.status === "planning" ||
+                              orchestration.status === "running" ||
+                              orchestration.status === "aggregating" ||
+                              !scrapeEnabled ||
+                              monthlyCapReached
+                            }
+                            data-testid="btn-rescrape"
+                          >
+                            {orchestration.status === "planning" ||
+                            orchestration.status === "running" ||
+                            orchestration.status === "aggregating" ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Scraping…
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Re-scrape
+                              </>
+                            )}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {rescrapeDisabledReason ? (
+                        <TooltipContent>{rescrapeDisabledReason}</TooltipContent>
+                      ) : null}
+                    </Tooltip>
+                  </div>
+                  {selectedBrandId ? <CostStatusBadge brandId={selectedBrandId} /> : null}
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-3">
-                <span>
-                  Last scraped:{" "}
-                  <span className="text-foreground font-medium">
-                    {lastScrapedAt ? formatRelative(lastScrapedAt) : "Never"}
-                  </span>
-                </span>
-                <span>
-                  {scrapedFacts.length} scraped · {manualFactsCount} manual
-                </span>
-              </div>
+
+              {(orchestration.status === "planning" ||
+                orchestration.status === "running" ||
+                orchestration.status === "aggregating") && (
+                <ScrapeProgressCardV2 sources={orchLiveProgress} />
+              )}
             </CardContent>
           </Card>
 
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-xl font-semibold">{selectedBrand.name} Facts</h2>
-              <p className="text-sm text-muted-foreground">{facts.length} verified facts</p>
-            </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-add-fact">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Fact
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Add New Fact</DialogTitle>
-                  <DialogDescription>
-                    Add a verified fact about {selectedBrand.name}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Category *</Label>
-                    <Select
-                      value={newFact.factCategory}
-                      onValueChange={(v) =>
-                        setNewFact({ ...newFact, factCategory: v, factKey: "" })
-                      }
+          {/* MANUAL PASTE FALLBACK — Plan 5 Task 6: zero facts after orchestration */}
+          {orchestration.status === "completed" &&
+            orchestration.totalFacts === 0 &&
+            orchestration.runId && (
+              <ManualPasteCard
+                runId={orchestration.runId}
+                onSubmit={async (text) => {
+                  if (!orchestration.runId) return;
+                  try {
+                    await apiRequest(
+                      "POST",
+                      `/api/brand-fact-sheet/runs/${orchestration.runId}/paste`,
+                      { text },
+                    );
+                    await queryClient.invalidateQueries({
+                      queryKey: ["/api/brand-facts", selectedBrandId],
+                    });
+                  } catch {
+                    // Paste failed — error already logged by apiRequest. UI shows the
+                    // unchanged "0 facts" state; user can retry.
+                  }
+                }}
+                onManualFill={() => {
+                  // For MVP, just close/dismiss — the existing FactRow edit button
+                  // and EditFactDialog are already on the page.
+                }}
+              />
+            )}
+
+          {/* PLAN FAILED ALERT — Plan 5 Task 6 */}
+          {orchestration.status === "plan_failed" && orchestration.planError && (
+            <Alert variant="default" data-testid="plan-failed-alert">
+              <AlertDescription>{orchestration.planError.message}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* PER-PAGE PANEL — Plan 2.5 Task 8 */}
+          {(stream.isStreaming || displayPages.length > 0) && activeRunId ? (
+            <ScrapePagesPanel
+              pages={displayPages}
+              runId={activeRunId}
+              isStreaming={stream.isStreaming}
+              runStartedAt={runDetailQuery.data?.run?.startedAt ?? activeRun?.startedAt ?? null}
+            />
+          ) : null}
+
+          {/* TERMINAL FAILURE STATE — Plan 2.5 Task 9 */}
+          {isTerminalFailure && latestRun ? (
+            <ScrapeFailureState
+              errorKind={latestRun.errorKind as ScrapeFailureKind | string}
+              errorMessage={failureErrorMessage}
+              runId={latestRun.id}
+              brandId={selectedBrandId}
+              brandWebsite={selectedBrand?.website ?? null}
+            />
+          ) : null}
+
+          {/* DIFF SECTION — Task 9 */}
+          <Card data-tour-id="fact-sheet.diff">
+            <CardHeader>
+              <CardTitle className="text-lg">Conflicts to resolve</CardTitle>
+              <CardDescription>
+                Pairs where what you entered and what we found differ. Pick one, keep both, or
+                merge.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {diffQuery.isLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              ) : diffQuery.isError ? (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Couldn&apos;t load conflicts</AlertTitle>
+                  <AlertDescription>
+                    <Button
+                      variant="link"
+                      className="px-0"
+                      onClick={() => diffQuery.refetch()}
+                      data-testid="btn-retry-diff"
                     >
-                      <SelectTrigger data-testid="select-fact-category">
-                        <SelectValue placeholder="Select category..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FACT_CATEGORIES.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {newFact.factCategory && (
-                    <div className="space-y-2">
-                      <Label>Fact Type *</Label>
-                      <Select
-                        value={newFact.factKey}
-                        onValueChange={(v) => setNewFact({ ...newFact, factKey: v })}
-                      >
-                        <SelectTrigger data-testid="select-fact-key">
-                          <SelectValue placeholder="Select or type fact type..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {isKnownFactCategory(newFact.factCategory) &&
-                            SUGGESTED_FACTS[newFact.factCategory].map((fact) => (
-                              <SelectItem key={fact.key} value={fact.key}>
-                                {fact.label}
-                              </SelectItem>
-                            ))}
-                          <SelectItem value="custom">Custom...</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {newFact.factKey === "custom" && (
-                        <Input
-                          placeholder="Enter custom fact key..."
-                          className="mt-2"
-                          onChange={(e) => setNewFact({ ...newFact, factKey: e.target.value })}
-                          data-testid="input-custom-fact-key"
+                      Try again
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : !diffQuery.data || diffHasNoConflicts(diffQuery.data) ? (
+                <EmptyState
+                  title="No conflicts"
+                  body="Everything you've entered matches (or has been resolved against) what AI found."
+                />
+              ) : (
+                <div className="space-y-6">
+                  {DOMAINS.map((domain) => {
+                    const pairs = diffQuery.data!.conflicts[domain] ?? [];
+                    if (pairs.length === 0) return null;
+                    return (
+                      <div key={domain} className="overflow-hidden rounded-md border border-border">
+                        <DomainGroupHeader
+                          domain={domain}
+                          conflictCount={pairs.length}
+                          onAcceptAllAI={() =>
+                            bulkAcceptMutation.mutate({ side: "scraped", domain })
+                          }
+                          onKeepAllMine={() => bulkAcceptMutation.mutate({ side: "user", domain })}
+                          disabled={bulkAcceptMutation.isPending}
                         />
-                      )}
-                    </div>
-                  )}
+                        <div className="space-y-3 p-3">
+                          {pairs.map((pair) => (
+                            <ConflictPair
+                              key={pair.userFact.id}
+                              pair={pair}
+                              onUseMine={handleUseMine}
+                              onUseAI={handleUseAI}
+                              onKeepBoth={handleKeepBoth}
+                              disabled={acceptFactMutation.isPending}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
 
-                  <div className="space-y-2">
-                    <Label>Value *</Label>
-                    <Input
-                      placeholder="e.g., 2015, $79/month, John Smith"
-                      value={newFact.factValue}
-                      onChange={(e) => setNewFact({ ...newFact, factValue: e.target.value })}
-                      data-testid="input-fact-value"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Source URL (optional)</Label>
-                    <Input
-                      placeholder="https://yoursite.com/about"
-                      value={newFact.sourceUrl}
-                      onChange={(e) => setNewFact({ ...newFact, sourceUrl: e.target.value })}
-                      data-testid="input-fact-source"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Link to where this fact can be verified
-                    </p>
+                  {/* Page-level bulk actions */}
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => bulkAcceptMutation.mutate({ side: "user" })}
+                      disabled={bulkAcceptMutation.isPending}
+                      data-testid="btn-keep-all-mine-global"
+                    >
+                      Keep all mine
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => bulkAcceptMutation.mutate({ side: "scraped" })}
+                      disabled={bulkAcceptMutation.isPending}
+                      data-testid="btn-accept-all-ai-global"
+                    >
+                      Accept all AI
+                    </Button>
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleAddFact}
-                    disabled={createFactMutation.isPending}
-                    data-testid="button-save-fact"
-                  >
-                    {createFactMutation.isPending ? "Saving..." : "Save Fact"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+              )}
+            </CardContent>
+          </Card>
 
-          {factsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : factsIsError ? (
-            <ErrorState
-              title="Couldn't load brand facts"
-              onRetry={() => refetchFacts()}
-              isRetrying={factsIsRefetching}
-            />
-          ) : facts.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-12 text-center">
-                {shouldPollForScrape ? (
-                  <>
-                    <Loader2 className="w-12 h-12 mx-auto text-primary mb-4 animate-spin" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      Auto-scraping facts from your website…
-                    </h3>
-                    <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                      This usually takes 30–60 seconds. We'll populate this page as soon as we find
-                      facts. You can add more manually at any time.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <Shield className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No Facts Added Yet</h3>
-                    <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                      {brandWebsite ? (
-                        <>
-                          We couldn't extract any facts from{" "}
-                          <span className="font-medium">{brandWebsite}</span> automatically — this
-                          can happen on single-page apps where content only renders in the browser.
-                          Add a few manually below to activate hallucination detection.
-                        </>
-                      ) : (
-                        <>
-                          Add verified facts about {selectedBrand.name} to enable hallucination
-                          detection. AI engines sometimes state incorrect information — your fact
-                          sheet helps us catch these errors.
-                        </>
-                      )}
-                    </p>
-                  </>
-                )}
-                <Button
-                  onClick={() => setIsAddDialogOpen(true)}
-                  data-testid="button-add-first-fact"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Your First Fact
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-6">
-              {groupedFacts.map((category) => {
-                if (category.facts.length === 0) return null;
-                const CategoryIcon = category.icon;
-                return (
-                  <Card key={category.value}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center gap-2">
-                        <CategoryIcon className="w-5 h-5 text-primary" />
-                        <CardTitle className="text-lg">{category.label}</CardTitle>
-                        <Badge variant="secondary" className="ml-auto">
-                          {category.facts.length}
-                        </Badge>
-                      </div>
-                      <CardDescription>{category.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {category.facts.map((fact) => (
-                          <div
-                            key={fact.id}
-                            className="flex items-start justify-between p-3 bg-muted/50 rounded-lg"
-                            data-testid={`fact-item-${fact.id}`}
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium text-sm">
-                                  {(isKnownFactCategory(fact.factCategory)
-                                    ? SUGGESTED_FACTS[fact.factCategory].find(
-                                        (f) => f.key === fact.factKey,
-                                      )?.label
-                                    : undefined) || fact.factKey}
-                                </span>
-                                <CheckCircle className="w-3 h-3 text-chart-4" />
-                                {fact.source === "scraped" && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] px-1.5 py-0 h-4"
-                                    data-testid={`badge-scraped-${fact.id}`}
-                                  >
-                                    Scraped
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-foreground">{fact.factValue}</p>
-                              {fact.sourceUrl && (
-                                <a
-                                  href={fact.sourceUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                  Source
-                                </a>
-                              )}
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setEditingFact(fact)}
-                                data-testid={`button-edit-fact-${fact.id}`}
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => deleteFactMutation.mutate(fact.id)}
-                                data-testid={`button-delete-fact-${fact.id}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
+          {/* RESOLVED FACTS — Task 10 */}
+          {/* TODO(spec-2 Plan 2.5): delta indicators (new / changed / removed) — needs prior-run comparison query */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Resolved facts</CardTitle>
+              <CardDescription>Verified facts about {selectedBrand.name}.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {resolvedQuery.isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : resolvedQuery.isError ? (
+                <ErrorState
+                  title="Couldn't load facts"
+                  onRetry={() => resolvedQuery.refetch()}
+                  isRetrying={resolvedQuery.isRefetching}
+                />
+              ) : !resolvedQuery.data?.data.length ? (
+                <EmptyState
+                  title="No facts yet"
+                  body="Run a scrape or add facts manually to start building this brand's fact sheet."
+                />
+              ) : (
+                <div className="space-y-6">
+                  {Object.entries(groupByDomain(resolvedQuery.data.data.filter((f) => !!f))).map(
+                    ([domain, facts]) => {
+                      if (facts.length === 0) return null;
+                      return (
+                        <div
+                          key={domain}
+                          className="overflow-hidden rounded-md border border-border"
+                        >
+                          <DomainGroupHeader domain={domain as Domain} conflictCount={0} />
+                          <div className="space-y-2 p-3">
+                            {facts.map((fact) => (
+                              <FactRow
+                                key={fact.id}
+                                fact={fact}
+                                onEdit={(f) => setEditingFact(f)}
+                                onDismiss={(f) => dismissFactMutation.mutate(f.id)}
+                              />
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-
-              <Separator className="my-8" />
-
-              <Card className="bg-muted/50 border-border">
-                <CardContent className="py-6">
-                  <div className="flex items-start gap-4">
-                    <Shield className="w-10 h-10 text-primary flex-shrink-0" />
-                    <div>
-                      <h3 className="font-semibold mb-1">How Fact Sheets Protect Your Brand</h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        When AI engines like ChatGPT or Claude mention your brand, we compare their
-                        statements against your verified facts. If they say something incorrect
-                        (e.g., wrong pricing, outdated leadership), we flag it as a hallucination so
-                        you can take action.
-                      </p>
-                      <Link href="/ai-intelligence">
-                        <Button variant="outline" size="sm" data-testid="link-view-hallucinations">
-                          View Detected Hallucinations
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
 
+      {/* Edit dialog (carried over from prior implementation; valueType editor is Plan 2.5) */}
       <Dialog open={!!editingFact} onOpenChange={(open) => !open && setEditingFact(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -664,22 +714,11 @@ export default function BrandFactSheet() {
           {editingFact && (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Category</Label>
-                <Select
-                  value={editingFact.factCategory}
-                  onValueChange={(v) => setEditingFact({ ...editingFact, factCategory: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FACT_CATEGORIES.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Subcategory</Label>
+                <Input
+                  value={editingFact.subcategory}
+                  onChange={(e) => setEditingFact({ ...editingFact, subcategory: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Fact Key</Label>
@@ -708,7 +747,10 @@ export default function BrandFactSheet() {
             <Button variant="outline" onClick={() => setEditingFact(null)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateFact} disabled={updateFactMutation.isPending}>
+            <Button
+              onClick={() => editingFact && updateFactMutation.mutate(editingFact)}
+              disabled={updateFactMutation.isPending}
+            >
               {updateFactMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>

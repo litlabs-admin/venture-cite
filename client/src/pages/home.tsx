@@ -38,6 +38,7 @@ import type { BrandMention } from "@shared/schema";
 import PageHeader from "@/components/PageHeader";
 import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
+import { formatRelativeTime } from "@/lib/formatRelativeTime";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import VisibilityGauge from "@/components/dashboard/VisibilityGauge";
@@ -98,23 +99,6 @@ function useCountUp(target: number, duration: number, enabled: boolean): number 
     return () => cancelAnimationFrame(raf);
   }, [enabled, target, duration]);
   return enabled ? value : 0;
-}
-
-function formatRelativeTime(date: string | Date | null | undefined): string {
-  if (!date) return "Not scanned yet";
-  const d = typeof date === "string" ? new Date(date) : date;
-  const diffMs = Date.now() - d.getTime();
-  if (diffMs < 0) return "just now";
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
 }
 
 function Section({

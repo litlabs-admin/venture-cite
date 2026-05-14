@@ -25,11 +25,13 @@ import {
   runCompetitorDiscoveryJob,
   runMentionScanJob,
   runListicleScanJob,
-  runFactRefreshJob,
   runWeeklyCatchupKickoff,
   runWeeklyDigestAggregator,
   runWeeklyReportJob,
 } from "../scheduler";
+import { runFactScrapeBackstop } from "../lib/factAgent/v2/factScrapeBackstop";
+import { runMonthlyFactRefresh } from "../lib/factAgent/v2/runMonthlyRefresh";
+import { runWeeklySummary } from "../lib/factAgent/v2/weeklySummary";
 import { reconcileOrphanCitationRuns } from "../lib/citationReconciliation";
 import { resumeInFlightAutopilots } from "../lib/onboardingAutopilot";
 import { storage } from "../storage";
@@ -66,8 +68,11 @@ const STEP_CAPS_MS = {
   "listicle-scan": 30_000,
   "weekly-catchup-kickoff": 5_000,
   "weekly-digest-aggregator": 10_000,
-  "fact-refresh": 30_000,
   "weekly-report-legacy": 20_000,
+  "fact-scrape-backstop": 30_000,
+  "v2-lifecycle-cleanup": 30_000,
+  "v2-monthly-fact-refresh": 50_000,
+  "v2-weekly-summary": 20_000,
 } as const;
 
 type StepName = keyof typeof STEP_CAPS_MS;
@@ -221,7 +226,6 @@ export function setupCronRoutes(app: Express): void {
       const dom = today.getUTCDate();
       const isMonday = dow === 1;
       const isSunday = dow === 0;
-      const isFirstOfMonth = dom === 1;
 
       const orch = new Orchestrator(ORCHESTRATOR_BUDGET_MS);
 
@@ -237,6 +241,35 @@ export function setupCronRoutes(app: Express): void {
       await orch.run("drain-pending-citation-runs", (deadline) =>
         drainPendingCitationRuns(deadline),
       );
+
+      // v2 backstop: completes any run abandoned by the client. Runs once a day
+      // here (Hobby cron limit); when on Pro we'll also have a dedicated
+      // every-5-min cron at /api/cron/fact-scrape-backstop.
+      await orch.run("fact-scrape-backstop", () => runFactScrapeBackstop());
+
+      // v2 lifecycle cleanup: prune stale fact-scrape rows to keep table sizes
+      // in check. Retention windows: pages=7d, runs=30d, logs=90d; cache and
+      // concurrency slots expire by their own TTL columns.
+      await orch.run("v2-lifecycle-cleanup", async () => {
+        const pages = await storage.deleteOldFactScrapePages(7);
+        const runs = await storage.deleteOldFactScrapeRuns(30);
+        const logs = await storage.deleteOldFactScrapeLogs(90);
+        const cache = await storage.deleteExpiredFactScrapeCache();
+        const slots = await storage.deleteExpiredLlmConcurrencySlots();
+        logger.info({ pages, runs, logs, cache, slots }, "v2-lifecycle-cleanup: deleted rows");
+      });
+
+      // Monthly fact refresh: finds brands that haven't been re-scraped in
+      // 30+ days and runs the full v2 pipeline for up to MAX_BRANDS_PER_TICK.
+      // Subsequent ticks pick up the next batch automatically.
+      await orch.run("v2-monthly-fact-refresh", (deadline) => runMonthlyFactRefresh(deadline));
+
+      // Weekly: run on Mondays only (UTC).
+      if (new Date().getUTCDay() === 1) {
+        await orch.run("v2-weekly-summary", async () => {
+          await runWeeklySummary();
+        });
+      }
 
       // Daily housekeeping (cheap).
       await orch.run("account-purge", () => runAccountPurgeJob());
@@ -269,10 +302,6 @@ export function setupCronRoutes(app: Express): void {
       // weekly_catchup completions whose post-hook didn't fire.
       await orch.run("weekly-digest-aggregator", () => runWeeklyDigestAggregator());
 
-      if (isFirstOfMonth) {
-        await orch.run("fact-refresh", (deadline) => runFactRefreshJob(deadline));
-      }
-
       if (isSunday) {
         await orch.run("weekly-report-legacy", () => runWeeklyReportJob());
       }
@@ -299,6 +328,26 @@ export function setupCronRoutes(app: Express): void {
         skippedDueToBudget: skippedSteps,
         results: orch.results,
       });
+    }),
+  );
+
+  // Standalone 5-min backstop. Vercel Hobby may reject this schedule at deploy
+  // time (Hobby allows only daily crons). When that happens, the
+  // daily-orchestrator already calls runFactScrapeBackstop as a fallback;
+  // this endpoint is here for when the project upgrades to Pro.
+  app.all(
+    "/api/cron/fact-scrape-backstop",
+    asyncHandler(async (req: Request, res: Response) => {
+      if (!isCronAuthorized(req)) {
+        return res.status(401).json({ success: false, error: "Not authorized" });
+      }
+      try {
+        const result = await runFactScrapeBackstop();
+        return res.status(200).json({ success: true, ...result });
+      } catch (err) {
+        logger.error({ err }, "fact-scrape-backstop cron failed");
+        return res.status(500).json({ success: false, error: (err as Error).message });
+      }
     }),
   );
 }

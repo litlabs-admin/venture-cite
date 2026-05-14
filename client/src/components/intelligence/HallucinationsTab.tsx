@@ -385,7 +385,8 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                 {facts.map((fact) => (
                   <div key={fact.id} className="p-3 border rounded-lg">
                     <div className="flex items-center justify-between">
-                      <Badge variant="outline">{fact.factCategory}</Badge>
+                      {/* TODO(spec-2 Plan 2.4): `subcategory` replaces `factCategory`. */}
+                      <Badge variant="outline">{fact.subcategory}</Badge>
                       <span className="text-xs text-muted-foreground">Verified</span>
                     </div>
                     <p className="font-medium mt-2">{fact.factKey}</p>

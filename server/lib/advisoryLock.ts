@@ -14,6 +14,7 @@ export const lockKeys = {
   listicleScan: 910004,
   metricsSnapshot: 910005,
   automationEvaluator: 910006,
+  factScrapeFailureDetect: 910007,
 } as const;
 
 export type LockKey = (typeof lockKeys)[keyof typeof lockKeys];

@@ -153,6 +153,7 @@ export const brands = pgTable(
     name: text("name").notNull(),
     companyName: text("company_name").notNull(),
     industry: text("industry").notNull(),
+    factScrapeEnabled: boolean("fact_scrape_enabled").notNull().default(true),
     description: text("description"),
     website: text("website"),
     tone: text("tone").default("professional"),
@@ -519,6 +520,117 @@ export const insertGeoSignalRunSchema = createInsertSchema(geoSignalRuns).omit({
 });
 export type GeoSignalRun = typeof geoSignalRuns.$inferSelect;
 export type InsertGeoSignalRun = z.infer<typeof insertGeoSignalRunSchema>;
+
+// ============================================================================
+// Spec 2: Brand Fact Sheet redesign — scrape runs + pages + cost caps
+// ============================================================================
+
+// One row per scrape run. Slice-resumable via `status='slice_pending'`.
+// Read by the SSE stream + the new diff view. See spec 2 §5.2.
+export const brandFactScrapeRuns = pgTable(
+  "brand_fact_scrape_runs",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"),
+    triggeredBy: text("triggered_by").notNull(),
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+    lastAdvanceAt: timestamp("last_advance_at").notNull().defaultNow(),
+    deadlineMs: bigint("deadline_ms", { mode: "number" }),
+    pagesPlanned: integer("pages_planned").notNull().default(0),
+    pagesFetched: integer("pages_fetched").notNull().default(0),
+    pagesFailed: integer("pages_failed").notNull().default(0),
+    factsExtracted: integer("facts_extracted").notNull().default(0),
+    factsValidated: integer("facts_validated").notNull().default(0),
+    factsRedacted: integer("facts_redacted").notNull().default(0),
+    llmCostCents: integer("llm_cost_cents").notNull().default(0),
+    llmCalls: integer("llm_calls").notNull().default(0),
+    llmInputTokens: bigint("llm_input_tokens", { mode: "number" }).notNull().default(0),
+    llmOutputTokens: bigint("llm_output_tokens", { mode: "number" }).notNull().default(0),
+    errorKind: text("error_kind"),
+    errorMessage: text("error_message"),
+    plan: jsonb("plan"),
+    progress: jsonb("progress"),
+    diagnostics: jsonb("diagnostics"),
+    retryCount: integer("retry_count").notNull().default(0),
+  },
+  (table) => [
+    index("brand_fact_scrape_runs_brand_started_idx").on(table.brandId, table.startedAt.desc()),
+    index("brand_fact_scrape_runs_slice_pending_idx").on(table.lastAdvanceAt),
+    // Spec 2 §4.9: at most one active run per brand. Partial unique index
+    // mirrors migrations/0061_brand_fact_scrape_runs_uniq_active.sql.
+    uniqueIndex("brand_fact_scrape_runs_one_active_per_brand_idx")
+      .on(table.brandId)
+      .where(sql`status IN ('pending','planning','fetching','extracting','slice_pending')`),
+  ],
+);
+
+export const insertBrandFactScrapeRunSchema = createInsertSchema(brandFactScrapeRuns).omit({
+  id: true,
+  startedAt: true,
+  lastAdvanceAt: true,
+});
+export type BrandFactScrapeRun = typeof brandFactScrapeRuns.$inferSelect;
+export type InsertBrandFactScrapeRun = z.infer<typeof insertBrandFactScrapeRunSchema>;
+
+// One row per page the agent attempted in a run. Drives the per-page UI panel.
+export const brandFactScrapePages = pgTable(
+  "brand_fact_scrape_pages",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    runId: varchar("run_id")
+      .notNull()
+      .references(() => brandFactScrapeRuns.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    canonicalUrl: text("canonical_url").notNull(),
+    status: text("status").notNull().default("pending"),
+    fetchedAt: timestamp("fetched_at"),
+    bytes: integer("bytes"),
+    statusCode: integer("status_code"),
+    contentType: text("content_type"),
+    lang: text("lang"),
+    factCount: integer("fact_count").notNull().default(0),
+    llmCostCents: integer("llm_cost_cents").notNull().default(0),
+    errorKind: text("error_kind"),
+    errorMessage: text("error_message"),
+    excerpt: text("excerpt"),
+  },
+  (table) => [index("brand_fact_scrape_pages_run_idx").on(table.runId)],
+);
+
+export const insertBrandFactScrapePageSchema = createInsertSchema(brandFactScrapePages).omit({
+  id: true,
+});
+export type BrandFactScrapePage = typeof brandFactScrapePages.$inferSelect;
+export type InsertBrandFactScrapePage = z.infer<typeof insertBrandFactScrapePageSchema>;
+
+// Per-brand monthly LLM cost cap. Row created lazily on first scrape of month.
+export const brandMonthlyCostCaps = pgTable(
+  "brand_monthly_cost_caps",
+  {
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    monthKey: text("month_key").notNull(),
+    factScrapeCents: integer("fact_scrape_cents").notNull().default(0),
+    monthlyCapCents: integer("monthly_cap_cents").notNull().default(500),
+  },
+  (table) => [
+    primaryKey({ columns: [table.brandId, table.monthKey] }),
+    index("brand_monthly_cost_caps_month_idx").on(table.monthKey),
+  ],
+);
+
+export const insertBrandMonthlyCostCapSchema = createInsertSchema(brandMonthlyCostCaps);
+export type BrandMonthlyCostCap = typeof brandMonthlyCostCaps.$inferSelect;
+export type InsertBrandMonthlyCostCap = z.infer<typeof insertBrandMonthlyCostCapSchema>;
 
 // One row per "Run Citation Check" click or weekly cron run. Stores the
 // aggregate totals so the trend chart can render without re-aggregating
@@ -1223,16 +1335,33 @@ export const brandFactSheet = pgTable(
     brandId: varchar("brand_id")
       .notNull()
       .references(() => brands.id, { onDelete: "cascade" }),
-    factCategory: text("fact_category").notNull(),
+    // Spec 2 §4.3: 8 universal domains
+    domain: text("domain").notNull().default("identity"),
+    // Spec 2 §4.3: free-form LLM-picked subcategory (was `factCategory`)
+    subcategory: text("subcategory").notNull(),
     factKey: text("fact_key").notNull(),
     factValue: text("fact_value").notNull(),
+    // Spec 2 §4.4: valueType discriminated union
+    valueType: text("value_type").notNull().default("string"),
+    valuePayload: jsonb("value_payload"),
+    // Spec 2 §4.8: quality signal from agent extraction
+    confidence: numeric("confidence", { precision: 3, scale: 2 }),
+    // Spec 2 §4.6: 200-char snippet showing where the fact came from
+    sourceExcerpt: text("source_excerpt"),
     sourceUrl: text("source_url"),
-    source: text("source").default("manual").notNull(), // "manual" | "scraped"
-    lastVerified: timestamp("last_verified").defaultNow().notNull(),
-    isActive: integer("is_active").default(1).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    source: text("source").notNull().default("manual"),
+    // Spec 2 §4.6: diff resolution state
+    dismissedAt: timestamp("dismissed_at"),
+    acceptedAt: timestamp("accepted_at"),
+    // Spec 2 §4.1: FK to the run that produced this row (null for source='user'/'manual')
+    runId: varchar("run_id").references(() => brandFactScrapeRuns.id, { onDelete: "set null" }),
+    lastVerified: timestamp("last_verified").notNull().defaultNow(),
+    isActive: integer("is_active").notNull().default(1),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
     metadata: jsonb("metadata"),
+    disagreementCount: integer("disagreement_count").notNull().default(0),
+    schemaVersion: integer("schema_version").notNull().default(1),
   },
   (table) => [index("brand_fact_sheet_brand_id_idx").on(table.brandId)],
 );
@@ -1763,6 +1892,8 @@ export const insertBrandFactSheetSchema = createInsertSchema(brandFactSheet).omi
   createdAt: true,
   updatedAt: true,
   lastVerified: true,
+  acceptedAt: true,
+  dismissedAt: true,
 });
 
 export type InsertCitation = z.infer<typeof insertCitationSchema>;
@@ -2173,3 +2304,75 @@ export const insertTourEventSchema = createInsertSchema(tourEvents).omit({
 
 export type TourEvent = typeof tourEvents.$inferSelect;
 export type InsertTourEvent = z.infer<typeof insertTourEventSchema>;
+
+// ── Plan 1 (v2): caching layer for search-grounded LLM ─────────────────
+export const factScrapeCache = pgTable(
+  "fact_scrape_cache",
+  {
+    cacheKey: text("cache_key").primaryKey(),
+    source: text("source").notNull(),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    valueJson: jsonb("value_json").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (table) => [
+    index("fact_scrape_cache_brand_id_idx").on(table.brandId),
+    index("fact_scrape_cache_expires_at_idx").on(table.expiresAt),
+  ],
+);
+export type FactScrapeCache = typeof factScrapeCache.$inferSelect;
+export type InsertFactScrapeCache = typeof factScrapeCache.$inferInsert;
+
+// ── Plan 1 (v2): observability log per (run, source) ───────────────────
+export const factScrapeLogs = pgTable(
+  "fact_scrape_logs",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    runId: varchar("run_id")
+      .notNull()
+      .references(() => brandFactScrapeRuns.id, { onDelete: "cascade" }),
+    source: text("source").notNull(),
+    status: text("status").notNull(),
+    factCount: integer("fact_count").notNull().default(0),
+    latencyMs: integer("latency_ms"),
+    providerLatencyMs: integer("provider_latency_ms"),
+    errorKind: text("error_kind"),
+    diagnostics: jsonb("diagnostics"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("fact_scrape_logs_run_id_idx").on(table.runId),
+    index("fact_scrape_logs_created_at_idx").on(table.createdAt),
+  ],
+);
+export type FactScrapeLog = typeof factScrapeLogs.$inferSelect;
+export type InsertFactScrapeLog = typeof factScrapeLogs.$inferInsert;
+
+// ── Plan 1 (v2): Postgres token bucket for LLM concurrency ─────────────
+export const llmConcurrencySlots = pgTable(
+  "llm_concurrency_slots",
+  {
+    slotId: text("slot_id").primaryKey(),
+    provider: text("provider").notNull(),
+    acquiredAt: timestamp("acquired_at").notNull().defaultNow(),
+    expiresAt: timestamp("expires_at").notNull(),
+    runId: varchar("run_id"),
+  },
+  (table) => [
+    index("llm_concurrency_slots_provider_expires_idx").on(table.provider, table.expiresAt),
+  ],
+);
+export type LlmConcurrencySlot = typeof llmConcurrencySlots.$inferSelect;
+
+// ── Plan 1 (v2): generic JSON config store ─────────────────────────────
+export const systemState = pgTable("system_state", {
+  key: text("key").primaryKey(),
+  valueJson: jsonb("value_json").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export type SystemState = typeof systemState.$inferSelect;

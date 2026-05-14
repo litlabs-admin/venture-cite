@@ -16,7 +16,7 @@ import { users } from "@shared/schema";
 import { logger } from "../lib/logger";
 import { validateDomain } from "@shared/validateDomain";
 import { safeFetchText } from "../lib/ssrf";
-import { scrapeLogoUrl } from "../lib/factExtractor";
+import { scrapeLogoUrl } from "../lib/logoScraper";
 import { downloadAndStoreLogo } from "../lib/logoStorage";
 import crypto from "crypto";
 import { requireUser, requireBrand, OwnershipError } from "../lib/ownership";
@@ -448,23 +448,12 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
           logger.warn({ err, brandId: brand.id }, "autopilot: inline kickoff failed");
         }
 
-        // Plan 4 audit (BUG #28): setImmediate is unreliable on Vercel
-        // serverless — the lambda can suspend immediately after
-        // res.json() and drop the queued work. waitUntil keeps the
-        // function alive past the response (locally it's a no-op shim).
-        // BUG #10: also surface failures to Sentry so dropped
-        // fact-scrapes actually page someone.
-        waitUntil(
-          (async () => {
-            try {
-              const { scrapeBrandFacts } = await import("../lib/factExtractor");
-              await scrapeBrandFacts(brand.id);
-            } catch (err) {
-              logger.warn({ err, brandId: brand.id }, "Welcome-path fact scrape failed");
-              captureAndFlush(err, { tags: { source: "welcome-fact-scrape" } });
-            }
-          })(),
-        );
+        // Plan 5 Task 8: the client-side v2 orchestration (useScrapeOrchestration)
+        // now triggers the fact scrape immediately after brand creation, so we no
+        // longer need the server-side waitUntil backstop here. Removing it avoids
+        // a double-scrape race where the old sequential run (triggeredBy:
+        // "welcome_confirm") blocks the Plan 5 /plan endpoint with a 409
+        // "already_running".
 
         res.json({ success: true, brandId: brand.id });
       } catch (err) {

@@ -58,6 +58,11 @@ import {
   type InsertBrandHallucination,
   type BrandFactSheet,
   type InsertBrandFactSheet,
+  type BrandFactScrapeRun,
+  type InsertBrandFactScrapeRun,
+  type BrandFactScrapePage,
+  type InsertBrandFactScrapePage,
+  type BrandMonthlyCostCap,
   type MetricsHistory,
   type InsertMetricsHistory,
   type AlertSettings,
@@ -520,6 +525,123 @@ export interface IStorage {
   ): Promise<BrandFactSheet | undefined>;
   deleteBrandFact(id: string): Promise<boolean>;
 
+  // ============================================================================
+  // Spec 2 §6: Brand Fact Sheet scrape runs + pages + cost caps + diff
+  // ============================================================================
+
+  // --- scrape runs ---
+  createScrapeRun(run: InsertBrandFactScrapeRun): Promise<BrandFactScrapeRun>;
+  getScrapeRunById(runId: string): Promise<BrandFactScrapeRun | null>;
+  listScrapeRunsForBrand(brandId: string, limit?: number): Promise<BrandFactScrapeRun[]>;
+  getInFlightScrapeRun(brandId: string): Promise<{ id: string } | null>;
+  getLastCompletedScrapeRunAt(brandId: string): Promise<Date | null>;
+  updateScrapeRunStatus(
+    runId: string,
+    status: BrandFactScrapeRun["status"],
+    fields?: {
+      completedAt?: Date | null;
+      errorKind?: string | null;
+      errorMessage?: string | null;
+      progress?: unknown;
+    },
+  ): Promise<BrandFactScrapeRun | null>;
+  /** Atomic compare-and-swap: only flip `status` from `expected` to `next`.
+   *  Returns the updated row, or null if the precondition didn't hold. */
+  transitionScrapeRunStatusCAS(
+    runId: string,
+    expected: BrandFactScrapeRun["status"],
+    next: BrandFactScrapeRun["status"],
+  ): Promise<BrandFactScrapeRun | null>;
+  incrementScrapeRunCounters(
+    runId: string,
+    deltas: Partial<{
+      pagesFetched: number;
+      pagesFailed: number;
+      factsExtracted: number;
+      factsValidated: number;
+      factsRedacted: number;
+      llmCostCents: number;
+      llmCalls: number;
+      llmInputTokens: number;
+      llmOutputTokens: number;
+    }>,
+  ): Promise<void>;
+  findSlicePendingRuns(staleSeconds: number, limit: number): Promise<BrandFactScrapeRun[]>;
+
+  // --- scrape pages ---
+  createScrapePage(page: InsertBrandFactScrapePage): Promise<BrandFactScrapePage>;
+  updateScrapePageStatus(
+    pageId: string,
+    status: BrandFactScrapePage["status"],
+    fields?: Partial<
+      Pick<
+        BrandFactScrapePage,
+        | "fetchedAt"
+        | "bytes"
+        | "statusCode"
+        | "contentType"
+        | "lang"
+        | "factCount"
+        | "llmCostCents"
+        | "errorKind"
+        | "errorMessage"
+        | "excerpt"
+      >
+    >,
+  ): Promise<BrandFactScrapePage | null>;
+  listScrapePagesForRun(runId: string): Promise<BrandFactScrapePage[]>;
+  getScrapePageById(
+    pageId: string,
+  ): Promise<{ id: string; runId: string; url: string; canonicalUrl: string } | null>;
+
+  // --- monthly cost caps ---
+  getMonthlyCostCap(brandId: string, monthKey: string): Promise<BrandMonthlyCostCap | null>;
+  /** Atomically increment month spend. Lazily creates the row if absent.
+   *  Returns the updated row. */
+  incrementMonthlyCostCents(
+    brandId: string,
+    monthKey: string,
+    deltaCents: number,
+  ): Promise<BrandMonthlyCostCap>;
+
+  // --- pause toggle ---
+  getBrandFactScrapeEnabled(brandId: string): Promise<boolean>;
+  setBrandFactScrapeEnabled(brandId: string, enabled: boolean): Promise<boolean>;
+
+  // --- diff (Spec 2 §4.6) ---
+  /** Returns the conflict pairs for a brand: (user-row, scraped-row) tuples
+   *  where neither has accepted_at nor dismissed_at set. Grouped by domain
+   *  client-side. */
+  getBrandFactSheetConflicts(
+    brandId: string,
+  ): Promise<Array<{ userFact: BrandFactSheet; scrapedFact: BrandFactSheet }>>;
+  /** Stamp accepted_at on the chosen fact. If `dismissOtherSide` is true,
+   *  also stamps dismissed_at on the conflicting row (used by Use-mine/Use-AI's).
+   *  Returns the updated fact. */
+  acceptFact(
+    factId: string,
+    options: { dismissOtherSide: boolean },
+  ): Promise<BrandFactSheet | null>;
+  /** Stamp dismissed_at on a fact. */
+  dismissFact(factId: string): Promise<BrandFactSheet | null>;
+
+  /** SSE incremental read: list facts inserted by `runId` whose `id > sinceId`,
+   *  ordered by id ASC, capped at `limit`. Consumed by Plan 2.3's SSE polling
+   *  loop to emit `event: fact` per new row since the last tick. */
+  listFactsByRunIdSince(
+    runId: string,
+    sinceId: string | null,
+    limit: number,
+  ): Promise<BrandFactSheet[]>;
+
+  // --- cross-instance concurrency ---
+  /** PG advisory lock keyed by hashtext('fact-scrape:' || brand_id). Returns
+   *  true if the caller now holds the lock, false otherwise. The lock is
+   *  transaction-scoped — must be held for the entire run. */
+  tryAcquireScrapeLock(brandId: string): Promise<boolean>;
+  /** Best-effort release (no-op if not held). */
+  releaseScrapeLock(brandId: string): Promise<void>;
+
   // Metrics History methods
   createMetricsSnapshot(snapshot: InsertMetricsHistory): Promise<MetricsHistory>;
   getMetricsHistory(brandId: string, metricType?: string, days?: number): Promise<MetricsHistory[]>;
@@ -862,6 +984,49 @@ export interface IStorage {
   clearTourStateForBrand(brandId: string): Promise<void>;
   recordTourEvents(events: import("@shared/schema").InsertTourEvent[]): Promise<number>;
   deleteOldTourEvents(olderThan: Date): Promise<number>;
+
+  // ── Plan 1 (v2): cache + observability + concurrency + system state ──
+  getFactScrapeCache(
+    cacheKey: string,
+  ): Promise<{ cacheKey: string; valueJson: unknown; expiresAt: Date } | null>;
+  upsertFactScrapeCache(row: {
+    cacheKey: string;
+    source: "search_llm";
+    brandId: string;
+    valueJson: unknown;
+    expiresAt: Date;
+  }): Promise<void>;
+  deleteExpiredFactScrapeCache(): Promise<number>;
+  deleteOldFactScrapePages(olderThanDays: number): Promise<number>;
+  deleteOldFactScrapeRuns(olderThanDays: number): Promise<number>;
+  deleteOldFactScrapeLogs(olderThanDays: number): Promise<number>;
+  deleteExpiredLlmConcurrencySlots(): Promise<number>;
+
+  insertFactScrapeLog(row: {
+    runId: string;
+    source: "static_pages" | "search_llm" | "user_enrich" | "aggregate" | "paste";
+    status: "done" | "failed" | "skipped";
+    factCount?: number;
+    latencyMs?: number;
+    providerLatencyMs?: number;
+    errorKind?: string;
+    diagnostics?: unknown;
+  }): Promise<void>;
+
+  /** SSE source-update: list all log entries for a run, ordered by createdAt ASC.
+   *  Consumed by the SSE poll loop to emit per-source status events. */
+  listFactScrapeLogsForRun(runId: string): Promise<
+    Array<{
+      source: string;
+      status: string;
+      factCount: number;
+      errorKind: string | null;
+      createdAt: Date;
+    }>
+  >;
+
+  getSystemState(key: string): Promise<unknown | null>;
+  setSystemState(key: string, value: unknown): Promise<void>;
 }
 
 import { DatabaseStorage } from "./databaseStorage";

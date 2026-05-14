@@ -48,25 +48,9 @@ export function setupPublicationsRoutes(app: Express): void {
     }),
   );
 
-  app.post(
-    "/api/brand-facts/scrape/:brandId",
-    aiLimitMiddleware,
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        const brand = await storage.getBrandById(req.params.brandId);
-        if (!brand || brand.userId !== user.id) {
-          return res.status(404).json({ success: false, error: "Brand not found" });
-        }
-        const { scrapeBrandFacts } = await import("../lib/factExtractor");
-        const inserted = await scrapeBrandFacts(brand.id);
-        const facts = await storage.getBrandFacts(brand.id);
-        res.json({ success: true, data: { inserted, facts } });
-      } catch (error) {
-        sendError(res, error, "Failed to scrape brand facts");
-      }
-    }),
-  );
+  // `POST /api/brand-facts/scrape/:brandId` removed in Spec 2 §4.10 — replaced
+  // by the slice-resumable `POST /api/brand-fact-sheet/runs` (server/routes/factSheet.ts).
+  // Plan 2.4 rewires the frontend Re-scrape button to the new endpoint.
 
   // Mention routes moved to server/routes/mentions.ts (mentions rebuild)
 

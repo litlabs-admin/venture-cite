@@ -6,6 +6,7 @@ import { aiVisibilityTour } from "./pages/ai-visibility.tour";
 import { citationsTour } from "./pages/citations.tour";
 import { geoToolsTour } from "./pages/geo-tools.tour";
 import { aiIntelligenceTour } from "./pages/ai-intelligence.tour";
+import { brandFactSheetTour } from "./pages/brand-fact-sheet.tour";
 import { firstScanCompleteNudge } from "./nudges/first-scan-complete.nudge";
 import { firstCitationFoundNudge } from "./nudges/first-citation-found.nudge";
 import { firstArticleGeneratedNudge } from "./nudges/first-article-generated.nudge";
@@ -25,6 +26,7 @@ export const TOURS: Record<string, TourConfig> = {
   [citationsTour.id]: citationsTour,
   [geoToolsTour.id]: geoToolsTour,
   [aiIntelligenceTour.id]: aiIntelligenceTour,
+  [brandFactSheetTour.id]: brandFactSheetTour,
   [firstScanCompleteNudge.id]: firstScanCompleteNudge,
   [firstCitationFoundNudge.id]: firstCitationFoundNudge,
   [firstArticleGeneratedNudge.id]: firstArticleGeneratedNudge,

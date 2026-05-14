@@ -10,6 +10,7 @@ import {
   X as XIcon,
   Plus,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,8 +21,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getAccessToken } from "@/lib/authStore";
 import { validateDomain } from "@shared/validateDomain";
+import { useScrapeOrchestration } from "@/hooks/useScrapeOrchestration";
+import { useSSEProgress } from "@/hooks/useSSEProgress";
+import { ScrapeProgressCardV2 } from "@/components/fact-sheet/ScrapeProgressCardV2";
 
-type Scene = "input" | "scraping" | "confirm";
+type Scene = "input" | "scraping" | "confirm" | "v2scraping";
 
 type LogEntry = { icon?: string; message: string; ts: number };
 
@@ -115,6 +119,11 @@ export default function Welcome() {
   const [editCompetitors, setEditCompetitors] = useState<Competitor[]>([]);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+
+  // v2 orchestration state (Plan 5 Task 8)
+  const [newBrandId, setNewBrandId] = useState<string | null>(null);
+  const orchestration = useScrapeOrchestration();
+  const orchLiveProgress = useSSEProgress(orchestration.runId);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -290,13 +299,16 @@ export default function Welcome() {
       };
       const res = await apiRequest("POST", "/api/onboarding/confirm", body);
       const json = (await res.json()) as { brandId: string };
-      // The FirstRunGate on /dashboard reads the cached /api/brands query to
-      // decide whether to redirect back here. Without invalidating, the cache
-      // still shows zero brands and bounces the user back to /welcome.
-      // Await the refetch so FirstRunGate sees the new brand on arrival.
+      // Invalidate brands cache so FirstRunGate on /dashboard sees the new brand.
       await queryClient.invalidateQueries({ queryKey: ["/api/brands"] });
       await queryClient.refetchQueries({ queryKey: ["/api/brands"] });
-      setLocation(`/dashboard?brandId=${json.brandId}`);
+      // Plan 5 Task 8: trigger the same v2 orchestration that the brand-fact-sheet
+      // Re-scrape button uses, so facts are built in the background while we show
+      // a progress scene. Navigate to dashboard after orchestration finishes (or
+      // the user skips).
+      setNewBrandId(json.brandId);
+      setScene("v2scraping");
+      orchestration.start(json.brandId);
     } catch (err: any) {
       toast({
         title: "Could not confirm brand",
@@ -307,6 +319,19 @@ export default function Welcome() {
       setSubmitting(false);
     }
   };
+
+  // Navigate to dashboard once v2 orchestration completes (or fails).
+  useEffect(() => {
+    if (scene !== "v2scraping" || !newBrandId) return;
+    if (
+      orchestration.status === "completed" ||
+      orchestration.status === "failed" ||
+      orchestration.status === "plan_failed" ||
+      orchestration.status === "offline"
+    ) {
+      setLocation(`/dashboard?brandId=${newBrandId}`);
+    }
+  }, [orchestration.status, scene, newBrandId, setLocation]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -632,6 +657,63 @@ export default function Welcome() {
                 data-testid="button-confirm-brand"
               >
                 {submitting ? "Confirming..." : "Confirm and go live"}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Plan 5 Task 8: v2 orchestration progress after brand creation */}
+      {scene === "v2scraping" && newBrandId && (
+        <Card className="w-full max-w-[560px]">
+          <CardContent className="p-8">
+            <div className="flex items-center gap-3">
+              {orchestration.status === "completed" ||
+              orchestration.status === "failed" ||
+              orchestration.status === "plan_failed" ? (
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              )}
+              <h2 className="text-xl font-semibold tracking-tight">
+                {orchestration.status === "completed"
+                  ? "Done! Taking you to your dashboard…"
+                  : orchestration.status === "plan_failed" || orchestration.status === "failed"
+                    ? "Scrape encountered an issue — continuing…"
+                    : "Building your fact sheet…"}
+              </h2>
+            </div>
+
+            <p className="mt-2 text-sm text-muted-foreground">
+              {orchestration.status === "planning"
+                ? "Planning which pages to read…"
+                : orchestration.status === "running"
+                  ? "Reading your website in parallel…"
+                  : orchestration.status === "aggregating"
+                    ? "Consolidating facts…"
+                    : orchestration.status === "completed" && orchestration.totalFacts === 0
+                      ? "We couldn't read your site automatically. You can fill in the fields manually on the next screen."
+                      : orchestration.status === "completed"
+                        ? `${orchestration.totalFacts} facts discovered.`
+                        : "We'll continue in the background — your dashboard is ready."}
+            </p>
+
+            <div className="mt-6">
+              <ScrapeProgressCardV2 sources={orchLiveProgress} />
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setLocation(`/dashboard?brandId=${newBrandId}`)}
+                data-testid="button-skip-to-dashboard"
+              >
+                {orchestration.status === "completed" ||
+                orchestration.status === "failed" ||
+                orchestration.status === "plan_failed"
+                  ? "Go to dashboard"
+                  : "Skip — go to dashboard"}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>

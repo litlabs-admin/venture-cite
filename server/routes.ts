@@ -91,6 +91,8 @@ import { setupGeoSignalsRoutes } from "./routes/geoSignals";
 import { setupCommunityRoutes } from "./routes/community";
 import { setupCronRoutes } from "./routes/cron";
 import { setupAssistantRoutes } from "./routes/assistant";
+import { setupFactSheetRoutes } from "./routes/factSheet";
+import { setupFactSheetV2Routes } from "./routes/factSheetV2";
 import { mentionsRouter } from "./routes/mentions";
 import { asyncHandler } from "./lib/asyncHandler";
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
@@ -742,6 +744,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupGeoSignalsRoutes(app);
   setupCommunityRoutes(app);
   setupAssistantRoutes(app);
+  setupFactSheetRoutes(app);
+  setupFactSheetV2Routes(app);
   app.use("/api/brand-mentions", mentionsRouter);
 
   const httpServer = createServer(app);

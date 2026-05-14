@@ -13,7 +13,9 @@ const stubs = vi.hoisted(() => ({
   runCompetitorDiscoveryJob: vi.fn(async () => undefined),
   runMentionScanJob: vi.fn(async () => undefined),
   runListicleScanJob: vi.fn(async () => undefined),
-  runFactRefreshJob: vi.fn(async () => undefined),
+  runFactScrapeBackstop: vi.fn(async () => ({ advanced: 0, failed: 0 })),
+  runMonthlyFactRefresh: vi.fn(async () => ({ processed: 0 })),
+  runWeeklySummary: vi.fn(async () => undefined),
   runWeeklyCatchupKickoff: vi.fn(async () => ({ started: 0, skipped: 0, failed: 0 })),
   runWeeklyDigestAggregator: vi.fn(async () => ({ sent: 0, pending: 0 })),
   runWeeklyReportJob: vi.fn(async () => ({ sent: 0, skipped: 0 })),
@@ -28,6 +30,11 @@ const stubs = vi.hoisted(() => ({
   listAdvanceablePendingJobs: vi.fn(async () => []),
   claimContentJobForSlice: vi.fn(async () => undefined),
   pruneChatbotMessages: vi.fn(async () => ({ deletedByAge: 0, deletedByCap: 0 })),
+  deleteOldFactScrapePages: vi.fn(async () => 0),
+  deleteOldFactScrapeRuns: vi.fn(async () => 0),
+  deleteOldFactScrapeLogs: vi.fn(async () => 0),
+  deleteExpiredFactScrapeCache: vi.fn(async () => 0),
+  deleteExpiredLlmConcurrencySlots: vi.fn(async () => 0),
   dbSelect: vi.fn(),
 }));
 
@@ -38,13 +45,21 @@ vi.mock("../../server/scheduler", () => ({
   runCompetitorDiscoveryJob: stubs.runCompetitorDiscoveryJob,
   runMentionScanJob: stubs.runMentionScanJob,
   runListicleScanJob: stubs.runListicleScanJob,
-  runFactRefreshJob: stubs.runFactRefreshJob,
   runWeeklyCatchupKickoff: stubs.runWeeklyCatchupKickoff,
   runWeeklyDigestAggregator: stubs.runWeeklyDigestAggregator,
   runWeeklyReportJob: stubs.runWeeklyReportJob,
 }));
 vi.mock("../../server/lib/citationReconciliation", () => ({
   reconcileOrphanCitationRuns: stubs.reconcileOrphanCitationRuns,
+}));
+vi.mock("../../server/lib/factAgent/v2/factScrapeBackstop", () => ({
+  runFactScrapeBackstop: stubs.runFactScrapeBackstop,
+}));
+vi.mock("../../server/lib/factAgent/v2/runMonthlyRefresh", () => ({
+  runMonthlyFactRefresh: stubs.runMonthlyFactRefresh,
+}));
+vi.mock("../../server/lib/factAgent/v2/weeklySummary", () => ({
+  runWeeklySummary: stubs.runWeeklySummary,
 }));
 vi.mock("../../server/lib/onboardingAutopilot", () => ({
   resumeInFlightAutopilots: stubs.resumeInFlightAutopilots,
@@ -72,6 +87,11 @@ vi.mock("../../server/storage", () => ({
     listAdvanceablePendingJobs: stubs.listAdvanceablePendingJobs,
     claimContentJobForSlice: stubs.claimContentJobForSlice,
     pruneChatbotMessages: stubs.pruneChatbotMessages,
+    deleteOldFactScrapePages: stubs.deleteOldFactScrapePages,
+    deleteOldFactScrapeRuns: stubs.deleteOldFactScrapeRuns,
+    deleteOldFactScrapeLogs: stubs.deleteOldFactScrapeLogs,
+    deleteExpiredFactScrapeCache: stubs.deleteExpiredFactScrapeCache,
+    deleteExpiredLlmConcurrencySlots: stubs.deleteExpiredLlmConcurrencySlots,
   },
 }));
 vi.mock("../../server/db", () => ({

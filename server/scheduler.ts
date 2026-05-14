@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { db } from "./db";
-import { and, eq, gte, isNull, isNotNull, lte } from "drizzle-orm";
+import { and, eq, gte, isNull, isNotNull, lte, sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { runBrandPrompts } from "./citationChecker";
 import { generateSuggestedPrompts } from "./lib/suggestionGenerator";
@@ -8,7 +8,6 @@ import { storage } from "./storage";
 import { sendWeeklyVisibilityReport, isEmailConfigured, type BrandReport } from "./emailService";
 import { discoverCompetitors } from "./lib/competitorDiscovery";
 import { withAdvisoryLock, lockKeys } from "./lib/advisoryLock";
-import { refreshScrapedFacts } from "./lib/factExtractor";
 import { runMentionScan } from "./lib/runMentionScan";
 import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
@@ -263,8 +262,6 @@ export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
 const COMPETITOR_DISCOVERY_CRON = process.env.COMPETITOR_DISCOVERY_CRON || "0 7 * * 1"; // Monday 7 AM UTC
 const MENTION_SCAN_CRON = process.env.MENTION_SCAN_CRON || "0 9 * * 1"; // Monday 9 AM UTC
 const LISTICLE_SCAN_CRON = process.env.LISTICLE_SCAN_CRON || "0 11 * * 1"; // Monday 11 AM UTC
-const FACT_REFRESH_CRON = process.env.FACT_REFRESH_CRON || "0 10 1 * *"; // 1st of month 10 AM UTC
-
 // Every per-brand iteration accepts a deadline so the daily orchestrator
 // can bail out cleanly before the function timeout. Brands that didn't
 // get processed today get retried tomorrow — natural backoff via the
@@ -354,10 +351,61 @@ export async function runListicleScanJob(deadlineMs?: number): Promise<void> {
     ),
   );
 }
-export async function runFactRefreshJob(deadlineMs?: number): Promise<void> {
-  await withAdvisoryLock(lockKeys.factRefresh, "fact-refresh", () =>
-    runForEveryBrand("fact-refresh", (bid) => refreshScrapedFacts(bid), { deadlineMs }),
+// Spec 2 §4.11: serial-failure alerting.
+// Daily at 11 UTC, find brands whose last 3 `triggered_by='cron_refresh'` runs
+// in the past 90 days all have `status='failed'` — fire Sentry alert +
+// structured log. Customer email notification deferred to v1.5.
+export async function detectFactScrapeFailureRate(): Promise<{ alerted: number }> {
+  let alerted = 0;
+  await withAdvisoryLock(
+    lockKeys.factScrapeFailureDetect,
+    "fact-scrape-failure-detect",
+    async () => {
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+      const result = await db.execute(sql`
+        WITH ranked AS (
+          SELECT brand_id, status, error_kind, started_at,
+                 ROW_NUMBER() OVER (PARTITION BY brand_id ORDER BY started_at DESC) AS rn
+          FROM brand_fact_scrape_runs
+          WHERE triggered_by = 'cron_refresh'
+            AND started_at >= ${ninetyDaysAgo}
+        )
+        SELECT brand_id,
+               array_agg(error_kind ORDER BY rn) FILTER (WHERE rn <= 3) AS error_kinds,
+               MAX(started_at) FILTER (WHERE rn = 1) AS last_failure_at,
+               bool_and(status = 'failed') FILTER (WHERE rn <= 3) AS all_failed,
+               COUNT(*) FILTER (WHERE rn <= 3) AS recent_count
+        FROM ranked
+        GROUP BY brand_id
+        HAVING COUNT(*) FILTER (WHERE rn <= 3) = 3
+           AND bool_and(status = 'failed') FILTER (WHERE rn <= 3) = TRUE
+      `);
+
+      const rows = ((result as unknown as { rows?: unknown[] }).rows ??
+        (result as unknown as unknown[])) as Array<{
+        brand_id: string;
+        error_kinds: string[] | null;
+        last_failure_at: Date | string | null;
+      }>;
+      for (const row of rows) {
+        const brandId = row.brand_id;
+        const errorKinds = row.error_kinds ?? [];
+        const lastFailureAt = row.last_failure_at;
+
+        logger.warn(
+          { brandId, errorKinds, lastFailureAt, event: "fact_scrape_serial_failure" },
+          "Brand has 3 consecutive cron_refresh scrape failures",
+        );
+        captureAndFlush(new Error(`fact_scrape_serial_failure brand=${brandId}`), {
+          tags: { source: "scheduler:detectFactScrapeFailureRate" },
+          extra: { brandId, errorKinds, lastFailureAt },
+        });
+        alerted += 1;
+      }
+    },
   );
+  return { alerted };
 }
 
 // Daily 03:00 UTC: hard-delete users whose 30-day grace window has
@@ -614,9 +662,18 @@ export function initScheduler(): void {
     cron.schedule(LISTICLE_SCAN_CRON, cronCrashGuard("listicle-scan", runListicleScanJob));
     logger.info({ cron: LISTICLE_SCAN_CRON }, "listicle scan scheduled");
   }
-  if (cron.validate(FACT_REFRESH_CRON)) {
-    cron.schedule(FACT_REFRESH_CRON, cronCrashGuard("fact-refresh", runFactRefreshJob));
-    logger.info({ cron: FACT_REFRESH_CRON }, "fact refresh scheduled");
+  // Spec 2 §4.11: serial-failure alerting — daily at 11 UTC.
+  const DETECT_FACT_SCRAPE_FAILURE_CRON =
+    process.env.DETECT_FACT_SCRAPE_FAILURE_CRON || "0 11 * * *";
+  if (cron.validate(DETECT_FACT_SCRAPE_FAILURE_CRON)) {
+    cron.schedule(
+      DETECT_FACT_SCRAPE_FAILURE_CRON,
+      cronCrashGuard("detect-fact-scrape-failure", detectFactScrapeFailureRate),
+    );
+    logger.info(
+      { cron: DETECT_FACT_SCRAPE_FAILURE_CRON },
+      "fact scrape failure detector scheduled",
+    );
   }
 
   // Workflow tick — formerly a 30s global cron, dropped for serverless

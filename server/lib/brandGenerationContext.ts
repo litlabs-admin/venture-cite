@@ -62,7 +62,8 @@ export function renderFactsBlock(facts: BrandFactSheet[]): string {
     const value = String(f.factValue ?? "")
       .slice(0, 500)
       .trim();
-    return `- [${f.factCategory}] ${f.factKey}: ${value}`;
+    // TODO(spec-2 Plan 2.4): `subcategory` replaces `factCategory`.
+    return `- [${f.subcategory}] ${f.factKey}: ${value}`;
   });
   return [
     "Verified facts about this brand. The model MUST use these and MUST NOT contradict them.",
