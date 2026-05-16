@@ -37,19 +37,9 @@ const HALLUCINATION_REMEDIATION_TRANSITIONS: TransitionMap = {
   verified: [],
 };
 
-const OUTREACH_EMAIL_TRANSITIONS: TransitionMap = {
-  draft: ["scheduled", "sent", "cancelled"],
-  scheduled: ["sent", "cancelled"],
-  sent: ["bounced", "replied"],
-  bounced: [],
-  replied: [],
-  cancelled: [],
-};
-
 const MAPS: Record<string, TransitionMap> = {
   agent_task: AGENT_TASK_TRANSITIONS,
   hallucination_remediation: HALLUCINATION_REMEDIATION_TRANSITIONS,
-  outreach_email: OUTREACH_EMAIL_TRANSITIONS,
 };
 
 export type StateMachineName = keyof typeof MAPS;

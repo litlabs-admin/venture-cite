@@ -550,10 +550,7 @@ export async function runWeeklyCatchupKickoff(): Promise<{
               eq(schema.workflowRuns.workflowKey, "weekly_catchup"),
             ),
           );
-        const hasActive = existing.some(
-          (r) =>
-            r.status === "pending" || r.status === "running" || r.status === "awaiting_approval",
-        );
+        const hasActive = existing.some((r) => r.status === "pending" || r.status === "running");
         if (hasActive) {
           skipped += 1;
           logger.info(

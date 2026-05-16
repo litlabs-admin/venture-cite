@@ -60,12 +60,6 @@ const envSchema = z.object({
   DATABASE_CA_CERT_PATH: z.string().optional(),
   DATABASE_SSL_REJECT_UNAUTHORIZED: z.enum(["true", "false"]).optional(),
 
-  // Shopify webhook secret. When unset, the Shopify webhook endpoint
-  // refuses every request (fail closed) — set this to enable the
-  // integration. From Shopify admin → Notifications → Webhooks (or
-  // app config), copy the "Webhook signing secret".
-  SHOPIFY_WEBHOOK_SECRET: z.string().optional(),
-
   // HMAC secret for email unsubscribe tokens. Falls back to
   // SESSION_SECRET when unset. Generate with `openssl rand -base64 32`.
   EMAIL_UNSUBSCRIBE_SECRET: z.string().optional(),

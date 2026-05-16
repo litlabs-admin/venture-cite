@@ -115,63 +115,11 @@ export async function requireBrandMention(
   return loadEntityThroughBrand(schema.brandMentions, id, userId, "Brand mention not found");
 }
 
-export async function requireAiSource(
-  id: string,
-  userId: string,
-): Promise<typeof schema.aiSources.$inferSelect> {
-  return loadEntityThroughBrand(schema.aiSources, id, userId, "AI source not found");
-}
-
 export async function requirePromptTest(
   id: string,
   userId: string,
 ): Promise<typeof schema.promptTestRuns.$inferSelect> {
   return loadEntityThroughBrand(schema.promptTestRuns, id, userId, "Prompt test not found");
-}
-
-export async function requireAgentTask(
-  id: string,
-  userId: string,
-): Promise<typeof schema.agentTasks.$inferSelect> {
-  return loadEntityThroughBrand(schema.agentTasks, id, userId, "Agent task not found");
-}
-
-export async function requireOutreachCampaign(
-  id: string,
-  userId: string,
-): Promise<typeof schema.outreachCampaigns.$inferSelect> {
-  return loadEntityThroughBrand(
-    schema.outreachCampaigns,
-    id,
-    userId,
-    "Outreach campaign not found",
-  );
-}
-
-export async function requireAutomationRule(
-  id: string,
-  userId: string,
-): Promise<typeof schema.automationRules.$inferSelect> {
-  return loadEntityThroughBrand(schema.automationRules, id, userId, "Automation rule not found");
-}
-
-export async function requirePublicationTarget(
-  id: string,
-  userId: string,
-): Promise<typeof schema.publicationTargets.$inferSelect> {
-  return loadEntityThroughBrand(
-    schema.publicationTargets,
-    id,
-    userId,
-    "Publication target not found",
-  );
-}
-
-export async function requireOutreachEmail(
-  id: string,
-  userId: string,
-): Promise<typeof schema.outreachEmails.$inferSelect> {
-  return loadEntityThroughBrand(schema.outreachEmails, id, userId, "Outreach email not found");
 }
 
 export async function requireCommunityPost(

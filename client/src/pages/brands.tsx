@@ -65,7 +65,7 @@ import {
   ArrowRight,
   Shield,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { normalizeWebsite, safeExternalHref } from "@/lib/urlSafety";
 import BrandFormFields from "@/components/BrandFormFields";
 import DeleteBrandDialog from "@/components/DeleteBrandDialog";
@@ -122,6 +122,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function Brands() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [showManualForm, setShowManualForm] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -208,7 +209,7 @@ export default function Brands() {
     "Building your brand profile...",
   ]);
 
-  const createMutation = useMutation({
+  const createMutation = useMutation<{ id: string; [k: string]: unknown }, Error, FormValues>({
     mutationFn: async (data: FormValues) => {
       const brandData = {
         ...data,
@@ -221,16 +222,20 @@ export default function Brands() {
           ? data.nameVariations.split(",").map((n) => n.trim())
           : [],
       };
-      return apiRequest("POST", "/api/brands", brandData);
+      const res = await apiRequest("POST", "/api/brands", brandData);
+      return res.json() as Promise<{ id: string; [k: string]: unknown }>;
     },
-    onSuccess: () => {
+    onSuccess: (newBrand) => {
       queryClient.invalidateQueries({ queryKey: ["/api/brands"] });
       setShowManualForm(false);
       form.reset();
       toast({
         title: "Brand created",
-        description: "Your brand profile has been created successfully.",
+        description: "Reading your website...",
       });
+      if (newBrand?.id) {
+        setLocation(`/brand-fact-sheet?autoScrape=${encodeURIComponent(newBrand.id)}`);
+      }
     },
     onError: (error: Error) => {
       let title = "Error";

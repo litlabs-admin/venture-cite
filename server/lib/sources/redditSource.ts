@@ -131,9 +131,10 @@ export async function scanRedditSource(
   input: RedditScanInput,
 ): Promise<{ mentions: RedditMention[]; failed?: string }> {
   const useOAuth = hasRedditOAuthCredentials();
-  // Match Reddit web search defaults: sort=relevance + t=all (no time filter).
-  // Brand monitoring should surface every mention, not just recent ones.
-  const t = "all";
+  // First scan (no sinceUnix): cast a wide net with t=year.
+  // Subsequent scans (sinceUnix set): only look at the last week to keep
+  // requests fast and results fresh.
+  const t = input.sinceUnix === undefined ? "year" : "week";
 
   try {
     if (useOAuth) {

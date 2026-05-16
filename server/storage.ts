@@ -22,14 +22,6 @@ import {
   type InsertContentGenerationJob,
   type Brand,
   type InsertBrand,
-  type CommerceSession,
-  type InsertCommerceSession,
-  type PurchaseEvent,
-  type InsertPurchaseEvent,
-  type PublicationReference,
-  type InsertPublicationReference,
-  type PublicationMetric,
-  type InsertPublicationMetric,
   type Competitor,
   type InsertCompetitor,
   type CompetitorCitationSnapshot,
@@ -69,24 +61,10 @@ import {
   type InsertAlertSettings,
   type AlertHistory,
   type InsertAlertHistory,
-  type AiSource,
-  type InsertAiSource,
-  type AiTrafficSession,
-  type InsertAiTrafficSession,
   type PromptTestRun,
   type InsertPromptTestRun,
   type AgentTask,
   type InsertAgentTask,
-  type OutreachCampaign,
-  type InsertOutreachCampaign,
-  type PublicationTarget,
-  type InsertPublicationTarget,
-  type OutreachEmail,
-  type InsertOutreachEmail,
-  type AutomationRule,
-  type InsertAutomationRule,
-  type AutomationExecution,
-  type InsertAutomationExecution,
   type BetaInviteCode,
   type InsertBetaInviteCode,
   type KeywordResearch,
@@ -292,39 +270,6 @@ export interface IStorage {
   failStuckContentJobs(
     olderThanMinutes: number,
   ): Promise<Array<{ id: string; userId: string; articleId: string | null }>>;
-
-  // Commerce Session methods
-  createCommerceSession(session: InsertCommerceSession): Promise<CommerceSession>;
-  getCommerceSessions(filters?: {
-    articleId?: string;
-    brandId?: string;
-    aiPlatform?: string;
-  }): Promise<CommerceSession[]>;
-
-  // Purchase Event methods
-  createPurchaseEvent(event: InsertPurchaseEvent): Promise<PurchaseEvent>;
-  getPurchaseEvents(filters?: {
-    articleId?: string;
-    brandId?: string;
-    aiPlatform?: string;
-  }): Promise<PurchaseEvent[]>;
-  getTotalRevenue(filters?: { brandId?: string; aiPlatform?: string }): Promise<number>;
-
-  // Publication Reference methods
-  createPublicationReference(ref: InsertPublicationReference): Promise<PublicationReference>;
-  getPublicationReferences(filters?: {
-    industry?: string;
-    aiPlatform?: string;
-  }): Promise<PublicationReference[]>;
-  updatePublicationReference(
-    id: string,
-    update: Partial<InsertPublicationReference>,
-  ): Promise<PublicationReference | undefined>;
-
-  // Publication Metrics methods
-  upsertPublicationMetric(metric: InsertPublicationMetric): Promise<PublicationMetric>;
-  getPublicationMetrics(industry?: string): Promise<PublicationMetric[]>;
-  getTopPublicationsByIndustry(industry: string, limit?: number): Promise<PublicationMetric[]>;
 
   // Competitor methods
   createCompetitor(competitor: InsertCompetitor): Promise<Competitor>;
@@ -661,32 +606,6 @@ export interface IStorage {
   createAlertHistory(history: InsertAlertHistory): Promise<AlertHistory>;
   getAlertHistory(brandId: string, limit?: number): Promise<AlertHistory[]>;
 
-  // AI Sources methods (Citation Network Tracing)
-  createAiSource(source: InsertAiSource): Promise<AiSource>;
-  getAiSources(
-    brandId?: string,
-    filters?: { aiPlatform?: string; sourceType?: string },
-  ): Promise<AiSource[]>;
-  getAiSourceById(id: string): Promise<AiSource | undefined>;
-  updateAiSource(id: string, update: Partial<InsertAiSource>): Promise<AiSource | undefined>;
-  deleteAiSource(id: string): Promise<boolean>;
-  getTopAiSources(brandId: string, limit?: number): Promise<AiSource[]>;
-
-  // AI Traffic Analytics methods
-  createAiTrafficSession(session: InsertAiTrafficSession): Promise<AiTrafficSession>;
-  getAiTrafficSessions(
-    brandId?: string,
-    filters?: { aiPlatform?: string; converted?: boolean },
-  ): Promise<AiTrafficSession[]>;
-  getAiTrafficStats(brandId: string): Promise<{
-    totalSessions: number;
-    totalPageViews: number;
-    conversions: number;
-    conversionRate: number;
-    byPlatform: Record<string, { sessions: number; conversions: number }>;
-    avgSessionDuration: number;
-  }>;
-
   // Prompt Test Run methods
   createPromptTestRun(run: InsertPromptTestRun): Promise<PromptTestRun>;
   getPromptTestRuns(
@@ -699,90 +618,14 @@ export interface IStorage {
     update: Partial<InsertPromptTestRun>,
   ): Promise<PromptTestRun | undefined>;
 
-  // Agent Task Queue methods
+  // Agent Task Queue — minimal surface kept for the workflow engine. The
+  // /api/agent-tasks routes were deleted with the agent-dashboard page, so
+  // list / stats / next-queued / delete methods are gone too. Only the four
+  // methods workflowEngine + agentTaskExecutor actually call remain.
   createAgentTask(task: InsertAgentTask): Promise<AgentTask>;
-  getAgentTasks(
-    brandId?: string,
-    filters?: { status?: string; taskType?: string; priority?: string },
-  ): Promise<AgentTask[]>;
   getAgentTaskById(id: string): Promise<AgentTask | undefined>;
   updateAgentTask(id: string, update: Partial<InsertAgentTask>): Promise<AgentTask | undefined>;
   claimAgentTask(id: string): Promise<AgentTask | null>;
-  deleteAgentTask(id: string): Promise<boolean>;
-  getNextQueuedTask(): Promise<AgentTask | undefined>;
-  getAgentTaskStats(brandId?: string): Promise<{
-    queued: number;
-    inProgress: number;
-    completed: number;
-    failed: number;
-    totalTokensUsed: number;
-  }>;
-
-  // Outreach Campaign methods
-  createOutreachCampaign(campaign: InsertOutreachCampaign): Promise<OutreachCampaign>;
-  getOutreachCampaigns(
-    brandId?: string,
-    filters?: { status?: string; campaignType?: string },
-  ): Promise<OutreachCampaign[]>;
-  getOutreachCampaignById(id: string): Promise<OutreachCampaign | undefined>;
-  updateOutreachCampaign(
-    id: string,
-    update: Partial<InsertOutreachCampaign>,
-  ): Promise<OutreachCampaign | undefined>;
-  deleteOutreachCampaign(id: string): Promise<boolean>;
-  getOutreachStats(
-    brandId: string,
-  ): Promise<{ total: number; byStatus: Record<string, number>; successRate: number }>;
-
-  // Publication Target methods
-  createPublicationTarget(target: InsertPublicationTarget): Promise<PublicationTarget>;
-  getPublicationTargets(
-    brandId?: string,
-    filters?: { status?: string; category?: string; industry?: string },
-  ): Promise<PublicationTarget[]>;
-  getPublicationTargetById(id: string): Promise<PublicationTarget | undefined>;
-  updatePublicationTarget(
-    id: string,
-    update: Partial<InsertPublicationTarget>,
-  ): Promise<PublicationTarget | undefined>;
-  deletePublicationTarget(id: string): Promise<boolean>;
-  discoverPublications(brandId: string, industry: string): Promise<PublicationTarget[]>;
-  findContacts(targetId: string): Promise<PublicationTarget | undefined>;
-
-  // Outreach Email methods
-  createOutreachEmail(email: InsertOutreachEmail): Promise<OutreachEmail>;
-  getOutreachEmails(
-    brandId?: string,
-    filters?: { status?: string; campaignId?: string },
-  ): Promise<OutreachEmail[]>;
-  getOutreachEmailById(id: string): Promise<OutreachEmail | undefined>;
-  updateOutreachEmail(
-    id: string,
-    update: Partial<InsertOutreachEmail>,
-  ): Promise<OutreachEmail | undefined>;
-  deleteOutreachEmail(id: string): Promise<boolean>;
-  sendOutreachEmail(id: string): Promise<OutreachEmail | undefined>;
-  getOutreachEmailStats(brandId: string): Promise<{
-    sent: number;
-    opened: number;
-    replied: number;
-    openRate: number;
-    replyRate: number;
-  }>;
-
-  // Automation Rule methods — most removed; the workflow engine replaces
-  // this surface. `getAutomationRuleById` stays because the
-  // requireAutomationRule ownership helper still uses it for the
-  // remaining automation-executions routes.
-  getAutomationRuleById(id: string): Promise<AutomationRule | undefined>;
-
-  // Automation Execution methods
-  createAutomationExecution(execution: InsertAutomationExecution): Promise<AutomationExecution>;
-  getAutomationExecutions(ruleId?: string, limit?: number): Promise<AutomationExecution[]>;
-  updateAutomationExecution(
-    id: string,
-    update: Partial<InsertAutomationExecution>,
-  ): Promise<AutomationExecution | undefined>;
 
   // Beta Invite Code methods
   createBetaInviteCode(code: InsertBetaInviteCode): Promise<BetaInviteCode>;

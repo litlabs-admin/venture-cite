@@ -57,6 +57,13 @@ export async function assertSafeUrl(raw: string): Promise<URL> {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("Only http(s) URLs are allowed");
   }
+  // Check the raw authority segment (between :// and the first /, ?, or #).
+  // URLs like "http:///path" have an empty authority — the URL parser then
+  // misidentifies the first path segment as the hostname, which causes
+  // dns.lookup() to hang for several seconds on an unresolvable single-word
+  // label before timing out. Reject empty authority early.
+  const rawAuthority = raw.match(/^https?:\/\/([^/?#]*)/)?.[1] ?? "";
+  if (!rawAuthority) throw new Error("URL has no host");
   const host = url.hostname;
   if (!host) throw new Error("URL has no host");
 

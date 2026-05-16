@@ -1,12 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "../db";
 import * as schema from "@shared/schema";
-import type {
-  InsertWorkflowRun,
-  WorkflowRun,
-  InsertWorkflowApproval,
-  WorkflowApproval,
-} from "@shared/schema";
+import type { InsertWorkflowRun, WorkflowRun } from "@shared/schema";
 
 export type WorkflowRunFilters = {
   status?: string;
@@ -63,41 +58,6 @@ export const workflowStorage = {
       .update(schema.workflowRuns)
       .set({ ...patch, updatedAt: new Date() })
       .where(eq(schema.workflowRuns.id, id))
-      .returning();
-    return row;
-  },
-
-  async createApproval(data: InsertWorkflowApproval): Promise<WorkflowApproval> {
-    const [row] = await db.insert(schema.workflowApprovals).values(data).returning();
-    return row;
-  },
-
-  async getPendingApproval(
-    runId: string,
-    stepIndex: number,
-  ): Promise<WorkflowApproval | undefined> {
-    const rows = await db
-      .select()
-      .from(schema.workflowApprovals)
-      .where(
-        and(
-          eq(schema.workflowApprovals.runId, runId),
-          eq(schema.workflowApprovals.stepIndex, stepIndex),
-        ),
-      )
-      .orderBy(desc(schema.workflowApprovals.createdAt));
-    return rows.find((r) => r.respondedAt == null);
-  },
-
-  async respondToApproval(
-    id: string,
-    decision: "approved" | "rejected",
-    respondedAt: Date,
-  ): Promise<WorkflowApproval | undefined> {
-    const [row] = await db
-      .update(schema.workflowApprovals)
-      .set({ decision, respondedAt })
-      .where(eq(schema.workflowApprovals.id, id))
       .returning();
     return row;
   },

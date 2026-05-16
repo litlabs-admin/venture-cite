@@ -1,16 +1,11 @@
-// Publications + competitors + misc scans (Wave 5.1).
+// Competitors + misc scans + robots/sitemap (Wave 5.1).
 //
 // Extracted from server/routes.ts as part of the per-domain split.
+// Publication-intelligence routes were removed (Tier 2B orphan cleanup).
 // Includes:
 //   POST /api/competitors/discover/:brandId   — manual competitor discovery
-//   POST /api/brand-facts/scrape/:brandId     — manual fact-sheet scrape
-//   POST /api/brand-mentions/scan/:brandId    — manual mention scan
 //   GET  /robots.txt                          — AI crawler allow-list
-//   GET  /api/publications/metrics/:industry
-//   GET  /api/publications/top/:industry
-//   GET  /api/publications/references
-//   POST /api/publications/reference
-//   POST /api/publications/metrics
+//   GET  /sitemap.xml
 //   GET  /api/competitors/leaderboard
 //   GET  /api/competitors
 //   POST /api/competitors
@@ -136,94 +131,6 @@ ${articleEntries}
       res.header("Content-Type", "application/xml");
       res.header("Cache-Control", "public, max-age=3600");
       res.send(xml);
-    }),
-  );
-
-  // ========== PUBLICATION INTELLIGENCE API ROUTES ==========
-
-  // Get publication metrics for industry
-  app.get(
-    "/api/publications/metrics/:industry",
-    asyncHandler(async (req, res) => {
-      try {
-        const { industry } = req.params;
-        const metrics = await storage.getPublicationMetrics(industry);
-
-        res.json({ success: true, data: metrics });
-      } catch (error) {
-        captureAndFlush(error, { tags: { source: "publications.ts:250" } });
-        res.status(500).json({ success: false, error: "Failed to fetch publication metrics" });
-      }
-    }),
-  );
-
-  // Get top publications by industry
-  app.get(
-    "/api/publications/top/:industry",
-    asyncHandler(async (req, res) => {
-      try {
-        const { industry } = req.params;
-        const limit = parseInt(req.query.limit as string) || 10;
-
-        const topPublications = await storage.getTopPublicationsByIndustry(industry, limit);
-
-        res.json({ success: true, data: topPublications });
-      } catch (error) {
-        captureAndFlush(error, { tags: { source: "publications.ts:264" } });
-        res.status(500).json({ success: false, error: "Failed to fetch top publications" });
-      }
-    }),
-  );
-
-  // Get all publication references
-  app.get(
-    "/api/publications/references",
-    asyncHandler(async (req, res) => {
-      try {
-        const { industry, aiPlatform } = req.query;
-
-        const filters = {
-          industry: industry as string | undefined,
-          aiPlatform: aiPlatform as string | undefined,
-        };
-
-        const references = await storage.getPublicationReferences(filters);
-
-        res.json({ success: true, data: references });
-      } catch (error) {
-        captureAndFlush(error, { tags: { source: "publications.ts:282" } });
-        res.status(500).json({ success: false, error: "Failed to fetch publication references" });
-      }
-    }),
-  );
-
-  // Create or update publication reference (from GEO ranking checks)
-  app.post(
-    "/api/publications/reference",
-    asyncHandler(async (req, res) => {
-      try {
-        const reference = await storage.createPublicationReference(req.body);
-
-        res.json({ success: true, data: reference });
-      } catch (error) {
-        captureAndFlush(error, { tags: { source: "publications.ts:293" } });
-        res.status(500).json({ success: false, error: "Failed to create publication reference" });
-      }
-    }),
-  );
-
-  // Update publication metrics (aggregation endpoint)
-  app.post(
-    "/api/publications/metrics",
-    asyncHandler(async (req, res) => {
-      try {
-        const metric = await storage.upsertPublicationMetric(req.body);
-
-        res.json({ success: true, data: metric });
-      } catch (error) {
-        captureAndFlush(error, { tags: { source: "publications.ts:304" } });
-        res.status(500).json({ success: false, error: "Failed to update publication metrics" });
-      }
     }),
   );
 

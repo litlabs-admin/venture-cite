@@ -5,7 +5,6 @@ import { storage } from "../../storage";
 import { attachAiLogger } from "../aiLogger";
 import { MODELS } from "../modelConfig";
 import { logger } from "../logger";
-import { isEmailConfigured } from "../../emailService";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -47,7 +46,6 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
       label: "Citation check",
       description: "Run prompt tests over all tracked prompts for the brand.",
       taskType: "prompt_test",
-      requiresApproval: false,
       buildInput: () => ({}),
       extractOutput: (task) => {
         const data = (task.outputData ?? {}) as CitationCheckOutput;
@@ -64,7 +62,6 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
       label: "Delta vs last week",
       description:
         "Compare this week's citation score and per-prompt results against the prior snapshot.",
-      requiresApproval: false,
       buildInput: () => ({}),
       extractOutput: () => ({}),
       run: async (ctx: WorkflowStepContext) => {
@@ -131,7 +128,6 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
       key: "hallucination_scan",
       label: "Hallucination scan",
       description: "Collect open brand hallucinations with emphasis on newly losing prompts.",
-      requiresApproval: false,
       buildInput: () => ({}),
       extractOutput: () => ({}),
       run: async (ctx: WorkflowStepContext) => {
@@ -142,42 +138,9 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
       },
     },
     {
-      key: "spawn_remediations",
-      label: "Spawn remediations",
-      description: "Queue a hallucination_remediation task for each high-severity finding.",
-      requiresApproval: false,
-      buildInput: () => ({}),
-      extractOutput: () => ({}),
-      run: async (ctx: WorkflowStepContext) => {
-        const scan =
-          (ctx.priorOutputs.hallucination_scan as Record<string, unknown> | undefined) ?? {};
-        const detected = (scan.detected as BrandHallucination[] | undefined) ?? [];
-        const highSev = detected.filter((h) => h.severity === "high" || h.severity === "critical");
-        const spawnedTaskIds: string[] = [];
-        for (const h of highSev) {
-          const t = await storage.createAgentTask({
-            brandId: ctx.run.brandId,
-            taskType: "hallucination_remediation",
-            taskTitle: "Remediate hallucination",
-            taskDescription: `Auto-spawned from weekly catch-up for hallucination ${h.id}.`,
-            triggeredBy: "automation_rule",
-            status: "queued",
-            inputData: { hallucinationId: h.id } as never,
-            workflowRunId: ctx.run.id,
-            workflowStepKey: "spawn_remediations",
-            priority: "high",
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any);
-          spawnedTaskIds.push(t.id);
-        }
-        return { spawnedTaskIds };
-      },
-    },
-    {
       key: "compose_digest",
       label: "Compose digest",
       description: "Build the weekly digest payload with an LLM-generated top insight.",
-      requiresApproval: false,
       buildInput: () => ({}),
       extractOutput: () => ({}),
       run: async (ctx: WorkflowStepContext) => {
@@ -185,10 +148,7 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
         const delta = (ctx.priorOutputs.delta_calc as Record<string, unknown> | undefined) ?? {};
         const scan =
           (ctx.priorOutputs.hallucination_scan as Record<string, unknown> | undefined) ?? {};
-        const spawned =
-          (ctx.priorOutputs.spawn_remediations as Record<string, unknown> | undefined) ?? {};
         const detected = (scan.detected as BrandHallucination[] | undefined) ?? [];
-        const spawnedIds = (spawned.spawnedTaskIds as string[] | undefined) ?? [];
         const newlyWonCount = ((delta.newlyWon as string[] | undefined) ?? []).length;
         const newlyLostCount = ((delta.newlyLost as string[] | undefined) ?? []).length;
         const currentScore = Number(delta.currentScore ?? 0);
@@ -242,7 +202,6 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
           newlyWonCount,
           newlyLostCount,
           hallucinationCount: detected.length,
-          spawnedTaskCount: spawnedIds.length,
           topInsight,
         };
       },
@@ -257,11 +216,9 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
       label: "Mark digest ready",
       description:
         "Record that this brand's catch-up is complete. Scheduler aggregator sends the actual user-level digest.",
-      requiresApproval: false,
       buildInput: () => ({}),
       extractOutput: () => ({}),
       run: async (ctx: WorkflowStepContext) => {
-        void isEmailConfigured;
         return {
           readyForDigest: true,
           userId: ctx.run.userId,

@@ -128,6 +128,26 @@ export default function BrandFactSheet() {
   const orchestration = useScrapeOrchestration();
   const orchLiveProgress = useSSEProgress(orchestration.runId);
 
+  // Auto-fire orchestration when redirected from a brand-create flow.
+  // /brands page redirects to /brand-fact-sheet?autoScrape=<newBrandId> after creating a brand.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (orchestration.status !== "idle") return;
+    if (!selectedBrandId) return;
+    const params = new URLSearchParams(window.location.search);
+    const autoScrapeId = params.get("autoScrape");
+    if (autoScrapeId && autoScrapeId === selectedBrandId) {
+      orchestration.start(selectedBrandId);
+      // Strip the param so a refresh doesn't re-trigger.
+      params.delete("autoScrape");
+      const newSearch = params.toString();
+      const newUrl =
+        window.location.pathname + (newSearch ? `?${newSearch}` : "") + window.location.hash;
+      window.history.replaceState(null, "", newUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBrandId]);
+
   // Auto-invalidate facts query when orchestration completes with facts.
   useEffect(() => {
     if (orchestration.status === "completed" && orchestration.totalFacts > 0 && selectedBrandId) {

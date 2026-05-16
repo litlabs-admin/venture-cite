@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, pool } from "../db";
 import * as schema from "@shared/schema";
 import type { AgentTask, WorkflowRun } from "@shared/schema";
@@ -10,13 +10,7 @@ import { executeAgentTask } from "./agentTaskExecutor";
 import { runArticleSlice } from "../contentGenerationWorker";
 
 import { captureAndFlush } from "./sentryReport";
-export type StepStatus =
-  | "pending"
-  | "awaiting_approval"
-  | "running"
-  | "completed"
-  | "failed"
-  | "skipped";
+export type StepStatus = "pending" | "running" | "completed" | "failed" | "skipped";
 
 export type StepState = {
   key: string;
@@ -39,7 +33,6 @@ export type WorkflowStep = {
   label: string;
   description: string;
   taskType?: AgentTaskType;
-  requiresApproval: boolean;
   parallel?: boolean;
   /** For parallel steps: what happens when ≥1 task fails but ≥1 succeeds.
    *  "fail" (default) — fail whole step. "continue" — complete with the
@@ -53,7 +46,6 @@ export type WorkflowStep = {
   buildInput: (ctx: WorkflowStepContext) => unknown;
   extractOutput: (task: AgentTask) => unknown;
   run?: (ctx: WorkflowStepContext) => Promise<unknown>;
-  buildApprovalSummary?: (ctx: WorkflowStepContext) => unknown;
 };
 
 export type WorkflowDefinition = {
@@ -231,71 +223,6 @@ async function advanceRunInner(runId: string): Promise<void> {
   const current: StepState = states[idx] ?? { key: step.key, status: "pending" };
 
   if (current.status === "pending") {
-    // Approval gate for SYNTHETIC steps: run the body first (so the user sees
-    // concrete output in the approval summary), then pause. Without this the
-    // body never executes — the approval blocks it, then approval resets the
-    // state to pending, which re-triggers the approval check → infinite no-op.
-    if (step.requiresApproval && step.run && !step.taskType) {
-      const existing = await workflowStorage.getPendingApproval(runId, idx);
-      if (!existing) {
-        let output: unknown;
-        try {
-          output = await step.run(ctx);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          logger.error(
-            { err, runId, stepKey: step.key },
-            "workflow: pre-approval synthetic step failed",
-          );
-          states[idx] = {
-            ...current,
-            status: "failed",
-            error: msg,
-            completedAt: new Date().toISOString(),
-          };
-          await workflowStorage.updateRun(runId, {
-            status: "failed",
-            lastError: msg,
-            stepStates: states as never,
-          });
-          return;
-        }
-        const summary = step.buildApprovalSummary
-          ? step.buildApprovalSummary({
-              ...ctx,
-              priorOutputs: { ...ctx.priorOutputs, [step.key]: output },
-            })
-          : { stepKey: step.key, label: step.label };
-        await workflowStorage.createApproval({
-          runId,
-          stepIndex: idx,
-          summary: summary as never,
-        });
-        states[idx] = {
-          ...current,
-          status: "awaiting_approval",
-          startedAt: new Date().toISOString(),
-          output,
-        };
-        await workflowStorage.updateRun(runId, {
-          status: "awaiting_approval",
-          stepStates: states as never,
-        });
-        return;
-      }
-      // Pending approval already exists — nothing to do; wait.
-      states[idx] = { ...current, status: "awaiting_approval" };
-      await workflowStorage.updateRun(runId, {
-        status: "awaiting_approval",
-        stepStates: states as never,
-      });
-      return;
-    }
-
-    // Task-based approval steps: fall through to create the task. The gate
-    // fires in the "running → all tasks done" branch below, once there's
-    // real output for the user to review.
-
     // await_job step: poll content_generation_jobs rather than spawn a task.
     if (step.awaitJob) {
       const jobId = step.getJobId ? step.getJobId(priorOutputs) : null;
@@ -415,7 +342,9 @@ async function advanceRunInner(runId: string): Promise<void> {
         taskType: step.taskType,
         taskTitle: step.label,
         taskDescription: step.description,
-        triggeredBy: "automation_rule",
+        // Inherit the parent workflow's trigger source so the agent_task is
+        // tagged accurately (cron for Monday catch-up, manual for user-kicked).
+        triggeredBy: run.triggeredBy,
         status: "queued",
         inputData: inp as never,
         workflowRunId: runId,
@@ -655,37 +584,6 @@ async function advanceRunInner(runId: string): Promise<void> {
       const outputs = tasks.map((t) => step.extractOutput(t));
       const output = step.parallel ? outputs : outputs[0];
 
-      // Task-based approval gate: now that the task has real output, pause
-      // for user review before advancing. On approve, engine merges payload
-      // and advances; on reject, cancels the run.
-      if (step.requiresApproval) {
-        const existing = await workflowStorage.getPendingApproval(runId, idx);
-        if (!existing) {
-          const summaryCtx: WorkflowStepContext = {
-            run,
-            priorOutputs: { ...priorOutputs, [step.key]: output },
-          };
-          const summary = step.buildApprovalSummary
-            ? step.buildApprovalSummary(summaryCtx)
-            : { stepKey: step.key, label: step.label, output };
-          await workflowStorage.createApproval({
-            runId,
-            stepIndex: idx,
-            summary: summary as never,
-          });
-        }
-        states[idx] = {
-          ...current,
-          status: "awaiting_approval",
-          output,
-        };
-        await workflowStorage.updateRun(runId, {
-          status: "awaiting_approval",
-          stepStates: states as never,
-        });
-        return;
-      }
-
       states[idx] = {
         ...current,
         status: "completed",
@@ -704,11 +602,6 @@ async function advanceRunInner(runId: string): Promise<void> {
     return;
   }
 
-  if (current.status === "awaiting_approval") {
-    // Wait for approveStep.
-    return;
-  }
-
   if (current.status === "completed") {
     // Shouldn't normally land here — advance.
     await workflowStorage.updateRun(runId, {
@@ -717,91 +610,6 @@ async function advanceRunInner(runId: string): Promise<void> {
     await advanceRunInner(runId);
     return;
   }
-}
-
-export async function approveStep(
-  runId: string,
-  stepIndex: number,
-  decision: "approved" | "rejected",
-  payload?: Record<string, unknown>,
-): Promise<void> {
-  const run = await workflowStorage.getRun(runId);
-  if (!run) throw new Error(`Run ${runId} not found`);
-
-  const pending = await workflowStorage.getPendingApproval(runId, stepIndex);
-  if (!pending) throw new Error(`No pending approval for run ${runId} step ${stepIndex}`);
-
-  await workflowStorage.respondToApproval(pending.id, decision, new Date());
-
-  const states = ((run.stepStates as StepState[] | null) ?? []).slice();
-  const { workflowByKey } = await import("./workflows/registry");
-  const def = workflowByKey(run.workflowKey);
-  const step = def?.steps[stepIndex];
-  const keyForIdx = step?.key || `step_${stepIndex}`;
-
-  if (decision === "rejected") {
-    const stepLabel = step?.label ?? `step ${stepIndex}`;
-    const msg = `User rejected step "${stepLabel}" at approval gate`;
-    const prior = states[stepIndex] ?? { key: keyForIdx, status: "pending" };
-    states[stepIndex] = {
-      ...prior,
-      key: prior.key || keyForIdx,
-      status: "failed",
-      error: msg,
-      completedAt: new Date().toISOString(),
-    };
-    await workflowStorage.updateRun(runId, {
-      status: "cancelled",
-      lastError: msg,
-      stepStates: states as never,
-      completedAt: new Date(),
-    });
-    return;
-  }
-
-  // Approved. If the step had a pre-execution synthetic body, it already ran
-  // (its output is in states[stepIndex].output). Merge the user's payload
-  // over that output so downstream buildInput reads curated-by-user values,
-  // then mark the step completed and advance. If there was no prior body
-  // (taskType-only approval gate), fall back to the original pending-reset
-  // behavior so the task fires on the next tick.
-  const priorState = states[stepIndex];
-  const hadPriorOutput =
-    priorState && priorState.status === "awaiting_approval" && priorState.output !== undefined;
-
-  if (hadPriorOutput) {
-    const original = (priorState.output as Record<string, unknown>) ?? {};
-    const merged: Record<string, unknown> = { ...original, ...(payload ?? {}) };
-    states[stepIndex] = {
-      ...priorState,
-      key: priorState.key || keyForIdx,
-      status: "completed",
-      output: merged,
-      completedAt: new Date().toISOString(),
-    };
-    await workflowStorage.updateRun(runId, {
-      status: "running",
-      currentStepIndex: stepIndex + 1,
-      stepStates: states as never,
-    });
-    await advanceRun(runId);
-    return;
-  }
-
-  // No prior output — reset to pending so advanceRun creates the task. Stash
-  // the payload as the output anyway so extractOutput can see it later if
-  // needed (e.g. task-based approval gates want user choices available).
-  states[stepIndex] = {
-    key: keyForIdx,
-    status: "pending",
-    output: payload ?? undefined,
-  };
-  await workflowStorage.updateRun(runId, {
-    status: "running",
-    stepStates: states as never,
-  });
-
-  await advanceRun(runId);
 }
 
 export async function cancelRun(runId: string, reason = "Cancelled by user"): Promise<void> {
@@ -883,7 +691,3 @@ export async function maybeTickActiveRunsForUser(userId: string): Promise<void> 
     }
   }
 }
-
-// Unused helper exports — re-exported for tests / future use.
-export { priorOutputsOf };
-export const _internal = { db, schema, and, eq };

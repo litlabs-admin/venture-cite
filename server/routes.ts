@@ -8,12 +8,7 @@ import {
   insertCompetitorCitationSnapshotSchema,
   usageLimits,
 } from "@shared/schema";
-import {
-  AI_PLATFORMS as SHARED_AI_PLATFORMS,
-  CITATION_SCORING,
-  ANALYTICS_WINDOWS,
-  MS_PER_DAY,
-} from "@shared/constants";
+import { AI_PLATFORMS as SHARED_AI_PLATFORMS, CITATION_SCORING } from "@shared/constants";
 import { runBrandPrompts, DEFAULT_CITATION_PLATFORMS, checkForCitation } from "./citationChecker";
 import { judgeCitation } from "./citationJudge";
 import { attachAiLogger } from "./lib/aiLogger";
@@ -42,13 +37,7 @@ import {
   requireHallucination,
   requireBrandFact,
   requireBrandMention,
-  requireAiSource,
   requirePromptTest,
-  requireAgentTask,
-  requireOutreachCampaign,
-  requireAutomationRule,
-  requirePublicationTarget,
-  requireOutreachEmail,
   requireCommunityPost,
   requirePromptPortfolio,
   requireCitationQuality,
@@ -76,7 +65,6 @@ import { setupLogoProxyRoutes } from "./routes/logoProxy";
 import { setupBrandRoutes } from "./routes/brands";
 import { setupBufferRoutes } from "./routes/buffer";
 import { setupBillingRoutes } from "./routes/billing";
-import { setupRevenueRoutes } from "./routes/revenue";
 
 import { setupContentRoutes } from "./routes/content";
 import { setupArticlesRoutes } from "./routes/articles";
@@ -86,7 +74,6 @@ import { setupAnalyticsRoutes } from "./routes/analytics";
 import { setupDashboardRoutes } from "./routes/dashboard";
 import { setupContentTypesRoutes } from "./routes/contentTypes";
 import { setupIntelligenceRoutes } from "./routes/intelligence";
-import { setupAgentRoutes } from "./routes/agent";
 import { setupGeoSignalsRoutes } from "./routes/geoSignals";
 import { setupCommunityRoutes } from "./routes/community";
 import { setupCronRoutes } from "./routes/cron";
@@ -204,9 +191,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stripe billing: publishable key + products + checkout + portal
   // (Wave 5.1: extracted). Webhook stays in server/index.ts (raw body).
   setupBillingRoutes(app);
-
-  // Revenue analytics + generic e-commerce webhook (Wave 5.1: extracted).
-  setupRevenueRoutes(app);
 
   // Body/query brandId ownership guard.
   app.use(enforceBrandOwnership);
@@ -607,127 +591,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }),
   );
 
-  // Comprehensive platform metrics — scoped to the authenticated user's
-  // brands / articles / tasks / campaigns / rankings.
-  //
-  // Wave 3.1: Promise.allSettled instead of Promise.all so one slow or
-  // failed source doesn't blank the entire dashboard. Each source falls
-  // back to an empty list and surfaces a flag in `degraded` so the
-  // frontend can show a "couldn't load X" badge per card.
-  app.get(
-    "/api/platform-metrics",
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        const brands = await storage.getBrandsByUserId(user.id);
-        const brandIds = new Set(brands.map((b) => b.id));
-        const [articlesRes, tasksRes, campaignsRes, rankingsRes] = await Promise.allSettled([
-          storage.getArticles(),
-          storage.getAgentTasks(),
-          storage.getOutreachCampaigns(),
-          storage.getGeoRankings(),
-        ]);
-
-        const degraded: Record<string, true> = {};
-        const unwrap = <T>(r: PromiseSettledResult<T[]>, label: string): T[] => {
-          if (r.status === "fulfilled") return r.value;
-          degraded[label] = true;
-          logger.warn({ err: r.reason, source: label }, "platform-metrics: source failed");
-          return [];
-        };
-
-        const allArticles = unwrap(articlesRes, "articles");
-        const allTasks = unwrap(tasksRes, "tasks");
-        const allCampaigns = unwrap(campaignsRes, "campaigns");
-        const allGeoRankings = unwrap(rankingsRes, "geoRankings");
-
-        const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
-        const tasks = allTasks.filter((t: any) => t.brandId && brandIds.has(t.brandId));
-        const campaigns = allCampaigns.filter((c: any) => c.brandId && brandIds.has(c.brandId));
-        const articleIds = new Set(articles.map((a) => a.id));
-        const geoRankings = allGeoRankings.filter(
-          (r: any) => r.articleId && articleIds.has(r.articleId),
-        );
-
-        // Calculate content production stats
-        const now = new Date();
-        const oneWeekAgo = new Date(now.getTime() - ANALYTICS_WINDOWS.week * MS_PER_DAY);
-        const oneMonthAgo = new Date(now.getTime() - ANALYTICS_WINDOWS.month * MS_PER_DAY);
-
-        const articlesThisWeek = articles.filter((a) => new Date(a.createdAt) >= oneWeekAgo).length;
-        const articlesThisMonth = articles.filter(
-          (a) => new Date(a.createdAt) >= oneMonthAgo,
-        ).length;
-
-        // Calculate task stats
-        const completedTasks = tasks.filter((t) => t.status === "completed").length;
-        const pendingTasks = tasks.filter((t) => t.status === "pending").length;
-        const failedTasks = tasks.filter((t) => t.status === "failed").length;
-        const taskCompletionRate =
-          tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
-
-        // Calculate outreach stats
-        const sentCampaigns = campaigns.filter(
-          (c) => c.status === "sent" || c.status === "responded",
-        ).length;
-        const successfulCampaigns = campaigns.filter(
-          (c) => c.status === "accepted" || c.status === "published",
-        ).length;
-        const outreachSuccessRate =
-          sentCampaigns > 0 ? Math.round((successfulCampaigns / sentCampaigns) * 100) : 0;
-
-        // Calculate citation stats
-        const totalCitations = geoRankings.filter((r) => r.isCited).length;
-        const citationRate =
-          geoRankings.length > 0 ? Math.round((totalCitations / geoRankings.length) * 100) : 0;
-
-        res.json({
-          success: true,
-          data: {
-            content: {
-              totalArticles: articles.length,
-              articlesThisWeek,
-              articlesThisMonth,
-              avgWordsPerArticle:
-                articles.length > 0
-                  ? Math.round(
-                      articles.reduce((sum, a) => sum + (a.content?.split(/\s+/).length || 0), 0) /
-                        articles.length,
-                    )
-                  : 0,
-            },
-            brands: {
-              total: brands.length,
-              withContent: brands.filter((b) => articles.some((a) => a.brandId === b.id)).length,
-            },
-            tasks: {
-              total: tasks.length,
-              completed: completedTasks,
-              pending: pendingTasks,
-              failed: failedTasks,
-              completionRate: taskCompletionRate,
-            },
-            outreach: {
-              totalCampaigns: campaigns.length,
-              sent: sentCampaigns,
-              successful: successfulCampaigns,
-              successRate: outreachSuccessRate,
-            },
-            citations: {
-              total: totalCitations,
-              checks: geoRankings.length,
-              citationRate,
-            },
-          },
-          // Empty when everything succeeded; otherwise per-source flags so
-          // the frontend can warn the user that a card is partial-data.
-          degraded: Object.keys(degraded).length > 0 ? degraded : undefined,
-        });
-      } catch (error) {
-        sendError(res, error, "Failed to fetch platform metrics");
-      }
-    }),
-  );
+  // The /api/platform-metrics endpoint was deleted along with the
+  // outreach/agent dashboard pages — no frontend caller remained.
 
   // Wave 5.1 domain splits: the rest of the routes live in per-domain
   // files under ./routes. Each mounts its own handlers; middleware above
@@ -740,7 +605,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupDashboardRoutes(app);
   setupContentTypesRoutes(app);
   setupIntelligenceRoutes(app);
-  setupAgentRoutes(app);
   setupGeoSignalsRoutes(app);
   setupCommunityRoutes(app);
   setupAssistantRoutes(app);

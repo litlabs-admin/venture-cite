@@ -105,7 +105,6 @@ async function buildUserExport(userId: string): Promise<Record<string, unknown>>
     brandHallucinations,
     brandMentions,
     brandPrompts,
-    purchaseEvents,
     auditLogs,
   ] = await Promise.all([
     byBrand(schema.articles) as Promise<Array<typeof schema.articles.$inferSelect>>,
@@ -114,7 +113,6 @@ async function buildUserExport(userId: string): Promise<Record<string, unknown>>
     byBrand(schema.brandHallucinations),
     byBrand(schema.brandMentions),
     byBrand(schema.brandPrompts),
-    byBrand(schema.purchaseEvents),
     db.select().from(schema.auditLogs).where(eq(schema.auditLogs.userId, userId)),
   ]);
 
@@ -140,7 +138,6 @@ async function buildUserExport(userId: string): Promise<Record<string, unknown>>
     brandMentions,
     brandPrompts,
     geoRankings,
-    purchaseEvents,
     auditLogs,
   };
 }

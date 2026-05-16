@@ -87,10 +87,6 @@ export const pageExplainers = {
     expectedOutcome: "Recommendations refresh weekly based on your latest citation data.",
     relatedConcept: "GEO",
   },
-  geoRankings: {
-    summary: "Where your brand ranks across each prompt × platform combination.",
-    relatedConcept: "GEO",
-  },
   geoSignals: {
     summary:
       "Score your content's chunkability, schema markup, and FAQ structure for AI consumption.",
@@ -119,33 +115,6 @@ export const pageExplainers = {
     expectedOutcome:
       "Adding facts here directly reduces 'wrong' citations (e.g., wrong founding year, wrong CEO).",
     relatedConcept: "GEO",
-  },
-  outreach: {
-    summary:
-      "Manage targeted outreach campaigns — publications, journalists, podcasts, newsletters.",
-    expectedOutcome: "Successful placements compound over weeks as AI engines re-index.",
-  },
-  publicationIntelligence: {
-    summary: "Insights on which publications AI engines cite most often in your industry.",
-    expectedOutcome: "Use this to prioritize where to pitch / get featured next.",
-  },
-  aiTraffic: {
-    summary:
-      "Track AI-referrer traffic to your site — sessions originating from ChatGPT, Perplexity, etc.",
-    prerequisites: "Connect Google Analytics or similar to enable.",
-  },
-  analyticsIntegrations: {
-    summary:
-      "Connect Google Analytics, Stripe, and other data sources to attribute revenue to AI traffic.",
-  },
-  revenueAnalytics: {
-    summary:
-      "Revenue rollups by AI platform + ecommerce platform + brand. Tracks the ROI of GEO work.",
-    prerequisites: "Connect Stripe (or fire purchase webhooks) so revenue events flow in.",
-  },
-  agentDashboard: {
-    summary: "Background AI agent tasks — content generation, citation runs, autopilot recipes.",
-    expectedOutcome: "Most tasks finish in 1–5 minutes; check the Status column for progress.",
   },
   settings: {
     summary: "Account, team, billing, integrations, and notification preferences.",

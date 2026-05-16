@@ -166,49 +166,6 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
 });
 
 app.post(
-  "/webhooks/shopify/orders",
-  express.raw({ type: ["application/json", "application/*+json"] }),
-  async (req, res) => {
-    const hmacHeader = req.headers["x-shopify-hmac-sha256"];
-    const webhookId = req.headers["x-shopify-webhook-id"];
-    const topic = req.headers["x-shopify-topic"];
-    const shopDomain = req.headers["x-shopify-shop-domain"];
-
-    if (!hmacHeader || !webhookId || !topic) {
-      return res.status(400).json({ error: "Missing required Shopify headers" });
-    }
-    if (!Buffer.isBuffer(req.body)) {
-      logger.error("Shopify webhook: req.body is not a Buffer");
-      return res.status(500).json({ error: "Webhook processing error" });
-    }
-
-    const hmac = Array.isArray(hmacHeader) ? hmacHeader[0] : hmacHeader;
-    const wid = Array.isArray(webhookId) ? webhookId[0] : webhookId;
-    const tpc = Array.isArray(topic) ? topic[0] : topic;
-    const dom = Array.isArray(shopDomain) ? shopDomain[0] : shopDomain;
-
-    try {
-      const result = await WebhookHandlers.processShopifyOrder(req.body, {
-        hmac,
-        webhookId: wid,
-        topic: tpc,
-        shopDomain: dom,
-      });
-      if (!result.processed) {
-        if (result.reason === "invalid_signature" || result.reason === "missing_secret") {
-          return res.status(401).json({ error: "Unauthorized" });
-        }
-      }
-      res.status(200).json({ received: true });
-    } catch (error: unknown) {
-      logger.error({ err: error }, "Shopify webhook error");
-      captureAndFlush(error, { tags: { source: "shopify-webhook" } });
-      res.status(500).json({ error: "Webhook processing error" });
-    }
-  },
-);
-
-app.post(
   "/api/webhooks/resend",
   express.raw({ type: ["application/json", "application/*+json"] }),
   async (req, res) => {

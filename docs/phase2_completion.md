@@ -4359,3 +4359,189 @@ The remaining adoption sweep (homepage hero, geo-analytics tabs, ai-intelligence
 - **Legacy `/api/brand-mentions/alerts/:brandId` endpoint** in `server/routes/mentions.ts` is dead code (not consumed by any client) but still authenticated. Returns the legacy `{ data: rows }` envelope. Low risk; flagged for cleanup.
 
 ---
+
+## Track 34 — Orphan-page cleanup + dead-code purge (2026-05-15 → 2026-05-16)
+
+**Goal:** Reduce VentureCite from 27 routed-or-orphan pages to 18 routed pages by deleting 8 orphan page files (pages on disk but not in `App.tsx`), then recursively remove every endpoint, storage method, ownership helper, schema table, and infrastructure subsystem that becomes dead as a result. Leave the codebase with zero references to deleted concepts (modulo historical docs).
+
+**Status:** Complete. **+155 / −10,269 lines** across 40 files, 4 migrations, no regressions.
+
+### Background
+
+Brainstorm phase surfaced an IA problem: 18 sidebar destinations was too many, with 5 of them duplicating measurement views (Dashboard / AI Visibility / AI Intelligence / GEO Analytics / Citations all read citation-run state). Before any consolidation could be planned, the codebase needed to lose the unrouted orphan pages that polluted the navigation analysis. Trust-rule reaffirmed mid-session: **verify from code, not from .md docs**.
+
+Grep against `App.tsx` route list vs `client/src/pages/*.tsx` identified 9 orphan files. `pricing.tsx` retained on user instruction (future marketing page). The other 8: `publication-intelligence`, `analytics-integrations`, `outreach`, `revenue-analytics`, `agent-dashboard`, `agent-run`, `geo-rankings`, `ai-traffic`.
+
+### Tier 1 — Client pages + server routes + ownership helpers
+
+| Deletion                                        | Detail                                                                                                                                                                                                                                 |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8 client pages                                  | `agent-dashboard.tsx`, `agent-run.tsx`, `ai-traffic.tsx`, `analytics-integrations.tsx`, `geo-rankings.tsx`, `outreach.tsx`, `publication-intelligence.tsx`, `revenue-analytics.tsx`                                                    |
+| 2 server route files                            | `server/routes/agent.ts` (919 lines — exposed `/api/agent-tasks/*`, `/api/outreach-*`, `/api/publication-targets/*`, `/api/outreach-emails/*`, `/api/automation-*`); `server/routes/revenue.ts` (173 lines — exposed `/api/revenue/*`) |
+| 5 ownership helpers                             | `requireAgentTask`, `requireOutreachCampaign`, `requireAutomationRule`, `requirePublicationTarget`, `requireOutreachEmail` stripped from `server/lib/ownership.ts`; also removed from import block in `server/routes.ts`               |
+| 7 `pageExplainers` entries                      | Removed `geoRankings`, `outreach`, `publicationIntelligence`, `aiTraffic`, `analyticsIntegrations`, `revenueAnalytics`, `agentDashboard` from `client/src/lib/pageExplainers.ts`                                                       |
+| `setupAgentRoutes` + `setupRevenueRoutes` calls | Removed from `registerRoutes` in `server/routes.ts`                                                                                                                                                                                    |
+
+**Verified no client code calls** `/api/agent-tasks`, `/api/outreach-*`, `/api/publication-targets`, `/api/automation-*`, `/api/revenue` (grep returned zero hits across `client/`).
+
+### Tier 1.5 — Dead workflow subsystem
+
+The orphan-analysis subagent initially flagged `server/lib/workflowEngine.ts` and the entire workflow stack as orphan-only, but a follow-up grep proved otherwise:
+
+- `server/auth.ts:11` — `maybeTickActiveRunsForUser` fires on every authenticated request
+- `server/scheduler.ts:565` — Monday 06:00 UTC cron starts `weekly_catchup` workflow for every brand with `weeklyReportEnabled=1`
+
+So `workflowEngine`, `weeklyCatchupWorkflow`, `weeklyDigestEmitter`, and the `agent_tasks` queue remain live. **Two of the three registered workflows were dead, however.**
+
+| Deletion                                                         | Reason                                                                                                                                                                             |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/lib/workflows/winAPrompt.ts` (256 lines)                 | `startRun("win_a_prompt", ...)` only ever called from inside `fixLosingArticle.ts` chain                                                                                           |
+| `server/lib/workflows/fixLosingArticle.ts` (242 lines)           | `startRun("fix_losing_article", ...)` never called anywhere                                                                                                                        |
+| `server/lib/workflows/registry.ts` shrunk to single export       | Only `weeklyCatchupWorkflow` survives                                                                                                                                              |
+| `weeklyCatchup.spawn_remediations` step (~36 lines)              | Created `hallucination_remediation` agent_tasks whose executor lived in the deleted agent-dashboard; rows piled up unexecuted each Monday                                          |
+| 5 of 6 task-type handlers in `agentTaskExecutor.ts` (~628 lines) | Only `prompt_test` survives — used by `weeklyCatchup.citation_check` step. Removed: `content_generation`, `outreach`, `source_analysis`, `hallucination_remediation`, `seo_update` |
+| 5 of 6 Zod schemas in `agentTaskSchemas.ts` (~62 lines)          | Matching schemas removed; kept `promptTestInputSchema`                                                                                                                             |
+| `OUTREACH_EMAIL_TRANSITIONS` FSM in `statusTransitions.ts`       | Table is dropped; FSM has no consumers                                                                                                                                             |
+
+### Tier 2A — First schema drop (migration 0068)
+
+`migrations/0068_drop_orphan_tables.sql` drops 5 tables whose every reader/writer was deleted in Tier 1:
+
+```
+DROP TABLE outreach_campaigns CASCADE;
+DROP TABLE outreach_emails CASCADE;
+DROP TABLE publication_targets CASCADE;
+DROP TABLE automation_rules CASCADE;
+DROP TABLE automation_executions CASCADE;
+```
+
+Schema source: 5 `pgTable` definitions + 5 `insertSchema` exports + 10 type exports stripped from `shared/schema.ts` (−211 lines).
+
+### Tier 2B — Orphan routes still mounted (migration 0069)
+
+Five more tables had no frontend caller but still had live route handlers in `intelligence.ts` and `publications.ts`. Deeper sweep:
+
+| Route block deleted                                                                                      | File                                          | Storage methods purged                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/ai-sources/*` (5 endpoints)                                                                        | `server/routes/intelligence.ts`               | `getAiSources`, `createAiSource`, `updateAiSource`, `deleteAiSource`, `getTopAiSources`                                                                                    |
+| `/api/ai-traffic/*` (3 endpoints)                                                                        | `server/routes/intelligence.ts`               | `createAiTrafficSession`, `getAiTrafficSessions`, `getAiTrafficStats`                                                                                                      |
+| `/api/publications/metrics/*`, `/api/publications/top/*`, `/api/publications/references/*` (5 endpoints) | `server/routes/publications.ts`               | `createPublicationReference`, `updatePublicationReference`, `getPublicationReferences`, `upsertPublicationMetric`, `getPublicationMetrics`, `getTopPublicationsByIndustry` |
+| `POST /webhooks/shopify/orders` (1 endpoint)                                                             | `server/app.ts` + `server/webhookHandlers.ts` | `createPurchaseEvent`; also stripped `processShopifyOrder`, `recordShopifyEvent`, `markShopifyEventProcessed` helpers                                                      |
+| `requireAiSource` ownership helper                                                                       | `server/lib/ownership.ts`                     | Removed plus its imports in routes.ts and intelligence.ts                                                                                                                  |
+| GDPR export builder                                                                                      | `server/routes/userAccount.ts`                | Stripped `purchaseEvents` from the export bundle                                                                                                                           |
+
+`migrations/0069_drop_orphan_tables_phase2.sql` drops:
+
+```
+DROP TABLE ai_traffic_sessions CASCADE;
+DROP TABLE ai_sources CASCADE;
+DROP TABLE purchase_events CASCADE;
+DROP TABLE publication_references CASCADE;
+DROP TABLE publication_metrics CASCADE;
+```
+
+Schema source: 5 more pgTables + 5 insert schemas + 8 type exports stripped (−368 lines).
+
+### Tier 2C — Shopify webhook leftovers + workflow_approvals (migration 0070)
+
+| Deletion                                       | Detail                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/lib/shopifyWebhook.ts`                 | HMAC verify util — no live callers after route deletion                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `tests/unit/shopifyWebhook.test.ts`            | Test was the only thing keeping the util alive                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `SHOPIFY_WEBHOOK_SECRET` env var               | Removed from `server/env.ts` and `.env.example`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `aiCommerceSessions` pgTable + storage methods | `createCommerceSession`, `getCommerceSessions` — no live callers (fed the deleted ai-traffic click-through tracker)                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 4 dead `agent_tasks` storage methods           | `getAgentTasks` (list), `getAgentTaskStats`, `getNextQueuedTask`, `deleteAgentTask` — only callers were the deleted `/api/agent-tasks/*` routes                                                                                                                                                                                                                                                                                                                                                                                 |
+| `workflow_approvals` subsystem (~195 lines)    | The approval gate machinery in `workflowEngine.ts` was wired throughout (synthetic-step gate, task-based gate, `awaiting_approval` status branch, exported `respondToApproval` function, `buildApprovalSummary` step field, `requiresApproval` step field), but **no live workflow step had `requiresApproval: true`**. Subsystem ran zero rows. Removed in full from `workflowEngine.ts`, `workflowStorage.ts`, and schema. The 5 `requiresApproval: false` lines in weeklyCatchup steps also removed (field no longer exists) |
+
+`migrations/0070_drop_shopify_webhook_events.sql`:
+
+```
+DROP TABLE shopify_webhook_events CASCADE;
+DROP TABLE ai_commerce_sessions CASCADE;
+DROP TABLE workflow_approvals CASCADE;
+```
+
+### Tier 2D — agent_tasks column + CHECK tightening (migration 0071)
+
+`migrations/0071_agent_tasks_cleanup.sql`:
+
+1. **Backfill stale artifact links.** Legacy `artifact_type` values (`content_job` | `outreach_email` | `hallucination` | `source_analysis`) came from the now-deleted handlers; some referenced tables that were already dropped in 0068/0069 (dangling FKs). `UPDATE agent_tasks SET artifact_type = NULL, artifact_id = NULL WHERE artifact_type IS NOT NULL AND artifact_type <> 'citation_run'`.
+
+2. **Drop `automation_rule_id` column.** Referenced now-dropped `automation_rules` table.
+
+3. **Tighten the `agent_tasks_artifact_type_check` constraint.** From `IN ('content_job', 'citation_run', 'outreach_email', 'hallucination', 'source_analysis')` (set in migration 0026) → `IN ('citation_run')`. Only the `prompt_test` handler writes today; only one valid value remains.
+
+**Critical fix:** the migration initially failed in dev with `check constraint "agent_tasks_artifact_type_check" of relation "agent_tasks" is violated by some row` because existing dev rows had the legacy values. Migration runner wraps each file in `BEGIN ... COMMIT` (`migrationRunner.ts:54-61`), so the failed 0071 rolled back cleanly. Re-authored to `UPDATE ... SET NULL` first, then `ALTER`. Idempotent on both fresh DBs (UPDATE affects 0 rows) and dev DBs with legacy data.
+
+Also rewrote `workflowEngine.ts:345`: `triggeredBy: "automation_rule"` (hardcoded dead value) → `triggeredBy: run.triggeredBy` (correctly inherits parent workflow's trigger source — `"cron"` for Monday catch-up, `"manual"` for user-kicked, `"chained"` for nested).
+
+### Final sweep — adjacent dead code
+
+After the four tiers, one more grep + read pass surfaced:
+
+| Removal                                   | File                                                                                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `_internal` and `priorOutputsOf` exports  | `server/lib/workflowEngine.ts` bottom — comments marked "Unused helper exports for tests / future use." Confirmed zero importers |
+| `void isEmailConfigured;` no-op statement | `server/lib/workflows/weeklyCatchup.ts:223` — leftover from previously deleted email-send logic                                  |
+| `isEmailConfigured` import                | `weeklyCatchup.ts` — became unused after the no-op was removed                                                                   |
+| `and` from `drizzle-orm` import           | `workflowEngine.ts:1` — became unused after `_internal` removal                                                                  |
+
+### features.md — code-verified feature reference
+
+Created `features.md` at repo root: **5,502 lines, 363 KB**. Documents every metric, calculation, API endpoint, server handler, and side-effect for all 18 routed destinations. Built by 5 parallel `general-purpose` agents (one per page group) using `Read`/`Grep` only — no claims sourced from prior `.md` files per the trust-rule. Notable findings the docs surfaced:
+
+- Reports page promises PDF/PPTX export but only ships a `weeklyReportEnabled` toggle mutation
+- Community is entirely LLM-driven (no real Reddit/HN scraping for discovery despite labeling)
+- Citation Quality uses two different scoring weight schemes (Phase 1 vs Phase 2 paths in `analytics.ts`)
+- Opportunities double-counts Reddit citations into the third-party bucket
+- GEO Analytics' "What These Metrics Mean" copy doesn't match the server formula
+- AI Visibility (correction to prior brainstorm) is an **engine-by-engine onboarding checklist**, not a duplicate measurement page — belongs in Setup, not Visibility
+
+### Verification
+
+| Check                                        | Result                                                                                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check` (tsc + tour-target verifier) | Clean across every tier                                                                                                                                       |
+| `npm test`                                   | 132 passed; 5 pre-existing failures (4 tour integration tests need `DATABASE_URL`, 1 `citationCronUnconditional` timeout) — identical to pre-cleanup baseline |
+| `npm run lint` on touched files              | Zero new errors; pre-existing warnings unchanged                                                                                                              |
+| Boot via `npm run dev`                       | Migrations 0068 → 0070 applied successfully on dev DB; 0071 initially failed on legacy CHECK rows, fixed with backfill, applied cleanly                       |
+
+### Cumulative impact
+
+| Metric                         | Count                        |
+| ------------------------------ | ---------------------------- |
+| Files changed                  | 40                           |
+| Lines added                    | +155                         |
+| Lines deleted                  | −10,269                      |
+| Net delta                      | −10,114                      |
+| Client pages deleted           | 8                            |
+| Server route files deleted     | 2                            |
+| Workflow files deleted         | 2                            |
+| API endpoints removed          | ~30                          |
+| Storage methods removed        | 47                           |
+| Ownership helpers removed      | 6                            |
+| Schema tables dropped          | 13                           |
+| `pgTable` definitions stripped | 13                           |
+| Migrations created             | 4 (0068, 0069, 0070, 0071)   |
+| Tests touched (deletions only) | 1 (`shopifyWebhook.test.ts`) |
+
+### Intentionally retained (judgment calls)
+
+- **Historical phase docs** (`docs/phase1_completion.md`, `docs/phase2_goals.md`, this file) still reference deleted concepts. Per the trust-rule, these are append-only records, not load-bearing for the live codebase.
+- **`weeklyCatchupWorkflow` + entire workflow engine** — drives the Monday digest email which goes to every user with `weeklyReportEnabled=1`. Real user-visible feature.
+- **`agent_tasks` table** — workflow engine queues `prompt_test` tasks here.
+- **`workflow_runs` table** — workflow engine's primary state.
+
+### Open follow-ups
+
+None blocking. The codebase is consistent — no orphan references to deleted concepts (verified by terminal-grep across all `.ts`/`.tsx`/`.sql`/`.example` files, excluding `migrations/` and `docs/`).
+
+### How to verify (Track 34)
+
+1. **Grep sweep.** Run `grep -rln "outreachCampaigns\|automationRules\|aiSources\|aiTrafficSessions\|publicationTargets\|purchaseEvents\|aiCommerceSessions\|shopifyWebhookEvents\|workflowApprovals\|requireAiSource\|requireOutreach\|processShopify\|SHOPIFY_WEBHOOK" ./client ./server ./shared` — should return zero hits.
+2. **Boot the dev server.** `npm run dev` — migrations 0068 → 0071 should apply on first run with no errors.
+3. **Trigger weekly catchup manually.** From an admin context, fire `startRun("weekly_catchup", brandId, userId, {}, "manual")` — confirm the four surviving steps (citation_check → delta_calc → hallucination_scan → compose_digest → send_digest_email) complete and the weekly digest email lands.
+4. **Confirm no broken routes.** Login → navigate every sidebar destination in turn. No 404s, no "Failed to load" toasts. (`features.md` documents the expected behavior of each.)
+5. **Sidebar destination count.** Inspect `client/src/components/Sidebar.tsx` — should be 18 destinations across 5 groups (Setup, Create, Measure, Grow, Optimize).
+
+---

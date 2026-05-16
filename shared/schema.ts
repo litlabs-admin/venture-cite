@@ -752,86 +752,6 @@ export const brandVisibilitySnapshots = pgTable(
   (table) => [index("brand_visibility_snapshots_brand_id_idx").on(table.brandId)],
 );
 
-export const aiCommerceSessions = pgTable(
-  "ai_commerce_sessions",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    articleId: varchar("article_id").references(() => articles.id, { onDelete: "cascade" }),
-    brandId: varchar("brand_id").references(() => brands.id, { onDelete: "cascade" }),
-    aiPlatform: text("ai_platform").notNull(),
-    sessionId: text("session_id"),
-    userQuery: text("user_query"),
-    productMentioned: text("product_mentioned"),
-    clickedThrough: integer("clicked_through").default(0).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("ai_commerce_sessions_brand_id_idx").on(table.brandId)],
-);
-
-export const purchaseEvents = pgTable(
-  "purchase_events",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    commerceSessionId: varchar("commerce_session_id").references(() => aiCommerceSessions.id, {
-      onDelete: "set null",
-    }),
-    articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
-    brandId: varchar("brand_id").references(() => brands.id, { onDelete: "cascade" }),
-    aiPlatform: text("ai_platform").notNull(),
-    ecommercePlatform: text("ecommerce_platform").notNull(),
-    orderId: text("order_id"),
-    revenue: numeric("revenue", { precision: 10, scale: 2 }).notNull(),
-    // Wave 4.1: integer-cents twin of `revenue`. Prefer this for any
-    // arithmetic; sum it as bigint and divide by 100 only at display.
-    // bigint is read out of pg as `string` to avoid 2^53 truncation —
-    // do `BigInt(row.revenueCents)` or treat it as Number when known
-    // safe (< $90 trillion).
-    revenueCents: bigint("revenue_cents", { mode: "number" }),
-    currency: text("currency").default("USD").notNull(),
-    productName: text("product_name"),
-    quantity: integer("quantity").default(1).notNull(),
-    customerEmail: text("customer_email"),
-    purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
-    webhookData: jsonb("webhook_data"),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("purchase_events_brand_id_idx").on(table.brandId)],
-);
-
-export const publicationReferences = pgTable("publication_references", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  outletName: text("outlet_name").notNull(),
-  outletDomain: text("outlet_domain").notNull(),
-  outletUrl: text("outlet_url"),
-  industry: text("industry"),
-  aiPlatform: text("ai_platform").notNull(),
-  articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
-  citationCount: integer("citation_count").default(1).notNull(),
-  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
-  metadata: jsonb("metadata"),
-});
-
-export const publicationMetrics = pgTable("publication_metrics", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  outletName: text("outlet_name").notNull(),
-  outletDomain: text("outlet_domain").notNull(),
-  industry: text("industry").notNull(),
-  totalCitations: integer("total_citations").default(0).notNull(),
-  aiPlatformBreakdown: jsonb("ai_platform_breakdown"),
-  authorityScore: numeric("authority_score", { precision: 5, scale: 2 }).default("0").notNull(),
-  trendDirection: text("trend_direction").default("stable"),
-  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
-});
-
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -869,26 +789,6 @@ export const insertBrandSchema = createInsertSchema(brands).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-});
-
-export const insertCommerceSessionSchema = createInsertSchema(aiCommerceSessions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertPurchaseEventSchema = createInsertSchema(purchaseEvents).omit({
-  id: true,
-  purchasedAt: true,
-});
-
-export const insertPublicationReferenceSchema = createInsertSchema(publicationReferences).omit({
-  id: true,
-  lastSeenAt: true,
-});
-
-export const insertPublicationMetricSchema = createInsertSchema(publicationMetrics).omit({
-  id: true,
-  lastUpdated: true,
 });
 
 export const competitors = pgTable(
@@ -1427,66 +1327,6 @@ export const alertHistory = pgTable(
   (table) => [index("alert_history_brand_id_idx").on(table.brandId)],
 );
 
-// AI Sources - Track where AI platforms source their answers from
-export const aiSources = pgTable(
-  "ai_sources",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id")
-      .notNull()
-      .references(() => brands.id, { onDelete: "cascade" }),
-    aiPlatform: text("ai_platform").notNull(),
-    sourceUrl: text("source_url").notNull(),
-    sourceDomain: text("source_domain").notNull(),
-    sourceName: text("source_name"),
-    sourceType: text("source_type").notNull(),
-    prompt: text("prompt"),
-    citationContext: text("citation_context"),
-    authorityScore: integer("authority_score").default(0).notNull(),
-    isBrandMentioned: integer("is_brand_mentioned").default(0).notNull(),
-    sentiment: text("sentiment").default("neutral"),
-    discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
-    lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
-    occurrenceCount: integer("occurrence_count").default(1).notNull(),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("ai_sources_brand_id_idx").on(table.brandId)],
-);
-
-// AI Traffic Sessions - Track referral traffic from AI engines
-export const aiTrafficSessions = pgTable(
-  "ai_traffic_sessions",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id")
-      .notNull()
-      .references(() => brands.id, { onDelete: "cascade" }),
-    articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
-    aiPlatform: text("ai_platform").notNull(),
-    referrerUrl: text("referrer_url"),
-    landingPage: text("landing_page").notNull(),
-    userAgent: text("user_agent"),
-    sessionDuration: integer("session_duration"),
-    pageViews: integer("page_views").default(1).notNull(),
-    bounced: integer("bounced").default(0).notNull(),
-    converted: integer("converted").default(0).notNull(),
-    conversionType: text("conversion_type"),
-    conversionValue: numeric("conversion_value", { precision: 10, scale: 2 }),
-    // Wave 4.1: integer-cents twin of conversionValue. See note on
-    // purchaseEvents.revenueCents.
-    conversionValueCents: bigint("conversion_value_cents", { mode: "number" }),
-    country: text("country"),
-    device: text("device"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("ai_traffic_sessions_brand_id_idx").on(table.brandId)],
-);
-
 // Prompt Test Runs - Scheduled testing of prompts across AI platforms
 export const promptTestRuns = pgTable(
   "prompt_test_runs",
@@ -1537,8 +1377,7 @@ export const agentTasks = pgTable(
     priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
     status: text("status").notNull().default("queued"), // 'queued', 'in_progress', 'completed', 'failed', 'cancelled'
     assignedTo: text("assigned_to").default("agent"), // 'agent' for automated, or user ID for manual
-    triggeredBy: text("triggered_by").notNull(), // 'automation_rule', 'manual', 'schedule', 'alert'
-    automationRuleId: varchar("automation_rule_id"),
+    triggeredBy: text("triggered_by").notNull(), // 'manual', 'cron', 'chained'
     inputData: jsonb("input_data"), // Task-specific input parameters
     outputData: jsonb("output_data"), // Task results/outputs
     aiModelUsed: text("ai_model_used"),
@@ -1551,9 +1390,10 @@ export const agentTasks = pgTable(
     error: text("error"),
     retryCount: integer("retry_count").default(0).notNull(),
     maxRetries: integer("max_retries").default(3).notNull(),
-    // Artifact link: set after /execute creates a downstream object so the
-    // task row points to its result. type ∈ content_job | citation_run |
-    // outreach_email | hallucination | source_analysis. CHECK in 0026.
+    // Artifact link: set after the executor creates a downstream object so
+    // the task row points to its result. Currently the only live writer is
+    // the prompt_test handler, which sets artifactType = 'citation_run'.
+    // CHECK constraint tightened to that single value in migration 0071.
     artifactType: text("artifact_type"),
     artifactId: varchar("artifact_id"),
     workflowRunId: varchar("workflow_run_id"),
@@ -1601,197 +1441,6 @@ export const workflowRuns = pgTable(
   ],
 );
 
-export const workflowApprovals = pgTable(
-  "workflow_approvals",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    runId: varchar("run_id")
-      .notNull()
-      .references(() => workflowRuns.id, { onDelete: "cascade" }),
-    stepIndex: integer("step_index").notNull(),
-    summary: jsonb("summary"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    respondedAt: timestamp("responded_at"),
-    decision: text("decision"),
-  },
-  (table) => [index("workflow_approvals_run_responded_idx").on(table.runId, table.respondedAt)],
-);
-
-// Outreach Campaigns - Track publication outreach and guest posts
-export const outreachCampaigns = pgTable(
-  "outreach_campaigns",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id")
-      .notNull()
-      .references(() => brands.id, { onDelete: "cascade" }),
-    campaignName: text("campaign_name").notNull(),
-    campaignType: text("campaign_type").notNull(),
-    targetPublicationId: varchar("target_publication_id"),
-    targetDomain: text("target_domain").notNull(),
-    targetContactEmail: text("target_contact_email"),
-    targetContactName: text("target_contact_name"),
-    status: text("status").notNull().default("draft"),
-    emailSubject: text("email_subject"),
-    emailBody: text("email_body"),
-    pitchAngle: text("pitch_angle"),
-    proposedTopic: text("proposed_topic"),
-    linkedArticleId: varchar("linked_article_id").references(() => articles.id, {
-      onDelete: "set null",
-    }),
-    authorityScore: integer("authority_score").default(0).notNull(),
-    expectedImpact: text("expected_impact"),
-    aiGeneratedDraft: integer("ai_generated_draft").default(0).notNull(),
-    sentAt: timestamp("sent_at"),
-    lastFollowUpAt: timestamp("last_follow_up_at"),
-    followUpCount: integer("follow_up_count").default(0).notNull(),
-    responseReceivedAt: timestamp("response_received_at"),
-    responseNotes: text("response_notes"),
-    resultUrl: text("result_url"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("outreach_campaigns_brand_id_idx").on(table.brandId)],
-);
-
-// Publication Targets - Discovered publications and blogs for outreach
-export const publicationTargets = pgTable(
-  "publication_targets",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id")
-      .notNull()
-      .references(() => brands.id, { onDelete: "cascade" }),
-    publicationName: text("publication_name").notNull(),
-    domain: text("domain").notNull(),
-    category: text("category").notNull(),
-    industry: text("industry"),
-    domainAuthority: integer("domain_authority").default(0).notNull(),
-    monthlyTraffic: text("monthly_traffic"),
-    acceptsGuestPosts: integer("accepts_guest_posts").default(0).notNull(),
-    acceptsPRPitches: integer("accepts_pr_pitches").default(0).notNull(),
-    relevanceScore: integer("relevance_score").default(0).notNull(),
-    contactName: text("contact_name"),
-    contactEmail: text("contact_email"),
-    contactRole: text("contact_role"),
-    contactLinkedIn: text("contact_linkedin"),
-    contactTwitter: text("contact_twitter"),
-    submissionUrl: text("submission_url"),
-    editorialGuidelines: text("editorial_guidelines"),
-    pitchNotes: text("pitch_notes"),
-    previousOutreach: integer("previous_outreach").default(0).notNull(),
-    lastContactedAt: timestamp("last_contacted_at"),
-    status: text("status").default("discovered").notNull(),
-    discoveredBy: text("discovered_by").default("ai").notNull(),
-    discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("publication_targets_brand_id_idx").on(table.brandId)],
-);
-
-// Outreach Emails - Track individual email sends and responses
-export const outreachEmails = pgTable(
-  "outreach_emails",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    campaignId: varchar("campaign_id").references(() => outreachCampaigns.id, {
-      onDelete: "cascade",
-    }),
-    publicationTargetId: varchar("publication_target_id").references(() => publicationTargets.id, {
-      onDelete: "set null",
-    }),
-    brandId: varchar("brand_id")
-      .notNull()
-      .references(() => brands.id, { onDelete: "cascade" }),
-    recipientEmail: text("recipient_email").notNull(),
-    recipientName: text("recipient_name"),
-    subject: text("subject").notNull(),
-    body: text("body").notNull(),
-    emailType: text("email_type").notNull(),
-    status: text("status").default("draft").notNull(),
-    scheduledFor: timestamp("scheduled_for"),
-    sentAt: timestamp("sent_at"),
-    openedAt: timestamp("opened_at"),
-    clickedAt: timestamp("clicked_at"),
-    repliedAt: timestamp("replied_at"),
-    openCount: integer("open_count").default(0).notNull(),
-    clickCount: integer("click_count").default(0).notNull(),
-    replyContent: text("reply_content"),
-    error: text("error"),
-    trackingId: text("tracking_id"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("outreach_emails_brand_id_idx").on(table.brandId)],
-);
-
-// Automation Rules - Define triggers and actions for autonomous workflows
-// Deprecated as of 2026-04 — workflow engine (server/lib/workflowEngine.ts) replaces this.
-export const automationRules = pgTable(
-  "automation_rules",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id")
-      .notNull()
-      .references(() => brands.id, { onDelete: "cascade" }),
-    ruleName: text("rule_name").notNull(),
-    ruleDescription: text("rule_description"),
-    triggerType: text("trigger_type").notNull(),
-    triggerConditions: jsonb("trigger_conditions").notNull(),
-    actionType: text("action_type").notNull(),
-    actionConfig: jsonb("action_config").notNull(),
-    isEnabled: integer("is_enabled").default(1).notNull(),
-    priority: integer("priority").default(50).notNull(),
-    cooldownMinutes: integer("cooldown_minutes").default(60).notNull(),
-    maxExecutionsPerDay: integer("max_executions_per_day").default(10).notNull(),
-    executionCount: integer("execution_count").default(0).notNull(),
-    lastTriggeredAt: timestamp("last_triggered_at"),
-    lastExecutedAt: timestamp("last_executed_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("automation_rules_brand_id_idx").on(table.brandId)],
-);
-
-// Automation Execution Log - Track automation runs
-export const automationExecutions = pgTable(
-  "automation_executions",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    automationRuleId: varchar("automation_rule_id").references(() => automationRules.id, {
-      onDelete: "cascade",
-    }),
-    brandId: varchar("brand_id").references(() => brands.id, { onDelete: "cascade" }),
-    agentTaskId: varchar("agent_task_id").references(() => agentTasks.id, { onDelete: "set null" }),
-    triggerData: jsonb("trigger_data"),
-    executionStatus: text("execution_status").notNull().default("running"),
-    resultSummary: text("result_summary"),
-    errorMessage: text("error_message"),
-    startedAt: timestamp("started_at").defaultNow().notNull(),
-    completedAt: timestamp("completed_at"),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [
-    index("automation_executions_rule_id_idx").on(table.automationRuleId),
-    index("automation_executions_brand_id_idx").on(table.brandId),
-  ],
-);
-
 export const insertAlertSettingsSchema = createInsertSchema(alertSettings).omit({
   id: true,
   createdAt: true,
@@ -1801,17 +1450,6 @@ export const insertAlertSettingsSchema = createInsertSchema(alertSettings).omit(
 export const insertAlertHistorySchema = createInsertSchema(alertHistory).omit({
   id: true,
   sentAt: true,
-});
-
-export const insertAiSourceSchema = createInsertSchema(aiSources).omit({
-  id: true,
-  discoveredAt: true,
-  lastSeenAt: true,
-});
-
-export const insertAiTrafficSessionSchema = createInsertSchema(aiTrafficSessions).omit({
-  id: true,
-  createdAt: true,
 });
 
 export const insertPromptTestRunSchema = createInsertSchema(promptTestRuns).omit({
@@ -1825,45 +1463,11 @@ export const insertAgentTaskSchema = createInsertSchema(agentTasks).omit({
   updatedAt: true,
 });
 
-export const insertOutreachCampaignSchema = createInsertSchema(outreachCampaigns).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertPublicationTargetSchema = createInsertSchema(publicationTargets).omit({
-  id: true,
-  discoveredAt: true,
-  updatedAt: true,
-});
-
-export const insertOutreachEmailSchema = createInsertSchema(outreachEmails).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertAutomationExecutionSchema = createInsertSchema(automationExecutions).omit({
-  id: true,
-  startedAt: true,
-});
-
 export const insertWorkflowRunSchema = createInsertSchema(workflowRuns).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
   completedAt: true,
-});
-
-export const insertWorkflowApprovalSchema = createInsertSchema(workflowApprovals).omit({
-  id: true,
-  createdAt: true,
-  respondedAt: true,
 });
 
 export const insertMetricsHistorySchema = createInsertSchema(metricsHistory).omit({
@@ -1908,14 +1512,6 @@ export type InsertGeoRanking = z.infer<typeof insertGeoRankingSchema>;
 export type GeoRanking = typeof geoRankings.$inferSelect;
 export type InsertBrand = z.infer<typeof insertBrandSchema>;
 export type Brand = typeof brands.$inferSelect;
-export type InsertCommerceSession = z.infer<typeof insertCommerceSessionSchema>;
-export type CommerceSession = typeof aiCommerceSessions.$inferSelect;
-export type InsertPurchaseEvent = z.infer<typeof insertPurchaseEventSchema>;
-export type PurchaseEvent = typeof purchaseEvents.$inferSelect;
-export type InsertPublicationReference = z.infer<typeof insertPublicationReferenceSchema>;
-export type PublicationReference = typeof publicationReferences.$inferSelect;
-export type InsertPublicationMetric = z.infer<typeof insertPublicationMetricSchema>;
-export type PublicationMetric = typeof publicationMetrics.$inferSelect;
 export type InsertCompetitor = z.infer<typeof insertCompetitorSchema>;
 export type Competitor = typeof competitors.$inferSelect;
 export type InsertCompetitorCitationSnapshot = z.infer<
@@ -1952,28 +1548,12 @@ export type InsertAlertSettings = z.infer<typeof insertAlertSettingsSchema>;
 export type AlertSettings = typeof alertSettings.$inferSelect;
 export type InsertAlertHistory = z.infer<typeof insertAlertHistorySchema>;
 export type AlertHistory = typeof alertHistory.$inferSelect;
-export type InsertAiSource = z.infer<typeof insertAiSourceSchema>;
-export type AiSource = typeof aiSources.$inferSelect;
-export type InsertAiTrafficSession = z.infer<typeof insertAiTrafficSessionSchema>;
-export type AiTrafficSession = typeof aiTrafficSessions.$inferSelect;
 export type InsertPromptTestRun = z.infer<typeof insertPromptTestRunSchema>;
 export type PromptTestRun = typeof promptTestRuns.$inferSelect;
 export type InsertAgentTask = z.infer<typeof insertAgentTaskSchema>;
 export type AgentTask = typeof agentTasks.$inferSelect;
-export type InsertOutreachCampaign = z.infer<typeof insertOutreachCampaignSchema>;
-export type OutreachCampaign = typeof outreachCampaigns.$inferSelect;
-export type InsertPublicationTarget = z.infer<typeof insertPublicationTargetSchema>;
-export type PublicationTarget = typeof publicationTargets.$inferSelect;
-export type InsertOutreachEmail = z.infer<typeof insertOutreachEmailSchema>;
-export type OutreachEmail = typeof outreachEmails.$inferSelect;
-export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
-export type AutomationRule = typeof automationRules.$inferSelect;
-export type InsertAutomationExecution = z.infer<typeof insertAutomationExecutionSchema>;
-export type AutomationExecution = typeof automationExecutions.$inferSelect;
 export type InsertWorkflowRun = z.infer<typeof insertWorkflowRunSchema>;
 export type WorkflowRun = typeof workflowRuns.$inferSelect;
-export type InsertWorkflowApproval = z.infer<typeof insertWorkflowApprovalSchema>;
-export type WorkflowApproval = typeof workflowApprovals.$inferSelect;
 
 // Community Engagement - Reddit, Quora, forums
 export const communityPosts = pgTable(
