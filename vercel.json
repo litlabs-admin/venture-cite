@@ -18,8 +18,5 @@
       "destination": "/index.html"
     }
   ],
-  "crons": [
-    { "path": "/api/cron/daily-orchestrator", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/fact-scrape-backstop", "schedule": "*/5 * * * *" }
-  ]
+  "crons": [{ "path": "/api/cron/daily-orchestrator", "schedule": "0 6 * * *" }]
 }
