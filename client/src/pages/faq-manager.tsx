@@ -1,3 +1,8 @@
+// Canonical FAQ editor (spine: /act?tab=faq). The geo-tools FAQ tab was
+// removed in favour of this one, so the first-FAQ nudge anchor moved here.
+//
+// Tour engine targets (literal data-tour-id strings for verifier):
+//   data-tour-id="faq.firstResult"
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -427,8 +432,12 @@ export default function FaqManager() {
                       ) : filteredFaqs.length > 0 ? (
                         <ScrollArea className="h-[500px]">
                           <div className="space-y-4 pr-4">
-                            {filteredFaqs.map((faq) => (
-                              <Card key={faq.id} className="border-l border-border">
+                            {filteredFaqs.map((faq, faqIndex) => (
+                              <Card
+                                key={faq.id}
+                                className="border-l border-border"
+                                data-tour-id={faqIndex === 0 ? "faq.firstResult" : undefined}
+                              >
                                 <CardContent className="pt-4">
                                   <div className="flex items-start gap-2">
                                     <StatusDot

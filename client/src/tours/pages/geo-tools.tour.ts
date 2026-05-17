@@ -9,24 +9,17 @@ export const geoToolsTour: TourConfig = {
   steps: [
     {
       id: "intro",
-      title: "GEO Tools",
+      title: "GEO Assets",
       content:
-        "Discover citation opportunities across listicles, Wikipedia, BOFU pages, FAQs, and brand mentions.",
+        "Discover and track citation assets — listicles, Wikipedia pages, and BOFU comparison content AI engines cite.",
     },
     {
       id: "tabs",
       target: "geoTools.tabs",
       attachTo: "bottom",
-      title: "Five surfaces",
-      content: "Each tab is a different way to find places where your brand should be mentioned.",
-    },
-    {
-      id: "mentions-tab",
-      target: "geoTools.tab.mentions",
-      attachTo: "bottom",
-      title: "Mentions",
+      title: "Three asset surfaces",
       content:
-        "Mentions monitors Reddit and HackerNews for unprompted brand discussion. Run a scan to start.",
+        "Listicles, Wikipedia, and BOFU — each a different place to earn an AI citation. (FAQs moved to the FAQ editor; brand mentions to Community.)",
     },
   ],
 };

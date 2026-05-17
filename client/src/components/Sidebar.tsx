@@ -1,25 +1,13 @@
 import { Link, useLocation } from "wouter";
 import {
   Home,
-  Building2,
-  FileText,
-  PenLine,
-  Link2,
-  Search,
-  ScanEye,
+  Activity,
+  Stethoscope,
+  Wrench,
+  ClipboardList,
+  SlidersHorizontal,
   LogOut,
   Settings,
-  BarChart3,
-  Brain,
-  Lightbulb,
-  Users,
-  Swords,
-  Bug,
-  Wrench,
-  Radio,
-  HelpCircle,
-  ClipboardList,
-  Shield,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,55 +22,19 @@ import {
 import logoPath from "@assets/logo.png";
 import SidebarOnboarding from "@/components/SidebarOnboarding";
 
-// ─── Nav definitions ─────────────────────────────────────────────────────────
-
-// Setup: brand identity + checklist before doing anything else.
-const NAV_MAIN = [
-  { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/brands", label: "Brands", icon: Building2 },
-  { href: "/ai-visibility", label: "AI Visibility", icon: ScanEye },
-];
-
-// Create: produce the content that AI engines will eventually cite.
-const NAV_TOOLS = [
-  { href: "/content", label: "Content", icon: PenLine },
-  { href: "/articles", label: "Articles", icon: FileText },
-  { href: "/keyword-research", label: "Keywords", icon: Search },
-];
-
-// Measure: see what's working — analytics that report citation outcomes.
-const NAV_ANALYTICS = [
-  { href: "/citations", label: "Citations", icon: Link2 },
-  { href: "/geo-analytics", label: "GEO Analytics", icon: BarChart3 },
-  { href: "/ai-intelligence", label: "AI Intelligence", icon: Brain },
-  { href: "/client-reports", label: "Reports", icon: ClipboardList },
-];
-
-// Grow: outreach + competitive intel that compound citation growth.
-const NAV_GROWTH = [
-  { href: "/community", label: "Community", icon: Users },
-  { href: "/opportunities", label: "Opportunities", icon: Lightbulb },
-  { href: "/competitors", label: "Competitors", icon: Swords },
-];
-
-// Optimize: dial-in technical signals that boost citation quality.
-const NAV_OPTIMIZE = [
-  { href: "/geo-tools", label: "GEO Tools", icon: Wrench },
-  { href: "/geo-signals", label: "Signals", icon: Radio },
-  { href: "/crawler-check", label: "Crawler Check", icon: Bug },
-  { href: "/faq-manager", label: "FAQ Manager", icon: HelpCircle },
-  { href: "/brand-fact-sheet", label: "Fact Sheet", icon: Shield },
-];
+// ─── Workflow spine ──────────────────────────────────────────────────────────
+// One flat list, no section labels. The product is a single operating system:
+// Monitor (where do I stand) → Diagnose (what's wrong) → Act (fix it) →
+// Report (prove it), with the Command Center as the at-a-glance home and
+// Setup holding brand/prompt/fact-sheet configuration.
+//
+// The Monitor/Act/Setup items are wrapped in elements carrying literal
+// data-tour-id attributes (nav.monitor / nav.act / nav.setup) referenced by
+// global-welcome.tour.ts. They must stay literal strings — the build gate
+// scripts/verify-tour-targets.ts statically greps `data-tour-id="…"` and
+// fails the build if a registered target has no literal match in source.
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function SectionLabel({ label }: { label: string }) {
-  return (
-    <p className="px-5 pt-5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90">
-      {label}
-    </p>
-  );
-}
 
 function NavItem({
   href,
@@ -130,77 +82,72 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     return "U";
   };
 
-  const activePath = location === "/" ? "/dashboard" : location;
+  // `/` and `/dashboard` both render the Command Center. Every other spine
+  // stage owns a path prefix (e.g. `/monitor?tab=citations`).
+  const isActive = (href: string) =>
+    href === "/"
+      ? location === "/" || location === "/dashboard"
+      : location === href || location.startsWith(`${href}/`) || location.startsWith(`${href}?`);
 
   return (
     <div className="flex h-full flex-col bg-sidebar">
       {/* Logo */}
       <div className="flex items-center px-5 h-14 border-b border-sidebar-border shrink-0">
-        <Link href="/dashboard" onClick={onNavigate}>
+        <Link href="/" onClick={onNavigate}>
           <img src={logoPath} alt="VentureCite" className="h-9 w-auto cursor-pointer" />
         </Link>
       </div>
 
-      {/* Scrollable nav */}
-      <nav className="flex-1 overflow-y-auto py-2">
-        <div data-tour-id="sidebar.group.setup">
-          <SectionLabel label="Setup" />
-          {NAV_MAIN.map((item) => (
-            <NavItem
-              key={item.href}
-              {...item}
-              active={activePath === item.href}
-              onNavigate={onNavigate}
-            />
-          ))}
+      {/* Spine nav. Unrolled (only 6 fixed items) so the three tour targets
+          can carry literal data-tour-id strings the build gate can grep. */}
+      <nav className="flex-1 overflow-y-auto py-3 space-y-0.5">
+        <NavItem
+          href="/"
+          label="Command Center"
+          icon={Home}
+          active={isActive("/")}
+          onNavigate={onNavigate}
+        />
+        <div data-tour-id="nav.monitor">
+          <NavItem
+            href="/monitor"
+            label="Monitor"
+            icon={Activity}
+            active={isActive("/monitor")}
+            onNavigate={onNavigate}
+          />
         </div>
-
-        <div data-tour-id="sidebar.group.create">
-          <SectionLabel label="Create" />
-          {NAV_TOOLS.map((item) => (
-            <NavItem
-              key={item.href}
-              {...item}
-              active={activePath === item.href}
-              onNavigate={onNavigate}
-            />
-          ))}
+        <NavItem
+          href="/diagnose"
+          label="Diagnose"
+          icon={Stethoscope}
+          active={isActive("/diagnose")}
+          onNavigate={onNavigate}
+        />
+        <div data-tour-id="nav.act">
+          <NavItem
+            href="/act"
+            label="Act"
+            icon={Wrench}
+            active={isActive("/act")}
+            onNavigate={onNavigate}
+          />
         </div>
-
-        <div data-tour-id="sidebar.group.measure">
-          <SectionLabel label="Measure" />
-          {NAV_ANALYTICS.map((item) => (
-            <NavItem
-              key={item.href}
-              {...item}
-              active={activePath === item.href}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </div>
-
-        <div data-tour-id="sidebar.group.grow">
-          <SectionLabel label="Grow" />
-          {NAV_GROWTH.map((item) => (
-            <NavItem
-              key={item.href}
-              {...item}
-              active={activePath === item.href}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </div>
-
-        <div data-tour-id="sidebar.group.optimize">
-          <SectionLabel label="Optimize" />
-          {NAV_OPTIMIZE.map((item) => (
-            <NavItem
-              key={item.href}
-              {...item}
-              active={activePath === item.href}
-              onNavigate={onNavigate}
-            />
-          ))}
+        <NavItem
+          href="/report"
+          label="Report"
+          icon={ClipboardList}
+          active={isActive("/report")}
+          onNavigate={onNavigate}
+        />
+        <div data-tour-id="nav.setup">
+          <NavItem
+            href="/setup"
+            label="Setup"
+            icon={SlidersHorizontal}
+            active={isActive("/setup")}
+            onNavigate={onNavigate}
+          />
         </div>
       </nav>
 

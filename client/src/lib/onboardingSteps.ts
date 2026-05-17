@@ -36,7 +36,7 @@ export const STEPS: OnboardingStep[] = [
     title: "Create your first brand",
     description:
       "Set up a brand profile so content can be personalized with your tone, values, and unique selling points.",
-    link: "/brands",
+    link: "/setup?tab=brands",
     linkText: "Create brand",
     icon: Building2,
     checkFn: (d) => (d?.brands?.length || 0) > 0,
@@ -46,7 +46,7 @@ export const STEPS: OnboardingStep[] = [
     title: "Generate AI-optimized content",
     description:
       "Use the AI content generator to create articles designed to be cited by AI search engines.",
-    link: "/content",
+    link: "/act?tab=create",
     linkText: "Create content",
     icon: PenLine,
     checkFn: (d) => Boolean(d?.hasArticles) || (d?.articles?.length || 0) > 0,
@@ -56,7 +56,7 @@ export const STEPS: OnboardingStep[] = [
     title: "View the AI Visibility Guide",
     description:
       "Step-by-step recommendations to optimize your presence across ChatGPT, Claude, and other AI engines.",
-    link: "/ai-visibility",
+    link: "/setup?tab=visibility",
     linkText: "View guide",
     icon: ScanEye,
     // Server-only — localStorage would leak across user accounts on the
@@ -68,7 +68,7 @@ export const STEPS: OnboardingStep[] = [
     title: "Run your first citation check",
     description:
       "Kick off an AI citation run so we can start tracking how often platforms mention your brand.",
-    link: "/citations",
+    link: "/monitor?tab=citations",
     linkText: "Run check",
     icon: Target,
     // Done the moment the user triggers their first run — no need to wait

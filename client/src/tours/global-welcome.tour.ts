@@ -15,26 +15,27 @@ export const globalWelcomeTour: TourConfig = {
     },
     {
       id: "sidebar-setup",
-      target: "sidebar.group.setup",
+      target: "nav.setup",
       attachTo: "right",
-      title: "Start here",
-      content: "Set up your brand and connect AI engines from the Setup section.",
+      title: "1. Set up",
+      content:
+        "Start in Setup: add your brand, generate prompts, and build a fact sheet so AI answers can be checked accurately.",
     },
     {
-      id: "sidebar-create",
-      target: "sidebar.group.create",
+      id: "sidebar-act",
+      target: "nav.act",
       attachTo: "right",
-      title: "Create content",
+      title: "2. Act",
       content:
-        "Generate citation-ready articles, FAQs, and keyword research from the Create section.",
+        "Act is where you create citation-ready articles, FAQs, GEO assets, and community outreach.",
     },
     {
-      id: "sidebar-measure",
-      target: "sidebar.group.measure",
+      id: "sidebar-monitor",
+      target: "nav.monitor",
       attachTo: "right",
-      title: "Measure impact",
+      title: "3. Monitor",
       content:
-        "Track citations, share-of-answer, and AI intelligence trends from the Measure section.",
+        "Monitor tracks how AI engines cite you — citations, competitors, share-of-answer, and mentions in one place.",
     },
     {
       id: "brand-selector",

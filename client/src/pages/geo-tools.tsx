@@ -1,6 +1,10 @@
+// GEO Assets — Listicles, Wikipedia, and BOFU content (the citation-asset
+// surfaces). FAQ management lives in the canonical FAQ editor (faq-manager,
+// /act?tab=faq) and brand mentions live in Community/Monitor — those tabs
+// were removed here to end the duplication.
+//
 // Tour engine targets (literal data-tour-id strings for verifier):
 //   data-tour-id="listicles.firstResult"
-//   data-tour-id="faq.firstResult"
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +46,7 @@ import { Link } from "wouter";
 import PageHeader from "@/components/PageHeader";
 import { PageHeaderHelp } from "@/components/PageHeaderHelp";
 import { pageExplainers } from "@/lib/pageExplainers";
-import type { Listicle, BofuContent, FaqItem, WikipediaMention, Competitor } from "@shared/schema";
+import type { Listicle, BofuContent, WikipediaMention, Competitor } from "@shared/schema";
 import { StatusDot } from "@/components/foundations";
 import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -52,24 +56,19 @@ import {
   List,
   BookOpen,
   FileText,
-  HelpCircle,
-  Bell,
   Sparkles,
   ExternalLink,
-  TrendingUp,
   Target,
   CheckCircle,
   XCircle,
   Search,
   Plus,
-  Trash2,
   Loader2,
   Check,
   X as XIcon,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import MentionsTab from "@/components/geo-tools/MentionsTab";
 
 // Wave 9.4: pretty-print scan reports as multi-line toast descriptions.
 // Hides zero-valued lines so a clean run shows just the meaningful ones.
@@ -228,7 +227,6 @@ export default function GeoTools() {
   const [bofuType, setBofuType] = useState<string>("comparison");
   const [bofuCompetitors, setBofuCompetitors] = useState<string[]>([]);
   const [bofuKeyword, setBofuKeyword] = useState("");
-  const [faqTopic, setFaqTopic] = useState("");
   // Wave 9.4: BOFU full-content sheet — replaces the prior 500-char preview.
   const [activeBofu, setActiveBofu] = useState<BofuContent | null>(null);
   const [bofuSheetOpen, setBofuSheetOpen] = useState(false);
@@ -407,24 +405,6 @@ export default function GeoTools() {
     onError: () => toast({ title: "Failed to generate content", variant: "destructive" }),
   });
 
-  // FAQ queries
-  const { data: faqsData, isLoading: faqsLoading } = useQuery({
-    queryKey: ["/api/faqs", selectedBrandId],
-    enabled: !!selectedBrandId,
-  });
-
-  const generateFaqsMutation = useMutation({
-    mutationFn: async (topic: string) => {
-      const response = await apiRequest("POST", `/api/faqs/generate/${selectedBrandId}`, { topic });
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({ title: "FAQs generated!" });
-      queryClient.invalidateQueries({ queryKey: ["/api/faqs"] });
-    },
-    onError: () => toast({ title: "Failed to generate FAQs", variant: "destructive" }),
-  });
-
   // Wave 9.4: header roll-up cards. Single endpoint returns counts
   // across all five tabs + 30-day cited counts so users can answer
   // "is GEO Tools working?" at a glance.
@@ -541,32 +521,15 @@ export default function GeoTools() {
       }),
   });
 
-  // Toggle an FAQ's isOptimized flag. The badge next to each FAQ used to
-  // only display the status with no way to mark one optimised/unoptimised —
-  // users had to hand-edit the DB or regenerate to change it.
-  const toggleFaqOptimizedMutation = useMutation({
-    mutationFn: async ({ id, isOptimized }: { id: string; isOptimized: 0 | 1 }) => {
-      const response = await apiRequest("PATCH", `/api/faqs/${id}`, { isOptimized });
-      return response.json();
-    },
-    onSuccess: (_data, variables) => {
-      toast({
-        title: variables.isOptimized === 1 ? "Marked as optimized" : "Marked as not yet optimized",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/faqs"] });
-    },
-    onError: () => toast({ title: "Failed to update FAQ status", variant: "destructive" }),
-  });
-
   return (
     <>
       <Helmet>
-        <title>GEO Tools - VentureCite</title>
+        <title>GEO Assets - VentureCite</title>
       </Helmet>
       <div className="space-y-8">
         <PageHeader
-          title="GEO Tools"
-          description="Advanced tools to boost your AI visibility"
+          title="GEO Assets"
+          description="Listicles, Wikipedia, and BOFU content that AI engines cite"
           actions={
             <div className="flex items-center gap-2">
               {brands.length > 0 ? (
@@ -595,7 +558,7 @@ export default function GeoTools() {
                 with the live cadence so newly published content +
                 self-citation counts surface within the run. */}
             {summary && (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                 <SummaryCard
                   label="Listicles"
                   primary={`${summary.listicles.included}/${summary.listicles.total}`}
@@ -614,22 +577,10 @@ export default function GeoTools() {
                   secondary={`${summary.bofu.cited30d} cited (30d) · ${summary.bofu.drafts} draft`}
                   testId="summary-bofu"
                 />
-                <SummaryCard
-                  label="FAQs"
-                  primary={`${summary.faqs.published}`}
-                  secondary={`${summary.faqs.cited30d} cited (30d) · ${summary.faqs.drafts} draft`}
-                  testId="summary-faqs"
-                />
-                <SummaryCard
-                  label="Mentions"
-                  primary={`${summary.mentions.total}`}
-                  secondary={`${summary.mentions.unaddressed} unaddressed · ${summary.mentions.negative} negative`}
-                  testId="summary-mentions"
-                />
               </div>
             )}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-5 mb-6" data-tour-id="geoTools.tabs">
+              <TabsList className="grid w-full grid-cols-3 mb-6" data-tour-id="geoTools.tabs">
                 <TabsTrigger
                   value="listicles"
                   className="flex items-center gap-2"
@@ -653,23 +604,6 @@ export default function GeoTools() {
                 >
                   <FileText className="h-4 w-4" />
                   <span className="hidden sm:inline">BOFU</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="faqs"
-                  className="flex items-center gap-2"
-                  data-testid="tab-faqs"
-                >
-                  <HelpCircle className="h-4 w-4" />
-                  <span className="hidden sm:inline">FAQs</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="mentions"
-                  className="flex items-center gap-2"
-                  data-testid="tab-mentions"
-                  data-tour-id="geoTools.tab.mentions"
-                >
-                  <Bell className="h-4 w-4" />
-                  <span className="hidden sm:inline">Mentions</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -1236,145 +1170,6 @@ export default function GeoTools() {
                     </CardContent>
                   </Card>
                 </div>
-              </TabsContent>
-
-              {/* FAQs TAB */}
-              <TabsContent value="faqs">
-                <div className="grid gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <HelpCircle className="h-5 w-5 text-chart-3" />
-                        FAQ Optimizer
-                      </CardTitle>
-                      <CardDescription>
-                        Generate AI-optimized FAQs that get surfaced by AI engines
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="bg-chart-3/10 p-4 rounded-lg mb-6">
-                        <p className="text-sm text-chart-3">
-                          <strong>FAQs = More Shots on Goal:</strong> AI engines frequently surface
-                          FAQ sections in responses. Keep answers 40-60 words for optimal AI
-                          summarization.
-                        </p>
-                      </div>
-
-                      <div className="flex gap-4 mb-6">
-                        <div className="flex-1">
-                          <Input
-                            placeholder="Topic focus (optional, e.g., pricing, features)"
-                            value={faqTopic}
-                            onChange={(e) => setFaqTopic(e.target.value)}
-                            data-testid="input-faq-topic"
-                          />
-                        </div>
-                        <Button
-                          onClick={() => generateFaqsMutation.mutate(faqTopic)}
-                          disabled={generateFaqsMutation.isPending}
-                          data-testid="button-generate-faqs"
-                        >
-                          {generateFaqsMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-4 w-4 mr-2" />
-                          )}
-                          Generate FAQs
-                        </Button>
-                      </div>
-
-                      {faqsLoading ? (
-                        <div className="text-center py-8">
-                          <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
-                        </div>
-                      ) : (faqsData as any)?.data?.length > 0 ? (
-                        <div className="space-y-4">
-                          {(faqsData as any).data.map((faq: FaqItem, faqIndex: number) => (
-                            <Card
-                              key={faq.id}
-                              data-tour-id={faqIndex === 0 ? "faq.firstResult" : undefined}
-                            >
-                              <CardContent className="pt-4">
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-chart-1">{faq.question}</h4>
-                                    <p className="text-sm mt-2">{faq.answer}</p>
-                                    <div className="flex gap-2 mt-3">
-                                      <Badge variant="outline">{faq.category}</Badge>
-                                      <Badge
-                                        variant={
-                                          faq.aiSurfaceScore && faq.aiSurfaceScore >= 70
-                                            ? "default"
-                                            : "secondary"
-                                        }
-                                      >
-                                        AI Score: {faq.aiSurfaceScore || 0}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="flex-shrink-0 gap-1"
-                                    disabled={toggleFaqOptimizedMutation.isPending}
-                                    onClick={() =>
-                                      toggleFaqOptimizedMutation.mutate({
-                                        id: faq.id,
-                                        isOptimized: faq.isOptimized === 1 ? 0 : 1,
-                                      })
-                                    }
-                                    title={
-                                      faq.isOptimized === 1
-                                        ? "Optimized — click to unmark"
-                                        : "Not optimized yet — click to mark optimized"
-                                    }
-                                    data-testid={`button-toggle-faq-${faq.id}`}
-                                  >
-                                    <CheckCircle
-                                      className={
-                                        faq.isOptimized === 1
-                                          ? "h-5 w-5 text-chart-4"
-                                          : "h-5 w-5 text-muted-foreground"
-                                      }
-                                    />
-                                    <span className="text-xs">
-                                      {faq.isOptimized === 1 ? "Optimized" : "Mark optimized"}
-                                    </span>
-                                  </Button>
-                                </div>
-                                {faq.optimizationTips?.length ? (
-                                  <div className="mt-3 pt-3 border-t">
-                                    <p className="text-xs text-muted-foreground mb-1">
-                                      Optimization Tips:
-                                    </p>
-                                    <ul className="text-xs space-y-1">
-                                      {faq.optimizationTips.map((tip, i) => (
-                                        <li key={i} className="flex items-start gap-1">
-                                          <Target className="h-3 w-3 mt-0.5 text-chart-3" />
-                                          {tip}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                ) : null}
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <HelpCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>No FAQs yet. Generate AI-optimized FAQs for {selectedBrand?.name}!</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              {/* MENTIONS TAB */}
-              <TabsContent value="mentions">
-                <MentionsTab brandId={selectedBrandId} />
               </TabsContent>
             </Tabs>
           </>
