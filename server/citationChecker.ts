@@ -251,8 +251,16 @@ export async function runPlatformCitationCheck(
     description: brand?.description || null,
     industry: brand?.industry || null,
   };
+  // Neutral, naturalistic persona. The previous prompt explicitly told the
+  // model to cite "specific sources, brands, companies, or products", which
+  // inflated measured visibility — a brand could surface only because the
+  // model was nudged to name brands, not because it would organically. To
+  // measure real GEO visibility we must query the way a normal user would,
+  // with no instruction that biases toward (or against) naming brands.
+  // Expect this to LOWER reported citation rates: that is a correctness
+  // de-inflation, not a regression.
   const systemMsg =
-    "You are a helpful assistant. Answer the question thoroughly, citing specific sources, brands, companies, or products when relevant.";
+    "Answer the question helpfully, accurately, and naturally — exactly as you would for any user.";
 
   if (platform === "ChatGPT" || platform === "GPT-4") {
     const chatResponse = await openaiBreaker.run(() =>
@@ -1213,6 +1221,17 @@ export async function runBrandPrompts(
     await reverifyHallucinationsForRun(brandId, rankings);
   } catch (err) {
     logger.warn({ err: err }, `[citationChecker] hallucination detection failed:`);
+  }
+
+  // 4. Run-change alerts — diff this run's snapshots (written in step 2)
+  // against the prior run's and persist alert_history rows. MUST run after
+  // steps 2 + 3 so the visibility_score / hallucinations snapshots exist.
+  // Best-effort: a failure here must never revert saved rankings.
+  try {
+    const { recordRunChangeAlerts } = await import("./lib/runChangeAlerts");
+    await recordRunChangeAlerts(brandId);
+  } catch (err) {
+    logger.warn({ err: err }, `[citationChecker] run-change alerts failed:`);
   }
 
   return { totalChecks, totalCited, rankings, runId: citationRun.id, done: true };

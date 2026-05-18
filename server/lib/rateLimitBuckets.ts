@@ -30,6 +30,11 @@ const CONFIGS: Record<string, BucketConfig> = {
   hackernews: { capacity: 30, refillPerSec: 5 },
   // Manual-add: 10 per user per minute (1 token per 6 seconds).
   "manual-add": { capacity: 10, refillPerSec: 10 / 60 },
+  // Phase 8 cheap-win: per-brand cooldown shared across the expensive manual
+  // discovery/generation triggers (listicle / wikipedia / FAQ / keyword
+  // discover). Burst of 3 then ~1 every 2 min so a user can run a couple of
+  // them back-to-back but can't hammer LLM/external quota by re-clicking.
+  "manual-discovery": { capacity: 3, refillPerSec: 1 / 120 },
 };
 
 function applyRefill(tokens: number, lastRefill: Date, cfg: BucketConfig, now: number): number {

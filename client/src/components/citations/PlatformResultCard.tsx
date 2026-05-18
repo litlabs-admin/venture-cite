@@ -12,6 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import SafeMarkdown from "@/components/SafeMarkdown";
 import { createHighlightPlugin } from "@/lib/highlightTermsRehype";
 import { useToast } from "@/hooks/use-toast";
+import { PLATFORM_COLORS } from "@/lib/platformColors";
 
 export type PlatformResult = {
   platform: string;
@@ -31,16 +32,9 @@ export type PlatformResult = {
   citedUrls?: string[] | null;
 };
 
-// Wave 9: known-platform palette stays explicit so the brand colors look
-// right; everything else falls back to a stable hash → HSL so a 6th /
-// 7th platform doesn't render as plain grey.
-const PLATFORM_COLORS: Record<string, string> = {
-  ChatGPT: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
-  Claude: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
-  Gemini: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
-  Perplexity: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
-  DeepSeek: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20",
-};
+// Wave 9: known-platform palette (shared single source) stays explicit so the
+// brand colors look right; everything else falls back to a stable hash → HSL
+// so a 6th / 7th platform doesn't render as plain grey.
 
 // Wave 9: inline color hash for unknown platforms. djb2-ish — stable across
 // renders, distributes hues evenly. Returns CSS variables so the same

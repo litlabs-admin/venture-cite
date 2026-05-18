@@ -34,6 +34,8 @@ import {
 import type { MetricsHistory } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { EmptyState } from "@/components/foundations";
+import { chartTheme } from "@/lib/chartTheme";
 
 export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string }) {
   const { toast } = useToast();
@@ -182,13 +184,11 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
           </CardContent>
         </Card>
       ) : getTrendChartData().length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <History className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-medium mb-2">No Historical Data Yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Start recording snapshots to track your metrics over time
-            </p>
+        <EmptyState
+          icon={History}
+          title="No Historical Data Yet"
+          body="Start recording snapshots to track your metrics over time"
+          cta={
             <Button
               onClick={() => recordMetricsMutation.mutate()}
               disabled={recordMetricsMutation.isPending}
@@ -197,8 +197,8 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
               <Plus className="w-4 h-4 mr-2" />
               Record First Snapshot
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <div className="grid gap-6">
           <Card>
@@ -215,24 +215,29 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
                   <AreaChart data={getTrendChartData()}>
                     <defs>
                       <linearGradient id="soaGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        <stop
+                          offset="5%"
+                          stopColor={chartTheme.series.visibility}
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={chartTheme.series.visibility}
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="date" className="text-xs" />
                     <YAxis domain={[0, 100]} className="text-xs" />
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                      }}
-                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                      contentStyle={chartTheme.tooltipContentStyle}
+                      labelStyle={chartTheme.tooltipLabelStyle}
                     />
                     <Area
                       type="monotone"
                       dataKey="shareOfAnswer"
-                      stroke="#3b82f6"
+                      stroke={chartTheme.series.visibility}
                       fill="url(#soaGradient)"
                       name="Share of Answer (%)"
                       connectNulls
@@ -259,18 +264,13 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis dataKey="date" className="text-xs" />
                       <YAxis domain={[0, 100]} className="text-xs" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                        }}
-                      />
+                      <Tooltip contentStyle={chartTheme.tooltipContentStyle} />
                       <Line
                         type="monotone"
                         dataKey="citationQuality"
-                        stroke="#10b981"
+                        stroke={chartTheme.series.quality}
                         strokeWidth={2}
-                        dot={{ fill: "#10b981" }}
+                        dot={{ fill: chartTheme.series.quality }}
                         name="Quality Score"
                         connectNulls
                       />
@@ -295,18 +295,13 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis dataKey="date" className="text-xs" />
                       <YAxis className="text-xs" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                        }}
-                      />
+                      <Tooltip contentStyle={chartTheme.tooltipContentStyle} />
                       <Line
                         type="monotone"
                         dataKey="hallucinations"
-                        stroke="#ef4444"
+                        stroke={chartTheme.series.issues}
                         strokeWidth={2}
-                        dot={{ fill: "#ef4444" }}
+                        dot={{ fill: chartTheme.series.issues }}
                         name="Unresolved Issues"
                         connectNulls
                       />
@@ -332,17 +327,12 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="date" className="text-xs" />
                     <YAxis className="text-xs" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                      }}
-                    />
+                    <Tooltip contentStyle={chartTheme.tooltipContentStyle} />
                     <Legend />
                     <Line
                       type="monotone"
                       dataKey="shareOfAnswer"
-                      stroke="#3b82f6"
+                      stroke={chartTheme.series.visibility}
                       strokeWidth={2}
                       name="Share of Answer (%)"
                       connectNulls
@@ -350,7 +340,7 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
                     <Line
                       type="monotone"
                       dataKey="citationQuality"
-                      stroke="#10b981"
+                      stroke={chartTheme.series.quality}
                       strokeWidth={2}
                       name="Citation Quality"
                       connectNulls
@@ -358,7 +348,7 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
                     <Line
                       type="monotone"
                       dataKey="hallucinations"
-                      stroke="#ef4444"
+                      stroke={chartTheme.series.issues}
                       strokeWidth={2}
                       name="Hallucinations"
                       connectNulls

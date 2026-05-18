@@ -3,11 +3,11 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
+  AlertTriangle,
   ArrowRight,
   ArrowUp,
   ArrowDown,
   Brain,
-  ClipboardList,
   Loader2,
   Stethoscope,
   Swords,
@@ -47,6 +47,12 @@ type LeaderRow = {
   isOwn: boolean;
   totalCitations: number;
   shareOfVoice: number;
+};
+type AlertRow = {
+  id: string;
+  alertType: string;
+  message: string;
+  sentAt: string;
 };
 
 function Widget({
@@ -94,11 +100,16 @@ export default function Home() {
     queryKey: [`/api/competitors/leaderboard?brandId=${selectedBrandId}`],
     enabled,
   });
+  const alertsQ = useQuery<{ success: boolean; data: AlertRow[] }>({
+    queryKey: [`/api/brands/${selectedBrandId}/alerts?limit=3`],
+    enabled,
+  });
   const { runs: activeRuns } = useActiveCitationRuns(selectedBrandId);
 
   const h = hero.data?.data;
   const weeks = trend.data?.data?.weeks ?? [];
   const rows = leaderboard.data?.data ?? [];
+  const alerts = alertsQ.data?.data ?? [];
 
   const weekDelta = useMemo(() => {
     const withData = weeks.filter((w) => w.total > 0);
@@ -166,7 +177,7 @@ export default function Home() {
   const scanRunning = activeRuns.length > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in-up motion-reduce:animate-none">
       <PageHeader
         title="Command Center"
         description={
@@ -248,6 +259,16 @@ export default function Home() {
               Not enough run history yet — check back after your next weekly scan.
             </p>
           )}
+          {alerts.length > 0 && (
+            <ul className="mt-3 space-y-1 border-t border-border/60 pt-2">
+              {alerts.slice(0, 3).map((a) => (
+                <li key={a.id} className="flex gap-1.5 text-xs text-muted-foreground">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-destructive" />
+                  <span className="line-clamp-2">{a.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Widget>
 
         {/* 4. Cited / Total */}
@@ -319,14 +340,6 @@ export default function Home() {
               No competitor is outranking you{rows.length === 0 ? " — none tracked yet" : ""}.
             </p>
           )}
-        </Widget>
-
-        {/* 7. Latest report → Report */}
-        <Widget title="Reporting" to="/report" icon={ClipboardList}>
-          <p className="text-sm text-muted-foreground">
-            Generate a shareable client-ready snapshot of this brand&apos;s AI visibility.
-          </p>
-          <span className="mt-2 inline-block text-sm font-medium text-primary">Open Report →</span>
         </Widget>
       </div>
 

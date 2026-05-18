@@ -266,6 +266,9 @@ export type WeeklyDigestBrandBrief = {
   hallucinationCount: number;
   topInsight: string;
   firstRun?: boolean;
+  /** Phase 8: accumulated run-change alert messages since the last digest
+   *  (most recent first, capped). Empty/undefined → no alerts block. */
+  alerts?: string[];
 };
 
 export type WeeklyDigestPayload = {
@@ -335,6 +338,15 @@ export async function sendWeeklyDigest(
       const insightBlock = b.topInsight
         ? `<p style="margin:12px 0 0;color:#374151;font-size:14px">${escapeHtml(b.topInsight)}</p>`
         : "";
+      const alertsBlock =
+        b.alerts && b.alerts.length > 0
+          ? `<div style="margin:12px 0 0">
+          <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#92400e;text-transform:uppercase;letter-spacing:.04em">Changes since last digest</p>
+          <ul style="margin:0;padding-left:20px;font-size:14px;color:#374151">
+            ${b.alerts.map((a) => `<li>${escapeHtml(a)}</li>`).join("")}
+          </ul>
+        </div>`
+          : "";
       return `
       <div style="margin-top:24px;padding:18px;background:#fafafa;border-radius:8px">
         <h2 style="margin:0 0 4px;font-size:18px">${escapeHtml(b.brandName)}</h2>
@@ -345,6 +357,7 @@ export async function sendWeeklyDigest(
         <ul style="margin:10px 0 0;padding-left:20px;font-size:14px;color:#374151">
           ${lostLine}${wonLine}${hallLine}
         </ul>
+        ${alertsBlock}
         ${insightBlock}
       </div>`;
     })

@@ -51,9 +51,11 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
         const Body = t.Component;
         return (
           <TabsContent key={t.value} value={t.value}>
-            <Suspense fallback={<RouteSpinner />}>
-              <Body />
-            </Suspense>
+            <div className="animate-fade-in-up motion-reduce:animate-none">
+              <Suspense fallback={<RouteSpinner />}>
+                <Body />
+              </Suspense>
+            </div>
           </TabsContent>
         );
       })}

@@ -34,7 +34,6 @@ const Content = lazy(() => import("@/pages/content"));
 const Articles = lazy(() => import("@/pages/articles"));
 const Brands = lazy(() => import("@/pages/brands"));
 const KeywordResearch = lazy(() => import("@/pages/keyword-research"));
-const ClientReports = lazy(() => import("@/pages/client-reports"));
 const Settings = lazy(() => import("@/pages/settings"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Welcome = lazy(() => import("@/pages/welcome"));
@@ -44,7 +43,6 @@ const Glossary = lazy(() => import("@/pages/glossary"));
 const Monitor = lazy(() => import("@/pages/monitor"));
 const Diagnose = lazy(() => import("@/pages/diagnose"));
 const Act = lazy(() => import("@/pages/act"));
-const Report = lazy(() => import("@/pages/report"));
 const Setup = lazy(() => import("@/pages/setup"));
 
 /**
@@ -167,7 +165,6 @@ function Router() {
       <Route path="/monitor">{() => <AuthenticatedRoute component={Monitor} />}</Route>
       <Route path="/diagnose">{() => <AuthenticatedRoute component={Diagnose} />}</Route>
       <Route path="/act">{() => <AuthenticatedRoute component={Act} />}</Route>
-      <Route path="/report">{() => <AuthenticatedRoute component={Report} />}</Route>
       <Route path="/setup">{() => <AuthenticatedRoute component={Setup} />}</Route>
       <Route path="/content">{() => <AuthenticatedRoute component={Content} />}</Route>
       <Route path="/content/:articleId">{() => <AuthenticatedRoute component={Content} />}</Route>
@@ -176,7 +173,6 @@ function Router() {
       <Route path="/keyword-research">
         {() => <AuthenticatedRoute component={KeywordResearch} />}
       </Route>
-      <Route path="/client-reports">{() => <AuthenticatedRoute component={ClientReports} />}</Route>
       {/* Retired feature paths → workflow spine (query-preserving 301s).
           Old links, bookmarks, emails, and recommendation CTAs keep working. */}
       <Route path="/citations">{() => <SpineRedirect to="/monitor" tab="citations" />}</Route>

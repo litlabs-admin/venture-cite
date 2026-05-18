@@ -320,7 +320,9 @@ export default function Welcome() {
     }
   };
 
-  // Navigate to dashboard once v2 orchestration completes (or fails).
+  // Route into the Command Center (canonical spine front door at `/`) once v2
+  // orchestration completes (or fails). The Command Center surfaces the first
+  // "Next Best Action" for the freshly-created brand automatically.
   useEffect(() => {
     if (scene !== "v2scraping" || !newBrandId) return;
     if (
@@ -329,7 +331,7 @@ export default function Welcome() {
       orchestration.status === "plan_failed" ||
       orchestration.status === "offline"
     ) {
-      setLocation(`/dashboard?brandId=${newBrandId}`);
+      setLocation(`/?brandId=${newBrandId}`);
     }
   }, [orchestration.status, scene, newBrandId, setLocation]);
 
@@ -706,7 +708,7 @@ export default function Welcome() {
             <div className="mt-6 flex justify-end">
               <Button
                 variant="outline"
-                onClick={() => setLocation(`/dashboard?brandId=${newBrandId}`)}
+                onClick={() => setLocation(`/?brandId=${newBrandId}`)}
                 data-testid="button-skip-to-dashboard"
               >
                 {orchestration.status === "completed" ||

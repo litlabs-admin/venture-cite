@@ -53,6 +53,7 @@ import {
   asyncHandler,
 } from "../lib/routesShared";
 import { runArticleSlice } from "../contentGenerationWorker";
+import { acquireOrWait, secondsUntilAvailable } from "../lib/rateLimitBuckets";
 
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
@@ -701,6 +702,15 @@ export function setupContentRoutes(app: Express): void {
         }
 
         const brand = await requireBrand(brandId, user.id);
+
+        if (!(await acquireOrWait("manual-discovery", brandId, 0))) {
+          const secs = await secondsUntilAvailable("manual-discovery", brandId);
+          return res.status(429).json({
+            success: false,
+            error: "rate_limited",
+            message: `Keyword discovery is on a short cooldown for this brand. Try again in ~${secs}s.`,
+          });
+        }
 
         const competitors = await storage.getCompetitors(brandId);
         const competitorContext =

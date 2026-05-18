@@ -50,19 +50,21 @@ export async function generateBrandPrompts(
         messages: [
           {
             role: "system",
-            content: `You are a GEO (Generative Engine Optimization) expert. Your job is to generate EXACTLY 10 user questions where the given brand is most likely to be cited if those questions were asked to ChatGPT, Claude, or Gemini.
+            content: `You are a GEO (Generative Engine Optimization) strategist. Generate EXACTLY 10 distinct questions a real person would type into ChatGPT, Claude, Gemini, or Perplexity while researching or buying in this brand's category — questions where a well-informed assistant would naturally name or recommend specific products/companies, so the brand has a genuine chance to be cited.
 
 Rules:
-- Mix query types: direct ("best X tools"), comparison ("X vs Y"), how-to, and buyer-intent.
-- Each question should be natural — something a real user would type.
-- For each question, include a 1-sentence rationale explaining why THIS brand would rank well for it.
-- Ground the questions in the brand's industry, products, and published articles.
-- Do NOT use the brand name in the questions themselves — users rarely search by brand.
+- Real user phrasing only — natural questions people actually ask an AI assistant. No SEO keyword stuffing, no marketing copy.
+- The 10 must be genuinely different: distinct topics and intents. Never rephrase or near-duplicate another question.
+- Do NOT use the brand's name in the questions — users rarely search by brand, and we want to see whether the brand surfaces unprompted.
+- Favor questions where an assistant would enumerate, compare, or recommend options in this category (that is where citations actually happen): "best X for Y", "X vs Y", "top alternatives to Y", "how to choose an X", and other buyer-intent / decision questions.
+- Ground every question in the brand's real industry, products, USPs, target audience, and published article topics — not generic filler.
+- For each, give a 1-sentence rationale: why an assistant answering THIS question would plausibly name this brand.
 - Classify each prompt on TWO dimensions:
   - category: a short topic cluster (2-4 words, lowercase), e.g. "pricing comparison", "getting started", "use case guide"
-  - funnelStage: EXACTLY one of "TOFU" (awareness: "what is X"), "MOFU" (consideration: "best X for Y"), or "BOFU" (decision: "X vs Y", "X pricing", "X alternatives")
+  - funnelStage: EXACTLY one of "TOFU" (awareness: "what is X", "how does X work"), "MOFU" (consideration: "best X for Y", "how to choose X"), or "BOFU" (decision: "X vs Y", "X pricing", "alternatives to Y")
+- Distribution across the 10: exactly 3 TOFU, 4 MOFU, 3 BOFU — buyer-intent MOFU/BOFU questions cite brands far more often, so weight toward them while keeping awareness coverage.
 
-Return JSON: { "prompts": [{ "prompt": "...", "rationale": "...", "category": "...", "funnelStage": "TOFU"|"MOFU"|"BOFU" }, ... 10 items total] }`,
+Return JSON only: { "prompts": [{ "prompt": "...", "rationale": "...", "category": "...", "funnelStage": "TOFU"|"MOFU"|"BOFU" }, ... exactly 10 items] }`,
           },
           {
             role: "user",

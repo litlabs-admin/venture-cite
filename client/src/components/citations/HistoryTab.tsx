@@ -37,6 +37,7 @@ import {
 } from "recharts";
 import { PlatformResultCard, type PlatformResult } from "./PlatformResultCard";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { chartTheme } from "@/lib/chartTheme";
 
 type CitationRunEntry = {
   id: string;
@@ -264,8 +265,12 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                 >
                   <defs>
                     <linearGradient id="citationGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      <stop
+                        offset="5%"
+                        stopColor={chartTheme.series.visibility}
+                        stopOpacity={0.2}
+                      />
+                      <stop offset="95%" stopColor={chartTheme.series.visibility} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -299,13 +304,13 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                   <Area
                     type="monotone"
                     dataKey="citationRate"
-                    stroke="hsl(var(--primary))"
+                    stroke={chartTheme.series.visibility}
                     strokeWidth={2}
                     fill="url(#citationGradient)"
-                    dot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+                    dot={{ r: 4, fill: chartTheme.series.visibility, strokeWidth: 0 }}
                     activeDot={{
                       r: 6,
-                      fill: "hsl(var(--primary))",
+                      fill: chartTheme.series.visibility,
                       strokeWidth: 2,
                       stroke: "hsl(var(--background))",
                     }}

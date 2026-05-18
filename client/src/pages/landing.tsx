@@ -15,7 +15,6 @@ import {
   FileText,
   Brain,
 } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
 import logoPath from "@assets/logo.png";
 import "./landing.css";
 
@@ -502,7 +501,7 @@ const faqs = [
   },
   {
     q: "Can I integrate VentureCite with my existing tools?",
-    a: "Yes. We support Slack, Notion, HubSpot, Google Analytics, and most major CMSs out of the box, with a public API for custom integrations on the Professional plan and above.",
+    a: "VentureCite connects to Buffer so you can push generated content straight to your social channels, and it works alongside any CMS since you publish the articles you create. Deeper native integrations are on the roadmap.",
   },
   {
     q: "Is VentureCite built for beginners or advanced users?",
@@ -561,14 +560,9 @@ function renderFeatureMock(kind: FeatureMock) {
 export default function Landing2() {
   const [navOpen, setNavOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [monthlyTraffic, setMonthlyTraffic] = useState<number[]>([50000]);
   const [email, setEmail] = useState<string>("");
   const [emailSubmitted, setEmailSubmitted] = useState<boolean>(false);
   useScrollReveal();
-
-  const estimatedCitations = Math.round(monthlyTraffic[0] * 0.023);
-  const estimatedRevenue = Math.round(estimatedCitations * 12.5);
-  const annualValue = estimatedRevenue * 12;
 
   return (
     <div className="landing">
@@ -882,96 +876,6 @@ export default function Landing2() {
         </div>
       </section>
 
-      {/* ═════ ROI CALCULATOR ═════ */}
-      <section id="roi" className="landing-section landing-roi-section">
-        <div className="landing-roi">
-          <div className="landing-section-head landing-reveal">
-            <Badge label="Calculate Your ROI" />
-            <RevealText as="h2" className="landing-h2" text="What Could AI Visibility Be Worth?" />
-            <RevealText
-              as="p"
-              className="landing-body"
-              text="Drag the slider to see how your traffic translates into AI citations and revenue."
-              baseDelay={80}
-            />
-          </div>
-
-          <div className="landing-roi-card landing-reveal">
-            <div className="landing-roi-hero">
-              <span className="landing-roi-hero-label">Estimated annual revenue uplift</span>
-              <div className="landing-roi-hero-value">
-                <span className="landing-roi-hero-currency">$</span>
-                <span className="landing-roi-hero-num">{annualValue.toLocaleString()}</span>
-                <span className="landing-roi-hero-period">/yr</span>
-              </div>
-              <span className="landing-roi-hero-sub">
-                at {monthlyTraffic[0].toLocaleString()} visitors / month
-              </span>
-            </div>
-
-            <div className="landing-roi-flow">
-              <div className="landing-roi-step">
-                <span className="landing-roi-step-tag">Traffic</span>
-                <span className="landing-roi-step-value">{monthlyTraffic[0].toLocaleString()}</span>
-                <span className="landing-roi-step-unit">visitors / mo</span>
-              </div>
-              <div className="landing-roi-arrow" aria-hidden="true">
-                <span />
-                <span />
-              </div>
-              <div className="landing-roi-step">
-                <span className="landing-roi-step-tag">Citations</span>
-                <span className="landing-roi-step-value">
-                  {estimatedCitations.toLocaleString()}
-                </span>
-                <span className="landing-roi-step-unit">AI citations / mo</span>
-              </div>
-              <div className="landing-roi-arrow" aria-hidden="true">
-                <span />
-                <span />
-              </div>
-              <div className="landing-roi-step is-revenue">
-                <span className="landing-roi-step-tag">Revenue</span>
-                <span className="landing-roi-step-value">${estimatedRevenue.toLocaleString()}</span>
-                <span className="landing-roi-step-unit">monthly value</span>
-              </div>
-            </div>
-
-            <div className="landing-roi-control">
-              <div className="landing-roi-control-head">
-                <span className="landing-roi-control-label">Adjust monthly traffic</span>
-                <span className="landing-roi-control-value">
-                  {monthlyTraffic[0].toLocaleString()}
-                </span>
-              </div>
-              <Slider
-                value={monthlyTraffic}
-                onValueChange={setMonthlyTraffic}
-                min={1000}
-                max={500000}
-                step={1000}
-                className="landing-roi-slider"
-              />
-              <div className="landing-roi-control-ticks">
-                <span>1K</span>
-                <span>100K</span>
-                <span>250K</span>
-                <span>500K</span>
-              </div>
-            </div>
-
-            <div className="landing-roi-cta-wrap">
-              <Link href="/register">
-                <a className="landing-btn landing-btn-primary landing-roi-cta">
-                  Start Capturing This Value
-                  <ArrowRight size={16} />
-                </a>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ═════ PRODUCT PILLARS ═════ */}
       <section id="product-pillars" className="landing-section">
         <div className="landing-pillars">
@@ -1169,7 +1073,6 @@ export default function Landing2() {
               <a href="#why-venturecite">Why VentureCite</a>
               <a href="#core-features">Features</a>
               <a href="#product-pillars">Pillars</a>
-              <a href="#roi">ROI Calculator</a>
               <a href="#faq">FAQ</a>
             </div>
 

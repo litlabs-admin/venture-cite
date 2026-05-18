@@ -4343,12 +4343,17 @@ export class DatabaseStorage implements IStorage {
     byStatus: Record<string, number>;
   }> {
     // Single-pass aggregate for total + sentiment breakdown.
+    // `total` is every mention. The positive/neutral/negative buckets are
+    // scoped to sentiment_source = 'llm': sentimentBatcher writes a fake
+    // {neutral, score 0} verdict on LLM failure / budget cap (tagged
+    // 'fallback' / 'capped'), so counting those would inflate "neutral"
+    // and misreport the real sentiment distribution.
     const [agg] = await db
       .select({
         total: sql<number>`count(*)::int`,
-        positive: sql<number>`count(*) filter (where sentiment = 'positive')::int`,
-        neutral: sql<number>`count(*) filter (where sentiment = 'neutral')::int`,
-        negative: sql<number>`count(*) filter (where sentiment = 'negative')::int`,
+        positive: sql<number>`count(*) filter (where sentiment = 'positive' and sentiment_source = 'llm')::int`,
+        neutral: sql<number>`count(*) filter (where sentiment = 'neutral' and sentiment_source = 'llm')::int`,
+        negative: sql<number>`count(*) filter (where sentiment = 'negative' and sentiment_source = 'llm')::int`,
       })
       .from(schema.brandMentions)
       .where(eq(schema.brandMentions.brandId, brandId));

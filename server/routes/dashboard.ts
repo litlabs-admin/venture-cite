@@ -162,12 +162,11 @@ export function setupDashboardRoutes(app: Express): void {
           if (!Number.isNaN(prior)) visibilityDelta = visibilityScore - prior;
         }
 
-        // Missed-visits + industry average: these require real category-query
-        // volume and per-industry benchmark data that we do NOT have yet. Return
-        // null for all of them rather than seeding with coarse constants that
-        // mislead the user. The UI omits the row when null. When industry_
-        // benchmarks lands, swap these for real numbers without changing the
-        // response shape.
+        // The hero exposes only metrics we can actually compute. The former
+        // missed-visits / revenue-impact / category-query / industry-average
+        // fields were removed entirely: they need category-query volume and
+        // per-industry benchmark data we don't have, and shipping null/
+        // placeholder fields just invited fabricated numbers downstream.
         res.json({
           success: true,
           data: {
@@ -176,10 +175,6 @@ export function setupDashboardRoutes(app: Express): void {
             citedChecks,
             totalChecks,
             citationRate: Math.round(citationRate * 100),
-            missedVisitsPerMonth: null,
-            revenueImpactUsd: null,
-            totalCategoryQueries: null,
-            industryAvg: null,
             lastScanAt: lastScanAt(rankings),
           },
         });
@@ -590,6 +585,29 @@ export function setupDashboardRoutes(app: Express): void {
         res.json({ success: true, data: recommendations });
       } catch (error) {
         sendError(res, error, "Failed to load recommendations");
+      }
+    }),
+  );
+
+  // ==========================================================================
+  // GET /api/brands/:brandId/alerts
+  // Phase 8: run-change alerts persisted by server/lib/runChangeAlerts.ts at
+  // the end of each citation run. Powers the Command Center "What changed"
+  // widget so the alert rows are a live surface, not write-only data.
+  // ==========================================================================
+  app.get(
+    "/api/brands/:brandId/alerts",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const limitRaw = Number((req.query.limit as string) ?? 10);
+        const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 10;
+        const alerts = await storage.getAlertHistory(brand.id, limit);
+        res.json({ success: true, data: alerts });
+      } catch (error) {
+        sendError(res, error, "Failed to load alerts");
       }
     }),
   );

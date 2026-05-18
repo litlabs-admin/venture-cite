@@ -1,9 +1,14 @@
 import { db } from "../db";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
+import { storage } from "../storage";
 import { sendWeeklyDigest, isEmailConfigured, type WeeklyDigestBrandBrief } from "../emailService";
 import { logger } from "./logger";
 import { captureAndFlush } from "./sentryReport";
+
+// Cap alert messages carried per brand in the digest body so a noisy week
+// can't bloat the email.
+const MAX_DIGEST_ALERTS = 5;
 const SIX_DAYS_MS = 6 * 24 * 60 * 60 * 1000;
 const LOOKBACK_MS = 25 * 60 * 60 * 1000;
 
@@ -73,6 +78,13 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
 
   const cutoff = new Date(Date.now() - LOOKBACK_MS);
 
+  // Run-change alerts accumulate continuously between weekly sends. Carry
+  // every alert raised since the last digest (or the last 7 days on the
+  // first send) so the email reflects the whole week, not just the final run.
+  const alertsSince = user.lastWeeklyReportSentAt
+    ? new Date(user.lastWeeklyReportSentAt).getTime()
+    : Date.now() - 7 * 24 * 60 * 60 * 1000;
+
   const briefs: WeeklyDigestBrandBrief[] = [];
   let allTerminal = true;
   let sawAnyRun = false;
@@ -115,6 +127,17 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
       | Record<string, unknown>
       | undefined;
 
+    let alerts: string[] = [];
+    try {
+      const history = await storage.getAlertHistory(b.id, 50);
+      alerts = history
+        .filter((r) => r.sentAt && new Date(r.sentAt).getTime() > alertsSince)
+        .slice(0, MAX_DIGEST_ALERTS)
+        .map((r) => r.message);
+    } catch (err) {
+      logger.warn({ err, brandId: b.id }, "weekly digest: alert_history fetch failed");
+    }
+
     briefs.push({
       brandName: String(compose?.brandName ?? b.name),
       currentScore: Number(compose?.currentScore ?? 0),
@@ -124,6 +147,7 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
       hallucinationCount: Number(compose?.hallucinationCount ?? 0),
       topInsight: String(compose?.topInsight ?? ""),
       firstRun: Boolean(compose?.firstRun),
+      alerts,
     });
   }
 

@@ -66,10 +66,6 @@ export const pageExplainers = {
     prerequisites: "Most useful after 2+ weeks of citation runs.",
     relatedConcept: "GEO",
   },
-  clientReports: {
-    summary: "Period-over-period reports for sharing with stakeholders or as agency deliverables.",
-    expectedOutcome: "Auto-generated weekly; export as PDF or share read-only links.",
-  },
   community: {
     summary:
       "Reddit + forum outreach — direct engagement that LLMs scrape into their training data.",

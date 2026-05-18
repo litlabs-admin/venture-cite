@@ -115,7 +115,7 @@ function friendlyErrorMessage(errorKind: string | null, fallback: string | null)
 export default function Content() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
+  const [loc, setLocation] = useLocation();
   const [, params] = useRoute("/content/:articleId");
   const articleIdFromRoute = params?.articleId ?? null;
 
@@ -141,6 +141,22 @@ export default function Content() {
         }
       : null;
   }, [searchString]);
+
+  // Shell-awareness. Content is BOTH a standalone route (/content,
+  // /content/:articleId) AND the Act › Create tab (/act?tab=create). When
+  // embedded under /act, path-based article selection would navigate the app
+  // out of the spine, so the active article rides on ?article= instead of the
+  // path. Standalone behavior is unchanged. wouter's useLocation() returns the
+  // pathname only (no query), so a prefix check is sufficient.
+  const embedded = loc.startsWith("/act");
+  const articleIdFromQuery = new URLSearchParams(searchString).get("article");
+  const articleId = embedded ? articleIdFromQuery : articleIdFromRoute;
+  const goToArticle = (id: string, opts?: { replace?: boolean }) =>
+    embedded
+      ? setLocation(`/act?tab=create&article=${id}`, opts)
+      : setLocation(`/content/${id}`, opts);
+  const goToCreateRoot = (opts?: { replace?: boolean }) =>
+    embedded ? setLocation(`/act?tab=create`, opts) : setLocation(`/content`, opts);
 
   // ── Brands / usage / drafts list ──────────────────────────────────────────
 
@@ -181,7 +197,7 @@ export default function Content() {
 
   const [bootstrapping, setBootstrapping] = useState(false);
   useEffect(() => {
-    if (articleIdFromRoute) return;
+    if (articleId) return;
     if (!draftsData) return;
     if (brands.length === 0) return;
     if (bootstrapping) return;
@@ -194,7 +210,7 @@ export default function Content() {
       if (!seedParams) {
         const recent = drafts[0];
         if (recent) {
-          setLocation(`/content/${recent.id}`, { replace: true });
+          goToArticle(recent.id, { replace: true });
           return;
         }
       }
@@ -214,7 +230,7 @@ export default function Content() {
         const json = await resp.json();
         if (json?.data?.id) {
           await refetchDrafts();
-          setLocation(`/content/${json.data.id}`, { replace: true });
+          goToArticle(json.data.id, { replace: true });
         }
       } catch {
         toast({
@@ -227,15 +243,15 @@ export default function Content() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [articleIdFromRoute, draftsData, brands.length]);
+  }, [articleId, draftsData, brands.length]);
 
   // ── Active article ────────────────────────────────────────────────────────
 
   const articleQuery = useQuery<{ success: boolean; article: Article; error?: string }>({
-    queryKey: ["/api/articles", articleIdFromRoute],
+    queryKey: ["/api/articles", articleId],
     queryFn: async () => {
-      if (!articleIdFromRoute) throw new Error("no id");
-      const r = await apiRequest("GET", `/api/articles/${articleIdFromRoute}`);
+      if (!articleId) throw new Error("no id");
+      const r = await apiRequest("GET", `/api/articles/${articleId}`);
       // 404 / 403 surface as success:false on this server. Throw so React
       // Query treats them as errors (which we handle below by redirecting).
       const json = await r.json();
@@ -244,7 +260,7 @@ export default function Content() {
       }
       return json;
     },
-    enabled: !!articleIdFromRoute,
+    enabled: !!articleId,
     refetchOnWindowFocus: true,
     retry: false,
   });
@@ -254,15 +270,15 @@ export default function Content() {
   // localStorage redirect, …) bounce to /content so the bootstrap can
   // pick or create a fresh draft instead of spinning forever.
   useEffect(() => {
-    if (!articleIdFromRoute) return;
+    if (!articleId) return;
     if (!articleQuery.isError) return;
     toast({
       title: "Article not available",
       description: "It may have been deleted. Starting a fresh draft.",
     });
-    setLocation("/content", { replace: true });
+    goToCreateRoot({ replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [articleIdFromRoute, articleQuery.isError]);
+  }, [articleId, articleQuery.isError]);
 
   // ── Form state ────────────────────────────────────────────────────────────
 
@@ -497,7 +513,7 @@ export default function Content() {
     onSuccess: (_data, deletedId) => {
       refetchDrafts();
       if (deletedId === article?.id) {
-        setLocation("/content");
+        goToCreateRoot();
       }
     },
   });
@@ -516,7 +532,7 @@ export default function Content() {
     onSuccess: async (data) => {
       if (data?.data?.id) {
         await refetchDrafts();
-        setLocation(`/content/${data.data.id}`);
+        goToArticle(data.data.id);
       }
     },
   });
@@ -658,7 +674,7 @@ export default function Content() {
           drafts={drafts}
           activeDraftId={article.id}
           onNewArticle={() => newArticleMutation.mutate()}
-          onLoadDraft={(d) => setLocation(`/content/${d.id}`)}
+          onLoadDraft={(d) => goToArticle(d.id)}
           onDeleteDraft={(id) => setPendingDeleteId(id)}
         />
 

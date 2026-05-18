@@ -25,6 +25,7 @@ import {
   safeParseJson,
   asyncHandler,
 } from "../lib/routesShared";
+import { acquireOrWait, secondsUntilAvailable } from "../lib/rateLimitBuckets";
 import {
   loadBrandGenerationContext,
   renderFactsBlock,
@@ -202,6 +203,15 @@ export function setupContentTypesRoutes(app: Express): void {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
 
+        if (!(await acquireOrWait("manual-discovery", brand.id, 0))) {
+          const secs = await secondsUntilAvailable("manual-discovery", brand.id);
+          return res.status(429).json({
+            success: false,
+            error: "rate_limited",
+            message: `Discovery is on a short cooldown for this brand. Try again in ~${secs}s.`,
+          });
+        }
+
         const { scanBrandListicles } = await import("../lib/listicleScanner");
         // Wave 9.4: full ScanReport — includes reverified/lostInclusion +
         // multi-line failure list so the toast can surface partial failures.
@@ -279,12 +289,10 @@ export function setupContentTypesRoutes(app: Express): void {
         }
         const mention = await storage.tryInsertWikipediaMention(body as any);
         if (!mention) {
-          return res
-            .status(409)
-            .json({
-              success: false,
-              error: "A mention for this Wikipedia page is already tracked",
-            });
+          return res.status(409).json({
+            success: false,
+            error: "A mention for this Wikipedia page is already tracked",
+          });
         }
         res.json({ success: true, data: mention });
       } catch (error) {
@@ -303,6 +311,15 @@ export function setupContentTypesRoutes(app: Express): void {
         const brand = await storage.getBrandById(req.params.brandId);
         if (!brand) {
           return res.status(404).json({ success: false, error: "Brand not found" });
+        }
+
+        if (!(await acquireOrWait("manual-discovery", brand.id, 0))) {
+          const secs = await secondsUntilAvailable("manual-discovery", brand.id);
+          return res.status(429).json({
+            success: false,
+            error: "rate_limited",
+            message: `Discovery is on a short cooldown for this brand. Try again in ~${secs}s.`,
+          });
         }
 
         const { scanBrandWikipedia } = await import("../lib/wikipediaScanner");
@@ -835,6 +852,16 @@ Return ONLY valid JSON. Do not include an aiSurfaceScore field — it is compute
         const ctx = await loadBrandGenerationContext(req.params.brandId, []);
         if (!ctx) return res.status(404).json({ success: false, error: "Brand not found" });
         const { brand, facts } = ctx;
+
+        if (!(await acquireOrWait("manual-discovery", brand.id, 0))) {
+          const secs = await secondsUntilAvailable("manual-discovery", brand.id);
+          return res.status(429).json({
+            success: false,
+            error: "rate_limited",
+            message: `Generation is on a short cooldown for this brand. Try again in ~${secs}s.`,
+          });
+        }
+
         const factsBlock = renderFactsBlock(facts);
 
         const { topic, count = 5 } = req.body;

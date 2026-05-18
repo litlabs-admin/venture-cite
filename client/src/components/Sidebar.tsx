@@ -4,7 +4,6 @@ import {
   Activity,
   Stethoscope,
   Wrench,
-  ClipboardList,
   SlidersHorizontal,
   LogOut,
   Settings,
@@ -133,13 +132,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             onNavigate={onNavigate}
           />
         </div>
-        <NavItem
-          href="/report"
-          label="Report"
-          icon={ClipboardList}
-          active={isActive("/report")}
-          onNavigate={onNavigate}
-        />
         <div data-tour-id="nav.setup">
           <NavItem
             href="/setup"

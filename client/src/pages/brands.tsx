@@ -449,17 +449,30 @@ export default function Brands() {
                   Visiting your website, reading your content, and building your brand profile...
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setShowManualForm(true);
-                  form.reset();
-                }}
-                className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4"
-                data-testid="link-manual-entry"
-              >
-                Or add your brand details manually
-              </button>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => setLocation("/welcome")}
+                  className="hover:text-foreground underline underline-offset-4"
+                  data-testid="link-guided-setup"
+                >
+                  Use the guided setup instead
+                </button>
+                <span aria-hidden className="text-border">
+                  ·
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowManualForm(true);
+                    form.reset();
+                  }}
+                  className="hover:text-foreground underline underline-offset-4"
+                  data-testid="link-manual-entry"
+                >
+                  Or add your brand details manually
+                </button>
+              </div>
             </div>
           </div>
         </CardContent>

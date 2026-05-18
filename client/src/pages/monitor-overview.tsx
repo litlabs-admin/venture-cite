@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { chartTheme } from "@/lib/chartTheme";
 import { useToast } from "@/hooks/use-toast";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
@@ -63,7 +64,6 @@ interface HeroData {
   citedChecks: number;
   totalChecks: number;
   citationRate: number;
-  industryAvg: number | null;
   lastScanAt: string | null;
 }
 
@@ -237,18 +237,9 @@ function useDashboardQueries(
   return { hero, rankings, gap, entity, trend, leaderboard, redditMentions };
 }
 
-// Explicit hex values so the "dot" beside each legend entry renders
-// consistently regardless of theme tokens. Prior version used
-// hsl(var(--primary)) for index 0, which resolved to near-black on dark
-// theme and read as "missing" next to the user's own brand. Ordered so
-// adjacent slices are perceptually distinct.
-const DONUT_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-];
+// Shared categorical palette (client/src/lib/chartTheme.ts) so competitor
+// slices read the same across every chart in the product.
+const DONUT_COLORS = chartTheme.palette;
 
 // Monitor › Overview — the full AI-visibility analytics view. This is the
 // verified dashboard implementation relocated verbatim from the old `/`
@@ -610,7 +601,11 @@ export default function MonitorOverview() {
                 <Sparkles className="w-4 h-4 mr-2" /> Create Content
               </Button>
             </Link>
-            <PageHeaderHelp tourId="dashboard" pageLabel="Dashboard" />
+            {/* The "dashboard" tour's anchors (dashboard.stats /
+                dashboard.recommendations) now live on the Command Center
+                (home.tsx), not here — so this surface uses the AI-tutor
+                fallback instead of replaying a tour whose targets are absent. */}
+            <PageHeaderHelp pageLabel="Monitor Overview" />
           </div>
         }
         explainer={pageExplainers.dashboard}
@@ -700,11 +695,6 @@ export default function MonitorOverview() {
                             heroData.lastScanAt ?? selectedBrand?.autopilotCompletedAt ?? null,
                           )}
                         </p>
-                        {heroData.industryAvg !== null && (
-                          <p className="text-[11px] text-muted-foreground">
-                            Industry avg: {heroData.industryAvg}
-                          </p>
-                        )}
                       </>
                     ) : null}
                   </div>
@@ -872,7 +862,7 @@ export default function MonitorOverview() {
                     <Line
                       type="monotone"
                       dataKey="score"
-                      stroke="hsl(var(--primary))"
+                      stroke={chartTheme.series.visibility}
                       strokeWidth={2}
                       dot={{ r: 3 }}
                     />
