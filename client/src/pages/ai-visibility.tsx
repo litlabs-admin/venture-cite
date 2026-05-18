@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -26,9 +25,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import PageHeader from "@/components/PageHeader";
-import { PageHeaderHelp } from "@/components/PageHeaderHelp";
-import { pageExplainers } from "@/lib/pageExplainers";
 import {
   CheckCircle2,
   Circle,
@@ -949,16 +945,7 @@ export default function AIVisibility() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="AI Engine Visibility Recommendations"
-        description="Step-by-step checklists to get your brand cited by each major AI search engine"
-        actions={<PageHeaderHelp tourId="ai-visibility" pageLabel="AI Visibility" />}
-        explainer={pageExplainers.aiVisibility}
-      />
-
       <div className="flex flex-wrap gap-4 mb-8 items-center justify-between">
-        <BrandSelector className="w-64" />
-
         <Card className="bg-card border border-border">
           <CardContent className="py-4 px-6">
             <div className="flex items-center gap-4">

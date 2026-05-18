@@ -6,9 +6,6 @@ import { queryClient, apiRequest, isApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { Button } from "@/components/ui/button";
-import PageHeader from "@/components/PageHeader";
-import { PageHeaderHelp } from "@/components/PageHeaderHelp";
-import { pageExplainers } from "@/lib/pageExplainers";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -369,13 +366,6 @@ export default function Brands() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Brand Management"
-        description="Your brand profiles power everything in VentureCite - content generation, AI tracking, and visibility optimization"
-        actions={<PageHeaderHelp tourId="brands" pageLabel="Brands" />}
-        explainer={pageExplainers.brands}
-      />
-
       <Card className="mb-8 border border-border bg-card" data-testid="card-add-brand">
         <CardContent className="p-6">
           <div className="flex items-start gap-4">

@@ -212,7 +212,6 @@ function FilterControls({ filters, onChange, stacked = false }: FilterControlsPr
           <SelectContent>
             <SelectItem value="newest">Newest first</SelectItem>
             <SelectItem value="oldest">Oldest first</SelectItem>
-            <SelectItem value="engagement">Most engagement</SelectItem>
           </SelectContent>
         </Select>
       </div>

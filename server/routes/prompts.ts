@@ -19,6 +19,7 @@ import { generateSuggestedPrompts } from "../lib/suggestionGenerator";
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
 import { detectBrandAndCompetitors, matchEntity } from "../lib/brandMatcher";
 import { logger } from "../lib/logger";
+import { waitUntil } from "@vercel/functions";
 
 export function setupPromptsRoutes(app: Express): void {
   // ============ BRAND-LEVEL CITATION PROMPT PORTFOLIO ============
@@ -397,6 +398,31 @@ export function setupPromptsRoutes(app: Express): void {
             error: "Couldn't start run — please try again.",
           });
         }
+        // Server-side drive: progress the run without requiring an open
+        // browser tab. Additive — the client /citation-runs/state +
+        // /advance loop still runs as the fast path when a tab is open
+        // (Vercel Hobby has no frequent cron). advanceCitationRun holds a
+        // per-run advisory lock internally, so server + client slices
+        // can't double-process the same pairs. Whatever doesn't finish in
+        // this function's window is resumed by the daily cron's
+        // drainPendingCitationRuns — a tab is no longer REQUIRED.
+        const driveRunId = result.runId;
+        const driveDeadlineMs = Date.now() + 50_000;
+        waitUntil(
+          (async () => {
+            try {
+              while (Date.now() < driveDeadlineMs) {
+                const sliceDeadlineMs = Math.min(driveDeadlineMs, Date.now() + 12_000);
+                const outcome = await advanceCitationRun(driveRunId, sliceDeadlineMs);
+                if (outcome.done) break;
+                await new Promise((r) => setTimeout(r, 1_500));
+              }
+            } catch (err) {
+              logger.warn({ err, runId: driveRunId }, "citation run: server-side drive failed");
+            }
+          })(),
+        );
+
         res.json({
           success: true,
           data: { runId: result.runId, status: "running" },

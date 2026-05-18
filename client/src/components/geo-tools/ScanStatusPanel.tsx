@@ -1,17 +1,16 @@
-// ScanStatusPanel — Task 19.5, spec §3.12 flows A/B/F/G/I
+// ScanStatusPanel — Task 19.5, spec §3.12 flows A/B/F
 //
 // Renders the scan-control surface for the Mentions tab: brand variation
 // search terms, scan button with cooldown/active state, per-source progress
-// chips, last-scan summary, next-auto-scan time, opt-in toggle, and
-// diagnostic banners (first-scan, 3-fail, sentiment-cap).
+// chips, last-scan summary, next-auto-scan time, opt-in toggle, and the
+// first-scan diagnostic banner.
 
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { AlertTriangle, Bell, Loader2, Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
 import type { ScanJob } from "@shared/schema";
 
 // ---------------------------------------------------------------------------
@@ -26,8 +25,6 @@ export type ScanStatusPanelProps = {
   activeScan: ScanJob | null;
   lastCompletedScan: ScanJob | null;
   scanCooldown: { canStart: boolean; nextAvailableAt: Date | null };
-  consecutiveAutoFailures: number;
-  sentimentCapped: boolean;
   onStartScan: () => void;
   onAddVariation: () => void;
   onToggleMonitor: (enabled: boolean) => void;
@@ -166,8 +163,6 @@ export function ScanStatusPanel({
   activeScan,
   lastCompletedScan,
   scanCooldown,
-  consecutiveAutoFailures,
-  sentimentCapped,
   onStartScan,
   onAddVariation,
   onToggleMonitor,
@@ -210,19 +205,6 @@ export function ScanStatusPanel({
 
   return (
     <Card className="w-full">
-      {/* ── 3-fail banner (flow G) ───────────────────────────────────── */}
-      {consecutiveAutoFailures >= 3 && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-t-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground"
-        >
-          <Bell className="h-4 w-4 shrink-0" />
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>Last 3 scheduled scans failed.</span>
-          <span className="ml-1">Reddit/HN paused — check status below.</span>
-        </div>
-      )}
-
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold">Scan Status</CardTitle>
       </CardHeader>
@@ -358,21 +340,6 @@ export function ScanStatusPanel({
             <p className="text-xs text-muted-foreground">Daily auto-scan enabled</p>
           )}
         </div>
-
-        {/* ── Sentiment cap indicator (flow I) ─────────────────────────── */}
-        {sentimentCapped && (
-          <>
-            <hr />
-            <div
-              role="status"
-              className={cn(
-                "rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700",
-              )}
-            >
-              Sentiment processing paused — daily limit reached. Will resume tomorrow.
-            </div>
-          </>
-        )}
       </CardContent>
     </Card>
   );

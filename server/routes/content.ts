@@ -53,6 +53,7 @@ import {
   asyncHandler,
 } from "../lib/routesShared";
 import { runArticleSlice } from "../contentGenerationWorker";
+import { waitUntil } from "@vercel/functions";
 import { acquireOrWait, secondsUntilAvailable } from "../lib/rateLimitBuckets";
 
 import { logger } from "../lib/logger";
@@ -195,6 +196,35 @@ export function setupContentRoutes(app: Express): void {
           .update(schema.articles)
           .set({ status: "generating", jobId, updatedAt: new Date() })
           .where(eq(schema.articles.id, article.id));
+
+        // Server-side drive: progress the job without requiring an open
+        // browser tab. Additive — the client /advance loop still runs as
+        // the fast path when a tab is open (Vercel Hobby has no frequent
+        // cron); the per-job slice lock (claimContentJobForSlice) makes
+        // client + server coexist (only one slice at a time). Whatever
+        // doesn't finish in this function's window is resumed by the
+        // daily cron's drainPendingContentJobs — same backstop as today,
+        // but a tab is no longer REQUIRED for progress.
+        const driveDeadlineMs = Date.now() + 50_000;
+        waitUntil(
+          (async () => {
+            try {
+              while (Date.now() < driveDeadlineMs) {
+                const claimed = await storage.claimContentJobForSlice(jobId, 12);
+                if (claimed) {
+                  const sliceDeadlineMs = Math.min(driveDeadlineMs, Date.now() + 10_000);
+                  const outcome = await runArticleSlice(jobId, sliceDeadlineMs);
+                  if (outcome.done) break;
+                }
+                // The OpenAI Responses run is background:true — it needs
+                // wall-clock time on OpenAI's side; don't hot-poll.
+                await new Promise((r) => setTimeout(r, 4_000));
+              }
+            } catch (err) {
+              captureAndFlush(err, { tags: { source: "content.generate.serverDrive" } });
+            }
+          })(),
+        );
 
         return res.json({ success: true, data: { jobId, status: "pending" } });
       } catch (error) {
@@ -861,7 +891,9 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     "/api/keyword-research/:brandId",
     asyncHandler(async (req, res) => {
       try {
+        const user = requireUser(req);
         const { brandId } = req.params;
+        await requireBrand(brandId, user.id);
         const { status, category } = req.query;
 
         const keywords = await storage.getKeywordResearch(brandId, {
@@ -874,9 +906,7 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
           data: keywords,
         });
       } catch (error) {
-        logger.error({ err: error }, "Get keyword research error");
-        captureAndFlush(error, { tags: { source: "content.ts:795" } });
-        res.status(500).json({ success: false, error: "Failed to fetch keywords" });
+        sendError(res, error, "Failed to fetch keywords");
       }
     }),
   );
@@ -885,7 +915,9 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     "/api/keyword-research/:brandId/opportunities",
     asyncHandler(async (req, res) => {
       try {
+        const user = requireUser(req);
         const { brandId } = req.params;
+        await requireBrand(brandId, user.id);
         const limit = parseInt(req.query.limit as string) || 10;
 
         const keywords = await storage.getTopKeywordOpportunities(brandId, limit);
@@ -895,9 +927,7 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
           data: keywords,
         });
       } catch (error) {
-        logger.error({ err: error }, "Get opportunities error");
-        captureAndFlush(error, { tags: { source: "content.ts:812" } });
-        res.status(500).json({ success: false, error: "Failed to fetch opportunities" });
+        sendError(res, error, "Failed to fetch opportunities");
       }
     }),
   );

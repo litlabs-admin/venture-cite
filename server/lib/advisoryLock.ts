@@ -39,6 +39,11 @@ function stringToInt32(input: string): number {
 // (run, prompt, platform) pairs and produce duplicate geo_rankings rows.
 export const dynamicLockNamespaces = {
   citationRunSlice: 920001,
+  // Per-brand lock around the full v2 fact-scrape pipeline. Shared by the
+  // monthly refresh cron and the onboarding activation pipeline so a
+  // manual re-scrape, the cron, and first-run activation can't all scrape
+  // the same brand at once.
+  fullBrandScrape: 920002,
 } as const;
 
 export type DynamicLockNamespace =

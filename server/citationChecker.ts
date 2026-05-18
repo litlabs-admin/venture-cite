@@ -2,7 +2,8 @@ import OpenAI from "openai";
 import { storage } from "./storage";
 import type { GeoRanking, Brand } from "@shared/schema";
 import { attachAiLogger } from "./lib/aiLogger";
-import { MODELS, OPENROUTER_BASE_URL } from "./lib/modelConfig";
+import { CITATION_MODELS, OPENROUTER_BASE_URL } from "./lib/modelConfig";
+import { citationRatePct } from "./lib/visibilityMetrics";
 import { judgeCitation, type JudgeBrand } from "./citationJudge";
 import { assertWithinBudget, recordSpend, type Tier } from "./lib/llmBudget";
 import { logger } from "./lib/logger";
@@ -212,13 +213,42 @@ export function computeAuthorityScore(
   return Math.min(100, prior * 10 + 10);
 }
 
-// Maps each non-ChatGPT citation platform to its OpenRouter model slug.
-const OPENROUTER_MODEL_BY_PLATFORM: Record<string, string> = {
-  Claude: MODELS.citationClaude,
-  Gemini: MODELS.citationGemini,
-  Perplexity: MODELS.citationPerplexity,
-  DeepSeek: MODELS.citationDeepSeek,
-};
+// Pull source URLs out of a grounded response. OpenRouter `:online` and
+// Perplexity return a top-level `citations` array; OpenAI search models
+// (and some OpenRouter models) attach url_citation `annotations` on the
+// message. Capture both defensively; the geo_rankings insert site dedupes
+// + caps.
+function extractStructuredCitations(resp: unknown): string[] {
+  const out: string[] = [];
+  const top = (resp as { citations?: unknown }).citations;
+  if (Array.isArray(top)) {
+    for (const c of top) {
+      if (typeof c === "string") out.push(c);
+      else if (c && typeof (c as { url?: unknown }).url === "string")
+        out.push((c as { url: string }).url);
+    }
+  }
+  const annotations = (resp as { choices?: Array<{ message?: { annotations?: unknown } }> })
+    ?.choices?.[0]?.message?.annotations;
+  if (Array.isArray(annotations)) {
+    for (const a of annotations) {
+      const url = a?.url_citation?.url ?? a?.url;
+      if (typeof url === "string") out.push(url);
+    }
+  }
+  return out;
+}
+
+// OpenRouter's non-deprecated server tool for live web grounding. Added
+// to the request `tools` array for OpenRouter models that don't ground
+// natively (Claude/Gemini/DeepSeek). OpenRouter runs the search
+// server-side in one round-trip and returns url_citation annotations.
+// Cast: it's an OpenRouter extension to the OpenAI-compatible API, not in
+// the SDK's tool union.
+const OPENROUTER_WEB_SEARCH_TOOL = {
+  type: "openrouter:web_search",
+  parameters: { max_results: 5 },
+} as unknown as OpenAI.Chat.Completions.ChatCompletionTool;
 
 // Per-platform query. ChatGPT hits OpenAI directly; the other four go through
 // OpenRouter. No simulation fallbacks — if OPENROUTER_API_KEY is missing the
@@ -251,57 +281,18 @@ export async function runPlatformCitationCheck(
     description: brand?.description || null,
     industry: brand?.industry || null,
   };
-  // Neutral, naturalistic persona. The previous prompt explicitly told the
-  // model to cite "specific sources, brands, companies, or products", which
-  // inflated measured visibility — a brand could surface only because the
-  // model was nudged to name brands, not because it would organically. To
-  // measure real GEO visibility we must query the way a normal user would,
-  // with no instruction that biases toward (or against) naming brands.
-  // Expect this to LOWER reported citation rates: that is a correctness
-  // de-inflation, not a regression.
+  // Real GEO measurement: query each engine WITH LIVE WEB GROUNDING, as
+  // itself (no persona spoof), deterministically (temperature 0 where the
+  // model allows it). The system message stays deliberately neutral — the
+  // old prompt nudged the model to name brands, inflating measured
+  // visibility; we measure the way a normal user would ask. Expect lower
+  // (more honest) citation rates than the prior ungrounded temp-0.7 path.
   const systemMsg =
     "Answer the question helpfully, accurately, and naturally — exactly as you would for any user.";
 
-  if (platform === "ChatGPT" || platform === "GPT-4") {
-    const chatResponse = await openaiBreaker.run(() =>
-      openai.chat.completions.create({
-        model: MODELS.citationChatGPT,
-        messages: [
-          { role: "system", content: systemMsg },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 1500,
-        temperature: 0.7,
-      }),
-    );
-    if (userId) {
-      await recordSpend({
-        userId,
-        service: "openai",
-        model: MODELS.citationChatGPT,
-        tokensIn: chatResponse.usage?.prompt_tokens ?? 0,
-        tokensOut: chatResponse.usage?.completion_tokens ?? 0,
-      });
-    }
-    const responseText = chatResponse.choices[0].message.content || "";
-    // ChatGPT (direct OpenAI) doesn't return a top-level structured-citations
-    // array, so always empty here. Phase 3 structured-citation capture is
-    // Perplexity-specific (in the OpenRouter branch below).
-    const structuredCitations: string[] = [];
-    if (skipJudge)
-      return { isCited: false, rank: null, relevance: null, responseText, structuredCitations };
-    const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
-    return {
-      isCited: r.isCited,
-      rank: r.rank,
-      relevance: r.relevance,
-      responseText,
-      structuredCitations,
-    };
-  }
-
-  const openrouterModel = OPENROUTER_MODEL_BY_PLATFORM[platform];
-  if (!openrouterModel) {
+  const cfg =
+    CITATION_MODELS[platform] ?? (platform === "GPT-4" ? CITATION_MODELS.ChatGPT : undefined);
+  if (!cfg) {
     return {
       isCited: false,
       rank: null,
@@ -311,8 +302,7 @@ export async function runPlatformCitationCheck(
       error: `Unknown citation platform: ${platform}`,
     };
   }
-
-  if (!openrouter) {
+  if (cfg.client === "openrouter" && !openrouter) {
     return {
       isCited: false,
       rank: null,
@@ -323,37 +313,35 @@ export async function runPlatformCitationCheck(
     };
   }
 
-  const chatResponse = await openrouterBreaker.run(() =>
-    openrouter!.chat.completions.create({
-      model: openrouterModel,
-      messages: [
-        { role: "system", content: `You are ${platform}, a helpful AI assistant. ${systemMsg}` },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 1500,
-      temperature: 0.7,
-    }),
-  );
+  const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+    model: cfg.model,
+    messages: [
+      { role: "system", content: systemMsg },
+      { role: "user", content: prompt },
+    ],
+    max_tokens: 1500,
+  };
+  // Search-grounded OpenAI models reject sampling params; every other
+  // engine is pinned to 0 so a weekly measurement isn't a random walk.
+  if (cfg.supportsTemperature) params.temperature = 0;
+  // Live web grounding for OpenRouter models that don't ground natively.
+  if (cfg.webSearchTool) params.tools = [OPENROUTER_WEB_SEARCH_TOOL];
+
+  const breaker = cfg.client === "openai" ? openaiBreaker : openrouterBreaker;
+  const client = cfg.client === "openai" ? openai : openrouter!;
+  const chatResponse = await breaker.run(() => client.chat.completions.create(params));
+
   if (userId) {
     await recordSpend({
       userId,
-      service: "openrouter",
-      model: openrouterModel,
+      service: cfg.client,
+      model: cfg.pricingModel,
       tokensIn: chatResponse.usage?.prompt_tokens ?? 0,
       tokensOut: chatResponse.usage?.completion_tokens ?? 0,
     });
   }
   const responseText = chatResponse.choices[0]?.message?.content || "";
-  // Phase 3: Perplexity (via OpenRouter) returns a top-level `citations`
-  // array of source URLs alongside the response content. Other platforms
-  // (ChatGPT/Claude/Gemini/DeepSeek) don't return this field, so we
-  // capture defensively. The URLs end up merged with text-extracted URLs
-  // at the geo_rankings INSERT site.
-  const structuredCitations: string[] = Array.isArray((chatResponse as any).citations)
-    ? ((chatResponse as any).citations as unknown[]).filter(
-        (c): c is string => typeof c === "string",
-      )
-    : [];
+  const structuredCitations = extractStructuredCitations(chatResponse);
   if (skipJudge)
     return { isCited: false, rank: null, relevance: null, responseText, structuredCitations };
   const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);
@@ -1021,6 +1009,7 @@ export async function runBrandPrompts(
     try {
       const row = await storage.createGeoRanking({
         articleId: null,
+        brandId,
         brandPromptId: bp.id,
         runId: citationRun.id,
         aiPlatform: platform,
@@ -1138,7 +1127,7 @@ export async function runBrandPrompts(
     : rankings;
   const totalChecks = allRankings.length;
   const finalTotalCited = allRankings.reduce((n, r) => n + (r.isCited === 1 ? 1 : 0), 0);
-  const citationRate = totalChecks > 0 ? Math.round((finalTotalCited / totalChecks) * 100) : 0;
+  const citationRate = citationRatePct(finalTotalCited, totalChecks);
   const platformMap = new Map<string, { cited: number; checks: number }>();
   for (const r of allRankings) {
     const entry = platformMap.get(r.aiPlatform) || { cited: 0, checks: 0 };
@@ -1149,7 +1138,7 @@ export async function runBrandPrompts(
   const platformBreakdown = Object.fromEntries(
     Array.from(platformMap.entries()).map(([p, s]) => [
       p,
-      { ...s, rate: s.checks > 0 ? Math.round((s.cited / s.checks) * 100) : 0 },
+      { ...s, rate: citationRatePct(s.cited, s.checks) },
     ]),
   );
   // Wave 8: classify the run as succeeded / partial / failed based on what
@@ -1215,10 +1204,13 @@ export async function runBrandPrompts(
   try {
     const { detectHallucinationsForRun, reverifyHallucinationsForRun } =
       await import("./lib/hallucinationDetector");
-    await detectHallucinationsForRun(brandId, rankings);
+    // Use the whole run's rankings, not just this slice's: on a multi-slice
+    // Vercel resume the local `rankings` array holds only the final slice,
+    // so slice-local detection silently skipped earlier slices' responses.
+    await detectHallucinationsForRun(brandId, allRankings);
     // 3b. Re-verify: auto-close previously-flagged hallucinations whose
     // claimedStatement no longer appears in this run's responses.
-    await reverifyHallucinationsForRun(brandId, rankings);
+    await reverifyHallucinationsForRun(brandId, allRankings);
   } catch (err) {
     logger.warn({ err: err }, `[citationChecker] hallucination detection failed:`);
   }

@@ -14,7 +14,8 @@
 
 import type { Express } from "express";
 import { storage } from "../storage";
-import { AI_PLATFORMS as SHARED_AI_PLATFORMS, CITATION_SCORING } from "@shared/constants";
+import { AI_PLATFORMS as SHARED_AI_PLATFORMS } from "@shared/constants";
+import { computeVisibilityScore } from "../lib/visibilityMetrics";
 import { MODELS } from "../lib/modelConfig";
 import { safeFetchText } from "../lib/ssrf";
 import { requireUser } from "../lib/ownership";
@@ -653,36 +654,31 @@ export function setupAnalyticsRoutes(app: Express): void {
             sentimentCounts[sentiment]++;
           }
 
-          // Visibility score is 0 when a platform has zero citations — no
-          // theater. Once there's at least one citation, the score blends
-          // citation count and rank position:
-          //   citationScore: up to 70 pts (was 40 + 30 for the bogus mention
-          //                  score; now just the citation weight plus what
-          //                  the mention weight used to be, so "Strong"
-          //                  labels at a similar citation count).
-          //   rankScore:     up to 30 pts, better rank = more.
-          let visibilityScore = 0;
-          if (citations > 0) {
-            const citationScore = Math.min(
-              citations * CITATION_SCORING.citationMultiplier,
-              CITATION_SCORING.citationWeight + CITATION_SCORING.mentionWeight,
-            );
-            const rankScore =
-              avgRankRaw > 0
-                ? Math.max(
-                    CITATION_SCORING.rankWeight - avgRankRaw * CITATION_SCORING.rankMultiplier,
-                    0,
-                  )
-                : 0;
-            visibilityScore = Math.round(citationScore + rankScore);
-          }
+          // Canonical visibility score (server/lib/visibilityMetrics.ts) —
+          // the SAME definition as the dashboard hero and /entity-strength.
+          // This used to be a different citation-count × multiplier model,
+          // so the dashboard and GEO Analytics disagreed for the same
+          // brand despite the hero comment claiming they matched.
+          const citedAuthority = citedRows
+            .map((r) => r.authorityScore)
+            .filter((s): s is number => typeof s === "number");
+          const avgAuthority =
+            citedAuthority.length > 0
+              ? citedAuthority.reduce((a, b) => a + b, 0) / citedAuthority.length
+              : 0;
+          const visibilityScore = computeVisibilityScore(
+            citations,
+            mentions,
+            avgRankRaw,
+            avgAuthority,
+          );
 
           platformMetrics[platform] = {
             mentions,
             citations,
             avgRank,
             sentiment: sentimentCounts,
-            visibilityScore: Math.min(visibilityScore, 100),
+            visibilityScore,
           };
         }
 

@@ -34,8 +34,9 @@ interface CountsResp {
 }
 
 function useCounts(brandId: string | null): CountsResp {
-  // Reads from existing TanStack Query caches; no additional fetches.
-  // We piggyback on the hooks already used by the dashboard so this is free.
+  // Shares query keys with the dashboard so brands/articles hit a warm
+  // cache; brand-scoped mentions/prompts fetch once per brand (30s stale)
+  // only when a brand is selected.
   const { data: brands } = useQuery<{ data: unknown[] }>({
     queryKey: ["/api/brands"],
     staleTime: 30_000,
@@ -61,12 +62,31 @@ function useCounts(brandId: string | null): CountsResp {
     enabled: !!brandId,
     staleTime: 30_000,
   });
+  // Real per-brand prompt count (same endpoint geo-signals uses) so the
+  // first-prompt-added nudge fires on the actual event instead of a
+  // hardcoded 0 that silently never triggered.
+  const { data: prompts } = useQuery<unknown>({
+    queryKey: brandId ? ["/api/brand-prompts", brandId] : ["__no_brand_prompts__"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/brand-prompts/${brandId}`);
+      return res.json();
+    },
+    enabled: !!brandId,
+    staleTime: 30_000,
+  });
+  const promptCount = Array.isArray(prompts)
+    ? prompts.length
+    : ((prompts as { data?: unknown[] } | undefined)?.data?.length ?? 0);
   return {
     brands: brands?.data?.length ?? 0,
     mentions: mentions?.rows?.length ?? 0,
-    citations: 0, // Hook into citations cache when available; safe default for v1.
+    // No cheap client-side citations-count source exists; the spine's
+    // activation pipeline runs citations server-side. Honest 0 means
+    // "not measured here", not "zero citations" — and no tour auto-fires
+    // on this value (the always-true empty-citations nudge was removed).
+    citations: 0,
     articles: articles?.data?.length ?? 0,
-    prompts: 0,
+    prompts: promptCount,
   };
 }
 

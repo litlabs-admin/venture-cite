@@ -691,6 +691,13 @@ export const geoRankings = pgTable(
     brandPromptId: varchar("brand_prompt_id").references(() => brandPrompts.id, {
       onDelete: "set null",
     }),
+    // Denormalized brand link (migration 0072). geo_rankings previously
+    // had no brand_id — every consumer joined via brand_prompts/articles,
+    // which was an easy "forgot the join → wrong brand's data" footgun.
+    // New rows set this directly; old rows were backfilled from those
+    // join paths. Nullable: the brand_prompt FK is ON DELETE SET NULL, so
+    // a row can outlive both join sources.
+    brandId: varchar("brand_id").references(() => brands.id, { onDelete: "cascade" }),
     runId: varchar("run_id").references(() => citationRuns.id, { onDelete: "set null" }),
     aiPlatform: text("ai_platform").notNull(),
     prompt: text("prompt").notNull(),
@@ -723,6 +730,7 @@ export const geoRankings = pgTable(
   (table) => [
     index("geo_rankings_article_id_idx").on(table.articleId),
     index("geo_rankings_brand_prompt_id_idx").on(table.brandPromptId),
+    index("geo_rankings_brand_id_idx").on(table.brandId),
     index("geo_rankings_run_id_idx").on(table.runId),
     index("geo_rankings_ai_platform_idx").on(table.aiPlatform),
   ],

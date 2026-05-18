@@ -284,8 +284,6 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
         activeScan={activeScan}
         lastCompletedScan={lastCompletedScan}
         scanCooldown={scanCooldown}
-        consecutiveAutoFailures={0}
-        sentimentCapped={false}
         onStartScan={startScan}
         onAddVariation={() => {
           // Variation management lives on the brands page. Navigate there;

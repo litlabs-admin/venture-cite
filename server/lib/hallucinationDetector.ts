@@ -6,7 +6,7 @@ import { attachAiLogger } from "./aiLogger";
 import { MODELS } from "./modelConfig";
 import { parseLLMJson, LLMParseError } from "./llmParse";
 import { logger } from "./logger";
-import type { GeoRanking } from "@shared/schema";
+import type { GeoRanking, BrandFactSheet } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -66,9 +66,9 @@ export async function detectHallucinationsForRun(
   }
   const factSheet = await storage.getBrandFacts(brandId).catch((err) => {
     logger.warn({ err, brandId }, "hallucinationDetector: getBrandFacts threw — treating as empty");
-    return [] as any[];
+    return [] as BrandFactSheet[];
   });
-  const activeFacts = factSheet.filter((f: any) => f.isActive !== 0);
+  const activeFacts = factSheet.filter((f) => f.isActive !== 0);
   if (activeFacts.length < MIN_FACT_SHEET_ROWS) {
     logger.info(
       { brandId, factCount: activeFacts.length, min: MIN_FACT_SHEET_ROWS },
@@ -84,15 +84,20 @@ export async function detectHallucinationsForRun(
 
   // Weight manual facts above scraped: scraped ones can themselves be
   // stale / wrong. Pass them to the judge in two clearly-labeled blocks.
+  // Migration 0059 renamed fact_category -> {domain, subcategory}; reading
+  // the dropped f.factCategory silently fed the judge "undefined/..." for
+  // every fact, destroying the taxonomy its severity rubric depends on.
+  const factLine = (f: BrandFactSheet) =>
+    `- ${f.domain}/${f.subcategory}/${f.factKey}: ${f.factValue}`;
   const manualBlock = activeFacts
-    .filter((f: any) => f.source !== "scraped")
+    .filter((f) => f.source !== "scraped")
     .slice(0, MAX_FACTS_IN_PROMPT)
-    .map((f: any) => `- ${f.factCategory}/${f.factKey}: ${f.factValue}`)
+    .map(factLine)
     .join("\n");
   const scrapedBlock = activeFacts
-    .filter((f: any) => f.source === "scraped")
+    .filter((f) => f.source === "scraped")
     .slice(0, MAX_FACTS_IN_PROMPT)
-    .map((f: any) => `- ${f.factCategory}/${f.factKey}: ${f.factValue}`)
+    .map(factLine)
     .join("\n");
 
   // Wave 8: `isCited` is matcher-authoritative (citationChecker.ts writes

@@ -33,15 +33,11 @@ import {
   Medal,
   Pencil,
   Plus,
-  Target,
   Trash2,
   TrendingUp,
   Trophy,
   Users,
 } from "lucide-react";
-import PageHeader from "@/components/PageHeader";
-import { pageExplainers } from "@/lib/pageExplainers";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -249,37 +245,29 @@ export default function CompetitorsPage() {
       <Helmet>
         <title>Competitors - VentureCite</title>
       </Helmet>
-      <PageHeader
-        title="Competitor Intelligence"
-        description="Track how your brand ranks against competitors in AI platform citations"
-        actions={
-          selectedBrandId ? (
-            <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-competitor">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Competitor
-            </Button>
-          ) : undefined
-        }
-        explainer={pageExplainers.competitors}
-      />
+      {selectedBrandId ? (
+        <div className="mb-4 flex items-center justify-end gap-2">
+          <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-competitor">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Competitor
+          </Button>
+        </div>
+      ) : null}
 
-      {/* Brand selector — competitors/leaderboard are scoped to a single brand */}
-      <Card>
-        <CardContent className="pt-6">
-          {brandsLoading ? (
-            <Skeleton className="h-10 w-full" />
-          ) : brands.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              Create a brand first to start tracking competitors.
-            </p>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Target className="h-4 w-4 text-muted-foreground shrink-0" />
-              <BrandSelector className="flex-1" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Competitors/leaderboard are scoped to a single brand */}
+      {(brandsLoading || brands.length === 0) && (
+        <Card>
+          <CardContent className="pt-6">
+            {brandsLoading ? (
+              <Skeleton className="h-10 w-full" />
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                Create a brand first to start tracking competitors.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogTrigger asChild>

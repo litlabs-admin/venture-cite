@@ -9,7 +9,6 @@ import {
   Ban,
   Clock,
   CloudOff,
-  DollarSign,
   ExternalLink,
   FileText,
   ServerCrash,
@@ -24,7 +23,6 @@ export type ScrapeFailureKind =
   | "blocked"
   | "robots_disallowed"
   | "llm_unavailable"
-  | "cost_cap_reached"
   | "timeout"
   | "fetch_failed"
   | "mixed_failures"
@@ -162,23 +160,6 @@ export function ScrapeFailureState({
             {errorMessage ? (
               <p className="mt-2 text-xs text-muted-foreground">Details: {errorMessage}</p>
             ) : null}
-          </AlertDescription>
-        </Alert>
-      );
-
-    case "cost_cap_reached":
-      return (
-        <Alert data-tour-id="fact-sheet.failure-state" data-testid={`scrape-failure-${errorKind}`}>
-          <DollarSign className="h-4 w-4" />
-          <AlertTitle>You've used your monthly fact-scrape budget</AlertTitle>
-          <AlertDescription className="space-y-2">
-            <p>
-              The default cap is $5.00 per month. It resets on day 1 of next month. Existing facts
-              continue to work — only re-scrapes are paused.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Need more headroom? Email support and we'll raise it.
-            </p>
           </AlertDescription>
         </Alert>
       );

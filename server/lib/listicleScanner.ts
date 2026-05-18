@@ -33,17 +33,7 @@ const MAX_PAGE_CHARS = 12_000;
 const MAX_URLS_PER_QUERY = 8;
 const MAX_QUERIES = 5;
 
-function safeParseJson<T = any>(raw: string | null | undefined): T | null {
-  if (!raw) return null;
-  const stripped = raw.replace(/```json\s*|\s*```/g, "").trim();
-  const match = stripped.match(/[\[{][\s\S]*[\]}]/);
-  const candidate = match ? match[0] : stripped;
-  try {
-    return JSON.parse(candidate) as T;
-  } catch {
-    return null;
-  }
-}
+import { safeParseJson } from "./safeParseJson";
 
 function htmlToText(html: string): string {
   return html

@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { RefreshCw, Loader2, AlertTriangle } from "lucide-react";
 
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, ApiError } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,20 +21,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
-import PageHeader from "@/components/PageHeader";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
-import { pageExplainers } from "@/lib/pageExplainers";
 import { EmptyState } from "@/components/foundations/EmptyState";
 import { ErrorState } from "@/components/ui/error-state";
 
 // Plan 2.3 hook — consume only.
 import { useScrapeRunStream } from "@/hooks/useScrapeRunStream";
 
-// Plan 5 orchestration hooks + components.
-import { useScrapeOrchestration } from "@/hooks/useScrapeOrchestration";
-import { useSSEProgress } from "@/hooks/useSSEProgress";
-import { ScrapeProgressCardV2 } from "@/components/fact-sheet/ScrapeProgressCardV2";
 import { ManualPasteCard } from "@/components/fact-sheet/ManualPasteCard";
 
 // Plan 2.4 components.
@@ -47,7 +39,6 @@ import { formatRelativeTime, daysSince } from "@/lib/formatRelativeTime";
 
 // Plan 2.5 components.
 import { PauseToggle } from "@/components/fact-sheet/PauseToggle";
-import { CostStatusBadge } from "@/components/fact-sheet/CostStatusBadge";
 import { ScrapePagesPanel } from "@/components/fact-sheet/ScrapePagesPanel";
 import {
   ScrapeFailureState,
@@ -121,23 +112,66 @@ function groupByDomain(facts: ResolvedFact[]): Record<Domain, ResolvedFact[]> {
 export default function BrandFactSheet() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
+  const { selectedBrandId, selectedBrand } = useBrandSelection();
   const [editingFact, setEditingFact] = useState<ResolvedFact | null>(null);
 
-  /* ---------- v2 orchestration ---------- */
-  const orchestration = useScrapeOrchestration();
-  const orchLiveProgress = useSSEProgress(orchestration.runId);
+  /* ---------- server-driven re-scrape ----------
+   * The browser no longer orchestrates the scrape (no /plan + scrape-one
+   * fan-out that orphans on tab close). It POSTs /full-rescrape, the
+   * server runs the SAME pipeline onboarding uses, and progress is
+   * observed through the existing run-status query + SSE stream below.
+   */
+  const [rescrapeError, setRescrapeError] = useState<string | null>(null);
+  // True between kicking a re-scrape and the server-side run row
+  // appearing in runsQuery — keeps the runs poll hot so the freshly
+  // created run is discovered within a tick.
+  const [expectingRun, setExpectingRun] = useState(false);
 
-  // Auto-fire orchestration when redirected from a brand-create flow.
-  // /brands page redirects to /brand-fact-sheet?autoScrape=<newBrandId> after creating a brand.
+  const rescrapeMutation = useMutation({
+    mutationFn: async (brandId: string) => {
+      const res = await apiRequest("POST", "/api/brand-fact-sheet/full-rescrape", { brandId });
+      return res.json();
+    },
+    onMutate: () => setRescrapeError(null),
+    onSuccess: () => {
+      setExpectingRun(true);
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-fact-sheet/runs", { brandId: selectedBrandId }],
+      });
+    },
+    onError: (err: unknown) => {
+      // /full-rescrape returns the same structured 409 shape as /plan
+      // (cooldown / already_running / cost cap). For already_running just
+      // let the runs poll surface the existing run; otherwise show why.
+      const body =
+        err instanceof ApiError ? ((err.body ?? {}) as { code?: string; error?: string }) : null;
+      if (body?.code === "already_running") {
+        setExpectingRun(true);
+        queryClient.invalidateQueries({
+          queryKey: ["/api/brand-fact-sheet/runs", { brandId: selectedBrandId }],
+        });
+        return;
+      }
+      setRescrapeError(
+        body?.error ?? (err instanceof Error ? err.message : "Couldn't start re-scrape."),
+      );
+    },
+  });
+
+  const startRescrape = () => {
+    if (!selectedBrandId) return;
+    rescrapeMutation.mutate(selectedBrandId);
+  };
+
+  // Auto-fire when redirected from a brand-create flow:
+  // /brands → /brand-fact-sheet?autoScrape=<newBrandId>.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (orchestration.status !== "idle") return;
     if (!selectedBrandId) return;
     const params = new URLSearchParams(window.location.search);
     const autoScrapeId = params.get("autoScrape");
     if (autoScrapeId && autoScrapeId === selectedBrandId) {
-      orchestration.start(selectedBrandId);
+      startRescrape();
       // Strip the param so a refresh doesn't re-trigger.
       params.delete("autoScrape");
       const newSearch = params.toString();
@@ -148,22 +182,17 @@ export default function BrandFactSheet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBrandId]);
 
-  // Auto-invalidate facts query when orchestration completes with facts.
-  useEffect(() => {
-    if (orchestration.status === "completed" && orchestration.totalFacts > 0 && selectedBrandId) {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/brand-facts", selectedBrandId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["/api/brand-fact-sheet/diff", { brandId: selectedBrandId }],
-      });
-    }
-  }, [orchestration.status, orchestration.totalFacts, selectedBrandId, queryClient]);
-
   /* ---------- queries ---------- */
   const runsQuery = useQuery<{ runs: ScrapeRun[] }>({
     queryKey: ["/api/brand-fact-sheet/runs", { brandId: selectedBrandId }],
     enabled: !!selectedBrandId,
+    // Poll while a run is active OR we just kicked one (server creates the
+    // row a beat after /full-rescrape returns). Stops once terminal.
+    refetchInterval: (q) => {
+      const data = q.state.data as { runs?: ScrapeRun[] } | undefined;
+      const hasActive = (data?.runs ?? []).some((r) => ACTIVE_STATUSES.includes(r.status));
+      return hasActive || expectingRun ? 2500 : false;
+    },
   });
 
   const diffQuery = useQuery<DiffResponse>({
@@ -235,6 +264,19 @@ export default function BrandFactSheet() {
       });
     }
   }, [liveProgress.lastEvent, liveProgress.sawDone, activeRunId, selectedBrandId]);
+
+  // Once the server-side run row materialises, stop forcing the runs poll.
+  useEffect(() => {
+    if (activeRun && expectingRun) setExpectingRun(false);
+  }, [activeRun, expectingRun]);
+
+  // Safety: if a kicked run never shows (silent server failure) don't poll
+  // forever — give up the hot poll after 20s.
+  useEffect(() => {
+    if (!expectingRun) return;
+    const t = setTimeout(() => setExpectingRun(false), 20_000);
+    return () => clearTimeout(t);
+  }, [expectingRun]);
 
   /* ---------- mutations ---------- */
   const acceptFactMutation = useMutation({
@@ -379,18 +421,14 @@ export default function BrandFactSheet() {
     : (runDetailQuery.data?.pages ?? []);
 
   /* ---------- re-scrape disabled state ---------- */
-  const monthlyCapReached = false;
-
-  const rescrapeDisabledReason =
-    orchestration.status === "planning" ||
-    orchestration.status === "running" ||
-    orchestration.status === "aggregating"
-      ? "A scrape is already running."
-      : !scrapeEnabled
-        ? "Auto-scraping paused."
-        : monthlyCapReached
-          ? "Monthly scrape budget reached."
-          : null;
+  // Server truth (an active run row) is authoritative; the local
+  // pending/expecting flags just cover the moment before it appears.
+  const rescrapeInFlight = !!activeRun || rescrapeMutation.isPending || expectingRun;
+  const rescrapeDisabledReason = rescrapeInFlight
+    ? "A scrape is already running."
+    : !scrapeEnabled
+      ? "Auto-scraping paused."
+      : null;
 
   /* ---------- terminal-failure detection (Plan 2.5 Task 9) ----------
    * Mixed-success (some pages done, some failed) does NOT render the failure
@@ -408,32 +446,6 @@ export default function BrandFactSheet() {
       <Helmet>
         <title>Brand Fact Sheet - VentureCite</title>
       </Helmet>
-
-      <PageHeader
-        title="Brand Fact Sheet"
-        description="Verified facts about your brand — user-entered, AI-scraped, with side-by-side conflict resolution."
-        explainer={pageExplainers.brandFactSheet}
-      />
-
-      {/* Brand selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Select Brand</CardTitle>
-          <CardDescription>Choose which brand to manage facts for</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <BrandSelector className="w-full max-w-md" />
-          {brands.length === 0 && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              No brands found.{" "}
-              <Link href="/brands" className="text-primary hover:underline">
-                Create a brand first
-              </Link>
-              .
-            </p>
-          )}
-        </CardContent>
-      </Card>
 
       {selectedBrand && (
         <>
@@ -470,23 +482,11 @@ export default function BrandFactSheet() {
                       <TooltipTrigger asChild>
                         <span>
                           <Button
-                            onClick={() => {
-                              if (!selectedBrandId) return;
-                              orchestration.start(selectedBrandId);
-                            }}
-                            disabled={
-                              !selectedBrandId ||
-                              orchestration.status === "planning" ||
-                              orchestration.status === "running" ||
-                              orchestration.status === "aggregating" ||
-                              !scrapeEnabled ||
-                              monthlyCapReached
-                            }
+                            onClick={startRescrape}
+                            disabled={!selectedBrandId || rescrapeInFlight || !scrapeEnabled}
                             data-testid="btn-rescrape"
                           >
-                            {orchestration.status === "planning" ||
-                            orchestration.status === "running" ||
-                            orchestration.status === "aggregating" ? (
+                            {rescrapeInFlight ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Scraping…
@@ -505,51 +505,41 @@ export default function BrandFactSheet() {
                       ) : null}
                     </Tooltip>
                   </div>
-                  {selectedBrandId ? <CostStatusBadge brandId={selectedBrandId} /> : null}
                 </div>
               </div>
-
-              {(orchestration.status === "planning" ||
-                orchestration.status === "running" ||
-                orchestration.status === "aggregating") && (
-                <ScrapeProgressCardV2 sources={orchLiveProgress} />
-              )}
             </CardContent>
           </Card>
 
-          {/* MANUAL PASTE FALLBACK — Plan 5 Task 6: zero facts after orchestration */}
-          {orchestration.status === "completed" &&
-            orchestration.totalFacts === 0 &&
-            orchestration.runId && (
-              <ManualPasteCard
-                runId={orchestration.runId}
-                onSubmit={async (text) => {
-                  if (!orchestration.runId) return;
-                  try {
-                    await apiRequest(
-                      "POST",
-                      `/api/brand-fact-sheet/runs/${orchestration.runId}/paste`,
-                      { text },
-                    );
-                    await queryClient.invalidateQueries({
-                      queryKey: ["/api/brand-facts", selectedBrandId],
-                    });
-                  } catch {
-                    // Paste failed — error already logged by apiRequest. UI shows the
-                    // unchanged "0 facts" state; user can retry.
-                  }
-                }}
-                onManualFill={() => {
-                  // For MVP, just close/dismiss — the existing FactRow edit button
-                  // and EditFactDialog are already on the page.
-                }}
-              />
-            )}
+          {/* MANUAL PASTE FALLBACK — latest completed run found zero facts */}
+          {latestCompleted && latestCompleted.factsExtracted === 0 && (
+            <ManualPasteCard
+              runId={latestCompleted.id}
+              onSubmit={async (text) => {
+                try {
+                  await apiRequest(
+                    "POST",
+                    `/api/brand-fact-sheet/runs/${latestCompleted.id}/paste`,
+                    { text },
+                  );
+                  await queryClient.invalidateQueries({
+                    queryKey: ["/api/brand-facts", selectedBrandId],
+                  });
+                } catch {
+                  // Paste failed — error already logged by apiRequest. UI shows the
+                  // unchanged "0 facts" state; user can retry.
+                }
+              }}
+              onManualFill={() => {
+                // For MVP, just close/dismiss — the existing FactRow edit button
+                // and EditFactDialog are already on the page.
+              }}
+            />
+          )}
 
-          {/* PLAN FAILED ALERT — Plan 5 Task 6 */}
-          {orchestration.status === "plan_failed" && orchestration.planError && (
-            <Alert variant="default" data-testid="plan-failed-alert">
-              <AlertDescription>{orchestration.planError.message}</AlertDescription>
+          {/* RE-SCRAPE BLOCKED ALERT — cooldown / cost cap from /full-rescrape */}
+          {rescrapeError && (
+            <Alert variant="default" data-testid="rescrape-error-alert">
+              <AlertDescription>{rescrapeError}</AlertDescription>
             </Alert>
           )}
 

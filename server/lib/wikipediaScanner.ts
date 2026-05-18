@@ -28,17 +28,7 @@ interface WikiPageEntry {
   extract: string;
 }
 
-function safeParseJson<T = any>(raw: string | null | undefined): T | null {
-  if (!raw) return null;
-  const stripped = raw.replace(/```json\s*|\s*```/g, "").trim();
-  const match = stripped.match(/[\[{][\s\S]*[\]}]/);
-  const candidate = match ? match[0] : stripped;
-  try {
-    return JSON.parse(candidate) as T;
-  } catch {
-    return null;
-  }
-}
+import { safeParseJson } from "./safeParseJson";
 
 function buildSearchTerms(brand: Brand, competitors: Competitor[]): string[] {
   const terms: string[] = [];

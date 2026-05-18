@@ -30,12 +30,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
-import PageHeader from "@/components/PageHeader";
-import { pageExplainers } from "@/lib/pageExplainers";
 import type { FaqItem } from "@shared/schema";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -64,7 +60,7 @@ import {
 
 export default function FaqManager() {
   const { toast } = useToast();
-  const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
+  const { selectedBrandId } = useBrandSelection();
   const [activeTab, setActiveTab] = useState("manage");
   const [generateTopic, setGenerateTopic] = useState("");
   const [generateCount, setGenerateCount] = useState("5");
@@ -209,22 +205,17 @@ export default function FaqManager() {
         <title>FAQ Manager - VentureCite</title>
       </Helmet>
       <div className="space-y-8">
-        <PageHeader
-          title="FAQ Manager"
-          description="Create AI-optimized FAQs that get cited by ChatGPT, Claude, and other AI engines"
-          actions={
-            brands.length > 0 ? (
-              <BrandSelector showIndustry />
-            ) : (
-              <Link href="/brands">
-                <Button data-testid="button-create-brand">
-                  <Plus className="h-4 w-4 mr-2" /> Create Brand First
-                </Button>
-              </Link>
-            )
-          }
-          explainer={pageExplainers.faqManager}
-        />
+        {!selectedBrandId && (
+          <Card data-testid="empty-state-no-brand">
+            <CardContent className="py-12 text-center">
+              <Target className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+              <p className="font-medium text-muted-foreground">Select a brand to get started</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Choose a brand above to create and manage AI-optimized FAQs
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {selectedBrandId && (
           <>

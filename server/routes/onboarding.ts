@@ -436,24 +436,21 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
           }
         }
 
-        // Run inline with a deadline so the prompt-generation phase
-        // completes before we return; the citation-run phase resumes via
-        // the autopilot status polling hook + the daily cron's
-        // resumeInFlightAutopilots step.
-        try {
-          await runOnboardingAutopilot(brand.id, user.id, {
+        // Kick off the full activation pipeline server-side and return
+        // immediately. The autopilot runs the phases IN ORDER —
+        // FactSheet kernel (Phase 0) → prompts grounded in that kernel →
+        // web-grounded citations — and is resumable: whatever doesn't
+        // finish within the deadline is driven to completion by the
+        // daily cron (resumeInFlightAutopilots) + the fact-scrape
+        // backstop. The fact scrape is no longer client-driven; the
+        // redesigned welcome screen just polls /autopilot-status.
+        waitUntil(
+          runOnboardingAutopilot(brand.id, user.id, {
             deadlineMs: Date.now() + 50_000,
-          });
-        } catch (err) {
-          logger.warn({ err, brandId: brand.id }, "autopilot: inline kickoff failed");
-        }
-
-        // Plan 5 Task 8: the client-side v2 orchestration (useScrapeOrchestration)
-        // now triggers the fact scrape immediately after brand creation, so we no
-        // longer need the server-side waitUntil backstop here. Removing it avoids
-        // a double-scrape race where the old sequential run (triggeredBy:
-        // "welcome_confirm") blocks the Plan 5 /plan endpoint with a 409
-        // "already_running".
+          }).catch((err) => {
+            captureAndFlush(err, { tags: { source: "onboarding.ts:confirm-kickoff" } });
+          }),
+        );
 
         res.json({ success: true, brandId: brand.id });
       } catch (err) {

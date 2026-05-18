@@ -35,7 +35,6 @@ import { computeAiSurfaceScore } from "../lib/faqScoring";
 import { normalizeUrl } from "../lib/trackedContentMatcher";
 
 import { logger } from "../lib/logger";
-import { captureAndFlush } from "../lib/sentryReport";
 // Wave 9.4: keep tracked_content_urls in sync with bofu_content / faq_items
 // publishedUrl. Called from PATCH handlers; defensive against partial inputs.
 async function syncTrackedContentUrl(
@@ -250,11 +249,12 @@ export function setupContentTypesRoutes(app: Express): void {
     "/api/wikipedia/:brandId",
     asyncHandler(async (req, res) => {
       try {
+        const user = requireUser(req);
+        await requireBrand(req.params.brandId, user.id);
         const mentions = await storage.getWikipediaMentions(req.params.brandId);
         res.json({ success: true, data: mentions });
       } catch (error) {
-        captureAndFlush(error, { tags: { source: "contentTypes.ts:217" } });
-        res.status(500).json({ success: false, error: "Failed to fetch Wikipedia mentions" });
+        sendError(res, error, "Failed to fetch Wikipedia mentions");
       }
     }),
   );

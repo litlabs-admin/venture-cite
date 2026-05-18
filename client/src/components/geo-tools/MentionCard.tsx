@@ -22,7 +22,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { BrandMention } from "@shared/schema";
 
@@ -159,36 +158,6 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Engagement — 0-100 normalized score with tooltip.
-// ---------------------------------------------------------------------------
-function EngagementDisplay({ score }: { score: number | null | undefined }) {
-  if (score == null) {
-    return (
-      <span className="text-xs text-muted-foreground" aria-label="Engagement unavailable">
-        —
-      </span>
-    );
-  }
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="cursor-default text-xs text-muted-foreground">
-            Engagement: <span className="font-medium text-foreground">{score}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p className="max-w-[200px] text-xs">
-            Normalized engagement score (0–100) across upvotes, comments, and views for this
-            platform.
-          </p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Within-24h check for "New" badge
 // ---------------------------------------------------------------------------
 function isWithin24h(date: Date | string | null | undefined): boolean {
@@ -253,7 +222,7 @@ export default function MentionCard({
     }
   }
 
-  // Shared pill row for sm+: platform icon, title, badges, date, engagement, menu
+  // Shared pill row for sm+: platform icon, title, badges, date, menu
   // Mobile: three rows laid out via flex-col inside.
 
   return (

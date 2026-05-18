@@ -4,6 +4,7 @@ import {
   Activity,
   Stethoscope,
   Wrench,
+  FileText,
   SlidersHorizontal,
   LogOut,
   Settings,
@@ -132,6 +133,13 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             onNavigate={onNavigate}
           />
         </div>
+        <NavItem
+          href="/report"
+          label="Report"
+          icon={FileText}
+          active={isActive("/report")}
+          onNavigate={onNavigate}
+        />
         <div data-tour-id="nav.setup">
           <NavItem
             href="/setup"

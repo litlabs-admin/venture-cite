@@ -21,7 +21,6 @@ import { z } from "zod";
 import { assertTransition, InvalidStateTransitionError } from "../lib/statusTransitions";
 import { assertSafeUrl } from "../lib/ssrf";
 
-import { captureAndFlush } from "../lib/sentryReport";
 // Slack incoming webhooks have a fixed URL shape:
 // https://hooks.slack.com/services/T<workspace>/B<bot>/<token>
 // Pinning the host AND path here closes two bypasses the previous
@@ -462,6 +461,11 @@ export function setupIntelligenceRoutes(app: Express): void {
 
   const BRAND_FACT_WRITE_FIELDS = [
     "brandId",
+    "domain",
+    "subcategory",
+    // Legacy alias: migration 0059 renamed fact_category -> subcategory.
+    // Older clients / the manual "Add Fact" dialog still post factCategory;
+    // normalizeFactBody remaps it so the NOT NULL subcategory column is set.
     "factCategory",
     "factKey",
     "factValue",
@@ -470,14 +474,27 @@ export function setupIntelligenceRoutes(app: Express): void {
     "metadata",
   ] as const;
 
+  function normalizeFactBody(body: Record<string, any>): Record<string, any> {
+    if (body.factCategory != null && body.subcategory == null) {
+      body.subcategory = body.factCategory;
+    }
+    delete body.factCategory;
+    return body;
+  }
+
   app.post(
     "/api/brand-facts",
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const body = pickFields<any>(req.body, BRAND_FACT_WRITE_FIELDS);
+        const body = normalizeFactBody(pickFields<any>(req.body, BRAND_FACT_WRITE_FIELDS));
         if (!body.brandId || typeof body.brandId !== "string") {
           return res.status(400).json({ success: false, error: "brandId is required" });
+        }
+        if (!body.subcategory || typeof body.subcategory !== "string") {
+          return res
+            .status(400)
+            .json({ success: false, error: "subcategory (or legacy factCategory) is required" });
         }
         await requireBrand(body.brandId, user.id);
         const fact = await storage.createBrandFact(body as any);
@@ -494,7 +511,7 @@ export function setupIntelligenceRoutes(app: Express): void {
       try {
         const user = requireUser(req);
         await requireBrandFact(req.params.id, user.id);
-        const update = pickFields<any>(req.body, BRAND_FACT_WRITE_FIELDS);
+        const update = normalizeFactBody(pickFields<any>(req.body, BRAND_FACT_WRITE_FIELDS));
         if (update.brandId && typeof update.brandId === "string") {
           await requireBrand(update.brandId, user.id);
         }
@@ -527,7 +544,9 @@ export function setupIntelligenceRoutes(app: Express): void {
     "/api/metrics-history/:brandId",
     asyncHandler(async (req, res) => {
       try {
+        const user = requireUser(req);
         const { brandId } = req.params;
+        await requireBrand(brandId, user.id);
         const metricType = req.query.metricType as string | undefined;
         const daysParam = req.query.days;
         const days = daysParam ? parseInt(daysParam as string, 10) : 30;
@@ -535,8 +554,7 @@ export function setupIntelligenceRoutes(app: Express): void {
         const history = await storage.getMetricsHistory(brandId, metricType, days);
         res.json({ success: true, data: history });
       } catch (error) {
-        captureAndFlush(error, { tags: { source: "intelligence.ts:649" } });
-        res.status(500).json({ success: false, error: "Failed to get metrics history" });
+        sendError(res, error, "Failed to get metrics history");
       }
     }),
   );
@@ -545,12 +563,13 @@ export function setupIntelligenceRoutes(app: Express): void {
     "/api/metrics-history/record/:brandId",
     asyncHandler(async (req, res) => {
       try {
+        const user = requireUser(req);
         const { brandId } = req.params;
+        await requireBrand(brandId, user.id);
         await storage.recordCurrentMetrics(brandId);
         res.json({ success: true, message: "Metrics snapshot recorded" });
       } catch (error) {
-        captureAndFlush(error, { tags: { source: "intelligence.ts:659" } });
-        res.status(500).json({ success: false, error: "Failed to record metrics" });
+        sendError(res, error, "Failed to record metrics");
       }
     }),
   );
@@ -564,15 +583,16 @@ export function setupIntelligenceRoutes(app: Express): void {
     "/api/prompt-tests/:brandId",
     asyncHandler(async (req, res) => {
       try {
+        const user = requireUser(req);
         const { brandId } = req.params;
+        await requireBrand(brandId, user.id);
         const { status } = req.query;
         const filters: { status?: string } = {};
         if (status) filters.status = status as string;
         const runs = await storage.getPromptTestRuns(brandId, filters);
         res.json({ success: true, data: runs });
       } catch (error) {
-        captureAndFlush(error, { tags: { source: "intelligence.ts:1058" } });
-        res.status(500).json({ success: false, error: "Failed to fetch prompt test runs" });
+        sendError(res, error, "Failed to fetch prompt test runs");
       }
     }),
   );

@@ -19,14 +19,11 @@ export default function VisibilityGauge({
   const radius = size / 2 - 12;
   const circumference = 2 * Math.PI * radius;
   const dash = (clamped / 100) * circumference;
+  // Semantic, theme-aware tokens (OKLCH; bare var() — never hsl()-wrapped).
   const resolvedFill =
     fillColor ??
-    (clamped >= 70
-      ? "hsl(var(--chart-2, 142 71% 45%))"
-      : clamped >= 40
-        ? "hsl(var(--chart-4, 48 96% 53%))"
-        : "hsl(var(--destructive, 0 84% 60%))");
-  const resolvedTrack = trackColor ?? "hsl(var(--muted, 240 5% 26%))";
+    (clamped >= 70 ? "var(--positive)" : clamped >= 40 ? "var(--warning)" : "var(--negative)");
+  const resolvedTrack = trackColor ?? "var(--border-default)";
 
   return (
     <div
@@ -57,7 +54,7 @@ export default function VisibilityGauge({
       </svg>
       {!hideLabel && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-4xl font-bold text-foreground leading-none">{clamped}</div>
+          <div className="tnum text-4xl font-semibold text-foreground leading-none">{clamped}</div>
           <div className="text-xs text-muted-foreground mt-1">/ 100</div>
         </div>
       )}

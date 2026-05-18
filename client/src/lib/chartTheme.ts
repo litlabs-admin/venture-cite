@@ -2,16 +2,14 @@
 // in the product reads as one system instead of each component hardcoding its
 // own hex values.
 //
-// Design tokens already include the hsl() wrapper (e.g. --chart-4 is defined
-// as `hsl(147 50% 42%)`), so they are referenced as raw `var(--token)` — NOT
-// `hsl(var(--token))`, which would double-wrap and resolve to a fallback. The
-// tooltip strings are kept exactly as the pre-existing inline values so this
-// is a pure de-duplication with zero rendering change for tooltips.
+// Design tokens are OKLCH color values (client/src/index.css) referenced as
+// raw `var(--token)`. Never wrap them in `hsl(...)` — that double-wraps an
+// oklch() value and the whole declaration is dropped by the browser.
 export const chartTheme = {
   series: {
-    // Primary "visibility / share-of-answer" metric. The palette has no blue
-    // token; centralised here so the accent is defined once, not inlined.
-    visibility: "#3b82f6",
+    // Primary "visibility / share-of-answer" metric — the accent-anchored
+    // head of the DESIGN.md data-viz ramp (was a stray hardcoded #3b82f6).
+    visibility: "var(--chart-1)",
     // Positive / quality — design-system green (consistent in light & dark).
     quality: "var(--chart-4)",
     // Negative / issues — theme-aware destructive red.
@@ -27,8 +25,8 @@ export const chartTheme = {
     "var(--chart-5)",
   ],
   tooltipContentStyle: {
-    backgroundColor: "hsl(var(--card))",
-    border: "1px solid hsl(var(--border))",
+    backgroundColor: "var(--card)",
+    border: "1px solid var(--border)",
   },
-  tooltipLabelStyle: { color: "hsl(var(--foreground))" },
+  tooltipLabelStyle: { color: "var(--foreground)" },
 } as const;

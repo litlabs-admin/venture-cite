@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/use-auth";
-import AppLayout from "@/components/AppLayout";
+import AppShell from "@/components/AppShell";
 import { ScanCompletionListener } from "@/components/ScanCompletionListener";
 import { TourOrchestrator } from "./tours/engine/TourOrchestrator";
 import { RouteSpinner } from "@/components/foundations";
@@ -44,6 +44,7 @@ const Monitor = lazy(() => import("@/pages/monitor"));
 const Diagnose = lazy(() => import("@/pages/diagnose"));
 const Act = lazy(() => import("@/pages/act"));
 const Setup = lazy(() => import("@/pages/setup"));
+const Report = lazy(() => import("@/pages/report"));
 
 /**
  * 301s a retired feature path into its workflow-spine home, preserving every
@@ -84,13 +85,13 @@ function AuthenticatedRoute({ component: Component }: { component: ComponentType
   }
 
   return (
-    <AppLayout>
+    <AppShell>
       <ErrorBoundary>
         <Suspense fallback={<RouteSpinner />}>
           <Component />
         </Suspense>
       </ErrorBoundary>
-    </AppLayout>
+    </AppShell>
   );
 }
 
@@ -139,13 +140,13 @@ function FirstRunGate({ component: Component }: { component: ComponentType }) {
   }
 
   return (
-    <AppLayout>
+    <AppShell>
       <ErrorBoundary>
         <Suspense fallback={<RouteSpinner />}>
           <Component />
         </Suspense>
       </ErrorBoundary>
-    </AppLayout>
+    </AppShell>
   );
 }
 
@@ -166,6 +167,7 @@ function Router() {
       <Route path="/diagnose">{() => <AuthenticatedRoute component={Diagnose} />}</Route>
       <Route path="/act">{() => <AuthenticatedRoute component={Act} />}</Route>
       <Route path="/setup">{() => <AuthenticatedRoute component={Setup} />}</Route>
+      <Route path="/report">{() => <AuthenticatedRoute component={Report} />}</Route>
       <Route path="/content">{() => <AuthenticatedRoute component={Content} />}</Route>
       <Route path="/content/:articleId">{() => <AuthenticatedRoute component={Content} />}</Route>
       <Route path="/articles">{() => <AuthenticatedRoute component={Articles} />}</Route>

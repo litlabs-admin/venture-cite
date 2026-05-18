@@ -78,18 +78,7 @@ export function sendError(res: Response, err: unknown, fallback: string, status 
   res.status(status).json({ success: false, error: message });
 }
 
-// Try to extract a JSON object from a raw LLM response even when the
-// model wraps it in markdown fences, prose, or trailing commentary.
-// Returns null on any failure instead of throwing — callers decide the
-// fallback shape.
-export function safeParseJson<T = unknown>(raw: string | null | undefined): T | null {
-  if (!raw) return null;
-  const stripped = raw.replace(/```json\s*|\s*```/g, "").trim();
-  const match = stripped.match(/[\[{][\s\S]*[\]}]/);
-  const candidate = match ? match[0] : stripped;
-  try {
-    return JSON.parse(candidate) as T;
-  } catch {
-    return null;
-  }
-}
+// Canonical implementation lives in ./safeParseJson (zero-dep). Re-export
+// so the route modules that import { safeParseJson } from
+// "../lib/routesShared" keep working unchanged.
+export { safeParseJson } from "./safeParseJson";

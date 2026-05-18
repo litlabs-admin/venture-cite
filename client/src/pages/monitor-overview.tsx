@@ -36,11 +36,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { BrandMention } from "@shared/schema";
-import PageHeader from "@/components/PageHeader";
-import { PageHeaderHelp } from "@/components/PageHeaderHelp";
-import { pageExplainers } from "@/lib/pageExplainers";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import VisibilityGauge from "@/components/dashboard/VisibilityGauge";
 import PlatformRankingCard, {
@@ -476,11 +472,6 @@ export default function MonitorOverview() {
   if (brands.length === 0) {
     return (
       <div className="space-y-4">
-        <PageHeader
-          title="AI Visibility Report"
-          description="Track how often AI engines cite your brand."
-          explainer={pageExplainers.dashboard}
-        />
         <EmptyState
           icon={Brain}
           title="Create a brand to get started"
@@ -516,17 +507,6 @@ export default function MonitorOverview() {
         return "";
     }
   })();
-
-  const headerLeading = selectedBrand?.logoUrl ? (
-    <img
-      src={selectedBrand.logoUrl}
-      alt=""
-      className="w-7 h-7 rounded-full object-cover bg-muted"
-      onError={(e) => {
-        (e.currentTarget as HTMLImageElement).style.display = "none";
-      }}
-    />
-  ) : null;
 
   return (
     <div className="space-y-4">
@@ -585,31 +565,13 @@ export default function MonitorOverview() {
         </div>
       )}
 
-      <PageHeader
-        title="AI Visibility Report"
-        leading={headerLeading}
-        description={
-          selectedBrand
-            ? `Live AI-engine visibility for ${selectedBrand.name}.`
-            : "Pick a brand to see the full report."
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <BrandSelector className="w-56" />
-            <Link href="/act?tab=create">
-              <Button>
-                <Sparkles className="w-4 h-4 mr-2" /> Create Content
-              </Button>
-            </Link>
-            {/* The "dashboard" tour's anchors (dashboard.stats /
-                dashboard.recommendations) now live on the Command Center
-                (home.tsx), not here — so this surface uses the AI-tutor
-                fallback instead of replaying a tour whose targets are absent. */}
-            <PageHeaderHelp pageLabel="Monitor Overview" />
-          </div>
-        }
-        explainer={pageExplainers.dashboard}
-      />
+      <div className="mb-4 flex items-center justify-end gap-2">
+        <Link href="/act?tab=create">
+          <Button>
+            <Sparkles className="w-4 h-4 mr-2" /> Create Content
+          </Button>
+        </Link>
+      </div>
 
       {/* Onboarding spine + a single-line "what to expect" caption. The
           RecommendationsPanel is the canonical next-actions surface; the
@@ -850,8 +812,8 @@ export default function MonitorOverview() {
                     />
                     <ReTooltip
                       contentStyle={{
-                        background: "hsl(var(--popover))",
-                        border: "1px solid hsl(var(--border))",
+                        background: "var(--popover)",
+                        border: "1px solid var(--border)",
                         borderRadius: 6,
                       }}
                       formatter={(value: number, _n, payload: any) => [
@@ -1037,8 +999,8 @@ export default function MonitorOverview() {
                       </Pie>
                       <ReTooltip
                         contentStyle={{
-                          background: "hsl(var(--popover))",
-                          border: "1px solid hsl(var(--border))",
+                          background: "var(--popover)",
+                          border: "1px solid var(--border)",
                           borderRadius: 6,
                         }}
                       />

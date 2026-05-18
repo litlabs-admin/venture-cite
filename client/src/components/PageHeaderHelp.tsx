@@ -13,12 +13,15 @@ interface Props {
 
 export function PageHeaderHelp({ tourId, pageLabel }: Props) {
   const replay = useTourReplay();
-  const hasTour = tourId ? !!getTour(tourId) : false;
-
-  if (!isTourEngineEnabled()) return null;
+  // The help affordance must exist in BOTH flag states. With the tour
+  // engine on and a tour for this page, it replays that tour. With the
+  // engine off (or no tour registered), the orchestrator never installs
+  // the replay bridge, so it falls back to the in-app AI tutor — the
+  // button never just disappears.
+  const canReplay = isTourEngineEnabled() && !!tourId && !!getTour(tourId);
 
   const onClick = () => {
-    if (hasTour && tourId) {
+    if (canReplay && tourId) {
       replay(tourId);
     } else {
       openChatbotPrompt(`Explain the ${pageLabel} page in VentureCite.`);
@@ -30,7 +33,7 @@ export function PageHeaderHelp({ tourId, pageLabel }: Props) {
       type="button"
       variant="ghost"
       size="icon"
-      aria-label={hasTour ? `Replay ${pageLabel} tour` : `Ask the AI tutor about ${pageLabel}`}
+      aria-label={canReplay ? `Replay ${pageLabel} tour` : `Ask the AI tutor about ${pageLabel}`}
       onClick={onClick}
       data-tour-id="page.help"
     >

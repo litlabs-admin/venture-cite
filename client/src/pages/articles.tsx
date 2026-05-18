@@ -42,8 +42,6 @@ import { Link } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import PageHeader from "@/components/PageHeader";
-import { pageExplainers } from "@/lib/pageExplainers";
 import ViewEditDialog from "@/components/articles/ViewEditDialog";
 import DistributeDialog from "@/components/articles/DistributeDialog";
 import { AIGeneratedPill } from "@/components/AIGeneratedPill";
@@ -232,12 +230,6 @@ export default function Articles() {
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        <PageHeader
-          title="Your Articles"
-          description="Manage your GEO-optimized content"
-          explainer={pageExplainers.articles}
-        />
-
         {articlesQuery.isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />

@@ -43,12 +43,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
-import PageHeader from "@/components/PageHeader";
-import { PageHeaderHelp } from "@/components/PageHeaderHelp";
-import { pageExplainers } from "@/lib/pageExplainers";
 import type { Listicle, BofuContent, WikipediaMention, Competitor } from "@shared/schema";
 import { StatusDot } from "@/components/foundations";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import BofuContentSheet from "@/components/geo-tools/BofuContentSheet";
@@ -222,7 +218,7 @@ function CompetitorCombobox({ options, value, onChange, placeholder }: Competito
 
 export default function GeoTools() {
   const { toast } = useToast();
-  const { selectedBrandId, brands, selectedBrand } = useBrandSelection();
+  const { selectedBrandId, selectedBrand } = useBrandSelection();
   const [activeTab, setActiveTab] = useState("listicles");
   const [bofuType, setBofuType] = useState<string>("comparison");
   const [bofuCompetitors, setBofuCompetitors] = useState<string[]>([]);
@@ -527,30 +523,13 @@ export default function GeoTools() {
         <title>GEO Assets - VentureCite</title>
       </Helmet>
       <div className="space-y-8">
-        <PageHeader
-          title="GEO Assets"
-          description="Listicles, Wikipedia, and BOFU content that AI engines cite"
-          actions={
-            <div className="flex items-center gap-2">
-              {brands.length > 0 ? (
-                <BrandSelector showIndustry />
-              ) : (
-                <Link href="/brands">
-                  <Button size="sm" data-testid="button-create-brand">
-                    <Plus className="h-4 w-4 mr-2" /> Create Brand
-                  </Button>
-                </Link>
-              )}
-              <Link href="/geo-signals">
-                <Button variant="outline" size="sm" data-testid="button-geo-signals">
-                  <Sparkles className="h-4 w-4 mr-2" /> GEO Signals
-                </Button>
-              </Link>
-              <PageHeaderHelp tourId="geo-tools" pageLabel="GEO Tools" />
-            </div>
-          }
-          explainer={pageExplainers.geoTools}
-        />
+        <div className="mb-4 flex items-center justify-end gap-2">
+          <Link href="/geo-signals">
+            <Button variant="outline" size="sm" data-testid="button-geo-signals">
+              <Sparkles className="h-4 w-4 mr-2" /> GEO Signals
+            </Button>
+          </Link>
+        </div>
 
         {selectedBrandId ? (
           <>

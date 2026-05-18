@@ -3,95 +3,134 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Token system — DESIGN.md "quiet precision instrument" (minimalist).
+   Two layers: DESIGN.md primitive tokens, then the shadcn semantic vars
+   mapped onto them. Dark only redefines the theme-varying primitives;
+   the shadcn mappings live once in :root and follow automatically.
+   Light is the default. OKLCH throughout; no #000/#fff; near-neutral
+   graphite tinted ~hue 250 toward the one azure accent.
+   ─────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --background: hsl(220, 14%, 96%);
-  --foreground: hsl(220, 20%, 10%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(220, 20%, 10%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(220, 20%, 10%);
-  --primary: hsl(0, 75%, 45%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(220, 14%, 94%);
-  --secondary-foreground: hsl(220, 20%, 10%);
-  --muted: hsl(220, 14%, 94%);
-  --muted-foreground: hsl(220, 9%, 46%);
-  --accent: hsl(0, 75%, 45%);
-  --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(220, 13%, 91%);
-  --input: hsl(220, 13%, 91%);
-  --ring: hsl(0, 75%, 45%);
-  --chart-1: hsl(0, 75%, 45%);
-  --chart-2: hsl(220, 20%, 35%);
-  --chart-3: hsl(30, 50%, 55%);
-  --chart-4: hsl(147, 50%, 42%);
-  --chart-5: hsl(341, 75%, 51%);
-  --sidebar-background: hsl(0, 0%, 100%);
-  --sidebar-foreground: hsl(220, 20%, 10%);
-  --sidebar-primary: hsl(220, 20%, 12%);
-  --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(220, 14%, 94%);
-  --sidebar-accent-foreground: hsl(220, 9%, 46%);
-  --sidebar-border: hsl(220, 13%, 91%);
-  --sidebar-ring: hsl(0, 75%, 45%);
+  /* DESIGN.md primitives — LIGHT (default, paper graphite) */
+  --bg-base: oklch(0.985 0.002 250);
+  --bg-surface-1: oklch(0.97 0.003 250);
+  --bg-surface-2: oklch(0.95 0.004 250);
+  --bg-surface-3: oklch(0.92 0.004 250);
+  --border-subtle: oklch(0.91 0.004 250);
+  --border-default: oklch(0.875 0.005 250);
+  --border-strong: oklch(0.78 0.006 250);
+  --fg-primary: oklch(0.255 0.01 255);
+  --fg-secondary: oklch(0.45 0.01 255);
+  --fg-tertiary: oklch(0.58 0.008 255);
+  --fg-disabled: oklch(0.68 0.006 255);
+  --brand-accent: oklch(0.52 0.15 248);
+  --brand-accent-hover: oklch(0.47 0.15 248);
+  --brand-accent-press: oklch(0.43 0.15 248);
+  --brand-accent-fg: oklch(0.99 0.002 250);
+  --brand-accent-subtle: oklch(0.52 0.15 248 / 0.12);
+  --positive: oklch(0.55 0.13 150);
+  --warning: oklch(0.66 0.12 75);
+  --negative: oklch(0.55 0.17 25);
+  /* Stable near-white for text on saturated fills (destructive/positive/
+     negative). Theme-agnostic on purpose — NOT redefined in .dark. */
+  --color-on-strong: oklch(0.99 0.002 250);
+
+  /* Motion (DESIGN.md) */
+  --motion-instant: 80ms;
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Elevation (light = neutral-tinted shadow) */
+  --elevation-raised: 0 1px 2px oklch(0.2 0.01 255 / 0.06);
+  --elevation-overlay: 0 8px 24px -8px oklch(0.2 0.01 255 / 0.18);
+
+  /* ── shadcn semantic layer, mapped onto the primitives ──────────────── */
+  --background: var(--bg-base);
+  --foreground: var(--fg-primary);
+  --card: var(--bg-surface-2);
+  --card-foreground: var(--fg-primary);
+  --popover: var(--bg-surface-3);
+  --popover-foreground: var(--fg-primary);
+  --primary: var(--brand-accent);
+  --primary-foreground: var(--brand-accent-fg);
+  --secondary: var(--bg-surface-2);
+  --secondary-foreground: var(--fg-primary);
+  --muted: var(--bg-surface-1);
+  --muted-foreground: var(--fg-tertiary);
+  /* shadcn `accent` is the NEUTRAL hover/selected surface, not the brand
+     colour. Brand colour is `--primary` (← --brand-accent above). */
+  --accent: var(--bg-surface-2);
+  --accent-foreground: var(--fg-primary);
+  --destructive: var(--negative);
+  --destructive-foreground: var(--color-on-strong);
+  --border: var(--border-default);
+  --input: var(--border-strong);
+  --ring: var(--brand-accent);
+  --chart-1: oklch(0.62 0.13 248);
+  --chart-2: oklch(0.66 0.1 220);
+  --chart-3: oklch(0.6 0.09 280);
+  --chart-4: oklch(0.66 0.1 150);
+  --chart-5: oklch(0.7 0.1 75);
+  --sidebar-background: var(--bg-surface-1);
+  --sidebar-foreground: var(--fg-secondary);
+  --sidebar-primary: var(--brand-accent);
+  --sidebar-primary-foreground: var(--brand-accent-fg);
+  --sidebar-accent: var(--bg-surface-2);
+  --sidebar-accent-foreground: var(--fg-primary);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-ring: var(--brand-accent);
+
   --font-sans: "Inter", system-ui, sans-serif;
   --font-serif: Georgia, serif;
-  --font-mono: "JetBrains Mono", Monaco, Consolas, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, Monaco, Consolas, monospace;
   --radius: 0.5rem;
-  --shadow-2xs: 0px 1px 2px 0px hsl(220, 20%, 20%, 0.04);
-  --shadow-xs: 0px 1px 3px 0px hsl(220, 20%, 20%, 0.06);
-  --shadow-sm: 0px 2px 4px 0px hsl(220, 20%, 20%, 0.06), 0px 1px 2px -1px hsl(220, 20%, 20%, 0.03);
-  --shadow: 0px 4px 6px -1px hsl(220, 20%, 20%, 0.08), 0px 2px 4px -2px hsl(220, 20%, 20%, 0.04);
+  --shadow-2xs: 0px 1px 2px 0px oklch(0.2 0.01 255 / 0.04);
+  --shadow-xs: 0px 1px 3px 0px oklch(0.2 0.01 255 / 0.06);
+  --shadow-sm:
+    0px 2px 4px 0px oklch(0.2 0.01 255 / 0.06), 0px 1px 2px -1px oklch(0.2 0.01 255 / 0.03);
+  --shadow:
+    0px 4px 6px -1px oklch(0.2 0.01 255 / 0.08), 0px 2px 4px -2px oklch(0.2 0.01 255 / 0.04);
   --shadow-md:
-    0px 6px 10px -1px hsl(220, 20%, 20%, 0.08), 0px 4px 6px -2px hsl(220, 20%, 20%, 0.04);
+    0px 6px 10px -1px oklch(0.2 0.01 255 / 0.08), 0px 4px 6px -2px oklch(0.2 0.01 255 / 0.04);
   --shadow-lg:
-    0px 10px 15px -3px hsl(220, 20%, 20%, 0.08), 0px 4px 6px -4px hsl(220, 20%, 20%, 0.04);
+    0px 10px 15px -3px oklch(0.2 0.01 255 / 0.08), 0px 4px 6px -4px oklch(0.2 0.01 255 / 0.04);
   --shadow-xl:
-    0px 20px 25px -5px hsl(220, 20%, 20%, 0.1), 0px 8px 10px -6px hsl(220, 20%, 20%, 0.04);
-  --shadow-2xl: 0px 25px 50px -12px hsl(220, 20%, 20%, 0.2);
+    0px 20px 25px -5px oklch(0.2 0.01 255 / 0.1), 0px 8px 10px -6px oklch(0.2 0.01 255 / 0.04);
+  --shadow-2xl: 0px 25px 50px -12px oklch(0.2 0.01 255 / 0.2);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
 
 .dark {
-  --background: hsl(220, 20%, 10%);
-  --foreground: hsl(0, 0%, 98%);
-  --card: hsl(220, 20%, 14%);
-  --card-foreground: hsl(0, 0%, 98%);
-  --popover: hsl(220, 20%, 14%);
-  --popover-foreground: hsl(0, 0%, 98%);
-  --primary: hsl(0, 75%, 50%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(220, 20%, 20%);
-  --secondary-foreground: hsl(0, 0%, 98%);
-  --muted: hsl(220, 20%, 20%);
-  --muted-foreground: hsl(220, 10%, 60%);
-  --accent: hsl(0, 75%, 50%);
-  --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(220, 20%, 22%);
-  --input: hsl(220, 20%, 22%);
-  --ring: hsl(0, 75%, 50%);
-  --chart-1: hsl(0, 75%, 50%);
-  --chart-2: hsl(159, 100%, 36%);
-  --chart-3: hsl(42, 93%, 56%);
-  --chart-4: hsl(147, 78%, 42%);
-  --chart-5: hsl(341, 75%, 51%);
-  --sidebar: hsl(220, 20%, 10%);
-  --sidebar-foreground: hsl(0, 0%, 98%);
-  --sidebar-primary: hsl(0, 75%, 50%);
-  --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(220, 20%, 18%);
-  --sidebar-accent-foreground: hsl(0, 0%, 98%);
-  --sidebar-border: hsl(220, 20%, 22%);
-  --sidebar-ring: hsl(0, 75%, 50%);
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: "JetBrains Mono", Monaco, Consolas, monospace;
-  --radius: 0.5rem;
+  /* Redefine ONLY the theme-varying primitives — the shadcn mappings in
+     :root reference these and follow automatically. */
+  --bg-base: oklch(0.165 0.004 255);
+  --bg-surface-1: oklch(0.195 0.004 255);
+  --bg-surface-2: oklch(0.225 0.005 255);
+  --bg-surface-3: oklch(0.265 0.006 255);
+  --border-subtle: oklch(0.26 0.006 255);
+  --border-default: oklch(0.32 0.007 255);
+  --border-strong: oklch(0.42 0.008 255);
+  --fg-primary: oklch(0.945 0.004 250);
+  --fg-secondary: oklch(0.73 0.006 250);
+  --fg-tertiary: oklch(0.58 0.006 250);
+  --fg-disabled: oklch(0.45 0.005 250);
+  --brand-accent: oklch(0.66 0.13 248);
+  --brand-accent-hover: oklch(0.71 0.13 248);
+  --brand-accent-press: oklch(0.6 0.13 248);
+  --brand-accent-fg: oklch(0.165 0.004 255);
+  --brand-accent-subtle: oklch(0.66 0.13 248 / 0.16);
+  --positive: oklch(0.72 0.12 150);
+  --warning: oklch(0.78 0.11 75);
+  --negative: oklch(0.66 0.15 25);
+
+  /* Dark elevation = surface-lightening + a lit top edge; shadows recede. */
+  --elevation-raised: inset 0 1px 0 oklch(1 0 0 / 0.04);
+  --elevation-overlay: 0 8px 24px -8px oklch(0 0 0 / 0.55);
 }
 
 @layer base {
@@ -105,36 +144,56 @@
 }
 
 @layer utilities {
+  /* Quiet reveal — DESIGN.md easing/duration, 6px settle (was 24px/0.8s
+     editorial). prefers-reduced-motion → opacity only, no movement. */
   .reveal {
     opacity: 0;
-    transform: translateY(24px);
+    transform: translateY(6px);
     transition:
-      opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-      transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity var(--motion-base) var(--ease-out),
+      transform var(--motion-base) var(--ease-out);
   }
   .reveal.in-view {
     opacity: 1;
     transform: translateY(0);
   }
   .reveal-delay-1 {
-    transition-delay: 0.08s;
+    transition-delay: 0.04s;
   }
   .reveal-delay-2 {
-    transition-delay: 0.16s;
+    transition-delay: 0.08s;
   }
   .reveal-delay-3 {
-    transition-delay: 0.24s;
+    transition-delay: 0.12s;
   }
   .reveal-delay-4 {
-    transition-delay: 0.32s;
+    transition-delay: 0.16s;
   }
   .reveal-delay-5 {
-    transition-delay: 0.4s;
+    transition-delay: 0.2s;
   }
   .reveal-delay-6 {
-    transition-delay: 0.48s;
+    transition-delay: 0.24s;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .reveal {
+      transform: none;
+      transition: opacity var(--motion-instant) linear;
+    }
+  }
+
+  /* Tabular numerics — apply to any figure that updates so it doesn't
+     shimmy (DESIGN.md: mandatory on live numbers). */
+  .tnum {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Landing-only decorative utilities (out of this slice's scope; flagged
+     in the roadmap for the future landing pass). Left intact so the
+     marketing page keeps working. */
   .text-gradient-red {
     background: linear-gradient(
       90deg,
@@ -161,11 +220,37 @@
 
   .card-lift {
     transition:
-      transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-      box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-      border-color 0.3s ease;
+      transform var(--motion-base) var(--ease-out),
+      box-shadow var(--motion-base) var(--ease-out),
+      border-color var(--motion-fast) var(--ease-out);
   }
   .card-lift:hover {
-    transform: translateY(-6px);
+    transform: translateY(-4px);
+  }
+}
+
+/* Print: the /report one-pager must be legible on white regardless of the
+   on-screen theme. Re-declare the light primitive token values under .dark
+   for print only; the shadcn semantic vars reference these and follow. */
+@media print {
+  .dark {
+    --bg-base: oklch(0.985 0.002 250);
+    --bg-surface-1: oklch(0.97 0.003 250);
+    --bg-surface-2: oklch(0.95 0.004 250);
+    --bg-surface-3: oklch(0.92 0.004 250);
+    --border-subtle: oklch(0.91 0.004 250);
+    --border-default: oklch(0.875 0.005 250);
+    --border-strong: oklch(0.78 0.006 250);
+    --fg-primary: oklch(0.255 0.01 255);
+    --fg-secondary: oklch(0.45 0.01 255);
+    --fg-tertiary: oklch(0.58 0.008 255);
+    --brand-accent: oklch(0.52 0.15 248);
+    --brand-accent-fg: oklch(0.99 0.002 250);
+    --positive: oklch(0.55 0.13 150);
+    --warning: oklch(0.66 0.12 75);
+    --negative: oklch(0.55 0.17 25);
+  }
+  body {
+    background: #fff;
   }
 }

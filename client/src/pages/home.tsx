@@ -3,7 +3,6 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
-  AlertTriangle,
   ArrowRight,
   ArrowUp,
   ArrowDown,
@@ -15,15 +14,12 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import PageHeader from "@/components/PageHeader";
-import { PageHeaderHelp } from "@/components/PageHeaderHelp";
-import { pageExplainers } from "@/lib/pageExplainers";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { useInspector } from "@/components/AppShell";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import VisibilityGauge from "@/components/dashboard/VisibilityGauge";
-import RecommendationsPanel from "@/components/dashboard/RecommendationsPanel";
+import Pulse from "@/components/dashboard/Pulse";
 
 // ─── Command Center ──────────────────────────────────────────────────────────
 // The single pane that answers: where do I stand, what changed, what's wrong,
@@ -47,12 +43,6 @@ type LeaderRow = {
   isOwn: boolean;
   totalCitations: number;
   shareOfVoice: number;
-};
-type AlertRow = {
-  id: string;
-  alertType: string;
-  message: string;
-  sentAt: string;
 };
 
 function Widget({
@@ -84,8 +74,64 @@ function Widget({
   );
 }
 
+function DriverRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border/60 py-2 last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground">{value}</span>
+    </div>
+  );
+}
+
+// Inspector body for the AI Visibility Score. Real, measured signals only
+// (the same data the hero already fetched) — honest by construction, no
+// estimates.
+function VisibilityDrivers({ h }: { h?: HeroData }) {
+  if (!h) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No scan data yet. Run a citation check and the drivers appear here.
+      </p>
+    );
+  }
+  const deltaText =
+    h.visibilityDelta === null || h.visibilityDelta === 0
+      ? "No change"
+      : `${h.visibilityDelta > 0 ? "+" : ""}${h.visibilityDelta} pts vs. last scan`;
+  return (
+    <div className="space-y-4">
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        The score blends three measured signals: how often AI engines cite you, the average rank of
+        those citations, and the authority of the citing sources. Everything below is from your
+        latest scan only.
+      </p>
+      <div>
+        <DriverRow label="Citation rate" value={<span className="tnum">{h.citationRate}%</span>} />
+        <DriverRow
+          label="Checks cited"
+          value={
+            <span className="tnum">
+              {h.citedChecks} / {h.totalChecks}
+            </span>
+          }
+        />
+        <DriverRow label="Change" value={deltaText} />
+        <DriverRow label="Last scan" value={formatRelativeTime(h.lastScanAt)} />
+      </div>
+      <Link
+        href="/monitor?tab=overview"
+        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+      >
+        Open full breakdown in Monitor
+        <ArrowRight className="h-3.5 w-3.5" />
+      </Link>
+    </div>
+  );
+}
+
 export default function Home() {
-  const { brands, selectedBrand, selectedBrandId, isLoading: brandsLoading } = useBrandSelection();
+  const { brands, selectedBrandId, isLoading: brandsLoading } = useBrandSelection();
+  const inspector = useInspector();
   const enabled = !!selectedBrandId;
 
   const hero = useQuery<{ success: boolean; data: HeroData }>({
@@ -100,16 +146,11 @@ export default function Home() {
     queryKey: [`/api/competitors/leaderboard?brandId=${selectedBrandId}`],
     enabled,
   });
-  const alertsQ = useQuery<{ success: boolean; data: AlertRow[] }>({
-    queryKey: [`/api/brands/${selectedBrandId}/alerts?limit=3`],
-    enabled,
-  });
   const { runs: activeRuns } = useActiveCitationRuns(selectedBrandId);
 
   const h = hero.data?.data;
   const weeks = trend.data?.data?.weeks ?? [];
   const rows = leaderboard.data?.data ?? [];
-  const alerts = alertsQ.data?.data ?? [];
 
   const weekDelta = useMemo(() => {
     const withData = weeks.filter((w) => w.total > 0);
@@ -148,29 +189,22 @@ export default function Home() {
 
   if (brands.length === 0) {
     return (
-      <div className="space-y-4">
-        <PageHeader
-          title="Command Center"
-          description="Your AI-visibility operating system."
-          explainer={pageExplainers.dashboard}
-        />
-        <EmptyState
-          icon={Brain}
-          title="Create a brand to get started"
-          description={
-            <>
-              Set up your first brand and we&apos;ll build a live AI-visibility operating system —
-              monitor where ChatGPT, Claude, Perplexity, and Gemini cite you, diagnose the gaps, and
-              act on them.
-            </>
-          }
-          action={{
-            label: "Create your first brand",
-            href: "/setup?tab=brands",
-            onClick: () => {},
-          }}
-        />
-      </div>
+      <EmptyState
+        icon={Brain}
+        title="Create a brand to get started"
+        description={
+          <>
+            Set up your first brand and we&apos;ll build a live AI-visibility operating system:
+            monitor where ChatGPT, Claude, Perplexity, and Gemini cite you, diagnose the gaps, and
+            act on them.
+          </>
+        }
+        action={{
+          label: "Create your first brand",
+          href: "/setup?tab=brands",
+          onClick: () => {},
+        }}
+      />
     );
   }
 
@@ -178,25 +212,15 @@ export default function Home() {
 
   return (
     <div className="space-y-4 animate-fade-in-up motion-reduce:animate-none">
-      <PageHeader
-        title="Command Center"
-        description={
-          selectedBrand
-            ? `AI-visibility operating system for ${selectedBrand.name}.`
-            : "Pick a brand to begin."
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <BrandSelector className="w-56" />
-            <PageHeaderHelp tourId="dashboard" pageLabel="Command Center" />
-          </div>
-        }
-        explainer={pageExplainers.dashboard}
-      />
-
-      {/* 1. Visibility (hero stat) — links into Monitor. */}
+      {/* 1. Visibility (hero stat) — selecting it opens the inspector. */}
       <div className="grid gap-4 md:grid-cols-3" data-tour-id="dashboard.stats">
-        <Link href="/monitor?tab=overview" className="md:col-span-1">
+        <button
+          type="button"
+          onClick={() =>
+            inspector.open({ title: "Visibility drivers", body: <VisibilityDrivers h={h} /> })
+          }
+          className="rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:col-span-1"
+        >
           <Card className="group h-full cursor-pointer border-border/60 transition-colors hover:border-primary/40">
             <CardContent className="flex h-full flex-col items-center justify-center gap-2 p-5">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -221,15 +245,16 @@ export default function Home() {
                     <ArrowDown className="h-3 w-3" />
                   )}
                   {h.visibilityDelta > 0 ? "+" : ""}
-                  {h.visibilityDelta} pts
+                  <span className="tnum">{h.visibilityDelta}</span> pts
                 </span>
               ) : null}
               <p className="text-[11px] text-muted-foreground">
                 Last scan: {formatRelativeTime(h?.lastScanAt ?? null)}
               </p>
+              <span className="mt-1 text-[11px] font-medium text-primary">View drivers</span>
             </CardContent>
           </Card>
-        </Link>
+        </button>
 
         {/* 2. What changed this week */}
         <Widget title="What changed this week" to="/monitor?tab=citations" icon={Activity}>
@@ -259,16 +284,6 @@ export default function Home() {
               Not enough run history yet — check back after your next weekly scan.
             </p>
           )}
-          {alerts.length > 0 && (
-            <ul className="mt-3 space-y-1 border-t border-border/60 pt-2">
-              {alerts.slice(0, 3).map((a) => (
-                <li key={a.id} className="flex gap-1.5 text-xs text-muted-foreground">
-                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-destructive" />
-                  <span className="line-clamp-2">{a.message}</span>
-                </li>
-              ))}
-            </ul>
-          )}
         </Widget>
 
         {/* 4. Cited / Total */}
@@ -290,9 +305,12 @@ export default function Home() {
         </Widget>
       </div>
 
-      {/* 3. Next Best Actions — canonical, deterministic recommendations. */}
+      {/* 3. Worklist — the ranked, action-first Pulse. Replaces the old
+          recommendations panel here; that panel stays the deep view at
+          /diagnose?tab=issues. The data-tour-id is a build-gate tour target
+          (scripts/verify-tour-targets.ts) and must stay this literal string. */}
       <div data-tour-id="dashboard.recommendations">
-        <RecommendationsPanel />
+        <Pulse />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

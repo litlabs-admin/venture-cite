@@ -4,6 +4,7 @@ import { storage } from "../storage";
 import { logger } from "./logger";
 import { generateBrandPrompts } from "./promptGenerator";
 import { runBrandPrompts } from "../citationChecker";
+import { runFullScrapeForBrand } from "./factAgent/v2/runFullScrape";
 import type { Brand } from "@shared/schema";
 
 import { captureAndFlush } from "./sentryReport";
@@ -36,6 +37,70 @@ export async function runOnboardingAutopilot(
     const status = brand.autopilotStatus ?? null;
 
     logger.info({ brandId, userId, status }, "onboardingAutopilot: starting/resuming");
+
+    // Phase 0: the FactSheet kernel must exist BEFORE prompt generation
+    // so prompts are grounded in real, verified facts (industry, ICP,
+    // products, positioning) rather than the thin confirm-form row the
+    // user just typed. This is the correct activation order:
+    //   Capture → Discover facts → Frame prompts → Measure citations.
+    // Resumable: if the scrape doesn't finish within the deadline the
+    // brand stays in 'scraping_facts'; the daily cron
+    // (resume-in-flight-autopilots) plus the fact-scrape-backstop drive
+    // the run to completion, and the next autopilot resume re-checks
+    // here and advances. 'generating_prompts'/'running_citations' mean a
+    // prior invocation already cleared Phase 0 — skip it.
+    if (status !== "generating_prompts" && status !== "running_citations") {
+      const factSheetReady = await storage.getLastCompletedScrapeRunAt(brandId);
+      if (!factSheetReady) {
+        if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) return;
+
+        await setAutopilot(brandId, {
+          autopilotStatus: "scraping_facts",
+          autopilotStep: 0,
+          autopilotStartedAt: new Date(),
+          autopilotError: null,
+          autopilotProgress: {},
+        } as never);
+
+        await runFullScrapeForBrand(
+          {
+            id: brand.id,
+            name: brand.name,
+            website: brand.website,
+            industry: brand.industry,
+            description: brand.description,
+            products: Array.isArray(brand.products) ? (brand.products as string[]) : [],
+            targetAudience: brand.targetAudience,
+            uniqueSellingPoints: Array.isArray(brand.uniqueSellingPoints)
+              ? (brand.uniqueSellingPoints as string[])
+              : [],
+            keyValues: Array.isArray(brand.keyValues)
+              ? (brand.keyValues as string[]).join(", ")
+              : ((brand.keyValues as string | null) ?? null),
+            brandVoice: brand.brandVoice,
+            tone: brand.tone,
+          },
+          options.deadlineMs ?? Date.now() + 45_000,
+          // Must be one of the brand_fact_scrape_runs_triggered_by_check
+          // values (migration 0062); "onboarding" is the canonical
+          // first-run origin.
+          "onboarding",
+        );
+
+        // Re-check: only advance to prompts once the run actually
+        // reached a completed terminal state. If not (deadline cut it
+        // short, or a concurrent scrape holds the brand lock) stay in
+        // 'scraping_facts' and let the cron finish it.
+        const nowReady = await storage.getLastCompletedScrapeRunAt(brandId);
+        if (!nowReady) {
+          logger.info(
+            { brandId, userId },
+            "onboardingAutopilot: fact sheet not complete yet — will resume next cron tick",
+          );
+          return;
+        }
+      }
+    }
 
     if (status !== "running_citations") {
       // Step 1: prompt generation. One-shot LLM call that takes ~5-15s.
@@ -131,7 +196,7 @@ export async function resumeInFlightAutopilots(deadlineMs?: number): Promise<voi
   try {
     const rows = await db.execute<{ id: string; user_id: string | null }>(sql`
       SELECT id, user_id FROM brands
-      WHERE autopilot_status IN ('pending', 'generating_prompts', 'running_citations')
+      WHERE autopilot_status IN ('pending', 'scraping_facts', 'generating_prompts', 'running_citations')
         AND deleted_at IS NULL
     `);
     const list = (rows as { rows?: Array<{ id: string; user_id: string | null }> }).rows ?? [];

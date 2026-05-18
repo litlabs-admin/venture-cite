@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -10,9 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
-import PageHeader from "@/components/PageHeader";
-import { PageHeaderHelp } from "@/components/PageHeaderHelp";
-import { pageExplainers } from "@/lib/pageExplainers";
 import { ErrorState } from "@/components/ui/error-state";
 import {
   Sparkles,
@@ -375,14 +371,7 @@ export default function Citations() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="AI Citations"
-        description="Track how often AI engines cite your brand when users ask them strategic questions."
-        actions={<PageHeaderHelp tourId="citations" pageLabel="Citations" />}
-        explainer={pageExplainers.citations}
-      />
-
-      {/* Brand selector + Run Check button */}
+      {/* Run Check action bar */}
       <Card>
         <CardContent className="pt-6">
           {brandsLoading ? (
@@ -392,9 +381,7 @@ export default function Citations() {
               Create a brand first to start tracking citations.
             </p>
           ) : (
-            <div className="flex items-center gap-3">
-              <Target className="h-4 w-4 text-muted-foreground shrink-0" />
-              <BrandSelector className="flex-1" />
+            <div className="flex items-center justify-end gap-3">
               {hasPrompts && (
                 <>
                   <Button

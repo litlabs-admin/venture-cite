@@ -11,17 +11,7 @@ const openai = new OpenAI({
 });
 attachAiLogger(openai);
 
-function safeParseJson<T = any>(raw: string | null | undefined): T | null {
-  if (!raw) return null;
-  const stripped = raw.replace(/```json\s*|\s*```/g, "").trim();
-  const match = stripped.match(/[\[{][\s\S]*[\]}]/);
-  const candidate = match ? match[0] : stripped;
-  try {
-    return JSON.parse(candidate) as T;
-  } catch {
-    return null;
-  }
-}
+import { safeParseJson } from "./safeParseJson";
 
 // Stopwords for the Jaccard similarity check — intentionally tiny, just the
 // filler tokens that inflate overlap without carrying intent.

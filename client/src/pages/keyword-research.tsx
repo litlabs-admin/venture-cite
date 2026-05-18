@@ -21,18 +21,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
-import PageHeader from "@/components/PageHeader";
-import { pageExplainers } from "@/lib/pageExplainers";
 import { useLocation } from "wouter";
 import type { KeywordResearch } from "@shared/schema";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import {
   Search,
   Sparkles,
-  Target,
   TrendingUp,
   FileText,
   Loader2,
@@ -67,7 +63,7 @@ const contentTypeLabels: Record<string, string> = {
 export default function KeywordResearchPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
+  const { selectedBrandId, selectedBrand } = useBrandSelection();
   const [statusFilter, setStatusFilter] = usePersistedState<string>("vc_keywords_filter", "all");
 
   const {
@@ -178,29 +174,7 @@ export default function KeywordResearchPage() {
         />
       </Helmet>
 
-      <PageHeader
-        title="AI Keyword Research"
-        description="Discover keywords that will get your brand cited by AI search engines"
-        explainer={pageExplainers.keywordResearch}
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="lg:col-span-1">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Select Brand
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {brandsLoading ? (
-              <Skeleton className="h-10 w-full" />
-            ) : (
-              <BrandSelector className="w-full" />
-            )}
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">

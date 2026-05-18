@@ -649,9 +649,10 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
         if (!articleId || typeof articleId !== "string") {
           return res.status(400).json({ success: false, error: "articleId is required" });
         }
-        await requireArticle(articleId, user.id);
+        const article = await requireArticle(articleId, user.id);
         const ranking = await storage.createGeoRanking({
           articleId,
+          brandId: article.brandId,
           aiPlatform,
           prompt,
           rank: rank ?? null,

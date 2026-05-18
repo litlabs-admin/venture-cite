@@ -25,27 +25,6 @@ const priorityTone = (p: string) => {
   }
 };
 
-const priorityPoints = (p: string) => {
-  switch (p) {
-    case "urgent":
-      return 30;
-    case "high":
-      return 25;
-    case "medium":
-      return 15;
-    default:
-      return 10;
-  }
-};
-
-const estimatedTimeframe = (taskType: string) => {
-  if (taskType.includes("content")) return "8 weeks";
-  if (taskType.includes("outreach")) return "4 weeks";
-  if (taskType.includes("seo")) return "4 weeks";
-  if (taskType.includes("hallucination")) return "2 weeks";
-  return "6 weeks";
-};
-
 export default function ActionPlanItem({ index, task }: Props) {
   return (
     <div
@@ -58,9 +37,6 @@ export default function ActionPlanItem({ index, task }: Props) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium text-sm text-foreground">{task.taskTitle}</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
-            +{priorityPoints(task.priority)} pts
-          </span>
           <span className={`text-[11px] px-1.5 py-0.5 rounded ${priorityTone(task.priority)}`}>
             {task.priority}
           </span>
@@ -68,9 +44,6 @@ export default function ActionPlanItem({ index, task }: Props) {
         {task.taskDescription && (
           <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{task.taskDescription}</p>
         )}
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Timeframe: {estimatedTimeframe(task.taskType)}
-        </p>
       </div>
     </div>
   );

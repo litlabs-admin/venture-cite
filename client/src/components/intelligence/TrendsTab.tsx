@@ -16,21 +16,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  Area,
-  AreaChart,
 } from "recharts";
-import {
-  TrendingUp,
-  AlertTriangle,
-  BarChart3,
-  Plus,
-  RefreshCw,
-  Award,
-  History,
-  Calendar,
-} from "lucide-react";
+import { AlertTriangle, Plus, RefreshCw, History, Calendar } from "lucide-react";
 import type { MetricsHistory } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -75,14 +63,16 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
     },
   });
 
+  // Only `hallucinations` is charted: it is a real unresolved-issue count.
+  // The former share_of_answer / citation_quality series were derived from
+  // the dead prompt_portfolio / citation_quality tables (server-synthesized
+  // numbers) and were removed — the system cannot defend them.
   const getTrendChartData = () => {
     // Bucket snapshots by timestamp rounded to the minute so multiple
     // citation runs on the same day each get their own point on the chart.
     // Previous code keyed by toLocaleDateString() which collapsed every
     // run on a given day into a single bucket — .find() took the first
     // row, leaving runs 2+N invisible and making the chart look stuck.
-    const soaData = metricsHistory.filter((m) => m.metricType === "share_of_answer");
-    const cqData = metricsHistory.filter((m) => m.metricType === "citation_quality");
     const halData = metricsHistory.filter((m) => m.metricType === "hallucinations");
 
     const keyOf = (ts: string | Date): string => {
@@ -110,8 +100,6 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
       {
         key: string;
         date: string;
-        shareOfAnswer: number | null;
-        citationQuality: number | null;
         hallucinations: number | null;
       }
     >();
@@ -121,18 +109,12 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
         row = {
           key,
           date: labelOf(key),
-          shareOfAnswer: null,
-          citationQuality: null,
           hallucinations: null,
         };
         byKey.set(key, row);
       }
       return row;
     };
-    for (const m of soaData)
-      ensure(keyOf(m.snapshotDate)).shareOfAnswer = parseFloat(m.metricValue);
-    for (const m of cqData)
-      ensure(keyOf(m.snapshotDate)).citationQuality = parseFloat(m.metricValue);
     for (const m of halData)
       ensure(keyOf(m.snapshotDate)).hallucinations = parseFloat(m.metricValue);
 
@@ -204,153 +186,26 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                Share-of-Answer Trend
+                <AlertTriangle className="w-5 h-5" />
+                Unresolved Hallucinations
               </CardTitle>
-              <CardDescription>Percentage of AI responses that cite your brand</CardDescription>
+              <CardDescription>Count of unresolved AI inaccuracies over time</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={getTrendChartData()}>
-                    <defs>
-                      <linearGradient id="soaGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="5%"
-                          stopColor={chartTheme.series.visibility}
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor={chartTheme.series.visibility}
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-xs" />
-                    <YAxis domain={[0, 100]} className="text-xs" />
-                    <Tooltip
-                      contentStyle={chartTheme.tooltipContentStyle}
-                      labelStyle={chartTheme.tooltipLabelStyle}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="shareOfAnswer"
-                      stroke={chartTheme.series.visibility}
-                      fill="url(#soaGradient)"
-                      name="Share of Answer (%)"
-                      connectNulls
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="w-5 h-5" />
-                  Citation Quality Trend
-                </CardTitle>
-                <CardDescription>Average quality score of citations over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[250px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={getTrendChartData()}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="date" className="text-xs" />
-                      <YAxis domain={[0, 100]} className="text-xs" />
-                      <Tooltip contentStyle={chartTheme.tooltipContentStyle} />
-                      <Line
-                        type="monotone"
-                        dataKey="citationQuality"
-                        stroke={chartTheme.series.quality}
-                        strokeWidth={2}
-                        dot={{ fill: chartTheme.series.quality }}
-                        name="Quality Score"
-                        connectNulls
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5" />
-                  Unresolved Hallucinations
-                </CardTitle>
-                <CardDescription>Count of unresolved AI inaccuracies</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[250px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={getTrendChartData()}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="date" className="text-xs" />
-                      <YAxis className="text-xs" />
-                      <Tooltip contentStyle={chartTheme.tooltipContentStyle} />
-                      <Line
-                        type="monotone"
-                        dataKey="hallucinations"
-                        stroke={chartTheme.series.issues}
-                        strokeWidth={2}
-                        dot={{ fill: chartTheme.series.issues }}
-                        name="Unresolved Issues"
-                        connectNulls
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                All Metrics Combined
-              </CardTitle>
-              <CardDescription>Compare all key metrics on a single chart</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={getTrendChartData()}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="date" className="text-xs" />
                     <YAxis className="text-xs" />
                     <Tooltip contentStyle={chartTheme.tooltipContentStyle} />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="shareOfAnswer"
-                      stroke={chartTheme.series.visibility}
-                      strokeWidth={2}
-                      name="Share of Answer (%)"
-                      connectNulls
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="citationQuality"
-                      stroke={chartTheme.series.quality}
-                      strokeWidth={2}
-                      name="Citation Quality"
-                      connectNulls
-                    />
                     <Line
                       type="monotone"
                       dataKey="hallucinations"
                       stroke={chartTheme.series.issues}
                       strokeWidth={2}
-                      name="Hallucinations"
+                      dot={{ fill: chartTheme.series.issues }}
+                      name="Unresolved Issues"
                       connectNulls
                     />
                   </LineChart>

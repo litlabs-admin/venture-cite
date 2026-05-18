@@ -54,6 +54,15 @@ const PRICING_PER_1K_TOKENS_CENTS: Record<string, { in: number; out: number }> =
   "claude-3-haiku": { in: 0.025, out: 0.125 },
   "claude-sonnet-4.5": { in: 0.3, out: 1.5 },
   "anthropic/claude-sonnet-4.5": { in: 0.3, out: 1.5 },
+  // Citation engines — token rates verified 2026-05-18 against the
+  // OpenRouter model pages. The web-search server-tool request fee
+  // (~$0.005/req) is separate, not token-priced here (analytics-only).
+  "anthropic/claude-haiku-4.5": { in: 0.1, out: 0.5 }, // $1 / $5 per 1M
+  "google/gemini-2.5-flash-lite": { in: 0.01, out: 0.04 }, // $0.10 / $0.40 per 1M
+  "perplexity/sonar": { in: 0.1, out: 0.1 }, // $1 / $1 per 1M (+ search fee)
+  "deepseek/deepseek-v3.2": { in: 0.0252, out: 0.0378 }, // $0.252 / $0.378 per 1M
+  // OpenAI web-search chat model used for the ChatGPT citation check.
+  "gpt-4o-mini-search-preview": { in: 0.015, out: 0.06 },
 };
 
 const FALLBACK_PRICING = { in: 0.1, out: 0.4 };

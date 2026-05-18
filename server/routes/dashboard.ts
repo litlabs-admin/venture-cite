@@ -16,6 +16,7 @@ import { sendError, asyncHandler } from "../lib/routesShared";
 import { AI_PLATFORMS_CORE, VISIBILITY_CHECKLIST_TOTAL } from "@shared/constants";
 import type { BrandPrompt, GeoRanking, Competitor } from "@shared/schema";
 import { getRecommendations, type RecommendationState } from "../lib/recommendationsEngine";
+import { citationRatePct, computeVisibilityScore } from "../lib/visibilityMetrics";
 
 // Platforms we surface on the dashboard. Only platforms in this list
 // are rendered as rows — matches the set we actually query via
@@ -123,8 +124,6 @@ export function setupDashboardRoutes(app: Express): void {
         const totalChecks = rankings.length;
         const cited = toCitedArr(rankings);
         const citedChecks = cited.length;
-        const citationRate = totalChecks > 0 ? citedChecks / totalChecks : 0;
-
         // Average authority across cited rows (rows with authority_score set).
         const authScores = cited
           .map((r) => r.authorityScore)
@@ -132,26 +131,20 @@ export function setupDashboardRoutes(app: Express): void {
         const avgAuthorityScore =
           authScores.length > 0 ? authScores.reduce((a, b) => a + b, 0) / authScores.length : 0;
 
-        // Average rank across cited rows — lower is better. Drives the
-        // "ranking quality" component of the score.
+        // Average rank across cited rows — lower is better.
         const ranks = cited.map((r) => r.rank).filter((r): r is number => typeof r === "number");
         const avgRank = ranks.length > 0 ? ranks.reduce((a, b) => a + b, 0) / ranks.length : 0;
-        const rankFactor = avgRank > 0 ? Math.max(0, 1 - (avgRank - 1) / 10) : 1;
 
-        // Zero citations → zero visibility. No theater.
-        // When there ARE citations:
-        //   70 pts max from cite_rate × rank_factor (blended so rank-1
-        //     citations score more than rank-10 citations at the same rate).
-        //   30 pts max from avg authority of cited rows.
-        // Must match the formula in /api/geo-analytics so both pages agree.
-        const visibilityScore =
-          citedChecks === 0
-            ? 0
-            : clamp(
-                round(70 * citationRate * ((1 + rankFactor) / 2) + 30 * (avgAuthorityScore / 100)),
-                0,
-                100,
-              );
+        // Canonical visibility score (server/lib/visibilityMetrics.ts) —
+        // the single definition now shared by /geo-analytics, /rankings
+        // and /entity-strength, so the number is identical across screens.
+        // This call is byte-for-byte the prior hero formula (unit-tested).
+        const visibilityScore = computeVisibilityScore(
+          citedChecks,
+          totalChecks,
+          avgRank,
+          avgAuthorityScore,
+        );
 
         // Score delta from most recent metrics_history snapshot of the same
         // metric type. If we have <2 points, delta is 0.
@@ -174,7 +167,7 @@ export function setupDashboardRoutes(app: Express): void {
             visibilityDelta,
             citedChecks,
             totalChecks,
-            citationRate: Math.round(citationRate * 100),
+            citationRate: citationRatePct(citedChecks, totalChecks),
             lastScanAt: lastScanAt(rankings),
           },
         });
@@ -224,15 +217,13 @@ export function setupDashboardRoutes(app: Express): void {
           const avgRank =
             ranks.length > 0 ? Math.round(ranks.reduce((a, b) => a + b, 0) / ranks.length) : null;
 
-          // Visibility /10: weighted blend of citation rate + authority + rank.
-          const rate = totalCount > 0 ? citedCount / totalCount : 0;
+          // Visibility /10: the canonical 0..100 score expressed at a /10
+          // scale, so this per-platform number agrees with the brand-level
+          // score and /api/geo-analytics (one number, one meaning).
           const auth = cited.map((r) => r.authorityScore ?? 0);
           const avgAuth = auth.length > 0 ? auth.reduce((a, b) => a + b, 0) / auth.length : 0;
-          const rankPenalty = avgRank ? Math.max(0, (10 - avgRank) / 10) : 0;
-          const score10 = clamp(
-            Math.round(10 * (0.5 * rate + 0.3 * (avgAuth / 100) + 0.2 * rankPenalty)),
-            0,
-            10,
+          const score10 = Math.round(
+            computeVisibilityScore(citedCount, totalCount, avgRank ?? 0, avgAuth) / 10,
           );
 
           const strengthLabel: "Weak" | "Moderate" | "Strong" =
@@ -429,13 +420,22 @@ export function setupDashboardRoutes(app: Express): void {
         const totalChecks = rankings.length;
         const cited = toCitedArr(rankings);
         const citedCount = cited.length;
-        const citeRate = totalChecks > 0 ? citedCount / totalChecks : 0;
 
         const ranks = cited.map((r) => r.rank).filter((r): r is number => typeof r === "number");
-        const avgRank = ranks.length > 0 ? ranks.reduce((a, b) => a + b, 0) / ranks.length : null;
-        const rankFactor = avgRank !== null ? Math.max(0, 1 - (avgRank - 1) / 10) : 1;
+        // Nullable for the response (UI shows "—" for no rank data); the
+        // score treats null as neutral via `?? 0` (canonical factor 1).
+        const avgRank: number | null =
+          ranks.length > 0 ? ranks.reduce((a, b) => a + b, 0) / ranks.length : null;
+        const authScores = cited
+          .map((r) => r.authorityScore)
+          .filter((s): s is number => typeof s === "number");
+        const avgAuthority =
+          authScores.length > 0 ? authScores.reduce((a, b) => a + b, 0) / authScores.length : 0;
 
-        const score = clamp(Math.round(100 * citeRate * rankFactor), 0, 100);
+        // Canonical visibility score — the same definition as the
+        // dashboard hero and /api/geo-analytics. (Previously this used a
+        // different, authority-less 100·rate·rankFactor formula.)
+        const score = computeVisibilityScore(citedCount, totalChecks, avgRank ?? 0, avgAuthority);
         const label: "Weak" | "Moderate" | "Strong" =
           score >= 60 ? "Strong" : score >= 30 ? "Moderate" : "Weak";
 
@@ -444,7 +444,7 @@ export function setupDashboardRoutes(app: Express): void {
           data: {
             score,
             label,
-            citeRatePct: Math.round(citeRate * 100),
+            citeRatePct: citationRatePct(citedCount, totalChecks),
             avgRank: avgRank === null ? null : Math.round(avgRank * 10) / 10,
             totalChecks,
             citedCount,

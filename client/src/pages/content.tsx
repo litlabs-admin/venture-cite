@@ -48,8 +48,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { HelpCircle, Loader2, Sparkles, Plus, Target, X, TrendingUp } from "lucide-react";
-import PageHeader from "@/components/PageHeader";
-import { pageExplainers } from "@/lib/pageExplainers";
 import BeginnerTips from "@/components/content/BeginnerTips";
 import UsageWidget from "@/components/content/UsageWidget";
 import DraftToolbar from "@/components/content/DraftToolbar";
@@ -582,11 +580,6 @@ export default function Content() {
     return (
       <TooltipProvider>
         <div className="space-y-8">
-          <PageHeader
-            title="AI Content Generation"
-            description="Generate SEO-optimized content for AI search engines"
-            explainer={pageExplainers.content}
-          />
           <ErrorState
             title="Couldn't load your brands"
             onRetry={() => refetchBrands()}
@@ -601,11 +594,6 @@ export default function Content() {
     return (
       <TooltipProvider>
         <div className="space-y-8">
-          <PageHeader
-            title="AI Content Generation"
-            description="Generate SEO-optimized content for AI search engines"
-            explainer={pageExplainers.content}
-          />
           <ErrorState
             title="Couldn't load your drafts"
             onRetry={() => refetchDrafts()}
@@ -620,11 +608,6 @@ export default function Content() {
     return (
       <TooltipProvider>
         <div className="space-y-8">
-          <PageHeader
-            title="AI Content Generation"
-            description="Generate SEO-optimized content for AI search engines"
-            explainer={pageExplainers.content}
-          />
           <EmptyState
             title="Add a brand first"
             description="Articles are tied to a brand so AI-citation tracking can attribute the result correctly."
@@ -664,12 +647,6 @@ export default function Content() {
   return (
     <TooltipProvider>
       <div className="space-y-8">
-        <PageHeader
-          title="AI Content Generation"
-          description="Generate SEO-optimized content for AI search engines"
-          explainer={pageExplainers.content}
-        />
-
         <DraftToolbar
           drafts={drafts}
           activeDraftId={article.id}

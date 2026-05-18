@@ -25,6 +25,7 @@ import { selectTopUrls } from "../lib/factAgent/v2/urlTierScoring";
 import { normalizeHttps, evaluatePlanGuards } from "../lib/factAgent/v2/planGuards";
 import { canonicalizeUrl } from "../lib/factAgent/canonicalize";
 import { runAggregate } from "../lib/factAgent/v2/aggregate";
+import { waitUntil } from "@vercel/functions";
 import { persistPasteFacts } from "../lib/factAgent/v2/persistPasteFacts";
 import { buildExtractionPrompt, parseFactsWithRepair } from "../lib/factAgent/v2/extractionPrompt";
 
@@ -48,6 +49,10 @@ const planSchema = z.object({
 
 const aggregateSchema = z.object({
   runId: z.string().min(1),
+});
+
+const fullRescrapeSchema = z.object({
+  brandId: z.string().min(1),
 });
 
 const pasteSchema = z.object({
@@ -472,6 +477,109 @@ export function setupFactSheetV2Routes(app: Express): void {
         logger.warn({ err }, "factSheetV2.plan failed");
         captureAndFlush(err, { tags: { source: "factSheetV2.plan" } });
         return sendError(res, err, "Failed to create plan");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/brand-fact-sheet/full-rescrape",
+    isAuthenticated,
+    aiLimitMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      try {
+        const user = requireUser(req);
+        const parsed = fullRescrapeSchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({
+            success: false,
+            error: parsed.error.errors[0]?.message ?? "Invalid request",
+          });
+        }
+        const { brandId } = parsed.data;
+        const brand = await requireBrand(brandId, user.id);
+
+        const normalized = normalizeHttps(brand.website ?? "");
+        if (!normalized) {
+          return res
+            .status(400)
+            .json({ success: false, error: "Brand website must be http(s) URL" });
+        }
+
+        // Same guards as /plan so a server-driven re-scrape can't stack on
+        // an in-flight run, ignore the cooldown, or bust the monthly cost
+        // cap. The structured 409 shape matches /plan so the client renders
+        // the same cooldown / already-running states.
+        const monthKey = new Date().toISOString().slice(0, 7);
+        const [inFlight, lastCompletedAt, costCap] = await Promise.all([
+          storage.getInFlightScrapeRun(brandId),
+          storage.getLastCompletedScrapeRunAt(brandId),
+          storage.getMonthlyCostCap(brandId, monthKey),
+        ]);
+        const verdict = evaluatePlanGuards({
+          brand: { id: brand.id, factScrapeEnabled: (brand as any).factScrapeEnabled !== false },
+          inFlightRun: inFlight,
+          lastCompletedRunAt: lastCompletedAt,
+          costCap: costCap
+            ? { factScrapeCents: costCap.factScrapeCents, monthlyCapCents: costCap.monthlyCapCents }
+            : null,
+        });
+        if (!verdict.ok) {
+          const body: Record<string, unknown> = {
+            success: false,
+            code: verdict.code,
+            error: verdict.message,
+          };
+          if (verdict.code === "already_running") body.runId = verdict.runId;
+          if (verdict.code === "cooldown") body.unlockAtMs = verdict.unlockAtMs;
+          return res.status(verdict.status).json(body);
+        }
+
+        // Server-driven: kick the SAME full pipeline onboarding uses and
+        // return immediately. The run row is created inside
+        // runFullScrapeForBrand; the client discovers it via the existing
+        // GET /runs?brandId= poll + SSE stream. Resumable through the
+        // fact-scrape backstop + monthly-refresh cron if the function is
+        // suspended mid-run — no browser tab required.
+        //
+        // Lazy import: runFullScrape pulls in `db` at module load (which
+        // throws without DATABASE_URL). Importing it here instead of at
+        // the top keeps the v2-route unit tests (which mock storage, not
+        // db) collectable in a DB-less environment.
+        const { runFullScrapeForBrand } = await import("../lib/factAgent/v2/runFullScrape");
+        waitUntil(
+          runFullScrapeForBrand(
+            {
+              id: brand.id,
+              name: brand.name,
+              website: brand.website,
+              industry: brand.industry,
+              description: brand.description,
+              products: Array.isArray(brand.products) ? (brand.products as string[]) : [],
+              targetAudience: brand.targetAudience,
+              uniqueSellingPoints: Array.isArray(brand.uniqueSellingPoints)
+                ? (brand.uniqueSellingPoints as string[])
+                : [],
+              keyValues: Array.isArray(brand.keyValues)
+                ? (brand.keyValues as string[]).join(", ")
+                : ((brand.keyValues as string | null) ?? null),
+              brandVoice: brand.brandVoice,
+              tone: brand.tone,
+            },
+            Date.now() + 50_000,
+            "manual_rescrape",
+          ).catch((err) => {
+            captureAndFlush(err, { tags: { source: "factSheetV2.full-rescrape" } });
+          }),
+        );
+
+        return res.status(200).json({ success: true });
+      } catch (err) {
+        if (err instanceof OwnershipError) {
+          return res.status(err.status).json({ success: false, error: err.message });
+        }
+        logger.warn({ err }, "factSheetV2.full-rescrape failed");
+        captureAndFlush(err, { tags: { source: "factSheetV2.full-rescrape" } });
+        return sendError(res, err, "Failed to start re-scrape");
       }
     }),
   );

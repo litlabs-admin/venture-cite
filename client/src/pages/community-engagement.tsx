@@ -27,10 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
-import PageHeader from "@/components/PageHeader";
-import { pageExplainers } from "@/lib/pageExplainers";
 import type { CommunityPost } from "@shared/schema";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState, KPITile } from "@/components/foundations";
@@ -94,7 +91,7 @@ const statusColors: Record<string, string> = {
 
 export default function CommunityEngagement() {
   const { toast } = useToast();
-  const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
+  const { selectedBrandId, selectedBrand } = useBrandSelection();
   const [discoveredGroups, setDiscoveredGroups] = useState<DiscoveredGroup[]>([]);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
@@ -307,12 +304,6 @@ export default function CommunityEngagement() {
       <Helmet>
         <title>Community Engagement - VentureCite</title>
       </Helmet>
-      <PageHeader
-        title="Community Engagement"
-        description="Find and engage with Reddit and Hacker News communities to build brand citations"
-        actions={brands.length > 0 ? <BrandSelector className="w-64" /> : null}
-        explainer={pageExplainers.community}
-      />
 
       <div className="flex flex-wrap items-center gap-4 mb-6">
         <Button

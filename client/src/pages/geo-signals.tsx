@@ -38,9 +38,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Helmet } from "react-helmet-async";
-import PageHeader from "@/components/PageHeader";
-import { pageExplainers } from "@/lib/pageExplainers";
-import BrandSelector from "@/components/BrandSelector";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import type { Article, BrandPrompt } from "@shared/schema";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -460,13 +457,6 @@ export default function GeoSignals() {
       </Helmet>
 
       <div className="space-y-8">
-        <PageHeader
-          title="GEO Signals"
-          description="Honest GEO scoring: 6 content signals + freshness, chunk engineering, schema audit, pipeline simulation"
-          actions={<BrandSelector className="w-[160px]" />}
-          explainer={pageExplainers.geoSignals}
-        />
-
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-5">

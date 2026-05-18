@@ -312,7 +312,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                       r: 6,
                       fill: chartTheme.series.visibility,
                       strokeWidth: 2,
-                      stroke: "hsl(var(--background))",
+                      stroke: "var(--background)",
                     }}
                   />
                 </AreaChart>

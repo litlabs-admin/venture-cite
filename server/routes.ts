@@ -11,13 +11,11 @@ import {
 import { AI_PLATFORMS as SHARED_AI_PLATFORMS, CITATION_SCORING } from "@shared/constants";
 import { runBrandPrompts, DEFAULT_CITATION_PLATFORMS, checkForCitation } from "./citationChecker";
 import { judgeCitation } from "./citationJudge";
-import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS } from "./lib/modelConfig";
 import { enqueueContentGenerationJob, type GenerationPayload } from "./contentGenerationWorker";
 import { generateBrandPrompts } from "./lib/promptGenerator";
 import { generateSuggestedPrompts } from "./lib/suggestionGenerator";
 import { z } from "zod";
-import OpenAI from "openai";
 import {
   setupAuth,
   attachUserIfPresent,
@@ -82,14 +80,6 @@ import { setupFactSheetRoutes } from "./routes/factSheet";
 import { setupFactSheetV2Routes } from "./routes/factSheetV2";
 import { mentionsRouter } from "./routes/mentions";
 import { asyncHandler } from "./lib/asyncHandler";
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  // Upstream hangs block worker threads indefinitely without a timeout.
-  timeout: 45_000,
-  maxRetries: 1,
-});
-attachAiLogger(openai);
 
 // Maximum accepted length for user-supplied content on AI endpoints. Caps
 // worst-case OpenAI token consumption so a hostile request can't drain the
@@ -132,21 +122,6 @@ function sendError(res: Response, err: unknown, fallback: string, status = 500):
     }
   }
   res.status(status).json({ success: false, error: message });
-}
-
-// Try to extract a JSON object from a raw LLM response even when the model
-// wraps it in markdown fences, prose, or trailing commentary. Returns null
-// on any failure instead of throwing — callers decide the fallback shape.
-function safeParseJson<T = any>(raw: string | null | undefined): T | null {
-  if (!raw) return null;
-  const stripped = raw.replace(/```json\s*|\s*```/g, "").trim();
-  const match = stripped.match(/[\[{][\s\S]*[\]}]/);
-  const candidate = match ? match[0] : stripped;
-  try {
-    return JSON.parse(candidate) as T;
-  } catch {
-    return null;
-  }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {

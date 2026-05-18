@@ -5,7 +5,12 @@ export const brandFactSheetTour: TourConfig = {
   id: "brand-fact-sheet",
   version: 1,
   scope: "perUser",
-  trigger: { kind: "route", routes: ["/brand-fact-sheet"] },
+  // Replay-only. The legacy /brand-fact-sheet route 301s into the spine
+  // (/setup?tab=fact-sheet), so a route auto-fire can never land; and
+  // auto-firing on the tabbed setup shell when the user may be on a
+  // different tab would be wrong. Reachable via the page help button,
+  // matching every other page tour.
+  trigger: { kind: "manual" },
   steps: [
     {
       id: "run-progress",

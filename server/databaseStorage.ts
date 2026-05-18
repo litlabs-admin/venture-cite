@@ -2950,7 +2950,6 @@ export class DatabaseStorage implements IStorage {
     return { total, resolved, bySeverity, byType };
   }
 
-  // TODO(spec-2 Plan 2.4): route handler still posts `factCategory`; remap to `subcategory` upstream.
   async createBrandFact(insertFact: InsertBrandFactSheet): Promise<BrandFactSheet> {
     const result = await db.insert(schema.brandFactSheet).values(insertFact).returning();
     return result[0];

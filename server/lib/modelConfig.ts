@@ -64,3 +64,70 @@ export const MODELS = {
 } as const;
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+
+// ── Citation grounding ──────────────────────────────────────────────
+// Citation checks must reflect REAL AI-search behavior: each engine
+// answers with LIVE WEB GROUNDING, queried as itself, deterministically.
+// Slugs + token prices + the facts below verified 2026-05-18 against the
+// OpenAI / OpenRouter model + docs pages.
+//   - ChatGPT: OpenAI `gpt-4o-mini-search-preview` via the direct OpenAI
+//     client. Search-preview models do their own retrieval and REJECT
+//     all sampling params (temperature/top_p/penalties) → returns a
+//     400 if `temperature` is sent, so supportsTemperature:false.
+//   - Claude / Gemini / DeepSeek: clean OpenRouter slug + the
+//     `openrouter:web_search` SERVER TOOL (added to the request `tools`
+//     array). The legacy `:online` suffix / web plugin is DEPRECATED by
+//     OpenRouter; the server tool is the supported path and runs the
+//     search server-side in ONE round-trip, returning url_citation
+//     annotations (no client-side tool-call handling needed).
+//   - Perplexity `sonar` is natively web-grounded; no tool needed.
+// pricingModel == model (token cost only). The web-search request fee
+// (~$0.005/req via Exa) is not token-priced (analytics-only). If a slug
+// 404s or a price drifts, this is the one place to edit.
+export type CitationModelClient = "openai" | "openrouter";
+export interface CitationModelConfig {
+  client: CitationModelClient;
+  model: string;
+  pricingModel: string;
+  supportsTemperature: boolean;
+  // Attach the openrouter:web_search server tool. False for engines that
+  // ground natively (ChatGPT search-preview, Perplexity sonar).
+  webSearchTool: boolean;
+}
+export const CITATION_MODELS: Record<string, CitationModelConfig> = {
+  ChatGPT: {
+    client: "openai",
+    model: "gpt-4o-mini-search-preview",
+    pricingModel: "gpt-4o-mini-search-preview",
+    supportsTemperature: false,
+    webSearchTool: false,
+  },
+  Claude: {
+    client: "openrouter",
+    model: "anthropic/claude-haiku-4.5",
+    pricingModel: "anthropic/claude-haiku-4.5",
+    supportsTemperature: true,
+    webSearchTool: true,
+  },
+  Gemini: {
+    client: "openrouter",
+    model: "google/gemini-2.5-flash-lite",
+    pricingModel: "google/gemini-2.5-flash-lite",
+    supportsTemperature: true,
+    webSearchTool: true,
+  },
+  Perplexity: {
+    client: "openrouter",
+    model: "perplexity/sonar",
+    pricingModel: "perplexity/sonar",
+    supportsTemperature: true,
+    webSearchTool: false,
+  },
+  DeepSeek: {
+    client: "openrouter",
+    model: "deepseek/deepseek-v3.2",
+    pricingModel: "deepseek/deepseek-v3.2",
+    supportsTemperature: true,
+    webSearchTool: true,
+  },
+};

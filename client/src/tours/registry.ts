@@ -15,7 +15,6 @@ import { firstMentionClickedNudge } from "./nudges/first-mention-clicked.nudge";
 import { firstListicleFoundNudge } from "./nudges/first-listicle-found.nudge";
 import { firstFaqGeneratedNudge } from "./nudges/first-faq-generated.nudge";
 import { firstKeywordResearchNudge } from "./nudges/first-keyword-research.nudge";
-import { emptyCitationsNudge } from "./nudges/empty-citations.nudge";
 
 export const TOURS: Record<string, TourConfig> = {
   [globalWelcomeTour.id]: globalWelcomeTour,
@@ -34,7 +33,6 @@ export const TOURS: Record<string, TourConfig> = {
   [firstListicleFoundNudge.id]: firstListicleFoundNudge,
   [firstFaqGeneratedNudge.id]: firstFaqGeneratedNudge,
   [firstKeywordResearchNudge.id]: firstKeywordResearchNudge,
-  [emptyCitationsNudge.id]: emptyCitationsNudge,
 };
 
 export function getTour(id: string): TourConfig | undefined {
