@@ -285,37 +285,6 @@ function MockContentEditor() {
   );
 }
 
-function MockReport() {
-  const cells: { label: string; value: string }[] = [
-    { label: "Mentions", value: "1,284" },
-    { label: "Avg Score", value: "7.6" },
-    { label: "Engines", value: "6" },
-    { label: "Sentiment", value: "91%" },
-  ];
-  return (
-    <div className="landing-mock-report">
-      <div className="landing-mock-report-grid">
-        {cells.map((c) => (
-          <div className="landing-mock-report-cell" key={c.label}>
-            <div className="landing-mock-report-cell-label">{c.label}</div>
-            <div className="landing-mock-report-cell-value">{c.value}</div>
-          </div>
-        ))}
-      </div>
-      <div className="landing-mock-report-sparkline">
-        <svg viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true">
-          <polyline
-            points="0,50 25,46 50,42 75,36 100,30 125,24 150,18 175,12 200,6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          />
-        </svg>
-      </div>
-    </div>
-  );
-}
-
 /* ─────────────────────────────────────────
    Data
 ───────────────────────────────────────── */
@@ -366,7 +335,7 @@ const card3MiniCards = [
   },
 ];
 
-type FeatureMock = "feed" | "share" | "editor" | "report";
+type FeatureMock = "feed" | "share" | "editor";
 
 const features: { title: string; desc: string; mock: FeatureMock }[] = [
   {
@@ -383,11 +352,6 @@ const features: { title: string; desc: string; mock: FeatureMock }[] = [
     title: "AI Content Generation",
     desc: "Generate citation-ready articles and FAQs scored against the signals AI engines reward.",
     mock: "editor",
-  },
-  {
-    title: "Client Reporting",
-    desc: "Share clean, branded reports with KPIs that map to revenue, not vanity metrics.",
-    mock: "report",
   },
 ];
 
@@ -552,8 +516,6 @@ function renderFeatureMock(kind: FeatureMock) {
       return <MockShareOfAnswer />;
     case "editor":
       return <MockContentEditor />;
-    case "report":
-      return <MockReport />;
   }
 }
 

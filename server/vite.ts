@@ -43,7 +43,6 @@ const KNOWN_ROUTES: RegExp[] = [
   /^\/ai-traffic$/,
   /^\/analytics-integrations$/,
   /^\/faq-manager$/,
-  /^\/client-reports$/,
   /^\/brand-fact-sheet$/,
   /^\/community$/,
   /^\/settings$/,

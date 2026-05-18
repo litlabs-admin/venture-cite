@@ -86,7 +86,6 @@ Disallow: /outreach
 Disallow: /ai-traffic
 Disallow: /analytics-integrations
 Disallow: /faq-manager
-Disallow: /client-reports
 Disallow: /brand-fact-sheet
 Disallow: /community
 Disallow: /settings
