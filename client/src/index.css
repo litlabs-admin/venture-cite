@@ -4,38 +4,51 @@
 @tailwind utilities;
 
 /* ───────────────────────────────────────────────────────────────────────────
-   Token system — DESIGN.md "quiet precision instrument" (minimalist).
-   Two layers: DESIGN.md primitive tokens, then the shadcn semantic vars
-   mapped onto them. Dark only redefines the theme-varying primitives;
-   the shadcn mappings live once in :root and follow automatically.
-   Light is the default. OKLCH throughout; no #000/#fff; near-neutral
-   graphite tinted ~hue 250 toward the one azure accent.
+   Token system — "monochrome zinc" (Vercel-lane premium restraint).
+   Two layers: primitive tokens, then the shadcn semantic vars mapped onto
+   them. .dark redefines the theme-varying primitives; the shadcn mappings
+   live once in :root and follow automatically. DARK is the default the
+   user lands on (`<html class="dark">` in index.html); light stays fully
+   themed for an optional toggle + the printed /report.
+   OKLCH throughout; no #000/#fff. Neutrals are cool zinc (hue ~285, very
+   low chroma) at HIGH contrast with widened surface steps for depth — the
+   #1 premium tell is sophisticated cool near-black/near-white, never warm
+   muddy mid-greys. Indigo accent (hue ~278–280) is NEAR-ABSENT: it appears
+   only on the single primary action and the focus ring (--primary /
+   --ring); active nav is a neutral raised chip, not an indigo fill.
+   positive/warning/negative are FUNCTIONAL-ONLY (status/destructive), never
+   brand or decoration — required for usability, used sparingly.
    ─────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* DESIGN.md primitives — LIGHT (default, paper graphite) */
-  --bg-base: oklch(0.985 0.002 250);
-  --bg-surface-1: oklch(0.97 0.003 250);
-  --bg-surface-2: oklch(0.95 0.004 250);
-  --bg-surface-3: oklch(0.92 0.004 250);
-  --border-subtle: oklch(0.91 0.004 250);
-  --border-default: oklch(0.875 0.005 250);
-  --border-strong: oklch(0.78 0.006 250);
-  --fg-primary: oklch(0.255 0.01 255);
-  --fg-secondary: oklch(0.45 0.01 255);
-  --fg-tertiary: oklch(0.58 0.008 255);
-  --fg-disabled: oklch(0.68 0.006 255);
-  --brand-accent: oklch(0.52 0.15 248);
-  --brand-accent-hover: oklch(0.47 0.15 248);
-  --brand-accent-press: oklch(0.43 0.15 248);
-  --brand-accent-fg: oklch(0.99 0.002 250);
-  --brand-accent-subtle: oklch(0.52 0.15 248 / 0.12);
-  --positive: oklch(0.55 0.13 150);
-  --warning: oklch(0.66 0.12 75);
-  --negative: oklch(0.55 0.17 25);
-  /* Stable near-white for text on saturated fills (destructive/positive/
-     negative). Theme-agnostic on purpose — NOT redefined in .dark. */
-  --color-on-strong: oklch(0.99 0.002 250);
+  /* Primitives — LIGHT (crisp soft-white zinc; used for the optional
+     toggle + the printed report). Cool hue 285, near-zero chroma, HIGH
+     contrast; surface steps widened so panels separate, not wash flat. */
+  --bg-base: oklch(0.988 0.0015 285);
+  --bg-surface-1: oklch(0.972 0.002 285);
+  --bg-surface-2: oklch(0.95 0.0025 285);
+  --bg-surface-3: oklch(0.925 0.003 285);
+  --border-subtle: oklch(0.92 0.003 285);
+  --border-default: oklch(0.875 0.004 285);
+  --border-strong: oklch(0.79 0.005 285);
+  --fg-primary: oklch(0.21 0.012 285);
+  --fg-secondary: oklch(0.44 0.01 285);
+  --fg-tertiary: oklch(0.57 0.008 285);
+  --fg-disabled: oklch(0.7 0.006 285);
+  /* Indigo accent — NEAR-ABSENT (primary action + focus ring only).
+     L0.55 carries white text at AA, so fg is white here. */
+  --brand-accent: oklch(0.55 0.2 280);
+  --brand-accent-hover: oklch(0.5 0.2 280);
+  --brand-accent-press: oklch(0.45 0.19 280);
+  --brand-accent-fg: oklch(0.99 0.004 285);
+  --brand-accent-subtle: oklch(0.55 0.2 280 / 0.1);
+  /* Functional-only status. Never brand/decoration; used sparingly. */
+  --positive: oklch(0.6 0.13 162);
+  --warning: oklch(0.72 0.12 85);
+  --negative: oklch(0.55 0.19 25);
+  /* Stable cool near-white for text on saturated status fills
+     (destructive/positive/negative). Theme-agnostic — NOT redefined. */
+  --color-on-strong: oklch(0.99 0.003 285);
 
   /* Motion (DESIGN.md) */
   --motion-instant: 80ms;
@@ -45,8 +58,8 @@
   --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* Elevation (light = neutral-tinted shadow) */
-  --elevation-raised: 0 1px 2px oklch(0.2 0.01 255 / 0.06);
-  --elevation-overlay: 0 8px 24px -8px oklch(0.2 0.01 255 / 0.18);
+  --elevation-raised: 0 1px 2px oklch(0.16 0.012 285 / 0.06);
+  --elevation-overlay: 0 8px 24px -8px oklch(0.16 0.012 285 / 0.18);
 
   /* ── shadcn semantic layer, mapped onto the primitives ──────────────── */
   --background: var(--bg-base);
@@ -70,15 +83,21 @@
   --border: var(--border-default);
   --input: var(--border-strong);
   --ring: var(--brand-accent);
-  --chart-1: oklch(0.62 0.13 248);
-  --chart-2: oklch(0.66 0.1 220);
-  --chart-3: oklch(0.6 0.09 280);
-  --chart-4: oklch(0.66 0.1 150);
-  --chart-5: oklch(0.7 0.1 75);
+  /* Quiet cool data ramp: indigo lead, then zinc steps + one restrained
+     teal so multi-series charts stay legible without going colorful
+     (functional necessity, kept monochrome-cool in spirit). */
+  --chart-1: oklch(0.62 0.18 280);
+  --chart-2: oklch(0.7 0.045 285);
+  --chart-3: oklch(0.62 0.1 200);
+  --chart-4: oklch(0.55 0.06 250);
+  --chart-5: oklch(0.45 0.05 285);
   --sidebar-background: var(--bg-surface-1);
   --sidebar-foreground: var(--fg-secondary);
-  --sidebar-primary: var(--brand-accent);
-  --sidebar-primary-foreground: var(--brand-accent-fg);
+  /* Monochrome lane: the active nav item is a raised NEUTRAL chip with
+     full-contrast text, not an indigo fill. Indigo stays reserved for the
+     single primary action + the focus ring (--primary / --ring). */
+  --sidebar-primary: var(--bg-surface-3);
+  --sidebar-primary-foreground: var(--fg-primary);
   --sidebar-accent: var(--bg-surface-2);
   --sidebar-accent-foreground: var(--fg-primary);
   --sidebar-border: var(--border-subtle);
@@ -88,19 +107,19 @@
   --font-serif: Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, Monaco, Consolas, monospace;
   --radius: 0.5rem;
-  --shadow-2xs: 0px 1px 2px 0px oklch(0.2 0.01 255 / 0.04);
-  --shadow-xs: 0px 1px 3px 0px oklch(0.2 0.01 255 / 0.06);
+  --shadow-2xs: 0px 1px 2px 0px oklch(0.16 0.012 285 / 0.04);
+  --shadow-xs: 0px 1px 3px 0px oklch(0.16 0.012 285 / 0.06);
   --shadow-sm:
-    0px 2px 4px 0px oklch(0.2 0.01 255 / 0.06), 0px 1px 2px -1px oklch(0.2 0.01 255 / 0.03);
+    0px 2px 4px 0px oklch(0.16 0.012 285 / 0.06), 0px 1px 2px -1px oklch(0.16 0.012 285 / 0.03);
   --shadow:
-    0px 4px 6px -1px oklch(0.2 0.01 255 / 0.08), 0px 2px 4px -2px oklch(0.2 0.01 255 / 0.04);
+    0px 4px 6px -1px oklch(0.16 0.012 285 / 0.08), 0px 2px 4px -2px oklch(0.16 0.012 285 / 0.04);
   --shadow-md:
-    0px 6px 10px -1px oklch(0.2 0.01 255 / 0.08), 0px 4px 6px -2px oklch(0.2 0.01 255 / 0.04);
+    0px 6px 10px -1px oklch(0.16 0.012 285 / 0.08), 0px 4px 6px -2px oklch(0.16 0.012 285 / 0.04);
   --shadow-lg:
-    0px 10px 15px -3px oklch(0.2 0.01 255 / 0.08), 0px 4px 6px -4px oklch(0.2 0.01 255 / 0.04);
+    0px 10px 15px -3px oklch(0.16 0.012 285 / 0.08), 0px 4px 6px -4px oklch(0.16 0.012 285 / 0.04);
   --shadow-xl:
-    0px 20px 25px -5px oklch(0.2 0.01 255 / 0.1), 0px 8px 10px -6px oklch(0.2 0.01 255 / 0.04);
-  --shadow-2xl: 0px 25px 50px -12px oklch(0.2 0.01 255 / 0.2);
+    0px 20px 25px -5px oklch(0.16 0.012 285 / 0.1), 0px 8px 10px -6px oklch(0.16 0.012 285 / 0.04);
+  --shadow-2xl: 0px 25px 50px -12px oklch(0.16 0.012 285 / 0.2);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
@@ -108,25 +127,28 @@
 .dark {
   /* Redefine ONLY the theme-varying primitives — the shadcn mappings in
      :root reference these and follow automatically. */
-  --bg-base: oklch(0.165 0.004 255);
-  --bg-surface-1: oklch(0.195 0.004 255);
-  --bg-surface-2: oklch(0.225 0.005 255);
-  --bg-surface-3: oklch(0.265 0.006 255);
-  --border-subtle: oklch(0.26 0.006 255);
-  --border-default: oklch(0.32 0.007 255);
-  --border-strong: oklch(0.42 0.008 255);
-  --fg-primary: oklch(0.945 0.004 250);
-  --fg-secondary: oklch(0.73 0.006 250);
-  --fg-tertiary: oklch(0.58 0.006 250);
-  --fg-disabled: oklch(0.45 0.005 250);
-  --brand-accent: oklch(0.66 0.13 248);
-  --brand-accent-hover: oklch(0.71 0.13 248);
-  --brand-accent-press: oklch(0.6 0.13 248);
-  --brand-accent-fg: oklch(0.165 0.004 255);
-  --brand-accent-subtle: oklch(0.66 0.13 248 / 0.16);
-  --positive: oklch(0.72 0.12 150);
-  --warning: oklch(0.78 0.11 75);
-  --negative: oklch(0.66 0.15 25);
+  /* DARK = the default. Sophisticated zinc near-black (NOT pure black —
+     that reads as an undesigned void), crisp near-white text at very high
+     contrast, indigo near-absent. */
+  --bg-base: oklch(0.165 0.003 285);
+  --bg-surface-1: oklch(0.195 0.004 285);
+  --bg-surface-2: oklch(0.225 0.0045 285);
+  --bg-surface-3: oklch(0.265 0.005 285);
+  --border-subtle: oklch(0.255 0.005 285);
+  --border-default: oklch(0.31 0.006 285);
+  --border-strong: oklch(0.41 0.007 285);
+  --fg-primary: oklch(0.97 0.003 285);
+  --fg-secondary: oklch(0.72 0.005 285);
+  --fg-tertiary: oklch(0.55 0.006 285);
+  --fg-disabled: oklch(0.42 0.005 285);
+  --brand-accent: oklch(0.66 0.19 278);
+  --brand-accent-hover: oklch(0.71 0.18 278);
+  --brand-accent-press: oklch(0.6 0.18 278);
+  --brand-accent-fg: oklch(0.99 0.004 285);
+  --brand-accent-subtle: oklch(0.66 0.19 278 / 0.16);
+  --positive: oklch(0.72 0.13 162);
+  --warning: oklch(0.78 0.12 86);
+  --negative: oklch(0.66 0.18 25);
 
   /* Dark elevation = surface-lightening + a lit top edge; shadows recede. */
   --elevation-raised: inset 0 1px 0 oklch(1 0 0 / 0.04);
@@ -234,21 +256,21 @@
    for print only; the shadcn semantic vars reference these and follow. */
 @media print {
   .dark {
-    --bg-base: oklch(0.985 0.002 250);
-    --bg-surface-1: oklch(0.97 0.003 250);
-    --bg-surface-2: oklch(0.95 0.004 250);
-    --bg-surface-3: oklch(0.92 0.004 250);
-    --border-subtle: oklch(0.91 0.004 250);
-    --border-default: oklch(0.875 0.005 250);
-    --border-strong: oklch(0.78 0.006 250);
-    --fg-primary: oklch(0.255 0.01 255);
-    --fg-secondary: oklch(0.45 0.01 255);
-    --fg-tertiary: oklch(0.58 0.008 255);
-    --brand-accent: oklch(0.52 0.15 248);
-    --brand-accent-fg: oklch(0.99 0.002 250);
-    --positive: oklch(0.55 0.13 150);
-    --warning: oklch(0.66 0.12 75);
-    --negative: oklch(0.55 0.17 25);
+    --bg-base: oklch(0.988 0.0015 285);
+    --bg-surface-1: oklch(0.972 0.002 285);
+    --bg-surface-2: oklch(0.95 0.0025 285);
+    --bg-surface-3: oklch(0.925 0.003 285);
+    --border-subtle: oklch(0.92 0.003 285);
+    --border-default: oklch(0.875 0.004 285);
+    --border-strong: oklch(0.79 0.005 285);
+    --fg-primary: oklch(0.21 0.012 285);
+    --fg-secondary: oklch(0.44 0.01 285);
+    --fg-tertiary: oklch(0.57 0.008 285);
+    --brand-accent: oklch(0.55 0.2 280);
+    --brand-accent-fg: oklch(0.99 0.004 285);
+    --positive: oklch(0.6 0.13 162);
+    --warning: oklch(0.72 0.12 85);
+    --negative: oklch(0.55 0.19 25);
   }
   body {
     background: #fff;
