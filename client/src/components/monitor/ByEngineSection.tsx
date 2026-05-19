@@ -12,7 +12,7 @@ type PlatformRow = {
   aiPlatform: string;
   citedCount: number;
   totalCount: number;
-  avgRank: number | null;
+  rank: number | null;
   latestSnippet?: string | null;
 };
 
@@ -51,7 +51,7 @@ export default function ByEngineSection({
                 <div className="flex-1">
                   <div className="text-sm font-medium">{p.aiPlatform}</div>
                   <div className="text-xs text-muted-foreground tabular-nums mt-0.5">
-                    {p.citedCount}/{p.totalCount} cited · avg rank {p.avgRank ?? "—"}
+                    {p.citedCount}/{p.totalCount} cited · avg rank {p.rank ?? "—"}
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />

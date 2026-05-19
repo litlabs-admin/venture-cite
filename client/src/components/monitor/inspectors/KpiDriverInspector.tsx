@@ -40,7 +40,7 @@ export default function KpiDriverInspector({ kind, brandId }: { kind: KpiKind; b
           <div key={p.aiPlatform} className="flex justify-between text-sm">
             <span>{p.aiPlatform}</span>
             <span className="tabular-nums text-muted-foreground">
-              {p.citedCount}/{p.totalCount} · avg rank {p.avgRank ?? "—"}
+              {p.citedCount}/{p.totalCount} · avg rank {p.rank ?? "—"}
             </span>
           </div>
         ))}
@@ -54,10 +54,9 @@ export default function KpiDriverInspector({ kind, brandId }: { kind: KpiKind; b
             value={`${(entity.data as any)?.data?.citeRatePct ?? 0}%`}
           />
           <Driver label="Avg rank" value={String((entity.data as any)?.data?.avgRank ?? "—")} />
-          <Driver
-            label="Authority bonus"
-            value={`${(entity.data as any)?.data?.authority ?? 0}/30`}
-          />
+          {(entity.data as any)?.data?.label ? (
+            <Driver label="Status" value={String((entity.data as any).data.label)} />
+          ) : null}
         </section>
       ) : null}
 

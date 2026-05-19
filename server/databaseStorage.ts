@@ -1557,6 +1557,7 @@ export class DatabaseStorage implements IStorage {
     opts?: { since?: Date },
   ): Promise<
     {
+      id: string;
       name: string;
       domain: string;
       isOwn: boolean;
@@ -1572,6 +1573,7 @@ export class DatabaseStorage implements IStorage {
     // exploded when really the numbers just accumulate forever.
     const since = opts?.since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const leaderboard: {
+      id: string;
       name: string;
       domain: string;
       isOwn: boolean;
@@ -1656,6 +1658,7 @@ export class DatabaseStorage implements IStorage {
       const breakdown = perBrand.get(brand.id) ?? {};
       const totalCitations = Object.values(breakdown).reduce((s, n) => s + n, 0);
       leaderboard.push({
+        id: brand.id,
         name: brand.name,
         domain: brand.website || brand.companyName,
         isOwn: true,
@@ -1700,6 +1703,7 @@ export class DatabaseStorage implements IStorage {
           total += count;
         });
         leaderboard.push({
+          id: competitor.id,
           name: competitor.name,
           domain: competitor.domain,
           isOwn: false,
@@ -3431,87 +3435,6 @@ export class DatabaseStorage implements IStorage {
       .from(schema.metricsHistory)
       .where(and(...conditions))
       .orderBy(asc(schema.metricsHistory.snapshotDate));
-  }
-
-  async recordCurrentMetrics(brandId: string): Promise<void> {
-    // The "Record Snapshot" button on the Trends tab calls this. It used to
-    // only read from the deprecated prompt_portfolio table (always empty in
-    // the active pipeline) — so the button silently wrote nothing and the
-    // chart stayed flat. Fall back to Phase-1 (brand_prompts + geo_rankings)
-    // so a manual snapshot actually produces data.
-
-    // Try Phase-2 prompt_portfolio first (richer metrics when present).
-    const phase2Prompts = await db
-      .select()
-      .from(schema.promptPortfolio)
-      .where(eq(schema.promptPortfolio.brandId, brandId));
-
-    if (phase2Prompts.length > 0) {
-      const citedPrompts = phase2Prompts.filter((p) => p.isBrandCited === 1);
-      const soaValue = (citedPrompts.length / phase2Prompts.length) * 100;
-      const avgVolatility =
-        phase2Prompts.reduce((sum, p) => sum + (p.answerVolatility || 0), 0) / phase2Prompts.length;
-      const avgConsensus =
-        phase2Prompts.reduce((sum, p) => sum + (p.consensusScore || 0), 0) / phase2Prompts.length;
-      await this.createMetricsSnapshot({
-        brandId,
-        metricType: "share_of_answer",
-        metricValue: soaValue.toFixed(2),
-        metricDetails: {
-          promptCount: phase2Prompts.length,
-          citedCount: citedPrompts.length,
-          avgVolatility,
-          avgConsensus,
-        },
-      } as any);
-    } else {
-      // Phase-1 fallback: compute share-of-answer from brand_prompts × geo_rankings.
-      const brandPrompts = await this.getBrandPromptsByBrandId(brandId);
-      if (brandPrompts.length > 0) {
-        const rankings = await this.getGeoRankingsByBrandPromptIds(brandPrompts.map((p) => p.id));
-        const totalChecks = rankings.length;
-        const citedChecks = rankings.filter((r) => r.isCited === 1).length;
-        const soaValue = totalChecks > 0 ? (citedChecks / totalChecks) * 100 : 0;
-        await this.createMetricsSnapshot({
-          brandId,
-          metricType: "share_of_answer",
-          metricValue: soaValue.toFixed(2),
-          metricDetails: {
-            promptCount: brandPrompts.length,
-            totalChecks,
-            citedChecks,
-          },
-        } as any);
-      }
-    }
-
-    // citation_quality — average totalQualityScore across citations.
-    // getCitationQualities has its own Phase-1 fallback (Wave D), so this
-    // always returns something when there are cited rankings.
-    const citations = await this.getCitationQualities(brandId);
-    if (citations.length > 0) {
-      const avgQuality =
-        citations.reduce((sum, c) => sum + c.totalQualityScore, 0) / citations.length;
-      await this.createMetricsSnapshot({
-        brandId,
-        metricType: "citation_quality",
-        metricValue: avgQuality.toFixed(2),
-        metricDetails: { citationCount: citations.length },
-      } as any);
-    }
-
-    // hallucinations — always write a row (even 0 unresolved is useful for
-    // trend tracking).
-    const hallucinations = await this.getBrandHallucinations(brandId);
-    const unresolvedCount = hallucinations.filter(
-      (h: BrandHallucination) => h.isResolved === 0,
-    ).length;
-    await this.createMetricsSnapshot({
-      brandId,
-      metricType: "hallucinations",
-      metricValue: unresolvedCount.toString(),
-      metricDetails: { total: hallucinations.length, unresolved: unresolvedCount },
-    } as any);
   }
 
   async createAlertSetting(setting: InsertAlertSettings): Promise<AlertSettings> {

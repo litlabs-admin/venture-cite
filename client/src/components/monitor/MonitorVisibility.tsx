@@ -56,15 +56,14 @@ export default function MonitorVisibility() {
       }
     | undefined;
 
-  // ByEngineSection's PlatformRow uses `avgRank` while the dashboard
-  // PlatformRanking shape uses `rank`. Cast through unknown — ByEngineSection
-  // only reads citedCount/totalCount/latestSnippet so the field-name gap is
-  // harmless for current rendering.
+  // ByEngineSection's PlatformRow matches the dashboard PlatformRanking
+  // shape (`rank`, `citedCount`, `totalCount`, `latestSnippet`). Cast through
+  // unknown to narrow to the subset ByEngineSection consumes.
   const platforms = (v.rankings.data?.data?.platforms ?? []) as unknown as {
     aiPlatform: string;
     citedCount: number;
     totalCount: number;
-    avgRank: number | null;
+    rank: number | null;
     latestSnippet?: string | null;
   }[];
   const trendWeeks = v.trend.data?.data?.weeks ?? [];

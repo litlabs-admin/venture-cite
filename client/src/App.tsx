@@ -48,15 +48,32 @@ const Report = lazy(() => import("@/pages/report"));
 
 /**
  * 301s a retired feature path into its workflow-spine home, preserving every
- * existing query param (brandId, action, autoScrape, …) and adding `?tab=`.
- * The spine target is itself auth-gated, so unauthenticated hits still bounce
- * to /login. `replace` keeps the old URL out of history so Back doesn't loop.
+ * existing query param (brandId, action, autoScrape, …) and adding `?tab=`
+ * (or any other params supplied via `params`). The spine target is itself
+ * auth-gated, so unauthenticated hits still bounce to /login. `replace` keeps
+ * the old URL out of history so Back doesn't loop.
  */
-function SpineRedirect({ to, tab }: { to: string; tab: string }) {
+function SpineRedirect({
+  to,
+  tab,
+  params: extraParams,
+}: {
+  to: string;
+  tab?: string;
+  params?: Record<string, string>;
+}) {
   const search = useSearch();
   const params = new URLSearchParams(search);
-  params.set("tab", tab);
-  return <Redirect to={`${to}?${params.toString()}`} replace />;
+  if (tab !== undefined) {
+    params.set("tab", tab);
+  }
+  if (extraParams) {
+    for (const [key, value] of Object.entries(extraParams)) {
+      params.set(key, value);
+    }
+  }
+  const qs = params.toString();
+  return <Redirect to={qs ? `${to}?${qs}` : to} replace />;
 }
 
 function HomePage() {
@@ -178,16 +195,16 @@ function Router() {
       <Route path="/citations">{() => <SpineRedirect to="/monitor" tab="citations" />}</Route>
       <Route path="/geo-analytics">{() => <SpineRedirect to="/monitor" tab="overview" />}</Route>
       <Route path="/competitors">
-        <Redirect to="/monitor?focus=competitors" />
+        {() => <SpineRedirect to="/monitor" params={{ focus: "competitors" }} />}
       </Route>
       <Route path="/ai-intelligence">
         {() => <SpineRedirect to="/monitor" tab="share-of-answer" />}
       </Route>
       <Route path="/geo-signals">
-        <Redirect to="/diagnose?type=weak_signal" />
+        {() => <SpineRedirect to="/diagnose" params={{ type: "weak_signal" }} />}
       </Route>
       <Route path="/crawler-check">
-        <Redirect to="/diagnose?type=crawler_block" />
+        {() => <SpineRedirect to="/diagnose" params={{ type: "crawler_block" }} />}
       </Route>
       <Route path="/opportunities">{() => <SpineRedirect to="/diagnose" tab="issues" />}</Route>
       <Route path="/geo-tools">{() => <SpineRedirect to="/diagnose" tab="coverage" />}</Route>

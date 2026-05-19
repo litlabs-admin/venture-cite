@@ -5,7 +5,7 @@
 // byte-identically.
 
 import type { Issue } from "@shared/diagnoseTypes";
-import type { BrandHallucination } from "@shared/schema";
+import type { BrandHallucination, Listicle, WikipediaMention, GeoSignalRun } from "@shared/schema";
 import HallucinationDetail from "@/components/intelligence/HallucinationDetail";
 import ListicleGapInspector from "./inspectors/ListicleGapInspector";
 import WikipediaGapInspector from "./inspectors/WikipediaGapInspector";
@@ -26,18 +26,16 @@ export default function IssueDetailSheet({ issue }: { issue: Issue }) {
         } as BrandHallucination);
       return <HallucinationDetail hal={hal} />;
     }
-    case "listicle_gap":
-      return (
-        <ListicleGapInspector
-          listicleId={String((issue.metadata as Record<string, unknown>).listicleId)}
-        />
-      );
-    case "wikipedia_gap":
-      return (
-        <WikipediaGapInspector
-          mentionId={String((issue.metadata as Record<string, unknown>).mentionId)}
-        />
-      );
+    case "listicle_gap": {
+      // Server aggregator puts the full row in metadata.listicle — the
+      // legacy `/api/listicles/single/:id` endpoint doesn't exist.
+      const meta = (issue.metadata as Record<string, unknown>) ?? {};
+      return <ListicleGapInspector listicle={meta.listicle as Listicle} />;
+    }
+    case "wikipedia_gap": {
+      const meta = (issue.metadata as Record<string, unknown>) ?? {};
+      return <WikipediaGapInspector mention={meta.mention as WikipediaMention} />;
+    }
     case "crawler_block": {
       const meta = issue.metadata as Record<string, unknown>;
       return (
@@ -48,12 +46,10 @@ export default function IssueDetailSheet({ issue }: { issue: Issue }) {
         />
       );
     }
-    case "weak_signal":
-      return (
-        <WeakSignalInspector
-          signalRunId={String((issue.metadata as Record<string, unknown>).signalRunId)}
-        />
-      );
+    case "weak_signal": {
+      const meta = (issue.metadata as Record<string, unknown>) ?? {};
+      return <WeakSignalInspector run={meta.run as GeoSignalRun} />;
+    }
     case "missing_schema": {
       const meta = issue.metadata as Record<string, unknown>;
       return (

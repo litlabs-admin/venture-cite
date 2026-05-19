@@ -192,7 +192,7 @@ function AddCompetitorForm({ brandId, onDone }: { brandId: string; onDone: () =>
       toast({ title: "Competitor added" });
       queryClient.invalidateQueries({ queryKey: ["/api/competitors", brandId] });
       queryClient.invalidateQueries({
-        queryKey: ["/api/competitors/leaderboard", brandId],
+        queryKey: [`/api/competitors/leaderboard?brandId=${brandId}`],
       });
       setName("");
       setDomain("");

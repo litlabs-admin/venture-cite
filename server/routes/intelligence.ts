@@ -626,21 +626,6 @@ export function setupIntelligenceRoutes(app: Express): void {
     }),
   );
 
-  app.post(
-    "/api/metrics-history/record/:brandId",
-    asyncHandler(async (req, res) => {
-      try {
-        const user = requireUser(req);
-        const { brandId } = req.params;
-        await requireBrand(brandId, user.id);
-        await storage.recordCurrentMetrics(brandId);
-        res.json({ success: true, message: "Metrics snapshot recorded" });
-      } catch (error) {
-        sendError(res, error, "Failed to record metrics");
-      }
-    }),
-  );
-
   // =====================================================
   // GEO AI Agent Feature Routes
   // =====================================================

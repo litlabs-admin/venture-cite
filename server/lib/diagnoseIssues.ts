@@ -117,7 +117,7 @@ export async function getDiagnoseIssues(brandId: string): Promise<{
       age: createdIso,
       ctaLabel: "Open outreach",
       inspectorKey: "listicle_gap",
-      metadata: { listicleId: l.id },
+      metadata: { listicleId: l.id, listicle: l },
     });
   }
 
@@ -137,7 +137,7 @@ export async function getDiagnoseIssues(brandId: string): Promise<{
       age: createdIso,
       ctaLabel: "Open draft helper",
       inspectorKey: "wikipedia_gap",
-      metadata: { mentionId: w.id },
+      metadata: { mentionId: w.id, mention: w },
     });
   }
 
@@ -162,7 +162,7 @@ export async function getDiagnoseIssues(brandId: string): Promise<{
       age: ranIso,
       ctaLabel: "Review signals",
       inspectorKey: "weak_signal",
-      metadata: { signalRunId: r.id, articleId: r.articleId },
+      metadata: { signalRunId: r.id, articleId: r.articleId, run: r },
     });
   }
 
