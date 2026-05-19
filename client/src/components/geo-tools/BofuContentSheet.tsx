@@ -161,17 +161,22 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="pr-8">{content.title}</SheetTitle>
-          <SheetDescription className="flex items-center gap-2">
-            <Badge variant="outline">{content.contentType}</Badge>
-            <Badge>{content.status ?? "draft"}</Badge>
-            {content.publishedAt && (
-              <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Published</Badge>
-            )}
-            {lastCitedAt && (
-              <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                Cited recently · {lastCitedAt}
-              </Badge>
-            )}
+          {/* asChild → renders as <div>, not <p>: Badge is a <div> and
+              must not nest inside a <p> (invalid DOM). Radix still wires
+              aria-describedby to this element. */}
+          <SheetDescription asChild>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">{content.contentType}</Badge>
+              <Badge>{content.status ?? "draft"}</Badge>
+              {content.publishedAt && (
+                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Published</Badge>
+              )}
+              {lastCitedAt && (
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                  Cited recently · {lastCitedAt}
+                </Badge>
+              )}
+            </div>
           </SheetDescription>
         </SheetHeader>
 

@@ -20,6 +20,7 @@ import { sendError, asyncHandler } from "../lib/routesShared";
 import { z } from "zod";
 import { assertTransition, InvalidStateTransitionError } from "../lib/statusTransitions";
 import { assertSafeUrl } from "../lib/ssrf";
+import { generateCorrection, CorrectionUngroundedError } from "../lib/hallucinationCorrection";
 
 // Slack incoming webhooks have a fixed URL shape:
 // https://hooks.slack.com/services/T<workspace>/B<bot>/<token>
@@ -422,6 +423,72 @@ export function setupIntelligenceRoutes(app: Express): void {
           return res.status(409).json({ success: false, error: error.message });
         }
         sendError(res, error, "Failed to resolve hallucination");
+      }
+    }),
+  );
+
+  // Detect → CORRECT. Generate a fact-grounded remediation plan + a
+  // publish-ready public correction snippet for one hallucination, persist
+  // them (the long-empty remediation_steps field + metadata.correction) and
+  // move remediation to in_progress. Honest by construction: the generator
+  // is constrained to the brand fact sheet + the verified contradicting
+  // fact (server/lib/hallucinationCorrection.ts). Proposal only — nothing
+  // is published; the user reviews it in the inspector.
+  app.post(
+    "/api/hallucinations/:id/draft-correction",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const existing = await requireHallucination(req.params.id, user.id);
+        // Reuse the resolve button's state machine so terminal rows
+        // (dismissed/verified) 409 instead of silently re-opening.
+        assertTransition(
+          "hallucination_remediation",
+          existing.remediationStatus as string | null | undefined,
+          "in_progress",
+        );
+        const facts = await storage.getBrandFacts(existing.brandId);
+        const correction = await generateCorrection({
+          claimedStatement: existing.claimedStatement,
+          actualFact: existing.actualFact ?? "",
+          category: existing.category,
+          facts,
+        });
+        const prevMeta =
+          existing.metadata && typeof existing.metadata === "object"
+            ? (existing.metadata as Record<string, unknown>)
+            : {};
+        const updated = await storage.updateBrandHallucination(req.params.id, {
+          remediationSteps: correction.remediationSteps,
+          remediationStatus: "in_progress",
+          metadata: {
+            ...prevMeta,
+            correction: {
+              publicSnippet: correction.publicSnippet,
+              factsUsed: correction.factsUsed,
+              generatedAt: new Date().toISOString(),
+            },
+          },
+        } as any);
+        if (!updated)
+          return res.status(404).json({ success: false, error: "Hallucination not found" });
+        res.json({
+          success: true,
+          data: {
+            remediationSteps: correction.remediationSteps,
+            publicSnippet: correction.publicSnippet,
+            factsUsed: correction.factsUsed,
+            remediationStatus: updated.remediationStatus,
+          },
+        });
+      } catch (error) {
+        if (error instanceof InvalidStateTransitionError) {
+          return res.status(409).json({ success: false, error: error.message });
+        }
+        if (error instanceof CorrectionUngroundedError) {
+          return res.status(422).json({ success: false, error: error.message });
+        }
+        sendError(res, error, "Failed to draft correction");
       }
     }),
   );

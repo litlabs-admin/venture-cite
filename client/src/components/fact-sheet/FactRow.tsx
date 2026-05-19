@@ -1,10 +1,74 @@
 // client/src/components/fact-sheet/FactRow.tsx
-import { Edit2, Trash2 } from "lucide-react";
+import { Edit2, Trash2, PanelRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { iconForDomain, type Domain } from "./domainIcons";
 import { formatRelativeTime, daysSince } from "@/lib/formatRelativeTime";
+import { useInspector } from "@/components/AppShell";
+
+const SOURCE_MEANING: Record<ResolvedFact["source"], string> = {
+  scraped: "Auto-extracted by the fact agent from the source below.",
+  user: "Entered by you.",
+  manual: "Added manually.",
+};
+
+// Inspector body: the fact's PROVENANCE. The row shows the value + a source
+// badge, but never the source URL — "did the system actually find this on
+// the brand's site, or invent it?" is the trust question this answers.
+// Only fields the client already holds (ResolvedFact); no synthesized
+// confidence score is shown (it isn't in the client model and its
+// provenance isn't defensible — honest by construction).
+function FactProvenance({ fact }: { fact: ResolvedFact }) {
+  return (
+    <div className="space-y-4 text-sm">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {fact.subcategory} · {fact.factKey}
+        </p>
+        {fact.valueType === "array" ? (
+          <ul className="mt-1 list-disc pl-4 text-foreground">
+            {(fact.valuePayload?.items ?? []).map((it, i) => (
+              <li key={i}>{it}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-1 text-foreground">
+            {fact.valueType === "number"
+              ? (fact.valuePayload?.n ?? fact.factValue)
+              : fact.factValue}
+          </p>
+        )}
+      </div>
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Source
+        </p>
+        <p className="mt-1 text-foreground">{SOURCE_MEANING[fact.source]}</p>
+        {fact.sourceUrl ? (
+          <a
+            href={fact.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-block break-all text-primary hover:underline"
+          >
+            {fact.sourceUrl}
+          </a>
+        ) : (
+          <p className="mt-1 text-xs text-muted-foreground">No source URL recorded.</p>
+        )}
+      </div>
+      <div className="border-t border-border pt-3 text-xs text-muted-foreground">
+        {fact.lastVerified ? (
+          <p>Last verified {formatRelativeTime(fact.lastVerified)}</p>
+        ) : (
+          <p>Not yet re-verified.</p>
+        )}
+        <p className="mt-2">Shown exactly as stored — no inferred or estimated values.</p>
+      </div>
+    </div>
+  );
+}
 
 export type ResolvedFact = {
   id: string;
@@ -37,6 +101,7 @@ export function FactRow({
 }) {
   const Icon = iconForDomain(fact.domain);
   const badge = SOURCE_BADGE[fact.source];
+  const inspector = useInspector();
 
   // Per Spec 2 §4.6: staleness shows on scraped rows ONLY.
   const showStale = fact.source === "scraped";
@@ -97,6 +162,18 @@ export function FactRow({
       </div>
 
       <div className="flex gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() =>
+            inspector.open({ title: fact.factKey, body: <FactProvenance fact={fact} /> })
+          }
+          aria-label="Fact provenance"
+          data-testid={`btn-provenance-${fact.id}`}
+        >
+          <PanelRight className="h-4 w-4" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"

@@ -39,6 +39,7 @@ import {
   Users,
 } from "lucide-react";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { useInspector } from "@/components/AppShell";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
@@ -63,9 +64,53 @@ interface LeaderboardEntry {
   platformBreakdown: Record<string, number>;
 }
 
+// Inspector body: the COMPLETE per-engine citation breakdown for one
+// competitor. The leaderboard row only shows the top 3 engines ("+N more")
+// and the Platform Breakdown card only ranks the top 3 performers per
+// engine, so a mid-pack competitor's full numbers aren't visible anywhere
+// — that gap is what this closes. Measured counts only, no estimates.
+function CompetitorBreakdown({ entry }: { entry: LeaderboardEntry }) {
+  const rows = Object.entries(entry.platformBreakdown).sort((a, b) => b[1] - a[1]);
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-xs text-muted-foreground">{entry.domain}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Total AI citations measured across all tracked prompts:
+        </p>
+        <p className="tnum mt-0.5 text-2xl font-semibold text-foreground">{entry.totalCitations}</p>
+      </div>
+      <div>
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          By AI engine
+        </p>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No per-engine citations recorded yet.</p>
+        ) : (
+          <div>
+            {rows.map(([platform, count]) => (
+              <div
+                key={platform}
+                className="flex items-baseline justify-between gap-3 border-b border-border/60 py-2 last:border-0"
+              >
+                <span className="text-sm text-foreground">{platform}</span>
+                <span className="tnum text-sm font-medium text-foreground">{count}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Every figure is a measured citation count from your tracked prompt runs — no estimates.
+      </p>
+    </div>
+  );
+}
+
 export default function CompetitorsPage() {
   const { toast } = useToast();
   const { selectedBrandId, brands, selectedBrand, isLoading: brandsLoading } = useBrandSelection();
+  const inspector = useInspector();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCompetitor, setEditingCompetitor] = useState<Competitor | null>(null);
   const [editForm, setEditForm] = useState({
@@ -373,9 +418,16 @@ export default function CompetitorsPage() {
                 ) : (
                   <div className="space-y-3">
                     {leaderboard.map((entry, index) => (
-                      <div
+                      <button
+                        type="button"
                         key={`${entry.domain}-${index}`}
-                        className={`flex items-center gap-4 p-4 rounded-lg border ${
+                        onClick={() =>
+                          inspector.open({
+                            title: entry.name,
+                            body: <CompetitorBreakdown entry={entry} />,
+                          })
+                        }
+                        className={`flex w-full items-center gap-4 rounded-lg border p-4 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                           entry.isOwn ? "bg-primary/5 border-primary/20" : "bg-muted/50"
                         }`}
                         data-testid={`leaderboard-entry-${index}`}
@@ -423,7 +475,7 @@ export default function CompetitorsPage() {
                             </Badge>
                           )}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}

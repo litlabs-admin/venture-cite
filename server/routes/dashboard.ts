@@ -545,6 +545,7 @@ export function setupDashboardRoutes(app: Express): void {
           faqItems,
           visibilityRows,
           lastSignalsScanAt,
+          hallucinationStats,
         ] = await Promise.all([
           storage.getArticlesByUserIdWithStatus(user.id, { brandId, limit: 100, offset: 0 }),
           storage.getBrandPromptsByBrandId(brandId),
@@ -554,6 +555,7 @@ export function setupDashboardRoutes(app: Express): void {
           storage.getFaqItems(brandId),
           storage.getVisibilityProgress(brandId),
           storage.getLastGeoSignalRunAt(brandId),
+          storage.getHallucinationStats(brandId),
         ]);
 
         // Citation rate from the most recent COMPLETED run. Null if no runs
@@ -567,6 +569,22 @@ export function setupDashboardRoutes(app: Express): void {
             ? (latestCompletedRun.totalCited ?? 0) / (latestCompletedRun.totalChecks ?? 1)
             : null;
 
+        // Competitors the weekly auto-discovery added recently and not yet
+        // ignored — derived from the already-loaded array (no extra query).
+        const DISCOVERED_RECENT_MS = 14 * 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const autoDiscoveredCompetitorCount = competitors.filter((c) => {
+          const cc = c as {
+            discoveredBy?: string | null;
+            isIgnored?: number | null;
+            createdAt?: Date | string | null;
+          };
+          if (!cc.discoveredBy || cc.discoveredBy === "manual") return false;
+          if (cc.isIgnored === 1) return false;
+          const t = cc.createdAt ? new Date(cc.createdAt).getTime() : NaN;
+          return !Number.isNaN(t) && nowMs - t <= DISCOVERED_RECENT_MS;
+        }).length;
+
         const state: RecommendationState = {
           brand,
           articleCount: articles.length,
@@ -579,6 +597,11 @@ export function setupDashboardRoutes(app: Express): void {
           competitorCount: competitors.length,
           communityPostCount: communityPosts.length,
           faqCount: faqItems.length,
+          unresolvedHallucinationCount: Math.max(
+            0,
+            hallucinationStats.total - hallucinationStats.resolved,
+          ),
+          autoDiscoveredCompetitorCount,
         };
 
         const recommendations = getRecommendations(state);

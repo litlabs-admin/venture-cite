@@ -32,21 +32,30 @@ export const SPINE_STAGES: SpineStage[] = [
     defaultTab: "hallucinations",
     labels: {
       hallucinations: "Hallucinations",
+      coverage: "Coverage",
       signals: "Signals",
       crawler: "Crawler",
       issues: "Issues",
     },
   },
   {
+    // /act is ONE surface. The context-bar title is the CONSTANT
+    // "Production" for every legacy `?tab` value — the old per-tab
+    // titles ("Create"/"Library"/"FAQ"…) were noise that made the
+    // header disagree with the page. The keys are still listed so
+    // Production reads the raw `?tab` for its type pre-filter; only the
+    // label (the title) is unified. geo-assets/off-site are absent —
+    // they 301 cross-stage to /diagnose?tab=coverage (act.tsx).
     path: "/act",
-    defaultTab: "create",
+    defaultTab: "production",
     labels: {
-      create: "Create",
-      library: "Library",
-      keywords: "Keywords",
-      "geo-assets": "GEO Assets",
-      faq: "FAQ",
-      community: "Community",
+      production: "Create content",
+      content: "Create content",
+      create: "Create content",
+      library: "Create content",
+      keywords: "Create content",
+      faq: "Create content",
+      community: "Create content",
     },
   },
   {
@@ -65,8 +74,6 @@ export const SPINE_STAGES: SpineStage[] = [
  *  their `/stage?tab=` twin. */
 export const STANDALONE_TITLES: Record<string, string> = {
   "/content": "Create",
-  "/articles": "Library",
-  "/keyword-research": "Keywords",
   "/brands": "Brands",
 };
 

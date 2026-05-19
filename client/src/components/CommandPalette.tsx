@@ -14,7 +14,7 @@ import {
   Lightbulb,
   PenLine,
   Search,
-  Wrench,
+  Target,
   HelpCircle,
   Users,
   Building2,
@@ -129,6 +129,14 @@ const NAV: NavEntry[] = [
   },
   {
     section: "Diagnose",
+    label: "Coverage",
+    href: "/diagnose?tab=coverage",
+    icon: Target,
+    brandScoped: true,
+    keywords: "listicles wikipedia placements best of missing",
+  },
+  {
+    section: "Diagnose",
     label: "Signals",
     href: "/diagnose?tab=signals",
     icon: Radio,
@@ -175,14 +183,6 @@ const NAV: NavEntry[] = [
     icon: Search,
     brandScoped: true,
     keywords: "research keyword ideas",
-  },
-  {
-    section: "Act",
-    label: "GEO Assets",
-    href: "/act?tab=geo-assets",
-    icon: Wrench,
-    brandScoped: true,
-    keywords: "tools wikipedia bofu",
   },
   {
     section: "Act",

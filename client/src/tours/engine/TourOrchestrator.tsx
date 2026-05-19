@@ -103,6 +103,14 @@ export function TourOrchestrator() {
   const activeRef = useRef<RunningTour | null>(null);
   const bufferRef = useRef<EventBuffer | null>(null);
   const lastBrandRef = useRef<string | null>(null);
+  // Tours that have auto-fired at least once this page session. Dismissing
+  // a tour (Esc / the modal's X) cancels it WITHOUT persisting a skipped/
+  // suppressed record, so shouldAutoFire() would keep returning true and
+  // re-fire it every time the trigger route is revisited (the welcome modal
+  // popping on every return to Command Center). Auto-fire each tour at most
+  // once per session; cross-session onboarding persistence is unchanged
+  // (still governed by tour state), and manual replay bypasses this.
+  const sessionFiredRef = useRef<Set<string>>(new Set());
 
   // Init event buffer once.
   useEffect(() => {
@@ -167,7 +175,9 @@ export function TourOrchestrator() {
     };
 
     for (const tour of Object.values(TOURS)) {
+      if (sessionFiredRef.current.has(tour.id)) continue;
       if (shouldAutoFire(tour, state, ctx, location)) {
+        sessionFiredRef.current.add(tour.id);
         activeRef.current = runTour({
           config: tour,
           ctx,

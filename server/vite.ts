@@ -8,44 +8,49 @@ import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
 
-// Wave 6.1: SPA routes the client router knows about. Anything else is a
-// genuine not-found — we still serve index.html (so the client NotFound page
+// SPA routes the client router knows about. Anything else is a genuine
+// not-found — we still serve index.html (so the client NotFound page
 // renders), but with a 404 status so crawlers don't index garbage URLs.
-// Keep this in sync with client/src/App.tsx `<Route path="…">` declarations.
+// MUST stay in sync with client/src/App.tsx `<Route path="…">` declarations
+// (it had drifted: the workflow-spine routes were missing, so a hard
+// reload of /monitor, /diagnose, /act, /setup, /report 404'd).
 const KNOWN_ROUTES: RegExp[] = [
   /^\/$/,
   /^\/login$/,
   /^\/register$/,
   /^\/forgot-password$/,
   /^\/reset-password$/,
-  /^\/privacy$/,
-  /^\/pricing$/,
-  /^\/article\/[^/]+$/,
+  /^\/verify-email$/,
+  /^\/welcome$/,
   /^\/dashboard$/,
+  // Workflow spine + its standalone twins.
+  /^\/monitor$/,
+  /^\/diagnose$/,
+  /^\/act$/,
+  /^\/setup$/,
+  /^\/report$/,
   /^\/content$/,
-  /^\/citations$/,
+  /^\/content\/[^/]+$/,
   /^\/articles$/,
   /^\/brands$/,
   /^\/keyword-research$/,
-  /^\/ai-visibility$/,
-  /^\/ai-intelligence$/,
-  /^\/geo-rankings$/,
+  // Retired feature paths: still real client routes that 301 client-side
+  // into the spine, so a hard reload must serve the app (200), not 404.
+  /^\/citations$/,
   /^\/geo-analytics$/,
-  /^\/geo-tools$/,
-  /^\/geo-signals$/,
-  /^\/revenue-analytics$/,
-  /^\/publications$/,
   /^\/competitors$/,
+  /^\/ai-intelligence$/,
+  /^\/geo-signals$/,
   /^\/crawler-check$/,
   /^\/opportunities$/,
-  /^\/agent$/,
-  /^\/outreach$/,
-  /^\/ai-traffic$/,
-  /^\/analytics-integrations$/,
+  /^\/geo-tools$/,
   /^\/faq-manager$/,
   /^\/brand-fact-sheet$/,
+  /^\/ai-visibility$/,
   /^\/community$/,
   /^\/settings$/,
+  /^\/privacy$/,
+  /^\/glossary$/,
 ];
 
 function isKnownRoute(pathname: string): boolean {

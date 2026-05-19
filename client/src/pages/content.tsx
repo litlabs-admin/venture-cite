@@ -23,7 +23,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation, useRoute, useSearch } from "wouter";
+import { useLocation, useRoute, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -56,6 +56,8 @@ import KeywordChips from "@/components/content/KeywordChips";
 import { AIGeneratedPill } from "@/components/AIGeneratedPill";
 import IndustryCombobox from "@/components/content/IndustryCombobox";
 import BrandCombobox from "@/components/content/BrandCombobox";
+import ViewEditDialog from "@/components/articles/ViewEditDialog";
+import DistributeDialog from "@/components/articles/DistributeDialog";
 import { apiRequest } from "@/lib/queryClient";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -121,7 +123,8 @@ export default function Content() {
   // Sent by the Keyword Research page when the user clicks "Generate Content"
   // on a row. When present AND we're at bare /content (no article id yet),
   // we create a fresh draft pre-populated with these values instead of
-  // recycling the most recent draft. See keyword-research.tsx → handleGenerateContent.
+  // recycling the most recent draft. The seed link is produced by the
+  // Production KeywordFinder ("Use" a researched keyword).
   const searchString = useSearch();
   const seedParams = useMemo(() => {
     const p = new URLSearchParams(searchString);
@@ -789,21 +792,27 @@ function ReadyEditor({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 flex-wrap min-w-0">
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="truncate">{article.title || "Untitled"}</span>
             {article.aiGenerated && <AIGeneratedPill />}
           </span>
-          <Link href={`/articles?edit=${article.id}`}>
-            <Button variant="outline" size="sm">
-              Open in Articles
-            </Button>
-          </Link>
+          {/* The article toolset, in-context (the orphaned /articles page
+              is retired): ViewEditDialog = View / Edit / Auto-Improve /
+              version history; DistributeDialog = generate per-platform
+              copy + Buffer scheduling (ready articles only). */}
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <ViewEditDialog article={article} />
+            {article.status === "ready" && (
+              <DistributeDialog articleId={article.id} aiGenerated={!!article.aiGenerated} />
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <MarkdownEditor value={content} onChange={onContentChange} />
-        <p className="text-xs text-muted-foreground mt-3">
-          Edits auto-save. Open in Articles for Auto-Improve, version history, and distribution.
+        <p className="mt-3 text-xs text-muted-foreground">
+          Edits auto-save. Use Distribute to generate platform copy and schedule it; View / Edit has
+          Auto-Improve and version history.
         </p>
       </CardContent>
     </Card>

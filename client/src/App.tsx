@@ -24,16 +24,16 @@ import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import VerifyEmail from "@/pages/verify-email";
 
-// Pages still routed directly. The duplicate/secondary feature pages
-// (citations, competitors, ai-intelligence, geo-*, faq-manager, community,
-// brand-fact-sheet, ai-visibility, crawler-check) are no longer imported
-// here — they are reached through the workflow spine and their old paths
-// 301 into it via SpineRedirect below. Their components are still
-// code-split, just lazy-imported by the spine shell pages instead.
+// Pages still routed directly. Secondary feature pages (citations,
+// competitors, ai-intelligence, geo-*, brand-fact-sheet, ai-visibility,
+// crawler-check) are reached through the workflow spine; their old paths
+// 301 into it via SpineRedirect below. faq-manager / community-engagement
+// / keyword-research / articles were RETIRED in the /act rework — their
+// capability folded into the Production surface (FaqPanel /
+// CommunityPanel / KeywordFinder) and the article editor (ViewEditDialog
+// + DistributeDialog in content.tsx), so their old paths now 301 to /act.
 const Content = lazy(() => import("@/pages/content"));
-const Articles = lazy(() => import("@/pages/articles"));
 const Brands = lazy(() => import("@/pages/brands"));
-const KeywordResearch = lazy(() => import("@/pages/keyword-research"));
 const Settings = lazy(() => import("@/pages/settings"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Welcome = lazy(() => import("@/pages/welcome"));
@@ -170,11 +170,9 @@ function Router() {
       <Route path="/report">{() => <AuthenticatedRoute component={Report} />}</Route>
       <Route path="/content">{() => <AuthenticatedRoute component={Content} />}</Route>
       <Route path="/content/:articleId">{() => <AuthenticatedRoute component={Content} />}</Route>
-      <Route path="/articles">{() => <AuthenticatedRoute component={Articles} />}</Route>
+      <Route path="/articles">{() => <SpineRedirect to="/act" tab="library" />}</Route>
       <Route path="/brands">{() => <AuthenticatedRoute component={Brands} />}</Route>
-      <Route path="/keyword-research">
-        {() => <AuthenticatedRoute component={KeywordResearch} />}
-      </Route>
+      <Route path="/keyword-research">{() => <SpineRedirect to="/act" tab="keywords" />}</Route>
       {/* Retired feature paths → workflow spine (query-preserving 301s).
           Old links, bookmarks, emails, and recommendation CTAs keep working. */}
       <Route path="/citations">{() => <SpineRedirect to="/monitor" tab="citations" />}</Route>
@@ -186,7 +184,7 @@ function Router() {
       <Route path="/geo-signals">{() => <SpineRedirect to="/diagnose" tab="signals" />}</Route>
       <Route path="/crawler-check">{() => <SpineRedirect to="/diagnose" tab="crawler" />}</Route>
       <Route path="/opportunities">{() => <SpineRedirect to="/diagnose" tab="issues" />}</Route>
-      <Route path="/geo-tools">{() => <SpineRedirect to="/act" tab="geo-assets" />}</Route>
+      <Route path="/geo-tools">{() => <SpineRedirect to="/diagnose" tab="coverage" />}</Route>
       <Route path="/faq-manager">{() => <SpineRedirect to="/act" tab="faq" />}</Route>
       <Route path="/community">{() => <SpineRedirect to="/act" tab="community" />}</Route>
       <Route path="/brand-fact-sheet">{() => <SpineRedirect to="/setup" tab="fact-sheet" />}</Route>
