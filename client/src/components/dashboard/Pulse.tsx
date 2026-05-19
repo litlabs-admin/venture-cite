@@ -18,7 +18,7 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 //   3. Open hallucinations (/api/hallucinations/stats/:id)  — standing accuracy debt
 //
 // Replaces RecommendationsPanel on `/`. RecommendationsPanel itself stays the
-// deep view at /diagnose, so this only changes what home renders.
+// deep view at /diagnose?tab=issues, so this only changes what home renders.
 
 // Mirrors RecommendationsPanel's localStorage contract ON PURPOSE: a rec
 // dismissed in either surface stays dismissed in both. Keep these two values
@@ -49,6 +49,12 @@ type AlertRow = {
   details: Record<string, unknown> | null;
   sentAt: string;
 };
+type HallucinationStats = {
+  total: number;
+  resolved: number;
+  bySeverity: Record<string, number>;
+  byType: Record<string, number>;
+};
 
 // One normalised row. `rank` orders the list (0 = most urgent). `marker` is
 // the only colour on the row — a small dot, severity not decoration.
@@ -66,9 +72,9 @@ type PulseItem = {
 };
 
 const ACTIONABLE_ALERTS: Record<string, { href: string; cta: string }> = {
-  visibility_drop: { href: "/monitor", cta: "Review visibility" },
+  visibility_drop: { href: "/monitor?tab=citations", cta: "Review citations" },
   prompts_lost: { href: "/act?tab=create", cta: "Generate content for gaps" },
-  new_hallucinations: { href: "/diagnose?type=hallucination", cta: "Review hallucinations" },
+  new_hallucinations: { href: "/diagnose?tab=hallucinations", cta: "Review hallucinations" },
 };
 
 /** Append the active brand to a deep-link when it doesn't already carry one,
@@ -135,6 +141,11 @@ export default function Pulse() {
     enabled,
     staleTime: 60_000,
   });
+  const hallucQ = useQuery<{ success: boolean; data: HallucinationStats }>({
+    queryKey: [`/api/hallucinations/stats/${selectedBrandId}`],
+    enabled,
+    staleTime: 60_000,
+  });
 
   const items = useMemo<PulseItem[]>(() => {
     if (!selectedBrandId) return [];
@@ -144,6 +155,7 @@ export default function Pulse() {
     // type (newest, since the API returns sentAt-desc).
     const recentCutoff = Date.now() - ALERT_RECENT_DAYS * MS_PER_DAY;
     const seenAlertTypes = new Set<string>();
+    let hasFreshHallucAlert = false;
     for (const a of alertsQ.data?.data ?? []) {
       const map = ACTIONABLE_ALERTS[a.alertType];
       if (!map) continue;
@@ -151,6 +163,7 @@ export default function Pulse() {
       if (Number.isNaN(ts) || ts < recentCutoff) continue;
       if (seenAlertTypes.has(a.alertType)) continue;
       seenAlertTypes.add(a.alertType);
+      if (a.alertType === "new_hallucinations") hasFreshHallucAlert = true;
       const d = a.details ?? {};
       const href = typeof d.nextHref === "string" ? d.nextHref : map.href;
       const cta = typeof d.nextLabel === "string" ? d.nextLabel : map.cta;
@@ -185,11 +198,37 @@ export default function Pulse() {
       });
     }
 
+    // 3 — Standing open hallucinations. Skipped when a fresh
+    // new_hallucinations alert already says the same thing more urgently.
+    const stats = hallucQ.data?.data;
+    if (stats && !hasFreshHallucAlert) {
+      const open = Math.max(0, stats.total - stats.resolved);
+      if (open > 0) {
+        out.push({
+          key: "halluc:open",
+          dismissKey: "halluc:open",
+          rank: 2,
+          marker: "fail",
+          kind: "Accuracy",
+          title: (
+            <>
+              <span className="tnum">{open}</span> unresolved hallucination
+              {open === 1 ? "" : "s"}
+            </>
+          ),
+          why: "AI engines are stating things your fact sheet contradicts.",
+          href: withBrand("/diagnose?tab=hallucinations", selectedBrandId),
+          cta: "Review hallucinations",
+          emphasised: false,
+        });
+      }
+    }
+
     return out
       .map((it, i) => ({ it, i }))
       .sort((a, b) => a.it.rank - b.it.rank || a.i - b.i)
       .map(({ it }) => it);
-  }, [selectedBrandId, alertsQ.data, recsQ.data]);
+  }, [selectedBrandId, alertsQ.data, recsQ.data, hallucQ.data]);
 
   const visible = useMemo(
     () => items.filter((it) => !isDismissed(it.dismissKey, dismissed)),

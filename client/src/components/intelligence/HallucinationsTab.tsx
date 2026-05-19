@@ -18,14 +18,11 @@ import {
   Plus,
   ExternalLink,
   Info,
-  PanelRight,
 } from "lucide-react";
 import type { BrandHallucination, BrandFactSheet } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useInspector } from "@/components/AppShell";
 import { Link } from "wouter";
-import HallucinationDetail from "./HallucinationDetail";
 
 const SEVERITY_RANK: Record<string, number> = {
   critical: 0,
@@ -36,7 +33,6 @@ const SEVERITY_RANK: Record<string, number> = {
 
 export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId: string }) {
   const { toast } = useToast();
-  const inspector = useInspector();
   const [severityFilter, setSeverityFilter] = useState<string>("all");
 
   const { data: hallucinationStats } = useQuery<{ success: boolean; data: any }>({
@@ -271,49 +267,31 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              inspector.open({
-                                title: `${hal.hallucinationType} on ${hal.aiPlatform}`,
-                                body: <HallucinationDetail hal={hal} />,
-                              })
-                            }
-                            data-testid={`button-details-${hal.id}`}
-                          >
-                            <PanelRight className="w-4 h-4 mr-1" />
-                            Details
-                          </Button>
-                          {hal.isResolved === 1 ? (
-                            <Badge className="bg-green-100 text-green-800">Resolved</Badge>
-                          ) : (
-                            (() => {
-                              // Only "pending" / "in_progress" hallucinations
-                              // can transition to resolved (server enforces
-                              // via assertTransition; the button used to
-                              // stay enabled for "verified"/"dismissed" too,
-                              // producing a confusing 409 toast).
-                              const actionable =
-                                !remStatus ||
-                                remStatus === "pending" ||
-                                remStatus === "in_progress";
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => resolveHallucinationMutation.mutate(hal.id)}
-                                  disabled={!actionable || resolveHallucinationMutation.isPending}
-                                  data-testid={`button-resolve-${hal.id}`}
-                                >
-                                  <CheckCircle className="w-4 h-4 mr-1" />
-                                  Mark Resolved
-                                </Button>
-                              );
-                            })()
-                          )}
-                        </div>
+                        {hal.isResolved === 1 ? (
+                          <Badge className="bg-green-100 text-green-800">Resolved</Badge>
+                        ) : (
+                          (() => {
+                            // Only "pending" / "in_progress" hallucinations
+                            // can transition to resolved (server enforces
+                            // via assertTransition; the button used to
+                            // stay enabled for "verified"/"dismissed" too,
+                            // producing a confusing 409 toast).
+                            const actionable =
+                              !remStatus || remStatus === "pending" || remStatus === "in_progress";
+                            return (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => resolveHallucinationMutation.mutate(hal.id)}
+                                disabled={!actionable || resolveHallucinationMutation.isPending}
+                                data-testid={`button-resolve-${hal.id}`}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Mark Resolved
+                              </Button>
+                            );
+                          })()
+                        )}
                       </div>
 
                       <div className="mt-3 space-y-2">

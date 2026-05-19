@@ -20,42 +20,33 @@ export const SPINE_STAGES: SpineStage[] = [
     path: "/monitor",
     defaultTab: "overview",
     labels: {
-      overview: "Visibility",
-      citations: "Visibility",
-      competitors: "Visibility",
-      trends: "Visibility",
-      mentions: "Visibility",
+      overview: "Overview",
+      citations: "Citations",
+      competitors: "Competitors",
+      trends: "Trends",
+      mentions: "Mentions",
     },
   },
   {
     path: "/diagnose",
     defaultTab: "hallucinations",
     labels: {
-      hallucinations: "Issues",
-      coverage: "Issues",
-      signals: "Issues",
-      crawler: "Issues",
+      hallucinations: "Hallucinations",
+      signals: "Signals",
+      crawler: "Crawler",
       issues: "Issues",
     },
   },
   {
-    // /act is ONE surface. The context-bar title is the CONSTANT
-    // "Production" for every legacy `?tab` value — the old per-tab
-    // titles ("Create"/"Library"/"FAQ"…) were noise that made the
-    // header disagree with the page. The keys are still listed so
-    // Production reads the raw `?tab` for its type pre-filter; only the
-    // label (the title) is unified. geo-assets/off-site are absent —
-    // they 301 cross-stage to /diagnose?tab=coverage (act.tsx).
     path: "/act",
-    defaultTab: "production",
+    defaultTab: "create",
     labels: {
-      production: "Create content",
-      content: "Create content",
-      create: "Create content",
-      library: "Create content",
-      keywords: "Create content",
-      faq: "Create content",
-      community: "Create content",
+      create: "Create",
+      library: "Library",
+      keywords: "Keywords",
+      "geo-assets": "GEO Assets",
+      faq: "FAQ",
+      community: "Community",
     },
   },
   {
@@ -74,6 +65,8 @@ export const SPINE_STAGES: SpineStage[] = [
  *  their `/stage?tab=` twin. */
 export const STANDALONE_TITLES: Record<string, string> = {
   "/content": "Create",
+  "/articles": "Library",
+  "/keyword-research": "Keywords",
   "/brands": "Brands",
 };
 

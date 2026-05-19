@@ -24,16 +24,16 @@ import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import VerifyEmail from "@/pages/verify-email";
 
-// Pages still routed directly. Secondary feature pages (citations,
-// competitors, ai-intelligence, geo-*, brand-fact-sheet, ai-visibility,
-// crawler-check) are reached through the workflow spine; their old paths
-// 301 into it via SpineRedirect below. faq-manager / community-engagement
-// / keyword-research / articles were RETIRED in the /act rework — their
-// capability folded into the Production surface (FaqPanel /
-// CommunityPanel / KeywordFinder) and the article editor (ViewEditDialog
-// + DistributeDialog in content.tsx), so their old paths now 301 to /act.
+// Pages still routed directly. The duplicate/secondary feature pages
+// (citations, competitors, ai-intelligence, geo-*, faq-manager, community,
+// brand-fact-sheet, ai-visibility, crawler-check) are no longer imported
+// here — they are reached through the workflow spine and their old paths
+// 301 into it via SpineRedirect below. Their components are still
+// code-split, just lazy-imported by the spine shell pages instead.
 const Content = lazy(() => import("@/pages/content"));
+const Articles = lazy(() => import("@/pages/articles"));
 const Brands = lazy(() => import("@/pages/brands"));
+const KeywordResearch = lazy(() => import("@/pages/keyword-research"));
 const Settings = lazy(() => import("@/pages/settings"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Welcome = lazy(() => import("@/pages/welcome"));
@@ -48,32 +48,15 @@ const Report = lazy(() => import("@/pages/report"));
 
 /**
  * 301s a retired feature path into its workflow-spine home, preserving every
- * existing query param (brandId, action, autoScrape, …) and adding `?tab=`
- * (or any other params supplied via `params`). The spine target is itself
- * auth-gated, so unauthenticated hits still bounce to /login. `replace` keeps
- * the old URL out of history so Back doesn't loop.
+ * existing query param (brandId, action, autoScrape, …) and adding `?tab=`.
+ * The spine target is itself auth-gated, so unauthenticated hits still bounce
+ * to /login. `replace` keeps the old URL out of history so Back doesn't loop.
  */
-function SpineRedirect({
-  to,
-  tab,
-  params: extraParams,
-}: {
-  to: string;
-  tab?: string;
-  params?: Record<string, string>;
-}) {
+function SpineRedirect({ to, tab }: { to: string; tab: string }) {
   const search = useSearch();
   const params = new URLSearchParams(search);
-  if (tab !== undefined) {
-    params.set("tab", tab);
-  }
-  if (extraParams) {
-    for (const [key, value] of Object.entries(extraParams)) {
-      params.set(key, value);
-    }
-  }
-  const qs = params.toString();
-  return <Redirect to={qs ? `${to}?${qs}` : to} replace />;
+  params.set("tab", tab);
+  return <Redirect to={`${to}?${params.toString()}`} replace />;
 }
 
 function HomePage() {
@@ -187,27 +170,23 @@ function Router() {
       <Route path="/report">{() => <AuthenticatedRoute component={Report} />}</Route>
       <Route path="/content">{() => <AuthenticatedRoute component={Content} />}</Route>
       <Route path="/content/:articleId">{() => <AuthenticatedRoute component={Content} />}</Route>
-      <Route path="/articles">{() => <SpineRedirect to="/act" tab="library" />}</Route>
+      <Route path="/articles">{() => <AuthenticatedRoute component={Articles} />}</Route>
       <Route path="/brands">{() => <AuthenticatedRoute component={Brands} />}</Route>
-      <Route path="/keyword-research">{() => <SpineRedirect to="/act" tab="keywords" />}</Route>
+      <Route path="/keyword-research">
+        {() => <AuthenticatedRoute component={KeywordResearch} />}
+      </Route>
       {/* Retired feature paths → workflow spine (query-preserving 301s).
           Old links, bookmarks, emails, and recommendation CTAs keep working. */}
       <Route path="/citations">{() => <SpineRedirect to="/monitor" tab="citations" />}</Route>
       <Route path="/geo-analytics">{() => <SpineRedirect to="/monitor" tab="overview" />}</Route>
-      <Route path="/competitors">
-        {() => <SpineRedirect to="/monitor" params={{ focus: "competitors" }} />}
-      </Route>
+      <Route path="/competitors">{() => <SpineRedirect to="/monitor" tab="competitors" />}</Route>
       <Route path="/ai-intelligence">
         {() => <SpineRedirect to="/monitor" tab="share-of-answer" />}
       </Route>
-      <Route path="/geo-signals">
-        {() => <SpineRedirect to="/diagnose" params={{ type: "weak_signal" }} />}
-      </Route>
-      <Route path="/crawler-check">
-        {() => <SpineRedirect to="/diagnose" params={{ type: "crawler_block" }} />}
-      </Route>
+      <Route path="/geo-signals">{() => <SpineRedirect to="/diagnose" tab="signals" />}</Route>
+      <Route path="/crawler-check">{() => <SpineRedirect to="/diagnose" tab="crawler" />}</Route>
       <Route path="/opportunities">{() => <SpineRedirect to="/diagnose" tab="issues" />}</Route>
-      <Route path="/geo-tools">{() => <SpineRedirect to="/diagnose" tab="coverage" />}</Route>
+      <Route path="/geo-tools">{() => <SpineRedirect to="/act" tab="geo-assets" />}</Route>
       <Route path="/faq-manager">{() => <SpineRedirect to="/act" tab="faq" />}</Route>
       <Route path="/community">{() => <SpineRedirect to="/act" tab="community" />}</Route>
       <Route path="/brand-fact-sheet">{() => <SpineRedirect to="/setup" tab="fact-sheet" />}</Route>

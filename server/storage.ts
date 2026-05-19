@@ -306,7 +306,6 @@ export interface IStorage {
     opts?: { since?: Date },
   ): Promise<
     {
-      id: string;
       name: string;
       domain: string;
       isOwn: boolean;
@@ -591,6 +590,7 @@ export interface IStorage {
   // Metrics History methods
   createMetricsSnapshot(snapshot: InsertMetricsHistory): Promise<MetricsHistory>;
   getMetricsHistory(brandId: string, metricType?: string, days?: number): Promise<MetricsHistory[]>;
+  recordCurrentMetrics(brandId: string): Promise<void>;
 
   // Alert Settings methods
   createAlertSetting(setting: InsertAlertSettings): Promise<AlertSettings>;

@@ -20,8 +20,6 @@ function state(overrides: Partial<RecommendationState> = {}): RecommendationStat
     competitorCount: 0,
     communityPostCount: 0,
     faqCount: 0,
-    unresolvedHallucinationCount: 0,
-    autoDiscoveredCompetitorCount: 0,
     ...overrides,
   };
 }
@@ -109,91 +107,6 @@ describe("getRecommendations", () => {
       // No P0 should appear after the first P1.
       expect(priorities.slice(firstP1Index).every((p) => p !== "P0")).toBe(true);
     }
-  });
-
-  it("unresolved hallucinations surface a dismissible P1 'correct-hallucinations' deep-linking to Diagnose", () => {
-    const recs = getRecommendations(
-      state({
-        brand: { id: "b-1", industry: "B2B SaaS" } as any,
-        articleCount: 5,
-        promptCount: 3,
-        citationRunCount: 2,
-        citationRate: 0.5, // healthy → no other P1 citation recs
-        faqCount: 5,
-        lastSignalsScanAt: new Date(),
-        visibilityChecklistCompleted: 4,
-        visibilityChecklistTotal: 4,
-        unresolvedHallucinationCount: 3,
-      }),
-    );
-    const hit = recs.find((r) => r.id === "correct-hallucinations");
-    expect(hit).toBeDefined();
-    expect(hit!.priority).toBe("P1");
-    expect(hit!.dismissible).toBe(true);
-    expect(hit!.title).toContain("3");
-    expect(hit!.ctaHref).toBe("/diagnose?type=hallucination&brandId=b-1");
-  });
-
-  it("zero unresolved hallucinations → no 'correct-hallucinations' rec", () => {
-    const recs = getRecommendations(
-      state({
-        brand: { id: "b-1", industry: "B2B SaaS" } as any,
-        articleCount: 5,
-        promptCount: 3,
-        citationRunCount: 2,
-        citationRate: 0.5,
-        faqCount: 5,
-        lastSignalsScanAt: new Date(),
-        visibilityChecklistCompleted: 4,
-        visibilityChecklistTotal: 4,
-        unresolvedHallucinationCount: 0,
-      }),
-    );
-    expect(recs.some((r) => r.id === "correct-hallucinations")).toBe(false);
-  });
-
-  it("auto-discovered competitors surface a dismissible P2 'review-discovered-competitors' deep-linking to Monitor", () => {
-    const recs = getRecommendations(
-      state({
-        brand: { id: "b-1", industry: "B2B SaaS" } as any,
-        articleCount: 10,
-        promptCount: 5,
-        citationRunCount: 3,
-        citationRate: 0.5,
-        faqCount: 5,
-        lastSignalsScanAt: new Date(),
-        visibilityChecklistCompleted: 4,
-        visibilityChecklistTotal: 4,
-        competitorCount: 4, // already tracking some → "add-competitors" won't fire
-        autoDiscoveredCompetitorCount: 2,
-      }),
-    );
-    const hit = recs.find((r) => r.id === "review-discovered-competitors");
-    expect(hit).toBeDefined();
-    expect(hit!.priority).toBe("P2");
-    expect(hit!.category).toBe("growth");
-    expect(hit!.dismissible).toBe(true);
-    expect(hit!.title).toContain("2");
-    expect(hit!.ctaHref).toBe("/monitor?brandId=b-1");
-  });
-
-  it("zero auto-discovered competitors → no 'review-discovered-competitors' rec", () => {
-    const recs = getRecommendations(
-      state({
-        brand: { id: "b-1", industry: "B2B SaaS" } as any,
-        articleCount: 10,
-        promptCount: 5,
-        citationRunCount: 3,
-        citationRate: 0.5,
-        faqCount: 5,
-        lastSignalsScanAt: new Date(),
-        visibilityChecklistCompleted: 4,
-        visibilityChecklistTotal: 4,
-        competitorCount: 4,
-        autoDiscoveredCompetitorCount: 0,
-      }),
-    );
-    expect(recs.some((r) => r.id === "review-discovered-competitors")).toBe(false);
   });
 
   it("each recommendation includes a deep-link CTA href", () => {

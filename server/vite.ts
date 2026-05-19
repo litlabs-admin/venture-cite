@@ -8,49 +8,44 @@ import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
 
-// SPA routes the client router knows about. Anything else is a genuine
-// not-found — we still serve index.html (so the client NotFound page
+// Wave 6.1: SPA routes the client router knows about. Anything else is a
+// genuine not-found — we still serve index.html (so the client NotFound page
 // renders), but with a 404 status so crawlers don't index garbage URLs.
-// MUST stay in sync with client/src/App.tsx `<Route path="…">` declarations
-// (it had drifted: the workflow-spine routes were missing, so a hard
-// reload of /monitor, /diagnose, /act, /setup, /report 404'd).
+// Keep this in sync with client/src/App.tsx `<Route path="…">` declarations.
 const KNOWN_ROUTES: RegExp[] = [
   /^\/$/,
   /^\/login$/,
   /^\/register$/,
   /^\/forgot-password$/,
   /^\/reset-password$/,
-  /^\/verify-email$/,
-  /^\/welcome$/,
+  /^\/privacy$/,
+  /^\/pricing$/,
+  /^\/article\/[^/]+$/,
   /^\/dashboard$/,
-  // Workflow spine + its standalone twins.
-  /^\/monitor$/,
-  /^\/diagnose$/,
-  /^\/act$/,
-  /^\/setup$/,
-  /^\/report$/,
   /^\/content$/,
-  /^\/content\/[^/]+$/,
+  /^\/citations$/,
   /^\/articles$/,
   /^\/brands$/,
   /^\/keyword-research$/,
-  // Retired feature paths: still real client routes that 301 client-side
-  // into the spine, so a hard reload must serve the app (200), not 404.
-  /^\/citations$/,
-  /^\/geo-analytics$/,
-  /^\/competitors$/,
+  /^\/ai-visibility$/,
   /^\/ai-intelligence$/,
+  /^\/geo-rankings$/,
+  /^\/geo-analytics$/,
+  /^\/geo-tools$/,
   /^\/geo-signals$/,
+  /^\/revenue-analytics$/,
+  /^\/publications$/,
+  /^\/competitors$/,
   /^\/crawler-check$/,
   /^\/opportunities$/,
-  /^\/geo-tools$/,
+  /^\/agent$/,
+  /^\/outreach$/,
+  /^\/ai-traffic$/,
+  /^\/analytics-integrations$/,
   /^\/faq-manager$/,
   /^\/brand-fact-sheet$/,
-  /^\/ai-visibility$/,
   /^\/community$/,
   /^\/settings$/,
-  /^\/privacy$/,
-  /^\/glossary$/,
 ];
 
 function isKnownRoute(pathname: string): boolean {

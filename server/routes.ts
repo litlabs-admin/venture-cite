@@ -73,7 +73,6 @@ import { setupDashboardRoutes } from "./routes/dashboard";
 import { setupContentTypesRoutes } from "./routes/contentTypes";
 import { setupIntelligenceRoutes } from "./routes/intelligence";
 import { setupGeoSignalsRoutes } from "./routes/geoSignals";
-import { setupDiagnoseRoutes } from "./routes/diagnose";
 import { setupCommunityRoutes } from "./routes/community";
 import { setupCronRoutes } from "./routes/cron";
 import { setupAssistantRoutes } from "./routes/assistant";
@@ -582,7 +581,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupContentTypesRoutes(app);
   setupIntelligenceRoutes(app);
   setupGeoSignalsRoutes(app);
-  setupDiagnoseRoutes(app);
   setupCommunityRoutes(app);
   setupAssistantRoutes(app);
   setupFactSheetRoutes(app);

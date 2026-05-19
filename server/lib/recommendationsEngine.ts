@@ -35,14 +35,6 @@ export type RecommendationState = {
   competitorCount: number;
   communityPostCount: number;
   faqCount: number;
-  /** Unresolved hallucinations (detected total − resolved). Drives the
-   *  "correct hallucinations" action that deep-links into the Diagnose
-   *  inspector where a grounded correction is drafted. */
-  unresolvedHallucinationCount: number;
-  /** Competitors the weekly auto-discovery added recently and not yet
-   *  ignored. Makes that automation legible: it surfaces "review what I
-   *  added" instead of silently mutating the tracked set. */
-  autoDiscoveredCompetitorCount: number;
 };
 
 const SIGNALS_STALE_DAYS = 14;
@@ -113,7 +105,7 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
       title: "Generate citation-check prompts",
       why: "Citation checks ask AI engines questions and look for your brand in the answers — you need prompts to ask.",
       ctaLabel: "Generate prompts",
-      ctaHref: `/monitor?brandId=${brandId}&action=generate-prompts`,
+      ctaHref: `/monitor?tab=citations&brandId=${brandId}&action=generate-prompts`,
       priority: "P0",
       category: "citations",
       dismissible: false,
@@ -127,7 +119,7 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
       title: "Run your first citation check",
       why: "Establishes the baseline. Subsequent runs measure progress.",
       ctaLabel: "Run check",
-      ctaHref: `/monitor?brandId=${brandId}&action=run`,
+      ctaHref: `/monitor?tab=citations&brandId=${brandId}&action=run`,
       priority: "P0",
       category: "citations",
       dismissible: false,
@@ -135,24 +127,6 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
   }
 
   // ============ P1 (improvements) ============
-
-  // 5b. AI is actively stating things the fact sheet contradicts. Highest-
-  //     value correction signal — first among P1 so it wins the 5-cap.
-  //     Deep-links into the Diagnose inspector where a grounded correction
-  //     is drafted (4b).
-  if (state.unresolvedHallucinationCount > 0) {
-    const n = state.unresolvedHallucinationCount;
-    recs.push({
-      id: "correct-hallucinations",
-      title: `Correct ${n} AI hallucination${n === 1 ? "" : "s"} about your brand`,
-      why: "AI engines are stating things your fact sheet contradicts. Draft a grounded correction and publish it.",
-      ctaLabel: "Review & correct",
-      ctaHref: `/diagnose?type=hallucination&brandId=${brandId}`,
-      priority: "P1",
-      category: "citations",
-      dismissible: true,
-    });
-  }
 
   // 6. Low citation rate → fact sheet enables hallucination detection.
   if (state.citationRate !== null && state.citationRate < LOW_CITATION_RATE) {
@@ -199,7 +173,7 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
           ? "GEO Signals scores chunkability, schema, and FAQ — never run for this brand."
           : `Last scan was ${Math.floor((Date.now() - state.lastSignalsScanAt.getTime()) / MS_PER_DAY)} days ago.`,
       ctaLabel: "Run scan",
-      ctaHref: `/diagnose?type=weak_signal&brandId=${brandId}`,
+      ctaHref: `/diagnose?tab=signals&brandId=${brandId}`,
       priority: "P1",
       category: "signals",
       dismissible: true,
@@ -226,24 +200,6 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
 
   // ============ P2 (growth) ============
 
-  // 9b. The weekly auto-discovery added competitors — surface them for
-  //     review (propose-don't-execute: the automation no longer silently
-  //     mutates the tracked set; the user keeps/ignores per row where the
-  //     competitors tab already supports it).
-  if (state.autoDiscoveredCompetitorCount > 0) {
-    const n = state.autoDiscoveredCompetitorCount;
-    recs.push({
-      id: "review-discovered-competitors",
-      title: `Review ${n} auto-discovered competitor${n === 1 ? "" : "s"}`,
-      why: "Our weekly scan added these from AI answers and citations. Keep the real ones, ignore false positives.",
-      ctaLabel: "Review competitors",
-      ctaHref: `/monitor?brandId=${brandId}`,
-      priority: "P2",
-      category: "growth",
-      dismissible: true,
-    });
-  }
-
   // 10. No competitors tracked.
   if (state.competitorCount === 0) {
     recs.push({
@@ -251,7 +207,7 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
       title: "Add competitors to track relative GEO performance",
       why: "Without competitors, you can't tell whether you're winning or just running in place.",
       ctaLabel: "Add competitors",
-      ctaHref: `/monitor?brandId=${brandId}`,
+      ctaHref: `/monitor?tab=competitors&brandId=${brandId}`,
       priority: "P2",
       category: "growth",
       dismissible: true,

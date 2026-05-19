@@ -19,30 +19,13 @@ export interface SpineTab {
   tourId?: string;
 }
 
-export default function SpineShell({
-  defaultTab,
-  tabs,
-  aliases,
-}: {
-  defaultTab: string;
-  tabs: SpineTab[];
-  /** Optional map from a legacy/retired `?tab` value → a real tab value.
-   *  Lets a stage collapse tabs (e.g. /act 6→2) while old deep-links,
-   *  301 redirects and recommendation CTAs keep landing on the right
-   *  surface. Additive + opt-in: stages that don't pass it are unchanged
-   *  (monitor/diagnose/setup behave exactly as before). */
-  aliases?: Record<string, string>;
-}) {
+export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; tabs: SpineTab[] }) {
   const [location, setLocation] = useLocation();
   const searchString = useSearch();
 
   const params = new URLSearchParams(searchString);
   const requested = params.get("tab");
-  const active = tabs.some((t) => t.value === requested)
-    ? (requested as string)
-    : requested && aliases && aliases[requested]
-      ? aliases[requested]
-      : defaultTab;
+  const active = tabs.some((t) => t.value === requested) ? (requested as string) : defaultTab;
 
   const setTab = (value: string) => {
     const next = new URLSearchParams(searchString);
@@ -51,26 +34,19 @@ export default function SpineShell({
     setLocation(`${path}?${next.toString()}`, { replace: true });
   };
 
-  // A single-tab stage is one surface — a one-item tab strip is pure
-  // chrome. Keep the Tabs wrapper (it still mirrors `?tab=` for legacy
-  // deep-links + the type pre-filter) but render no strip.
-  const showStrip = tabs.length > 1;
-
   return (
     <Tabs value={active} onValueChange={setTab} className="space-y-4">
-      {showStrip && (
-        <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            return (
-              <TabsTrigger key={t.value} value={t.value} data-tour-id={t.tourId}>
-                <Icon className="mr-2 h-4 w-4" />
-                {t.label}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
-      )}
+      <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          return (
+            <TabsTrigger key={t.value} value={t.value} data-tour-id={t.tourId}>
+              <Icon className="mr-2 h-4 w-4" />
+              {t.label}
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
       {tabs.map((t) => {
         const Body = t.Component;
         return (
