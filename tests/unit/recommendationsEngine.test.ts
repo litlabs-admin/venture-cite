@@ -131,7 +131,7 @@ describe("getRecommendations", () => {
     expect(hit!.priority).toBe("P1");
     expect(hit!.dismissible).toBe(true);
     expect(hit!.title).toContain("3");
-    expect(hit!.ctaHref).toBe("/diagnose?tab=hallucinations&brandId=b-1");
+    expect(hit!.ctaHref).toBe("/diagnose?type=hallucination&brandId=b-1");
   });
 
   it("zero unresolved hallucinations → no 'correct-hallucinations' rec", () => {
@@ -174,7 +174,7 @@ describe("getRecommendations", () => {
     expect(hit!.category).toBe("growth");
     expect(hit!.dismissible).toBe(true);
     expect(hit!.title).toContain("2");
-    expect(hit!.ctaHref).toBe("/monitor?tab=competitors&brandId=b-1");
+    expect(hit!.ctaHref).toBe("/monitor?brandId=b-1");
   });
 
   it("zero auto-discovered competitors → no 'review-discovered-competitors' rec", () => {

@@ -177,12 +177,18 @@ function Router() {
           Old links, bookmarks, emails, and recommendation CTAs keep working. */}
       <Route path="/citations">{() => <SpineRedirect to="/monitor" tab="citations" />}</Route>
       <Route path="/geo-analytics">{() => <SpineRedirect to="/monitor" tab="overview" />}</Route>
-      <Route path="/competitors">{() => <SpineRedirect to="/monitor" tab="competitors" />}</Route>
+      <Route path="/competitors">
+        <Redirect to="/monitor?focus=competitors" />
+      </Route>
       <Route path="/ai-intelligence">
         {() => <SpineRedirect to="/monitor" tab="share-of-answer" />}
       </Route>
-      <Route path="/geo-signals">{() => <SpineRedirect to="/diagnose" tab="signals" />}</Route>
-      <Route path="/crawler-check">{() => <SpineRedirect to="/diagnose" tab="crawler" />}</Route>
+      <Route path="/geo-signals">
+        <Redirect to="/diagnose?type=weak_signal" />
+      </Route>
+      <Route path="/crawler-check">
+        <Redirect to="/diagnose?type=crawler_block" />
+      </Route>
       <Route path="/opportunities">{() => <SpineRedirect to="/diagnose" tab="issues" />}</Route>
       <Route path="/geo-tools">{() => <SpineRedirect to="/diagnose" tab="coverage" />}</Route>
       <Route path="/faq-manager">{() => <SpineRedirect to="/act" tab="faq" />}</Route>

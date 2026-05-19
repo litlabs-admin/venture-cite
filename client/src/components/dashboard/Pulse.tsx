@@ -18,7 +18,7 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 //   3. Open hallucinations (/api/hallucinations/stats/:id)  — standing accuracy debt
 //
 // Replaces RecommendationsPanel on `/`. RecommendationsPanel itself stays the
-// deep view at /diagnose?tab=issues, so this only changes what home renders.
+// deep view at /diagnose, so this only changes what home renders.
 
 // Mirrors RecommendationsPanel's localStorage contract ON PURPOSE: a rec
 // dismissed in either surface stays dismissed in both. Keep these two values
@@ -66,9 +66,9 @@ type PulseItem = {
 };
 
 const ACTIONABLE_ALERTS: Record<string, { href: string; cta: string }> = {
-  visibility_drop: { href: "/monitor?tab=citations", cta: "Review citations" },
+  visibility_drop: { href: "/monitor", cta: "Review visibility" },
   prompts_lost: { href: "/act?tab=create", cta: "Generate content for gaps" },
-  new_hallucinations: { href: "/diagnose?tab=hallucinations", cta: "Review hallucinations" },
+  new_hallucinations: { href: "/diagnose?type=hallucination", cta: "Review hallucinations" },
 };
 
 /** Append the active brand to a deep-link when it doesn't already carry one,
