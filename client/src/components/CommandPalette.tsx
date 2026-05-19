@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   Radio,
   Bug,
-  Lightbulb,
   PenLine,
   Search,
   Wrench,
@@ -143,15 +142,6 @@ const NAV: NavEntry[] = [
     brandScoped: true,
     keywords: "robots gptbot permissions blocked",
   },
-  {
-    section: "Diagnose",
-    label: "Issues",
-    href: "/diagnose?tab=issues",
-    icon: Lightbulb,
-    brandScoped: true,
-    keywords: "recommendations next steps",
-  },
-
   {
     section: "Act",
     label: "Create",

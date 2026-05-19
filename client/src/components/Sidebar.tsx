@@ -23,13 +23,18 @@ import logoPath from "@assets/logo.png";
 import SidebarOnboarding from "@/components/SidebarOnboarding";
 
 // ─── Workflow spine ──────────────────────────────────────────────────────────
-// One flat list, no section labels. The product is a single operating system:
-// Monitor (where do I stand) → Diagnose (what's wrong) → Act (fix it) →
-// Report (prove it), with the Command Center as the at-a-glance home and
-// Setup holding brand/prompt/fact-sheet configuration.
+// One flat list, no section labels. The product is a single operating system,
+// rendered in the order a real user moves through it:
 //
-// The Monitor/Act/Setup items are wrapped in elements carrying literal
-// data-tour-id attributes (nav.monitor / nav.act / nav.setup) referenced by
+//   Command Center → Setup → Monitor → Diagnose → Act → Report
+//
+// Command Center is the daily landing spot. Setup configures the brand and
+// fact sheet (first task for any new user, ongoing maintenance for existing
+// ones). Monitor measures, Diagnose explains, Act fixes, Report proves.
+// The global welcome tour narrates the same flow.
+//
+// Each spine stage carries a literal data-tour-id wrapper (nav.setup,
+// nav.monitor, nav.diagnose, nav.act, nav.report) referenced by
 // global-welcome.tour.ts. They must stay literal strings — the build gate
 // scripts/verify-tour-targets.ts statically greps `data-tour-id="…"` and
 // fails the build if a registered target has no literal match in source.
@@ -98,8 +103,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </Link>
       </div>
 
-      {/* Spine nav. Unrolled (only 6 fixed items) so the three tour targets
-          can carry literal data-tour-id strings the build gate can grep. */}
+      {/* Spine nav. Rendered in workflow order — the sequence a user
+          actually moves through. Unrolled so the five spine-stage tour
+          targets can carry literal data-tour-id strings the build gate
+          can grep. */}
       <nav className="flex-1 overflow-y-auto py-3 space-y-0.5">
         <NavItem
           href="/"
@@ -108,6 +115,15 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           active={isActive("/")}
           onNavigate={onNavigate}
         />
+        <div data-tour-id="nav.setup">
+          <NavItem
+            href="/setup"
+            label="Setup"
+            icon={SlidersHorizontal}
+            active={isActive("/setup")}
+            onNavigate={onNavigate}
+          />
+        </div>
         <div data-tour-id="nav.monitor">
           <NavItem
             href="/monitor"
@@ -117,13 +133,15 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             onNavigate={onNavigate}
           />
         </div>
-        <NavItem
-          href="/diagnose"
-          label="Diagnose"
-          icon={Stethoscope}
-          active={isActive("/diagnose")}
-          onNavigate={onNavigate}
-        />
+        <div data-tour-id="nav.diagnose">
+          <NavItem
+            href="/diagnose"
+            label="Diagnose"
+            icon={Stethoscope}
+            active={isActive("/diagnose")}
+            onNavigate={onNavigate}
+          />
+        </div>
         <div data-tour-id="nav.act">
           <NavItem
             href="/act"
@@ -133,19 +151,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             onNavigate={onNavigate}
           />
         </div>
-        <NavItem
-          href="/report"
-          label="Report"
-          icon={FileText}
-          active={isActive("/report")}
-          onNavigate={onNavigate}
-        />
-        <div data-tour-id="nav.setup">
+        <div data-tour-id="nav.report">
           <NavItem
-            href="/setup"
-            label="Setup"
-            icon={SlidersHorizontal}
-            active={isActive("/setup")}
+            href="/report"
+            label="Report"
+            icon={FileText}
+            active={isActive("/report")}
             onNavigate={onNavigate}
           />
         </div>

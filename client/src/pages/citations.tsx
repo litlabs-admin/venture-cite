@@ -371,93 +371,6 @@ export default function Citations() {
 
   return (
     <div className="space-y-6">
-      {/* Run Check action bar */}
-      <Card>
-        <CardContent className="pt-6">
-          {brandsLoading ? (
-            <Skeleton className="h-10 w-full" />
-          ) : brands.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              Create a brand first to start tracking citations.
-            </p>
-          ) : (
-            <div className="flex items-center justify-end gap-3">
-              {hasPrompts && (
-                <>
-                  <Button
-                    onClick={() => {
-                      if (runMutation.isPending || showBanner || !selectedBrandId) return;
-                      runMutation.mutate();
-                    }}
-                    disabled={runMutation.isPending || showBanner || !selectedBrandId}
-                    className="bg-primary hover:bg-primary/90 shrink-0"
-                    data-testid="button-run-check"
-                    data-tour-id="prompts.runButton"
-                  >
-                    {showBanner ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Run in progress…
-                      </>
-                    ) : runMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {runLoadingMessage}
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4 mr-2" />
-                        Run Check
-                      </>
-                    )}
-                  </Button>
-                  {/* Wave 9: secondary actions in an overflow menu so the
-                      primary Run Check button has clear visual hierarchy.
-                      Re-check stored is read-mostly and rarely needed. */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="shrink-0"
-                        data-testid="button-citations-overflow"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-72">
-                      <DropdownMenuItem
-                        disabled={backfillMutation.isPending}
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          if (!backfillMutation.isPending) backfillMutation.mutate();
-                        }}
-                        data-testid="button-backfill-detection"
-                      >
-                        {backfillMutation.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Re-checking stored responses…
-                          </>
-                        ) : (
-                          <div>
-                            <div className="font-medium">Re-check stored responses</div>
-                            <div className="text-xs text-muted-foreground">
-                              Re-apply detection to old runs after adding name variations. Free — no
-                              AI calls.
-                            </div>
-                          </div>
-                        )}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Live progress banner — shown only while a citation run is in
           flight for this brand. /citation-runs/state polling feeds the
           progress %; the active-runs gate provides the gating boolean. */}
@@ -475,18 +388,11 @@ export default function Citations() {
                 </span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                {/* Wave 9: hide the count line until /citation-runs/state
-                    fills in real numbers (initial state is totalChecks=-1
-                    from the active-runs fallback). Avoids the misleading
-                    "0 cited / 0 checks so far" flash for ~8s after Run. */}
                 {headlineProgress.totalChecks > 0 && (
                   <span className="text-xs text-muted-foreground">
                     {headlineProgress.totalCited} cited / {headlineProgress.totalChecks} checks
                   </span>
                 )}
-                {/* Wave 9: deep-link to the tab where live data actually
-                    appears. Banner is page-level but per-row updates land
-                    on Latest Results. */}
                 {activeTab !== "results" && (
                   <Button
                     variant="ghost"
@@ -506,7 +412,13 @@ export default function Citations() {
         </Card>
       )}
 
-      {!selectedBrandId ? (
+      {brandsLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : brands.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          Create a brand first to start tracking citations.
+        </p>
+      ) : !selectedBrandId ? (
         <Card>
           <CardContent className="py-16 text-center">
             <Sparkles className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
@@ -521,28 +433,101 @@ export default function Citations() {
         </Card>
       ) : (
         <>
-          {/* Tab bar */}
-          <div className="flex gap-1 border-b border-border">
-            {TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  data-tour-id={tab.tourId}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                    isActive
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                  }`}
+          {/* Tab bar + Run Check on the same row. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border">
+            <div className="flex gap-1">
+              {TABS.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    data-tour-id={tab.tourId}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                      isActive
+                        ? "border-primary text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+            {hasPrompts && (
+              <div className="flex items-center gap-2 pb-2">
+                <Button
+                  onClick={() => {
+                    if (runMutation.isPending || showBanner || !selectedBrandId) return;
+                    runMutation.mutate();
+                  }}
+                  disabled={runMutation.isPending || showBanner || !selectedBrandId}
+                  className="bg-primary hover:bg-primary/90 shrink-0"
+                  data-testid="button-run-check"
+                  data-tour-id="prompts.runButton"
                 >
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
+                  {showBanner ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Run in progress…
+                    </>
+                  ) : runMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {runLoadingMessage}
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Check
+                    </>
+                  )}
+                </Button>
+                {/* Wave 9: secondary actions in an overflow menu so the
+                    primary Run Check button has clear visual hierarchy.
+                    Re-check stored is read-mostly and rarely needed. */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      data-testid="button-citations-overflow"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-72">
+                    <DropdownMenuItem
+                      disabled={backfillMutation.isPending}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (!backfillMutation.isPending) backfillMutation.mutate();
+                      }}
+                      data-testid="button-backfill-detection"
+                    >
+                      {backfillMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Re-checking stored responses…
+                        </>
+                      ) : (
+                        <div>
+                          <div className="font-medium">Re-check stored responses</div>
+                          <div className="text-xs text-muted-foreground">
+                            Re-apply detection to old runs after adding name variations. Free — no
+                            AI calls.
+                          </div>
+                        </div>
+                      )}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </div>
 
           {/* PROMPTS TAB */}

@@ -565,14 +565,6 @@ export default function MonitorOverview() {
         </div>
       )}
 
-      <div className="mb-4 flex items-center justify-end gap-2">
-        <Link href="/act?tab=create">
-          <Button>
-            <Sparkles className="w-4 h-4 mr-2" /> Create Content
-          </Button>
-        </Link>
-      </div>
-
       {/* Onboarding spine + a single-line "what to expect" caption. The
           RecommendationsPanel is the canonical next-actions surface; the
           timeline caption sets timing expectations for everyone. */}

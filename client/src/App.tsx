@@ -185,7 +185,9 @@ function Router() {
       </Route>
       <Route path="/geo-signals">{() => <SpineRedirect to="/diagnose" tab="signals" />}</Route>
       <Route path="/crawler-check">{() => <SpineRedirect to="/diagnose" tab="crawler" />}</Route>
-      <Route path="/opportunities">{() => <SpineRedirect to="/diagnose" tab="issues" />}</Route>
+      <Route path="/opportunities">
+        {() => <SpineRedirect to="/diagnose" tab="hallucinations" />}
+      </Route>
       <Route path="/geo-tools">{() => <SpineRedirect to="/act" tab="geo-assets" />}</Route>
       <Route path="/faq-manager">{() => <SpineRedirect to="/act" tab="faq" />}</Route>
       <Route path="/community">{() => <SpineRedirect to="/act" tab="community" />}</Route>

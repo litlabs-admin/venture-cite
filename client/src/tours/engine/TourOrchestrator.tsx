@@ -103,6 +103,12 @@ export function TourOrchestrator() {
   const activeRef = useRef<RunningTour | null>(null);
   const bufferRef = useRef<EventBuffer | null>(null);
   const lastBrandRef = useRef<string | null>(null);
+  // Belt-and-braces against the "fires every page load" failure mode:
+  // even if state persistence is delayed or a user dismisses without
+  // a state-saving exit (network blip, server error on PATCH), the
+  // same tour cannot auto-fire a second time in this browser session.
+  // Server state is still the source of truth across sessions.
+  const firedThisSessionRef = useRef<Set<string>>(new Set());
 
   // Init event buffer once.
   useEffect(() => {
@@ -167,7 +173,9 @@ export function TourOrchestrator() {
     };
 
     for (const tour of Object.values(TOURS)) {
+      if (firedThisSessionRef.current.has(tour.id)) continue;
       if (shouldAutoFire(tour, state, ctx, location)) {
+        firedThisSessionRef.current.add(tour.id);
         activeRef.current = runTour({
           config: tour,
           ctx,

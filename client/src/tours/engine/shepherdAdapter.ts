@@ -80,6 +80,19 @@ export function runTour(opts: RunOptions): RunningTour {
 
   let stepEnterAt = Date.now();
   let cancelled = false;
+  // Tracks whether a state-persisting button handler (Skip / Done /
+  // Don't-show-again) already fired for this run. The X cancel icon
+  // also triggers tour.cancel() but doesn't go through those handlers,
+  // so without this flag the X-out used to leave state unchanged and
+  // the tour would re-fire on every page load. tour.on("cancel") now
+  // calls onSkip when this flag is false — i.e. X-out is treated as
+  // a skip for the current version.
+  let exitHandled = false;
+  // Programmatic cancels from the orchestrator (e.g. brand-switch)
+  // should NOT mark the tour skipped — they're internal navigation,
+  // not user intent. The orchestrator's RunningTour.cancel(reason)
+  // toggles this before tearing the tour down.
+  let cancelReason: string | null = null;
 
   buffer.push(
     baseEvent({ eventType: mode === "manual" ? "tour_manual_replayed" : "tour_auto_fired" }),
@@ -116,6 +129,7 @@ export function runTour(opts: RunOptions): RunningTour {
         secondary: true,
         action: () => {
           buffer.push(baseEvent({ eventType: "tour_skipped", stepId: step.id, stepIndex: index }));
+          exitHandled = true;
           onSkip?.();
           tour.cancel();
         },
@@ -129,6 +143,7 @@ export function runTour(opts: RunOptions): RunningTour {
           buffer.push(
             baseEvent({ eventType: "tour_suppressed", stepId: step.id, stepIndex: index }),
           );
+          exitHandled = true;
           onSkipForever?.();
           tour.cancel();
         },
@@ -150,6 +165,7 @@ export function runTour(opts: RunOptions): RunningTour {
           buffer.push(
             baseEvent({ eventType: "tour_completed", stepId: step.id, stepIndex: index }),
           );
+          exitHandled = true;
           if (mode === "auto") onComplete?.();
           tour.complete();
         } else {
@@ -189,6 +205,21 @@ export function runTour(opts: RunOptions): RunningTour {
   })();
 
   tour.on("cancel", () => {
+    // Three sources of cancel reach this handler:
+    //   1. Skip / Done / Don't-show-again buttons (their handlers set
+    //      exitHandled = true before calling tour.cancel/complete()).
+    //   2. The X cancel icon — no button handler fires, so exitHandled
+    //      stays false. We treat this as a Skip so the user doesn't
+    //      see the same tour every page load.
+    //   3. Programmatic cancel from the orchestrator (brand-switch
+    //      etc.) — RunningTour.cancel(reason) sets cancelReason. Do
+    //      NOT mark state in that case; it's internal navigation,
+    //      not user intent.
+    if (!exitHandled && !cancelReason) {
+      buffer.push(baseEvent({ eventType: "tour_skipped", stepId: "cancel-icon" }));
+      onSkip?.();
+      exitHandled = true;
+    }
     if (!cancelled) {
       buffer.push(baseEvent({ eventType: "tour_abandoned" }));
     }
@@ -197,6 +228,7 @@ export function runTour(opts: RunOptions): RunningTour {
   return {
     cancel(reason?: string) {
       cancelled = true;
+      cancelReason = reason ?? "programmatic";
       if (reason) {
         buffer.push(baseEvent({ eventType: "tour_abandoned", stepId: reason }));
       }

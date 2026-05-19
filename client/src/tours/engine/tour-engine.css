@@ -1,7 +1,32 @@
-/* client/src/tours/engine/tour-engine.css */
-
-/* Shepherd ships its theme — we import it then constrain z-index to sit
-   above Radix Dialog (50) and below Toaster (100). */
+/* client/src/tours/engine/tour-engine.css
+ *
+ * Shepherd ships a generic third-party theme. We import its structural CSS
+ * (positioning, modal overlay, arrows) and override every surface, border,
+ * button, and font reference with VentureCite tokens so tour popovers read
+ * as part of the product, not a foreign widget.
+ *
+ * IMPORTANT TOKEN SYNTAX: tokens in this codebase are raw OKLCH values
+ * (see client/src/index.css). Use bare `var(--x)` — never `hsl(var(--x))`,
+ * which would yield hsl(oklch(...)), invalid CSS, and a transparent panel.
+ * Pattern used everywhere else in the project (`bg-[var(--positive)]`,
+ * `tailwind.config.ts: background: "var(--background)"`).
+ *
+ * IMPORTANT SELECTOR SPECIFICITY: Shepherd 14.x has TWO tiers of theme rules:
+ *   • baseline: `.shepherd-element .shepherd-X` (2 classes, 0,2,0)
+ *   • title-aware: `.shepherd-has-title .shepherd-content .shepherd-X` (3 classes, 0,3,0)
+ *
+ * Every popover we render has a title, so `.shepherd-has-title` is on the
+ * panel and the title-aware rules win — they're why the header showed up
+ * gray and the cancel icon stayed default-tinted in earlier passes. To
+ * beat them we use `.shepherd-element.shepherd-has-title .shepherd-content
+ * .shepherd-X` (4 classes, 0,4,0). Tying source-order wins; this exceeds.
+ *
+ * z-index hierarchy (mirrors AppShell):
+ *   Radix Dialog: 50
+ *   Tour overlay: 60
+ *   Tour popover: 61
+ *   Toaster:     100
+ */
 
 @import "shepherd.js/dist/css/shepherd.css";
 
@@ -9,16 +34,233 @@
   --tour-overlay-z: 60;
 }
 
+/* ─── Overlay ────────────────────────────────────────────────────────────── */
+
 .shepherd-modal-overlay-container {
   z-index: var(--tour-overlay-z);
 }
 
-.shepherd-element {
-  z-index: calc(var(--tour-overlay-z) + 1);
-  max-width: 360px;
+/* Shepherd renders the dimmed backdrop as an inline <svg> masked around
+   the active target. The dim color lives on that SVG's `fill`, not on
+   the container. Quieter than the default near-black so the rest of the
+   screen stays composed, not hostile. */
+.shepherd-modal-overlay-container svg path {
+  fill: oklch(0 0 0 / 0.45);
 }
 
-/* Mobile fallback: render as bottom-sheet on screens <768px. */
+/* ─── Popover panel ──────────────────────────────────────────────────────── */
+
+.shepherd-element {
+  z-index: calc(var(--tour-overlay-z) + 1);
+  max-width: 380px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--elevation-overlay);
+  font-family: var(--font-sans);
+  padding: 0;
+  animation: tour-popover-in var(--motion-base) var(--ease-out) both;
+}
+
+@keyframes tour-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shepherd-element {
+    animation: tour-popover-fade var(--motion-instant) linear both;
+  }
+  @keyframes tour-popover-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* Content wrapper — Shepherd may give this a background; force transparent
+   so our panel-level surface shows through evenly behind header + body. */
+.shepherd-element .shepherd-content {
+  background: transparent;
+  border-radius: 10px;
+  padding: 0;
+}
+
+/* Arrow tip — match panel chrome. Shepherd renders the arrow as a
+   rotated square with `:before` carrying the visible face. The
+   `.shepherd-has-title[data-popper-placement^=bottom]` variant sets a
+   gray background; we match its specificity (3 classes + attr) to win
+   on source-order. */
+.shepherd-element .shepherd-arrow::before,
+.shepherd-element.shepherd-has-title[data-popper-placement^="bottom"] > .shepherd-arrow::before {
+  background: var(--popover);
+  background-color: var(--popover);
+  border: 1px solid var(--border);
+}
+
+/* ─── Header / title ─────────────────────────────────────────────────────── */
+
+.shepherd-element .shepherd-header,
+.shepherd-element.shepherd-has-title .shepherd-content .shepherd-header {
+  background: transparent;
+  padding: 16px 16px 4px;
+  border-bottom: none;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.shepherd-element .shepherd-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--foreground);
+  line-height: 1.4;
+  font-family: var(--font-sans);
+  margin: 0;
+}
+
+/* ─── Body text ──────────────────────────────────────────────────────────── */
+
+.shepherd-element .shepherd-text {
+  padding: 4px 16px 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  background: transparent;
+}
+
+.shepherd-element .shepherd-text p {
+  margin: 0;
+}
+
+.shepherd-element .shepherd-text p + p {
+  margin-top: 8px;
+}
+
+/* ─── Cancel (X) ─────────────────────────────────────────────────────────── */
+
+.shepherd-element .shepherd-cancel-icon,
+.shepherd-element.shepherd-has-title .shepherd-content .shepherd-cancel-icon {
+  color: var(--muted-foreground);
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.7;
+  background: transparent;
+  border: none;
+  transition: opacity var(--motion-instant) var(--ease-out);
+}
+
+.shepherd-element .shepherd-cancel-icon:hover,
+.shepherd-element .shepherd-cancel-icon:focus-visible,
+.shepherd-element.shepherd-has-title .shepherd-content .shepherd-cancel-icon:hover,
+.shepherd-element.shepherd-has-title .shepherd-content .shepherd-cancel-icon:focus-visible {
+  color: var(--foreground);
+  opacity: 1;
+}
+
+.shepherd-element .shepherd-cancel-icon span {
+  color: inherit;
+}
+
+/* ─── Footer + buttons ───────────────────────────────────────────────────── */
+
+.shepherd-element .shepherd-footer {
+  padding: 0 16px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  background: transparent;
+  border-top: none;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.shepherd-element .shepherd-button {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  cursor: pointer;
+  margin: 0;
+  transition:
+    background var(--motion-instant) var(--ease-out),
+    border-color var(--motion-instant) var(--ease-out),
+    color var(--motion-instant) var(--ease-out);
+}
+
+.shepherd-element .shepherd-button:hover,
+.shepherd-element .shepherd-button:not(:disabled):hover {
+  background: var(--brand-accent-hover);
+}
+
+.shepherd-element .shepherd-button:active {
+  background: var(--brand-accent-press);
+}
+
+.shepherd-element .shepherd-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.shepherd-element .shepherd-button.shepherd-button-secondary,
+.shepherd-element .shepherd-button-secondary {
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+
+.shepherd-element .shepherd-button.shepherd-button-secondary:hover,
+.shepherd-element .shepherd-button.shepherd-button-secondary:not(:disabled):hover {
+  background: var(--accent);
+  border-color: var(--border-strong);
+}
+
+/* "Don't show again" — tertiary text-style affordance, left-aligned. */
+.shepherd-element .shepherd-footer .tour-skip-forever {
+  background: transparent;
+  border: none;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  padding: 6px 0;
+  margin: 0 auto 0 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color var(--motion-instant) var(--ease-out);
+}
+
+.shepherd-element .shepherd-footer .tour-skip-forever:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.shepherd-element .shepherd-footer .tour-skip-forever:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Mobile fallback — bottom-sheet under 768px ─────────────────────────── */
+
 @media (max-width: 767px) {
   .shepherd-element {
     position: fixed !important;
@@ -29,23 +271,21 @@
     transform: none !important;
     max-width: 100vw;
     width: 100%;
-    border-radius: 16px 16px 0 0;
+    border-radius: 14px 14px 0 0;
+    border-bottom: none;
+    box-shadow: 0 -8px 24px -12px oklch(0 0 0 / 0.35);
   }
   .shepherd-arrow {
     display: none !important;
   }
-}
-
-/* Skip-forever button styling (custom — Shepherd does not ship one). */
-.shepherd-footer .tour-skip-forever {
-  font-size: 12px;
-  color: rgb(120, 120, 120);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  margin-right: auto;
-}
-.shepherd-footer .tour-skip-forever:hover {
-  color: rgb(80, 80, 80);
-  text-decoration: underline;
+  .shepherd-element .shepherd-header,
+  .shepherd-element .shepherd-text {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .shepherd-element .shepherd-footer {
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
 }

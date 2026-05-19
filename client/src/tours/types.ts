@@ -26,7 +26,26 @@ export interface TourStep {
   content: TourCopy;
   waitForTarget?: boolean; // default true
   waitTimeoutMs?: number; // default 3000
-  attachTo?: "top" | "bottom" | "left" | "right" | "auto";
+  // Popper.js placement values. The `-start`/`-end` variants align the
+  // popover with the start/end edge of the target instead of centering
+  // on it — useful for narrow vertical targets like sidebar nav rows
+  // where the centered default would float mid-list.
+  attachTo?:
+    | "top"
+    | "top-start"
+    | "top-end"
+    | "bottom"
+    | "bottom-start"
+    | "bottom-end"
+    | "left"
+    | "left-start"
+    | "left-end"
+    | "right"
+    | "right-start"
+    | "right-end"
+    | "auto"
+    | "auto-start"
+    | "auto-end";
   showSkip?: boolean; // default true
   showSkipForever?: boolean; // default true (the "don't show again" button)
 }

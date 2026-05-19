@@ -523,14 +523,6 @@ export default function GeoTools() {
         <title>GEO Assets - VentureCite</title>
       </Helmet>
       <div className="space-y-8">
-        <div className="mb-4 flex items-center justify-end gap-2">
-          <Link href="/geo-signals">
-            <Button variant="outline" size="sm" data-testid="button-geo-signals">
-              <Sparkles className="h-4 w-4 mr-2" /> GEO Signals
-            </Button>
-          </Link>
-        </div>
-
         {selectedBrandId ? (
           <>
             {/* Wave 9.4: header roll-up. Single endpoint, refreshes

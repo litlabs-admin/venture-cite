@@ -33,9 +33,13 @@ export function shouldAutoFire(
   // Brand-scoped tours require a brand id.
   if (tour.scope === "perBrand" && !ctx.brandId) return false;
 
-  // Version-gated completion check.
+  // Version-gated dismissal check. Either explicit completion OR a skip
+  // counts as "user has seen this version; don't auto-fire it again."
+  // The version bump on the tour config is the only way to re-show it.
+  // (A separate "Don't show again" path adds the tour to perUserSuppressed
+  // and is honored above; that one suppresses across version bumps too.)
   const record = readCompletion(tour, state, ctx);
-  if (record && record.v >= tour.version && record.completedAt) return false;
+  if (record && record.v >= tour.version && (record.completedAt || record.skippedAt)) return false;
 
   return true;
 }
@@ -44,7 +48,7 @@ function readCompletion(
   tour: TourConfig,
   state: TourState,
   ctx: TourContext,
-): { v: number; completedAt?: string } | undefined {
+): { v: number; completedAt?: string; skippedAt?: string } | undefined {
   if (tour.scope === "global") return state.global;
   if (tour.scope === "perBrand" && ctx.brandId) {
     return state.perBrand?.[ctx.brandId]?.[tour.id];

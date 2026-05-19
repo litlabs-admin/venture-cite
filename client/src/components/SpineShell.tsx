@@ -36,13 +36,16 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
 
   return (
     <Tabs value={active} onValueChange={setTab} className="space-y-4">
-      <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+      <TabsList
+        className="grid h-auto w-full gap-1"
+        style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+      >
         {tabs.map((t) => {
           const Icon = t.icon;
           return (
-            <TabsTrigger key={t.value} value={t.value} data-tour-id={t.tourId}>
-              <Icon className="mr-2 h-4 w-4" />
-              {t.label}
+            <TabsTrigger key={t.value} value={t.value} data-tour-id={t.tourId} className="w-full">
+              <Icon className="mr-2 h-4 w-4 shrink-0" />
+              <span className="truncate">{t.label}</span>
             </TabsTrigger>
           );
         })}

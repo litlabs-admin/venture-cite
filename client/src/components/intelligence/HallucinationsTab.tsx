@@ -76,15 +76,14 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
   const getRemediationPillClass = (status: string | null | undefined) => {
     switch (status) {
       case "in_progress":
-        return "bg-blue-100 text-blue-800";
+        return "bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border-[var(--brand-accent)]/20";
       case "resolved":
-        return "bg-green-100 text-green-800";
       case "verified":
-        return "bg-emerald-100 text-emerald-800";
+        return "bg-[var(--positive)]/10 text-[var(--positive)] border-[var(--positive)]/20";
       case "dismissed":
-        return "bg-gray-200 text-gray-700";
+        return "bg-muted text-muted-foreground border-transparent";
       default:
-        return "bg-amber-100 text-amber-800"; // pending / null
+        return "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20"; // pending / null
     }
   };
 
@@ -112,44 +111,52 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "critical":
-        return "bg-red-500 text-white";
+        return "bg-[var(--negative)]/10 text-[var(--negative)] border border-[var(--negative)]/20";
       case "high":
-        return "bg-orange-500 text-white";
+        return "bg-[var(--warning)]/10 text-[var(--warning)] border border-[var(--warning)]/20";
       case "medium":
-        return "bg-yellow-500 text-white";
+        return "bg-[var(--warning)]/8 text-[var(--warning)] border border-[var(--warning)]/15";
       case "low":
-        return "bg-blue-500 text-white";
+        return "bg-muted text-muted-foreground border border-border";
       default:
-        return "bg-gray-500 text-white";
+        return "bg-muted text-muted-foreground border border-border";
     }
   };
 
   return (
     <>
-      <div className="grid gap-6 md:grid-cols-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Total Detected
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold" data-testid="stat-total-hallucinations">
+            <div
+              className="tnum text-3xl font-semibold leading-none text-foreground"
+              data-testid="stat-total-hallucinations"
+            >
               {halStats.total}
             </div>
-            <p className="text-sm text-muted-foreground">inaccuracies found</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">inaccuracies found</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Resolved</CardTitle>
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Resolved
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600" data-testid="stat-resolved">
+            <div
+              className="tnum text-3xl font-semibold leading-none text-[var(--positive)]"
+              data-testid="stat-resolved"
+            >
               {halStats.resolved}
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="mt-1.5 text-xs text-muted-foreground">
               {halStats.total > 0
                 ? `${((halStats.resolved / halStats.total) * 100).toFixed(0)}% resolution rate`
                 : "no issues yet"}
@@ -159,27 +166,35 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Critical Issues
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-600" data-testid="stat-critical">
+            <div
+              className="tnum text-3xl font-semibold leading-none text-[var(--negative)]"
+              data-testid="stat-critical"
+            >
               {halStats.bySeverity?.critical || 0}
             </div>
-            <p className="text-sm text-muted-foreground">need immediate attention</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">need immediate attention</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Brand Facts</CardTitle>
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Brand Facts
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold" data-testid="stat-facts">
+            <div
+              className="tnum text-3xl font-semibold leading-none text-foreground"
+              data-testid="stat-facts"
+            >
               {facts.length}
             </div>
-            <p className="text-sm text-muted-foreground">verified facts stored</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">verified facts stored</p>
           </CardContent>
         </Card>
       </div>
@@ -212,109 +227,117 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
           <CardContent>
             {factSheetTooSmall && (
               <div
-                className="mb-4 p-3 rounded-md bg-amber-50 border border-amber-200 text-sm text-amber-800 flex items-start gap-2"
+                className="mb-4 flex items-start gap-2 rounded-md border border-[var(--warning)]/20 bg-[var(--warning)]/10 p-3 text-sm text-[var(--warning)]"
                 data-testid="warning-facts-too-small"
               >
-                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 <div>
                   <strong>Hallucination detection is inactive.</strong> Your fact sheet has{" "}
                   {activeFactCount} active {activeFactCount === 1 ? "entry" : "entries"}; we need at
                   least 3 to run the detector.{" "}
-                  <Link href="/brand-fact-sheet" className="underline hover:text-amber-900">
+                  <Link href="/brand-fact-sheet" className="underline">
                     Add more facts →
                   </Link>
                 </div>
               </div>
             )}
             {hallucinations.length === 0 ? (
-              <div className="text-center py-8">
-                <Shield className="w-12 h-12 mx-auto mb-4 text-green-500" />
-                <p className="text-muted-foreground">
+              <div className="py-8 text-center">
+                <Shield className="mx-auto mb-4 h-12 w-12 text-[var(--positive)]" />
+                <p className="text-sm font-medium text-foreground">
                   {severityFilter === "all"
                     ? "No hallucinations detected"
                     : `No ${severityFilter}-severity hallucinations`}
                 </p>
                 {severityFilter === "all" && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Your brand information appears accurate across AI platforms
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Your brand information appears accurate across AI platforms.
                   </p>
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {hallucinations.map((hal) => {
                   const citingUrl = (hal as any).citingOutletUrl as string | null | undefined;
                   const remStatus = (hal as any).remediationStatus as string | null | undefined;
                   const seenCount = (hal as any).seenCount as number | undefined;
+                  const actionable =
+                    !remStatus || remStatus === "pending" || remStatus === "in_progress";
                   return (
-                    <div key={hal.id} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between mb-2 flex-wrap gap-2">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge className={getSeverityColor(hal.severity)}>{hal.severity}</Badge>
-                          <Badge variant="outline">{hal.hallucinationType}</Badge>
-                          <Badge variant="outline">{hal.aiPlatform}</Badge>
+                    <div
+                      key={hal.id}
+                      className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-[var(--border-strong)]"
+                    >
+                      {/* Header: severity + type + platform + (resolve action) */}
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge className={`${getSeverityColor(hal.severity)} font-medium`}>
+                            {hal.severity}
+                          </Badge>
+                          <Badge variant="outline" className="font-normal">
+                            {hal.hallucinationType}
+                          </Badge>
+                          <Badge variant="outline" className="font-normal">
+                            {hal.aiPlatform}
+                          </Badge>
                           {remStatus && (
                             <Badge
-                              className={getRemediationPillClass(remStatus)}
+                              className={`${getRemediationPillClass(remStatus)} font-medium`}
                               data-testid={`badge-remediation-${hal.id}`}
                             >
                               {remStatus.replace(/_/g, " ")}
                             </Badge>
                           )}
                           {seenCount && seenCount > 1 && (
-                            <Badge variant="outline" className="text-[10px]">
-                              seen {seenCount}×
-                            </Badge>
+                            <span className="tnum text-[11px] text-muted-foreground">
+                              · seen {seenCount}×
+                            </span>
                           )}
                         </div>
                         {hal.isResolved === 1 ? (
-                          <Badge className="bg-green-100 text-green-800">Resolved</Badge>
+                          <Badge className="bg-[var(--positive)]/10 text-[var(--positive)] border border-[var(--positive)]/20 font-medium shrink-0">
+                            Resolved
+                          </Badge>
                         ) : (
-                          (() => {
-                            // Only "pending" / "in_progress" hallucinations
-                            // can transition to resolved (server enforces
-                            // via assertTransition; the button used to
-                            // stay enabled for "verified"/"dismissed" too,
-                            // producing a confusing 409 toast).
-                            const actionable =
-                              !remStatus || remStatus === "pending" || remStatus === "in_progress";
-                            return (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => resolveHallucinationMutation.mutate(hal.id)}
-                                disabled={!actionable || resolveHallucinationMutation.isPending}
-                                data-testid={`button-resolve-${hal.id}`}
-                              >
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                Mark Resolved
-                              </Button>
-                            );
-                          })()
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => resolveHallucinationMutation.mutate(hal.id)}
+                            disabled={!actionable || resolveHallucinationMutation.isPending}
+                            data-testid={`button-resolve-${hal.id}`}
+                            className="shrink-0"
+                          >
+                            <CheckCircle className="mr-1 h-4 w-4" />
+                            Mark Resolved
+                          </Button>
                         )}
                       </div>
 
-                      <div className="mt-3 space-y-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground">AI Claimed:</p>
-                          <p className="text-sm bg-red-50 p-2 rounded text-red-800">
-                            "{hal.claimedStatement}"
+                      {/* Claim vs. fact: quote-style with semantic accents.
+                          No heavy block fills — DESIGN.md asks colour to
+                          encode importance, not category. The left rule does
+                          the work; the text reads cleanly on a neutral card. */}
+                      <div className="space-y-3">
+                        <div className="border-l-2 border-[var(--negative)] pl-3">
+                          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                            AI claimed
+                          </p>
+                          <p className="mt-0.5 text-sm leading-snug text-foreground">
+                            {hal.claimedStatement}
                           </p>
                         </div>
                         {hal.actualFact && (
-                          <div>
-                            <p className="text-xs text-muted-foreground">Actual Fact:</p>
-                            <p className="text-sm bg-green-50 p-2 rounded text-green-800">
-                              "{hal.actualFact}"
+                          <div className="border-l-2 border-[var(--positive)] pl-3">
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                              Actual fact
+                            </p>
+                            <p className="mt-0.5 text-sm leading-snug text-foreground">
+                              {hal.actualFact}
                             </p>
                           </div>
                         )}
                         {citingUrl &&
                           (() => {
-                            // Bare domains (hubspot.com/...) and synthetic ai://
-                            // URLs from the analyzer fallback both fail
-                            // new URL(). Normalise + guard so the whole tab
-                            // doesn't error out on one bad row.
                             let hostname = "";
                             try {
                               const normalised = /^[a-z][a-z0-9+.-]*:/i.test(citingUrl)
@@ -326,26 +349,29 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                             }
                             if (!hostname || hostname.startsWith("ai://")) return null;
                             return (
-                              <div className="text-xs">
-                                <a
-                                  href={citingUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                                  data-testid={`link-source-${hal.id}`}
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                  Source: {hostname}
-                                </a>
-                              </div>
+                              <a
+                                href={citingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                data-testid={`link-source-${hal.id}`}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Source: {hostname}
+                              </a>
                             );
                           })()}
                         {hal.remediationSteps && hal.remediationSteps.length > 0 && (
-                          <div>
-                            <p className="text-xs text-muted-foreground">Remediation Steps:</p>
-                            <ul className="text-sm list-disc list-inside text-muted-foreground">
+                          <div className="pt-1">
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                              Remediation
+                            </p>
+                            <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">
                               {hal.remediationSteps.map((step, i) => (
-                                <li key={i}>{step}</li>
+                                <li key={i} className="flex gap-2">
+                                  <span aria-hidden>·</span>
+                                  <span>{step}</span>
+                                </li>
                               ))}
                             </ul>
                           </div>

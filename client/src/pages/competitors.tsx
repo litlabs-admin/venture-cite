@@ -245,15 +245,6 @@ export default function CompetitorsPage() {
       <Helmet>
         <title>Competitors - VentureCite</title>
       </Helmet>
-      {selectedBrandId ? (
-        <div className="mb-4 flex items-center justify-end gap-2">
-          <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-competitor">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Competitor
-          </Button>
-        </div>
-      ) : null}
-
       {/* Competitors/leaderboard are scoped to a single brand */}
       {(brandsLoading || brands.length === 0) && (
         <Card>
@@ -343,13 +334,26 @@ export default function CompetitorsPage() {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-chart-3" />
-                  GEO Leaderboard
-                </CardTitle>
-                <CardDescription>
-                  See how your brand stacks up against competitors in AI citations
-                </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <CardTitle className="flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-chart-3" />
+                      GEO Leaderboard
+                    </CardTitle>
+                    <CardDescription>
+                      See how your brand stacks up against competitors in AI citations
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsAddDialogOpen(true)}
+                    data-testid="button-add-competitor"
+                    className="shrink-0"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Competitor
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {leaderboardIsError ? (
@@ -365,10 +369,19 @@ export default function CompetitorsPage() {
                 ) : leaderboard.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="font-medium">No data yet</p>
+                    <p className="font-medium">No competitors yet</p>
                     <p className="text-sm">
-                      Add competitors and record their citations to see the leaderboard
+                      Add a competitor to start benchmarking your AI citations.
                     </p>
+                    <Button
+                      className="mt-4"
+                      size="sm"
+                      onClick={() => setIsAddDialogOpen(true)}
+                      data-testid="button-leaderboard-empty-add"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add your first competitor
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-3">
