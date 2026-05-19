@@ -6,7 +6,7 @@
 
 export function applyTourStateOp(
   tours: Record<string, unknown>,
-  op: "markCompleted" | "markSkipped" | "suppress" | "clearBrand",
+  op: "markCompleted" | "markSkipped" | "suppress" | "unsuppress" | "clearBrand",
   args: {
     tourId?: string;
     version?: number;
@@ -21,6 +21,15 @@ export function applyTourStateOp(
     const list = Array.isArray(next.perUserSuppressed) ? (next.perUserSuppressed as string[]) : [];
     if (!list.includes(args.tourId)) list.push(args.tourId);
     next.perUserSuppressed = list;
+    return next;
+  }
+
+  if (op === "unsuppress") {
+    // Reverses `suppress`. Lets a user re-enable auto-tours from
+    // settings (toggling off "Don't auto-show tours" sends "*").
+    if (!args.tourId) return next;
+    const list = Array.isArray(next.perUserSuppressed) ? (next.perUserSuppressed as string[]) : [];
+    next.perUserSuppressed = list.filter((id) => id !== args.tourId);
     return next;
   }
 

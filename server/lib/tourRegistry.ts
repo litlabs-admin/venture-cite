@@ -1,8 +1,10 @@
 // server/lib/tourRegistry.ts
 //
 // Single source of truth for valid tour IDs and event types accepted by the
-// tour engine API. Server validates inbound writes against these. Mirrors the
-// client registry at client/src/tours/registry.ts — keep both in sync.
+// tour engine API. Server validates inbound writes against these. Must stay
+// exactly in sync with the client registry at client/src/tours/registry.ts —
+// tests/unit/tourRegistryParity.test.ts asserts the two lists are identical,
+// so a drift fails CI rather than silently 400-ing state writes/events.
 
 export const KNOWN_TOUR_IDS = [
   // Global
@@ -13,18 +15,12 @@ export const KNOWN_TOUR_IDS = [
   "ai-visibility",
   "citations",
   "geo-tools",
-  "ai-intelligence",
+  "brand-fact-sheet",
   // Nudges
   "first-scan-complete",
-  "first-citation-found",
   "first-article-generated",
   "first-prompt-added",
   "first-brand-created",
-  "first-mention-clicked",
-  "first-listicle-found",
-  "first-faq-generated",
-  "first-keyword-research",
-  "empty-citations",
 ] as const;
 
 export type KnownTourId = (typeof KNOWN_TOUR_IDS)[number];
@@ -45,7 +41,13 @@ export const KNOWN_EVENT_TYPES = [
 
 export type KnownEventType = (typeof KNOWN_EVENT_TYPES)[number];
 
-export const TOUR_STATE_OPS = ["markCompleted", "markSkipped", "suppress", "clearBrand"] as const;
+export const TOUR_STATE_OPS = [
+  "markCompleted",
+  "markSkipped",
+  "suppress",
+  "unsuppress",
+  "clearBrand",
+] as const;
 export type TourStateOp = (typeof TOUR_STATE_OPS)[number];
 
 export function isKnownTourId(value: unknown): value is KnownTourId {

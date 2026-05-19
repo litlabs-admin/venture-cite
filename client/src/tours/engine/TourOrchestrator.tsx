@@ -139,7 +139,7 @@ export function TourOrchestrator() {
     const params = new URLSearchParams(window.location.search);
     const previewId = params.get(PREVIEW_QUERY_PARAM);
     if (!previewId) return;
-    const isAdmin = typeof user.email === "string" && user.email.endsWith("@litlabs.io");
+    const isAdmin = !!user.isAdmin;
     if (!isAdmin) return;
     const tour = getTour(previewId);
     if (!tour || !bufferRef.current) return;
@@ -156,6 +156,9 @@ export function TourOrchestrator() {
       ctx,
       mode: "preview",
       buffer: bufferRef.current,
+      onNoShow: () => {
+        activeRef.current = null;
+      },
     });
   }, [enabled, user, brandId, selectedBrand?.name, counts]);
 
@@ -168,7 +171,7 @@ export function TourOrchestrator() {
       userId: user.id,
       brandId,
       brandName: selectedBrand?.name,
-      isAdmin: typeof user.email === "string" && user.email.endsWith("@litlabs.io"),
+      isAdmin: !!user.isAdmin,
       counts,
     };
 
@@ -203,6 +206,15 @@ export function TourOrchestrator() {
             patchState({ op: "suppress", tourId: tour.id });
             activeRef.current = null;
           },
+          onNoShow: () => {
+            // Anchor wasn't on this page, so nothing showed. Persist
+            // nothing and release the per-session guard so this tour is
+            // re-evaluated on the next route/state change — it fires
+            // properly once the user reaches the page that has the
+            // anchor, instead of being silently consumed here.
+            firedThisSessionRef.current.delete(tour.id);
+            activeRef.current = null;
+          },
         });
         break;
       }
@@ -221,7 +233,7 @@ export function TourOrchestrator() {
         userId: user.id,
         brandId,
         brandName: selectedBrand?.name,
-        isAdmin: typeof user.email === "string" && user.email.endsWith("@litlabs.io"),
+        isAdmin: !!user.isAdmin,
         counts,
       };
       activeRef.current = runTour({
@@ -230,6 +242,9 @@ export function TourOrchestrator() {
         mode: "manual",
         buffer: bufferRef.current,
         onComplete: () => {
+          activeRef.current = null;
+        },
+        onNoShow: () => {
           activeRef.current = null;
         },
       });

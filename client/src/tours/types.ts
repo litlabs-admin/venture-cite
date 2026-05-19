@@ -53,7 +53,15 @@ export interface TourStep {
 export type TourTrigger =
   | { kind: "manual" } // "?" replay only
   | { kind: "route"; routes: string[] } // auto-fire on route entry
-  | { kind: "predicate"; evaluate: (ctx: TourContext) => boolean };
+  | {
+      kind: "predicate";
+      evaluate: (ctx: TourContext) => boolean;
+      // Pathnames where this nudge's DOM anchor can exist. The predicate
+      // (a count threshold) often flips while the user is on a different
+      // page than the anchor; without this gate the nudge fires off-page,
+      // misses its target, and is consumed. Omit for anchorless nudges.
+      routes?: string[];
+    };
 
 export interface TourConfig {
   id: string; // must match KNOWN_TOUR_IDS

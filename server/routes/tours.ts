@@ -25,7 +25,7 @@ import {
 import { asyncHandler } from "../lib/routesShared";
 import { captureAndFlush } from "../lib/sentryReport";
 
-type AuthedReq = Request & { user?: { id: string; email?: string } };
+type AuthedReq = Request & { user?: { id: string; email?: string; isAdmin?: number } };
 
 function requireUserId(req: AuthedReq, res: Response): string | null {
   const id = req.user?.id;
@@ -37,9 +37,9 @@ function requireUserId(req: AuthedReq, res: Response): string | null {
 }
 
 function isAdmin(req: AuthedReq): boolean {
-  // Pre-launch admin check — gate by litlabs.io email domain.
-  const email = req.user?.email;
-  return typeof email === "string" && email.endsWith("@litlabs.io");
+  // users.is_admin (integer 1) — same gate as the shared `isAdmin`
+  // middleware in server/auth.ts, not a hardcoded email domain.
+  return req.user?.isAdmin === 1;
 }
 
 const PatchOpSchema = z.discriminatedUnion("op", [
@@ -57,6 +57,10 @@ const PatchOpSchema = z.discriminatedUnion("op", [
   }),
   z.object({
     op: z.literal("suppress"),
+    tourId: z.string().refine((v) => v === "*" || isKnownTourId(v), "Unknown tourId"),
+  }),
+  z.object({
+    op: z.literal("unsuppress"),
     tourId: z.string().refine((v) => v === "*" || isKnownTourId(v), "Unknown tourId"),
   }),
   z.object({
@@ -92,9 +96,13 @@ export function setupTourRoutes(app: Express): void {
 
       const tours = await storage.getTourState(userId);
 
-      // One-time backfill: pre-launch users who already saw the legacy guidedSeen
-      // flag should have global-welcome marked complete so it doesn't auto-fire.
-      // Removed after 30 days post-launch.
+      // Legacy bridge: pre-launch users who saw the old `guidedSeen` flag
+      // shouldn't get global-welcome re-fired. Synthesize the effective
+      // state at READ time WITHOUT persisting — a GET must be safe/
+      // idempotent (the old code did a write inside GET, which also
+      // raced PATCH and could clobber the whole onboarding_state column).
+      // The next genuine PATCH persists global naturally; until then the
+      // client just sees global as complete and won't auto-fire it.
       if (!tours.global) {
         const result = await db.execute(sql`
           SELECT onboarding_state->>'guidedSeen' AS guided_seen, created_at
@@ -105,14 +113,10 @@ export function setupTourRoutes(app: Express): void {
         const row = Array.isArray(rows) ? rows[0] : undefined;
         const r = row as { guided_seen?: string; created_at?: string } | undefined;
         if (r?.guided_seen === "true" && r.created_at) {
-          await storage.patchTourState(userId, "markCompleted", {
-            tourId: "global-welcome",
-            version: 1,
-            brandId: null,
-            timestamp: r.created_at,
+          return res.json({
+            success: true,
+            data: { ...tours, global: { v: 1, completedAt: r.created_at } },
           });
-          const refreshed = await storage.getTourState(userId);
-          return res.json({ success: true, data: refreshed });
         }
       }
 
@@ -139,7 +143,7 @@ export function setupTourRoutes(app: Express): void {
 
       const data = parsed.data;
       const args =
-        data.op === "suppress"
+        data.op === "suppress" || data.op === "unsuppress"
           ? { tourId: data.tourId, timestamp: new Date().toISOString() }
           : data.op === "clearBrand"
             ? { brandId: data.brandId, timestamp: new Date().toISOString() }
@@ -171,6 +175,20 @@ export function setupTourRoutes(app: Express): void {
         });
       }
 
+      // occurredAt is untrusted client input. Clamp it: a far-future
+      // timestamp would survive every retention sweep and skew the
+      // 30-day metrics window; a far-past one would be purged on the
+      // next cron. Bound to [now - retention, now + small clock skew].
+      const nowMs = Date.now();
+      const MAX_SKEW_MS = 5 * 60 * 1000;
+      const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+      const clampOccurredAt = (iso: string): Date => {
+        const t = new Date(iso).getTime();
+        const lo = nowMs - RETENTION_MS;
+        const hi = nowMs + MAX_SKEW_MS;
+        return new Date(Math.min(Math.max(Number.isFinite(t) ? t : nowMs, lo), hi));
+      };
+
       const rows = parsed.data.events.map((e) => ({
         id: e.id,
         userId,
@@ -182,7 +200,7 @@ export function setupTourRoutes(app: Express): void {
         eventType: e.eventType,
         triggerType: e.triggerType ?? null,
         dwellMs: e.dwellMs ?? null,
-        occurredAt: new Date(e.occurredAt),
+        occurredAt: clampOccurredAt(e.occurredAt),
       }));
 
       try {

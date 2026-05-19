@@ -4,7 +4,8 @@ export const firstPromptAddedNudge: TourConfig = {
   id: "first-prompt-added",
   version: 1,
   scope: "perBrand",
-  trigger: { kind: "predicate", evaluate: (ctx) => ctx.counts.prompts >= 1 },
+  // Anchor `prompts.runButton` lives on the Monitor → Citations tab.
+  trigger: { kind: "predicate", evaluate: (ctx) => ctx.counts.prompts >= 1, routes: ["/monitor"] },
   steps: [
     {
       id: "tip",

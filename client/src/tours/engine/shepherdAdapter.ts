@@ -17,6 +17,11 @@ interface RunOptions {
   onComplete?: () => void;
   onSkipForever?: () => void;
   onSkip?: () => void;
+  // Every step's target was missing, so nothing rendered. The tour must
+  // NOT be persisted as completed/skipped (that would burn a one-step
+  // nudge forever); the orchestrator clears its session guard so it can
+  // re-fire when the user reaches the page whose anchor exists.
+  onNoShow?: () => void;
 }
 
 const DEFAULT_TIMEOUT_MS = 3000;
@@ -59,7 +64,7 @@ export interface RunningTour {
 }
 
 export function runTour(opts: RunOptions): RunningTour {
-  const { config, ctx, mode, buffer, onComplete, onSkipForever, onSkip } = opts;
+  const { config, ctx, mode, buffer, onComplete, onSkipForever, onSkip, onNoShow } = opts;
   const baseEvent = (extras: { eventType: string } & Record<string, unknown>) => ({
     tourId: config.id,
     tourVersion: config.version,
@@ -80,18 +85,13 @@ export function runTour(opts: RunOptions): RunningTour {
 
   let stepEnterAt = Date.now();
   let cancelled = false;
-  // Tracks whether a state-persisting button handler (Skip / Done /
-  // Don't-show-again) already fired for this run. The X cancel icon
-  // also triggers tour.cancel() but doesn't go through those handlers,
-  // so without this flag the X-out used to leave state unchanged and
-  // the tour would re-fire on every page load. tour.on("cancel") now
-  // calls onSkip when this flag is false — i.e. X-out is treated as
-  // a skip for the current version.
-  let exitHandled = false;
+  // Steps that actually rendered (target found). If this stays 0 the
+  // tour showed nothing — see onNoShow handling below.
+  let builtCount = 0;
   // Programmatic cancels from the orchestrator (e.g. brand-switch)
   // should NOT mark the tour skipped — they're internal navigation,
   // not user intent. The orchestrator's RunningTour.cancel(reason)
-  // toggles this before tearing the tour down.
+  // sets this before tearing the tour down.
   let cancelReason: string | null = null;
 
   buffer.push(
@@ -129,7 +129,6 @@ export function runTour(opts: RunOptions): RunningTour {
         secondary: true,
         action: () => {
           buffer.push(baseEvent({ eventType: "tour_skipped", stepId: step.id, stepIndex: index }));
-          exitHandled = true;
           onSkip?.();
           tour.cancel();
         },
@@ -143,7 +142,6 @@ export function runTour(opts: RunOptions): RunningTour {
           buffer.push(
             baseEvent({ eventType: "tour_suppressed", stepId: step.id, stepIndex: index }),
           );
-          exitHandled = true;
           onSkipForever?.();
           tour.cancel();
         },
@@ -165,7 +163,6 @@ export function runTour(opts: RunOptions): RunningTour {
           buffer.push(
             baseEvent({ eventType: "tour_completed", stepId: step.id, stepIndex: index }),
           );
-          exitHandled = true;
           if (mode === "auto") onComplete?.();
           tour.complete();
         } else {
@@ -195,32 +192,39 @@ export function runTour(opts: RunOptions): RunningTour {
   (async () => {
     for (let i = 0; i < config.steps.length; i++) {
       if (cancelled) return;
-      await buildStep(config.steps[i], i);
+      const built = await buildStep(config.steps[i], i);
+      if (built) builtCount++;
     }
-    if (!cancelled) {
-      requestAnimationFrame(() => {
-        if (!cancelled) tour.start();
-      });
+    if (cancelled) return;
+    if (builtCount === 0) {
+      // Every step's target was missing — nothing rendered. Don't
+      // persist completion/skip (that would consume a one-step nudge
+      // permanently) and don't emit completed/abandoned. Hand back to
+      // the orchestrator so the same tour can re-fire once the user is
+      // on the page whose anchor exists. tour.start() is never called,
+      // so Shepherd's "cancel" never fires for this run.
+      onNoShow?.();
+      return;
     }
+    requestAnimationFrame(() => {
+      if (!cancelled) tour.start();
+    });
   })();
 
   tour.on("cancel", () => {
-    // Three sources of cancel reach this handler:
-    //   1. Skip / Done / Don't-show-again buttons (their handlers set
-    //      exitHandled = true before calling tour.cancel/complete()).
-    //   2. The X cancel icon — no button handler fires, so exitHandled
-    //      stays false. We treat this as a Skip so the user doesn't
-    //      see the same tour every page load.
-    //   3. Programmatic cancel from the orchestrator (brand-switch
-    //      etc.) — RunningTour.cancel(reason) sets cancelReason. Do
-    //      NOT mark state in that case; it's internal navigation,
-    //      not user intent.
-    if (!exitHandled && !cancelReason) {
-      buffer.push(baseEvent({ eventType: "tour_skipped", stepId: "cancel-icon" }));
-      onSkip?.();
-      exitHandled = true;
-    }
-    if (!cancelled) {
+    // Reaches here from: the explicit Skip / Don't-show-again buttons
+    // (which already persisted via onSkip / onSkipForever), the X
+    // cancel icon or Esc, or a programmatic cancel.
+    //
+    // X / Esc is a SOFT dismiss: we deliberately do NOT persist a skip.
+    // The orchestrator's per-session guard stops it reopening this
+    // session; it becomes eligible again next session. Only the
+    // explicit "Skip" (writes skippedAt) and "Don't show again"
+    // (writes suppressed) buttons persist — an accidental X must not
+    // kill a tour forever. Programmatic cancels (cancelReason set,
+    // `cancelled` true) emit their own abandoned event in
+    // RunningTour.cancel and must stay silent here.
+    if (!cancelled && !cancelReason) {
       buffer.push(baseEvent({ eventType: "tour_abandoned" }));
     }
   });

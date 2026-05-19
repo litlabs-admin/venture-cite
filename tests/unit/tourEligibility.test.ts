@@ -95,4 +95,21 @@ describe("shouldAutoFire", () => {
     const fired = { ...noBrand, counts: { ...noBrand.counts, mentions: 1 } };
     expect(shouldAutoFire(nudge, {}, fired, "/geo-tools")).toBe(false);
   });
+
+  it("route-gated nudge fires only on its declared routes", () => {
+    const gated: TourConfig = {
+      ...nudge,
+      trigger: {
+        kind: "predicate",
+        evaluate: (c) => c.counts.mentions === 1,
+        routes: ["/monitor"],
+      },
+    };
+    const fired = { ...ctx, counts: { ...ctx.counts, mentions: 1 } };
+    // Predicate true but user is off-route → must not fire (would miss
+    // its anchor and be consumed).
+    expect(shouldAutoFire(gated, {}, fired, "/dashboard")).toBe(false);
+    // On the route that has the anchor → fires.
+    expect(shouldAutoFire(gated, {}, fired, "/monitor")).toBe(true);
+  });
 });

@@ -362,10 +362,7 @@ export default function Settings() {
   const wildcardSuppressed = (tourState.perUserSuppressed ?? []).includes("*");
 
   const toggleWildcard = (next: boolean) => {
-    if (next) {
-      patchTour({ op: "suppress", tourId: "*" });
-    }
-    // No "off" path in v1 — see plan note (un-suppress is v2).
+    patchTour({ op: next ? "suppress" : "unsuppress", tourId: "*" });
   };
 
   const prefsQueryKey = ["/api/user/notification-preferences"];
@@ -565,7 +562,6 @@ export default function Settings() {
             id="suppress-tours"
             checked={wildcardSuppressed}
             onCheckedChange={toggleWildcard}
-            disabled={wildcardSuppressed}
           />
         </div>
       </section>

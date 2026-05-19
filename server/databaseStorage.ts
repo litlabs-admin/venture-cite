@@ -362,32 +362,45 @@ export class DatabaseStorage implements IStorage {
       timestamp: string;
     },
   ): Promise<Record<string, unknown>> {
-    const [current] = await db
-      .select({ onboardingState: schema.users.onboardingState })
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
+    // Read-modify-write of the whole onboarding_state column, so it must
+    // be atomic: a SELECT ... FOR UPDATE row lock serializes concurrent
+    // tour patches AND blocks the sibling /api/onboarding/state writer
+    // (any UPDATE of this row waits on the lock) for the duration of the
+    // transaction. Without this, two concurrent writers each computed
+    // from a stale snapshot and the second clobbered the first (lost
+    // updates, including legacy onboarding flags).
+    return await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ onboardingState: schema.users.onboardingState })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1)
+        .for("update");
 
-    const existing = (current?.onboardingState ?? {}) as Record<string, unknown>;
-    const tours = (existing.tours ?? {}) as Record<string, unknown>;
-    const next = applyTourStateOp(tours, op, args);
+      const existing = (current?.onboardingState ?? {}) as Record<string, unknown>;
+      const tours = (existing.tours ?? {}) as Record<string, unknown>;
+      const next = applyTourStateOp(tours, op, args);
 
-    const merged = { ...existing, tours: next };
+      const merged = { ...existing, tours: next };
 
-    const [updated] = await db
-      .update(schema.users)
-      .set({ onboardingState: merged })
-      .where(eq(schema.users.id, userId))
-      .returning({ onboardingState: schema.users.onboardingState });
+      const [updated] = await tx
+        .update(schema.users)
+        .set({ onboardingState: merged })
+        .where(eq(schema.users.id, userId))
+        .returning({ onboardingState: schema.users.onboardingState });
 
-    const newTours = ((updated?.onboardingState as Record<string, unknown> | undefined)?.tours ??
-      {}) as Record<string, unknown>;
-    return newTours;
+      const newTours = ((updated?.onboardingState as Record<string, unknown> | undefined)?.tours ??
+        {}) as Record<string, unknown>;
+      return newTours;
+    });
   }
 
   async clearTourStateForBrand(brandId: string): Promise<void> {
     // Strip perBrand[brandId] sub-tree from every user that has it.
-    // Called from deleteBrand and softDeleteBrand grace-window expiry.
+    // Called from deleteBrand (synchronous hard delete) AND directly
+    // from the brand-purge cron (runBrandPurgeJob raw-deletes the row
+    // without going through deleteBrand, so it must call this itself —
+    // otherwise the JSONB sub-tree is orphaned forever on purge).
     await db.execute(sql`
       UPDATE users
       SET onboarding_state = jsonb_set(
@@ -409,8 +422,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteOldTourEvents(olderThan: Date): Promise<number> {
+    // Retain on server_received_at (server clock), not occurred_at
+    // (clamped, but still client-influenced) — retention must key off
+    // a trusted column so rows can't dodge or trigger early cleanup.
     const result = await db.execute(sql`
-      DELETE FROM tour_events WHERE occurred_at < ${olderThan.toISOString()}
+      DELETE FROM tour_events WHERE server_received_at < ${olderThan.toISOString()}
     `);
     return (result as unknown as { rowCount?: number }).rowCount ?? 0;
   }

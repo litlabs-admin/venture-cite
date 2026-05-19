@@ -293,6 +293,73 @@ describe("POST /api/auth/register (requires verification)", () => {
     // Crucially: we did NOT auto-login the freshly created account.
     expect(stubs.signInWithPassword).not.toHaveBeenCalled();
   });
+
+  it("sends the signup verification email after creating the account", async () => {
+    // admin.createUser does NOT send the confirmation email; register
+    // must trigger it explicitly via auth.resend({type:'signup'}).
+    stubs.createUser.mockResolvedValue({
+      data: { user: { id: USER_ID, email: "new@example.com" } },
+      error: null,
+    });
+    stubs.resend.mockResolvedValue({ data: null, error: null });
+    const app = buildApp();
+    const { status, body } = await call(app, "POST", "/api/auth/register", {
+      email: "New@Example.com",
+      password: "averylongpassword",
+    });
+    expect(status).toBe(200);
+    expect(body?.requiresVerification).toBe(true);
+    expect(stubs.resend).toHaveBeenCalledTimes(1);
+    const arg = stubs.resend.mock.calls[0]![0] as {
+      type: string;
+      email: string;
+      options: { emailRedirectTo: string };
+    };
+    expect(arg.type).toBe("signup");
+    expect(arg.email).toBe("new@example.com");
+    expect(arg.options.emailRedirectTo).toContain("/login?verified=1");
+  });
+
+  it("self-heals an existing unverified account: resends + 200 instead of dead-ending at 400", async () => {
+    stubs.createUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: "A user with this email address has already been registered", status: 422 },
+    });
+    stubs.resend.mockResolvedValue({ data: null, error: null });
+    const app = buildApp();
+    const { status, body } = await call(app, "POST", "/api/auth/register", {
+      email: "stuck@example.com",
+      password: "averylongpassword",
+    });
+    expect(status).toBe(200);
+    expect(body?.success).toBe(true);
+    expect(body?.requiresVerification).toBe(true);
+    // The stuck account is rescued by resending the confirmation link.
+    expect(stubs.resend).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a genuine createUser failure as 400 and does NOT self-heal (no resend)", async () => {
+    // Weak-password is also a 422 — must not be misread as "already
+    // exists" (that would falsely tell the user they registered).
+    stubs.createUser.mockResolvedValue({
+      data: { user: null },
+      error: {
+        message: "Password should be at least 6 characters",
+        status: 422,
+        code: "weak_password",
+      },
+    });
+    stubs.resend.mockResolvedValue({ data: null, error: null });
+    const app = buildApp();
+    const { status, body } = await call(app, "POST", "/api/auth/register", {
+      email: "weak@example.com",
+      password: "averylongpassword",
+    });
+    expect(status).toBe(400);
+    expect(body?.success).toBe(false);
+    expect(body?.error).toContain("Password should be at least");
+    expect(stubs.resend).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /api/auth/resend-verification", () => {

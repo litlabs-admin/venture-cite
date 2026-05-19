@@ -5,7 +5,8 @@ export const firstScanCompleteNudge: TourConfig = {
   id: "first-scan-complete",
   version: 1,
   scope: "perBrand",
-  trigger: { kind: "predicate", evaluate: (ctx) => ctx.counts.mentions >= 1 },
+  // Anchor `mentions.firstResult` lives on the Monitor → Mentions tab.
+  trigger: { kind: "predicate", evaluate: (ctx) => ctx.counts.mentions >= 1, routes: ["/monitor"] },
   steps: [
     {
       id: "celebrate",

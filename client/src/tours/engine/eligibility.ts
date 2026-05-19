@@ -21,6 +21,11 @@ export function shouldAutoFire(
 
   // Predicate-based trigger (nudges).
   if (tour.trigger.kind === "predicate") {
+    // Route gate first: a nudge whose anchor only exists on specific
+    // pages must not fire elsewhere (it would miss its target and be
+    // consumed). Anchorless nudges omit `routes` and skip this.
+    const routes = tour.trigger.routes;
+    if (routes && routes.length > 0 && !routes.includes(currentRoute)) return false;
     let predicateOk = false;
     try {
       predicateOk = tour.trigger.evaluate(ctx);

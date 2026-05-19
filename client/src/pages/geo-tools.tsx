@@ -2,9 +2,6 @@
 // surfaces). FAQ management lives in the canonical FAQ editor (faq-manager,
 // /act?tab=faq) and brand mentions live in Community/Monitor — those tabs
 // were removed here to end the duplication.
-//
-// Tour engine targets (literal data-tour-id strings for verifier):
-//   data-tour-id="listicles.firstResult"
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -682,13 +679,7 @@ export default function GeoTools() {
                               const statusMeta =
                                 LISTICLE_STATUS_DISPLAY[status] ?? LISTICLE_STATUS_DISPLAY.new;
                               return (
-                                <Card
-                                  key={l.id}
-                                  className="border-l border-border"
-                                  data-tour-id={
-                                    listicleIndex === 0 ? "listicles.firstResult" : undefined
-                                  }
-                                >
+                                <Card key={l.id} className="border-l border-border">
                                   <CardContent className="pt-4">
                                     <div className="flex items-start justify-between gap-4">
                                       <StatusDot tone="neutral" className="mt-2" />

@@ -69,4 +69,24 @@ describe("applyTourStateOp", () => {
     });
     expect(out.perBrand).toEqual({ other: {} });
   });
+
+  it("unsuppress reverses a wildcard suppress (settings re-enable)", () => {
+    const suppressed = applyTourStateOp({}, "suppress", { tourId: "*", timestamp: NOW });
+    expect(suppressed.perUserSuppressed).toEqual(["*"]);
+    const restored = applyTourStateOp(suppressed, "unsuppress", { tourId: "*", timestamp: NOW });
+    expect(restored.perUserSuppressed).toEqual([]);
+  });
+
+  it("unsuppress removes only the matching id and is a no-op when absent", () => {
+    const seeded = applyTourStateOp(
+      applyTourStateOp({}, "suppress", { tourId: "mentions", timestamp: NOW }),
+      "suppress",
+      { tourId: "citations", timestamp: NOW },
+    );
+    expect(seeded.perUserSuppressed).toEqual(["mentions", "citations"]);
+    const out = applyTourStateOp(seeded, "unsuppress", { tourId: "mentions", timestamp: NOW });
+    expect(out.perUserSuppressed).toEqual(["citations"]);
+    const noop = applyTourStateOp(out, "unsuppress", { tourId: "not-there", timestamp: NOW });
+    expect(noop.perUserSuppressed).toEqual(["citations"]);
+  });
 });

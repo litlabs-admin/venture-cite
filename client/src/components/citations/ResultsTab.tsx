@@ -65,8 +65,6 @@ type ResultsTabProps = {
   runMutation: { mutate: () => void; isPending: boolean };
 };
 
-// Tour engine targets (literal data-tour-id strings for verifier):
-//   data-tour-id="citations.firstResult"
 export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }: ResultsTabProps) {
   // Wave 9: keep results in sync during a citation run by polling 6s
   // while one is active. TanStack dedupes the gate query so this is free.
@@ -417,7 +415,6 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
                   key={row.promptId}
                   value={row.promptId}
                   data-testid={`prompt-result-${i}`}
-                  data-tour-id={i === 0 ? "citations.firstResult" : undefined}
                 >
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-3 flex-1 text-left">

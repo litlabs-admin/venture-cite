@@ -4,7 +4,12 @@ export const firstBrandCreatedNudge: TourConfig = {
   id: "first-brand-created",
   version: 1,
   scope: "perUser",
-  trigger: { kind: "predicate", evaluate: (ctx) => ctx.counts.brands >= 1 },
+  // Anchor `brands.firstRow` renders on /brands and /setup?tab=brands.
+  trigger: {
+    kind: "predicate",
+    evaluate: (ctx) => ctx.counts.brands >= 1,
+    routes: ["/brands", "/setup"],
+  },
   steps: [
     {
       id: "next",

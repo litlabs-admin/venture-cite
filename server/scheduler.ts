@@ -486,6 +486,9 @@ export async function runBrandPurgeJob(): Promise<{ purged: number; failed: numb
     try {
       // Wave 7: drafts are now articles with status='draft' and brand_id has
       // ON DELETE CASCADE, so the explicit cleanup is no longer needed.
+      // Tour state lives in users.onboarding_state JSONB (no FK cascade),
+      // so it must be cleared explicitly — this path bypasses deleteBrand.
+      await storage.clearTourStateForBrand(brand.id);
       await db.delete(schema.brands).where(eq(schema.brands.id, brand.id));
 
       await logSystemAudit(brand.userId ?? null, {

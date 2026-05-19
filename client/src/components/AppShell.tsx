@@ -9,7 +9,7 @@ import { PageHeaderHelp } from "./PageHeaderHelp";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import logoPath from "@assets/logo.png";
-import { spineTitleFor } from "@/lib/spineStages";
+import { spineTitleFor, pageTourFor } from "@/lib/spineStages";
 
 // ─── AppShell ────────────────────────────────────────────────────────────────
 // The one persistent three-zone shell (nav rail / context bar + canvas /
@@ -78,7 +78,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const title = shellTitleFor(location, new URLSearchParams(search).get("tab"));
+  const activeTab = new URLSearchParams(search).get("tab");
+  const title = shellTitleFor(location, activeTab);
   const ownsContextBar = title !== null;
   const inspectorOpen = ownsContextBar && inspector !== null;
 
@@ -119,7 +120,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <Link href="/dashboard">
               <img src={logoPath} alt="VentureCite" className="h-8 w-auto cursor-pointer" />
             </Link>
-            <div className="w-9" />
+            {/* Mobile help: the desktop context bar is lg:-only, so without
+                this the "?" (tour replay / AI tutor) is unreachable on phones
+                — where it's most needed. Sits in the balanced right slot. */}
+            <PageHeaderHelp
+              tourId={pageTourFor(location, activeTab)}
+              pageLabel={title ?? "this page"}
+            />
           </header>
 
           {/* Zone 2 — context bar (only the migrated surface owns it). One
@@ -134,7 +141,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 <div className="flex shrink-0 items-center gap-2">
                   <BrandSelector className="w-56" />
                   <PageHeaderHelp
-                    tourId={location === "/" || location === "/dashboard" ? "dashboard" : undefined}
+                    tourId={pageTourFor(location, activeTab)}
                     pageLabel={title ?? ""}
                   />
                 </div>

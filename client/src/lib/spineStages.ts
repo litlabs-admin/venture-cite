@@ -87,3 +87,33 @@ export function spineTitleFor(pathname: string, tab: string | null): string | nu
   }
   return STANDALONE_TITLES[pathname] ?? null;
 }
+
+/**
+ * Resolve which replayable page tour (client/src/tours/pages/*) belongs to
+ * the surface a user is currently on, so AppShell's "?" help button can
+ * replay the right tour on every page instead of only the dashboard.
+ *
+ * Keyed off the same (pathname, ?tab) pair as spineTitleFor and the same
+ * defaultTab fallback, so the help button and the title can never name
+ * different surfaces. Returns undefined where no page tour exists (the
+ * help button then falls back to the AI tutor, which is intended).
+ *
+ * Tour ids must exist in client/src/tours/registry.ts.
+ */
+export function pageTourFor(pathname: string, tab: string | null): string | undefined {
+  if (pathname === "/" || pathname === "/dashboard") return "dashboard";
+  if (pathname === "/brands") return "brands";
+
+  const stage = SPINE_STAGES.find((s) => s.path === pathname);
+  if (!stage) return undefined;
+  const key = tab && stage.labels[tab] ? tab : stage.defaultTab;
+
+  if (pathname === "/setup") {
+    if (key === "brands") return "brands";
+    if (key === "fact-sheet") return "brand-fact-sheet";
+    if (key === "visibility") return "ai-visibility";
+  }
+  if (pathname === "/monitor" && key === "citations") return "citations";
+  if (pathname === "/act" && key === "geo-assets") return "geo-tools";
+  return undefined;
+}

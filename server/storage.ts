@@ -816,7 +816,7 @@ export interface IStorage {
   getTourState(userId: string): Promise<Record<string, unknown>>;
   patchTourState(
     userId: string,
-    op: "markCompleted" | "markSkipped" | "suppress" | "clearBrand",
+    op: "markCompleted" | "markSkipped" | "suppress" | "unsuppress" | "clearBrand",
     args: {
       tourId?: string;
       version?: number;

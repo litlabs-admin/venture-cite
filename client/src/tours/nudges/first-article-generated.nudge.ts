@@ -4,7 +4,12 @@ export const firstArticleGeneratedNudge: TourConfig = {
   id: "first-article-generated",
   version: 1,
   scope: "perBrand",
-  trigger: { kind: "predicate", evaluate: (ctx) => ctx.counts.articles >= 1 },
+  // Anchor `articles.firstResult` renders on /articles and /act?tab=library.
+  trigger: {
+    kind: "predicate",
+    evaluate: (ctx) => ctx.counts.articles >= 1,
+    routes: ["/articles", "/act"],
+  },
   steps: [
     {
       id: "celebrate",

@@ -7,14 +7,9 @@ import { citationsTour } from "./pages/citations.tour";
 import { geoToolsTour } from "./pages/geo-tools.tour";
 import { brandFactSheetTour } from "./pages/brand-fact-sheet.tour";
 import { firstScanCompleteNudge } from "./nudges/first-scan-complete.nudge";
-import { firstCitationFoundNudge } from "./nudges/first-citation-found.nudge";
 import { firstArticleGeneratedNudge } from "./nudges/first-article-generated.nudge";
 import { firstPromptAddedNudge } from "./nudges/first-prompt-added.nudge";
 import { firstBrandCreatedNudge } from "./nudges/first-brand-created.nudge";
-import { firstMentionClickedNudge } from "./nudges/first-mention-clicked.nudge";
-import { firstListicleFoundNudge } from "./nudges/first-listicle-found.nudge";
-import { firstFaqGeneratedNudge } from "./nudges/first-faq-generated.nudge";
-import { firstKeywordResearchNudge } from "./nudges/first-keyword-research.nudge";
 
 export const TOURS: Record<string, TourConfig> = {
   [globalWelcomeTour.id]: globalWelcomeTour,
@@ -25,14 +20,9 @@ export const TOURS: Record<string, TourConfig> = {
   [geoToolsTour.id]: geoToolsTour,
   [brandFactSheetTour.id]: brandFactSheetTour,
   [firstScanCompleteNudge.id]: firstScanCompleteNudge,
-  [firstCitationFoundNudge.id]: firstCitationFoundNudge,
   [firstArticleGeneratedNudge.id]: firstArticleGeneratedNudge,
   [firstPromptAddedNudge.id]: firstPromptAddedNudge,
   [firstBrandCreatedNudge.id]: firstBrandCreatedNudge,
-  [firstMentionClickedNudge.id]: firstMentionClickedNudge,
-  [firstListicleFoundNudge.id]: firstListicleFoundNudge,
-  [firstFaqGeneratedNudge.id]: firstFaqGeneratedNudge,
-  [firstKeywordResearchNudge.id]: firstKeywordResearchNudge,
 };
 
 export function getTour(id: string): TourConfig | undefined {

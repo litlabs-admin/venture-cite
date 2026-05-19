@@ -1,8 +1,5 @@
 // Canonical FAQ editor (spine: /act?tab=faq). The geo-tools FAQ tab was
-// removed in favour of this one, so the first-FAQ nudge anchor moved here.
-//
-// Tour engine targets (literal data-tour-id strings for verifier):
-//   data-tour-id="faq.firstResult"
+// removed in favour of this one to end the duplication.
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

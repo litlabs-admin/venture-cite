@@ -326,12 +326,43 @@ export function setupAuth(app: Express) {
 
       const normalizedEmail = String(email).toLowerCase().trim();
 
+      // Verification link must land back on our app, not Supabase's
+      // default Site URL. Mirrors /api/auth/resend-verification.
+      const appUrl = process.env.APP_URL || "http://localhost:5000";
+      const emailRedirectTo = `${appUrl}/login?verified=1`;
+
+      // admin.createUser is an admin *provisioning* API — it does NOT
+      // send the signup confirmation email (only the public signUp() or
+      // an explicit resend/generateLink does). So the verification email
+      // must be sent explicitly here; without it the user lands on
+      // /verify-email waiting for a link that never arrives, can't log
+      // in (unconfirmed), and re-registering dead-ends at "already
+      // registered". Same mechanism as /api/auth/resend-verification.
+      // Best-effort: a failure to send the email must NOT fail the
+      // registration (the account exists; the user can still use the
+      // manual "Resend" button on /verify-email). So this never throws.
+      const sendSignupEmail = async (): Promise<void> => {
+        try {
+          const result = await supabaseAdmin.auth.resend({
+            type: "signup",
+            email: normalizedEmail,
+            options: { emailRedirectTo },
+          });
+          const resendErr = (result as { error?: unknown } | undefined)?.error;
+          if (resendErr) {
+            logger.warn(
+              { err: resendErr, email: normalizedEmail },
+              "auth: register signup-email send failed",
+            );
+          }
+        } catch (err) {
+          logger.warn({ err, email: normalizedEmail }, "auth: register signup-email send threw");
+        }
+      };
+
       // Plan 4 Task 3: require email verification before the account can
-      // be used. Previously this called createUser with email_confirm:true
-      // and issued a session in the same response — meaning anyone could
-      // register with someone-else@gmail.com and be immediately logged
-      // in. Now Supabase sends the confirmation email and refuses login
-      // until the user clicks the link.
+      // be used. No session is issued in this response — the client
+      // routes to /verify-email and waits for the confirmation link.
       const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email: normalizedEmail,
         password,
@@ -340,21 +371,52 @@ export function setupAuth(app: Express) {
       });
 
       if (createErr || !created.user) {
+        const msg = createErr?.message ?? "";
+        // Match ONLY the duplicate-email case. Not a bare status===422:
+        // Supabase also returns 422 for weak_password etc., and
+        // self-healing those would falsely tell the user they
+        // registered when no account was created.
+        const alreadyExists =
+          (createErr as any)?.code === "email_exists" ||
+          /already.*regist|already.*exist|user.*already.*regist/i.test(msg);
+
+        // Self-heal the stuck-account dead-end: a prior attempt created
+        // the Supabase user but no verification email was ever sent, so
+        // the user keeps re-registering and hitting "already
+        // registered". Re-send the confirmation and treat it as an
+        // idempotent success so the account becomes usable. Supabase
+        // no-ops resend for already-verified accounts (the /verify-email
+        // screen offers an "Already verified? Sign in" path for that
+        // case), and the response is now uniform with a fresh signup so
+        // this also closes the previous account-enumeration leak.
+        if (alreadyExists) {
+          await sendSignupEmail();
+          logger.info(
+            { email: normalizedEmail },
+            "auth: register on existing unverified account — resent verification",
+          );
+          return res.json({ success: true, requiresVerification: true, email: normalizedEmail });
+        }
+
+        // Genuine failure — log it (the old code returned this only to
+        // the client and never logged it, so production 400s had no
+        // diagnosable reason).
+        logger.warn({ err: createErr, email: normalizedEmail }, "auth: register createUser failed");
         return res.status(400).json({
           success: false,
           error: createErr?.message || "Failed to create account",
         });
       }
 
-      // No session is issued. Client routes to /verify-email and waits
-      // for the user to click the link in Supabase's confirmation email.
+      await sendSignupEmail();
+
       res.json({
         success: true,
         requiresVerification: true,
         email: normalizedEmail,
       });
     } catch (error: any) {
-      captureAndFlush(error, { tags: { source: "auth.ts:328" } });
+      captureAndFlush(error, { tags: { source: "auth.ts:register" } });
       res.status(500).json({ success: false, error: error.message || "Registration failed" });
     }
   });
