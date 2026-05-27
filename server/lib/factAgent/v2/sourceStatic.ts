@@ -24,7 +24,15 @@ import {
 import { sanitizeHydration } from "./hydrationSanitizer";
 import { discoverSubdomainUrls } from "./urlDiscovery";
 import { buildExtractionPrompt, parseFactsWithRepair, type LlmCallable } from "./extractionPrompt";
-import type { Fact } from "@shared/factAgent/schema";
+import { type Fact, subcategoryFor, type Domain } from "@shared/factAgent/schema";
+
+// 2026-05-28 production cap: the LLM input is now bounded at ~6 KB of
+// body text + 12 KB of sanitised hydration + however much structured
+// data was found. Past this point we get diminishing returns on fact
+// extraction and a meaningful tail-latency cost. Hero/about content
+// typically lives in the first 4 KB; we keep slack for sites that put
+// the relevant copy slightly lower.
+const MAX_BODY_CHARS = 6_000;
 
 export interface FetcherResponse {
   status: number;
@@ -165,15 +173,22 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
     });
   }
 
-  // 6. Canonical redirect — must happen before any expensive LLM call.
+  // 6. Canonical redirect — informational, NOT a skip.
+  //
+  // 2026-05-28 production fix: the previous behaviour was to drop ANY
+  // page whose <link rel="canonical"> pointed elsewhere. This silently
+  // killed scraping for every brand whose homepage canonicalises
+  // bare-host → www-host (Adyen, Samsung, Notion, …). The HTML body is
+  // present; we should extract from it. The canonical URL is captured
+  // and returned so the executor can dedup against future runs that
+  // queue the canonical target separately, but we DO NOT skip.
+  //
+  // Edge case: if a deeper page canonicalises back to the homepage
+  // (e.g. venturepr.com/services → venturepr.com/), the homepage
+  // dedup-within-run logic will filter the duplicate facts. The
+  // alternative (skipping the page) lost real content for cases like
+  // bare-host → www-host where every page returns this signal.
   const canonicalRedirect = detectCanonicalRedirect(res.text, canonical);
-  if (canonicalRedirect) {
-    return empty("skipped_canonical", {
-      statusCode: res.status,
-      bytes: res.text.length,
-      canonicalRedirect,
-    });
-  }
 
   // 7. Extract signals: RSC/hydration payloads, structured data, body text.
   const hydra = extractHydration(res.text);
@@ -242,14 +257,22 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
   // 11. Subdomain URL discovery (cheap; do before the LLM call)
   const discoveredUrls = discoverSubdomainUrls(res.text, args.brandUrl);
 
-  // 12. Compose LLM payload: structured metadata + sanitised hydration + body text
+  // 12. Compose LLM payload: structured metadata + sanitised hydration + body text.
+  //
+  // Body is trimmed to MAX_BODY_CHARS — empirically the hero/about
+  // content sits within the first 4-6 KB on every site we audited;
+  // beyond that is footer / repeated nav / blog excerpts that
+  // contribute noise more than signal.
   const sanitizedHydration = sanitizeHydration(hydra.payload);
-  const llmPayload = [structured.text, sanitizedHydration, body]
+  const trimmedBody = body.length > MAX_BODY_CHARS ? body.slice(0, MAX_BODY_CHARS) : body;
+  const llmPayload = [structured.text, sanitizedHydration, trimmedBody]
     .filter((s) => s.length > 0)
     .join("\n\n---\n\n");
 
-  // 13. Build prompt and call LLM with one auto-repair retry
-  const prompt = buildExtractionPrompt(llmPayload, {
+  // 13. Build prompt and call LLM. Strict JSON Schema mode handles most
+  // of what auto-repair used to. We keep a 0-fact retry with the
+  // relaxed prompt as a separate concern from JSON-shape repair.
+  const basePrompt = buildExtractionPrompt(llmPayload, {
     brandUrl: args.brandUrl,
     brandName: args.brandName,
     industry: args.industry ?? null,
@@ -257,7 +280,7 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
 
   let parseResult: Awaited<ReturnType<typeof parseFactsWithRepair>>;
   try {
-    parseResult = await parseFactsWithRepair(prompt, args.llm);
+    parseResult = await parseFactsWithRepair(basePrompt, args.llm);
   } catch (err) {
     return empty("failed", {
       statusCode: res.status,
@@ -274,15 +297,39 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
     });
   }
 
-  // 14. Post-processing: tag sourceUrl, dedup, sanitize, redact, validate.
+  // 13a. Zero-fact retry on rich content — the v1 audit showed pages
+  // with 5-18k characters of body still returning facts=[] because the
+  // model was being overly conservative about confidence. The relaxed
+  // prompt explicitly tells it lower-confidence paraphrases are OK.
+  // We only retry once, and only when the page clearly has content
+  // worth a second pass; otherwise tail latency creeps up.
+  if (parseResult.facts.length === 0 && body.length >= 2000) {
+    const relaxedPrompt = buildExtractionPrompt(llmPayload, {
+      brandUrl: args.brandUrl,
+      brandName: args.brandName,
+      industry: args.industry ?? null,
+      relaxed: true,
+    });
+    try {
+      const relaxedResult = await parseFactsWithRepair(relaxedPrompt, args.llm);
+      if (relaxedResult.facts.length > 0) {
+        parseResult = { facts: relaxedResult.facts, repairUsed: true };
+      }
+    } catch {
+      // Non-fatal; the original 0-fact result stands.
+    }
+  }
+
+  // 14. Post-processing: derive subcategory from (domain, factKey),
+  // tag sourceUrl, dedup, sanitize, redact, validate.
   //
-  // The helpers (dedupWithinRun, etc.) operate on ExtractedFact from ../types.
-  // Fact from @shared/factAgent/schema is structurally compatible once sourceUrl
-  // is set (the only diff is sourceUrl is optional in Fact but required in
-  // ExtractedFact). We cast through the shared structural boundary.
+  // v2 (2026-05-28): subcategory is no longer LLM-picked. We derive it
+  // here so the (brandId, domain, subcategory, factKey) partial unique
+  // index in `brand_fact_sheet` cleanly collapses cross-page
+  // duplicates of the same logical fact.
   const tagged: ExtractedFact[] = parseResult.facts.map((f: Fact) => ({
     domain: f.domain,
-    subcategory: f.subcategory,
+    subcategory: subcategoryFor(f.domain as Domain, f.factKey),
     factKey: f.factKey,
     factValue: f.factValue,
     valueType: f.valueType,
@@ -297,10 +344,9 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
   const secretCleared = redactSecretsFromFacts(injCleared).kept;
   const validated = secretCleared.filter((f) => validateFact(f).ok);
 
-  // Convert back to Fact[] (same structural shape; sourceUrl is now present).
+  // Convert back to Fact[] for the PageOutcome contract.
   const facts: Fact[] = validated.map((f: ExtractedFact) => ({
     domain: f.domain,
-    subcategory: f.subcategory,
     factKey: f.factKey,
     factValue: f.factValue,
     valueType: f.valueType,
@@ -317,7 +363,10 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
     bytes: res.text.length,
     errorKind: null,
     errorMessage: null,
-    canonicalRedirect: null,
+    // Pass the canonical URL through for the executor to use as the
+    // identity of this page when persisting / deduping across runs.
+    // null when the page is its own canonical.
+    canonicalRedirect,
     discoveredUrls,
     diagnostics: {
       lang,

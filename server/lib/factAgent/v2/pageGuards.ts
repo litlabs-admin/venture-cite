@@ -21,21 +21,29 @@ export function isWafBlocked(
   return Boolean(cfRay) || server.includes("cloudflare") || server.includes("akamai");
 }
 
-/** Detect Cloudflare/SPA 200-with-not-found-content "soft 404". Only triggers
- *  when hydration is absent — if hydration exists, trust the page. */
+/** Detect Cloudflare/SPA 200-with-not-found-content "soft 404". Only
+ *  triggers when hydration is absent — if hydration exists, trust the
+ *  page.
+ *
+ *  2026-05-28: tightened the length cap from 600 to 300 chars and
+ *  require ≥2 pattern hits (not 1). The old single-hit-at-600-chars
+ *  rule fired on legitimate sparse pages like Adyen's regional
+ *  contact stubs that happened to contain the word "not" in their
+ *  copy. Real 404 pages bunch the "not found" / "404" markers tightly
+ *  together; legitimate pages don't. */
 const NOT_FOUND_PATTERNS = [
   /\bpage not found\b/i,
-  /\bnot found\b/i,
   /\b404\b/,
   /\bcoming soon\b/i,
   /\bunder construction\b/i,
   /\bthis page does not exist\b/i,
+  /\bsorry,?\s+we couldn'?t find/i,
 ];
 export function isSoft404(text: string, hadHydration: boolean): boolean {
   if (hadHydration) return false;
-  if (text.length > 600) return false; // real article-length pages don't get this guard
+  if (text.length > 300) return false;
   const hits = NOT_FOUND_PATTERNS.filter((p) => p.test(text)).length;
-  return hits >= 1 && text.length < 600;
+  return hits >= 2;
 }
 
 /** Detect EU cookie/consent walls. Short page + prominent consent keywords +

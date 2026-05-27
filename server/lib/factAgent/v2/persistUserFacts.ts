@@ -6,7 +6,12 @@
 import { db } from "../../../db";
 import { and, eq } from "drizzle-orm";
 import * as schema from "@shared/schema";
-import type { Fact } from "@shared/factAgent/schema";
+import {
+  type Fact,
+  subcategoryFor,
+  type Domain,
+  CURRENT_SCHEMA_VERSION,
+} from "@shared/factAgent/schema";
 import { logger } from "../../logger";
 
 interface PersistUserArgs {
@@ -33,10 +38,12 @@ export async function persistUserFacts(
 
       if (facts.length === 0) return { inserted: 0 };
 
+      // v2: subcategory is derived server-side from (domain, factKey)
+      // — the LLM no longer picks it, so we compute it here.
       const rows = facts.map((f) => ({
         brandId: args.brandId,
         domain: f.domain,
-        subcategory: f.subcategory,
+        subcategory: subcategoryFor(f.domain as Domain, f.factKey),
         factKey: f.factKey,
         factValue: f.factValue,
         valueType: f.valueType,
@@ -46,6 +53,7 @@ export async function persistUserFacts(
         sourceUrl: f.sourceUrl ?? null,
         source: "user",
         runId: args.runId,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
       }));
       await tx.insert(schema.brandFactSheet).values(rows as never);
       return { inserted: rows.length };

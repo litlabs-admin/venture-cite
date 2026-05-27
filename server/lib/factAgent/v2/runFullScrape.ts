@@ -12,6 +12,7 @@
 // re-scrape, the cron, and first-run activation can't double-run the
 // same brand concurrently.
 import { db } from "../../../db";
+import { and, eq } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { storage } from "../../../storage";
 import { logger } from "../../logger";
@@ -51,14 +52,31 @@ export interface FullScrapeBrandInput {
   tone: string | null;
 }
 
+// LLM call timeout per provider attempt. Cut from "the SDK default" to
+// 25 s so a single slow page (Adyen /offices showed a 47 s tail in the
+// audit) can't eat the entire 50 s Vercel slice budget.
+const LLM_CALL_TIMEOUT_MS = 25_000;
+
 // Build provider clients lazily; same pattern as factSheetV2.ts. A
 // missing OPENROUTER_API_KEY just disables the Claude fallback rather
 // than crashing — single-provider extraction still works.
+//
+// v2 (2026-05-28): both providers now honour `prompt.responseFormat`
+// when present. OpenAI gets it as a real json_schema response_format
+// (strict mode → schema-valid output guaranteed). OpenRouter's
+// pass-through model providers (when the underlying model is OpenAI-
+// family) honour it the same way. Claude via OpenRouter currently
+// ignores the json_schema flavour; the prompt's text instruction is
+// the fallback there.
 function buildOpenaiProvider(): ProviderClient {
   return {
     name: "openai",
     async call(prompt) {
-      const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const openaiClient = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+        timeout: LLM_CALL_TIMEOUT_MS,
+        maxRetries: 0,
+      });
       const messages =
         typeof prompt === "string"
           ? [{ role: "user" as const, content: prompt }]
@@ -66,9 +84,13 @@ function buildOpenaiProvider(): ProviderClient {
               { role: "system" as const, content: prompt.system },
               { role: "user" as const, content: prompt.user },
             ];
+      const responseFormat =
+        typeof prompt === "object" && "responseFormat" in prompt && prompt.responseFormat
+          ? prompt.responseFormat
+          : { type: "json_object" as const };
       const res = await openaiClient.chat.completions.create({
         model: MODELS.misc,
-        response_format: { type: "json_object" },
+        response_format: responseFormat as never,
         messages,
       });
       return res.choices?.[0]?.message?.content ?? "";
@@ -81,8 +103,8 @@ function buildOpenrouterClaudeProvider(): ProviderClient | null {
   const client = new OpenAI({
     apiKey: process.env.OPENROUTER_API_KEY,
     baseURL: OPENROUTER_BASE_URL,
-    timeout: 45_000,
-    maxRetries: 1,
+    timeout: LLM_CALL_TIMEOUT_MS,
+    maxRetries: 0,
   });
   return {
     // "anthropic" is the slot bucket in llm_concurrency_slots — sized for
@@ -97,6 +119,9 @@ function buildOpenrouterClaudeProvider(): ProviderClient | null {
               { role: "system" as const, content: prompt.system },
               { role: "user" as const, content: prompt.user },
             ];
+      // Claude via OpenRouter doesn't accept the OpenAI json_schema
+      // response_format yet. Send json_object so we still get JSON,
+      // and rely on the prompt + Zod post-validation for shape.
       const res = await client.chat.completions.create({
         model: MODELS.citationClaude,
         response_format: { type: "json_object" },
@@ -207,7 +232,7 @@ export async function runFullScrapeForBrand(
             robotsCache,
           });
           if (outcome.facts.length > 0) {
-            await persistFacts(outcome.facts as never, {
+            await persistFacts(outcome.facts, {
               brandId: brand.id,
               runId: activeRunId,
               sourceUrl: p.url,
@@ -232,8 +257,61 @@ export async function runFullScrapeForBrand(
         }
       });
 
+      // Mid-run cost-cap check. The pre-run guard in planGuards.ts only
+      // gated us BEFORE any work happened; if a run spans the threshold
+      // (e.g. a brand that crossed into a new month or has expensive
+      // pages) the old code would have just kept burning. We poll the
+      // current spend every page and bail the queue if the cap is hit.
+      // Cap-hit aborts the remaining queue but lets in-flight pages
+      // finish naturally — they've already paid the LLM call cost.
+      let costCapHit = false;
+      const isOverCostCap = async (): Promise<boolean> => {
+        if (costCapHit) return true;
+        try {
+          const runRow = await db
+            .select({
+              llmCostCents: schema.brandFactScrapeRuns.llmCostCents,
+            })
+            .from(schema.brandFactScrapeRuns)
+            .where(eq(schema.brandFactScrapeRuns.id, activeRunId))
+            .limit(1);
+          const monthKey = `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, "0")}`;
+          const capRow = await db
+            .select({
+              factScrapeCents: schema.brandMonthlyCostCaps.factScrapeCents,
+              monthlyCapCents: schema.brandMonthlyCostCaps.monthlyCapCents,
+            })
+            .from(schema.brandMonthlyCostCaps)
+            .where(
+              and(
+                eq(schema.brandMonthlyCostCaps.brandId, brand.id),
+                eq(schema.brandMonthlyCostCaps.monthKey, monthKey),
+              ),
+            )
+            .limit(1);
+          const spentThisRun = Number(runRow[0]?.llmCostCents ?? 0);
+          const spentThisMonth = Number(capRow[0]?.factScrapeCents ?? 0);
+          const cap = Number(capRow[0]?.monthlyCapCents ?? 500);
+          if (spentThisMonth + spentThisRun >= cap) {
+            logger.warn(
+              { brandId: brand.id, runId: activeRunId, spentThisRun, spentThisMonth, cap },
+              "runFullScrape: monthly cost cap reached mid-run, aborting remaining pages",
+            );
+            costCapHit = true;
+            return true;
+          }
+        } catch (err) {
+          logger.warn(
+            { err, runId: activeRunId },
+            "runFullScrape: mid-run cost check failed (best-effort, continuing)",
+          );
+        }
+        return false;
+      };
+
       const next = async () => {
         while (queue.length > 0 && Date.now() < deadlineMs) {
+          if (await isOverCostCap()) break;
           const job = queue.shift();
           if (!job) return;
           await job();
@@ -254,7 +332,7 @@ export async function runFullScrapeForBrand(
           runId: activeRunId,
         });
         if (searchOutcome.facts.length > 0) {
-          await persistFacts(searchOutcome.facts as never, {
+          await persistFacts(searchOutcome.facts, {
             brandId: brand.id,
             runId: activeRunId,
             sourceUrl: normalized,

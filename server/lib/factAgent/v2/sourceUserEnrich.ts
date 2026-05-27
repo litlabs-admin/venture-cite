@@ -105,9 +105,11 @@ function buildUserPrompt(brand: UserEnrichBrand): string {
 
 function deterministicFallback(brand: UserEnrichBrand): Fact[] {
   const out: Fact[] = [];
+  // v2: subcategory is no longer in Fact — the server derives it from
+  // (domain, factKey) before persistence. The push helper takes the
+  // controlled-vocab key directly.
   const push = (
     domain: Fact["domain"],
-    subcategory: string,
     factKey: string,
     factValue: string,
     valueType: Fact["valueType"] = "string",
@@ -116,7 +118,6 @@ function deterministicFallback(brand: UserEnrichBrand): Fact[] {
     if (!factValue) return;
     out.push({
       domain,
-      subcategory,
       factKey,
       factValue,
       valueType,
@@ -125,29 +126,25 @@ function deterministicFallback(brand: UserEnrichBrand): Fact[] {
       sourceExcerpt: "",
     });
   };
-  if (brand.name) push("identity", "description", "name", brand.name);
-  if (brand.description) push("identity", "description", "description", brand.description);
-  if (brand.industry) push("identity", "description", "industry", brand.industry);
+  if (brand.name) push("identity", "name", brand.name);
+  if (brand.description) push("identity", "description", brand.description);
+  if (brand.industry) push("identity", "industry", brand.industry);
   if (brand.products?.length) {
-    push("offerings", "products", "products", brand.products.join(", "), "array", {
+    push("offerings", "productLine", brand.products.join(", "), "array", {
       items: brand.products,
     });
   }
-  if (brand.targetAudience)
-    push("positioning", "target_audience", "target_audience", brand.targetAudience);
+  if (brand.targetAudience) push("positioning", "targetAudience", brand.targetAudience);
   if (brand.uniqueSellingPoints?.length) {
-    push(
-      "positioning",
-      "unique_selling_points",
-      "unique_selling_points",
-      brand.uniqueSellingPoints.join(", "),
-      "array",
-      { items: brand.uniqueSellingPoints },
-    );
+    push("positioning", "differentiator", brand.uniqueSellingPoints.join(", "), "array", {
+      items: brand.uniqueSellingPoints,
+    });
   }
-  if (brand.keyValues) push("positioning", "values", "key_values", brand.keyValues);
-  if (brand.brandVoice) push("positioning", "brand_voice", "brand_voice", brand.brandVoice);
-  if (brand.tone) push("positioning", "brand_voice", "tone", brand.tone);
+  if (brand.keyValues)
+    push("positioning", "other", brand.keyValues, "string", { otherLabel: "values" });
+  if (brand.brandVoice)
+    push("positioning", "other", brand.brandVoice, "string", { otherLabel: "brand voice" });
+  if (brand.tone) push("positioning", "tone", brand.tone);
   return out;
 }
 

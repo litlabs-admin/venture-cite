@@ -145,13 +145,34 @@ export async function runAggregate(args: RunAggregateArgs): Promise<AggregateRes
     .from(schema.brandFactSheet)
     .where(eq(schema.brandFactSheet.brandId, args.brandId));
 
-  // 4. Mark run terminal.
+  // 4. Mark run terminal AND set the rollup counters the UI reads.
+  //
+  // 2026-05-28 fix: runFullScrape.ts persists facts per-page but never
+  // bumps `factsExtracted` on the run row (only the /scrape-one route
+  // calls incrementScrapeRunCounters). When the bulk re-scrape path is
+  // used — which is what the brand-fact-sheet page actually hits via
+  // POST /full-rescrape — the run row's factsExtracted stayed at 0,
+  // so the UI's "We couldn't read your site automatically" paste card
+  // fired on EVERY completed run regardless of how many facts the LLM
+  // actually produced. We now compute the rollup from the per-source
+  // logs and write it alongside the terminal status.
+  const totalFactsFromLogs = outcomes.reduce((sum, o) => sum + o.factCount, 0);
+  const staticPagesOutcomes = outcomes.filter((o) => o.source === "static_pages");
+  const pagesFetchedRollup = staticPagesOutcomes.filter((o) => o.status === "done").length;
+  const pagesFailedRollup = staticPagesOutcomes.filter((o) => o.status === "failed").length;
+
   await db
     .update(schema.brandFactScrapeRuns)
     .set({
       status: terminal.status,
       errorKind: terminal.errorKind,
       completedAt: new Date(),
+      // Only overwrite if our rollup is higher than what's already
+      // there (the /scrape-one path increments per page; we'd
+      // otherwise stomp a partial-then-aggregated value).
+      factsExtracted: sql`GREATEST(${schema.brandFactScrapeRuns.factsExtracted}, ${totalFactsFromLogs})`,
+      pagesFetched: sql`GREATEST(${schema.brandFactScrapeRuns.pagesFetched}, ${pagesFetchedRollup})`,
+      pagesFailed: sql`GREATEST(${schema.brandFactScrapeRuns.pagesFailed}, ${pagesFailedRollup})`,
     })
     .where(eq(schema.brandFactScrapeRuns.id, args.runId));
 

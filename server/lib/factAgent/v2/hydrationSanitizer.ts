@@ -4,13 +4,20 @@
 //   1. PII safety — never send emails, phones, JWTs, session tokens.
 //   2. Signal density — drop image URLs, base64 blobs, build artifacts, React
 //      internals so the LLM's attention is on real text.
-//   3. Token budget — hard cap at 300KB so a runaway blob doesn't OOM the
-//      Vercel function or push the LLM past 128k context.
+//   3. Token budget — hard cap so a runaway blob doesn't OOM the Vercel
+//      function or push the LLM past 128k context.
 //
 // Order matters: regex redaction first (operates on raw text), then
 // noise/key drops, then size cap (post-everything).
+//
+// 2026-05-28: cap reduced from 300 KB to 12 KB. After the regex
+// redactions strip the obvious noise (image URLs, base64 blobs, build
+// artifacts), the remaining signal — server-rendered hero/about copy +
+// structured data — almost always fits in 12 KB. The 300 KB ceiling
+// was spending 80% of the LLM's token budget on noise and pushing the
+// per-call latency past 25 s on slow pages.
 
-const MAX_BYTES = 300_000;
+const MAX_BYTES = 12_000;
 
 const IMAGE_URL_RE =
   /https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp|svg|gif|ico|css|woff2?|ttf|otf|eot)(?:\?[^\s"'<>]*)?/gi;

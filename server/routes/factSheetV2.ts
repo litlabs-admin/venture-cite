@@ -60,6 +60,13 @@ const pasteSchema = z.object({
 });
 
 // OpenAI primary provider client adapter — wraps the existing singleton.
+//
+// 2026-05-28: honour the prompt's `responseFormat` when present. The v2
+// extraction prompt sends a strict json_schema; without passing it
+// through here, the route handlers (scrape-one / search-llm / paste)
+// received json_object responses that produced factKey strings
+// outside the controlled vocab — and our post-parse vocab filter
+// dropped them all, yielding zero facts on the dev server.
 const openaiProvider: ProviderClient = {
   name: "openai",
   async call(prompt) {
@@ -70,9 +77,13 @@ const openaiProvider: ProviderClient = {
             { role: "system" as const, content: prompt.system },
             { role: "user" as const, content: prompt.user },
           ];
+    const responseFormat =
+      typeof prompt === "object" && prompt && "responseFormat" in prompt && prompt.responseFormat
+        ? prompt.responseFormat
+        : { type: "json_object" as const };
     const res = await openai.chat.completions.create({
       model: MODELS.misc,
-      response_format: { type: "json_object" },
+      response_format: responseFormat as never,
       messages,
     });
     return res.choices?.[0]?.message?.content ?? "";
@@ -101,6 +112,10 @@ const openrouterClaudeProvider: ProviderClient | null = openrouterClient
       // "anthropic" is the slot bucket in llm_concurrency_slots — sized for
       // Claude-family concurrent calls. The actual network egress is via
       // OpenRouter, but the model is Claude, so we account for it there.
+      // Claude via OpenRouter doesn't honour OpenAI's json_schema mode
+      // yet — we send json_object and rely on the Zod post-validation +
+      // the post-parse vocab filter in extractionPrompt.ts to catch any
+      // shape drift.
       name: "anthropic",
       async call(prompt) {
         const messages =
@@ -189,7 +204,7 @@ export function setupFactSheetV2Routes(app: Express): void {
           errorMessage: outcome.errorMessage,
         });
         if (outcome.facts.length > 0) {
-          await persistFacts(outcome.facts as never, {
+          await persistFacts(outcome.facts, {
             brandId: brand.id,
             runId,
             sourceUrl: page.url,
@@ -267,7 +282,7 @@ export function setupFactSheetV2Routes(app: Express): void {
         });
 
         if (outcome.facts.length > 0) {
-          await persistFacts(outcome.facts as never, {
+          await persistFacts(outcome.facts, {
             brandId: brand.id,
             runId,
             sourceUrl: brand.website ?? "",

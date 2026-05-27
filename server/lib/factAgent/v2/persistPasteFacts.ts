@@ -4,7 +4,12 @@
 import { db } from "../../../db";
 import { and, eq } from "drizzle-orm";
 import * as schema from "@shared/schema";
-import type { Fact } from "@shared/factAgent/schema";
+import {
+  type Fact,
+  subcategoryFor,
+  type Domain,
+  CURRENT_SCHEMA_VERSION,
+} from "@shared/factAgent/schema";
 import { logger } from "../../logger";
 
 interface PersistPasteArgs {
@@ -32,7 +37,7 @@ export async function persistPasteFacts(
       const rows = facts.map((f) => ({
         brandId: args.brandId,
         domain: f.domain,
-        subcategory: f.subcategory,
+        subcategory: subcategoryFor(f.domain as Domain, f.factKey),
         factKey: f.factKey,
         factValue: f.factValue,
         valueType: f.valueType,
@@ -42,6 +47,7 @@ export async function persistPasteFacts(
         sourceUrl: f.sourceUrl ?? null,
         source: "paste",
         runId: args.runId,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
       }));
       await tx.insert(schema.brandFactSheet).values(rows as never);
       return { inserted: rows.length };

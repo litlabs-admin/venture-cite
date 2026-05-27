@@ -3,14 +3,32 @@
 // timeouts) but NOT on caller errors (4xx other than 429). Each call is
 // concurrency-gated via the Postgres token bucket so the global RPM cap
 // is respected.
+//
+// v2 (2026-05-28): prompts now carry an optional `responseFormat`
+// describing the OpenAI structured-outputs JSON Schema. Providers that
+// understand it (OpenAI direct, OpenRouter for OpenAI-family models)
+// pass it through to the underlying chat-completions call. Providers
+// that don't (Claude via OpenRouter — Anthropic's API doesn't honour
+// json_schema) just ignore the field and rely on the prompt's
+// instruction to return JSON; the post-parse Zod step catches any
+// drift.
 import { withSlot, type LlmProvider } from "../../llmConcurrency";
+
+export interface ExtractionPrompt {
+  system: string;
+  user: string;
+  responseFormat?: {
+    type: "json_schema";
+    json_schema: Record<string, unknown>;
+  };
+}
 
 export interface ProviderClient {
   name: LlmProvider;
-  /** Plain-text call: takes a prompt (string or {system, user}), returns
-   *  the model's raw response body. JSON-mode response_format is the
-   *  caller's responsibility — we just shuttle bytes. */
-  call(prompt: string | { system: string; user: string }): Promise<string>;
+  /** Call the provider with a prompt (string, plain {system,user}, or
+   *  full ExtractionPrompt with responseFormat). Returns the raw
+   *  response body for the caller to parse. */
+  call(prompt: string | ExtractionPrompt): Promise<string>;
 }
 
 function isTransient(err: unknown): boolean {
@@ -27,7 +45,7 @@ function isTransient(err: unknown): boolean {
 
 export async function callWithFailover(
   providers: ProviderClient[],
-  prompt: string | { system: string; user: string },
+  prompt: string | ExtractionPrompt,
   runId: string | undefined,
 ): Promise<string> {
   if (providers.length === 0) throw new Error("callWithFailover: no providers");

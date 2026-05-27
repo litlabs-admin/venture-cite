@@ -9,9 +9,25 @@ import { withSlot } from "../../llmConcurrency";
 import { storage } from "../../../storage";
 import { logger } from "../../logger";
 import { MODELS } from "../../modelConfig";
-import { CURRENT_SCHEMA_VERSION, FactsResponseSchema, type Fact } from "@shared/factAgent/schema";
+import {
+  ALLOWED_KEYS,
+  CURRENT_SCHEMA_VERSION,
+  DOMAINS,
+  FactsResponseSchema,
+  isAllowedFactKey,
+  type Domain,
+  type Fact,
+} from "@shared/factAgent/schema";
 import { getOpenrouterClient } from "./openrouterClient";
 import { filterByBrandDomain } from "./domainAllowlist";
+
+// Reuse the same vocabulary block the static-source prompt uses so the
+// search-LLM produces facts under controlled keys too. Without this, the
+// search source dumped facts with free-form factKeys and the
+// `isAllowedFactKey` post-filter dropped every one of them.
+const VOCAB_BLOCK = DOMAINS.map(
+  (d) => `  ${d}: ${(ALLOWED_KEYS[d] as readonly string[]).join(", ")}`,
+).join("\n");
 
 export interface RunSearchSourceArgs {
   brandId: string;
@@ -59,13 +75,17 @@ CRITICAL RULES:
 3. Confidence 1.0 only for facts that appear verbatim in a source. 0.7-0.9 for paraphrased. ≤0.5 for inferred.
 4. If you cannot find the brand or cannot verify any facts, return facts=[]. Do not invent.
 
+CONTROLLED VOCABULARY — pick factKey from this list exactly. Do not invent new keys.
+${VOCAB_BLOCK}
+
+If a fact genuinely doesn't fit any of the above, use factKey="other" and put a short label in valuePayload.otherLabel.
+
 Return JSON in exactly this shape:
 {
   "facts": [
     {
       "domain": "identity"|"offerings"|"positioning"|"team"|"operations"|"credentials"|"growth"|"contact",
-      "subcategory": "<short label>",
-      "factKey": "<short label>",
+      "factKey": "<one of the controlled-vocab keys above>",
       "factValue": "<value>",
       "valueType": "string"|"number"|"array",
       "valuePayload": null|object,
@@ -189,9 +209,16 @@ export async function runSearchSource(args: RunSearchSourceArgs): Promise<Search
     repairUsed = true;
   }
 
+  // ── Controlled-vocabulary guard ───────────────────────────────────────────
+  // Drop any facts the LLM produced with factKeys outside the controlled
+  // vocabulary. Mirrors the post-parse filter in extractionPrompt.ts so
+  // the search source can't smuggle in synthetic keys that would later
+  // be rejected at the persistFacts boundary anyway.
+  const vocabFiltered = parsedFacts.filter((f) => isAllowedFactKey(f.domain as Domain, f.factKey));
+
   // ── Domain-confusion guard ────────────────────────────────────────────────
-  const before = parsedFacts.length;
-  const filtered = filterByBrandDomain(parsedFacts, args.brandUrl);
+  const before = vocabFiltered.length;
+  const filtered = filterByBrandDomain(vocabFiltered, args.brandUrl);
   const dropped = before - filtered.length;
   const cappedToSocial = filtered.filter((f) => f.confidence === 0.5).length;
 
