@@ -28,6 +28,8 @@ import { pageExplainers } from "@/lib/pageExplainers";
 import { Loader2 } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
 import { useTourState, useTourStatePatch } from "@/hooks/useTourState";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/components/ThemeProvider";
 
 type NotificationPreference = {
   type: string;
@@ -165,6 +167,32 @@ function ProfileSection() {
         >
           {updateProfile.isPending ? "Saving…" : "Save profile"}
         </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Appearance — light / dark / system. Persists per-browser via
+// localStorage; the FOUC-blocking script in client/index.html applies the
+// chosen theme before React mounts, so this section is purely a write
+// surface. The current resolved theme is shown as a quiet inline hint
+// so users on "System" know whether they're currently in light or dark.
+function AppearanceSection() {
+  const { theme, resolvedTheme } = useTheme();
+  const hint =
+    theme === "system" ? `Following your system. Currently ${resolvedTheme}.` : `Always ${theme}.`;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Appearance</CardTitle>
+        <CardDescription>
+          Choose how VentureCite looks to you. System follows your operating system; Light and Dark
+          stay put across reloads and devices on this browser.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <ThemeToggle />
+        <p className="text-xs text-muted-foreground tnum">{hint}</p>
       </CardContent>
     </Card>
   );
@@ -492,6 +520,7 @@ export default function Settings() {
       />
 
       <ProfileSection />
+      <AppearanceSection />
       <PasswordSection />
       <BillingSection />
       <IntegrationsSection />

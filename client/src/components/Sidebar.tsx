@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import logoPath from "@assets/logo.png";
 import SidebarOnboarding from "@/components/SidebarOnboarding";
+import { ThemeMenuItems } from "@/components/ThemeMenuItems";
 
 // ─── Workflow spine ──────────────────────────────────────────────────────────
 // One flat list, no section labels. The product is a single operating system,
@@ -198,6 +199,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <Settings className="w-4 h-4 mr-2" />
               Account settings
             </DropdownMenuItem>
+            <ThemeMenuItems />
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => logout()}>
               <LogOut className="w-4 h-4 mr-2" />
               Log out

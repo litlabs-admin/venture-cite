@@ -1,11 +1,48 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
     <title>VentureCite</title>
+    <!--
+      FOUC blocker: apply the right theme class to <html> BEFORE any CSS
+      loads or React mounts. Mirrors the logic in client/src/lib/theme.ts
+      (kept tiny and dependency-free so it can run synchronously in <head>).
+      Dark is the fallback when no signal is available, matching the
+      dark-first token system in client/src/index.css.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = null;
+          try {
+            stored = window.localStorage.getItem("vc-theme-v1");
+          } catch (e) {
+            /* private mode — fall through to system */
+          }
+          var resolved;
+          if (stored === "light" || stored === "dark") {
+            resolved = stored;
+          } else {
+            // "system" or unset — read OS preference, fall back to dark.
+            var mql =
+              typeof window.matchMedia === "function"
+                ? window.matchMedia("(prefers-color-scheme: light)")
+                : null;
+            resolved = mql && mql.matches ? "light" : "dark";
+          }
+          var root = document.documentElement;
+          if (resolved === "dark") root.classList.add("dark");
+          root.style.colorScheme = resolved;
+        } catch (e) {
+          // Last-ditch fallback: dark.
+          document.documentElement.classList.add("dark");
+          document.documentElement.style.colorScheme = "dark";
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
