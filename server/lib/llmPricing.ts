@@ -5,28 +5,29 @@
 
 export type Tier = "free" | "beta" | "pro" | "enterprise" | "admin";
 
-// Daily token cap per tier. -1 = unlimited (admin).
+// Daily token cap per tier. -1 = unlimited.
 //
-// Tuned for typical content-generation cost: a single article job is
-// ~5-10k tokens total. So free=100k allows ~10-20 jobs/day, pro=1M
-// allows ~100-200 jobs/day, enterprise allows ~1000-2000 jobs/day.
+// 2026-05-27: token budget intentionally disabled across all tiers — the
+// `if (cap < 0) return;` short-circuit in assertWithinBudget() makes the
+// enforcement a no-op while keeping recordSpend() writing api_costs rows
+// for analytics. CHATBOT_MESSAGES_PER_HOUR (below) still applies as a
+// spam guard. Re-introduce per-tier limits here if billing reinstates a
+// daily ceiling.
 export const DAILY_TOKEN_CAP: Record<Tier, number> = {
-  free: 100_000,
-  beta: 250_000,
-  pro: 1_000_000,
-  enterprise: 10_000_000,
+  free: -1,
+  beta: -1,
+  pro: -1,
+  enterprise: -1,
   admin: -1,
 };
 
-// Per-user chatbot token cap per day. -1 = unlimited (admin).
-// Chatbot messages are MUCH smaller than article generation — typical
-// 200–800 tokens per turn. Caps tuned so worst-case spend stays
-// reasonable per tier (free=$4.50/mo, pro=$22/mo, enterprise=$75/mo).
+// Per-user chatbot token cap per day. -1 = unlimited.
+// Disabled 2026-05-27 alongside DAILY_TOKEN_CAP — see note above.
 export const CHATBOT_DAILY_TOKEN_CAP: Record<Tier, number> = {
-  free: 15_000,
-  beta: 30_000,
-  pro: 75_000,
-  enterprise: 250_000,
+  free: -1,
+  beta: -1,
+  pro: -1,
+  enterprise: -1,
   admin: -1,
 };
 
@@ -60,7 +61,12 @@ const PRICING_PER_1K_TOKENS_CENTS: Record<string, { in: number; out: number }> =
   "anthropic/claude-haiku-4.5": { in: 0.1, out: 0.5 }, // $1 / $5 per 1M
   "google/gemini-2.5-flash-lite": { in: 0.01, out: 0.04 }, // $0.10 / $0.40 per 1M
   "perplexity/sonar": { in: 0.1, out: 0.1 }, // $1 / $1 per 1M (+ search fee)
-  "deepseek/deepseek-v3.2": { in: 0.0252, out: 0.0378 }, // $0.252 / $0.378 per 1M
+  // DeepSeek slug verified 2026-05-28 — live variant is the `-exp` one.
+  "deepseek/deepseek-v3.2-exp": { in: 0.027, out: 0.041 }, // $0.27 / $0.41 per 1M (OpenRouter card)
+  // Keep the non-exp key as a fallback so analytics records that
+  // pre-dated the fix still cost-estimate sensibly via the
+  // `startsWith` matcher in estimateCostCents.
+  "deepseek/deepseek-v3.2": { in: 0.027, out: 0.041 },
   // OpenAI web-search chat model used for the ChatGPT citation check.
   "gpt-4o-mini-search-preview": { in: 0.015, out: 0.06 },
 };

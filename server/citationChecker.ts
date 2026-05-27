@@ -239,16 +239,25 @@ function extractStructuredCitations(resp: unknown): string[] {
   return out;
 }
 
-// OpenRouter's non-deprecated server tool for live web grounding. Added
-// to the request `tools` array for OpenRouter models that don't ground
-// natively (Claude/Gemini/DeepSeek). OpenRouter runs the search
-// server-side in one round-trip and returns url_citation annotations.
-// Cast: it's an OpenRouter extension to the OpenAI-compatible API, not in
-// the SDK's tool union.
-const OPENROUTER_WEB_SEARCH_TOOL = {
-  type: "openrouter:web_search",
-  parameters: { max_results: 5 },
-} as unknown as OpenAI.Chat.Completions.ChatCompletionTool;
+// OpenRouter live web grounding for models that don't ground natively
+// (Claude / Gemini / DeepSeek). 2026-05-27: switched from an invented
+// `tools:[{type:"openrouter:web_search"}]` entry (silently ignored by
+// the OpenRouter API — Claude/Gemini/DeepSeek citation checks were
+// running against stale training data) to the documented `plugins`
+// extension. Per https://openrouter.ai/docs/guides/features/plugins/web-search
+// the supported forms are:
+//   1) `:online` suffix on model name (shortcut for the `web` plugin)
+//   2) `plugins: [{ id: "web", max_results: 5, ... }]` — full control
+// We use form 2 so we can tune max_results without minting a separate
+// model slug per engine. Cast: the OpenAI SDK doesn't type `plugins`,
+// but OpenRouter accepts it as a top-level extension to the
+// OpenAI-compatible chat-completions schema. Annotations still arrive on
+// `choices[].message.annotations` as url_citation entries — no consumer
+// change needed.
+const OPENROUTER_WEB_SEARCH_PLUGIN = {
+  id: "web" as const,
+  max_results: 5,
+};
 
 // Per-platform query. ChatGPT hits OpenAI directly; the other four go through
 // OpenRouter. No simulation fallbacks — if OPENROUTER_API_KEY is missing the
@@ -319,13 +328,25 @@ export async function runPlatformCitationCheck(
       { role: "system", content: systemMsg },
       { role: "user", content: prompt },
     ],
-    max_tokens: 1500,
+    // 2026-05-27: bumped from 1500 → 3000. Perplexity Sonar's
+    // grounded responses routinely run 2000+ tokens (answer + inline
+    // citations + the "Sources" tail). 1500 was truncating Sonar's
+    // citation block mid-list, dropping later URLs from
+    // `extractStructuredCitations` and depressing measured citation
+    // rates. 3000 leaves headroom for all five engines without
+    // becoming a runaway cost.
+    max_tokens: 3000,
   };
   // Search-grounded OpenAI models reject sampling params; every other
   // engine is pinned to 0 so a weekly measurement isn't a random walk.
   if (cfg.supportsTemperature) params.temperature = 0;
   // Live web grounding for OpenRouter models that don't ground natively.
-  if (cfg.webSearchTool) params.tools = [OPENROUTER_WEB_SEARCH_TOOL];
+  // Attach as a top-level `plugins` array (OpenRouter extension) — see
+  // the OPENROUTER_WEB_SEARCH_PLUGIN definition above for the
+  // why-not-tools rationale.
+  if (cfg.webSearchTool) {
+    (params as unknown as { plugins: unknown[] }).plugins = [OPENROUTER_WEB_SEARCH_PLUGIN];
+  }
 
   const breaker = cfg.client === "openai" ? openaiBreaker : openrouterBreaker;
   const client = cfg.client === "openai" ? openai : openrouter!;
@@ -342,6 +363,26 @@ export async function runPlatformCitationCheck(
   }
   const responseText = chatResponse.choices[0]?.message?.content || "";
   const structuredCitations = extractStructuredCitations(chatResponse);
+  // Observability: when web grounding silently returns zero citations
+  // (e.g. an engine rejected our plugins/tools extension, or upstream
+  // grounding is offline) we want it in the logs at WARN — not
+  // discoverable only by manually inspecting geo_rankings. ChatGPT
+  // search-preview + Perplexity sonar should always return at least a
+  // few citations; Claude/Gemini/DeepSeek depend on the `plugins`
+  // server-tool firing.
+  if (cfg.webSearchTool || cfg.model.includes("sonar") || cfg.model.includes("search-preview")) {
+    if (structuredCitations.length === 0 && responseText.length > 0) {
+      logger.warn(
+        {
+          platform,
+          model: cfg.model,
+          responseLength: responseText.length,
+          hasPlugins: !!cfg.webSearchTool,
+        },
+        "citationChecker: grounded engine returned 0 structured citations — web search may be broken",
+      );
+    }
+  }
   if (skipJudge)
     return { isCited: false, rank: null, relevance: null, responseText, structuredCitations };
   const r = await checkForCitation(responseText, brandName, brandNameVariations, brandContext);

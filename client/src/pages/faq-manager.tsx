@@ -91,12 +91,31 @@ export default function FaqManager() {
       const response = await apiRequest("POST", `/api/faqs/generate/${selectedBrandId}`, data);
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: "FAQs generated successfully!" });
+    onSuccess: (data: any) => {
+      // Surface the REAL insert count from the server's report. The previous
+      // toast lied — "FAQs generated successfully!" fired even when zero rows
+      // were inserted (LLM returned malformed JSON, all merged as duplicates,
+      // etc.). Now we read report.inserted to tell the user what happened.
+      const inserted = data?.report?.inserted ?? data?.data?.length ?? 0;
+      const merged = data?.report?.mergedDuplicates ?? 0;
+      toast({
+        title: inserted > 0 ? `Generated ${inserted} FAQs` : "No new FAQs",
+        description:
+          merged > 0
+            ? `${merged} similar question(s) merged into existing FAQs.`
+            : inserted === 0
+              ? "The AI did not produce any new FAQs. Try a different topic or complete your brand profile."
+              : undefined,
+      });
       queryClient.invalidateQueries({ queryKey: [`/api/faqs?brandId=${selectedBrandId}`] });
       setGenerateTopic("");
     },
-    onError: () => toast({ title: "Failed to generate FAQs", variant: "destructive" }),
+    onError: (err: Error) =>
+      toast({
+        title: "Failed to generate FAQs",
+        description: err.message || "Unknown error",
+        variant: "destructive",
+      }),
   });
 
   const createFaqMutation = useMutation({
@@ -114,7 +133,12 @@ export default function FaqManager() {
       setNewAnswer("");
       setNewCategory("general");
     },
-    onError: () => toast({ title: "Failed to create FAQ", variant: "destructive" }),
+    onError: (err: Error) =>
+      toast({
+        title: "Failed to create FAQ",
+        description: err.message || "Unknown error",
+        variant: "destructive",
+      }),
   });
 
   const updateFaqMutation = useMutation({
@@ -127,7 +151,12 @@ export default function FaqManager() {
       queryClient.invalidateQueries({ queryKey: [`/api/faqs?brandId=${selectedBrandId}`] });
       setEditingFaq(null);
     },
-    onError: () => toast({ title: "Failed to update FAQ", variant: "destructive" }),
+    onError: (err: Error) =>
+      toast({
+        title: "Failed to update FAQ",
+        description: err.message || "Unknown error",
+        variant: "destructive",
+      }),
   });
 
   const deleteFaqMutation = useMutation({
@@ -139,7 +168,12 @@ export default function FaqManager() {
       toast({ title: "FAQ deleted!" });
       queryClient.invalidateQueries({ queryKey: [`/api/faqs?brandId=${selectedBrandId}`] });
     },
-    onError: () => toast({ title: "Failed to delete FAQ", variant: "destructive" }),
+    onError: (err: Error) =>
+      toast({
+        title: "Failed to delete FAQ",
+        description: err.message || "Unknown error",
+        variant: "destructive",
+      }),
   });
 
   const optimizeFaqMutation = useMutation({
@@ -151,7 +185,12 @@ export default function FaqManager() {
       toast({ title: "FAQ optimized for AI citation!" });
       queryClient.invalidateQueries({ queryKey: [`/api/faqs?brandId=${selectedBrandId}`] });
     },
-    onError: () => toast({ title: "Failed to optimize FAQ", variant: "destructive" }),
+    onError: (err: Error) =>
+      toast({
+        title: "Failed to optimize FAQ",
+        description: err.message || "Unknown error",
+        variant: "destructive",
+      }),
   });
 
   const generateSchemaMarkup = () => {

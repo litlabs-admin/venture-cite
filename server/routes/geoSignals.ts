@@ -770,26 +770,46 @@ ${brand ? `Brand context: ${brand.name}, Industry: ${brand.industry}` : ""}`,
 
         let html = "";
         let fetchError: string | null = null;
+        let fetchStatus: number | null = null;
         try {
-          const result = await safeFetchText(normalised, {
+          // 2026-05-28: switched from safeFetchText (bot UA
+          // "VentureCite-SchemaAudit/1.0") to safeFetchTextWithLockedIp
+          // (Chrome UA + Accept headers + manual redirect handling).
+          // Cloudflare / Akamai / Vercel WAFs silently 403 the bot UA, so
+          // legitimate audits of marketing sites were returning empty HTML
+          // and rendering as "every schema missing" — the user's
+          // "mimicking" symptom. The locked-IP variant also closes the
+          // SSRF rebinding window for free.
+          const { safeFetchTextWithLockedIp } = await import("../lib/ssrf");
+          const result = await safeFetchTextWithLockedIp(normalised, {
             maxBytes: 2 * 1024 * 1024,
             timeoutMs: 15_000,
-            headers: { "User-Agent": "VentureCite-SchemaAudit/1.0" },
           });
+          fetchStatus = result.status;
           if (result.status >= 200 && result.status < 300) {
             html = result.text;
+          } else if (result.status === 403 || result.status === 429) {
+            // Bot detection / WAF. Be specific so the UI can surface this
+            // rather than showing the generic "all schemas missing".
+            fetchError = `Bot detection blocked the audit (HTTP ${result.status}). The site's WAF may not allow third-party schema audits.`;
+          } else if (result.status === 404) {
+            fetchError = "Target URL returned HTTP 404 (page not found).";
           } else {
             fetchError = `Target returned HTTP ${result.status}`;
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Failed to fetch URL";
-          if (/private|not allowed|resolve|Invalid URL|http/i.test(msg)) {
+          if (/private|not allowed|resolve|Invalid URL/i.test(msg)) {
             return res.status(400).json({
               success: false,
               error: "This URL isn't reachable (private host or invalid).",
             });
           }
-          fetchError = msg;
+          if (/timeout|aborted/i.test(msg)) {
+            fetchError = "Target site took too long to respond (>15s timeout).";
+          } else {
+            fetchError = msg;
+          }
         }
 
         const nodesByType = html ? parseJsonLdFromHtml(html) : new Map<string, object[]>();
@@ -825,6 +845,7 @@ ${brand ? `Brand context: ${brand.name}, Industry: ${brand.industry}` : ""}`,
           url: normalised,
           fetched: !fetchError,
           fetchError,
+          fetchStatus,
           schemas,
           additionalTypes,
           totalSchemasFound,

@@ -733,8 +733,37 @@ export function setupContentRoutes(app: Express): void {
 
         const brand = await requireBrand(brandId, user.id);
 
-        if (!(await acquireOrWait("manual-discovery", brandId, 0))) {
-          const secs = await secondsUntilAvailable("manual-discovery", brandId);
+        // Preflight: GEO keyword research is brand-profile-driven. When the
+        // brand has no industry/products/audience the LLM has nothing to
+        // anchor on and the response will be generic noise (or empty).
+        // Surface this before the OpenAI call so the user sees a clear
+        // 400 instead of "Failed to discover keywords."
+        const keywordHasProfile =
+          (brand.industry && brand.industry.trim().length > 0) ||
+          (Array.isArray(brand.products) && brand.products.length > 0) ||
+          (brand.targetAudience && brand.targetAudience.trim().length > 0);
+        if (!keywordHasProfile) {
+          return res.status(400).json({
+            success: false,
+            error:
+              "Add industry, products, or target audience to your brand profile to discover keywords.",
+          });
+        }
+
+        // Diagnostic breadcrumb so prod logs reveal which path is failing
+        // when users hit "Discover" — invocation count, profile state, etc.
+        logger.info(
+          {
+            brandId,
+            userId: user.id,
+            hasIndustry: !!brand.industry,
+            hasProducts: Array.isArray(brand.products) && brand.products.length > 0,
+          },
+          "keyword-research/discover: invoked",
+        );
+
+        if (!(await acquireOrWait("discover-keywords", brandId, 0))) {
+          const secs = await secondsUntilAvailable("discover-keywords", brandId);
           return res.status(429).json({
             success: false,
             error: "rate_limited",
@@ -868,11 +897,17 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
         }
 
         if (savedKeywords.length === 0) {
-          return res.status(200).json({
-            success: false,
-            error:
-              "No new keywords found — try completing your brand profile (description, products, target audience) for better results.",
+          // Soft case: AI returned valid keywords but all matched existing
+          // rows after dedup. Return success:true with an explanatory
+          // message so the client can show an informational (not
+          // destructive) toast. The previous 200+success:false fired the
+          // client's else-branch and looked like a hard error.
+          return res.json({
+            success: true,
+            data: [],
             count: 0,
+            message:
+              "No new keywords found — try completing your brand profile (description, products, target audience) for better results.",
           });
         }
 

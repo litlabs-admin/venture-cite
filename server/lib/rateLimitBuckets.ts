@@ -30,16 +30,43 @@ const CONFIGS: Record<string, BucketConfig> = {
   hackernews: { capacity: 30, refillPerSec: 5 },
   // Manual-add: 10 per user per minute (1 token per 6 seconds).
   "manual-add": { capacity: 10, refillPerSec: 10 / 60 },
-  // Phase 8 cheap-win: per-brand cooldown shared across the expensive manual
-  // discovery/generation triggers (listicle / wikipedia / FAQ / keyword
-  // discover). Burst of 3 then ~1 every 2 min so a user can run a couple of
-  // them back-to-back but can't hammer LLM/external quota by re-clicking.
-  "manual-discovery": { capacity: 3, refillPerSec: 1 / 120 },
+  // 2026-05-27: split the legacy `manual-discovery` bucket into one
+  // bucket PER feature. The shared bucket had capacity 3 — touching any 3
+  // of {Listicles, Wikipedia, FAQ generate, Keyword discover} in a brand
+  // session within 4 minutes rate-limited ALL four, which the user
+  // experienced as "broken." Per-feature buckets isolate the cost of
+  // each action: hit the FAQ limit and the others remain available.
+  // Capacity 10, refill 1 / 20 s ≈ 3 per minute steady state with a 10-
+  // burst headroom — enough for a power user to run several scans in a
+  // row but still capped against runaway re-clicks.
+  "discover-listicles": { capacity: 10, refillPerSec: 1 / 20 },
+  "scan-wikipedia": { capacity: 10, refillPerSec: 1 / 20 },
+  "generate-faqs": { capacity: 10, refillPerSec: 1 / 20 },
+  "discover-keywords": { capacity: 10, refillPerSec: 1 / 20 },
+  // Kept for backwards compatibility — anywhere still passing
+  // "manual-discovery" gets the same generous shape as the per-feature
+  // buckets above. Should be removable after a grep confirms no callers.
+  "manual-discovery": { capacity: 10, refillPerSec: 1 / 20 },
 };
 
 function applyRefill(tokens: number, lastRefill: Date, cfg: BucketConfig, now: number): number {
   const elapsedSec = (now - lastRefill.getTime()) / 1000;
+  // 2026-05-28: self-heal clock-skew corruption. If `last_refill_at` is in
+  // the FUTURE (negative elapsed) — which happens when the DB and the app
+  // server clocks are skewed, or when a previous bug persisted a bad
+  // timestamp — the old code returned `tokens` unchanged. A row stuck at
+  // tokens=0 with a future last_refill_at would stay stuck FOREVER (the
+  // refill curve never advances). Treat negative elapsed as "clock skew /
+  // bad state" and reset the bucket to full capacity.
+  if (elapsedSec < -1) return cfg.capacity;
   if (elapsedSec <= 0) return tokens;
+  // 2026-05-28: also self-heal "stuck-at-zero" rows. If enough wall time
+  // has elapsed for the bucket to be at FULL capacity (2× the full-fill
+  // duration, as a margin), but tokens is still pathologically low
+  // (< 0.1), the refill math must have been skipped on a prior UPDATE
+  // (e.g. a deploy mid-transaction). Snap back to capacity.
+  const fullFillSec = cfg.capacity / cfg.refillPerSec;
+  if (elapsedSec > fullFillSec * 2 && tokens < 0.1) return cfg.capacity;
   return Math.min(cfg.capacity, tokens + elapsedSec * cfg.refillPerSec);
 }
 
@@ -125,6 +152,16 @@ export async function tryAcquire(provider: string, scopeId: string): Promise<boo
 /**
  * Acquire a token, waiting up to `maxWaitMs` for capacity. Returns
  * true if a token was acquired, false on timeout.
+ *
+ * 2026-05-27: callers passing `maxWaitMs=0` (the "try once, don't wait"
+ * pattern used by every manual-discovery handler) were getting `false`
+ * unconditionally — the `while (elapsed < maxWaitMs)` loop body never
+ * executed when maxWaitMs was 0, so `tryAcquire` was never called and
+ * the bucket state never changed. Users saw "rate limited — try again
+ * in ~0s" on the first click of Listicles/Wikipedia/Keywords/FAQ since
+ * the routes were written. Fix: always attempt one acquire BEFORE
+ * entering the wait loop, so maxWaitMs=0 cleanly means "no waiting,
+ * one try" instead of "no attempt at all."
  */
 export async function acquireOrWait(
   provider: string,
@@ -133,12 +170,14 @@ export async function acquireOrWait(
 ): Promise<boolean> {
   const cfg = CONFIGS[provider];
   if (!cfg) return true;
+  // First attempt always happens, regardless of maxWaitMs.
+  if (await tryAcquire(provider, scopeId)) return true;
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
-    if (await tryAcquire(provider, scopeId)) return true;
     const waitMs = Math.max(50, Math.ceil(1000 / cfg.refillPerSec));
     const remaining = maxWaitMs - (Date.now() - start);
     await new Promise((r) => setTimeout(r, Math.min(waitMs, Math.max(0, remaining))));
+    if (await tryAcquire(provider, scopeId)) return true;
   }
   return false;
 }

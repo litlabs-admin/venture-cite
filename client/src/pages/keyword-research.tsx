@@ -91,6 +91,16 @@ export default function KeywordResearchPage() {
     },
     onSuccess: (data) => {
       if (data.success) {
+        if (data.count === 0) {
+          // Soft "no new keywords" case — not a failure, just informational.
+          // Server returns 200 + success:true + data:[] + message when the AI
+          // found candidates but they were all duplicates of existing rows.
+          toast({
+            title: "No new keywords",
+            description: data.message || "All discovered keywords already exist for this brand.",
+          });
+          return;
+        }
         toast({ title: `Discovered ${data.count} keywords!` });
         // Instant update: append new keywords to cache
         const qk = [`/api/keyword-research/${selectedBrandId}`];
@@ -99,10 +109,19 @@ export default function KeywordResearchPage() {
           return { ...old, data: [...old.data, ...data.data] };
         });
       } else {
-        toast({ title: data.error || "Failed to discover keywords", variant: "destructive" });
+        toast({
+          title: "Failed to discover keywords",
+          description: data.error || "Unknown error",
+          variant: "destructive",
+        });
       }
     },
-    onError: () => toast({ title: "Failed to discover keywords", variant: "destructive" }),
+    onError: (err: Error) =>
+      toast({
+        title: "Failed to discover keywords",
+        description: err.message || "Unknown error",
+        variant: "destructive",
+      }),
   });
 
   const keywordLoadingMessage = useLoadingMessages(discoverMutation.isPending, [

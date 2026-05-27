@@ -93,10 +93,15 @@ interface ChunkAnalysis {
 interface SchemaAudit {
   schemaType: string;
   present: boolean;
-  searchable: boolean;
-  indexable: boolean;
-  retrievable: boolean;
-  recommendations: string[];
+  // 0-100 share of required+recommended fields populated on the best
+  // instance of this schema type on the page.
+  completenessPercent: number;
+  populatedFields: string[];
+  missingFields: string[];
+  // The catalogue of fields the auditor measured against — used to split
+  // `missingFields` into required vs recommended buckets in the UI.
+  required: string[];
+  recommended: string[];
 }
 
 interface PipelineStage {
@@ -397,6 +402,16 @@ export default function GeoSignals() {
   const schemaAudits: SchemaAudit[] = activeSlice.schemaResult?.schemas || [];
   const additionalTypes: string[] = activeSlice.schemaResult?.additionalTypes || [];
   const schemaCachedAt: string | undefined = activeSlice.schemaResult?.cachedAt;
+  // Diagnostic fields surfaced from the server so users can verify the
+  // audit actually fetched their page (not "mimicking"). totalSchemasFound
+  // counts EVERY JSON-LD `@type` seen on the page (including types not in
+  // our catalogue); fetched/fetchError tell the user if SSRF/timeout
+  // blocked the fetch; auditedUrl echoes the normalised URL the server
+  // actually requested (after schema/redirect cleanup).
+  const totalSchemasFound: number = activeSlice.schemaResult?.totalSchemasFound ?? 0;
+  const schemaFetched: boolean = activeSlice.schemaResult?.fetched ?? false;
+  const schemaFetchError: string | null = activeSlice.schemaResult?.fetchError ?? null;
+  const auditedUrl: string | undefined = activeSlice.schemaResult?.url;
   const pipelineStages: PipelineStage[] = activeSlice.pipelineResult?.stages || [];
   const optimizedContent = optimizeChunksMutation.data?.data?.optimizedContent || "";
 
@@ -1126,7 +1141,8 @@ export default function GeoSignals() {
               <CardHeader>
                 <CardTitle className="text-foreground">Schema Impact Lab</CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  Audit structured data for Searchable, Indexable, and Retrievable functions
+                  Audit structured data completeness — required and recommended fields per schema
+                  type.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1167,112 +1183,261 @@ export default function GeoSignals() {
 
                 <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
                   <div className="text-center">
-                    <Search className="w-8 h-8 mx-auto text-chart-1 mb-2" />
-                    <p className="font-medium text-foreground">Searchable</p>
+                    <Gauge className="w-8 h-8 mx-auto text-chart-1 mb-2" />
+                    <p className="font-medium text-foreground">Completeness</p>
                     <p className="text-xs text-muted-foreground">
-                      Affects recall - whether AI can find you
+                      % of required + recommended fields populated
                     </p>
                   </div>
                   <div className="text-center">
-                    <Database className="w-8 h-8 mx-auto text-chart-4 mb-2" />
-                    <p className="font-medium text-foreground">Indexable</p>
-                    <p className="text-xs text-muted-foreground">Affects filtering and ordering</p>
+                    <CheckCircle className="w-8 h-8 mx-auto text-chart-4 mb-2" />
+                    <p className="font-medium text-foreground">Required Fields</p>
+                    <p className="text-xs text-muted-foreground">
+                      Mandatory for Google to validate this type
+                    </p>
                   </div>
                   <div className="text-center">
                     <FileText className="w-8 h-8 mx-auto text-primary mb-2" />
-                    <p className="font-medium text-foreground">Retrievable</p>
-                    <p className="text-xs text-muted-foreground">Affects what gets cited</p>
+                    <p className="font-medium text-foreground">Recommended Fields</p>
+                    <p className="text-xs text-muted-foreground">
+                      Lift citation odds in AI search results
+                    </p>
                   </div>
                 </div>
 
                 {schemaAudits.length > 0 ? (
                   <div className="space-y-4">
-                    {schemaCachedAt && (
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <Clock className="w-3 h-3" />
-                        Last audited{" "}
-                        {Math.max(
-                          0,
-                          Math.floor(
-                            (Date.now() - new Date(schemaCachedAt).getTime()) /
-                              (1000 * 60 * 60 * 24),
-                          ),
-                        )}{" "}
-                        days ago —{" "}
-                        <button
-                          type="button"
-                          className="underline hover:text-foreground"
-                          onClick={() => auditSchemaMutation.mutate({ url })}
-                        >
-                          Re-audit
-                        </button>
-                      </div>
-                    )}
-                    {schemaAudits.map((schema, idx) => (
-                      <div key={idx} className="p-4 bg-muted/30 rounded-lg border">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            {schema.present ? (
-                              <CheckCircle className="w-5 h-5 text-chart-4" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-red-500" />
+                    {/* Diagnostic strip: prove to the user that the audit
+                        is REAL by surfacing the URL we fetched + the total
+                        number of JSON-LD `@type` blocks we found on the
+                        page. The previous UI showed every catalogued type
+                        as "Missing" for any page with no JSON-LD, which
+                        looked indistinguishable from a stub. */}
+                    {!schemaFetched ? (
+                      // Fetch FAILED — surface this prominently as an
+                      // error banner instead of letting the "all 14 types
+                      // missing" body render as if it were a real audit
+                      // result. Without this, a WAF-blocked fetch is
+                      // visually identical to "page has no schema."
+                      <div
+                        className="rounded-md border border-destructive/30 bg-destructive/5 p-4"
+                        data-testid="schema-fetch-failed"
+                      >
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                          <div className="flex-1 space-y-1">
+                            <p className="font-medium text-foreground">
+                              Audit couldn't fetch this page
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {schemaFetchError ?? "Unknown fetch error."}
+                            </p>
+                            {auditedUrl && (
+                              <a
+                                href={auditedUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block text-xs text-primary hover:underline"
+                                data-testid="schema-audit-url"
+                              >
+                                Open {auditedUrl} ↗
+                              </a>
                             )}
-                            <span className="font-medium text-foreground">{schema.schemaType}</span>
+                            <p className="text-xs text-muted-foreground pt-1">
+                              Common causes: Cloudflare/WAF bot detection, the URL requires
+                              authentication, or the target site is offline. Try a public-facing
+                              article URL.
+                            </p>
                           </div>
-                          <Badge variant={schema.present ? "default" : "secondary"}>
-                            {schema.present ? "Present" : "Missing"}
-                          </Badge>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground underline hover:text-foreground shrink-0"
+                            onClick={() => auditSchemaMutation.mutate({ url })}
+                          >
+                            Retry
+                          </button>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 mb-3">
-                          <div
-                            className={`p-2 rounded text-center ${schema.searchable ? "bg-sky-500/10" : ""}`}
-                          >
-                            <p className="text-xs text-muted-foreground">Searchable</p>
-                            <p
-                              className={
-                                schema.searchable ? "text-chart-1" : "text-muted-foreground"
-                              }
-                            >
-                              {schema.searchable ? "✓" : "—"}
-                            </p>
+                      </div>
+                    ) : (
+                      <div
+                        className="rounded-md border bg-card p-3 text-xs"
+                        data-testid="schema-audit-summary"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-3.5 w-3.5 text-chart-4" />
+                              <span className="font-medium text-foreground">Fetched live</span>
+                              {auditedUrl && (
+                                <a
+                                  href={auditedUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="truncate text-primary hover:underline max-w-[260px]"
+                                  data-testid="schema-audit-url"
+                                >
+                                  {auditedUrl}
+                                </a>
+                              )}
+                            </div>
+                            <div className="text-muted-foreground">
+                              Found{" "}
+                              <span
+                                className="tnum font-medium text-foreground"
+                                data-testid="schema-total-found"
+                              >
+                                {totalSchemasFound}
+                              </span>{" "}
+                              JSON-LD schema {totalSchemasFound === 1 ? "block" : "blocks"} on this
+                              page
+                              {totalSchemasFound === 0 && (
+                                <span className="text-muted-foreground">
+                                  {" "}
+                                  — page is reachable but has no structured data
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div
-                            className={`p-2 rounded text-center ${schema.indexable ? "bg-chart-4/10" : ""}`}
-                          >
-                            <p className="text-xs text-muted-foreground">Indexable</p>
-                            <p
-                              className={
-                                schema.indexable ? "text-chart-4" : "text-muted-foreground"
-                              }
+                          {schemaCachedAt && (
+                            <button
+                              type="button"
+                              className="text-muted-foreground underline hover:text-foreground shrink-0"
+                              onClick={() => auditSchemaMutation.mutate({ url })}
                             >
-                              {schema.indexable ? "✓" : "—"}
-                            </p>
-                          </div>
-                          <div
-                            className={`p-2 rounded text-center ${schema.retrievable ? "bg-primary/10" : ""}`}
-                          >
-                            <p className="text-xs text-muted-foreground">Retrievable</p>
-                            <p
-                              className={
-                                schema.retrievable ? "text-primary" : "text-muted-foreground"
-                              }
-                            >
-                              {schema.retrievable ? "✓" : "—"}
-                            </p>
-                          </div>
+                              <Clock className="w-3 h-3 inline mr-1" />
+                              Re-audit
+                            </button>
+                          )}
                         </div>
-                        {schema.recommendations.length > 0 && (
-                          <div className="text-sm text-muted-foreground">
-                            {schema.recommendations.map((rec, rIdx) => (
-                              <p key={rIdx} className="flex items-start gap-2">
-                                <ChevronRight className="w-3 h-3 mt-1 text-primary" />
-                                {rec}
-                              </p>
-                            ))}
-                          </div>
+                        {schemaCachedAt && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            Cached{" "}
+                            {Math.max(
+                              0,
+                              Math.floor(
+                                (Date.now() - new Date(schemaCachedAt).getTime()) /
+                                  (1000 * 60 * 60 * 24),
+                              ),
+                            )}{" "}
+                            day(s) ago — server caches for 7 days.
+                          </p>
                         )}
                       </div>
-                    ))}
+                    )}
+                    {/* Render only schema types that are EITHER present on the
+                        page OR have a required field — keeps the list short
+                        and actionable. Server returns a row for every catalogued
+                        type even when absent. Skip the entire card list when
+                        the fetch failed — we already showed the error banner
+                        above, and rendering 14 "missing" cards on a failed
+                        fetch makes the error feel like real audit results. */}
+                    {schemaFetched &&
+                      schemaAudits
+                        .filter((schema) => schema.present || schema.required.length > 0)
+                        .map((schema, idx) => {
+                          const requiredSet = new Set(schema.required);
+                          const recommendedSet = new Set(schema.recommended);
+                          const missingRequired = schema.missingFields.filter((f) =>
+                            requiredSet.has(f),
+                          );
+                          const missingRecommended = schema.missingFields.filter((f) =>
+                            recommendedSet.has(f),
+                          );
+                          const pct = Math.max(0, Math.min(100, schema.completenessPercent ?? 0));
+                          return (
+                            <div
+                              key={`${schema.schemaType}-${idx}`}
+                              className="p-4 bg-muted/30 rounded-lg border"
+                              data-testid={`schema-card-${schema.schemaType}`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  {schema.present ? (
+                                    <CheckCircle className="w-5 h-5 text-chart-4" />
+                                  ) : (
+                                    <XCircle className="w-5 h-5 text-destructive" />
+                                  )}
+                                  <span className="font-medium text-foreground">
+                                    {schema.schemaType}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {schema.present && (
+                                    <span
+                                      className="tnum text-sm font-medium text-foreground"
+                                      data-testid={`schema-pct-${schema.schemaType}`}
+                                    >
+                                      {pct}%
+                                    </span>
+                                  )}
+                                  <Badge variant={schema.present ? "default" : "secondary"}>
+                                    {schema.present ? "Present" : "Missing"}
+                                  </Badge>
+                                </div>
+                              </div>
+
+                              {schema.present && <Progress value={pct} className="mb-3 h-1.5" />}
+
+                              {schema.populatedFields.length > 0 && (
+                                <div className="mb-3">
+                                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                                    Populated ({schema.populatedFields.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {schema.populatedFields.map((f) => (
+                                      <Badge
+                                        key={f}
+                                        variant="outline"
+                                        className="text-[11px] font-normal border-chart-4/30 text-chart-4 bg-chart-4/5"
+                                      >
+                                        <Check className="w-2.5 h-2.5 mr-1" />
+                                        {f}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {missingRequired.length > 0 && (
+                                <div className="mb-2">
+                                  <p className="text-[11px] font-medium uppercase tracking-wider text-destructive mb-1.5">
+                                    Missing required ({missingRequired.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {missingRequired.map((f) => (
+                                      <Badge
+                                        key={f}
+                                        variant="destructive"
+                                        className="text-[11px] font-normal"
+                                      >
+                                        {f}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {missingRecommended.length > 0 && (
+                                <div>
+                                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                                    Missing recommended ({missingRecommended.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {missingRecommended.map((f) => (
+                                      <Badge
+                                        key={f}
+                                        variant="secondary"
+                                        className="text-[11px] font-normal"
+                                      >
+                                        {f}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
 
                     {additionalTypes.length > 0 && (
                       <div className="p-4 bg-muted/20 rounded-lg border">
@@ -1293,7 +1458,7 @@ export default function GeoSignals() {
                   <EmptyState
                     icon={Code}
                     title="Enter a URL to audit schema markup"
-                    description="Analyze how structured data affects AI visibility"
+                    description="See which required and recommended fields are populated for each schema type."
                   />
                 )}
               </CardContent>

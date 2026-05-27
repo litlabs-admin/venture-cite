@@ -395,7 +395,12 @@ export default function GeoTools() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/bofu-content"] });
     },
-    onError: () => toast({ title: "Failed to generate content", variant: "destructive" }),
+    onError: (err: any) =>
+      toast({
+        title: "Failed to generate content",
+        description: err?.message || "Unknown error",
+        variant: "destructive",
+      }),
   });
 
   // Wave 9.4: header roll-up cards. Single endpoint returns counts

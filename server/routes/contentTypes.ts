@@ -202,12 +202,35 @@ export function setupContentTypesRoutes(app: Express): void {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
 
-        if (!(await acquireOrWait("manual-discovery", brand.id, 0))) {
-          const secs = await secondsUntilAvailable("manual-discovery", brand.id);
+        // Preflight: surface env + profile gaps with actionable messages so
+        // the GEO Assets toast tells the user WHY discovery would have run
+        // empty, instead of swallowing it as "Failed to discover listicles".
+        // listicleScanner.ts:76 throws "OPENROUTER_API_KEY not configured"
+        // when the key is absent; sendError() then masks the reason. And
+        // buildQueries() returns [] for brands without industry/products,
+        // making the scan "succeed" with 0 candidates. Catch both here.
+        if (!process.env.OPENROUTER_API_KEY) {
+          return res.status(503).json({
+            success: false,
+            error: "Listicle discovery requires OPENROUTER_API_KEY. Contact support.",
+          });
+        }
+        const listicleHasProfile =
+          (brand.industry && brand.industry.trim().length > 0) ||
+          (Array.isArray(brand.products) && brand.products.length > 0);
+        if (!listicleHasProfile) {
+          return res.status(400).json({
+            success: false,
+            error: "Add industry or products to your brand profile to discover listicles.",
+          });
+        }
+
+        if (!(await acquireOrWait("discover-listicles", brand.id, 0))) {
+          const secs = await secondsUntilAvailable("discover-listicles", brand.id);
           return res.status(429).json({
             success: false,
             error: "rate_limited",
-            message: `Discovery is on a short cooldown for this brand. Try again in ~${secs}s.`,
+            message: `Listicle discovery is on a short cooldown for this brand. Try again in ~${secs}s.`,
           });
         }
 
@@ -313,12 +336,35 @@ export function setupContentTypesRoutes(app: Express): void {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
 
-        if (!(await acquireOrWait("manual-discovery", brand.id, 0))) {
-          const secs = await secondsUntilAvailable("manual-discovery", brand.id);
+        // Preflight: wikipediaScanner uses OpenAI (not OpenRouter) for the
+        // classifier and the MediaWiki API for search. If OPENAI_API_KEY is
+        // missing classifyPages throws a 401-shape error that sendError
+        // masks. If buildSearchTerms returns [] (no name/industry/products)
+        // the scan "succeeds" with 0 candidates.
+        if (!process.env.OPENAI_API_KEY) {
+          return res.status(503).json({
+            success: false,
+            error: "Wikipedia scan requires OPENAI_API_KEY. Contact support.",
+          });
+        }
+        const wikiHasProfile =
+          brand.name &&
+          brand.name.trim().length > 0 &&
+          ((brand.industry && brand.industry.trim().length > 0) ||
+            (Array.isArray(brand.products) && brand.products.length > 0));
+        if (!wikiHasProfile) {
+          return res.status(400).json({
+            success: false,
+            error: "Add industry or products to your brand profile to scan Wikipedia.",
+          });
+        }
+
+        if (!(await acquireOrWait("scan-wikipedia", brand.id, 0))) {
+          const secs = await secondsUntilAvailable("scan-wikipedia", brand.id);
           return res.status(429).json({
             success: false,
             error: "rate_limited",
-            message: `Discovery is on a short cooldown for this brand. Try again in ~${secs}s.`,
+            message: `Wikipedia scan is on a short cooldown for this brand. Try again in ~${secs}s.`,
           });
         }
 
@@ -853,12 +899,12 @@ Return ONLY valid JSON. Do not include an aiSurfaceScore field — it is compute
         if (!ctx) return res.status(404).json({ success: false, error: "Brand not found" });
         const { brand, facts } = ctx;
 
-        if (!(await acquireOrWait("manual-discovery", brand.id, 0))) {
-          const secs = await secondsUntilAvailable("manual-discovery", brand.id);
+        if (!(await acquireOrWait("generate-faqs", brand.id, 0))) {
+          const secs = await secondsUntilAvailable("generate-faqs", brand.id);
           return res.status(429).json({
             success: false,
             error: "rate_limited",
-            message: `Generation is on a short cooldown for this brand. Try again in ~${secs}s.`,
+            message: `FAQ generation is on a short cooldown for this brand. Try again in ~${secs}s.`,
           });
         }
 
@@ -885,24 +931,49 @@ Generate FAQs that:
 3. Include the brand name naturally where relevant
 4. Cover common objections and buying considerations
 
-Return JSON array:
-[{
-  "question": "The question users might ask AI",
-  "answer": "Concise, authoritative answer",
-  "category": "pricing|features|comparison|support|general",
-  "optimizationTips": ["tip1", "tip2"]
-}]
+Return a JSON object of this exact shape:
+{
+  "faqs": [
+    {
+      "question": "The question users might ask AI",
+      "answer": "Concise, authoritative answer",
+      "category": "pricing|features|comparison|support|general",
+      "optimizationTips": ["tip1", "tip2"]
+    }
+  ]
+}
 
-Return ONLY the JSON array. Do NOT include any aiSurfaceScore field — it is computed server-side from a deterministic heuristic.`;
+Return ONLY the JSON object (no prose, no markdown fences). Do NOT include any aiSurfaceScore field — it is computed server-side from a deterministic heuristic.`;
 
         const response = await openai.chat.completions.create({
           model: MODELS.misc,
+          // JSON mode forces the model to return parseable JSON. Note:
+          // `json_object` requires an OBJECT root, not a bare array — the
+          // prompt above is updated to ask for `{ "faqs": [...] }` to match.
+          response_format: { type: "json_object" },
           messages: [{ role: "user", content: prompt }],
           temperature: 0.7,
         });
 
-        const parsed = safeParseJson<any[]>(response.choices[0].message.content);
-        const faqs: any[] = Array.isArray(parsed) ? parsed : [];
+        // Accept either { faqs: [...] } (new shape) or a bare [...] (just in
+        // case the model ignores the wrapper). Both unwrap to the same array.
+        const parsed = safeParseJson<{ faqs?: any[] } | any[]>(response.choices[0].message.content);
+        const faqs: any[] = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray((parsed as any)?.faqs)
+            ? (parsed as any).faqs
+            : [];
+
+        if (faqs.length === 0) {
+          // The AI didn't return any parseable FAQs — mirror the keyword
+          // research pattern (content.ts:833) and surface a clear 502 so
+          // the client toast describes the problem instead of saying
+          // "successfully generated" with zero rows.
+          return res.status(502).json({
+            success: false,
+            error: "AI returned an unexpected response. Please try again.",
+          });
+        }
 
         // Save sequentially with per-item try/catch so one bad item doesn't
         // abort the whole batch (fixes the Promise.all partial-failure bug).

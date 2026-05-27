@@ -50,7 +50,14 @@ export const MODELS = {
   citationClaude: "anthropic/claude-haiku-4.5",
   citationGemini: "google/gemini-2.5-flash-lite",
   citationPerplexity: "perplexity/sonar",
-  citationDeepSeek: "deepseek/deepseek-v3.2",
+  // 2026-05-28: corrected from `deepseek/deepseek-v3.2` (404s) to the
+  // actual live slug `deepseek/deepseek-v3.2-exp` confirmed against
+  // https://openrouter.ai/deepseek/deepseek-v3.2-exp. The `-exp` suffix
+  // matters — DeepSeek's V3.2 line ships only as the experimental
+  // variant. The 404 was being eaten by the circuit breaker as a 4xx
+  // (non-infra) failure, so the DeepSeek column on the citations page
+  // had been silently returning is_cited=false for every prompt.
+  citationDeepSeek: "deepseek/deepseek-v3.2-exp",
 
   // ── Distribute Content (articles page → distribute dialog) ────────
   // Rewrites an article for LinkedIn, Medium, Reddit.
@@ -68,19 +75,23 @@ export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 // ── Citation grounding ──────────────────────────────────────────────
 // Citation checks must reflect REAL AI-search behavior: each engine
 // answers with LIVE WEB GROUNDING, queried as itself, deterministically.
-// Slugs + token prices + the facts below verified 2026-05-18 against the
+// Slugs + token prices + the facts below verified 2026-05-27 against the
 // OpenAI / OpenRouter model + docs pages.
 //   - ChatGPT: OpenAI `gpt-4o-mini-search-preview` via the direct OpenAI
 //     client. Search-preview models do their own retrieval and REJECT
 //     all sampling params (temperature/top_p/penalties) → returns a
 //     400 if `temperature` is sent, so supportsTemperature:false.
-//   - Claude / Gemini / DeepSeek: clean OpenRouter slug + the
-//     `openrouter:web_search` SERVER TOOL (added to the request `tools`
-//     array). The legacy `:online` suffix / web plugin is DEPRECATED by
-//     OpenRouter; the server tool is the supported path and runs the
-//     search server-side in ONE round-trip, returning url_citation
-//     annotations (no client-side tool-call handling needed).
-//   - Perplexity `sonar` is natively web-grounded; no tool needed.
+//   - Claude / Gemini / DeepSeek: clean OpenRouter slug + the documented
+//     `plugins:[{id:"web", max_results:5}]` extension on the OpenAI-compatible
+//     chat-completions request. (Per https://openrouter.ai/docs/guides/features/plugins/web-search
+//     the supported forms are the `:online` model suffix or the `plugins`
+//     array — there is no `openrouter:web_search` tool type. The prior
+//     code mistakenly built a fake `tools` entry which OpenRouter
+//     silently ignored, so these engines were running against stale
+//     training data.) OpenRouter runs the search server-side in one
+//     round-trip and returns url_citation annotations on
+//     `choices[].message.annotations` — no client-side tool-call handling.
+//   - Perplexity `sonar` is natively web-grounded; no plugin needed.
 // pricingModel == model (token cost only). The web-search request fee
 // (~$0.005/req via Exa) is not token-priced (analytics-only). If a slug
 // 404s or a price drifts, this is the one place to edit.
@@ -125,8 +136,8 @@ export const CITATION_MODELS: Record<string, CitationModelConfig> = {
   },
   DeepSeek: {
     client: "openrouter",
-    model: "deepseek/deepseek-v3.2",
-    pricingModel: "deepseek/deepseek-v3.2",
+    model: "deepseek/deepseek-v3.2-exp",
+    pricingModel: "deepseek/deepseek-v3.2-exp",
     supportsTemperature: true,
     webSearchTool: true,
   },

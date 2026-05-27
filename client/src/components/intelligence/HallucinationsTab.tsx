@@ -106,6 +106,12 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
       });
       toast({ title: "Hallucination marked as resolved" });
     },
+    onError: (err: Error) =>
+      toast({
+        title: "Failed to resolve hallucination",
+        description: err.message || "Unknown error",
+        variant: "destructive",
+      }),
   });
 
   const getSeverityColor = (severity: string) => {
@@ -401,17 +407,18 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                 <p className="text-sm text-muted-foreground">
                   Add verified facts about your brand to enable hallucination detection
                 </p>
-                <Button className="mt-4" data-testid="button-add-fact">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Brand Fact
-                </Button>
+                <Link href="/brand-fact-sheet">
+                  <Button className="mt-4" data-testid="button-add-fact">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Brand Fact
+                  </Button>
+                </Link>
               </div>
             ) : (
               <div className="space-y-3">
                 {facts.map((fact) => (
                   <div key={fact.id} className="p-3 border rounded-lg">
                     <div className="flex items-center justify-between">
-                      {/* TODO(spec-2 Plan 2.4): `subcategory` replaces `factCategory`. */}
                       <Badge variant="outline">{fact.subcategory}</Badge>
                       <span className="text-xs text-muted-foreground">Verified</span>
                     </div>
