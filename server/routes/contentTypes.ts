@@ -33,8 +33,123 @@ import {
 } from "../lib/brandGenerationContext";
 import { computeAiSurfaceScore } from "../lib/faqScoring";
 import { normalizeUrl } from "../lib/trackedContentMatcher";
+import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
 
 import { logger } from "../lib/logger";
+
+// ─────────────────────────────────────────────────────────────────────────
+// FAQ generation handler — registered at module-load.
+//
+// Server pattern: POST /api/faqs/generate/:brandId enqueues an OpenAI
+// Responses background job and returns 202 + jobId. The client polls
+// /api/llm-jobs/:jobId. When the run completes, this handler:
+//   - parses { faqs: [...] } (tolerates bare [...] too)
+//   - dedups against existing FAQs via findSimilarFaqQuestion
+//   - persists new rows with computed aiSurfaceScore
+//   - returns the same { data, report, tips } shape the route used to
+//     return inline, so the client renders identically.
+// ─────────────────────────────────────────────────────────────────────────
+interface FaqGenerationPayload {
+  brandId: string;
+  brandName: string;
+  faqCount: number;
+}
+
+interface GeneratedFaq {
+  question: string;
+  answer: string;
+  category?: string;
+  optimizationTips?: string[];
+}
+
+registerLlmJobHandler<
+  FaqGenerationPayload,
+  {
+    data: unknown[];
+    report: {
+      requested: number;
+      generated: number;
+      inserted: number;
+      mergedDuplicates: number;
+      invalid: number;
+    };
+    tips: string[];
+  }
+>({
+  kind: "faq_generation",
+  finalize: async ({ payload, structuredOutput, outputText }) => {
+    const parsed = structuredOutput as { faqs?: GeneratedFaq[] } | GeneratedFaq[] | null;
+    const faqs: GeneratedFaq[] = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.faqs)
+        ? parsed.faqs
+        : [];
+    if (faqs.length === 0) {
+      throw new Error(
+        outputText && outputText.length > 0
+          ? "AI returned an unexpected response shape (no faqs[])."
+          : "AI returned an empty response.",
+      );
+    }
+
+    const ctx = await loadBrandGenerationContext(payload.brandId, []);
+    if (!ctx) throw new Error("Brand not found at finalize time");
+    const { brand } = ctx;
+
+    const savedFaqs: unknown[] = [];
+    let merged = 0;
+    let invalid = 0;
+    for (const faq of faqs) {
+      if (!faq || typeof faq.question !== "string" || typeof faq.answer !== "string") {
+        invalid += 1;
+        continue;
+      }
+      try {
+        const similar = await storage
+          .findSimilarFaqQuestion(brand.id, faq.question)
+          .catch(() => null);
+        if (similar) {
+          merged += 1;
+          continue;
+        }
+        const aiSurfaceScore = computeAiSurfaceScore({
+          question: faq.question,
+          answer: faq.answer,
+          brand: { name: brand.name, nameVariations: brand.nameVariations ?? [] },
+        });
+        const saved = await storage.createFaqItem({
+          brandId: brand.id,
+          question: faq.question,
+          answer: faq.answer,
+          category: faq.category ?? null,
+          aiSurfaceScore,
+          isOptimized: 0,
+          optimizationTips: Array.isArray(faq.optimizationTips) ? faq.optimizationTips : [],
+        });
+        savedFaqs.push(saved);
+      } catch (err) {
+        logger.warn({ err }, "[faqs] handler.createFaqItem failed for one item");
+      }
+    }
+
+    return {
+      data: savedFaqs,
+      report: {
+        requested: payload.faqCount,
+        generated: faqs.length,
+        inserted: savedFaqs.length,
+        mergedDuplicates: merged,
+        invalid,
+      },
+      tips: [
+        "Add FAQ schema markup to your pages for rich snippets",
+        "Keep answers 40-60 words for optimal AI summarization",
+        "Update FAQs quarterly with new questions from support",
+        "Include FAQs on product pages, not just a dedicated FAQ page",
+      ],
+    };
+  },
+});
 // Wave 9.4: keep tracked_content_urls in sync with bofu_content / faq_items
 // publishedUrl. Called from PATCH handlers; defensive against partial inputs.
 async function syncTrackedContentUrl(
@@ -945,95 +1060,45 @@ Return a JSON object of this exact shape:
 
 Return ONLY the JSON object (no prose, no markdown fences). Do NOT include any aiSurfaceScore field — it is computed server-side from a deterministic heuristic.`;
 
-        const response = await openai.chat.completions.create({
-          model: MODELS.misc,
-          // JSON mode forces the model to return parseable JSON. Note:
-          // `json_object` requires an OBJECT root, not a bare array — the
-          // prompt above is updated to ask for `{ "faqs": [...] }` to match.
-          response_format: { type: "json_object" },
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.7,
-        });
-
-        // Accept either { faqs: [...] } (new shape) or a bare [...] (just in
-        // case the model ignores the wrapper). Both unwrap to the same array.
-        const parsed = safeParseJson<{ faqs?: any[] } | any[]>(response.choices[0].message.content);
-        const faqs: any[] = Array.isArray(parsed)
-          ? parsed
-          : Array.isArray((parsed as any)?.faqs)
-            ? (parsed as any).faqs
-            : [];
-
-        if (faqs.length === 0) {
-          // The AI didn't return any parseable FAQs — mirror the keyword
-          // research pattern (content.ts:833) and surface a clear 502 so
-          // the client toast describes the problem instead of saying
-          // "successfully generated" with zero rows.
-          return res.status(502).json({
-            success: false,
-            error: "AI returned an unexpected response. Please try again.",
+        // Vercel-Hobby-safe: enqueue an OpenAI Responses background
+        // job. Kickoff returns instantly with a jobId. The handler
+        // registered above (kind="faq_generation") parses the output,
+        // dedups against existing FAQs, persists rows, and returns the
+        // { data, report, tips } shape the client renders.
+        try {
+          const job = await enqueueLlmJob<FaqGenerationPayload>({
+            kind: "faq_generation",
+            payload: { brandId: brand.id, brandName: brand.name, faqCount },
+            brandId: brand.id,
+            userId: user.id,
+            model: MODELS.misc,
+            input: prompt,
+            responseFormat: { type: "json_object" },
           });
-        }
-
-        // Save sequentially with per-item try/catch so one bad item doesn't
-        // abort the whole batch (fixes the Promise.all partial-failure bug).
-        // Wave 9.4: also dedupe semantically against existing FAQs and
-        // compute the aiSurfaceScore heuristically.
-        const savedFaqs: any[] = [];
-        let merged = 0;
-        let invalid = 0;
-        for (const faq of faqs) {
-          if (!faq || typeof faq.question !== "string" || typeof faq.answer !== "string") {
-            invalid += 1;
-            continue;
-          }
-          try {
-            const similar = await storage
-              .findSimilarFaqQuestion(brand.id, faq.question)
-              .catch(() => null);
-            if (similar) {
-              merged += 1;
-              continue;
-            }
-            const aiSurfaceScore = computeAiSurfaceScore({
-              question: faq.question,
-              answer: faq.answer,
-              brand: { name: brand.name, nameVariations: brand.nameVariations ?? [] },
+          return res.status(202).json({
+            success: true,
+            jobId: job.jobId,
+            status: job.status,
+            pollUrl: `/api/llm-jobs/${job.jobId}`,
+            message: "Generating FAQs — usually 10-25s.",
+          });
+        } catch (aiErr: unknown) {
+          const e = aiErr as { status?: number; name?: string };
+          if (e?.status === 429) {
+            return res.status(429).json({
+              success: false,
+              error: "AI is busy right now. Please wait a moment and try again.",
             });
-            const saved = await storage.createFaqItem({
-              brandId: brand.id,
-              question: faq.question,
-              answer: faq.answer,
-              category: faq.category ?? null,
-              aiSurfaceScore,
-              // Generation produces draft FAQs; the per-FAQ optimizer is
-              // a separate manual step that flips this to 1.
-              isOptimized: 0,
-              optimizationTips: Array.isArray(faq.optimizationTips) ? faq.optimizationTips : [],
-            });
-            savedFaqs.push(saved);
-          } catch (err) {
-            logger.warn({ err: err }, "[faqs] createFaqItem failed for one item");
           }
+          if (e?.status === 401) {
+            return res
+              .status(503)
+              .json({ success: false, error: "AI service is misconfigured. Contact support." });
+          }
+          return res
+            .status(502)
+            .json({ success: false, error: "AI service error. Please try again shortly." });
         }
-
-        res.json({
-          success: true,
-          data: savedFaqs,
-          report: {
-            requested: faqCount,
-            generated: faqs.length,
-            inserted: savedFaqs.length,
-            mergedDuplicates: merged,
-            invalid,
-          },
-          tips: [
-            "Add FAQ schema markup to your pages for rich snippets",
-            "Keep answers 40-60 words for optimal AI summarization",
-            "Update FAQs quarterly with new questions from support",
-            "Include FAQs on product pages, not just a dedicated FAQ page",
-          ],
-        });
       } catch (error) {
         sendError(res, error, "Failed to generate FAQs");
       }

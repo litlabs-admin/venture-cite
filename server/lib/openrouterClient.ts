@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 
 let cached: OpenAI | null = null;
 
@@ -18,7 +19,8 @@ export function getOpenRouterClient(): OpenAI {
       "HTTP-Referer": "https://venturecite.com",
       "X-Title": "VentureCite",
     },
-    timeout: 45_000,
+    // Tier-aware: ~6.3s on Hobby, 25s on Pro.
+    timeout: LLM_CALL_TIMEOUT_MS,
     maxRetries: 1,
   });
   return cached;

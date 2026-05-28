@@ -11,7 +11,6 @@ import { withAdvisoryLock, lockKeys } from "./lib/advisoryLock";
 import { runMentionScan } from "./lib/runMentionScan";
 import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
-import { Sentry } from "./instrument";
 import { logSystemAudit } from "./lib/audit";
 import { supabaseAdmin } from "./supabase";
 import { startRun } from "./lib/workflowEngine";

@@ -49,6 +49,32 @@ export type ValueType = (typeof VALUE_TYPES)[number];
 // logical fact is the whole point. If a new fact recurs in the wild,
 // add it here (bump CURRENT_SCHEMA_VERSION) rather than letting the LLM
 // invent.
+// 2026-05-28 (revised): controlled vocabulary cleaned up to eliminate
+// redundant keys that caused the LLM to extract the same fact twice
+// under different names. The duplicates we removed:
+//
+//   identity.foundedDate    — overlapped foundedYear. Kept foundedYear
+//                             (more specific to brand-fact use case)
+//   identity.founderNames   — overlapped team.founders. Kept team.founders
+//                             (correct domain — founders ARE team)
+//   identity.category       — overlapped identity.industry. Kept industry
+//   operations.address      — overlapped operations.headquarters. Kept
+//                             headquarters (one canonical location key)
+//   operations.city,
+//   operations.stateRegion,
+//   operations.postalCode,
+//   operations.country      — duplicated contact.* equivalents. Kept the
+//                             contact.* versions since address details
+//                             are part of the contact record.
+//
+// Also added domain-rich keys observed during the production audit:
+//   identity.publicTradingExchange (Adyen → Euronext Amsterdam)
+//   credentials.certifications already covered ISO standards
+//   credentials.regulatoryRegistrations (Adyen → DNB, FCA, etc.)
+//   offerings.subProducts (sub-brands like "Adyen Capital", "Adyen Issuing")
+//   offerings.geographicAvailability
+//   operations.dataCenters
+//   growth.publicMetrics (processing volume, MAU, etc.)
 export const ALLOWED_KEYS = {
   identity: [
     "name",
@@ -57,13 +83,12 @@ export const ALLOWED_KEYS = {
     "tagline",
     "description",
     "foundedYear",
-    "foundedDate",
-    "founderNames",
     "logoUrl",
     "website",
     "industry",
-    "category",
     "companyType",
+    "publicTradingExchange",
+    "publicTradingSymbol",
     "other",
   ],
   offerings: [
@@ -71,10 +96,12 @@ export const ALLOWED_KEYS = {
     "primaryProduct",
     "primaryService",
     "productCategory",
+    "subProducts",
     "keyFeatures",
     "useCases",
     "platforms",
     "integrations",
+    "geographicAvailability",
     "other",
   ],
   positioning: [
@@ -99,13 +126,9 @@ export const ALLOWED_KEYS = {
   ],
   operations: [
     "headquarters",
-    "address",
-    "city",
-    "stateRegion",
-    "postalCode",
-    "country",
     "additionalOffices",
     "operatingRegions",
+    "dataCenters",
     "userCount",
     "customerCount",
     "uptime",
@@ -115,18 +138,19 @@ export const ALLOWED_KEYS = {
   credentials: [
     "certifications",
     "complianceStandards",
+    "regulatoryRegistrations",
     "awards",
     "press",
     "fundingTotal",
     "fundingStage",
     "investors",
-    "publicTradingSymbol",
     "other",
   ],
   growth: [
     "annualRevenue",
     "revenueRange",
     "yearOverYearGrowth",
+    "publicMetrics",
     "newProductLaunches",
     "majorMilestones",
     "expansionRegions",
@@ -174,22 +198,23 @@ const SUBCATEGORY_LABELS: Record<string, string> = {
   "identity.tagline": "Tagline",
   "identity.description": "Description",
   "identity.foundedYear": "Founded",
-  "identity.foundedDate": "Founded",
-  "identity.founderNames": "Founders",
   "identity.logoUrl": "Logo",
   "identity.website": "Website",
   "identity.industry": "Industry",
-  "identity.category": "Category",
   "identity.companyType": "Company type",
+  "identity.publicTradingExchange": "Stock exchange",
+  "identity.publicTradingSymbol": "Ticker",
   // offerings
   "offerings.productLine": "Product line",
   "offerings.primaryProduct": "Primary product",
   "offerings.primaryService": "Primary service",
   "offerings.productCategory": "Product category",
+  "offerings.subProducts": "Sub-products",
   "offerings.keyFeatures": "Key features",
   "offerings.useCases": "Use cases",
   "offerings.platforms": "Platforms",
   "offerings.integrations": "Integrations",
+  "offerings.geographicAvailability": "Availability",
   // positioning
   "positioning.valueProposition": "Value proposition",
   "positioning.missionStatement": "Mission",
@@ -208,13 +233,9 @@ const SUBCATEGORY_LABELS: Record<string, string> = {
   "team.headquartersTeamSize": "HQ team size",
   // operations
   "operations.headquarters": "Headquarters",
-  "operations.address": "Address",
-  "operations.city": "City",
-  "operations.stateRegion": "State / region",
-  "operations.postalCode": "Postal code",
-  "operations.country": "Country",
   "operations.additionalOffices": "Additional offices",
   "operations.operatingRegions": "Operating regions",
+  "operations.dataCenters": "Data centers",
   "operations.userCount": "Users",
   "operations.customerCount": "Customers",
   "operations.uptime": "Uptime",
@@ -222,16 +243,17 @@ const SUBCATEGORY_LABELS: Record<string, string> = {
   // credentials
   "credentials.certifications": "Certifications",
   "credentials.complianceStandards": "Compliance",
+  "credentials.regulatoryRegistrations": "Regulatory registrations",
   "credentials.awards": "Awards",
   "credentials.press": "Press",
   "credentials.fundingTotal": "Funding raised",
   "credentials.fundingStage": "Funding stage",
   "credentials.investors": "Investors",
-  "credentials.publicTradingSymbol": "Ticker",
   // growth
   "growth.annualRevenue": "Annual revenue",
   "growth.revenueRange": "Revenue range",
   "growth.yearOverYearGrowth": "YoY growth",
+  "growth.publicMetrics": "Public metrics",
   "growth.newProductLaunches": "Recent launches",
   "growth.majorMilestones": "Milestones",
   "growth.expansionRegions": "Expansion regions",

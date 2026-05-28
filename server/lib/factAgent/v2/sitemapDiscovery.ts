@@ -108,6 +108,43 @@ function parseRobotsForSitemap(text: string): string | null {
   return m?.[1] ?? null;
 }
 
+/** Extract same-domain top-level nav links from a homepage HTML doc.
+ *  Used as a fallback when the sitemap is missing or sparse. Returns
+ *  absolute URLs filtered to:
+ *    - same registered domain
+ *    - path depth ≤ 2 segments (homepage nav, not sub-sections)
+ *    - extension not in NON_PAGE_EXTENSIONS
+ *    - case-insensitive dedup
+ *  Capped at 30 entries. */
+function extractNavLinks(html: string, brandUrl: string, brandRegistered: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const hrefRegex = /<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = hrefRegex.exec(html)) !== null && out.length < 30) {
+    const href = m[1].trim();
+    if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+      continue;
+    }
+    let url: URL;
+    try {
+      url = new URL(href, brandUrl);
+    } catch {
+      continue;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+    if (registeredDomain(url.hostname) !== brandRegistered) continue;
+    if (NON_PAGE_EXTENSIONS.test(url.pathname)) continue;
+    const depth = url.pathname.split("/").filter(Boolean).length;
+    if (depth > 2) continue;
+    const canonical = `${url.protocol}//${url.host}${url.pathname}`.toLowerCase();
+    if (seen.has(canonical)) continue;
+    seen.add(canonical);
+    out.push(url.toString());
+  }
+  return out;
+}
+
 /** Score a nested-sitemap URL by how well it matches the brand's URL
  *  context. Higher = more relevant. Used to prioritise which nested
  *  sitemaps to recurse into when an index has more than
@@ -233,13 +270,43 @@ export async function discoverSitemapUrls(
   let pageUrls: string[] = [];
 
   if (rootParsed.kind === "sitemapindex") {
+    // 2026-05-28 (revised): dedup nested sitemaps by CANONICAL path so
+    // Samsung's 66 country-locale variants of the same sitemap structure
+    // collapse to one fetch instead of consuming all 8 nested slots on
+    // duplicates. The canonical path here is the sitemap URL with its
+    // locale prefix stripped — different country versions of the same
+    // sitemap structure have identical canonical paths.
+    const canonicalizeSitemapPath = (u: string): string => {
+      try {
+        const url = new URL(u);
+        // Strip locale prefix (e.g., /uk/sitemap.xml → /sitemap.xml,
+        // /en-gb/sitemap-root.xml → /sitemap-root.xml).
+        const localeMatch = /^\/([a-z]{2,3}(?:[-_][a-z]{2,4})?)(\/|$)/i.exec(url.pathname);
+        if (localeMatch) {
+          return url.pathname.slice(localeMatch[1].length + 1) || "/";
+        }
+        return url.pathname;
+      } catch {
+        return u;
+      }
+    };
+
     const ranked = rootParsed.locs
       .map((u) => ({ url: u, score: scoreNestedSitemap(u, brandUrl) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, MAX_NESTED_SITEMAPS)
-      .map((r) => r.url);
+      .sort((a, b) => b.score - a.score);
 
-    for (const nestedUrl of ranked) {
+    // Dedup-by-canonical-path: keep first occurrence by score.
+    const seenCanonical = new Set<string>();
+    const dedupedNested: string[] = [];
+    for (const { url } of ranked) {
+      const canonical = canonicalizeSitemapPath(url);
+      if (seenCanonical.has(canonical)) continue;
+      seenCanonical.add(canonical);
+      dedupedNested.push(url);
+      if (dedupedNested.length >= MAX_NESTED_SITEMAPS) break;
+    }
+
+    for (const nestedUrl of dedupedNested) {
       if (pageUrls.length >= MAX_ENTRIES) break;
       const nestedParsed = await fetchAndParse(fetcher, nestedUrl);
       if (!nestedParsed) continue;
@@ -251,6 +318,29 @@ export async function discoverSitemapUrls(
   } else {
     // urlset or unknown — trust the <loc>s as candidates.
     pageUrls = rootParsed.locs;
+  }
+
+  // 2026-05-28 (revised): HTML nav-link fallback. If sitemap discovery
+  // returned <3 URLs, parse the homepage for <a href> tags pointing at
+  // same-domain top-level paths (1-2 segments deep, not tier-3). Many
+  // marketing-only sites (Webflow / Squarespace / Wix) ship trivial or
+  // missing sitemaps but expose every relevant URL in the nav.
+  if (pageUrls.length < 3) {
+    try {
+      const homepage = await fetcher(`${origin}/`, { maxBytes: 200_000 });
+      if (homepage.status >= 200 && homepage.status < 300) {
+        const navLinks = extractNavLinks(homepage.text, brandUrl, brandRegistered);
+        const existing = new Set(pageUrls);
+        for (const link of navLinks) {
+          if (!existing.has(link)) {
+            pageUrls.push(link);
+            existing.add(link);
+          }
+        }
+      }
+    } catch {
+      // best-effort; ignore failures
+    }
   }
 
   // Filter:

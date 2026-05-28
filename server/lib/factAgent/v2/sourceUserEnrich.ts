@@ -11,12 +11,16 @@ import { withSlot } from "../../llmConcurrency";
 import { MODELS } from "../../modelConfig";
 import { logger } from "../../logger";
 import { FactsResponseSchema, type Fact } from "@shared/factAgent/schema";
+import { LLM_CALL_TIMEOUT_MS } from "./vercelBudget";
 
 // Standalone client — avoids pulling in routesShared → ownership → db which
 // requires DATABASE_URL and is not needed by this pure-LLM helper.
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45_000,
+  // Tier-aware: on Hobby (10s) this is ~6.3s, on Pro (60s) it's 25s.
+  // The deterministic fallback below catches the case where the LLM
+  // hits the deadline before returning a structured response.
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 

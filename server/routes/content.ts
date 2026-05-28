@@ -58,6 +58,104 @@ import { acquireOrWait, secondsUntilAvailable } from "../lib/rateLimitBuckets";
 
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
+import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
+
+// ─────────────────────────────────────────────────────────────────────────
+// Keyword discovery handler — registered at module-load. The poll endpoint
+// in routes/llmJobs.ts dispatches to this handler when the OpenAI Responses
+// background run completes. The handler is responsible for:
+//   - validating the structured output
+//   - deduping against existing rows
+//   - persisting brand-keyword rows
+//   - returning the lean result the client renders
+// ─────────────────────────────────────────────────────────────────────────
+interface KeywordDiscoveryPayload {
+  brandId: string;
+}
+
+interface DiscoveredKeyword {
+  keyword: string;
+  searchVolume?: number;
+  difficulty?: number;
+  opportunityScore?: number;
+  aiCitationPotential?: number;
+  intent?: string;
+  category?: string | null;
+  competitorGap?: number;
+  suggestedContentType?: string;
+  relatedKeywords?: string[];
+}
+
+registerLlmJobHandler<
+  KeywordDiscoveryPayload,
+  { data: unknown[]; count: number; message?: string }
+>({
+  kind: "keyword_discovery",
+  finalize: async ({ payload, structuredOutput, outputText }) => {
+    // Tolerate both shapes the model historically returned:
+    // either { keywords: [...] } or a bare [...] array.
+    const parsed = structuredOutput as
+      | { keywords?: DiscoveredKeyword[] }
+      | DiscoveredKeyword[]
+      | null;
+    const keywords: DiscoveredKeyword[] = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.keywords)
+        ? parsed.keywords
+        : [];
+
+    if (keywords.length === 0) {
+      throw new Error(
+        outputText && outputText.length > 0
+          ? "AI returned an unexpected response shape (no keywords[])."
+          : "AI returned an empty response.",
+      );
+    }
+
+    // Dedup against existing keyword_research rows.
+    const existingKeywords = await storage.getKeywordResearch(payload.brandId, {});
+    const existingSet = new Set(existingKeywords.map((k) => k.keyword.trim().toLowerCase()));
+
+    const savedKeywords: unknown[] = [];
+    for (const kw of keywords) {
+      if (!kw || typeof kw.keyword !== "string" || !kw.keyword.trim()) continue;
+      const normalized = kw.keyword.trim().toLowerCase();
+      if (existingSet.has(normalized)) continue;
+      existingSet.add(normalized);
+      const saved = await storage.createKeywordResearch({
+        brandId: payload.brandId,
+        keyword: kw.keyword.trim(),
+        searchVolume: typeof kw.searchVolume === "number" ? kw.searchVolume : null,
+        difficulty: typeof kw.difficulty === "number" ? kw.difficulty : null,
+        opportunityScore: typeof kw.opportunityScore === "number" ? kw.opportunityScore : 50,
+        aiCitationPotential:
+          typeof kw.aiCitationPotential === "number" ? kw.aiCitationPotential : 50,
+        intent: kw.intent || "informational",
+        category: kw.category || null,
+        competitorGap: typeof kw.competitorGap === "number" ? kw.competitorGap : 0,
+        suggestedContentType: kw.suggestedContentType || "article",
+        relatedKeywords: Array.isArray(kw.relatedKeywords) ? kw.relatedKeywords : null,
+        status: "discovered",
+        provenance: "ai-estimate",
+        contentGenerated: 0,
+        articleId: null,
+      });
+      savedKeywords.push(saved);
+    }
+
+    if (savedKeywords.length === 0) {
+      // Soft case: all returned keywords matched existing rows.
+      return {
+        data: [],
+        count: 0,
+        message:
+          "No new keywords found — try completing your brand profile (description, products, target audience) for better results.",
+      };
+    }
+
+    return { data: savedKeywords, count: savedKeywords.length };
+  },
+});
 // Foundations Plan 1, Task 4: the previous time-driven "phase label"
 // (Brainstorming → Drafting → Writing → Polishing) was theatre — the
 // Responses API background mode doesn't expose intra-run progress, so
@@ -777,15 +875,13 @@ export function setupContentRoutes(app: Express): void {
             ? `Competitors: ${competitors.map((c) => c.name).join(", ")}.`
             : "";
 
-        let response;
-        try {
-          response = await openai.chat.completions.create({
-            model: MODELS.keywordResearch,
-            response_format: { type: "json_object" },
-            messages: [
-              {
-                role: "system",
-                content: `You are an expert keyword researcher specializing in AI search optimization (GEO - Generative Engine Optimization). Your goal is to find keywords that will help brands get cited by AI search engines like ChatGPT, Claude, Perplexity, and Google AI.
+        // Vercel-Hobby-safe: enqueue a background LLM job instead of
+        // waiting inline. The OpenAI Responses run executes on OpenAI's
+        // infrastructure (background:true, store:true) and the client
+        // polls /api/llm-jobs/:id. Both the kickoff and each poll fit
+        // in <1s of function time, so even with a 6s budget the user
+        // gets through 10–20s of effective LLM work.
+        const instructions = `You are an expert keyword researcher specializing in AI search optimization (GEO - Generative Engine Optimization). Your goal is to find keywords that will help brands get cited by AI search engines like ChatGPT, Claude, Perplexity, and Google AI.
 
 Return a JSON object of the shape:
 {
@@ -810,11 +906,9 @@ Focus on:
 2. Comparison queries ("X vs Y")
 3. "Best of" and recommendation queries
 4. How-to and educational content
-5. Industry-specific expertise queries`,
-              },
-              {
-                role: "user",
-                content: `Discover 12-15 high-opportunity keywords for this brand:
+5. Industry-specific expertise queries`;
+
+        const userPrompt = `Discover 12-15 high-opportunity keywords for this brand:
 
 Brand: ${brand.name}
 Company: ${brand.companyName}
@@ -824,24 +918,43 @@ Products/Services: ${brand.products?.join(", ") || "Not specified"}
 Target Audience: ${brand.targetAudience || "Not specified"}
 ${competitorContext}
 
-Find keywords that would help this brand get cited by AI search engines. Prioritize queries where creating authoritative content could establish the brand as a trusted source.`,
-              },
-            ],
-            max_tokens: 2000,
+Find keywords that would help this brand get cited by AI search engines. Prioritize queries where creating authoritative content could establish the brand as a trusted source.`;
+
+        try {
+          const job = await enqueueLlmJob<KeywordDiscoveryPayload>({
+            kind: "keyword_discovery",
+            payload: { brandId },
+            brandId,
+            userId: user.id,
+            model: MODELS.keywordResearch,
+            instructions,
+            input: userPrompt,
+            responseFormat: { type: "json_object" },
           });
-        } catch (aiErr: any) {
-          if (aiErr?.status === 429) {
+          // 202 Accepted — the work is running on OpenAI's infra. The
+          // client polls /api/llm-jobs/:jobId and renders the result
+          // when status='succeeded'.
+          return res.status(202).json({
+            success: true,
+            jobId: job.jobId,
+            status: job.status,
+            pollUrl: `/api/llm-jobs/${job.jobId}`,
+            message: "Discovering keywords — this usually takes 10-20s.",
+          });
+        } catch (aiErr: unknown) {
+          const e = aiErr as { status?: number; name?: string };
+          if (e?.status === 429) {
             return res.status(429).json({
               success: false,
               error: "AI is busy right now. Please wait a moment and try again.",
             });
           }
-          if (aiErr?.status === 401) {
+          if (e?.status === 401) {
             return res
               .status(503)
               .json({ success: false, error: "AI service is misconfigured. Contact support." });
           }
-          if (aiErr?.name === "AbortError" || aiErr?.name === "TimeoutError") {
+          if (e?.name === "AbortError" || e?.name === "TimeoutError") {
             return res
               .status(504)
               .json({ success: false, error: "Keyword discovery timed out. Please try again." });
@@ -850,72 +963,6 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
             .status(502)
             .json({ success: false, error: "AI service error. Please try again shortly." });
         }
-
-        const rawContent = response.choices[0].message.content;
-        const parsed = safeParseJson<{ keywords?: any[] } | any[]>(rawContent);
-        const keywords: any[] = Array.isArray(parsed)
-          ? parsed
-          : Array.isArray((parsed as any)?.keywords)
-            ? (parsed as any).keywords
-            : [];
-
-        if (keywords.length === 0) {
-          return res.status(502).json({
-            success: false,
-            error: "AI returned an unexpected response. Please try again.",
-          });
-        }
-
-        const existingKeywords = await storage.getKeywordResearch(brandId, {});
-        const existingSet = new Set(existingKeywords.map((k) => k.keyword.trim().toLowerCase()));
-
-        const savedKeywords = [];
-        for (const kw of keywords) {
-          if (!kw || typeof kw.keyword !== "string" || !kw.keyword.trim()) continue;
-          const normalized = kw.keyword.trim().toLowerCase();
-          if (existingSet.has(normalized)) continue;
-          existingSet.add(normalized);
-          const saved = await storage.createKeywordResearch({
-            brandId,
-            keyword: kw.keyword.trim(),
-            searchVolume: typeof kw.searchVolume === "number" ? kw.searchVolume : null,
-            difficulty: typeof kw.difficulty === "number" ? kw.difficulty : null,
-            opportunityScore: typeof kw.opportunityScore === "number" ? kw.opportunityScore : 50,
-            aiCitationPotential:
-              typeof kw.aiCitationPotential === "number" ? kw.aiCitationPotential : 50,
-            intent: kw.intent || "informational",
-            category: kw.category || null,
-            competitorGap: typeof kw.competitorGap === "number" ? kw.competitorGap : 0,
-            suggestedContentType: kw.suggestedContentType || "article",
-            relatedKeywords: Array.isArray(kw.relatedKeywords) ? kw.relatedKeywords : null,
-            status: "discovered",
-            provenance: "ai-estimate",
-            contentGenerated: 0,
-            articleId: null,
-          });
-          savedKeywords.push(saved);
-        }
-
-        if (savedKeywords.length === 0) {
-          // Soft case: AI returned valid keywords but all matched existing
-          // rows after dedup. Return success:true with an explanatory
-          // message so the client can show an informational (not
-          // destructive) toast. The previous 200+success:false fired the
-          // client's else-branch and looked like a hard error.
-          return res.json({
-            success: true,
-            data: [],
-            count: 0,
-            message:
-              "No new keywords found — try completing your brand profile (description, products, target audience) for better results.",
-          });
-        }
-
-        res.json({
-          success: true,
-          data: savedKeywords,
-          count: savedKeywords.length,
-        });
       } catch (error) {
         sendError(res, error, "Failed to discover keywords");
       }

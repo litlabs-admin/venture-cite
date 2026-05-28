@@ -2,7 +2,6 @@ import type { Request } from "express";
 import { db } from "../db";
 import { auditLogs } from "@shared/schema";
 import { logger } from "./logger";
-import { Sentry } from "../instrument";
 
 import { captureAndFlush } from "./sentryReport";
 // Sensitive-operation audit log.

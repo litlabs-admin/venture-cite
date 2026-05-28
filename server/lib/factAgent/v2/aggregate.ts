@@ -161,20 +161,44 @@ export async function runAggregate(args: RunAggregateArgs): Promise<AggregateRes
   const pagesFetchedRollup = staticPagesOutcomes.filter((o) => o.status === "done").length;
   const pagesFailedRollup = staticPagesOutcomes.filter((o) => o.status === "failed").length;
 
+  // 2026-05-28 SAFETY NET: the terminal-status UPDATE is the ONE write
+  // that absolutely has to land. If it doesn't, the SSE stream never
+  // sees a terminal status, the frontend reconnects forever, and the
+  // backstop retries up to 10 × 5 min before finally giving up — what
+  // the user described as "stuck in an infinite loop on Adyen."
+  //
+  // We split the write into two steps:
+  //   (a) The minimal terminal write — status, errorKind, completedAt.
+  //       This is the SLA. If even this fails, we bubble up so the
+  //       caller's catch can record the failure mode.
+  //   (b) The rollup write — factsExtracted / pagesFetched / pagesFailed.
+  //       Nice to have for the UI but not load-bearing for run
+  //       termination. Wrap in its own try/catch so a malformed SQL
+  //       template or column-name issue can never wedge the run.
   await db
     .update(schema.brandFactScrapeRuns)
     .set({
       status: terminal.status,
       errorKind: terminal.errorKind,
       completedAt: new Date(),
-      // Only overwrite if our rollup is higher than what's already
-      // there (the /scrape-one path increments per page; we'd
-      // otherwise stomp a partial-then-aggregated value).
-      factsExtracted: sql`GREATEST(${schema.brandFactScrapeRuns.factsExtracted}, ${totalFactsFromLogs})`,
-      pagesFetched: sql`GREATEST(${schema.brandFactScrapeRuns.pagesFetched}, ${pagesFetchedRollup})`,
-      pagesFailed: sql`GREATEST(${schema.brandFactScrapeRuns.pagesFailed}, ${pagesFailedRollup})`,
     })
     .where(eq(schema.brandFactScrapeRuns.id, args.runId));
+
+  try {
+    await db
+      .update(schema.brandFactScrapeRuns)
+      .set({
+        factsExtracted: sql`GREATEST(${schema.brandFactScrapeRuns.factsExtracted}, ${totalFactsFromLogs})`,
+        pagesFetched: sql`GREATEST(${schema.brandFactScrapeRuns.pagesFetched}, ${pagesFetchedRollup})`,
+        pagesFailed: sql`GREATEST(${schema.brandFactScrapeRuns.pagesFailed}, ${pagesFailedRollup})`,
+      })
+      .where(eq(schema.brandFactScrapeRuns.id, args.runId));
+  } catch (err) {
+    logger.warn(
+      { err, runId: args.runId, totalFactsFromLogs, pagesFetchedRollup, pagesFailedRollup },
+      "runAggregate: rollup counter UPDATE failed (terminal status already set; non-fatal)",
+    );
+  }
 
   // 5. Log the aggregate step itself.
   try {

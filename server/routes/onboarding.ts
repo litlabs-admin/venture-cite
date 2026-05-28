@@ -33,7 +33,6 @@ import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
 import type { Tier } from "../lib/llmPricing";
 import { runOnboardingAutopilot } from "../lib/onboardingAutopilot";
 import { waitUntil } from "@vercel/functions";
-import { Sentry } from "../instrument";
 
 import { captureAndFlush } from "../lib/sentryReport";
 // Allowlist of field names the client can write into onboarding_state.

@@ -7,7 +7,6 @@
 //   4. isSoft404 (skip "not found" pages)
 //   5. isCookieWall (skip pre-consent shells)
 //   6. isHollowShell (skip pure-CSR SPAs with no metadata)
-import { canonicalizeUrl } from "../canonicalize";
 
 /** Detect WAF/CDN block. Cloudflare and most CDNs set `cf-ray` on every
  *  response; we only treat as a block when paired with 403/503. */

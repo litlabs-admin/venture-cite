@@ -9,7 +9,6 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { requireUser, requireBrand } from "../lib/ownership";
 import {
-  runBrandPrompts,
   kickoffBrandPromptsRun,
   advanceCitationRun,
   DEFAULT_CITATION_PLATFORMS,

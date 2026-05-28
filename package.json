@@ -20,6 +20,10 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:fact-sheet": "tsx scripts/run-fact-sheet-benchmark.ts --against=scripts/fact-sheet-benchmark.baseline.json",
+    "test:fact-sheet:full": "tsx scripts/run-fact-sheet-benchmark.ts --full --against=scripts/fact-sheet-benchmark.baseline.json",
+    "test:fact-sheet:llm": "tsx scripts/run-fact-sheet-benchmark.ts --full --llm --against=scripts/fact-sheet-benchmark.baseline.json",
+    "test:fact-sheet:baseline": "tsx scripts/run-fact-sheet-benchmark.ts --output=scripts/fact-sheet-benchmark.baseline.json",
     "prepare": "husky || true"
   },
   "dependencies": {

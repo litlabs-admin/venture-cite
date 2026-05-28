@@ -2972,11 +2972,141 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBrandFacts(brandId: string): Promise<BrandFactSheet[]> {
-    return await db
+    // 2026-05-28: query-time dedup across sources.
+    //
+    // The partial unique index on `(brandId, domain, subcategory, factKey)`
+    // is filtered to `source='scraped' AND dismissed_at IS NULL`, so user-
+    // entered rows + scraped rows for the SAME logical fact can both
+    // exist. The UI then renders them twice — the user-reported "duplicate
+    // unrelated data" symptom.
+    //
+    // Collapse them here. Within a (domain, subcategory, factKey) group:
+    //   1. Prefer user_manual (explicit user edit) over user (onboarding-
+    //      derived) over scraped over paste.
+    //   2. Within the same source priority, prefer the row whose value
+    //      survived more sources (sources.length on valuePayload), then
+    //      higher confidence, then most recent updatedAt.
+    //   3. Carry the OTHER source's value into the canonical row's
+    //      valuePayload.alternatives so the user can still see it in the
+    //      provenance disclosure.
+    //
+    // Result: one row per logical fact, all variants visible on demand,
+    // no double-render.
+    const rows = await db
       .select()
       .from(schema.brandFactSheet)
       .where(and(eq(schema.brandFactSheet.brandId, brandId), eq(schema.brandFactSheet.isActive, 1)))
       .orderBy(asc(schema.brandFactSheet.subcategory));
+
+    if (rows.length === 0) return rows;
+
+    const SOURCE_PRIORITY: Record<string, number> = {
+      user_manual: 4,
+      user: 3,
+      scraped: 2,
+      paste: 1,
+    };
+
+    type Row = (typeof rows)[number];
+    type Payload = {
+      n?: number;
+      items?: string[];
+      sources?: Array<{ url: string; excerpt: string; confidence: number }>;
+      alternatives?: Array<{
+        value: string;
+        sources: Array<{ url: string; excerpt: string; confidence: number }>;
+      }>;
+      otherLabel?: string;
+    };
+
+    const normalizeForDedup = (s: string): string =>
+      (s ?? "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^\w\s]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const groups = new Map<string, Row[]>();
+    for (const row of rows) {
+      const key = `${row.domain}|${row.subcategory}|${row.factKey}`;
+      const bucket = groups.get(key);
+      if (bucket) bucket.push(row);
+      else groups.set(key, [row]);
+    }
+
+    const out: Row[] = [];
+    for (const bucket of Array.from(groups.values())) {
+      if (bucket.length === 1) {
+        out.push(bucket[0]);
+        continue;
+      }
+
+      // Pick winner.
+      bucket.sort((a: Row, b: Row) => {
+        const pa = SOURCE_PRIORITY[a.source ?? "scraped"] ?? 0;
+        const pb = SOURCE_PRIORITY[b.source ?? "scraped"] ?? 0;
+        if (pa !== pb) return pb - pa;
+        const sa = ((a.valuePayload as Payload | null)?.sources ?? []).length;
+        const sb = ((b.valuePayload as Payload | null)?.sources ?? []).length;
+        if (sa !== sb) return sb - sa;
+        const ca = Number(a.confidence ?? 0);
+        const cb = Number(b.confidence ?? 0);
+        if (ca !== cb) return cb - ca;
+        const ua = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const ub = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return ub - ua;
+      });
+
+      const winner = bucket[0];
+      const others = bucket.slice(1);
+      const winnerNorm = normalizeForDedup(winner.factValue ?? "");
+
+      const winnerPayload: Payload = (winner.valuePayload as Payload | null) ?? {};
+      const carriedAlternatives = [...(winnerPayload.alternatives ?? [])];
+
+      for (const loser of others) {
+        const loserNorm = normalizeForDedup(loser.factValue ?? "");
+        const loserPayload: Payload = (loser.valuePayload as Payload | null) ?? {};
+        if (loserNorm === winnerNorm) {
+          // Same value — merge losing row's sources into the winner's.
+          const winnerSources = winnerPayload.sources ?? [];
+          const loserSources = loserPayload.sources ?? [];
+          const byUrl = new Map(winnerSources.map((s) => [s.url, s]));
+          for (const s of loserSources) {
+            if (!byUrl.has(s.url)) byUrl.set(s.url, s);
+          }
+          winnerPayload.sources = Array.from(byUrl.values()).slice(0, 20);
+        } else {
+          // Different value — carry as an alternative.
+          const existing = carriedAlternatives.find(
+            (a) => normalizeForDedup(a.value) === loserNorm,
+          );
+          if (existing) {
+            const merged = new Map(existing.sources.map((s) => [s.url, s]));
+            for (const s of loserPayload.sources ?? []) {
+              if (!merged.has(s.url)) merged.set(s.url, s);
+            }
+            existing.sources = Array.from(merged.values()).slice(0, 20);
+          } else {
+            carriedAlternatives.push({
+              value: loser.factValue ?? "",
+              sources: loserPayload.sources ?? [],
+            });
+          }
+        }
+      }
+
+      const finalPayload: Payload = {
+        ...winnerPayload,
+        alternatives: carriedAlternatives.length > 0 ? carriedAlternatives.slice(0, 10) : undefined,
+      };
+
+      out.push({ ...winner, valuePayload: finalPayload as Row["valuePayload"] });
+    }
+
+    return out;
   }
 
   async getBrandFactById(id: string): Promise<BrandFactSheet | undefined> {
@@ -4589,7 +4719,7 @@ export class DatabaseStorage implements IStorage {
 
   async upsertFactScrapeCache(row: {
     cacheKey: string;
-    source: "search_llm";
+    source: "search_llm" | "wikidata";
     brandId: string;
     valueJson: unknown;
     expiresAt: Date;
@@ -4623,7 +4753,14 @@ export class DatabaseStorage implements IStorage {
   // ── Plan 1 (v2): fact_scrape_logs ───────────────────────────────────
   async insertFactScrapeLog(row: {
     runId: string;
-    source: "static_pages" | "search_llm" | "user_enrich" | "aggregate" | "paste";
+    source:
+      | "static_pages"
+      | "search_llm"
+      | "user_enrich"
+      | "aggregate"
+      | "paste"
+      | "wikidata"
+      | "structured_data";
     status: "done" | "failed" | "skipped";
     factCount?: number;
     latencyMs?: number;

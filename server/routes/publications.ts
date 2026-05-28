@@ -19,7 +19,6 @@ import { insertCompetitorSchema } from "@shared/schema";
 import { requireUser, requireBrand, requireCompetitor, getUserBrandIds } from "../lib/ownership";
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
 
-import { captureAndFlush } from "../lib/sentryReport";
 export function setupPublicationsRoutes(app: Express): void {
   // Manual triggers for weekly automations — useful for dev/testing and for
   // a "Run now" button on the UI. All require ownership.

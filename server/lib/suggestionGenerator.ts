@@ -2,11 +2,12 @@ import OpenAI from "openai";
 import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
 import { attachAiLogger } from "./aiLogger";
+import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import type { Brand, BrandPrompt } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45_000,
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(openai);
@@ -91,7 +92,7 @@ async function callSuggestionLLM(
   const trackedList = tracked.map((p, i) => `${i + 1}. ${p.prompt}`).join("\n");
   const avoidBlock =
     avoidList.length > 0
-      ? `\n\nPreviously rejected (too similar to tracked) — avoid these shapes too:\n${avoidList.map((p, i) => `- ${p}`).join("\n")}`
+      ? `\n\nPreviously rejected (too similar to tracked) — avoid these shapes too:\n${avoidList.map((p) => `- ${p}`).join("\n")}`
       : "";
 
   const completion = await openai.chat.completions.create(
@@ -133,7 +134,7 @@ Return exactly ${howMany} NEW, distinct questions as JSON.`,
       ],
       max_tokens: 1200,
     },
-    { signal: AbortSignal.timeout(45_000) },
+    { signal: AbortSignal.timeout(LLM_CALL_TIMEOUT_MS) },
   );
 
   const parsed = safeParseJson<{ prompts?: Array<{ prompt: string; rationale?: string }> }>(

@@ -28,6 +28,7 @@ import { runAggregate } from "../lib/factAgent/v2/aggregate";
 import { waitUntil } from "@vercel/functions";
 import { persistPasteFacts } from "../lib/factAgent/v2/persistPasteFacts";
 import { buildExtractionPrompt, parseFactsWithRepair } from "../lib/factAgent/v2/extractionPrompt";
+import { LLM_CALL_TIMEOUT_MS } from "../lib/factAgent/v2/vercelBudget";
 
 const scrapeOneSchema = z.object({
   runId: z.string().min(1),
@@ -102,7 +103,8 @@ const openrouterClient = process.env.OPENROUTER_API_KEY
   ? new OpenAI({
       apiKey: process.env.OPENROUTER_API_KEY,
       baseURL: OPENROUTER_BASE_URL,
-      timeout: 45_000,
+      // Tier-aware: 6.3s Hobby / 25s Pro.
+      timeout: LLM_CALL_TIMEOUT_MS,
       maxRetries: 1,
     })
   : null;

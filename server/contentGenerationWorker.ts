@@ -27,9 +27,17 @@ import { refundArticleQuota, type ErrorKind } from "./lib/usageLimit";
 import type { ContentGenerationJob } from "@shared/schema";
 
 import { captureAndFlush } from "./lib/sentryReport";
+import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
+
+// Both the kick-off (responses.create) and the poll (responses.retrieve)
+// are fast HTTP calls because the heavy lifting runs on OpenAI's
+// infra in background mode. The 120s "streaming" cap was a leftover
+// from the legacy worker that streamed the full response inline. We
+// now inherit LLM_CALL_TIMEOUT_MS so the slice stays under the
+// Vercel function ceiling (10s Hobby / 60s Pro).
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 120_000, // streaming runs longer than non-streaming
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(openai);

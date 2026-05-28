@@ -5,11 +5,13 @@ import { attachAiLogger } from "./aiLogger";
 import { MODELS } from "./modelConfig";
 import { parseLLMJson, LLMParseError } from "./llmParse";
 import { logger } from "./logger";
+import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import type { Brand } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45_000,
+  // Inherit Vercel-tier budget so this never outlives the function.
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(openai);

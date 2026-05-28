@@ -14,7 +14,6 @@ import { OwnershipError } from "../lib/ownership";
 import { storage } from "../storage";
 import { MODELS } from "../lib/modelConfig";
 import { openai, aiLimitMiddleware, MAX_CONTENT_LENGTH, asyncHandler } from "../lib/routesShared";
-import { safeFetchText } from "../lib/ssrf";
 import { db } from "../db";
 import { articles, brands, schemaAudits } from "@shared/schema";
 import { logger } from "../lib/logger";

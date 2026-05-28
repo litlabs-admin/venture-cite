@@ -2,11 +2,12 @@ import OpenAI from "openai";
 import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
 import { attachAiLogger } from "./aiLogger";
+import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import type { Brand } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45_000,
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(openai);
@@ -91,7 +92,7 @@ ${articleSummaries.length === 0 ? "(no articles published yet — base prompts o
         ],
         max_tokens: 2000,
       },
-      { signal: AbortSignal.timeout(45_000) },
+      { signal: AbortSignal.timeout(LLM_CALL_TIMEOUT_MS) },
     );
   } catch (err: any) {
     return { saved: [], error: err?.message || "AI call failed" };

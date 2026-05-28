@@ -21,42 +21,73 @@
 //     if room remains after Tier 1+2.
 //
 // Homepage is ALWAYS included as the first entry regardless of sitemap.
+//
+// 2026-05-28 (revised): Tier regexes broadened to capture the full
+// spectrum of company-identity paths real brands use. Specific additions:
+//
+//   TIER_1: heritage, history, story, culture, values, vision, research,
+//           safety, investors, locations, contact (was tier 2 — bumped
+//           because contact pages reliably carry HQ + legal name)
+//   TIER_2: testimonials, why-us, why-choose-us, changelog, roadmap,
+//           methodology, method
+//
+// We also normalise separators before matching: `/our_company`,
+// `/aboutus`, `/our-company` all collapse to the same canonical form.
+//
+// Tier 3 is more selective — `/integrations` only drops the listing
+// page, individual `/integrations/<vendor>` pages now go to tier 0
+// because for some brands (Zapier, Make) integrations ARE the product.
 import { canonicalizeUrl } from "../canonicalize";
 
-// Tier 1 — exact single-segment paths. Captures the company-identity
-// landing pages every brand has under SOME name. Trailing slash already
-// stripped by the caller before testing.
+// Normalise hyphens/underscores/no-separator so "/our_company",
+// "/our-company" and "/ourcompany" all hit the same matcher.
+function normalizeSeparators(path: string): string {
+  return path
+    .replace(/[-_]+/g, "-") // _ and -- → single -
+    .replace(/\/+/g, "/"); // collapse double slashes
+}
+
+// Tier 1 — exact single-segment paths. Trailing slash already stripped
+// and separators normalised by the caller. NB: the `index.html?` clause
+// is for static-site brands.
 const TIER_1 =
-  /^\/(?:|index\.html?|about(?:-us|-the-company)?|company|our-company|who-we-are|our-story|our-mission|mission|company-overview|overview|pricing(?:-plans)?|plans|team|leadership|founders|management|product|products|product-tour)$/i;
+  /^\/(?:|index\.html?|about(?:-us|-the-company)?|company|our-company|who-we-are|our-story|our-mission|mission|company-overview|overview|pricing(?:-plans)?|plans|team|leadership|management|product|products|product-tour|heritage|history|story|culture|values|vision|research|safety|investors?|impact|sustainability|approach)$/i;
 
 // Tier 2 — features, solutions, customers, case studies, use cases,
-// contact, security, careers. PREFIX-matched on a `/` boundary so
+// contact, security, careers, methodology. PREFIX-matched on `/` so
 // /case-studies/<slug>, /customers/<slug>, /solutions/<slug> all count.
 const TIER_2 =
-  /^\/(?:features?|platform|solutions?|customers?|case-studies?|case-study|use-cases?|use-case|services?|contact(?:-us)?|security|trust|careers?|jobs|locations?|offices)(?:\/|$)/i;
+  /^\/(?:features?|platform|solutions?|customers?|testimonials?|case-studies?|case-study|use-cases?|use-case|services?|contact(?:-us)?|security|trust|careers?|jobs|locations?|offices|why-us|why-choose-us|changelog|roadmap|methodology|method|our-work|portfolio|clients?)(?:\/|$)/i;
 
-// Tier 3 — prefix-match paths to DROP entirely. Adds press/news/help/
-// docs/status/template-gallery to the previous list. These pages either
-// don't describe the brand (press releases, blog posts), or are
-// linked-out destinations (help, docs).
+// Tier 3 — prefix-match paths to DROP entirely. Includes blog / press
+// / news / legal / docs / help. NOTE: bare `/integrations` (no slash)
+// dropped, but `/integrations/<vendor>` falls through to tier 0
+// because integration pages ARE product pages for some brands.
 const TIER_3 =
-  /^\/(?:blog|author|tag|category|legal|privacy(?:-policy)?|terms(?:-of-service)?|cookie(?:-policy)?|integrations|p|press|news|media|newsroom|help|docs|documentation|api-?docs|status|template-gallery|templates|partners|app|signin|signup|login|register|cart|checkout|account|dashboard|admin)(?:\/|$)/i;
+  /^\/(?:blog|author|tag|category|legal|privacy(?:-policy)?|terms(?:-of-service)?|cookie(?:-policy)?|p|press|news|media|newsroom|help|docs|documentation|api-?docs|status|template-gallery|templates|partners|app|signin|signup|login|register|cart|checkout|account|dashboard|admin|404|search|sitemap)(?:\/|$)/i;
 
 const MAX_URLS = 10;
 
-// Locale-prefix matcher. Strips an optional leading /xx/ or /xx-XX/ or
-// /xx_XX/ segment before tier evaluation so /en-gb/about scores the
-// same as /about. Production sites for global brands ALL prefix their
-// URLs this way; without this stripping, every /en-gb/* URL fell
-// through to tier 0 and competed on equal footing with arbitrary noise.
-const LOCALE_PREFIX = /^\/([a-z]{2}(?:[-_][a-z]{2,3})?)(\/|$)/i;
+// Locale-prefix matcher. Strips an optional leading /xx/, /xx-XX/,
+// /xx_XX/, or /xx-XXXX/ segment (the last for CJK script variants
+// like /zh-hans/, /zh-hant/) AND non-ISO bucket prefixes (/global/,
+// /worldwide/, /intl/, /international/).
+//
+// 2026-05-28 (revised): widened the 3rd char count from 2-3 to 2-4 to
+// catch /zh-hans, and added a non-locale bucket-prefix alternative.
+const LOCALE_PREFIX = /^\/([a-z]{2,3}(?:[-_][a-z]{2,4})?)(\/|$)/i;
+const NON_ISO_BUCKET = /^\/(global|worldwide|intl|international|en|english)(\/|$)/i;
 
 function stripLocalePrefix(path: string): string {
-  const m = LOCALE_PREFIX.exec(path);
-  if (!m) return path;
-  // Slice off the locale segment but preserve the leading slash so
-  // tier regexes (which anchor with `^\/`) still match.
-  return path.slice(m[1].length + 1) || "/";
+  const localeMatch = LOCALE_PREFIX.exec(path);
+  if (localeMatch) {
+    return path.slice(localeMatch[1].length + 1) || "/";
+  }
+  const bucketMatch = NON_ISO_BUCKET.exec(path);
+  if (bucketMatch) {
+    return path.slice(bucketMatch[1].length + 1) || "/";
+  }
+  return path;
 }
 
 /**
@@ -73,10 +104,10 @@ export function scoreUrl(url: string): 0 | 1 | 2 | 3 {
   } catch {
     return 0;
   }
-  // Try the original path first, then with the locale prefix stripped.
-  // Both forms get the same score; the locale variant just falls back
-  // to the de-localised form.
-  const candidates = [path, stripLocalePrefix(path)];
+  // Normalise separators so /our_company, /our-company, /ourcompany hit
+  // the same matcher. Then test against locale-stripped + original.
+  const normalized = normalizeSeparators(path);
+  const candidates = [normalized, stripLocalePrefix(normalized)];
   for (const p of candidates) {
     if (TIER_1.test(p)) return 1;
     if (TIER_2.test(p)) return 2;
@@ -163,7 +194,14 @@ export function selectTopUrls(brandUrl: string, candidates: string[]): string[] 
     if (out.length >= MAX_URLS) break;
     let parent: string;
     try {
-      const parts = new URL(u).pathname.split("/").filter(Boolean);
+      // 2026-05-28 (revised): strip the locale prefix BEFORE computing
+      // the "parent" segment. Without this, /in/about, /in/products,
+      // /in/contact all count as parent="/in/" and the per-parent cap
+      // collapses to 3 country pages instead of 3 DIFFERENT topics.
+      let path = new URL(u).pathname;
+      path = normalizeSeparators(path);
+      path = stripLocalePrefix(path);
+      const parts = path.split("/").filter(Boolean);
       parent = parts[0] ?? "/";
     } catch {
       parent = "/";

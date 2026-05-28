@@ -6,11 +6,12 @@ import { logger } from "./logger";
 import { safeFetchText } from "./ssrf";
 import { matchEntity } from "./brandMatcher";
 import { type ScanReport, emptyReport } from "./scanReport";
+import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import type { Brand, Competitor } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45_000,
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(openai);

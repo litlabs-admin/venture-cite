@@ -396,6 +396,60 @@ export const insertContentGenerationJobSchema = createInsertSchema(contentGenera
 export type ContentGenerationJob = typeof contentGenerationJobs.$inferSelect;
 export type InsertContentGenerationJob = z.infer<typeof insertContentGenerationJobSchema>;
 
+// llm_jobs (migration 0079, 2026-05-28).
+//
+// Generic substrate for any Vercel-Hobby-incompatible one-shot LLM
+// call: keyword discovery, FAQ generation, hallucination detection,
+// prompt generation, suggestion generation, etc. Pattern:
+//   1. Route handler calls openai.responses.create({ background: true,
+//      store: true }) — returns immediately with a response_id.
+//   2. Row inserted here with status='running' + response_id.
+//   3. Client polls GET /api/llm-jobs/:id; poll handler calls
+//      openai.responses.retrieve(response_id) and on completion
+//      dispatches by `kind` to the right finalize step (which parses
+//      the output and persists the product-side rows: brand keywords,
+//      faqs, etc.).
+//   4. Cron drains stragglers so closed browsers don't orphan work.
+//
+// Distinct from content_generation_jobs (which has article-specific
+// columns + per-row slice lock).
+export const llmJobs = pgTable(
+  "llm_jobs",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    kind: text("kind").notNull(),
+    status: text("status").notNull().default("pending"),
+    responseId: text("response_id"),
+    payload: jsonb("payload").notNull(),
+    result: jsonb("result"),
+    errorKind: text("error_kind"),
+    errorMessage: text("error_message"),
+    userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+    brandId: varchar("brand_id").references(() => brands.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true })
+      .notNull()
+      .default(sql`(NOW() + INTERVAL '24 hours')`),
+  },
+  (table) => [
+    index("llm_jobs_active_idx").on(table.createdAt),
+    index("llm_jobs_brand_idx").on(table.brandId, table.createdAt),
+    index("llm_jobs_user_idx").on(table.userId, table.createdAt),
+    index("llm_jobs_expires_idx").on(table.expiresAt),
+  ],
+);
+
+export const insertLlmJobSchema = createInsertSchema(llmJobs).omit({
+  id: true,
+  createdAt: true,
+});
+export type LlmJob = typeof llmJobs.$inferSelect;
+export type InsertLlmJob = z.infer<typeof insertLlmJobSchema>;
+
 // Wave 7: the legacy content_drafts table was absorbed into `articles` (with
 // status='draft'). See migration 0033_content_unification.sql.
 
@@ -631,6 +685,40 @@ export const brandMonthlyCostCaps = pgTable(
 export const insertBrandMonthlyCostCapSchema = createInsertSchema(brandMonthlyCostCaps);
 export type BrandMonthlyCostCap = typeof brandMonthlyCostCaps.$inferSelect;
 export type InsertBrandMonthlyCostCap = z.infer<typeof insertBrandMonthlyCostCapSchema>;
+
+// Per-step telemetry for fact-sheet scrapes (migration 0076). One row
+// per significant event during a run — sitemap probes, page fetches,
+// LLM calls, fact drops, terminal status. The /admin/scrape/:runId
+// inspector reads from this table to render the timeline.
+//
+// Intentionally lightweight: no FK to brandFactScrapeRuns so events
+// survive run hard-deletes (we want post-mortem capability), and
+// metadata is wide-open JSONB so new step types don't require
+// migrations.
+export const factScrapeEvents = pgTable(
+  "fact_scrape_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: varchar("run_id").notNull(),
+    brandId: varchar("brand_id").notNull(),
+    stepName: text("step_name").notNull(),
+    outcome: text("outcome").notNull().default("ok"),
+    durationMs: integer("duration_ms"),
+    metadata: jsonb("metadata").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("fact_scrape_events_run_created_idx").on(table.runId, table.createdAt),
+    index("fact_scrape_events_brand_step_idx").on(table.brandId, table.stepName, table.createdAt),
+    index("fact_scrape_events_created_idx").on(table.createdAt),
+  ],
+);
+export const insertFactScrapeEventSchema = createInsertSchema(factScrapeEvents).omit({
+  id: true,
+  createdAt: true,
+});
+export type FactScrapeEvent = typeof factScrapeEvents.$inferSelect;
+export type InsertFactScrapeEvent = z.infer<typeof insertFactScrapeEventSchema>;
 
 // One row per "Run Citation Check" click or weekly cron run. Stores the
 // aggregate totals so the trend chart can render without re-aggregating
@@ -1270,6 +1358,15 @@ export const brandFactSheet = pgTable(
     metadata: jsonb("metadata"),
     disagreementCount: integer("disagreement_count").notNull().default(0),
     schemaVersion: integer("schema_version").notNull().default(1),
+    // 2026-05-28 Phase 4 truth-table columns:
+    //   - userOverridden: when true, no scrape may overwrite factValue.
+    //     persistFacts.ts respects this flag.
+    //   - verificationAttempts / lastVerificationAt / verificationStatus:
+    //     used by the per-fact re-verification cron.
+    userOverridden: boolean("user_overridden").notNull().default(false),
+    verificationAttempts: integer("verification_attempts").notNull().default(0),
+    lastVerificationAt: timestamp("last_verification_at"),
+    verificationStatus: text("verification_status").notNull().default("never"),
   },
   (table) => [index("brand_fact_sheet_brand_id_idx").on(table.brandId)],
 );

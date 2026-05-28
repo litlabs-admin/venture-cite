@@ -81,7 +81,6 @@ import {
   type InsertSourceHealth,
   type SentimentCache,
 } from "@shared/schema";
-import { randomUUID } from "crypto";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -834,7 +833,7 @@ export interface IStorage {
   ): Promise<{ cacheKey: string; valueJson: unknown; expiresAt: Date } | null>;
   upsertFactScrapeCache(row: {
     cacheKey: string;
-    source: "search_llm";
+    source: "search_llm" | "wikidata";
     brandId: string;
     valueJson: unknown;
     expiresAt: Date;
@@ -847,7 +846,14 @@ export interface IStorage {
 
   insertFactScrapeLog(row: {
     runId: string;
-    source: "static_pages" | "search_llm" | "user_enrich" | "aggregate" | "paste";
+    source:
+      | "static_pages"
+      | "search_llm"
+      | "user_enrich"
+      | "aggregate"
+      | "paste"
+      | "wikidata"
+      | "structured_data";
     status: "done" | "failed" | "skipped";
     factCount?: number;
     latencyMs?: number;

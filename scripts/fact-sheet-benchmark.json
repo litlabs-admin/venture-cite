@@ -1,0 +1,351 @@
+{
+  "_comment": [
+    "50-URL benchmark set for the brand fact sheet pipeline. Used by the",
+    "integration test runner (scripts/run-fact-sheet-benchmark.ts) and CI.",
+    "",
+    "Each entry has a `category` for grouping and a `surfaces` field that",
+    "describes the specific failure mode it exercises. When a regression",
+    "lands, the failing categories tell us what changed.",
+    "",
+    "Curation principle: every URL here represents a class of brand we",
+    "MUST work on, not a class we already pass. The current implementation",
+    "fails 60%+ of these — that's the point.",
+    "",
+    "Maintenance: add a new URL when you encounter a brand whose failure",
+    "mode isn't already exercised. Remove a URL only if its failure mode",
+    "is permanently fixed and another URL in the set covers it.",
+    "",
+    "Schema version: 1 (2026-05-28)"
+  ],
+  "version": 1,
+  "lastUpdated": "2026-05-28",
+  "subsets": {
+    "smoke": {
+      "_comment": "Fast subset for PR checks. Runs in <2 min.",
+      "urls": [
+        "https://adyen.com",
+        "https://notion.com",
+        "https://venturepr.com",
+        "https://stripe.com",
+        "https://linear.app",
+        "https://patagonia.com",
+        "https://anthropic.com",
+        "https://shopify.com",
+        "https://supabase.com",
+        "https://carrd.co"
+      ]
+    },
+    "full": {
+      "_comment": "Nightly run; all 50 URLs.",
+      "useAll": true
+    }
+  },
+  "brands": [
+    {
+      "name": "Adyen",
+      "url": "https://adyen.com",
+      "category": "fintech-payments",
+      "surfaces": "sitemap-index, www-canonical, large enterprise, NL HQ, public co (Euronext)"
+    },
+    {
+      "name": "Stripe",
+      "url": "https://stripe.com",
+      "category": "fintech-payments",
+      "surfaces": "dev-focused, JSON-LD heavy, clean sitemap, US"
+    },
+    {
+      "name": "Wise",
+      "url": "https://wise.com",
+      "category": "fintech-payments",
+      "surfaces": "consumer fintech, multi-country, formerly TransferWise"
+    },
+    {
+      "name": "Block",
+      "url": "https://block.xyz",
+      "category": "fintech-payments",
+      "surfaces": "holding company, multiple sub-brands (Square, Cash App, Tidal, TBD)"
+    },
+    {
+      "name": "Klarna",
+      "url": "https://klarna.com",
+      "category": "fintech-payments",
+      "surfaces": "Cloudflare-heavy, locale-stratified, BNPL"
+    },
+    {
+      "name": "Salesforce",
+      "url": "https://salesforce.com",
+      "category": "saas-enterprise",
+      "surfaces": "massive sitemap, locale-stratified, complex sub-products"
+    },
+    {
+      "name": "HubSpot",
+      "url": "https://hubspot.com",
+      "category": "saas-enterprise",
+      "surfaces": "well-structured, blog-heavy, freemium"
+    },
+    {
+      "name": "Slack",
+      "url": "https://slack.com",
+      "category": "saas-enterprise",
+      "surfaces": "Salesforce subsidiary, simple structure"
+    },
+    {
+      "name": "Notion",
+      "url": "https://notion.com",
+      "category": "saas-enterprise",
+      "surfaces": "SPA-heavy, www-canonical, 200+ nested sitemaps"
+    },
+    {
+      "name": "Linear",
+      "url": "https://linear.app",
+      "category": "saas-enterprise",
+      "surfaces": "modern SPA, hollow shell on plain HTTP, minimal nav"
+    },
+    {
+      "name": "Atlassian",
+      "url": "https://atlassian.com",
+      "category": "saas-enterprise",
+      "surfaces": "multi-product (Jira, Confluence, Trello), public co (ASX)"
+    },
+    {
+      "name": "Asana",
+      "url": "https://asana.com",
+      "category": "saas-enterprise",
+      "surfaces": "PM tool, founder-led, public co"
+    },
+    {
+      "name": "GitHub",
+      "url": "https://github.com",
+      "category": "dev-tools",
+      "surfaces": "massive site, dev community, Microsoft subsidiary"
+    },
+    {
+      "name": "Vercel",
+      "url": "https://vercel.com",
+      "category": "dev-tools",
+      "surfaces": "SPA, dev-focused, Next.js maker"
+    },
+    {
+      "name": "Cloudflare",
+      "url": "https://cloudflare.com",
+      "category": "dev-tools",
+      "surfaces": "infra, security pages critical, public co"
+    },
+    {
+      "name": "Supabase",
+      "url": "https://supabase.com",
+      "category": "dev-tools",
+      "surfaces": "OSS Firebase alternative, community-driven"
+    },
+    {
+      "name": "Sentry",
+      "url": "https://sentry.io",
+      "category": "dev-tools",
+      "surfaces": "OSS error monitoring, .io TLD"
+    },
+    {
+      "name": "Datadog",
+      "url": "https://datadoghq.com",
+      "category": "dev-tools",
+      "surfaces": "enterprise observability, public co, NYC"
+    },
+    {
+      "name": "Anthropic",
+      "url": "https://anthropic.com",
+      "category": "ai-foundation",
+      "surfaces": "research-heavy, /research and /safety important, no /about-us"
+    },
+    {
+      "name": "OpenAI",
+      "url": "https://openai.com",
+      "category": "ai-foundation",
+      "surfaces": "research-heavy, multiple sub-products (ChatGPT, API, DALL-E)"
+    },
+    {
+      "name": "Mistral",
+      "url": "https://mistral.ai",
+      "category": "ai-foundation",
+      "surfaces": "small French AI co, sparse fact sheet, .ai TLD"
+    },
+    {
+      "name": "Cohere",
+      "url": "https://cohere.com",
+      "category": "ai-foundation",
+      "surfaces": "enterprise AI, Canadian, B2B-only"
+    },
+    {
+      "name": "Perplexity",
+      "url": "https://perplexity.ai",
+      "category": "ai-foundation",
+      "surfaces": "new co, sparse history, search product"
+    },
+    {
+      "name": "Shopify",
+      "url": "https://shopify.com",
+      "category": "ecommerce-platform",
+      "surfaces": "SaaS for DTC, public co (NYSE/TSX), Canadian"
+    },
+    {
+      "name": "Patagonia",
+      "url": "https://patagonia.com",
+      "category": "ecommerce-dtc",
+      "surfaces": "mission/heritage critical, B Corp, private"
+    },
+    {
+      "name": "Allbirds",
+      "url": "https://allbirds.com",
+      "category": "ecommerce-dtc",
+      "surfaces": "small DTC, sustainability-focused, public co"
+    },
+    {
+      "name": "Warby Parker",
+      "url": "https://warbyparker.com",
+      "category": "ecommerce-dtc",
+      "surfaces": "DTC + retail hybrid, eyewear, public co"
+    },
+    {
+      "name": "Glossier",
+      "url": "https://glossier.com",
+      "category": "ecommerce-dtc",
+      "surfaces": "beauty DTC, private, brand-narrative heavy"
+    },
+    {
+      "name": "Apple",
+      "url": "https://apple.com",
+      "category": "hardware-consumer",
+      "surfaces": "massive site, locale-stratified, multi-product"
+    },
+    {
+      "name": "Samsung",
+      "url": "https://samsung.com",
+      "category": "hardware-consumer",
+      "surfaces": "66 country sitemaps, conglomerate, Korean public co"
+    },
+    {
+      "name": "Nothing",
+      "url": "https://nothing.tech",
+      "category": "hardware-consumer",
+      "surfaces": "new brand, modern SPA, .tech TLD"
+    },
+    {
+      "name": "Framework",
+      "url": "https://frame.work",
+      "category": "hardware-consumer",
+      "surfaces": "modular laptops, niche, small team"
+    },
+    {
+      "name": "Sonos",
+      "url": "https://sonos.com",
+      "category": "hardware-consumer",
+      "surfaces": "hardware + app + music platform, public co"
+    },
+    {
+      "name": "Netflix",
+      "url": "https://netflix.com",
+      "category": "media-streaming",
+      "surfaces": "content-heavy, locale-stratified, redirects to /about for non-subscribers"
+    },
+    {
+      "name": "Spotify",
+      "url": "https://spotify.com",
+      "category": "media-streaming",
+      "surfaces": "international, locale-stratified, public co (NYSE)"
+    },
+    {
+      "name": "Substack",
+      "url": "https://substack.com",
+      "category": "media-platform",
+      "surfaces": "publisher platform, newer brand, private"
+    },
+    {
+      "name": "Medium",
+      "url": "https://medium.com",
+      "category": "media-platform",
+      "surfaces": "publisher platform, content-heavy, A Medium Corporation"
+    },
+    {
+      "name": "Airbnb",
+      "url": "https://airbnb.com",
+      "category": "marketplace",
+      "surfaces": "service marketplace, public co, locale-stratified"
+    },
+    {
+      "name": "Uber",
+      "url": "https://uber.com",
+      "category": "mobility",
+      "surfaces": "multi-product (Rides, Eats, Freight), public co, locale-stratified"
+    },
+    {
+      "name": "Booking.com",
+      "url": "https://booking.com",
+      "category": "marketplace",
+      "surfaces": "travel marketplace, Dutch HQ, locale-stratified"
+    },
+    {
+      "name": "Lyft",
+      "url": "https://lyft.com",
+      "category": "mobility",
+      "surfaces": "US-focused, public co, ride-sharing"
+    },
+    {
+      "name": "Coinbase",
+      "url": "https://coinbase.com",
+      "category": "crypto",
+      "surfaces": "public crypto exchange (NASDAQ), regulated"
+    },
+    {
+      "name": "Kraken",
+      "url": "https://kraken.com",
+      "category": "crypto",
+      "surfaces": "private crypto exchange, international"
+    },
+    {
+      "name": "Circle",
+      "url": "https://circle.com",
+      "category": "crypto",
+      "surfaces": "stablecoin issuer (USDC), B2B"
+    },
+    {
+      "name": "Moderna",
+      "url": "https://modernatx.com",
+      "category": "healthcare-biotech",
+      "surfaces": "public biotech, science-heavy, mRNA pioneer"
+    },
+    {
+      "name": "Ro",
+      "url": "https://ro.co",
+      "category": "healthcare-dtc",
+      "surfaces": "DTC telehealth, multi-vertical, .co TLD"
+    },
+    {
+      "name": "Hims",
+      "url": "https://hims.com",
+      "category": "healthcare-dtc",
+      "surfaces": "DTC mens health, public co"
+    },
+    {
+      "name": "Tesla",
+      "url": "https://tesla.com",
+      "category": "auto-mobility",
+      "surfaces": "multi-brand (Cars, Energy, Shop), public co, multiple subdomains"
+    },
+    {
+      "name": "Rivian",
+      "url": "https://rivian.com",
+      "category": "auto-mobility",
+      "surfaces": "new EV co, public co, narrow product line"
+    },
+    {
+      "name": "VenturePR",
+      "url": "https://venturepr.com",
+      "category": "agency-small",
+      "surfaces": "PR agency, small team, Webflow-style site, no sitemap-index"
+    },
+    {
+      "name": "Carrd",
+      "url": "https://carrd.co",
+      "category": "indie-bootstrap",
+      "surfaces": "one-person business, single-page builder, .co TLD"
+    }
+  ]
+}

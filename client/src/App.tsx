@@ -39,6 +39,8 @@ const Settings = lazy(() => import("@/pages/settings"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Welcome = lazy(() => import("@/pages/welcome"));
 const Glossary = lazy(() => import("@/pages/glossary"));
+const AdminScrapeInspector = lazy(() => import("@/pages/admin-scrape-inspector"));
+const AdminScrapeRuns = lazy(() => import("@/pages/admin-scrape-runs"));
 
 // Workflow-spine shells.
 const Monitor = lazy(() => import("@/pages/monitor"));
@@ -202,6 +204,10 @@ function Router() {
           </Suspense>
         )}
       </Route>
+      <Route path="/admin/scrape/:runId">
+        {() => <AuthenticatedRoute component={AdminScrapeInspector} />}
+      </Route>
+      <Route path="/admin/scrape">{() => <AuthenticatedRoute component={AdminScrapeRuns} />}</Route>
       <Route path="/glossary">
         {() => (
           <Suspense fallback={<RouteSpinner />}>

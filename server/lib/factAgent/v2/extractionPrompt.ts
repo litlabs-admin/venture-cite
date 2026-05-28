@@ -143,7 +143,26 @@ function tryParse(raw: string): { ok: true; facts: Fact[] } | { ok: false; err: 
   // outside the controlled vocab. The JSON Schema enum protects
   // against this in strict mode but we double-check in case the model
   // squeaked a value through via /other-loose mappings.
-  const filtered = v.data.facts.filter((f) => isAllowedFactKey(f.domain as Domain, f.factKey));
+  const filtered: Fact[] = [];
+  const droppedKeys: string[] = [];
+  for (const f of v.data.facts) {
+    if (isAllowedFactKey(f.domain as Domain, f.factKey)) {
+      filtered.push(f);
+    } else {
+      droppedKeys.push(`${f.domain}.${f.factKey}`);
+    }
+  }
+  // Telemetry: surface dropped-key patterns so we can expand the
+  // controlled vocab where the LLM keeps trying to introduce new
+  // keys. Bare console — caller injects its own logger via the llm
+  // arg so we keep this module pure.
+  if (droppedKeys.length > 0 && typeof globalThis !== "undefined") {
+    const g = globalThis as { __factAgentDroppedKeys?: Record<string, number> };
+    g.__factAgentDroppedKeys ??= {};
+    for (const k of droppedKeys) {
+      g.__factAgentDroppedKeys[k] = (g.__factAgentDroppedKeys[k] ?? 0) + 1;
+    }
+  }
   return { ok: true, facts: filtered };
 }
 

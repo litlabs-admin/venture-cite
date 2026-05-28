@@ -1,21 +1,14 @@
-import type { Express, Request, Response } from "express";
+// routes.ts hosts the few cross-cutting routes (usage, user preferences,
+// waitlist, beta validation) plus the registry of per-domain setup
+// functions. Wave 5.1 split most route logic out into ./routes/*.ts
+// modules — anything specific to a domain (brands, content, FAQs, etc.)
+// belongs there, not here. Only imports actually referenced in this file
+// remain; the dead imports from the pre-extraction era were removed
+// 2026-05-28 during the LLM-jobs cleanup pass.
+import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
-import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import {
-  insertBrandSchema,
-  insertCompetitorSchema,
-  insertCompetitorCitationSnapshotSchema,
-  usageLimits,
-} from "@shared/schema";
-import { AI_PLATFORMS as SHARED_AI_PLATFORMS, CITATION_SCORING } from "@shared/constants";
-import { runBrandPrompts, DEFAULT_CITATION_PLATFORMS, checkForCitation } from "./citationChecker";
-import { judgeCitation } from "./citationJudge";
-import { MODELS } from "./lib/modelConfig";
-import { enqueueContentGenerationJob, type GenerationPayload } from "./contentGenerationWorker";
-import { generateBrandPrompts } from "./lib/promptGenerator";
-import { generateSuggestedPrompts } from "./lib/suggestionGenerator";
-import { z } from "zod";
+import { usageLimits } from "@shared/schema";
 import {
   setupAuth,
   attachUserIfPresent,
@@ -24,37 +17,10 @@ import {
   brandIdParamHandler,
   isAdmin,
 } from "./auth";
-import {
-  requireUser,
-  requireBrand,
-  requireArticle,
-  requireCompetitor,
-  requireFaq,
-  requireListicle,
-  requireBofuContent,
-  requireHallucination,
-  requireBrandFact,
-  requireBrandMention,
-  requirePromptTest,
-  requireCommunityPost,
-  requirePromptPortfolio,
-  requireCitationQuality,
-  requireKeywordResearch,
-  requireCitation,
-  getUserBrandIds,
-  pickFields,
-  sendOwnershipError,
-  OwnershipError,
-} from "./lib/ownership";
-import { safeFetchText } from "./lib/ssrf";
-import { encryptToken, decryptToken } from "./lib/tokenCipher";
+import { requireUser, sendOwnershipError } from "./lib/ownership";
 import { logAudit } from "./lib/audit";
 import { logger } from "./lib/logger";
-import { Sentry } from "./instrument";
 import { captureAndFlush } from "./lib/sentryReport";
-import { withArticleQuota, withBrandQuota, isUsageLimitError } from "./lib/usageLimit";
-import type { Tier } from "./lib/llmPricing";
-import { parsePagination } from "./lib/pagination";
 import { setupUserAccountRoutes } from "./routes/userAccount";
 import { setupUnsubscribeRoutes } from "./routes/unsubscribe";
 import { setupOnboardingRoutes } from "./routes/onboarding";
@@ -78,35 +44,14 @@ import { setupCronRoutes } from "./routes/cron";
 import { setupAssistantRoutes } from "./routes/assistant";
 import { setupFactSheetRoutes } from "./routes/factSheet";
 import { setupFactSheetV2Routes } from "./routes/factSheetV2";
+import { setupAdminScrapeInspectorRoutes } from "./routes/adminScrapeInspector";
+import { setupLlmJobsRoutes } from "./routes/llmJobs";
 import { mentionsRouter } from "./routes/mentions";
 import { asyncHandler } from "./lib/asyncHandler";
 
-// Maximum accepted length for user-supplied content on AI endpoints. Caps
-// worst-case OpenAI token consumption so a hostile request can't drain the
-// bill on a single call. 40 KB ≈ ~10k tokens input which is already
-// generous for article-scale analysis.
-const MAX_CONTENT_LENGTH = 40_000;
-
-// Rate limiter for AI generation endpoints: 10 requests per minute, keyed by
-// authenticated user id when available (so shared IPs / proxies don't DoS
-// each other) or by IP for unauthenticated callers.
-const aiRateKey = (req: Request) => {
-  const user = (req as any).user;
-  if (user?.id) return `user:${user.id}`;
-  return `ip:${req.ip ?? "unknown"}`;
-};
-
-const aiLimitMiddleware = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: aiRateKey,
-  message: {
-    success: false,
-    error: "Too many requests. Please wait a moment before trying again.",
-  },
-});
+// Note: MAX_CONTENT_LENGTH + aiLimitMiddleware lived here pre-Wave 5.1.
+// Both are now imported from ./lib/routesShared by the per-domain route
+// modules that actually need them.
 
 // Shared error-response helper: prefers OwnershipError (401/404) when present,
 // otherwise returns a generic 500 and logs the underlying error server-side.
@@ -308,31 +253,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }),
   );
 
-  // Helper function to check usage limits
-  async function checkUsageLimit(
-    userId: string,
-    accessTier: string,
-  ): Promise<{ allowed: boolean; reason?: string; remaining?: number }> {
-    const tier = (accessTier || "free") as keyof typeof usageLimits;
-    const limits = usageLimits[tier] || usageLimits.free;
-
-    if (limits.articlesPerMonth === -1) {
-      return { allowed: true, remaining: -1 };
-    }
-
-    const usage = await storage.getUserUsage(userId);
-    const articlesUsed = usage?.articlesUsed || 0;
-
-    if (articlesUsed >= limits.articlesPerMonth) {
-      return {
-        allowed: false,
-        reason: `You've reached your monthly limit of ${limits.articlesPerMonth} articles. Upgrade your plan for more.`,
-        remaining: 0,
-      };
-    }
-
-    return { allowed: true, remaining: limits.articlesPerMonth - articlesUsed };
-  }
+  // (Pre-Wave-5.1 `checkUsageLimit` helper lived here. Callers now use
+  // ./lib/usageLimit.withArticleQuota directly; the helper is gone.)
 
   // Beta invite code validation — redeems for the current authenticated user.
   // userId is NEVER taken from request body (was an IDOR vulnerability).
@@ -585,6 +507,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAssistantRoutes(app);
   setupFactSheetRoutes(app);
   setupFactSheetV2Routes(app);
+  setupAdminScrapeInspectorRoutes(app);
+  setupLlmJobsRoutes(app);
   app.use("/api/brand-mentions", mentionsRouter);
 
   const httpServer = createServer(app);

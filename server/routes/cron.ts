@@ -45,9 +45,11 @@ import { and, inArray, lt } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 
 import { captureAndFlush } from "../lib/sentryReport";
-// Total wall-clock budget for the orchestrator. Function timeout is 60s
-// on Hobby; we leave 5s of headroom so the response can finalize.
-const ORCHESTRATOR_BUDGET_MS = 55_000;
+import { CRON_TOTAL_BUDGET_MS, LLM_CALL_TIMEOUT_MS } from "../lib/factAgent/v2/vercelBudget";
+// Total wall-clock budget for the orchestrator. Derived from
+// VERCEL_FUNCTION_BUDGET_MS so a Hobby (10s) vs Pro (60s) deploy
+// inherits the right budget without code changes.
+const ORCHESTRATOR_BUDGET_MS = CRON_TOTAL_BUDGET_MS;
 
 // Per-step soft caps. The step runs against a deadline = min(stepCap,
 // remaining-orchestrator-budget). Heavy iterations honour the deadline
@@ -73,6 +75,17 @@ const STEP_CAPS_MS = {
   "v2-lifecycle-cleanup": 30_000,
   "v2-monthly-fact-refresh": 50_000,
   "v2-weekly-summary": 20_000,
+  // Phase 4 (2026-05-28): per-fact re-verification — cheaper than a
+  // full re-scrape. Processes up to ~20 stale facts per tick.
+  "fact-reverification-batch": 30_000,
+  // Phase 1: events table retention. 90-day rolling window prevents
+  // unbounded growth.
+  "fact-scrape-events-prune": 5_000,
+  // Vercel-Hobby substrate (2026-05-28): drain pending OpenAI
+  // Responses background jobs whose clients haven't polled, and prune
+  // 24h-expired job rows so the table doesn't grow unbounded.
+  "llm-jobs-drain": 20_000,
+  "llm-jobs-prune": 3_000,
 } as const;
 
 type StepName = keyof typeof STEP_CAPS_MS;
@@ -263,6 +276,81 @@ export function setupCronRoutes(app: Express): void {
       // 30+ days and runs the full v2 pipeline for up to MAX_BRANDS_PER_TICK.
       // Subsequent ticks pick up the next batch automatically.
       await orch.run("v2-monthly-fact-refresh", (deadline) => runMonthlyFactRefresh(deadline));
+
+      // Per-fact re-verification: cheaper than a full re-scrape. Hits
+      // each stale fact's source URL, re-extracts ONLY that fact, and
+      // either marks it verified or records drift. Budget bounded.
+      await orch.run("fact-reverification-batch", async () => {
+        const { runReverificationBatch } = await import("../lib/factAgent/v2/reverifyFact");
+        // We need an LLM callable here; the structured-data pre-pass
+        // in reverify covers most facts, but for the rest we use the
+        // same gpt-4o-mini that runs in the main pipeline.
+        const OpenAI = (await import("openai")).default;
+        const { MODELS } = await import("../lib/modelConfig");
+        const openai = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+          // Inherit Vercel-tier-aware LLM timeout. On Hobby this is
+          // ~6.3s; on Pro ~25s. Avoid orphaning the cron tick.
+          timeout: LLM_CALL_TIMEOUT_MS,
+          maxRetries: 0,
+        });
+        const llm: import("../lib/factAgent/v2/extractionPrompt").LlmCallable = async (prompt) => {
+          const messages =
+            typeof prompt === "string"
+              ? [{ role: "user" as const, content: prompt }]
+              : [
+                  { role: "system" as const, content: prompt.system },
+                  { role: "user" as const, content: prompt.user },
+                ];
+          const responseFormat =
+            typeof prompt === "object" &&
+            prompt &&
+            "responseFormat" in prompt &&
+            (prompt as { responseFormat?: unknown }).responseFormat
+              ? (prompt as { responseFormat: unknown }).responseFormat
+              : { type: "json_object" as const };
+          const res = await openai.chat.completions.create({
+            model: MODELS.misc,
+            response_format: responseFormat as never,
+            messages,
+          });
+          return res.choices?.[0]?.message?.content ?? "";
+        };
+        const counters = await runReverificationBatch(20, llm);
+        logger.info({ counters }, "fact-reverification-batch: counters");
+      });
+
+      // Vercel-Hobby LLM-jobs substrate. The mutation routes (keyword
+      // discovery, FAQ generation, etc.) enqueue an llm_jobs row whose
+      // OpenAI Responses run executes in background mode. The client
+      // polls /api/llm-jobs/:id. If the client never comes back (closed
+      // tab, mobile sleep), the cron drains the row so the user sees the
+      // result on next visit. Bounded by step cap.
+      await orch.run("llm-jobs-drain", async (deadline) => {
+        const { drainPendingLlmJobs } = await import("../lib/llmJobs");
+        const counters = await drainPendingLlmJobs(deadline);
+        logger.info({ counters }, "llm-jobs-drain: counters");
+      });
+
+      // Prune expired llm_jobs rows (24h default). Keeps the table small.
+      await orch.run("llm-jobs-prune", async () => {
+        const { pruneExpiredLlmJobs } = await import("../lib/llmJobs");
+        const deleted = await pruneExpiredLlmJobs();
+        logger.info({ deleted }, "llm-jobs-prune: rows deleted");
+      });
+
+      // Phase 1 retention: 90-day rolling window on fact_scrape_events.
+      // Prevents unbounded growth. Keeping recent events is cheap
+      // (~100 events/run × 50 runs/day × 90 days ≈ 450K rows).
+      await orch.run("fact-scrape-events-prune", async () => {
+        const { db } = await import("../db");
+        const { sql } = await import("drizzle-orm");
+        const result = await db.execute(
+          sql`DELETE FROM fact_scrape_events WHERE created_at < now() - interval '90 days'`,
+        );
+        const deleted = (result as { rowCount?: number }).rowCount ?? 0;
+        logger.info({ deleted }, "fact-scrape-events-prune: rows deleted");
+      });
 
       // Weekly: run on Mondays only (UTC).
       if (new Date().getUTCDay() === 1) {

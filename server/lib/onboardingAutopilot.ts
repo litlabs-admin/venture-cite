@@ -5,10 +5,10 @@ import { logger } from "./logger";
 import { generateBrandPrompts } from "./promptGenerator";
 import { runBrandPrompts } from "../citationChecker";
 import { runFullScrapeForBrand } from "./factAgent/v2/runFullScrape";
+import { cronStepBudget } from "./factAgent/v2/vercelBudget";
 import type { Brand } from "@shared/schema";
 
 import { captureAndFlush } from "./sentryReport";
-const ACTIVE_STATUSES = new Set(["generating_prompts", "running_citations"]);
 
 async function setAutopilot(brandId: string, patch: Partial<Brand>): Promise<void> {
   try {
@@ -80,7 +80,9 @@ export async function runOnboardingAutopilot(
             brandVoice: brand.brandVoice,
             tone: brand.tone,
           },
-          options.deadlineMs ?? Date.now() + 45_000,
+          // Inherit Vercel-tier budget. Pro ≈ 46s; Hobby ≈ 7s. If a
+          // deadline was passed in, trust the caller's tighter bound.
+          options.deadlineMs ?? Date.now() + cronStepBudget(0.8),
           // Must be one of the brand_fact_scrape_runs_triggered_by_check
           // values (migration 0062); "onboarding" is the canonical
           // first-run origin.

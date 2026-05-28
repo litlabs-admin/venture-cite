@@ -46,14 +46,6 @@ function extractResponseBody(ctx: string | null | undefined): string | null {
   return trimmed || null;
 }
 
-function clamp(n: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, n));
-}
-
-function round(n: number): number {
-  return Math.round(n);
-}
-
 async function requireOwnedBrand(req: any) {
   const user = requireUser(req);
   const brand = await storage.getBrandById(req.params.brandId);

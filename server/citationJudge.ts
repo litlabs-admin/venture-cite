@@ -1,11 +1,13 @@
 import OpenAI from "openai";
 import { attachAiLogger } from "./lib/aiLogger";
+import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
 
 // Dedicated client for the citation-judge LLM. Uses gpt-4o-mini for cost —
 // a judge call runs ~$0.0002 per response.
 const judgeClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 30_000,
+  // Tier-aware to keep judge calls inside the function envelope.
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(judgeClient);

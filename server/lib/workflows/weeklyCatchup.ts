@@ -5,10 +5,11 @@ import { storage } from "../../storage";
 import { attachAiLogger } from "../aiLogger";
 import { MODELS } from "../modelConfig";
 import { logger } from "../logger";
+import { LLM_CALL_TIMEOUT_MS } from "../factAgent/v2/vercelBudget";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45_000,
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(openai);

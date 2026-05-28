@@ -61,6 +61,37 @@ vi.mock("../../server/lib/factAgent/v2/runMonthlyRefresh", () => ({
 vi.mock("../../server/lib/factAgent/v2/weeklySummary", () => ({
   runWeeklySummary: stubs.runWeeklySummary,
 }));
+// The reverification + events-prune steps were added 2026-05-28. Their
+// imports happen at runtime inside the orchestrator (via `await
+// import(...)`) so vitest's auto-resolver picks the real module. Stub
+// each so we don't need a live DATABASE_URL during the unit test.
+vi.mock("../../server/lib/factAgent/v2/reverifyFact", () => ({
+  runReverificationBatch: vi.fn(async () => ({
+    attempted: 0,
+    verified: 0,
+    drift: 0,
+    unreachable: 0,
+  })),
+}));
+vi.mock("../../server/lib/factAgent/v2/vercelBudget", () => ({
+  CRON_TOTAL_BUDGET_MS: 55_000,
+  LLM_CALL_TIMEOUT_MS: 20_000,
+  cronStepBudget: (w: number = 1) => Math.floor(55_000 * w),
+}));
+// llm_jobs drain/prune steps (added 2026-05-28). Same pattern as
+// reverify — orchestrator dynamically imports llmJobs at runtime.
+vi.mock("../../server/lib/llmJobs", () => ({
+  drainPendingLlmJobs: vi.fn(async () => ({
+    attempted: 0,
+    finalized: 0,
+    stillRunning: 0,
+    failed: 0,
+  })),
+  pruneExpiredLlmJobs: vi.fn(async () => 0),
+  enqueueLlmJob: vi.fn(),
+  pollLlmJob: vi.fn(),
+  registerLlmJobHandler: vi.fn(),
+}));
 vi.mock("../../server/lib/onboardingAutopilot", () => ({
   resumeInFlightAutopilots: stubs.resumeInFlightAutopilots,
   runOnboardingAutopilot: vi.fn(),
@@ -103,6 +134,8 @@ vi.mock("../../server/db", () => ({
         }),
       }),
     }),
+    // events-prune step calls db.execute(sql`DELETE ...`) directly.
+    execute: vi.fn(async () => ({ rowCount: 0 })),
   },
   pool: {},
 }));
@@ -171,6 +204,10 @@ beforeEach(() => {
     if (typeof (fn as any).mockClear === "function") (fn as any).mockClear();
   }
   stubs.dbSelect.mockResolvedValue([]);
+  // The fact-reverification-batch step constructs an inline OpenAI
+  // client which requires this env var, even though we mock the
+  // batch fn itself (the constructor still runs).
+  if (!process.env.OPENAI_API_KEY) process.env.OPENAI_API_KEY = "sk-test";
 });
 
 describe("cron orchestrator", () => {

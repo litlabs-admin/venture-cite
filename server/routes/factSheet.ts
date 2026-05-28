@@ -19,7 +19,10 @@ import { storage } from "../storage";
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
 
-const SSE_SLICE_BUDGET_MS = 50_000; // < vercel.json maxDuration: 60s
+// SSE_SLICE_BUDGET_MS derives from VERCEL_FUNCTION_BUDGET_MS so the
+// same code runs cleanly on Hobby (9 s slice + reconnect) and Pro
+// (49 s slice). Pro default = ~57 s; Hobby = ~8 s.
+import { SSE_SLICE_BUDGET_MS } from "../lib/factAgent/v2/vercelBudget";
 const SSE_TICK_MS = 500;
 const SSE_HEARTBEAT_MS = 15_000;
 

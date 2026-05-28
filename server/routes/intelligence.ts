@@ -19,21 +19,11 @@ import {
 import { sendError, asyncHandler } from "../lib/routesShared";
 import { z } from "zod";
 import { assertTransition, InvalidStateTransitionError } from "../lib/statusTransitions";
-import { assertSafeUrl } from "../lib/ssrf";
 
-// Slack incoming webhooks have a fixed URL shape:
-// https://hooks.slack.com/services/T<workspace>/B<bot>/<token>
-// Pinning the host AND path here closes two bypasses the previous
-// `endsWith("slack.com")` check left open: (1) attacker-controlled
-// `*.slack.com` subdomains, (2) any non-webhook slack.com endpoint.
-// SSRF (DNS rebinding, private-IP resolution) is handled separately by
-// assertSafeUrl at fetch time.
-const SLACK_WEBHOOK_RE =
-  /^https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]+$/;
-
-function isValidSlackWebhookUrl(raw: unknown): raw is string {
-  return typeof raw === "string" && SLACK_WEBHOOK_RE.test(raw);
-}
+// (The Slack-webhook validator + SLACK_WEBHOOK_RE constant lived here
+// until they were removed alongside the legacy notification endpoint.
+// Slack delivery now goes through ./lib/slackNotify, which handles its
+// own URL allow-listing.)
 
 // Mention routes moved to server/routes/mentions.ts (mentions rebuild)
 

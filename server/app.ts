@@ -12,8 +12,9 @@ import "dotenv/config";
 import "./env";
 // Sentry must be imported before any module that throws or makes network
 // calls so its instrumentation is active for the whole process. No-op if
-// SENTRY_DSN isn't set.
-import { Sentry } from "./instrument";
+// SENTRY_DSN isn't set. Side-effect import — we don't reference the
+// `Sentry` symbol from this file directly.
+import "./instrument";
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";

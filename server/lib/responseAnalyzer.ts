@@ -5,6 +5,7 @@ import { MODELS } from "./modelConfig";
 import { parseLLMJson, LLMParseError } from "./llmParse";
 import { logger } from "./logger";
 import { matchEntity, type TrackedEntity as MatcherEntity } from "./brandMatcher";
+import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 
 // Merged extract+judge analyzer. One call per AI-chatbot response returns
 // every brand mentioned plus cited/rank/relevance/context/citedUrls, replacing
@@ -16,7 +17,7 @@ import { matchEntity, type TrackedEntity as MatcherEntity } from "./brandMatcher
 
 const analyzerClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45_000,
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(analyzerClient);

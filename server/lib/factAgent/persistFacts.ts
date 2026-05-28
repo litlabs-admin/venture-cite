@@ -178,6 +178,7 @@ export async function persistFacts(
           sourceExcerpt: schema.brandFactSheet.sourceExcerpt,
           valuePayload: schema.brandFactSheet.valuePayload,
           dismissedAt: schema.brandFactSheet.dismissedAt,
+          userOverridden: schema.brandFactSheet.userOverridden,
         })
         .from(schema.brandFactSheet)
         .where(
@@ -195,6 +196,39 @@ export async function persistFacts(
 
       // Prior dismissal — respect the user's intent and skip entirely.
       if (existing?.dismissedAt) continue;
+
+      // 2026-05-28 Phase 4: user_overridden facts are off-limits to
+      // scrapes. The user explicitly set this value; we record the
+      // disagreement count but never overwrite. If the scrape produced
+      // a DIFFERENT value, push it into alternatives so the user can
+      // see what we found without disturbing their canonical answer.
+      if (existing?.userOverridden) {
+        const incomingSource: SourceEntry = {
+          url: f.sourceUrl,
+          excerpt: f.sourceExcerpt ?? "",
+          confidence: f.confidence,
+        };
+        const existingPayloadUO: ValuePayload = (existing.valuePayload as ValuePayload) ?? {};
+        const existingAltsUO: AlternativeEntry[] = existingPayloadUO?.alternatives ?? [];
+        const normalizedIncoming = normalizeValue(f.factValue);
+        const normalizedCanonical = normalizeValue(existing.factValue);
+        if (normalizedIncoming !== normalizedCanonical) {
+          const newAlts = appendSourceToAlternative(existingAltsUO, f.factValue, incomingSource);
+          const merged =
+            newAlts.length === existingAltsUO.length
+              ? demoteToAlternatives(existingAltsUO, f.factValue, [incomingSource])
+              : newAlts;
+          await db
+            .update(schema.brandFactSheet)
+            .set({
+              valuePayload: { ...existingPayloadUO, alternatives: merged },
+              disagreementCount: sql`${schema.brandFactSheet.disagreementCount} + 1`,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.brandFactSheet.id, existing.id));
+        }
+        continue;
+      }
 
       const incomingSource = sourceEntryFor(f);
 

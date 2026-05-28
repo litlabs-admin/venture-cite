@@ -11,9 +11,13 @@ import { sql } from "drizzle-orm";
 import { db } from "../../../db";
 import { logger } from "../../logger";
 import { runFullScrapeForBrand } from "./runFullScrape";
+import { cronStepBudget } from "./vercelBudget";
 
 const REFRESH_INTERVAL_DAYS = 30;
 const MAX_BRANDS_PER_TICK = 3;
+// On Pro (60s) this resolves to ~46s. On Hobby (10s) it shrinks to
+// ~7s so the cron step doesn't overrun the function timeout.
+const DEFAULT_REFRESH_BUDGET_MS = cronStepBudget(0.8);
 
 interface StaleBrand {
   id: string;
@@ -91,7 +95,7 @@ async function refreshOneBrand(brand: StaleBrand, deadlineMs: number): Promise<v
 }
 
 export async function runMonthlyFactRefresh(deadlineMs?: number): Promise<{ processed: number }> {
-  const budgetEnd = deadlineMs ?? Date.now() + 45_000;
+  const budgetEnd = deadlineMs ?? Date.now() + DEFAULT_REFRESH_BUDGET_MS;
   const stale = await findStaleBrands(MAX_BRANDS_PER_TICK);
   if (stale.length === 0) return { processed: 0 };
 

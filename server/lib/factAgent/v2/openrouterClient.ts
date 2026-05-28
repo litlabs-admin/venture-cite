@@ -7,6 +7,7 @@
 // Returns null when OPENROUTER_API_KEY is unset (callers gracefully skip).
 import OpenAI from "openai";
 import { OPENROUTER_BASE_URL } from "../../modelConfig";
+import { LLM_CALL_TIMEOUT_MS } from "./vercelBudget";
 
 let cached: OpenAI | null | undefined;
 
@@ -20,7 +21,10 @@ export function getOpenrouterClient(): OpenAI | null {
   cached = new OpenAI({
     apiKey: key,
     baseURL: OPENROUTER_BASE_URL,
-    timeout: 45_000,
+    // Tier-aware: ~6.3s on Hobby (10s function), 25s on Pro (60s).
+    // Without this, a 45s timeout on Hobby would let the LLM stall
+    // longer than the entire function budget, guaranteeing a hard kill.
+    timeout: LLM_CALL_TIMEOUT_MS,
     maxRetries: 1,
   });
   return cached;

@@ -12,6 +12,7 @@ import { attachAiLogger } from "./aiLogger";
 import { sendOwnershipError } from "./ownership";
 import { logger } from "./logger";
 import { captureAndFlush } from "./sentryReport";
+import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 
 // Re-export so the 20+ route modules that already import asyncHandler
 // from "../lib/routesShared" keep working unchanged. Utility modules
@@ -24,8 +25,10 @@ export { asyncHandler } from "./asyncHandler";
 // concern; both pin the same SDK version.
 export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  // Upstream hangs block worker threads indefinitely without a timeout.
-  timeout: 45_000,
+  // Tier-aware: derived from VERCEL_FUNCTION_BUDGET_MS so a Hobby
+  // deploy (10s function) never lets the LLM stall past the function
+  // ceiling. Pro stays at ~25s, matching the old 45s only loosely.
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(openai);

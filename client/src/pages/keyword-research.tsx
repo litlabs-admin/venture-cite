@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,25 +17,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { runLlmJob } from "@/lib/llmJobs";
 import { Helmet } from "react-helmet-async";
 import { useLocation } from "wouter";
 import type { KeywordResearch } from "@shared/schema";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import {
-  Search,
-  Sparkles,
-  TrendingUp,
-  FileText,
-  Loader2,
-  Trash2,
-  ExternalLink,
-  Zap,
-  BarChart3,
-  Filter,
-  RefreshCw,
-} from "lucide-react";
+import { Search, Sparkles, FileText, Loader2, Trash2, Filter, RefreshCw } from "lucide-react";
 
 const intentColors: Record<string, string> = {
   informational: "bg-muted text-muted-foreground border-border",
@@ -84,37 +72,41 @@ export default function KeywordResearchPage() {
 
   const discoverMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/keyword-research/discover", {
-        brandId: selectedBrandId,
-      });
-      return response.json();
+      // Server (post-2026-05-28): enqueues an OpenAI Responses
+      // background job and returns 202 + { jobId }. runLlmJob() polls
+      // /api/llm-jobs/:jobId until the kind-handler finalizes (parses
+      // the AI output, dedups against existing rows, persists the new
+      // brand_keywords). The polling resolves with the same shape the
+      // route used to return inline: { data: [...], count, message? }.
+      // Works equally well on Hobby and Pro because the LLM runs on
+      // OpenAI's infra rather than inside our 10s function ceiling.
+      return await runLlmJob<
+        { brandId: string },
+        {
+          data: KeywordResearch[];
+          count: number;
+          message?: string;
+        }
+      >("/api/keyword-research/discover", { brandId: selectedBrandId! });
     },
     onSuccess: (data) => {
-      if (data.success) {
-        if (data.count === 0) {
-          // Soft "no new keywords" case — not a failure, just informational.
-          // Server returns 200 + success:true + data:[] + message when the AI
-          // found candidates but they were all duplicates of existing rows.
-          toast({
-            title: "No new keywords",
-            description: data.message || "All discovered keywords already exist for this brand.",
-          });
-          return;
-        }
-        toast({ title: `Discovered ${data.count} keywords!` });
-        // Instant update: append new keywords to cache
-        const qk = [`/api/keyword-research/${selectedBrandId}`];
-        queryClient.setQueryData<{ success: boolean; data: KeywordResearch[] }>(qk, (old) => {
-          if (!old) return { success: true, data: data.data };
-          return { ...old, data: [...old.data, ...data.data] };
-        });
-      } else {
+      if (data.count === 0) {
+        // Soft "no new keywords" case — not a failure, just informational.
+        // Handler returns { data: [], count: 0, message } when all
+        // discovered keywords already existed for this brand.
         toast({
-          title: "Failed to discover keywords",
-          description: data.error || "Unknown error",
-          variant: "destructive",
+          title: "No new keywords",
+          description: data.message || "All discovered keywords already exist for this brand.",
         });
+        return;
       }
+      toast({ title: `Discovered ${data.count} keywords!` });
+      // Instant update: append new keywords to cache
+      const qk = [`/api/keyword-research/${selectedBrandId}`];
+      queryClient.setQueryData<{ success: boolean; data: KeywordResearch[] }>(qk, (old) => {
+        if (!old) return { success: true, data: data.data };
+        return { ...old, data: [...old.data, ...data.data] };
+      });
     },
     onError: (err: Error) =>
       toast({
@@ -149,20 +141,10 @@ export default function KeywordResearchPage() {
     onError: () => toast({ title: "Failed to delete keyword", variant: "destructive" }),
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const response = await apiRequest("PATCH", `/api/keyword-research/${id}`, { status });
-      return response.json();
-    },
-    onSuccess: (_data, { id, status }) => {
-      // Instant update: update status in cache
-      const qk = [`/api/keyword-research/${selectedBrandId}`];
-      queryClient.setQueryData<{ success: boolean; data: KeywordResearch[] }>(qk, (old) => {
-        if (!old) return old;
-        return { ...old, data: old.data.map((k) => (k.id === id ? { ...k, status } : k)) };
-      });
-    },
-  });
+  // (updateStatusMutation lived here pre-2026-05-28. It targeted
+  // PATCH /api/keyword-research/:id but no UI control ever called it.
+  // The PATCH endpoint stays available for future use; the unused
+  // mutation hook is removed to keep the page lean.)
 
   const handleGenerateContent = (keyword: KeywordResearch) => {
     const params = new URLSearchParams({
@@ -326,7 +308,7 @@ export default function KeywordResearchPage() {
             </Button>
           </div>
 
-          {filteredKeywords.map((keyword, keywordIndex) => (
+          {filteredKeywords.map((keyword) => (
             <Card
               key={keyword.id}
               className="transition-colors"

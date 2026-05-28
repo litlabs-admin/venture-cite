@@ -4,8 +4,13 @@ import { storage } from "../storage";
 import { MODELS } from "./modelConfig";
 import { attachAiLogger } from "./aiLogger";
 import { logger } from "./logger";
+import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30_000, maxRetries: 1 });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: LLM_CALL_TIMEOUT_MS,
+  maxRetries: 1,
+});
 attachAiLogger(openai);
 
 export type SentimentInput = { key: string; text: string };

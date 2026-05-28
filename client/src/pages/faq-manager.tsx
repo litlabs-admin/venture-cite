@@ -15,18 +15,10 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { runLlmJob } from "@/lib/llmJobs";
 import { Helmet } from "react-helmet-async";
 import type { FaqItem } from "@shared/schema";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -42,16 +34,12 @@ import {
   CheckCircle,
   AlertTriangle,
   Target,
-  TrendingUp,
   Loader2,
   Copy,
-  RefreshCw,
   Edit,
   Save,
   X,
   Zap,
-  FileText,
-  Search,
   BookOpen,
 } from "lucide-react";
 
@@ -88,8 +76,26 @@ export default function FaqManager() {
 
   const generateFaqsMutation = useMutation({
     mutationFn: async (data: { topic: string; count: number }) => {
-      const response = await apiRequest("POST", `/api/faqs/generate/${selectedBrandId}`, data);
-      return response.json();
+      // Server (post-2026-05-28): enqueues an OpenAI Responses
+      // background job and returns 202 + { jobId }. runLlmJob() polls
+      // /api/llm-jobs/:jobId until the FAQ handler dedups + persists
+      // the new FAQ rows. Resolves with the same { data, report, tips }
+      // the route used to return inline so the toast logic stays the
+      // same.
+      return await runLlmJob<
+        { topic: string; count: number },
+        {
+          data: unknown[];
+          report: {
+            requested: number;
+            generated: number;
+            inserted: number;
+            mergedDuplicates: number;
+            invalid: number;
+          };
+          tips: string[];
+        }
+      >(`/api/faqs/generate/${selectedBrandId}`, data);
     },
     onSuccess: (data: any) => {
       // Surface the REAL insert count from the server's report. The previous

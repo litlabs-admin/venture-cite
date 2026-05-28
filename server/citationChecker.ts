@@ -14,11 +14,17 @@ import { findSelfCitationsInText } from "./lib/trackedContentMatcher";
 import { dynamicLockNamespaces, withDynamicAdvisoryLock } from "./lib/advisoryLock";
 import { extractCitedUrls } from "./lib/urlExtractor";
 import type { TrackedContentUrl } from "@shared/schema";
+import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
 
 // ChatGPT citation checks go through the direct OpenAI client.
+// Citation runs execute in slices via /advance polling on Vercel —
+// each slice is bounded by VERCEL_FUNCTION_BUDGET_MS, so the per-LLM
+// timeout must inherit that limit. On Hobby (10s function) this is
+// ~6.3s; on Pro (60s) it's 25s. A 45s timeout against a 10s function
+// would guarantee a hard kill before the LLM can finish.
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45_000,
+  timeout: LLM_CALL_TIMEOUT_MS,
   maxRetries: 1,
 });
 attachAiLogger(openai);
@@ -32,7 +38,7 @@ const openrouter = process.env.OPENROUTER_API_KEY
       const client = new OpenAI({
         apiKey: process.env.OPENROUTER_API_KEY,
         baseURL: OPENROUTER_BASE_URL,
-        timeout: 45_000,
+        timeout: LLM_CALL_TIMEOUT_MS,
         maxRetries: 1,
       });
       attachAiLogger(client);
