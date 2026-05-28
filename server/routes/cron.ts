@@ -86,6 +86,10 @@ const STEP_CAPS_MS = {
   // 24h-expired job rows so the table doesn't grow unbounded.
   "llm-jobs-drain": 20_000,
   "llm-jobs-prune": 3_000,
+  // Signals page retention (2026-05-28): geo_signal_runs is append-only
+  // (every Analyze click writes a row) and schema_audits accumulates
+  // one row per unique URL. Without these the tables grow unboundedly.
+  "signals-retention-prune": 5_000,
 } as const;
 
 type StepName = keyof typeof STEP_CAPS_MS;
@@ -337,6 +341,44 @@ export function setupCronRoutes(app: Express): void {
         const { pruneExpiredLlmJobs } = await import("../lib/llmJobs");
         const deleted = await pruneExpiredLlmJobs();
         logger.info({ deleted }, "llm-jobs-prune: rows deleted");
+      });
+
+      // Signals page retention. Two tables, two policies:
+      //   - geo_signal_runs: cap to 100 rows per brand (keep the most
+      //     recent 100 ran_at per brand_id; delete older). Plus a
+      //     90-day hard floor so single-brand abandoned accounts
+      //     don't accumulate forever.
+      //   - schema_audits: drop rows older than 30 days. The route's
+      //     7-day cache TTL already covers freshness; anything past
+      //     that point is dead weight (one row per unique URL).
+      await orch.run("signals-retention-prune", async () => {
+        const { db: cronDb } = await import("../db");
+        const { sql } = await import("drizzle-orm");
+        const ninetyDays = await cronDb.execute(
+          sql`DELETE FROM geo_signal_runs WHERE ran_at < now() - interval '90 days'`,
+        );
+        const perBrandCap = await cronDb.execute(sql`
+          DELETE FROM geo_signal_runs
+          WHERE id IN (
+            SELECT id FROM (
+              SELECT id, row_number() OVER (
+                PARTITION BY brand_id ORDER BY ran_at DESC
+              ) AS rn FROM geo_signal_runs
+            ) ranked
+            WHERE rn > 100
+          )
+        `);
+        const schemaCleanup = await cronDb.execute(
+          sql`DELETE FROM schema_audits WHERE fetched_at < now() - interval '30 days'`,
+        );
+        logger.info(
+          {
+            signalsByAge: (ninetyDays as { rowCount?: number }).rowCount ?? 0,
+            signalsByCap: (perBrandCap as { rowCount?: number }).rowCount ?? 0,
+            schemaAuditsByAge: (schemaCleanup as { rowCount?: number }).rowCount ?? 0,
+          },
+          "signals-retention-prune: rows deleted",
+        );
       });
 
       // Phase 1 retention: 90-day rolling window on fact_scrape_events.

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useReducer, useMemo } from "react";
+﻿import { useState, useEffect, useReducer, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,29 +45,20 @@ import {
   Sparkles,
   Loader2,
   BarChart3,
-  Layers,
   Code,
   Workflow,
   Clock,
   CheckCircle,
   XCircle,
   AlertTriangle,
-  TrendingUp,
-  Search,
-  FileText,
-  Zap,
-  Target,
   Brain,
-  Gauge,
   SplitSquareVertical,
-  Database,
-  Timer,
   ArrowRight,
   ChevronRight,
   ChevronDown,
   Activity,
-  Pencil,
   Check,
+  HelpCircle,
 } from "lucide-react";
 
 interface SignalScore {
@@ -117,7 +108,7 @@ const STAGE_BLURBS: Record<string, string> = {
   Retrieve:
     "Real retrieval surface. Combines query-term coverage, the fraction of headings phrased as questions, and the fraction of chunks that are formatted as AI-friendly answer units.",
   Signal:
-    "The overall score from Tab 1's scorecard — exactly the same inputs, exactly the same number. If they differ, it's a bug.",
+    "Your overall scorecard score, decomposed into the pipeline stage it represents. The number above is the same as the headline % on the Signal Scorecard — both routes feed off computeSignals().",
   Serve:
     "Real citability signals: byline detection, outbound citation count, and whether at least one chunk has a heading plus a direct 200+ char answer.",
 };
@@ -127,12 +118,19 @@ const STAGE_BLURBS: Record<string, string> = {
 // the user switches articles, the active slice swaps to a fresh empty object,
 // so stale results from the previous article don't linger on the stat cards.
 // -----------------------------------------------------------------------------
-type TabName = "analyze" | "chunks" | "schema" | "pipeline";
+type TabName = "analyze" | "chunks" | "schema" | "pipeline" | "optimize";
 type PerArticleState = {
   analyzeResult?: any;
   chunksResult?: any;
   schemaResult?: any;
   pipelineResult?: any;
+  // 2026-05-28 fix: optimize result MUST be keyed per-article. Previously
+  // the page read optimizeChunksMutation.data?.data?.optimizedContent
+  // which is mutation-scoped (page-level). Switch articles, the prior
+  // article's optimised text stayed rendered, and "Apply to Article"
+  // would write Article A's content over Article B's body. Now the
+  // reducer key isolates per (brandId, articleId).
+  optimizeResult?: { optimizedContent: string };
   computedAt: Partial<Record<TabName, number>>;
 };
 type ReducerState = Record<string, PerArticleState>;
@@ -153,7 +151,9 @@ function geoReducer(state: ReducerState, action: ReducerAction): ReducerState {
             ? "chunksResult"
             : action.tab === "schema"
               ? "schemaResult"
-              : "pipelineResult";
+              : action.tab === "optimize"
+                ? "optimizeResult"
+                : "pipelineResult";
       return {
         ...state,
         [action.key]: {
@@ -168,23 +168,43 @@ function geoReducer(state: ReducerState, action: ReducerAction): ReducerState {
   }
 }
 
-function formatRelativeMinutes(ts?: number): string | null {
-  if (!ts) return null;
-  const mins = Math.floor((Date.now() - ts) / 60000);
-  if (mins < 1) return "just now";
-  if (mins === 1) return "1 minute ago";
-  if (mins < 60) return `${mins} minutes ago`;
-  const hrs = Math.floor(mins / 60);
-  return hrs === 1 ? "1 hour ago" : `${hrs} hours ago`;
-}
+// (formatRelativeMinutes lived here pre-2026-05-28 cleanup. It powered
+// the "computed N minutes ago" sub-labels on the four KPI cards that
+// were removed when the IA collapsed. With those cards gone there are
+// no remaining callers, so the helper was deleted to keep this file
+// honest. If the active scorecard later needs a freshness label, lean
+// on date-fns formatDistanceToNow instead.)
 
 // Line-level LCS diff — small enough to inline; no new dep.
+//
+// 2026-05-28 perf cap: this is O(m·n). Two 1500-line articles produce a
+// 2.25M cell DP table that took 5-10s to render and froze the dialog
+// open animation. We now bail out early on inputs above MAX_DIFF_LINES
+// (per side) and render a simpler before/after summary instead. The
+// LCS-with-bail covers ~99% of real article edits; the bail covers the
+// pathological "pasted a different 8000-line draft" case.
+const MAX_DIFF_LINES = 800;
 function lineDiff(
   oldText: string,
   newText: string,
 ): Array<{ kind: "equal" | "add" | "del"; text: string }> {
   const a = oldText.split("\n");
   const b = newText.split("\n");
+  if (a.length > MAX_DIFF_LINES || b.length > MAX_DIFF_LINES) {
+    // Fallback: show a coarse delta the user can still reason about
+    // (line counts, length delta) without the LCS quadratic cost.
+    const delta = b.length - a.length;
+    return [
+      {
+        kind: "equal",
+        text: `(Article is ${a.length} lines / ${oldText.length.toLocaleString()} chars; optimised is ${b.length} lines / ${newText.length.toLocaleString()} chars — ${delta >= 0 ? "+" : ""}${delta.toLocaleString()} lines.)`,
+      },
+      {
+        kind: "equal",
+        text: `(Line-by-line diff skipped for performance above ${MAX_DIFF_LINES} lines/side. Compare the two panels manually or apply with caution.)`,
+      },
+    ];
+  }
   const m = a.length;
   const n = b.length;
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
@@ -239,12 +259,77 @@ export default function GeoSignals() {
 
   const [diffDialogOpen, setDiffDialogOpen] = useState(false);
   const [pendingOptimized, setPendingOptimized] = useState<string>("");
+  // AbortControllers per long-running mutation. Each Analyze / Pipeline
+  // / Auto-Optimize call can take 10-30s; without a cancel handle the
+  // user is stuck waiting (or has to reload the tab). Each ref holds
+  // the controller for the IN-FLIGHT call so the Cancel button can
+  // abort it. We re-create on each invocation; React Query's
+  // mutationFn closes over the right one.
+  const analyzeAbortRef = useRef<AbortController | null>(null);
+  const chunkAbortRef = useRef<AbortController | null>(null);
+  const optimizeAbortRef = useRef<AbortController | null>(null);
+  const pipelineAbortRef = useRef<AbortController | null>(null);
+  const auditAbortRef = useRef<AbortController | null>(null);
+  // Schema Lab can render up to 14 catalogued types; for a typical
+  // blog article most are irrelevant (Recipe / Event / LocalBusiness).
+  // Default to showing only types that are PRESENT on the page or
+  // belong to a small "core" set most articles care about. The toggle
+  // reveals the full 14 for power users.
+  const [showAllSchemaTypes, setShowAllSchemaTypes] = useState(false);
+  const CORE_SCHEMA_TYPES = useMemo(
+    () =>
+      new Set([
+        "Article",
+        "BlogPosting",
+        "NewsArticle",
+        "FAQPage",
+        "Organization",
+        "BreadcrumbList",
+        "WebPage",
+        "Product",
+      ]),
+    [],
+  );
+
+  // Per-signal "what does this measure" map — replaces the 171-line
+  // inline "How signals are scored" Collapsible. Surfaced as a
+  // hoverable info icon on each scorecard row so the documentation
+  // sits next to the result instead of taking over the page.
+  const SIGNAL_BLURBS: Record<string, string> = useMemo(
+    () => ({
+      "Content Depth":
+        "Word count plus H2/H3 hierarchy. 2000+ words and both heading levels score full marks. <500 words caps the score.",
+      "Semantic Similarity":
+        "Cosine similarity between embeddings of your first 8000 chars and the target query. Real text-embedding-3-small embeddings, not keyword matching.",
+      "Query-Term Coverage":
+        "Fraction of meaningful (non-stopword) query terms that appear anywhere in the article body.",
+      "Exact-Phrase Match":
+        "Whether the verbatim target query appears at least once in the body. Pass/fail.",
+      "Structure Extractability":
+        "Fraction of paragraph-chunks that are AI-extractable: ≤500 tokens, have a heading, and start with a direct answer.",
+      "Authority Signals":
+        "Byline detection + external citation count + factual claim markers + JSON-LD schema completeness (from Schema Lab).",
+      Freshness:
+        "Days since the article's updatedAt. ≤30d = excellent, ≤90d = good, >90d = stale. Requires a timestamp.",
+    }),
+    [],
+  );
+
+  // Legend explanations for the schema cards — replace the three
+  // standalone "Completeness / Required / Recommended" cards with a
+  // single tooltip on the section header.
+  const SCHEMA_LEGEND_BLURB =
+    "Completeness % = (populated required + recommended fields) / (total catalogued fields) on the best instance of that schema type on the page. Missing 'Required' fields fail Google's Rich Results test; missing 'Recommended' fields just leave score on the table.";
 
   const { data: articlesData } = useQuery<{ data: Article[] }>({
-    queryKey: ["/api/articles", selectedBrandId],
+    // Pass status=all so drafts / generating / failed articles also
+    // appear in the picker. The default server filter is status=ready
+    // which silently hid in-progress work — the user wondered why an
+    // article they JUST clicked Generate on didn't show up in Diagnose.
+    queryKey: ["/api/articles", selectedBrandId, "all"],
     enabled: !!selectedBrandId,
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/articles?brandId=${selectedBrandId}`);
+      const res = await apiRequest("GET", `/api/articles?brandId=${selectedBrandId}&status=all`);
       return res.json();
     },
   });
@@ -272,12 +357,19 @@ export default function GeoSignals() {
   useEffect(() => {
     if (!selectedArticle || urlTouched) return;
     if (url) return;
-    const site = (selectedBrand as any)?.website as string | undefined;
-    const slug = (selectedArticle as any).slug as string | undefined;
-    if (site && slug) {
-      setUrl(`${site.replace(/\/$/, "")}/articles/${slug}`);
+    // Use the article's own `externalUrl` — where the user told us it
+    // actually lives on their site. The previous code synthesised
+    // `${brand.website}/articles/${slug}`, but `slug` was removed from
+    // the articles table during Wave 7 unification (the column comment
+    // in shared/schema.ts says "Replaces the old slug-based fake URL").
+    // Every auto-fill became `…/articles/undefined`, which then audited
+    // a 404, then cached "no schemas found" under the wrong hash key —
+    // breaking the Schema Lab → Authority signal loop end-to-end.
+    const externalUrl = (selectedArticle as any).externalUrl as string | undefined;
+    if (externalUrl && externalUrl.trim().length > 0) {
+      setUrl(externalUrl);
     }
-  }, [selectedArticle, selectedBrand, urlTouched, url]);
+  }, [selectedArticle, urlTouched, url]);
 
   const analyzeSignalsMutation = useMutation({
     mutationFn: async (data: {
@@ -287,33 +379,82 @@ export default function GeoSignals() {
       articleId?: string;
       articleUpdatedAt?: string;
     }) => {
-      const response = await apiRequest("POST", "/api/geo-signals/analyze", data);
+      analyzeAbortRef.current?.abort(); // cancel any previous in-flight call
+      const controller = new AbortController();
+      analyzeAbortRef.current = controller;
+      const response = await apiRequest("POST", "/api/geo-signals/analyze", data, {
+        signal: controller.signal,
+      });
       return response.json();
     },
     onSuccess: (data) => {
       geoDispatch({ type: "set", key: articleKey, tab: "analyze", data: data?.data });
     },
-    onError: () => toast({ title: "Analysis failed", variant: "destructive" }),
+    onError: (err: Error) => {
+      // Aborts are intentional — don't toast on those, the user clicked Cancel.
+      if (/abort/i.test(err.message ?? "") || err.name === "AbortError") return;
+      toast({
+        title: "Analysis failed",
+        description: err.message || "Try again or shorten the article.",
+        variant: "destructive",
+      });
+    },
   });
 
   const analyzeChunksMutation = useMutation({
     mutationFn: async (data: { content: string }) => {
-      const response = await apiRequest("POST", "/api/geo-signals/chunk-analysis", data);
+      chunkAbortRef.current?.abort();
+      const controller = new AbortController();
+      chunkAbortRef.current = controller;
+      const response = await apiRequest("POST", "/api/geo-signals/chunk-analysis", data, {
+        signal: controller.signal,
+      });
       return response.json();
     },
     onSuccess: (data) => {
       geoDispatch({ type: "set", key: articleKey, tab: "chunks", data: data?.data });
     },
-    onError: () => toast({ title: "Chunk analysis failed", variant: "destructive" }),
+    onError: (err: Error) => {
+      if (/abort/i.test(err.message ?? "") || err.name === "AbortError") return;
+      toast({
+        title: "Chunk analysis failed",
+        description: err.message || "Try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const optimizeChunksMutation = useMutation({
     mutationFn: async (data: { content: string; brandId?: string }) => {
-      const response = await apiRequest("POST", "/api/geo-signals/optimize-chunks", data);
+      optimizeAbortRef.current?.abort();
+      const controller = new AbortController();
+      optimizeAbortRef.current = controller;
+      const response = await apiRequest("POST", "/api/geo-signals/optimize-chunks", data, {
+        signal: controller.signal,
+      });
       return response.json();
     },
-    onSuccess: () => toast({ title: "Content optimized into AI-extractable chunks!" }),
-    onError: () => toast({ title: "Optimization failed", variant: "destructive" }),
+    onSuccess: (data) => {
+      // Persist into the per-article slice so optimizedContent doesn't
+      // bleed across article switches. The page reads from the slice,
+      // not from this mutation's data.
+      const optimized = (data?.data?.optimizedContent ?? "") as string;
+      geoDispatch({
+        type: "set",
+        key: articleKey,
+        tab: "optimize",
+        data: { optimizedContent: optimized },
+      });
+      toast({ title: "Content optimized into AI-extractable chunks!" });
+    },
+    onError: (err: Error) => {
+      if (/abort/i.test(err.message ?? "") || err.name === "AbortError") return;
+      toast({
+        title: "Optimization failed",
+        description: err.message || "Try again or shorten the article.",
+        variant: "destructive",
+      });
+    },
   });
 
   const applyOptimizedMutation = useMutation({
@@ -366,14 +507,29 @@ export default function GeoSignals() {
   });
 
   const auditSchemaMutation = useMutation({
-    mutationFn: async (data: { url: string }) => {
-      const response = await apiRequest("POST", "/api/geo-signals/schema-audit", data);
+    mutationFn: async (data: { url: string; force?: boolean }) => {
+      auditAbortRef.current?.abort();
+      const controller = new AbortController();
+      auditAbortRef.current = controller;
+      // `force: true` bypasses the server's 7-day cache so the Re-audit
+      // button actually re-audits. Without this, hitting Re-audit just
+      // re-rendered the cached result for up to 7 days.
+      const response = await apiRequest("POST", "/api/geo-signals/schema-audit", data, {
+        signal: controller.signal,
+      });
       return response.json();
     },
     onSuccess: (data) => {
       geoDispatch({ type: "set", key: articleKey, tab: "schema", data: data?.data });
     },
-    onError: () => toast({ title: "Schema audit failed", variant: "destructive" }),
+    onError: (err: Error) => {
+      if (/abort/i.test(err.message ?? "") || err.name === "AbortError") return;
+      toast({
+        title: "Schema audit failed",
+        description: err.message || "Try a different URL or check your connection.",
+        variant: "destructive",
+      });
+    },
   });
 
   const simulatePipelineMutation = useMutation({
@@ -383,13 +539,25 @@ export default function GeoSignals() {
       articleUpdatedAt?: string;
       schemaCompleteness?: number;
     }) => {
-      const response = await apiRequest("POST", "/api/geo-signals/pipeline-simulation", data);
+      pipelineAbortRef.current?.abort();
+      const controller = new AbortController();
+      pipelineAbortRef.current = controller;
+      const response = await apiRequest("POST", "/api/geo-signals/pipeline-simulation", data, {
+        signal: controller.signal,
+      });
       return response.json();
     },
     onSuccess: (data) => {
       geoDispatch({ type: "set", key: articleKey, tab: "pipeline", data: data?.data });
     },
-    onError: () => toast({ title: "Pipeline simulation failed", variant: "destructive" }),
+    onError: (err: Error) => {
+      if (/abort/i.test(err.message ?? "") || err.name === "AbortError") return;
+      toast({
+        title: "Pipeline simulation failed",
+        description: err.message || "Try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const signalScores: SignalScore[] = activeSlice.analyzeResult?.signals || [];
@@ -413,13 +581,22 @@ export default function GeoSignals() {
   const schemaFetchError: string | null = activeSlice.schemaResult?.fetchError ?? null;
   const auditedUrl: string | undefined = activeSlice.schemaResult?.url;
   const pipelineStages: PipelineStage[] = activeSlice.pipelineResult?.stages || [];
-  const optimizedContent = optimizeChunksMutation.data?.data?.optimizedContent || "";
+  // 2026-05-28 fix: read from the per-article slice, not the mutation
+  // data, so switching articles doesn't carry over the prior article's
+  // optimised output.
+  const optimizedContent: string = activeSlice.optimizeResult?.optimizedContent ?? "";
 
+  // Single source of truth — mirrors the server's bucketize() thresholds
+  // exactly (excellent ≥0.8, good ≥0.6, needs_improvement ≥0.4, poor <0.4).
+  // The previous version had a 60% AND 40% case both returning chart-3
+  // which collapsed two buckets into one colour; now the 4 buckets get
+  // 4 distinct treatments and the client agrees with the server's
+  // status label so the colour and the icon never contradict.
   const getScoreColor = (score: number, max: number) => {
-    const percentage = (score / max) * 100;
-    if (percentage >= 80) return "text-chart-4";
-    if (percentage >= 60) return "text-chart-3";
-    if (percentage >= 40) return "text-chart-3";
+    const ratio = max > 0 ? score / max : 0;
+    if (ratio >= 0.8) return "text-chart-4";
+    if (ratio >= 0.6) return "text-chart-1";
+    if (ratio >= 0.4) return "text-chart-3";
     return "text-destructive";
   };
 
@@ -472,128 +649,20 @@ export default function GeoSignals() {
       </Helmet>
 
       <div className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Overall Score
-                </span>
-                <Gauge className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <p
-                className="text-3xl font-semibold text-foreground tracking-tight"
-                data-testid="stat-overall"
-              >
-                {overallScore === null ? (
-                  <span className="text-muted-foreground">—</span>
-                ) : (
-                  <>
-                    {overallScore}
-                    <span className="text-lg text-muted-foreground">/100</span>
-                  </>
-                )}
-              </p>
-              <Progress value={overallScore ?? 0} className="mt-3 h-1.5" />
-              {activeSlice.computedAt.analyze &&
-                Date.now() - (activeSlice.computedAt.analyze ?? 0) > 5 * 60 * 1000 && (
-                  <p className="mt-2 text-[10px] text-muted-foreground">
-                    computed {formatRelativeMinutes(activeSlice.computedAt.analyze)}
-                  </p>
-                )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Extractable Chunks
-                </span>
-                <SplitSquareVertical className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <p
-                className="text-3xl font-semibold text-foreground tracking-tight"
-                data-testid="stat-chunks"
-              >
-                {chunkStats ? (
-                  <>
-                    {chunkStats.extractableChunks}
-                    <span className="text-lg text-muted-foreground">/{chunkStats.totalChunks}</span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </p>
-              {activeSlice.computedAt.chunks &&
-                Date.now() - (activeSlice.computedAt.chunks ?? 0) > 5 * 60 * 1000 && (
-                  <p className="mt-2 text-[10px] text-muted-foreground">
-                    computed {formatRelativeMinutes(activeSlice.computedAt.chunks)}
-                  </p>
-                )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Schema Coverage
-                </span>
-                <Code className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <p
-                className="text-3xl font-semibold text-foreground tracking-tight"
-                data-testid="stat-schema"
-              >
-                {schemaAudits.length === 0 ? (
-                  <span className="text-muted-foreground">—</span>
-                ) : (
-                  <>
-                    {schemaAudits.filter((s) => s.present).length}
-                    <span className="text-lg text-muted-foreground">/{schemaAudits.length}</span>
-                  </>
-                )}
-              </p>
-              {activeSlice.computedAt.schema &&
-                Date.now() - (activeSlice.computedAt.schema ?? 0) > 5 * 60 * 1000 && (
-                  <p className="mt-2 text-[10px] text-muted-foreground">
-                    computed {formatRelativeMinutes(activeSlice.computedAt.schema)}
-                  </p>
-                )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Pipeline Status
-                </span>
-                <Workflow className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <p
-                className="text-3xl font-semibold text-foreground tracking-tight"
-                data-testid="stat-pipeline"
-              >
-                {pipelineStages.length === 0 ? (
-                  <span className="text-muted-foreground">—</span>
-                ) : (
-                  <>
-                    {pipelineStages.filter((s) => s.status === "pass").length}
-                    <span className="text-lg text-muted-foreground">/{pipelineStages.length}</span>
-                  </>
-                )}
-              </p>
-              {activeSlice.computedAt.pipeline &&
-                Date.now() - (activeSlice.computedAt.pipeline ?? 0) > 5 * 60 * 1000 && (
-                  <p className="mt-2 text-[10px] text-muted-foreground">
-                    computed {formatRelativeMinutes(activeSlice.computedAt.pipeline)}
-                  </p>
-                )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* The four KPI cards (Overall / Chunks / Schema / Pipeline)
+            that used to sit above the tabs were removed — every number
+            was already shown one click below inside its respective tab,
+            so the strip was pure redundancy. The active scorecard
+            inside the Signals tab is now the canonical headline. */}
 
-        {/* Sticky article toolbar — visible next to whichever analyze button is on screen. */}
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-2 -mx-2 px-2 border-b">
+        {/* Sticky article toolbar — anchored below the SpineShell stage
+            tablist (which is also sticky at z-20). top-[3.5rem] keeps
+            this strip directly underneath the stage tabs so they stack
+            cleanly without overlap. The previous top-0 made this float
+            up to viewport top while the stage tabs were scrolled away
+            → audit flag "sticks under nothing". z-10 < z-20 keeps the
+            layering correct. */}
+        <div className="sticky top-[3.5rem] z-10 bg-background/95 backdrop-blur py-2 -mx-2 px-2 border-b">
           <div className="flex items-center gap-3">
             <Label className="text-sm text-muted-foreground whitespace-nowrap">Article:</Label>
             {selectedBrandId && articles.length > 0 && (
@@ -602,11 +671,29 @@ export default function GeoSignals() {
                   <SelectValue placeholder="Select article" />
                 </SelectTrigger>
                 <SelectContent>
-                  {articles.map((article) => (
-                    <SelectItem key={article.id} value={article.id}>
-                      {article.title}
-                    </SelectItem>
-                  ))}
+                  {articles.map((article) => {
+                    // Show a status pill next to non-ready articles so the
+                    // user understands why an article they just started might
+                    // be empty or unfinished. The picker now includes
+                    // drafts/generating/failed (status=all on the query).
+                    const status = (article as any).status as string | undefined;
+                    const showPill = status && status !== "ready";
+                    return (
+                      <SelectItem key={article.id} value={article.id}>
+                        <span className="flex items-center gap-2">
+                          <span className="truncate max-w-xs">{article.title}</span>
+                          {showPill && (
+                            <Badge
+                              variant={status === "failed" ? "destructive" : "outline"}
+                              className="text-[10px] uppercase"
+                            >
+                              {status}
+                            </Badge>
+                          )}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             )}
@@ -626,8 +713,20 @@ export default function GeoSignals() {
           </div>
         </div>
 
+        {/* IA collapse (2026-05-28): 5 sub-tabs → 3.
+            - "Pipeline Sim" was a self-reference. Its Signal stage was
+              literally the Scorecard's overall number echoed back (see
+              STAGE_BLURBS.Signal above). The remaining 3 stages now
+              render as a collapsible "Pipeline breakdown" panel inside
+              the Scorecard tab — same data, no separate tab.
+            - "Freshness" was a per-article-list view: it iterated over
+              every article in the brand and color-coded the
+              `updatedAt` age. The per-article freshness already shows
+              up as signal #7 inside the Scorecard, and the list view
+              is fundamentally an article-list pivot that belongs on
+              /act?tab=library, not in Diagnose. Tab removed entirely. */}
         <Tabs defaultValue="signals" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="signals" data-testid="tab-signals">
               <BarChart3 className="w-4 h-4 mr-2" /> Signal Scorecard
             </TabsTrigger>
@@ -636,12 +735,6 @@ export default function GeoSignals() {
             </TabsTrigger>
             <TabsTrigger value="schema" data-testid="tab-schema">
               <Code className="w-4 h-4 mr-2" /> Schema Lab
-            </TabsTrigger>
-            <TabsTrigger value="pipeline" data-testid="tab-pipeline">
-              <Workflow className="w-4 h-4 mr-2" /> Pipeline Sim
-            </TabsTrigger>
-            <TabsTrigger value="freshness" data-testid="tab-freshness">
-              <Clock className="w-4 h-4 mr-2" /> Freshness
             </TabsTrigger>
           </TabsList>
 
@@ -727,7 +820,7 @@ export default function GeoSignals() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <div className="flex items-end">
+                  <div className="flex items-end gap-2">
                     <Button
                       onClick={handleAnalyzeArticle}
                       disabled={!selectedArticle || analyzeSignalsMutation.isPending}
@@ -741,224 +834,275 @@ export default function GeoSignals() {
                       )}
                       Analyze Signals
                     </Button>
+                    {/* Cancel button — appears while the request is in
+                        flight. Aborts via the AbortController stored in
+                        analyzeAbortRef so the user isn't stuck waiting
+                        on a 30-second call they regret. */}
+                    {analyzeSignalsMutation.isPending && (
+                      <Button
+                        variant="outline"
+                        onClick={() => analyzeAbortRef.current?.abort()}
+                        data-testid="button-analyze-cancel"
+                      >
+                        Cancel
+                      </Button>
+                    )}
                   </div>
                 </div>
 
                 {signalScores.length > 0 && (
                   <div className="space-y-4">
-                    {signalScores.map((signal, idx) => (
-                      <div key={idx} className="p-4 bg-muted/30 rounded-lg border">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(signal.status)}
-                            <span className="font-medium text-foreground">{signal.signal}</span>
-                          </div>
-                          <span
-                            className={`font-bold ${getScoreColor(signal.score, signal.maxScore)}`}
+                    {/* Honest headline score. The denominator is the
+                        sum of applicable maxScores (Freshness drops out
+                        when the article has no updatedAt; Authority's
+                        schema sub-score drops out when no schema audit
+                        is on file). So 100% is reachable when every
+                        input was measurable — the previous "X / 100"
+                        could never reach 100 because the underlying
+                        sum capped at 90 (and 86 in production with the
+                        Schema chain broken). */}
+                    {overallScore !== null && (
+                      <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                            Overall score
+                          </p>
+                          <p
+                            className="text-3xl font-semibold text-foreground tracking-tight"
+                            data-testid="stat-overall"
                           >
-                            {signal.score}/{signal.maxScore}
+                            {overallScore}
+                            <span className="text-lg text-muted-foreground">%</span>
+                          </p>
+                        </div>
+                        <Progress value={overallScore} className="w-1/2 h-2" />
+                      </div>
+                    )}
+                    {signalScores
+                      .filter((signal) => signal.maxScore > 0)
+                      .map((signal, idx) => (
+                        <div key={idx} className="p-4 bg-muted/30 rounded-lg border">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(signal.status)}
+                              <span className="font-medium text-foreground">{signal.signal}</span>
+                              {SIGNAL_BLURBS[signal.signal] && (
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="text-muted-foreground hover:text-foreground"
+                                      aria-label={`How "${signal.signal}" is measured`}
+                                    >
+                                      <HelpCircle className="w-3.5 h-3.5" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="text-sm" align="start">
+                                    <p className="font-medium text-foreground mb-1">
+                                      How this signal is measured
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                      {SIGNAL_BLURBS[signal.signal]}
+                                    </p>
+                                  </PopoverContent>
+                                </Popover>
+                              )}
+                            </div>
+                            <span
+                              className={`font-bold ${getScoreColor(signal.score, signal.maxScore)}`}
+                            >
+                              {signal.score}/{signal.maxScore}
+                            </span>
+                          </div>
+                          <Progress
+                            value={(signal.score / signal.maxScore) * 100}
+                            className="h-2 mb-2"
+                          />
+                          {signal.recommendations.length > 0 && (
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                              {signal.recommendations.map((rec, rIdx) => (
+                                <li key={rIdx} className="flex items-start gap-2">
+                                  <ChevronRight className="w-3 h-3 mt-1 text-primary" />
+                                  {rec}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    {/* Surface signals we couldn't score (maxScore=0)
+                        so the user knows WHY they couldn't, instead of
+                        a silent omission. */}
+                    {signalScores
+                      .filter((signal) => signal.maxScore === 0)
+                      .map((signal, idx) => (
+                        <div
+                          key={`na-${idx}`}
+                          className="p-3 bg-muted/20 rounded-lg border border-dashed text-sm text-muted-foreground flex items-center gap-2"
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                          <span>
+                            <span className="font-medium text-foreground">{signal.signal}</span> —{" "}
+                            {signal.recommendations[0] ?? "Not applicable for this article."}
                           </span>
                         </div>
-                        <Progress
-                          value={(signal.score / signal.maxScore) * 100}
-                          className="h-2 mb-2"
-                        />
-                        {signal.recommendations.length > 0 && (
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            {signal.recommendations.map((rec, rIdx) => (
-                              <li key={rIdx} className="flex items-start gap-2">
-                                <ChevronRight className="w-3 h-3 mt-1 text-primary" />
-                                {rec}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
 
                 {signalScores.length === 0 && !analyzeSignalsMutation.isPending && (
                   <EmptyState
                     icon={BarChart3}
-                    title="Select an article and run analysis"
-                    description="Get scores for the 6 content signals plus freshness"
+                    title={
+                      selectedArticle
+                        ? "Pick a target query and run analysis"
+                        : "Select an article above to begin"
+                    }
+                    description="Get honest scores for the 7 content signals — only what's measurable counts toward the headline %."
                   />
                 )}
               </CardContent>
             </Card>
 
-            <Collapsible defaultOpen={false}>
-              <Card>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover-elevate">
-                    <CardTitle className="text-foreground flex items-center gap-2">
-                      <Target className="w-5 h-5 text-primary" />
-                      How these signals are scored
-                      <ChevronDown className="w-4 h-4 ml-auto text-muted-foreground" />
-                    </CardTitle>
-                    <CardDescription className="text-muted-foreground">
-                      Each label below matches what we actually compute. No fiction.
-                    </CardDescription>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent>
-                    <div className="space-y-4 text-sm">
-                      <div className="p-4 bg-muted/30 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="w-5 h-5 text-primary" />
-                          <span className="font-semibold text-foreground text-base">
-                            1. Content depth
-                          </span>
-                        </div>
-                        <p className="text-foreground mb-3">
-                          The length + heading structure of your article. AI search prefers
-                          comprehensive pages with clear H2/H3 hierarchy.
-                        </p>
-                        <div className="space-y-2 text-muted-foreground">
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>1500+ words across clear sections</span>
-                          </p>
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>Use both H2 for top sections and H3 for sub-points</span>
-                          </p>
-                        </div>
-                      </div>
+            {/* 2026-05-28: the 171-line "How signals are scored" inline
+                Collapsible was replaced by per-signal `?` tooltips
+                rendered next to each signal name in the scorecard.
+                Documentation now sits beside the data it explains
+                instead of taking over the page. See SIGNAL_BLURBS above. */}
 
-                      <div className="p-4 bg-muted/30 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Brain className="w-5 h-5 text-chart-1" />
-                          <span className="font-semibold text-foreground text-base">
-                            2. Semantic similarity to query
-                          </span>
-                        </div>
-                        <p className="text-foreground mb-3">
-                          How closely the ideas in your article match the target query. We compute
-                          this with real text embeddings — not keyword matching.
-                        </p>
-                        <div className="space-y-2 text-muted-foreground">
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>Answer the question directly in the first paragraph</span>
-                          </p>
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>Use the query's concepts and related terminology naturally</span>
-                          </p>
-                        </div>
-                      </div>
+            {/* Pipeline breakdown — was a separate sub-tab; now an
+                inline collapsible because its "Signal" stage is the
+                same number as the Scorecard above and the other 3
+                stages are just derived views of the same content+query.
+                Hidden by default to keep the page calm; only opens
+                when the user wants the 4-stage decomposition. */}
+            <Collapsible className="-mt-2">
+              <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3 text-left hover:bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Workflow className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Pipeline breakdown</span>
+                  <span className="text-xs text-muted-foreground">
+                    Prepare → Retrieve → Signal → Serve
+                  </span>
+                </div>
+                <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-4">
+                <div className="flex items-center gap-2 px-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedArticle && selectedArticle.content) {
+                        simulatePipelineMutation.mutate({
+                          content: selectedArticle.content,
+                          query: targetQuery || selectedArticle.title || "",
+                          articleUpdatedAt: selectedArticle.updatedAt
+                            ? new Date(selectedArticle.updatedAt).toISOString()
+                            : undefined,
+                        });
+                      }
+                    }}
+                    disabled={!selectedArticle || simulatePipelineMutation.isPending}
+                    data-testid="button-simulate-pipeline"
+                  >
+                    {simulatePipelineMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Workflow className="w-4 h-4 mr-2" />
+                    )}
+                    {pipelineStages.length > 0 ? "Re-run breakdown" : "Run breakdown"}
+                  </Button>
+                  {simulatePipelineMutation.isPending && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => pipelineAbortRef.current?.abort()}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                  {pipelineStages.length === 0 && !simulatePipelineMutation.isPending && (
+                    <span className="text-xs text-muted-foreground">
+                      Maps your content through the 4-stage AI-search pipeline.
+                    </span>
+                  )}
+                </div>
 
-                      <div className="p-4 bg-muted/30 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Search className="w-5 h-5 text-chart-4" />
-                          <span className="font-semibold text-foreground text-base">
-                            3. Query-term coverage
-                          </span>
+                {pipelineStages.length > 0 && (
+                  <>
+                    <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                      {pipelineStages.map((stage, idx) => (
+                        <div key={stage.stage} className="flex items-center">
+                          <div className="text-center">
+                            <div
+                              className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
+                                stage.status === "pass"
+                                  ? "bg-chart-4"
+                                  : stage.status === "warning"
+                                    ? "bg-chart-3"
+                                    : "bg-destructive"
+                              }`}
+                            >
+                              {stage.stage === "Prepare" && (
+                                <Brain className="w-6 h-6 text-white" />
+                              )}
+                              {stage.stage === "Retrieve" && (
+                                <SplitSquareVertical className="w-6 h-6 text-white" />
+                              )}
+                              {stage.stage === "Signal" && (
+                                <Activity className="w-6 h-6 text-white" />
+                              )}
+                              {stage.stage === "Serve" && (
+                                <Sparkles className="w-6 h-6 text-white" />
+                              )}
+                            </div>
+                            <p className="text-sm font-medium text-foreground">{stage.stage}</p>
+                            <p className="text-xs text-muted-foreground">{stage.score}/100</p>
+                          </div>
+                          {idx < pipelineStages.length - 1 && (
+                            <ArrowRight className="w-6 h-6 text-muted-foreground mx-4" />
+                          )}
                         </div>
-                        <p className="text-foreground mb-3">
-                          How many meaningful words from your target query appear in the article.
-                          Stopwords like "the" and "is" are filtered out — only content words count.
-                        </p>
-                        <div className="space-y-2 text-muted-foreground">
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>
-                              If the query is "best CRM for startups", the article should cover
-                              "CRM" and "startups" explicitly
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="p-4 bg-muted/30 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Target className="w-5 h-5 text-chart-3" />
-                          <span className="font-semibold text-foreground text-base">
-                            4. Exact-phrase match
-                          </span>
-                        </div>
-                        <p className="text-foreground mb-3">
-                          Whether your article contains the target query verbatim at least once. A
-                          small boost, but worth ensuring.
-                        </p>
-                      </div>
-
-                      <div className="p-4 bg-muted/30 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <SplitSquareVertical className="w-5 h-5 text-primary" />
-                          <span className="font-semibold text-foreground text-base">
-                            5. Structure extractability
-                          </span>
-                        </div>
-                        <p className="text-foreground mb-3">
-                          How many of your article's chunks are formatted as AI-friendly answer
-                          units (clear heading + direct opening answer + under 500 tokens).
-                        </p>
-                        <div className="space-y-2 text-muted-foreground">
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>Start each section with a question-style H2</span>
-                          </p>
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>
-                              Follow each heading with a 2-3 sentence direct answer before adding
-                              detail
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="p-4 bg-muted/30 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <TrendingUp className="w-5 h-5 text-chart-3" />
-                          <span className="font-semibold text-foreground text-base">
-                            6. Authority signals
-                          </span>
-                        </div>
-                        <p className="text-foreground mb-3">
-                          Real E-E-A-T markers: visible byline, outbound citations to authoritative
-                          sources, factual claims with attribution, and valid schema markup.
-                          Fiction-free.
-                        </p>
-                        <div className="space-y-2 text-muted-foreground">
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>Include a visible byline</span>
-                          </p>
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>Cite ≥3 authoritative sources with outbound links</span>
-                          </p>
-                          <p className="flex items-start gap-2">
-                            <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 flex-shrink-0" />
-                            <span>
-                              Run Schema Lab audit on this article's URL to contribute to this
-                              signal
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="p-4 bg-muted/30 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Clock className="w-5 h-5 text-cyan-500" />
-                          <span className="font-semibold text-foreground text-base">
-                            7. Freshness
-                          </span>
-                        </div>
-                        <p className="text-foreground mb-3">
-                          How recently this article was updated. ≤30 days = fresh, 30-90 = aging,
-                          90+ = stale.
-                        </p>
-                      </div>
+                      ))}
                     </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
+                    <div className="space-y-3">
+                      {pipelineStages.map((stage) => (
+                        <div key={stage.stage} className="bg-muted/30 rounded-lg border p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(stage.status)}
+                              <span className="font-medium text-foreground">{stage.stage}</span>
+                            </div>
+                            <Badge
+                              variant={
+                                stage.status === "pass"
+                                  ? "default"
+                                  : stage.status === "warning"
+                                    ? "outline"
+                                    : "destructive"
+                              }
+                            >
+                              {stage.score}/100
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            {STAGE_BLURBS[stage.stage]}
+                          </p>
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            {stage.details.map((detail, dIdx) => (
+                              <li key={dIdx} className="flex items-start gap-2">
+                                <ChevronRight className="w-3 h-3 mt-1 text-primary" />
+                                {detail}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </CollapsibleContent>
             </Collapsible>
           </TabsContent>
 
@@ -1019,6 +1163,15 @@ export default function GeoSignals() {
                     )}
                     Auto-Optimize Chunks
                   </Button>
+                  {optimizeChunksMutation.isPending && (
+                    <Button
+                      variant="outline"
+                      onClick={() => optimizeAbortRef.current?.abort()}
+                      data-testid="button-optimize-cancel"
+                    >
+                      Cancel
+                    </Button>
+                  )}
                 </div>
 
                 {chunks.length > 0 && chunkStats && (
@@ -1139,10 +1292,28 @@ export default function GeoSignals() {
           <TabsContent value="schema" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-foreground">Schema Impact Lab</CardTitle>
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  Schema Impact Lab
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="How completeness is measured"
+                      >
+                        <HelpCircle className="w-4 h-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="text-sm max-w-md" align="start">
+                      <p className="font-medium text-foreground mb-1">How this is measured</p>
+                      <p className="text-muted-foreground">{SCHEMA_LEGEND_BLURB}</p>
+                    </PopoverContent>
+                  </Popover>
+                </CardTitle>
                 <CardDescription className="text-muted-foreground">
                   Audit structured data completeness — required and recommended fields per schema
-                  type.
+                  type. Feeds the Authority signal automatically when audited URL matches the
+                  article's external URL.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1160,11 +1331,17 @@ export default function GeoSignals() {
                       data-testid="input-url"
                     />
                     <p className="mt-1 text-xs text-muted-foreground">
-                      This guesses your URL pattern. Edit if your article is hosted at a different
-                      path.
+                      {selectedArticle &&
+                      !((selectedArticle as any).externalUrl as string | undefined)?.trim()
+                        ? // Help users connect Schema Lab → Authority signal.
+                          // Without externalUrl on the article, the cache key
+                          // is wrong and the Authority signal can't pick up
+                          // the audit. Tell them how to fix it.
+                          "This article has no published URL set. Add an 'External URL' on the article editor to auto-fill — or paste any URL to audit it."
+                        : "Auto-filled from this article's external URL. Edit if you want to audit a different page."}
                     </p>
                   </div>
-                  <div className="flex items-end">
+                  <div className="flex items-end gap-2">
                     <Button
                       onClick={() => auditSchemaMutation.mutate({ url })}
                       disabled={!url || auditSchemaMutation.isPending}
@@ -1178,32 +1355,23 @@ export default function GeoSignals() {
                       )}
                       Audit Schema
                     </Button>
+                    {auditSchemaMutation.isPending && (
+                      <Button
+                        variant="outline"
+                        onClick={() => auditAbortRef.current?.abort()}
+                        data-testid="button-audit-cancel"
+                      >
+                        Cancel
+                      </Button>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
-                  <div className="text-center">
-                    <Gauge className="w-8 h-8 mx-auto text-chart-1 mb-2" />
-                    <p className="font-medium text-foreground">Completeness</p>
-                    <p className="text-xs text-muted-foreground">
-                      % of required + recommended fields populated
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <CheckCircle className="w-8 h-8 mx-auto text-chart-4 mb-2" />
-                    <p className="font-medium text-foreground">Required Fields</p>
-                    <p className="text-xs text-muted-foreground">
-                      Mandatory for Google to validate this type
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <FileText className="w-8 h-8 mx-auto text-primary mb-2" />
-                    <p className="font-medium text-foreground">Recommended Fields</p>
-                    <p className="text-xs text-muted-foreground">
-                      Lift citation odds in AI search results
-                    </p>
-                  </div>
-                </div>
+                {/* 2026-05-28: the three glossary cards (Completeness /
+                    Required / Recommended) used to render here before any
+                    audit data — pure docs, ate vertical space. Replaced
+                    with one inline help icon on the section header below;
+                    SCHEMA_LEGEND_BLURB holds the same explanation. */}
 
                 {schemaAudits.length > 0 ? (
                   <div className="space-y-4">
@@ -1302,7 +1470,8 @@ export default function GeoSignals() {
                             <button
                               type="button"
                               className="text-muted-foreground underline hover:text-foreground shrink-0"
-                              onClick={() => auditSchemaMutation.mutate({ url })}
+                              onClick={() => auditSchemaMutation.mutate({ url, force: true })}
+                              disabled={auditSchemaMutation.isPending}
                             >
                               <Clock className="w-3 h-3 inline mr-1" />
                               Re-audit
@@ -1319,21 +1488,43 @@ export default function GeoSignals() {
                                   (1000 * 60 * 60 * 24),
                               ),
                             )}{" "}
-                            day(s) ago — server caches for 7 days.
+                            day(s) ago — Re-audit forces a fresh fetch.
                           </p>
                         )}
                       </div>
                     )}
-                    {/* Render only schema types that are EITHER present on the
-                        page OR have a required field — keeps the list short
-                        and actionable. Server returns a row for every catalogued
-                        type even when absent. Skip the entire card list when
-                        the fetch failed — we already showed the error banner
-                        above, and rendering 14 "missing" cards on a failed
-                        fetch makes the error feel like real audit results. */}
+                    {/* Render only the relevant schema cards by default:
+                        types that are PRESENT on the audited page, plus a
+                        small "core" set most articles care about (Article,
+                        BlogPosting, NewsArticle, FAQPage, Organization,
+                        BreadcrumbList, WebPage, Product). The "Show all
+                        14" toggle reveals the full catalogue including
+                        Recipe / Event / LocalBusiness which were the bulk
+                        of the "it's just mimicking" noise. The original
+                        filter (.filter(s => s.present || s.required.length > 0))
+                        was a no-op because EVERY catalogued type has at
+                        least one required field. */}
+                    {schemaFetched && (
+                      <div className="flex items-center justify-end -mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAllSchemaTypes((v) => !v)}
+                          className="text-xs text-muted-foreground underline hover:text-foreground"
+                        >
+                          {showAllSchemaTypes
+                            ? `Hide irrelevant schema types`
+                            : `Show all 14 schema types`}
+                        </button>
+                      </div>
+                    )}
                     {schemaFetched &&
                       schemaAudits
-                        .filter((schema) => schema.present || schema.required.length > 0)
+                        .filter(
+                          (schema) =>
+                            showAllSchemaTypes ||
+                            schema.present ||
+                            CORE_SCHEMA_TYPES.has(schema.schemaType),
+                        )
                         .map((schema, idx) => {
                           const requiredSet = new Set(schema.required);
                           const recommendedSet = new Set(schema.recommended);
@@ -1461,274 +1652,6 @@ export default function GeoSignals() {
                     description="See which required and recommended fields are populated for each schema type."
                   />
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="pipeline" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-foreground">Pipeline Simulation Tool</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Map your content through Google's 4-stage AI pipeline: Prepare → Retrieve → Signal
-                  → Serve
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-4">
-                  <Button
-                    onClick={() => {
-                      if (selectedArticle && selectedArticle.content) {
-                        simulatePipelineMutation.mutate({
-                          content: selectedArticle.content,
-                          query: targetQuery || selectedArticle.title || "",
-                          articleUpdatedAt: selectedArticle.updatedAt
-                            ? new Date(selectedArticle.updatedAt).toISOString()
-                            : undefined,
-                        });
-                      }
-                    }}
-                    disabled={!selectedArticle || simulatePipelineMutation.isPending}
-                    className="bg-primary hover:bg-primary/90"
-                    data-testid="button-simulate-pipeline"
-                  >
-                    {simulatePipelineMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Workflow className="w-4 h-4 mr-2" />
-                    )}
-                    Simulate Pipeline
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                  {["Prepare", "Retrieve", "Signal", "Serve"].map((stage, idx) => (
-                    <div key={stage} className="flex items-center">
-                      <div className="text-center">
-                        <div
-                          className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
-                            pipelineStages[idx]?.status === "pass"
-                              ? "bg-chart-4"
-                              : pipelineStages[idx]?.status === "warning"
-                                ? "bg-chart-3"
-                                : pipelineStages[idx]?.status === "fail"
-                                  ? "bg-destructive"
-                                  : "bg-muted"
-                          }`}
-                        >
-                          {stage === "Prepare" && <Brain className="w-6 h-6 text-white" />}
-                          {stage === "Retrieve" && (
-                            <SplitSquareVertical className="w-6 h-6 text-white" />
-                          )}
-                          {stage === "Signal" && <Activity className="w-6 h-6 text-white" />}
-                          {stage === "Serve" && <Sparkles className="w-6 h-6 text-white" />}
-                        </div>
-                        <p className="text-sm font-medium text-foreground">{stage}</p>
-                        {pipelineStages[idx] && (
-                          <p className="text-xs text-muted-foreground">
-                            {pipelineStages[idx].score}/100
-                          </p>
-                        )}
-                      </div>
-                      {idx < 3 && <ArrowRight className="w-6 h-6 text-muted-foreground mx-4" />}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-4">
-                  {["Prepare", "Retrieve", "Signal", "Serve"].map((stageName, idx) => {
-                    const stage = pipelineStages[idx];
-                    return (
-                      <div
-                        key={stageName}
-                        className="bg-muted/30 rounded-lg border overflow-hidden"
-                      >
-                        <div className="p-4 text-sm text-muted-foreground border-b bg-muted/20">
-                          <span className="font-medium text-foreground">{stageName}.</span>{" "}
-                          {STAGE_BLURBS[stageName]}
-                        </div>
-                        {stage ? (
-                          <div className="p-4 border-t border-dashed">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                {getStatusIcon(stage.status)}
-                                <span className="font-medium text-foreground">
-                                  Computed diagnostic
-                                </span>
-                              </div>
-                              <Badge
-                                variant={
-                                  stage.status === "pass"
-                                    ? "default"
-                                    : stage.status === "warning"
-                                      ? "outline"
-                                      : "destructive"
-                                }
-                              >
-                                {stage.score}/100
-                              </Badge>
-                            </div>
-                            <ul className="text-sm text-muted-foreground space-y-1">
-                              {stage.details.map((detail, dIdx) => (
-                                <li key={dIdx} className="flex items-start gap-2">
-                                  <ChevronRight className="w-3 h-3 mt-1 text-primary" />
-                                  {detail}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : (
-                          <div className="p-4 text-sm text-muted-foreground italic">
-                            Run Simulate Pipeline to see this stage's diagnostic.
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="freshness" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-foreground">Freshness Automation</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Track content age decay and schedule updates before freshness score drops
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-chart-4/10 border border-chart-4/30 rounded-lg text-center">
-                    <Timer className="w-8 h-8 mx-auto text-chart-4 mb-2" />
-                    <p className="text-2xl font-bold text-foreground">
-                      {
-                        articles.filter((a) => {
-                          if (!a.updatedAt) return false;
-                          const age =
-                            (Date.now() - new Date(a.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
-                          return age < 30;
-                        }).length
-                      }
-                    </p>
-                    <p className="text-sm text-muted-foreground">Fresh (&lt;30 days)</p>
-                  </div>
-                  <div className="p-4 bg-chart-3/10 border border-chart-3/30 rounded-lg text-center">
-                    <Clock className="w-8 h-8 mx-auto text-chart-3 mb-2" />
-                    <p className="text-2xl font-bold text-foreground">
-                      {
-                        articles.filter((a) => {
-                          if (!a.updatedAt) return false;
-                          const age =
-                            (Date.now() - new Date(a.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
-                          return age >= 30 && age < 90;
-                        }).length
-                      }
-                    </p>
-                    <p className="text-sm text-muted-foreground">Aging (30-90 days)</p>
-                  </div>
-                  <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-center">
-                    <AlertTriangle className="w-8 h-8 mx-auto text-destructive mb-2" />
-                    <p className="text-2xl font-bold text-foreground">
-                      {
-                        articles.filter((a) => {
-                          if (!a.updatedAt) return false;
-                          const age =
-                            (Date.now() - new Date(a.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
-                          return age >= 90;
-                        }).length
-                      }
-                    </p>
-                    <p className="text-sm text-muted-foreground">Stale (&gt;90 days)</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-foreground">
-                    Content Freshness Timeline
-                  </h3>
-                  <ScrollArea className="h-[400px]">
-                    <div className="space-y-3">
-                      {articles
-                        .slice()
-                        .sort((a, b) => {
-                          const at = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-                          const bt = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-                          return at - bt;
-                        })
-                        .map((article) => {
-                          const hasTs = !!article.updatedAt;
-                          const age = hasTs
-                            ? Math.floor(
-                                (Date.now() - new Date(article.updatedAt).getTime()) /
-                                  (1000 * 60 * 60 * 24),
-                              )
-                            : null;
-                          const freshness = age === null ? 0 : Math.max(0, 100 - age);
-                          const status =
-                            age === null
-                              ? "unknown"
-                              : age < 30
-                                ? "fresh"
-                                : age < 90
-                                  ? "aging"
-                                  : "stale";
-
-                          return (
-                            <div key={article.id} className="p-4 bg-muted/30 rounded-lg border">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="font-medium text-foreground truncate max-w-md">
-                                  {article.title}
-                                </span>
-                                <Badge
-                                  variant={
-                                    status === "fresh"
-                                      ? "default"
-                                      : status === "aging"
-                                        ? "outline"
-                                        : status === "stale"
-                                          ? "destructive"
-                                          : "secondary"
-                                  }
-                                >
-                                  {age === null ? "No update timestamp" : `${age} days old`}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                <Progress value={freshness} className="flex-1 h-2" />
-                                <span
-                                  className={`text-sm font-medium ${
-                                    status === "fresh"
-                                      ? "text-chart-4"
-                                      : status === "aging"
-                                        ? "text-chart-3"
-                                        : status === "stale"
-                                          ? "text-destructive"
-                                          : "text-muted-foreground"
-                                  }`}
-                                >
-                                  {age === null ? "—" : `${freshness}%`}
-                                </span>
-                                {status !== "fresh" && status !== "unknown" && (
-                                  <Link href={`/articles?edit=${article.id}`}>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      data-testid={`button-open-editor-${article.id}`}
-                                    >
-                                      <Pencil className="w-3 h-3 mr-1" />
-                                      Open in editor
-                                    </Button>
-                                  </Link>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </ScrollArea>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>

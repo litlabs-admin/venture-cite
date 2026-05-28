@@ -30,6 +30,12 @@ export type RecommendationState = {
    *  runs completed yet. */
   citationRate: number | null;
   lastSignalsScanAt: Date | null;
+  /** Phase 6 — Pulse cross-feature. Most recent Signals scan's
+   *  overallScore as a 0..100 percentage. Null when no scan has been
+   *  run, or when the row predates the percentage representation. Lets
+   *  the engine fire different recs based on RESULT quality, not just
+   *  scan staleness. */
+  lastSignalsScore: number | null;
   visibilityChecklistCompleted: number;
   visibilityChecklistTotal: number;
   competitorCount: number;
@@ -38,6 +44,7 @@ export type RecommendationState = {
 };
 
 const SIGNALS_STALE_DAYS = 14;
+const SIGNALS_LOW_SCORE = 40; // below this, fire the "fix low score" rec
 const LOW_CITATION_RATE = 0.2;
 const VISIBILITY_INCOMPLETE_THRESHOLD = 0.5;
 const MAX_RECOMMENDATIONS = 5;
@@ -160,7 +167,16 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
     });
   }
 
-  // 8. Signals scan stale or never run.
+  // 8. Signals: fork on (stale | low-score | ok). The previous engine
+  // only knew about staleness and fired the same "re-run scan" rec
+  // regardless of whether the last scan came back at 12% or 88%. Now:
+  //
+  //   - No scan yet OR stale → "Run scan" / "Re-run scan" (same rec).
+  //   - Recent scan with low score → "Fix Signals score" (different
+  //     rec, different copy, points at concrete next actions).
+  //   - Recent high-score scan → no rec.
+  //
+  // Both branches use category="signals" and remain dismissible.
   const signalsStale =
     state.lastSignalsScanAt === null ||
     Date.now() - state.lastSignalsScanAt.getTime() > SIGNALS_STALE_DAYS * MS_PER_DAY;
@@ -173,6 +189,20 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
           ? "GEO Signals scores chunkability, schema, and FAQ — never run for this brand."
           : `Last scan was ${Math.floor((Date.now() - state.lastSignalsScanAt.getTime()) / MS_PER_DAY)} days ago.`,
       ctaLabel: "Run scan",
+      ctaHref: `/diagnose?tab=signals&brandId=${brandId}`,
+      priority: "P1",
+      category: "signals",
+      dismissible: true,
+    });
+  } else if (
+    typeof state.lastSignalsScore === "number" &&
+    state.lastSignalsScore < SIGNALS_LOW_SCORE
+  ) {
+    recs.push({
+      id: "fix-low-signals-score",
+      title: `Improve GEO Signals score (${state.lastSignalsScore}%)`,
+      why: "Your last scan came back below 40%. The top fixes are usually external citations, a JSON-LD schema audit, and adding direct-answer chunks.",
+      ctaLabel: "Open Signal Scorecard",
       ctaHref: `/diagnose?tab=signals&brandId=${brandId}`,
       priority: "P1",
       category: "signals",

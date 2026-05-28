@@ -1,7 +1,7 @@
 // Plan 5 Task 3: dashboard recommendations input plumbing.
 //
 // Verifies the `GET /api/brands/:brandId/recommendations` handler:
-//   - Plumbs `storage.getLastGeoSignalRunAt(brandId)` -> state.lastSignalsScanAt.
+//   - Plumbs `storage.getLastGeoSignalSummary(brandId)` -> state.lastSignalsScanAt.
 //   - Plumbs `storage.getVisibilityProgress(brandId).length` -> state.visibilityChecklistCompleted.
 //   - Plumbs the shared VISIBILITY_CHECKLIST_TOTAL constant as the denominator.
 //   - As a behavioural consequence, P1 rules #8 (rerun-geo-signals) and
@@ -25,7 +25,7 @@ const stubs = vi.hoisted(() => ({
   getCommunityPosts: vi.fn(),
   getFaqItems: vi.fn(),
   getVisibilityProgress: vi.fn(),
-  getLastGeoSignalRunAt: vi.fn(),
+  getLastGeoSignalSummary: vi.fn(),
 }));
 
 vi.mock("../../server/storage", () => ({
@@ -38,7 +38,7 @@ vi.mock("../../server/storage", () => ({
     getCommunityPosts: stubs.getCommunityPosts,
     getFaqItems: stubs.getFaqItems,
     getVisibilityProgress: stubs.getVisibilityProgress,
-    getLastGeoSignalRunAt: stubs.getLastGeoSignalRunAt,
+    getLastGeoSignalSummary: stubs.getLastGeoSignalSummary,
     // Unused-but-imported by the dashboard module — stub permissively
     // so module init doesn't blow up.
     getMetricsHistory: vi.fn(),
@@ -161,7 +161,7 @@ function applyBaselineMocks() {
   stubs.getCommunityPosts.mockResolvedValue([]);
   stubs.getFaqItems.mockResolvedValue([{ id: "f-1" }]);
   stubs.getVisibilityProgress.mockResolvedValue([]);
-  stubs.getLastGeoSignalRunAt.mockResolvedValue(null);
+  stubs.getLastGeoSignalSummary.mockResolvedValue(null);
 }
 
 beforeEach(() => {
@@ -171,20 +171,25 @@ beforeEach(() => {
 
 describe("GET /api/brands/:brandId/recommendations state assembly", () => {
   it("passes the last geo_signal_runs.ran_at as lastSignalsScanAt", async () => {
-    const scanAt = new Date("2026-05-10T12:00:00.000Z");
-    stubs.getLastGeoSignalRunAt.mockResolvedValue(scanAt);
+    // 2026-05-28: signature now returns { ranAt, overallScore } so the
+    // engine can fork on result quality, not just staleness. scanAt is
+    // relative (2 days ago) so the staleness window (14d) doesn't kick
+    // in as the test calendar moves forward.
+    const scanAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    stubs.getLastGeoSignalSummary.mockResolvedValue({ ranAt: scanAt, overallScore: 85 });
 
     const r = await call(app, "GET", `/api/brands/${BRAND_ID}/recommendations`);
 
     expect(r.status).toBe(200);
-    expect(stubs.getLastGeoSignalRunAt).toHaveBeenCalledWith(BRAND_ID);
+    expect(stubs.getLastGeoSignalSummary).toHaveBeenCalledWith(BRAND_ID);
     // Rule #8 must NOT fire when scan was 2 days ago (< 14-day stale window).
     const ids = (r.body.data as Array<{ id: string }>).map((rec) => rec.id);
     expect(ids).not.toContain("rerun-geo-signals");
+    expect(ids).not.toContain("fix-low-signals-score");
   });
 
   it("treats null lastSignalsScanAt as 'never scanned' (rule #8 fires)", async () => {
-    stubs.getLastGeoSignalRunAt.mockResolvedValue(null);
+    stubs.getLastGeoSignalSummary.mockResolvedValue(null);
 
     const r = await call(app, "GET", `/api/brands/${BRAND_ID}/recommendations`);
 
@@ -215,7 +220,7 @@ describe("GET /api/brands/:brandId/recommendations state assembly", () => {
 
   it("rule #8 does NOT fire when last scan was 1 day ago", async () => {
     const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
-    stubs.getLastGeoSignalRunAt.mockResolvedValue(oneDayAgo);
+    stubs.getLastGeoSignalSummary.mockResolvedValue({ ranAt: oneDayAgo, overallScore: 80 });
 
     const r = await call(app, "GET", `/api/brands/${BRAND_ID}/recommendations`);
 
@@ -224,12 +229,32 @@ describe("GET /api/brands/:brandId/recommendations state assembly", () => {
     expect(ids).not.toContain("rerun-geo-signals");
   });
 
+  it("fires fix-low-signals-score when the latest fresh scan returned a low overall score", async () => {
+    // Recent scan (no staleness rec) but score below SIGNALS_LOW_SCORE (40).
+    // This is the new Phase 6 cross-feature link: Pulse now reads the
+    // actual scan result, not just the timestamp.
+    stubs.getLastGeoSignalSummary.mockResolvedValue({
+      ranAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      overallScore: 25,
+    });
+
+    const r = await call(app, "GET", `/api/brands/${BRAND_ID}/recommendations`);
+
+    expect(r.status).toBe(200);
+    const ids = (r.body.data as Array<{ id: string }>).map((rec) => rec.id);
+    expect(ids).not.toContain("rerun-geo-signals");
+    expect(ids).toContain("fix-low-signals-score");
+  });
+
   it("rule #9 does NOT fire when > 50% of the checklist is complete", async () => {
     // 30 / 57 > 50% — rule #9 must drop out.
     const completedRows = Array.from({ length: 30 }, (_, i) => ({ id: `v-${i}` }));
     stubs.getVisibilityProgress.mockResolvedValue(completedRows);
     // Keep last-scan recent too so the response isn't dominated by rule #8.
-    stubs.getLastGeoSignalRunAt.mockResolvedValue(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    stubs.getLastGeoSignalSummary.mockResolvedValue({
+      ranAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      overallScore: 80,
+    });
 
     const r = await call(app, "GET", `/api/brands/${BRAND_ID}/recommendations`);
 

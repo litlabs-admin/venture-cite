@@ -528,6 +528,10 @@ export function setupDashboardRoutes(app: Express): void {
         const brandId = brand.id;
 
         // Parallel-load all the count/state queries the engine needs.
+        // 2026-05-28: replaced getLastGeoSignalRunAt (timestamp-only)
+        // with getLastGeoSignalSummary (timestamp + overall score) so
+        // the engine can fork the Signals rec on staleness vs result
+        // quality. One query instead of two.
         const [
           articles,
           prompts,
@@ -536,7 +540,7 @@ export function setupDashboardRoutes(app: Express): void {
           communityPosts,
           faqItems,
           visibilityRows,
-          lastSignalsScanAt,
+          lastSignalsSummary,
         ] = await Promise.all([
           storage.getArticlesByUserIdWithStatus(user.id, { brandId, limit: 100, offset: 0 }),
           storage.getBrandPromptsByBrandId(brandId),
@@ -545,7 +549,7 @@ export function setupDashboardRoutes(app: Express): void {
           storage.getCommunityPosts(brandId),
           storage.getFaqItems(brandId),
           storage.getVisibilityProgress(brandId),
-          storage.getLastGeoSignalRunAt(brandId),
+          storage.getLastGeoSignalSummary(brandId),
         ]);
 
         // Citation rate from the most recent COMPLETED run. Null if no runs
@@ -565,7 +569,8 @@ export function setupDashboardRoutes(app: Express): void {
           promptCount: prompts.length,
           citationRunCount: citationRuns.length,
           citationRate,
-          lastSignalsScanAt,
+          lastSignalsScanAt: lastSignalsSummary?.ranAt ?? null,
+          lastSignalsScore: lastSignalsSummary?.overallScore ?? null,
           visibilityChecklistCompleted: visibilityRows.length,
           visibilityChecklistTotal: VISIBILITY_CHECKLIST_TOTAL,
           competitorCount: competitors.length,

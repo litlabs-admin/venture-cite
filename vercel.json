@@ -4,7 +4,6 @@
   "outputDirectory": "dist/public",
   "functions": {
     "api/index.ts": {
-      "//": "Pro tier: 60s function timeout. On Hobby, change maxDuration to 10 and set env VERCEL_FUNCTION_BUDGET_MS=10000 so server/lib/factAgent/v2/vercelBudget.ts derives Hobby-safe LLM/Jina/Wikidata/fetch/SSE/cron timeouts. Memory must stay >=1024 for Sharp + Playwright-rendered Jina markdown.",
       "maxDuration": 60,
       "memory": 1024,
       "includeFiles": "api/_bundle.js"

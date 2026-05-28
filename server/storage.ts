@@ -193,6 +193,11 @@ export interface IStorage {
   // GEO Signal run history (powers `lastSignalsScanAt` recommendation input).
   recordGeoSignalRun(run: InsertGeoSignalRun): Promise<GeoSignalRun>;
   getLastGeoSignalRunAt(brandId: string): Promise<Date | null>;
+  /** Returns the latest scan's timestamp AND overall score so Pulse
+   *  can fire different recs for stale vs low-scoring scans. */
+  getLastGeoSignalSummary(
+    brandId: string,
+  ): Promise<{ ranAt: Date; overallScore: number | null } | null>;
 
   // Citation run history
   createCitationRun(run: InsertCitationRun): Promise<CitationRun>;

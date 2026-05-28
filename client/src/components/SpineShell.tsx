@@ -36,8 +36,15 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
 
   return (
     <Tabs value={active} onValueChange={setTab} className="space-y-4">
+      {/* sticky so the Monitor/Diagnose/Act/Report stage tabs stay
+          on-screen when the user scrolls into a long page body.
+          Without this, child sticky toolbars (e.g. the article picker
+          on the Signals page) had nothing to anchor against and looked
+          orphaned at the top of the viewport. backdrop-blur keeps the
+          underlying scroll visible so the sticky element doesn't feel
+          like a hard banner. */}
       <TabsList
-        className="grid h-auto w-full gap-1"
+        className="grid h-auto w-full gap-1 sticky top-0 z-20 bg-background/95 backdrop-blur"
         style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
       >
         {tabs.map((t) => {

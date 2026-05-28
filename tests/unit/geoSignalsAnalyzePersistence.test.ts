@@ -78,12 +78,28 @@ vi.mock("../../server/lib/geoSignalsScoring", () => ({
   ]),
   cosineSimilarity: vi.fn(() => 1),
   stopwordFilterQuery: vi.fn((q: string) => q.split(/\s+/).filter(Boolean)),
-  detectBylines: vi.fn(() => []),
-  detectCitations: vi.fn(() => []),
-  detectFactualClaims: vi.fn(() => []),
+  // Real shapes — the route reads .found, .count, .matches, .headings
+  // etc. from each return value, so empty arrays caused 500s when the
+  // 2026-05-28 audit added bucketize/sanitisePromptField + threaded
+  // ownDomain into detectCitations.
+  detectBylines: vi.fn(() => ({ found: false, authors: [] })),
+  detectCitations: vi.fn(() => ({ urls: [], count: 0, selfLinkCount: 0 })),
+  detectFactualClaims: vi.fn(() => ({ count: 0, matches: [] })),
   countContentWords: vi.fn(() => 1200),
-  detectHeadings: vi.fn(() => ({ hasHierarchy: true, h2: ["## What?"], h3: [] })),
+  detectHeadings: vi.fn(() => ({
+    count: 2,
+    hasHierarchy: true,
+    headings: [
+      { level: 2, text: "What?" },
+      { level: 3, text: "How?" },
+    ],
+  })),
   STOPWORDS: new Set<string>(),
+  // 2026-05-28 additions used by computeSignals + optimize-chunks.
+  bucketize: vi.fn((r: number) =>
+    r >= 0.8 ? "excellent" : r >= 0.6 ? "good" : r >= 0.4 ? "needs_improvement" : "poor",
+  ),
+  sanitisePromptField: vi.fn((s: string | null | undefined) => (s ?? "").trim().slice(0, 120)),
 }));
 
 // db — analyze handler itself doesn't touch db directly, but importing the
@@ -201,9 +217,11 @@ describe("POST /api/geo-signals/analyze persistence", () => {
       articleId: ARTICLE_ID,
     });
     expect(typeof payload.overallScore === "number" || payload.overallScore === null).toBe(true);
-    expect(payload.payload).toBeDefined();
-    expect(payload.payload).toHaveProperty("signals");
-    expect(payload.payload).toHaveProperty("wordCount");
+    // 2026-05-28: the heavy `payload` jsonb column was dropped in
+    // migration 0080. Persistence is now just (brandId, articleId,
+    // overallScore) — Pulse + Inspector are the only readers and
+    // neither needs the per-signal recommendations breakdown.
+    expect(payload).not.toHaveProperty("payload");
   });
 
   it("does NOT insert when brandId is omitted (back-compat for ad-hoc usage)", async () => {

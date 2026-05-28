@@ -563,7 +563,10 @@ export const geoSignalRuns = pgTable(
     }),
     ranAt: timestamp("ran_at").defaultNow().notNull(),
     overallScore: integer("overall_score"),
-    payload: jsonb("payload"),
+    // 2026-05-28: payload jsonb column dropped (migration 0080) — it
+    // was write-only, up to 32 KB per row, never read by any consumer.
+    // overallScore + ranAt cover everything the Pulse engine and
+    // Inspector actually need.
   },
   (table) => [index("geo_signal_runs_brand_id_ran_at_idx").on(table.brandId, table.ranAt.desc())],
 );
@@ -1806,9 +1809,11 @@ export const schemaAudits = pgTable(
     urlHash: text("url_hash").notNull(),
     url: text("url").notNull(),
     // Full audit result payload (detected schemas, raw JSON-LD, etc).
+    // The `additionalTypes` array lives inside this jsonb as
+    // `payload.additionalTypes`; the old top-level `additional_types`
+    // sidecar column was dropped in migration 0080 — it duplicated
+    // data already inside `schemas`.
     schemas: jsonb("schemas").notNull(),
-    // Flat list of extra schema.org @types discovered on the page.
-    additionalTypes: text("additional_types").array(),
     // Per-type completeness scores, e.g. { Article: 0.75, FAQPage: 0.4 }.
     completenessByType: jsonb("completeness_by_type"),
     fetchedAt: timestamp("fetched_at").defaultNow().notNull(),

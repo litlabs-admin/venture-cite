@@ -108,17 +108,69 @@ function cacheSet(key: string, v: number[]): void {
   }
 }
 
+// Module-level counters for telemetry. Reported to logs every
+// EMBED_REPORT_INTERVAL_MS so the operator can spot cache-hit
+// regressions and embedding-spend spikes. Per-instance, but that's
+// acceptable for a coarse signal — Sentry/Datadog can aggregate.
+const embedStats = {
+  totalCalls: 0,
+  totalInputs: 0,
+  cacheHits: 0,
+  cacheMisses: 0,
+  apiErrors: 0,
+  estimatedSpendCents: 0,
+  lastReportAt: Date.now(),
+};
+const EMBED_REPORT_INTERVAL_MS = 5 * 60 * 1000; // 5 min
+// text-embedding-3-small is $0.02 / 1M tokens. We approximate tokens as
+// ceil(chars / 4) — close enough for spend telemetry. The output dim
+// doesn't matter for billing.
+const EMBED_PRICE_PER_M_TOKENS_CENTS = 2;
+
+function maybeReportEmbedStats(): void {
+  if (Date.now() - embedStats.lastReportAt < EMBED_REPORT_INTERVAL_MS) return;
+  embedStats.lastReportAt = Date.now();
+  const total = embedStats.cacheHits + embedStats.cacheMisses;
+  const hitRate = total > 0 ? embedStats.cacheHits / total : 0;
+  logger.info(
+    {
+      calls: embedStats.totalCalls,
+      inputs: embedStats.totalInputs,
+      cacheHits: embedStats.cacheHits,
+      cacheMisses: embedStats.cacheMisses,
+      hitRate: Number(hitRate.toFixed(3)),
+      apiErrors: embedStats.apiErrors,
+      estimatedSpendCents: Number(embedStats.estimatedSpendCents.toFixed(2)),
+    },
+    "embedBatch: 5m stats roll-up",
+  );
+  // Reset counters so each window is independent.
+  embedStats.totalCalls = 0;
+  embedStats.totalInputs = 0;
+  embedStats.cacheHits = 0;
+  embedStats.cacheMisses = 0;
+  embedStats.apiErrors = 0;
+  embedStats.estimatedSpendCents = 0;
+}
+
 export async function embedBatch(texts: string[]): Promise<number[][]> {
   if (!texts || texts.length === 0) return [];
   const cleaned = texts.map((t) => (typeof t === "string" && t.length > 0 ? t : " "));
   const keys = cleaned.map(cacheKey);
-  const result: (number[] | null)[] = keys.map((k) => cacheGet(k) ?? null);
+  embedStats.totalCalls++;
+  embedStats.totalInputs += cleaned.length;
+  const result: (number[] | null)[] = keys.map((k) => {
+    const hit = cacheGet(k);
+    if (hit !== undefined) embedStats.cacheHits++;
+    return hit ?? null;
+  });
   const missingIdx: number[] = [];
   const missingText: string[] = [];
   for (let i = 0; i < cleaned.length; i++) {
     if (result[i] === null) {
       missingIdx.push(i);
       missingText.push(cleaned[i]);
+      embedStats.cacheMisses++;
     }
   }
   if (missingText.length > 0) {
@@ -127,6 +179,9 @@ export async function embedBatch(texts: string[]): Promise<number[][]> {
         model: "text-embedding-3-small",
         input: missingText,
       });
+      // Spend telemetry: ceil(chars/4) ≈ tokens.
+      const approxTokens = missingText.reduce((s, t) => s + Math.ceil(t.length / 4), 0);
+      embedStats.estimatedSpendCents += (approxTokens * EMBED_PRICE_PER_M_TOKENS_CENTS) / 1_000_000;
       for (let j = 0; j < missingIdx.length; j++) {
         const emb = resp.data[j]?.embedding;
         if (Array.isArray(emb)) {
@@ -138,11 +193,20 @@ export async function embedBatch(texts: string[]): Promise<number[][]> {
         }
       }
     } catch (err) {
+      embedStats.apiErrors++;
       logger.warn({ err }, "embedBatch: OpenAI embeddings call failed");
       for (const j of missingIdx) if (result[j] === null) result[j] = [];
     }
   }
+  maybeReportEmbedStats();
   return result.map((r) => r ?? []);
+}
+
+/** Test-only / debug accessor — returns a snapshot of the current
+ *  embedding-call stats. Lets the operator inspector show live
+ *  cache-hit rate without grep-ing logs. */
+export function getEmbedStats(): Readonly<typeof embedStats> {
+  return { ...embedStats };
 }
 
 export function detectBylines(content: string): { found: boolean; authors: string[] } {
@@ -159,7 +223,7 @@ export function detectBylines(content: string): { found: boolean; authors: strin
 
   const nameShape = /([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]{1,}){1,3})/;
   const prefixes: RegExp[] = [
-    /\bAuthor\s*[:\-]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/g,
+    /\bAuthor\s*[:-]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/g,
     /\bWritten\s+by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/g,
     /(?:^|[\n\r>.\s])By\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b/g,
     /(?:^|\n)\s*[-—–]{1,2}\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\s*$/gm,
@@ -183,8 +247,11 @@ export function detectBylines(content: string): { found: boolean; authors: strin
   return { found: authors.size > 0, authors: Array.from(authors) };
 }
 
-export function detectCitations(content: string): { urls: string[]; count: number } {
-  if (!content) return { urls: [], count: 0 };
+export function detectCitations(
+  content: string,
+  ownDomain?: string | null,
+): { urls: string[]; count: number; selfLinkCount: number } {
+  if (!content) return { urls: [], count: 0, selfLinkCount: 0 };
   const stripped = content.replace(/\]\(([^)]+)\)/g, " $1 ");
   const urlRe = /\bhttps?:\/\/[^\s<>"')\]]+/gi;
   const urls = new Set<string>();
@@ -193,7 +260,86 @@ export function detectCitations(content: string): { urls: string[]; count: numbe
     const cleaned = m[0].replace(/[.,;:!?)]+$/, "");
     urls.add(cleaned);
   }
-  return { urls: Array.from(urls), count: urls.size };
+  const all = Array.from(urls);
+  // Exclude same-domain links from the "external authority" count.
+  // The Authority signal cares about whether the article cites EXTERNAL
+  // sources, not whether it cross-links to itself. A footer that links
+  // to /about, /pricing, and /blog used to score +4 on citations
+  // without any actual third-party reference. ownDomain is normalised
+  // to a registrable host (no scheme, no www., no path); we treat a
+  // link as "self" if its host endsWith that.
+  const own = normaliseDomain(ownDomain);
+  let external = 0;
+  let self = 0;
+  for (const u of all) {
+    try {
+      const h = new URL(u).host.toLowerCase().replace(/^www\./, "");
+      if (own && (h === own || h.endsWith("." + own))) self++;
+      else external++;
+    } catch {
+      external++; // malformed URL — count it; we'd rather over-credit than crash.
+    }
+  }
+  return { urls: all, count: external, selfLinkCount: self };
+}
+
+function normaliseDomain(d: string | null | undefined): string | null {
+  if (!d) return null;
+  try {
+    const stripped = d
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .split(/[/?#]/)[0];
+    const lower = stripped.toLowerCase();
+    return lower.length > 0 ? lower : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Unified bucketizer — single source of truth for score → status across
+ *  every signal, the overall scorecard, and the pipeline-simulation
+ *  stages. Replaces three inconsistent threshold systems that disagreed
+ *  with each other (one used 0.85/0.6/0.3, one used 0.75/0.5/0.25, one
+ *  used 70/40). The same icon palette means the same thing everywhere. */
+export type SignalStatus = "excellent" | "good" | "needs_improvement" | "poor";
+export function bucketize(ratio: number): SignalStatus {
+  if (!Number.isFinite(ratio)) return "poor";
+  if (ratio >= 0.8) return "excellent";
+  if (ratio >= 0.6) return "good";
+  if (ratio >= 0.4) return "needs_improvement";
+  return "poor";
+}
+
+/** Strip control characters / newlines and trim. Used to sanitise
+ *  user-controlled fields (brand.name, brand.industry) before they're
+ *  interpolated into an LLM prompt — closes the self-prompt-injection
+ *  hole in /optimize-chunks. */
+export function sanitisePromptField(s: string | null | undefined, maxLen = 120): string {
+  if (!s) return "";
+  // Char-by-char so we don't need a regex containing literal control
+  // bytes (eslint no-control-regex). Strips C0 controls (0x00-0x1F)
+  // and DEL (0x7F), collapses any whitespace run to a single space,
+  // trims trailing space, and caps length. Closes the self-prompt-
+  // injection vector in /optimize-chunks where a brand name with
+  // embedded newlines could break out of the system prompt.
+  let out = "";
+  let lastWasSpace = false;
+  for (let i = 0; i < s.length && out.length < maxLen; i++) {
+    const code = s.charCodeAt(i);
+    const isControl = code < 0x20 || code === 0x7f;
+    const isSpace = code === 0x20 || isControl;
+    if (isSpace) {
+      if (!lastWasSpace && out.length > 0) {
+        out += " ";
+        lastWasSpace = true;
+      }
+    } else {
+      out += s[i];
+      lastWasSpace = false;
+    }
+  }
+  return out.trimEnd();
 }
 
 export function detectFactualClaims(content: string): { count: number; matches: string[] } {

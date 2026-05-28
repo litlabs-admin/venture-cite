@@ -816,6 +816,31 @@ export class DatabaseStorage implements IStorage {
     return row?.ranAt ? new Date(row.ranAt as string | Date) : null;
   }
 
+  /** Phase 6 — Pulse cross-feature. Returns the latest Signals run's
+   *  ranAt AND its overallScore so the recommendations engine can fire
+   *  a DIFFERENT rec for a low-scoring scan ("Your last scan returned
+   *  35% — content depth is below threshold") vs just a stale-scan
+   *  rec ("Last scan was N days ago"). Previously the engine only had
+   *  ranAt and treated every scan equally regardless of result. */
+  async getLastGeoSignalSummary(
+    brandId: string,
+  ): Promise<{ ranAt: Date; overallScore: number | null } | null> {
+    const [row] = await db
+      .select({
+        ranAt: schema.geoSignalRuns.ranAt,
+        overallScore: schema.geoSignalRuns.overallScore,
+      })
+      .from(schema.geoSignalRuns)
+      .where(eq(schema.geoSignalRuns.brandId, brandId))
+      .orderBy(desc(schema.geoSignalRuns.ranAt))
+      .limit(1);
+    if (!row?.ranAt) return null;
+    return {
+      ranAt: new Date(row.ranAt as string | Date),
+      overallScore: row.overallScore ?? null,
+    };
+  }
+
   async createCitationRun(run: InsertCitationRun): Promise<CitationRun> {
     const [row] = await db.insert(schema.citationRuns).values(run).returning();
     return row;
