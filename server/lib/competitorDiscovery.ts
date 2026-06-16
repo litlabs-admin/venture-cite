@@ -6,6 +6,7 @@ import { MODELS } from "./modelConfig";
 import { parseLLMJson, LLMParseError } from "./llmParse";
 import { logger } from "./logger";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
+import { relevanceForRank } from "./competitorRelevance";
 import type { Brand } from "@shared/schema";
 
 const openai = new OpenAI({
@@ -30,6 +31,10 @@ const competitorListSchema = z.object({
 
 type DiscoveredCompetitor = z.infer<typeof discoveredCompetitorSchema> & {
   source: "ai" | "citation_mining";
+  // 0-100, assigned by rank within its source (most-direct first). Profile
+  // inference scores in the core band (60-100); citation mining, being
+  // noisier "appeared alongside" signal, scores in the discovered band (25-55).
+  relevanceScore: number;
 };
 
 function normalizeDomain(raw: string | null | undefined): string {
@@ -40,6 +45,27 @@ function normalizeDomain(raw: string | null | undefined): string {
     .replace(/^https?:\/\//, "")
     .replace(/^www\./, "")
     .split("/")[0];
+}
+
+// Compact the brand fact sheet into a bullet digest the discovery model can
+// read alongside the profile. Capped so it can't blow the prompt budget on a
+// brand with a large sheet; one short line per fact, highest-signal first.
+function buildFactDigest(
+  facts: { subcategory?: string | null; factKey?: string | null; factValue?: string | null }[],
+): string {
+  if (!facts || facts.length === 0) return "";
+  const lines: string[] = [];
+  let len = 0;
+  for (const f of facts) {
+    const val = (f.factValue ?? "").trim();
+    if (!val) continue;
+    const label = [f.subcategory, f.factKey].filter(Boolean).join(" · ");
+    const line = `- ${label ? `${label}: ` : ""}${val}`.slice(0, 240);
+    if (len + line.length > 1800) break;
+    lines.push(line);
+    len += line.length + 1;
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -77,10 +103,24 @@ export async function discoverCompetitors(brandId: string): Promise<number> {
     existing.filter((c) => (c as any).isIgnored === 1).map((c) => c.name.toLowerCase().trim()),
   );
 
+  // Brand fact sheet sharpens substitutability judgement: a verified
+  // positioning / product / audience fact lets the model reject lookalikes
+  // that share a category but not a buyer. Best-effort — discovery still
+  // runs on the profile alone if the sheet is empty or unavailable.
+  let factDigest = "";
+  try {
+    factDigest = buildFactDigest(await storage.getBrandFacts(brandId));
+  } catch (err) {
+    logger.warn(
+      { err, brandId },
+      "competitorDiscovery: fact-sheet load failed — using profile only",
+    );
+  }
+
   const candidates: DiscoveredCompetitor[] = [];
 
   try {
-    const aiCompetitors = await inferCompetitorsFromProfile(brand);
+    const aiCompetitors = await inferCompetitorsFromProfile(brand, factDigest);
     candidates.push(...aiCompetitors.map((c) => ({ ...c, source: "ai" as const })));
   } catch (err) {
     logger.warn({ err, brandId }, "competitorDiscovery: AI inference failed");
@@ -112,6 +152,10 @@ export async function discoverCompetitors(brandId: string): Promise<number> {
           ? `[auto-discovered] ${cand.reason}`.slice(0, 500)
           : "[auto-discovered]",
         discoveredBy: cand.source,
+        // AI-inferred direct competitors seed the curated core set; mined
+        // "appeared alongside" names land in the broader discovered pool.
+        tier: cand.source === "ai" ? "core" : "discovered",
+        relevanceScore: cand.relevanceScore,
       } as any);
       touched += 1;
     } catch (err) {
@@ -123,19 +167,32 @@ export async function discoverCompetitors(brandId: string): Promise<number> {
   return touched;
 }
 
-async function inferCompetitorsFromProfile(brand: Brand): Promise<DiscoveredCompetitor[]> {
+async function inferCompetitorsFromProfile(
+  brand: Brand,
+  factDigest: string,
+): Promise<DiscoveredCompetitor[]> {
   const completion = await openai.chat.completions.create({
     model: MODELS.misc,
-    temperature: 0.3,
+    temperature: 0.2,
     response_format: { type: "json_object" },
-    max_tokens: 1000,
+    max_tokens: 1400,
     messages: [
       {
         role: "system",
-        content: `You are a competitive intelligence analyst. Given a brand profile, return 5-10 real, direct competitors — companies that sell a substitutable product to the same audience. Rules:
-- Only real, currently-operating companies
-- No fictional names, no acquired companies, no parent companies
-- For each, provide name, primary domain, and a short reason (why they compete)
+        content: `You are a competitive-intelligence analyst. Given a brand profile, return up to 10 real, DIRECT competitors: companies a prospective buyer would seriously evaluate INSTEAD of this brand because they sell a substitutable product to the same audience.
+
+Hard requirements:
+- Only real, currently-operating companies (no fictional, no shut-down, no companies already acquired into another brand).
+- Direct substitutes only: a company qualifies only if a buyer could realistically choose it instead of this brand to solve the same job.
+
+Exclude these common false positives:
+- Tools, platforms, infrastructure, or vendors the brand merely USES or integrates with.
+- Publications, news outlets, blogs, directories, marketplaces, and review sites.
+- Generic category terms ("CRM software", "a PR agency") instead of named companies.
+- Parent companies, subsidiaries, or resellers of the brand.
+- Agencies or consultancies, UNLESS this brand is itself an agency or consultancy.
+
+Order the list most-direct first (strongest substitute at the top). Aim for 8-10 when the market supports it; return fewer rather than padding with weak or tangential matches. For each, give: name, primary domain (bare host, no protocol or path), and a one-line reason naming the overlapping product or audience.
 
 Return JSON: {"competitors": [{"name": "...", "domain": "example.com", "reason": "..."}]}`,
       },
@@ -147,18 +204,24 @@ Industry: ${brand.industry}
 Description: ${brand.description || "N/A"}
 Products: ${Array.isArray(brand.products) ? brand.products.join(", ") : "N/A"}
 Target audience: ${brand.targetAudience || "N/A"}
-Website: ${brand.website || "N/A"}`,
+Website: ${brand.website || "N/A"}${
+          factDigest
+            ? `\n\nVerified brand facts (use these to judge who is a true substitute, not just a category neighbour):\n${factDigest}`
+            : ""
+        }`,
       },
     ],
   });
 
   try {
     const parsed = parseLLMJson(completion.choices[0]?.message?.content, competitorListSchema);
-    return parsed.competitors.map((c) => ({
+    // List is returned most-direct-first; score by position in the core band.
+    return parsed.competitors.map((c, i) => ({
       name: c.name,
       domain: c.domain ?? "",
       reason: c.reason,
       source: "ai" as const,
+      relevanceScore: relevanceForRank("ai", i),
     }));
   } catch (err) {
     if (err instanceof LLMParseError) {
@@ -203,11 +266,12 @@ async function mineCompetitorsFromCitations(brand: Brand): Promise<DiscoveredCom
         role: "system",
         content: `You are mining AI-generated responses to find real competitors of a given brand. Each response below was returned by ChatGPT/Claude/Gemini/Perplexity in answer to a user question, and mentioned the brand.
 
-Your job: extract names of OTHER companies that appear alongside the brand in these responses. Filter out:
+Your job: extract names of OTHER companies that are DIRECT competitors (a buyer could pick them instead of the brand) appearing alongside the brand in these responses. Filter out:
 - generic category terms ("CRM software", "startup", "PR agency")
 - the brand itself (see profile)
-- obvious publications ("Forbes", "TechCrunch" — those are outlets, not competitors)
-- acquired-by-brand or parent-of-brand relationships
+- publications and outlets ("Forbes", "TechCrunch"), directories, and marketplaces
+- tools, platforms, or vendors the brand merely uses or integrates with
+- acquired-by-brand, parent-of-brand, or subsidiary relationships
 
 Return JSON: {"competitors": [{"name": "Real Company Name", "domain": "example.com", "reason": "what they do"}]}. Max 10.`,
       },
@@ -226,11 +290,12 @@ ${responseBlob}`,
 
   try {
     const parsed = parseLLMJson(completion.choices[0]?.message?.content, competitorListSchema);
-    return parsed.competitors.map((c) => ({
+    return parsed.competitors.map((c, i) => ({
       name: c.name,
       domain: c.domain ?? "",
       reason: c.reason,
       source: "citation_mining" as const,
+      relevanceScore: relevanceForRank("citation_mining", i),
     }));
   } catch (err) {
     if (err instanceof LLMParseError) {

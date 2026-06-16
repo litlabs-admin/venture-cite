@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { ToastAction } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ import PlatformRankingCard, {
   type PlatformRanking,
 } from "@/components/dashboard/PlatformRankingCard";
 import PlatformVisibilityBar from "@/components/dashboard/PlatformVisibilityBar";
+import CitedUrlsCard from "@/components/dashboard/CitedUrlsCard";
 import CompetitorGapMatrix, { type GapMatrixRow } from "@/components/dashboard/CompetitorGapMatrix";
 import BrandEntityStrength, {
   type EntityStrengthData,
@@ -248,6 +250,7 @@ export default function MonitorOverview() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const completedToastFired = useRef(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
   const { data: autopilotData } = useQuery<{ success: boolean; data: AutopilotStatusData }>({
@@ -313,9 +316,17 @@ export default function MonitorOverview() {
   useEffect(() => {
     if (autopilot?.status === "completed" && !completedToastFired.current) {
       completedToastFired.current = true;
-      toast({ title: "Report ready", description: "Your AI visibility data is live." });
+      toast({
+        title: "Report ready",
+        description: "Your AI visibility report is live.",
+        action: (
+          <ToastAction altText="View report" onClick={() => setLocation("/report")}>
+            View report
+          </ToastAction>
+        ),
+      });
     }
-  }, [autopilot?.status, toast]);
+  }, [autopilot?.status, toast, setLocation]);
 
   // Wave 9: live-refresh during citation runs. The hook returns the
   // refetch cadence we thread directly into each useQuery via
@@ -859,6 +870,9 @@ export default function MonitorOverview() {
               </div>
             )}
           </Section>
+
+          {/* ===== 3b. CITED URLS ===== */}
+          <CitedUrlsCard brandId={selectedBrandId} refetchInterval={refetchInterval} />
 
           {/* ===== 4. PLATFORM VISIBILITY ===== */}
           <Section

@@ -88,6 +88,9 @@ drizzle/meta/
 vite.config.ts.*
 vite.config.js.*
 
+# ─── graphify knowledge-graph output (do not track) ──────────
+graphify-out/
+
 # ─── Stale Replit artifacts (should already be deleted) ────────
 .replit
 replit.nix

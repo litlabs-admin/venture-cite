@@ -26,9 +26,25 @@ export default function Diagnose() {
           label: "Hallucinations",
           icon: AlertTriangle,
           Component: Hallucinations,
+          description:
+            "Find where AI engines state something false or outdated about your brand. Requires at least 3 active facts in your Brand Fact Sheet so we have a source of truth to check against.",
         },
-        { value: "signals", label: "Signals", icon: Radio, Component: GeoSignals },
-        { value: "crawler", label: "Crawler", icon: Bug, Component: CrawlerCheck },
+        {
+          value: "signals",
+          label: "Signals",
+          icon: Radio,
+          Component: GeoSignals,
+          description:
+            "Score how AI-ready a generated article is and how to improve it. Generate an article first, then select it above to run the analysis.",
+        },
+        {
+          value: "crawler",
+          label: "Crawler",
+          icon: Bug,
+          Component: CrawlerCheck,
+          description:
+            "Check that your website follows GEO/SEO norms and that AI crawlers can access it. Enter a URL to run the check.",
+        },
       ]}
     />
   );

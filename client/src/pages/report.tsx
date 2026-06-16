@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
+import CitedUrlsCard from "@/components/dashboard/CitedUrlsCard";
 
 // ─── Report ──────────────────────────────────────────────────────────────────
 // The "prove the impact" surface. Opens with one plain-language conclusion
@@ -286,6 +287,9 @@ export default function Report() {
           </p>
         )}
       </section>
+
+      {/* 4. Which pages got cited. The card carries its own heading. */}
+      <CitedUrlsCard brandId={selectedBrandId} />
 
       <p className="border-t border-border pt-4 text-xs text-muted-foreground">
         VentureCite, generated{" "}

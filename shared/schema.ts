@@ -910,6 +910,11 @@ export const competitors = pgTable(
       .array()
       .default(sql`ARRAY[]::text[]`),
     discoveredBy: text("discovered_by").default("manual").notNull(), // "manual" | "ai" | "citation_mining" | "scheduler"
+    // Phase 6: curated "core" set (manual adds + AI-inferred direct
+    // competitors) vs a broader "discovered" pool (citation-mined / scheduler).
+    // relevanceScore (0-100, null for manual) ranks the discovered pool.
+    tier: text("tier").default("discovered").notNull(), // "core" | "discovered"
+    relevanceScore: integer("relevance_score"),
     // Soft delete + ignore tombstone. `deletedAt` hides from lists;
     // `isIgnored=1` additionally blocks re-discovery in cron.
     deletedAt: timestamp("deleted_at"),

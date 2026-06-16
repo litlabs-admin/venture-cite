@@ -74,7 +74,7 @@ Return JSON in exactly this shape:
       "domain": "identity"|"offerings"|"positioning"|"team"|"operations"|"credentials"|"growth"|"contact",
       "subcategory": "<short label matching the field>",
       "factKey": "<short label>",
-      "factValue": "<the user's value, cleaned of whitespace only>",
+      "factValue": "<the user's value, verbatim — preserve the spaces between words; only trim leading/trailing whitespace>",
       "valueType": "string"|"number"|"array",
       "valuePayload": null|object,
       "confidence": 1.0,
@@ -105,6 +105,55 @@ function buildUserPrompt(brand: UserEnrichBrand): string {
       2,
     ),
   ].join("\n");
+}
+
+// The genuinely-safe interpretation of "clean whitespace": collapse internal
+// runs of whitespace (newlines/tabs/double spaces) to a single space and trim
+// the ends. Crucially it NEVER removes the single spaces between words — the
+// old prompt wording ("cleaned of whitespace only") led the LLM to delete every
+// space, producing values like "VenturePRspecializes…". Applied deterministically
+// server-side so whitespace handling no longer depends on the model behaving.
+function tidyWhitespace(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+const despace = (s: string): string => s.toLowerCase().replace(/\s+/g, "");
+
+// Every authoritative source string the LLM was asked to echo verbatim. The
+// model maps these into facts; when it does its job they round-trip unchanged.
+function sourceStringsFor(brand: UserEnrichBrand): string[] {
+  const out: string[] = [];
+  const add = (v?: string | null) => {
+    const t = (v ?? "").trim();
+    if (t) out.push(t);
+  };
+  add(brand.name);
+  add(brand.description);
+  add(brand.industry);
+  add(brand.targetAudience);
+  add(brand.keyValues);
+  add(brand.brandVoice);
+  add(brand.tone);
+  for (const p of brand.products ?? []) add(p);
+  for (const u of brand.uniqueSellingPoints ?? []) add(u);
+  return out;
+}
+
+// Deterministic repair for the exact failure mode behind "VenturePRspecializes…":
+// a small model deletes the spaces from a value it was told to echo verbatim.
+// tidyWhitespace can only COLLAPSE runs, never re-insert deleted spaces — but
+// the authoritative source field still has them. If the model's value matches a
+// source string once spaces+case are ignored, and that source is the longer
+// (properly-spaced) form, snap back to the source. Exact despaced equality means
+// we never alter meaning; non-matches (real paraphrase) are left untouched.
+export function restoreSpacesFromSources(value: string, sources: string[]): string {
+  const key = despace(value);
+  if (!key) return value;
+  for (const src of sources) {
+    const tidy = tidyWhitespace(src);
+    if (despace(tidy) === key && tidy.length > value.length) return tidy;
+  }
+  return value;
 }
 
 function deterministicFallback(brand: UserEnrichBrand): Fact[] {
@@ -168,7 +217,14 @@ export async function runUserEnrichSource(args: RunUserEnrichArgs): Promise<User
     const parsed = JSON.parse(raw as string);
     const v = FactsResponseSchema.safeParse(parsed);
     if (v.success) {
-      const facts = v.data.facts.map((f) => ({ ...f, confidence: 1.0 }));
+      const sources = sourceStringsFor(args.brand);
+      const facts = v.data.facts.map((f) => ({
+        ...f,
+        // Collapse runs, then deterministically restore any spaces the model
+        // deleted from a verbatim-echoed source field (the "VenturePRspecializes…" bug).
+        factValue: restoreSpacesFromSources(tidyWhitespace(f.factValue), sources),
+        confidence: 1.0,
+      }));
       return {
         status: "done",
         facts,

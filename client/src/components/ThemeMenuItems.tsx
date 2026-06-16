@@ -24,6 +24,31 @@ const OPTIONS: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
   { value: "dark", label: "Dark", icon: Moon },
 ];
 
+// A compact, always-visible light/dark toggle for the sidebar footer. The full
+// System/Light/Dark picker still lives in the account menu (ThemeMenuItems);
+// this surfaces the most common action (flip light<->dark) without the user
+// having to discover the dropdown — a repeated piece of client feedback.
+export function QuickThemeToggle({ className }: { className?: string }) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  const next = isDark ? "light" : "dark";
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(next)}
+      title={`Switch to ${next} mode`}
+      aria-label={`Switch to ${next} mode`}
+      data-testid="quick-theme-toggle"
+      className={
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+        (className ?? "")
+      }
+    >
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+}
+
 export function ThemeMenuItems() {
   const { theme, setTheme } = useTheme();
   return (

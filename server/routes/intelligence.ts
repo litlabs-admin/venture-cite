@@ -487,7 +487,15 @@ export function setupIntelligenceRoutes(app: Express): void {
             .json({ success: false, error: "subcategory (or legacy factCategory) is required" });
         }
         await requireBrand(body.brandId, user.id);
-        const fact = await storage.createBrandFact(body as any);
+        // Manually-entered facts are user-authoritative: tag them as
+        // `user_manual` (highest source priority in getBrandFacts' dedup, where
+        // the schema default "manual" is unranked and would lose to scraped
+        // rows) and set userOverridden so later scrapes never clobber them.
+        const fact = await storage.createBrandFact({
+          ...body,
+          source: "user_manual",
+          userOverridden: true,
+        } as any);
         res.json({ success: true, data: fact });
       } catch (error) {
         sendError(res, error, "Failed to create brand fact");

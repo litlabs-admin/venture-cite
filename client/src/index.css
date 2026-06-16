@@ -10,42 +10,46 @@
    live once in :root and follow automatically. DARK is the default the
    user lands on (`<html class="dark">` in index.html); light stays fully
    themed for an optional toggle + the printed /report.
-   OKLCH throughout; no #000/#fff. Neutrals are cool zinc (hue ~285, very
-   low chroma) at HIGH contrast with widened surface steps for depth — the
-   #1 premium tell is sophisticated cool near-black/near-white, never warm
-   muddy mid-greys. Indigo accent (hue ~278–280) is NEAR-ABSENT: it appears
-   only on the single primary action and the focus ring (--primary /
-   --ring); active nav is a neutral raised chip, not an indigo fill.
+   OKLCH throughout; no #000/#fff. DARK neutrals are cool zinc (hue ~285);
+   LIGHT is a Modern-SaaS scheme: slate-50 canvas (#F8FAFC), white cards,
+   slate text; DARK keeps the cool zinc near-black/near-white. Indigo
+   #6366F1 is the PRIMARY accent (primary action + focus ring), teal #14B8A6
+   the secondary accent / chart lead; active nav is still a neutral raised
+   chip, not an indigo fill.
    positive/warning/negative are FUNCTIONAL-ONLY (status/destructive), never
    brand or decoration — required for usability, used sparingly.
    ─────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Primitives — LIGHT (crisp soft-white zinc; used for the optional
-     toggle + the printed report). Cool hue 285, near-zero chroma, HIGH
-     contrast; surface steps widened so panels separate, not wash flat. */
-  --bg-base: oklch(0.988 0.0015 285);
-  --bg-surface-1: oklch(0.972 0.002 285);
-  --bg-surface-2: oklch(0.95 0.0025 285);
-  --bg-surface-3: oklch(0.925 0.003 285);
-  --border-subtle: oklch(0.92 0.003 285);
-  --border-default: oklch(0.875 0.004 285);
-  --border-strong: oklch(0.79 0.005 285);
-  --fg-primary: oklch(0.21 0.012 285);
-  --fg-secondary: oklch(0.44 0.01 285);
-  --fg-tertiary: oklch(0.57 0.008 285);
-  --fg-disabled: oklch(0.7 0.006 285);
-  /* Indigo accent — NEAR-ABSENT (primary action + focus ring only).
-     L0.55 carries white text at AA, so fg is white here. */
-  --brand-accent: oklch(0.55 0.2 280);
-  --brand-accent-hover: oklch(0.5 0.2 280);
-  --brand-accent-press: oklch(0.45 0.19 280);
-  --brand-accent-fg: oklch(0.99 0.004 285);
-  --brand-accent-subtle: oklch(0.55 0.2 280 / 0.1);
-  /* Functional-only status. Never brand/decoration; used sparingly. */
-  --positive: oklch(0.6 0.13 162);
-  --warning: oklch(0.72 0.12 85);
-  --negative: oklch(0.55 0.19 25);
+  /* Primitives — LIGHT (Modern SaaS: slate-50 canvas, WHITE cards, slate
+     borders + text). Background is the 70% tone (slate-50 #F8FAFC); cards
+     and popovers are white (the 20%); muted / sidebar sit one step deeper
+     for recession. Slate hue ~247; white cards float above the canvas. */
+  --bg-base: oklch(0.984 0.003 247); /* slate-50 #F8FAFC — page background */
+  --bg-surface-1: oklch(0.962 0.006 247); /* slate-100 — muted / sidebar */
+  --bg-surface-2: oklch(0.9985 0.001 247); /* white #FFFFFF — cards */
+  --bg-surface-3: oklch(0.9985 0.001 247); /* white — popovers / elevated */
+  --border-subtle: oklch(0.945 0.007 247);
+  --border-default: oklch(0.912 0.011 247); /* slate-200 #E2E8F0 */
+  --border-strong: oklch(0.842 0.018 247); /* slate-300 #CBD5E1 */
+  --fg-primary: oklch(0.25 0.03 263); /* slate-900 #0F172A */
+  --fg-secondary: oklch(0.45 0.035 258); /* slate-600 #475569 */
+  --fg-tertiary: oklch(0.55 0.03 257); /* slate-500 #64748B */
+  --fg-disabled: oklch(0.68 0.03 257); /* slate-400 #94A3B8 */
+  /* Primary accent — Indigo #6366F1 (primary action, links, focus ring).
+     L0.585 carries white text at AA; ~10% usage, not a nav fill. */
+  --brand-accent: oklch(0.585 0.205 277);
+  --brand-accent-hover: oklch(0.535 0.2 277);
+  --brand-accent-press: oklch(0.485 0.2 277);
+  --brand-accent-fg: oklch(0.99 0.01 277);
+  --brand-accent-subtle: oklch(0.585 0.205 277 / 0.1);
+  /* Secondary accent — Teal #14B8A6. Complementary highlights / secondary
+     emphasis + the chart lead; pair sparingly with the indigo primary. */
+  --brand-accent-secondary: oklch(0.71 0.13 184);
+  /* Functional status — Emerald / Orange / Rose. Used sparingly. */
+  --positive: oklch(0.7 0.15 162);
+  --warning: oklch(0.7 0.19 48);
+  --negative: oklch(0.645 0.225 14);
   /* Stable cool near-white for text on saturated status fills
      (destructive/positive/negative). Theme-agnostic — NOT redefined. */
   --color-on-strong: oklch(0.99 0.003 285);
@@ -57,9 +61,9 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
 
-  /* Elevation (light = neutral-tinted shadow) */
-  --elevation-raised: 0 1px 2px oklch(0.16 0.012 285 / 0.06);
-  --elevation-overlay: 0 8px 24px -8px oklch(0.16 0.012 285 / 0.18);
+  /* Elevation (light = slate-tinted shadow to match the neutrals) */
+  --elevation-raised: 0 1px 2px oklch(0.16 0.012 263 / 0.06);
+  --elevation-overlay: 0 8px 24px -8px oklch(0.16 0.012 263 / 0.18);
 
   /* ── shadcn semantic layer, mapped onto the primitives ──────────────── */
   --background: var(--bg-base);
@@ -75,22 +79,23 @@
   --muted: var(--bg-surface-1);
   --muted-foreground: var(--fg-tertiary);
   /* shadcn `accent` is the NEUTRAL hover/selected surface, not the brand
-     colour. Brand colour is `--primary` (← --brand-accent above). */
-  --accent: var(--bg-surface-2);
+     colour. Brand colour is `--primary` (← --brand-accent above). With white
+     cards, the hover/selected surface is the slate muted step so it stays
+     visible on white (surface-2 would be invisible card-on-card). */
+  --accent: var(--bg-surface-1);
   --accent-foreground: var(--fg-primary);
   --destructive: var(--negative);
   --destructive-foreground: var(--color-on-strong);
   --border: var(--border-default);
   --input: var(--border-strong);
   --ring: var(--brand-accent);
-  /* Quiet cool data ramp: indigo lead, then zinc steps + one restrained
-     teal so multi-series charts stay legible without going colorful
-     (functional necessity, kept monochrome-cool in spirit). */
-  --chart-1: oklch(0.62 0.18 280);
-  --chart-2: oklch(0.7 0.045 285);
-  --chart-3: oklch(0.62 0.1 200);
-  --chart-4: oklch(0.55 0.06 250);
-  --chart-5: oklch(0.45 0.05 285);
+  /* Categorical data ramp = the brand palette: indigo, teal, emerald,
+     orange, rose. Vibrant but cohesive across multi-series charts. */
+  --chart-1: oklch(0.585 0.205 277); /* indigo */
+  --chart-2: oklch(0.71 0.13 184); /* teal */
+  --chart-3: oklch(0.7 0.15 162); /* emerald */
+  --chart-4: oklch(0.7 0.19 48); /* orange */
+  --chart-5: oklch(0.645 0.225 14); /* rose */
   --sidebar-background: var(--bg-surface-1);
   --sidebar-foreground: var(--fg-secondary);
   /* Monochrome lane: the active nav item is a raised NEUTRAL chip with
@@ -107,19 +112,19 @@
   --font-serif: Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, Monaco, Consolas, monospace;
   --radius: 0.5rem;
-  --shadow-2xs: 0px 1px 2px 0px oklch(0.16 0.012 285 / 0.04);
-  --shadow-xs: 0px 1px 3px 0px oklch(0.16 0.012 285 / 0.06);
+  --shadow-2xs: 0px 1px 2px 0px oklch(0.16 0.012 263 / 0.04);
+  --shadow-xs: 0px 1px 3px 0px oklch(0.16 0.012 263 / 0.06);
   --shadow-sm:
-    0px 2px 4px 0px oklch(0.16 0.012 285 / 0.06), 0px 1px 2px -1px oklch(0.16 0.012 285 / 0.03);
+    0px 2px 4px 0px oklch(0.16 0.012 263 / 0.06), 0px 1px 2px -1px oklch(0.16 0.012 263 / 0.03);
   --shadow:
-    0px 4px 6px -1px oklch(0.16 0.012 285 / 0.08), 0px 2px 4px -2px oklch(0.16 0.012 285 / 0.04);
+    0px 4px 6px -1px oklch(0.16 0.012 263 / 0.08), 0px 2px 4px -2px oklch(0.16 0.012 263 / 0.04);
   --shadow-md:
-    0px 6px 10px -1px oklch(0.16 0.012 285 / 0.08), 0px 4px 6px -2px oklch(0.16 0.012 285 / 0.04);
+    0px 6px 10px -1px oklch(0.16 0.012 263 / 0.08), 0px 4px 6px -2px oklch(0.16 0.012 263 / 0.04);
   --shadow-lg:
-    0px 10px 15px -3px oklch(0.16 0.012 285 / 0.08), 0px 4px 6px -4px oklch(0.16 0.012 285 / 0.04);
+    0px 10px 15px -3px oklch(0.16 0.012 263 / 0.08), 0px 4px 6px -4px oklch(0.16 0.012 263 / 0.04);
   --shadow-xl:
-    0px 20px 25px -5px oklch(0.16 0.012 285 / 0.1), 0px 8px 10px -6px oklch(0.16 0.012 285 / 0.04);
-  --shadow-2xl: 0px 25px 50px -12px oklch(0.16 0.012 285 / 0.2);
+    0px 20px 25px -5px oklch(0.16 0.012 263 / 0.1), 0px 8px 10px -6px oklch(0.16 0.012 263 / 0.04);
+  --shadow-2xl: 0px 25px 50px -12px oklch(0.16 0.012 263 / 0.2);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
@@ -256,21 +261,21 @@
    for print only; the shadcn semantic vars reference these and follow. */
 @media print {
   .dark {
-    --bg-base: oklch(0.988 0.0015 285);
-    --bg-surface-1: oklch(0.972 0.002 285);
-    --bg-surface-2: oklch(0.95 0.0025 285);
-    --bg-surface-3: oklch(0.925 0.003 285);
-    --border-subtle: oklch(0.92 0.003 285);
-    --border-default: oklch(0.875 0.004 285);
-    --border-strong: oklch(0.79 0.005 285);
-    --fg-primary: oklch(0.21 0.012 285);
-    --fg-secondary: oklch(0.44 0.01 285);
-    --fg-tertiary: oklch(0.57 0.008 285);
-    --brand-accent: oklch(0.55 0.2 280);
-    --brand-accent-fg: oklch(0.99 0.004 285);
-    --positive: oklch(0.6 0.13 162);
-    --warning: oklch(0.72 0.12 85);
-    --negative: oklch(0.55 0.19 25);
+    --bg-base: oklch(0.984 0.003 247);
+    --bg-surface-1: oklch(0.962 0.006 247);
+    --bg-surface-2: oklch(0.9985 0.001 247);
+    --bg-surface-3: oklch(0.9985 0.001 247);
+    --border-subtle: oklch(0.945 0.007 247);
+    --border-default: oklch(0.912 0.011 247);
+    --border-strong: oklch(0.842 0.018 247);
+    --fg-primary: oklch(0.25 0.03 263);
+    --fg-secondary: oklch(0.45 0.035 258);
+    --fg-tertiary: oklch(0.55 0.03 257);
+    --brand-accent: oklch(0.585 0.205 277);
+    --brand-accent-fg: oklch(0.99 0.01 277);
+    --positive: oklch(0.7 0.15 162);
+    --warning: oklch(0.7 0.19 48);
+    --negative: oklch(0.645 0.225 14);
   }
   body {
     background: #fff;

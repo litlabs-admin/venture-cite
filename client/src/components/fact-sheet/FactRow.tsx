@@ -37,7 +37,7 @@ export type ResolvedFact = {
     alternatives?: FactAlternativeEntry[];
     otherLabel?: string;
   } | null;
-  source: "user" | "scraped" | "manual";
+  source: "user" | "user_manual" | "scraped" | "manual" | "paste";
   sourceUrl: string | null;
   lastVerified: string | null;
 };
@@ -63,8 +63,13 @@ function shortPath(url: string): string {
 const SOURCE_BADGE: Record<ResolvedFact["source"], { emoji: string; label: string }> = {
   scraped: { emoji: "🤖", label: "AI" },
   user: { emoji: "👤", label: "You" },
+  user_manual: { emoji: "✋", label: "Manual" },
   manual: { emoji: "✋", label: "Manual" },
+  paste: { emoji: "📋", label: "Pasted" },
 };
+
+// Defensive fallback so an unexpected source value can never crash the row.
+const FALLBACK_BADGE = { emoji: "📝", label: "Fact" };
 
 export function FactRow({
   fact,
@@ -76,7 +81,7 @@ export function FactRow({
   onDismiss: (fact: ResolvedFact) => void;
 }) {
   const Icon = iconForDomain(fact.domain);
-  const badge = SOURCE_BADGE[fact.source];
+  const badge = SOURCE_BADGE[fact.source] ?? FALLBACK_BADGE;
 
   // Per Spec 2 §4.6: staleness shows on scraped rows ONLY.
   const showStale = fact.source === "scraped";

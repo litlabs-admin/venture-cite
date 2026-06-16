@@ -239,6 +239,11 @@ ${articleEntries}
           name,
           domain,
           discoveredBy: "manual",
+          // A competitor the user adds by hand is, by definition, part of
+          // their curated core set — not the broader discovered pool. Relevance
+          // is a discovery-only signal, so a client-supplied score is dropped.
+          tier: "core",
+          relevanceScore: null,
         } as any);
         res.json({ success: true, data: competitor });
       } catch (error) {
@@ -275,6 +280,16 @@ ${articleEntries}
         }
         if (typeof body.industry === "string") {
           patch.industry = body.industry.trim().slice(0, 200);
+        }
+        // tier: promote/demote between the curated core set and the
+        // discovered pool. Only the two known values are accepted.
+        if (typeof body.tier === "string") {
+          if (body.tier !== "core" && body.tier !== "discovered") {
+            return res
+              .status(400)
+              .json({ success: false, error: "tier must be 'core' or 'discovered'" });
+          }
+          patch.tier = body.tier;
         }
         if (typeof body.description === "string") {
           patch.description = body.description.trim().slice(0, 2000);

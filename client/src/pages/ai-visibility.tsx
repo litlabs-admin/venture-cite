@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -42,6 +42,8 @@ import {
   TrendingUp,
   AlertCircle,
   Zap,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { SiOpenai, SiGoogle } from "react-icons/si";
 import type { Brand } from "@shared/schema";
@@ -68,6 +70,111 @@ interface AIEngine {
   description: string;
   keyFactors: string[];
   steps: EngineStep[];
+}
+
+// One-at-a-time quick-win card per engine. Shows a single high-priority step
+// but lets the user page back/forward through the engine's high-priority steps
+// so completed steps stay reviewable instead of silently disappearing.
+function QuickWinCard({
+  engine,
+  steps,
+  startIndex,
+  completedStepIds,
+  onToggle,
+}: {
+  engine: AIEngine;
+  steps: EngineStep[];
+  startIndex: number;
+  completedStepIds: string[];
+  onToggle: (stepId: string) => void;
+}) {
+  const [viewIndex, setViewIndex] = useState(startIndex);
+  // Auto-follow the first-outstanding step only until the user takes control of
+  // this card (pages or toggles). This handles the async progress load (before
+  // interaction we track startIndex) without yanking the view away from a step
+  // the user deliberately navigated to — completing the viewed step no longer
+  // makes the card jump, it just flips to "Done" and the user pages on.
+  const userControlled = useRef(false);
+  useEffect(() => {
+    if (!userControlled.current) setViewIndex(startIndex);
+  }, [startIndex]);
+
+  const index = Math.min(viewIndex, steps.length - 1);
+  const step = steps[index];
+  const isDone = completedStepIds.includes(step.id);
+
+  const goTo = (next: number) => {
+    userControlled.current = true;
+    setViewIndex(Math.max(0, Math.min(steps.length - 1, next)));
+  };
+  const handleToggle = () => {
+    userControlled.current = true;
+    onToggle(step.id);
+  };
+
+  return (
+    <Card className="bg-card">
+      <CardContent className="pt-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className={engine.color}>{engine.icon}</span>
+            <span className="text-sm font-medium">{engine.name}</span>
+          </div>
+          {steps.length > 1 && (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                disabled={index === 0}
+                onClick={() => goTo(index - 1)}
+                aria-label="Previous step"
+                data-testid={`quick-prev-${engine.id}`}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-xs tabular-nums">
+                {index + 1}/{steps.length}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                disabled={index === steps.length - 1}
+                onClick={() => goTo(index + 1)}
+                aria-label="Next step"
+                data-testid={`quick-next-${engine.id}`}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+        <h4 className="font-medium mb-2">{step.title}</h4>
+        <p className="text-sm text-muted-foreground mb-3">{step.description}</p>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            checked={isDone}
+            onCheckedChange={handleToggle}
+            data-testid={`quick-checkbox-${step.id}`}
+          />
+          <span className="text-sm">{isDone ? "Done" : "Mark as done"}</span>
+          {step.quickAction && (
+            <Link href={step.quickAction.link}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto"
+                data-testid={`quick-action-${step.id}`}
+              >
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 const aiEngines: AIEngine[] = [
@@ -150,7 +257,7 @@ const aiEngines: AIEngine[] = [
         description:
           "ChatGPT favors comprehensive, well-researched content that demonstrates expertise. Aim for 1,500+ word articles with citations.",
         howTo:
-          "Create in-depth guides, whitepapers, and research pieces. Include statistics, expert quotes, and cite reputable sources.",
+          "Create in-depth guides, whitepapers, and research pieces. Include statistics, expert quotes, and cite reputable sources. Where to publish: start on your own blog (you control it and it builds domain authority), then syndicate to high-reach platforms like Medium and LinkedIn Articles, and pitch industry publications. High-authority placements (Forbes, Business Insider, TechCrunch, and a Wikipedia entry once you qualify) carry the most weight with AI engines.",
         priority: "high",
         estimatedImpact: "High - Establishes topical authority",
         quickAction: { label: "Generate Content", link: "/content" },
@@ -177,9 +284,9 @@ const aiEngines: AIEngine[] = [
       },
       {
         id: "chatgpt-6",
-        title: "Maintain consistent NAP across the web",
+        title: "Maintain consistent NAP (Name, Address, Phone) across the web",
         description:
-          "Name, Address, Phone consistency helps AI correlate information about your brand.",
+          "Keeping your business Name, Address, and Phone identical everywhere helps AI engines correlate information and trust it's the same real company.",
         howTo:
           "Audit all your online listings and ensure your business information is identical everywhere.",
         priority: "low",
@@ -933,13 +1040,21 @@ export default function AIVisibility() {
 
   const totalProgress = getTotalProgress();
 
-  // Quick-wins list: one outstanding high-priority step per engine. Memoized
-  // so switching engines/tabs doesn't re-walk every engine + step.
+  // Quick-wins list: ALL high-priority steps per engine (not just the first
+  // outstanding one) plus the index of the first outstanding step. The card
+  // shows one step at a time but lets the user page back/forward to review
+  // what they've already completed — previously, completing a step made it
+  // silently vanish with no way to go back. Memoized so switching engines/tabs
+  // doesn't re-walk every engine + step.
   const quickWins = useMemo(() => {
     return aiEngines.flatMap((engine) => {
       const done = completedSteps[engine.id] || [];
-      const first = engine.steps.find((s) => s.priority === "high" && !done.includes(s.id));
-      return first ? [{ engine, step: first }] : [];
+      const steps = engine.steps.filter((s) => s.priority === "high");
+      if (steps.length === 0) return [];
+      const firstOutstanding = steps.findIndex((s) => !done.includes(s.id));
+      // If every high-priority step is done, land on the last one for review.
+      const startIndex = firstOutstanding === -1 ? steps.length - 1 : firstOutstanding;
+      return [{ engine, steps, startIndex }];
     });
   }, [completedSteps]);
 
@@ -1124,37 +1239,15 @@ export default function AIVisibility() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {quickWins.map(({ engine, step }) => (
-              <Card key={`${engine.id}-${step.id}`} className="bg-card">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={engine.color}>{engine.icon}</span>
-                    <span className="text-sm font-medium">{engine.name}</span>
-                  </div>
-                  <h4 className="font-medium mb-2">{step.title}</h4>
-                  <p className="text-sm text-muted-foreground mb-3">{step.description}</p>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={(completedSteps[engine.id] || []).includes(step.id)}
-                      onCheckedChange={() => toggleStep(engine.id, step.id)}
-                      data-testid={`quick-checkbox-${step.id}`}
-                    />
-                    <span className="text-sm">Mark as done</span>
-                    {step.quickAction && (
-                      <Link href={step.quickAction.link}>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="ml-auto"
-                          data-testid={`quick-action-${step.id}`}
-                        >
-                          <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+            {quickWins.map(({ engine, steps, startIndex }) => (
+              <QuickWinCard
+                key={engine.id}
+                engine={engine}
+                steps={steps}
+                startIndex={startIndex}
+                completedStepIds={completedSteps[engine.id] || []}
+                onToggle={(stepId) => toggleStep(engine.id, stepId)}
+              />
             ))}
           </div>
         </CardContent>

@@ -235,9 +235,78 @@ function lineDiff(
   return out;
 }
 
+// The article picker, extracted so it can sit inline beside the Target query
+// on the Signal Scorecard AND in the top bar on the other two tabs, without
+// duplicating the option-rendering markup. Module-level (stable identity) so
+// it never remounts the underlying Select on parent re-render.
+function ArticleSelect({
+  articles,
+  selectedArticleId,
+  onChange,
+  brandName,
+  selectedBrandId,
+}: {
+  articles: Article[];
+  selectedArticleId: string;
+  onChange: (v: string) => void;
+  brandName: string;
+  selectedBrandId: string | undefined;
+}) {
+  if (!selectedBrandId) {
+    return (
+      <div className="flex h-10 items-center text-sm text-muted-foreground">
+        Select a brand first.
+      </div>
+    );
+  }
+  if (articles.length === 0) {
+    return (
+      <div className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
+        <span>No articles yet for {brandName}.</span>
+        <Link href="/articles">
+          <Button variant="outline" size="sm" data-testid="button-create-article">
+            Create an article →
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <Select value={selectedArticleId} onValueChange={onChange}>
+      <SelectTrigger className="w-[320px]" data-testid="select-article">
+        <SelectValue placeholder="Select article" />
+      </SelectTrigger>
+      <SelectContent>
+        {articles.map((article) => {
+          // Status pill on non-ready articles so the user understands why a
+          // just-started article might be empty (status=all in the query).
+          const status = (article as any).status as string | undefined;
+          const showPill = status && status !== "ready";
+          return (
+            <SelectItem key={article.id} value={article.id}>
+              <span className="flex items-center gap-2">
+                <span className="max-w-xs truncate">{article.title}</span>
+                {showPill && (
+                  <Badge
+                    variant={status === "failed" ? "destructive" : "outline"}
+                    className="text-[10px] uppercase"
+                  >
+                    {status}
+                  </Badge>
+                )}
+              </span>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export default function GeoSignals() {
   const { toast } = useToast();
   const { selectedBrandId, selectedBrand } = useBrandSelection();
+  const [activeTab, setActiveTab] = useState<string>("signals");
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
   const [, setContentToAnalyze] = useState<string>("");
   const [targetQuery, setTargetQuery] = useState<string>("");
@@ -662,56 +731,27 @@ export default function GeoSignals() {
             up to viewport top while the stage tabs were scrolled away
             → audit flag "sticks under nothing". z-10 < z-20 keeps the
             layering correct. */}
-        <div className="sticky top-[3.5rem] z-10 bg-background/95 backdrop-blur py-2 -mx-2 px-2 border-b">
-          <div className="flex items-center gap-3">
-            <Label className="text-sm text-muted-foreground whitespace-nowrap">Article:</Label>
-            {selectedBrandId && articles.length > 0 && (
-              <Select value={selectedArticleId} onValueChange={setSelectedArticleId}>
-                <SelectTrigger className="w-[320px]" data-testid="select-article">
-                  <SelectValue placeholder="Select article" />
-                </SelectTrigger>
-                <SelectContent>
-                  {articles.map((article) => {
-                    // Show a status pill next to non-ready articles so the
-                    // user understands why an article they just started might
-                    // be empty or unfinished. The picker now includes
-                    // drafts/generating/failed (status=all on the query).
-                    const status = (article as any).status as string | undefined;
-                    const showPill = status && status !== "ready";
-                    return (
-                      <SelectItem key={article.id} value={article.id}>
-                        <span className="flex items-center gap-2">
-                          <span className="truncate max-w-xs">{article.title}</span>
-                          {showPill && (
-                            <Badge
-                              variant={status === "failed" ? "destructive" : "outline"}
-                              className="text-[10px] uppercase"
-                            >
-                              {status}
-                            </Badge>
-                          )}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            )}
-            {selectedBrandId && articles.length === 0 && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>No articles yet for {brandName}.</span>
-                <Link href="/articles">
-                  <Button variant="outline" size="sm" data-testid="button-create-article">
-                    Create an article →
-                  </Button>
-                </Link>
+        {/* Top article bar — only on the tabs WITHOUT a target query. On the
+            Signal Scorecard the article picker sits inline next to the query
+            (one line, no duplicate picker). */}
+        {activeTab !== "signals" && (
+          <div className="sticky top-[3.5rem] z-10 -mx-2 border-b bg-background/95 px-2 py-3 backdrop-blur">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label className="whitespace-nowrap text-sm font-medium text-foreground">
+                  Article to analyze
+                </Label>
+                <ArticleSelect
+                  articles={articles}
+                  selectedArticleId={selectedArticleId}
+                  onChange={setSelectedArticleId}
+                  brandName={brandName}
+                  selectedBrandId={selectedBrandId}
+                />
               </div>
-            )}
-            {!selectedBrandId && (
-              <span className="text-sm text-muted-foreground">Select a brand first.</span>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* IA collapse (2026-05-28): 5 sub-tabs → 3.
             - "Pipeline Sim" was a self-reference. Its Signal stage was
@@ -725,15 +765,23 @@ export default function GeoSignals() {
               up as signal #7 inside the Scorecard, and the list view
               is fundamentally an article-list pivot that belongs on
               /act?tab=library, not in Diagnose. Tab removed entirely. */}
-        <Tabs defaultValue="signals" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="signals" data-testid="tab-signals">
               <BarChart3 className="w-4 h-4 mr-2" /> Signal Scorecard
             </TabsTrigger>
-            <TabsTrigger value="chunks" data-testid="tab-chunks">
+            <TabsTrigger
+              value="chunks"
+              data-testid="tab-chunks"
+              title="Chunk Engineer: AI engines read your article in ~500-token pieces, not all at once. This shows those pieces and flags which ones aren't answer-ready."
+            >
               <SplitSquareVertical className="w-4 h-4 mr-2" /> Chunk Engineer
             </TabsTrigger>
-            <TabsTrigger value="schema" data-testid="tab-schema">
+            <TabsTrigger
+              value="schema"
+              data-testid="tab-schema"
+              title="Schema Lab: checks the structured-data labels (Schema.org markup) in your page's code that tell Google and AI engines what your content is."
+            >
               <Code className="w-4 h-4 mr-2" /> Schema Lab
             </TabsTrigger>
           </TabsList>
@@ -748,9 +796,22 @@ export default function GeoSignals() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-foreground">Target Query</Label>
+                {/* Article + Target query on one line, with Analyze. The
+                    article picker lives here (not the top bar) on this tab so
+                    the two selectors read as a single setup row. */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                  <div className="space-y-1">
+                    <Label className="text-foreground">Article to analyze</Label>
+                    <ArticleSelect
+                      articles={articles}
+                      selectedArticleId={selectedArticleId}
+                      onChange={setSelectedArticleId}
+                      brandName={brandName}
+                      selectedBrandId={selectedBrandId}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1 sm:min-w-[240px]">
+                    <Label className="text-foreground">Target query</Label>
                     <Popover open={queryPopoverOpen} onOpenChange={setQueryPopoverOpen}>
                       <PopoverTrigger asChild>
                         <Button
@@ -849,7 +910,6 @@ export default function GeoSignals() {
                     )}
                   </div>
                 </div>
-
                 {signalScores.length > 0 && (
                   <div className="space-y-4">
                     {/* Honest headline score. The denominator is the
@@ -1109,7 +1169,32 @@ export default function GeoSignals() {
           <TabsContent value="chunks" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-foreground">500-Token Chunk Engineer</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  500-Token Chunk Engineer
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="What is chunking?"
+                      >
+                        <HelpCircle className="w-4 h-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="max-w-md text-sm" align="start">
+                      <p className="mb-1 font-medium text-foreground">
+                        What is &quot;chunking&quot;?
+                      </p>
+                      <p className="text-muted-foreground">
+                        AI engines don&apos;t read your whole article at once. They pull it into
+                        roughly 500-token pieces (about 375 words) and quote individual pieces in
+                        their answers. A piece is &quot;extractable&quot; when it has a clear
+                        heading and opens with a direct answer. This tool shows your article&apos;s
+                        pieces and flags the ones AI can&apos;t easily quote.
+                      </p>
+                    </PopoverContent>
+                  </Popover>
+                </CardTitle>
                 <CardDescription className="text-muted-foreground">
                   Restructure content into AI-extractable ~375 word chunks with question-based
                   headings
@@ -1304,8 +1389,18 @@ export default function GeoSignals() {
                         <HelpCircle className="w-4 h-4" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="text-sm max-w-md" align="start">
-                      <p className="font-medium text-foreground mb-1">How this is measured</p>
+                    <PopoverContent className="max-w-md text-sm" align="start">
+                      <p className="mb-1 font-medium text-foreground">
+                        What is &quot;schema&quot;?
+                      </p>
+                      <p className="mb-3 text-muted-foreground">
+                        Schema (structured data) is hidden labels in your page&apos;s code that
+                        spell out what the content is, an article, an FAQ, your company name and
+                        contact info, so Google and AI engines don&apos;t have to guess.
+                      </p>
+                      <p className="mb-1 font-medium text-foreground">
+                        How completeness is measured
+                      </p>
                       <p className="text-muted-foreground">{SCHEMA_LEGEND_BLURB}</p>
                     </PopoverContent>
                   </Popover>

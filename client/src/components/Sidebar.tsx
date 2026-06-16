@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import logoPath from "@assets/logo.png";
 import SidebarOnboarding from "@/components/SidebarOnboarding";
-import { ThemeMenuItems } from "@/components/ThemeMenuItems";
+import { ThemeMenuItems, QuickThemeToggle } from "@/components/ThemeMenuItems";
 
 // ─── Workflow spine ──────────────────────────────────────────────────────────
 // One flat list, no section labels. The product is a single operating system,
@@ -169,44 +169,49 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <SidebarOnboarding onNavigate={onNavigate} />
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 w-full px-2 py-2 rounded-lg hover:bg-sidebar-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarImage src={user?.profileImageUrl || undefined} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
-                  {getInitials()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">
-                  {user?.firstName ? `${user.firstName} ${user.lastName ?? ""}`.trim() : "Account"}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-              </div>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="end" className="w-56">
-            <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                navigate("/settings");
-                onNavigate?.();
-              }}
-              className="cursor-pointer"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Account settings
-            </DropdownMenuItem>
-            <ThemeMenuItems />
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => logout()}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 flex-1 min-w-0 px-2 py-2 rounded-lg hover:bg-sidebar-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarImage src={user?.profileImageUrl || undefined} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
+                    {getInitials()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium text-sidebar-foreground truncate">
+                    {user?.firstName
+                      ? `${user.firstName} ${user.lastName ?? ""}`.trim()
+                      : "Account"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="end" className="w-56">
+              <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  navigate("/settings");
+                  onNavigate?.();
+                }}
+                className="cursor-pointer"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Account settings
+              </DropdownMenuItem>
+              <ThemeMenuItems />
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => logout()}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <QuickThemeToggle />
+        </div>
       </div>
     </div>
   );

@@ -16,7 +16,10 @@ vi.mock("openai", () => ({
 // openaiMock surface used in tests
 const openaiMock = { chat: { completions: { create: createMock } } };
 
-import { runUserEnrichSource } from "../../server/lib/factAgent/v2/sourceUserEnrich";
+import {
+  runUserEnrichSource,
+  restoreSpacesFromSources,
+} from "../../server/lib/factAgent/v2/sourceUserEnrich";
 
 const baseBrand = {
   id: "brand-1",
@@ -31,6 +34,43 @@ const baseBrand = {
   brandVoice: "Friendly + technical",
   tone: "Casual",
 };
+
+describe("restoreSpacesFromSources", () => {
+  const desc =
+    "VenturePR specializes in providing strategic public relations services for disruptive companies, particularly in the tech sector.";
+  const sources = ["VenturePR", desc, "Public Relations", "Tech founders"];
+
+  it("restores spaces a model deleted from a verbatim-echoed source", () => {
+    const mangled = desc.replace(/\s+/g, ""); // "VenturePRspecializesin…"
+    expect(restoreSpacesFromSources(mangled, sources)).toBe(desc);
+  });
+
+  it("is a no-op when the value already has its spaces", () => {
+    expect(restoreSpacesFromSources(desc, sources)).toBe(desc);
+  });
+
+  it("leaves a genuinely paraphrased value untouched (no despaced match)", () => {
+    const paraphrase = "A PR firm for tech startups.";
+    expect(restoreSpacesFromSources(paraphrase, sources)).toBe(paraphrase);
+  });
+
+  it("requires an exact despaced match — a prefix of a source is not restored", () => {
+    // despace("venture") is a prefix of despace(desc) but not equal, so the
+    // long description must NOT be substituted in.
+    expect(restoreSpacesFromSources("venture", sources)).toBe("venture");
+  });
+
+  it("does not touch a single-word value that only differs by case (no spaces lost)", () => {
+    // "venturepr" despaces-equal to source "VenturePR" but is the same length,
+    // so there are no deleted spaces to restore; left as-is.
+    expect(restoreSpacesFromSources("venturepr", sources)).toBe("venturepr");
+  });
+
+  it("handles empty / spaceless-source edge cases without throwing", () => {
+    expect(restoreSpacesFromSources("", sources)).toBe("");
+    expect(restoreSpacesFromSources("anything", [])).toBe("anything");
+  });
+});
 
 describe("runUserEnrichSource", () => {
   beforeEach(() => {
@@ -86,7 +126,9 @@ describe("runUserEnrichSource", () => {
     expect(
       out.facts.some((f) => f.factKey === "description" && f.factValue.includes("AI for SMBs")),
     ).toBe(true);
-    expect(out.facts.some((f) => f.factKey === "products")).toBe(true);
+    // deterministicFallback emits the controlled-vocab key "productLine"
+    // (not "products") for the offerings domain — see sourceUserEnrich.ts.
+    expect(out.facts.some((f) => f.factKey === "productLine")).toBe(true);
   });
 
   it("returns empty facts when the brand record is entirely blank", async () => {

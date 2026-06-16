@@ -46,6 +46,28 @@ export function useInspector(): InspectorApi {
   return useContext(InspectorContext) ?? { open: () => {}, close: () => {} };
 }
 
+// The inspector has two mutually exclusive presentations: an inline aside at
+// xl+ and an overlay Sheet below xl. They MUST be gated in JS, not just CSS.
+// A Radix Sheet left `open` at xl+ keeps its full-screen overlay + body
+// scroll-lock active even when its content is `display:none` (xl:hidden) —
+// which froze the entire Command Center on desktop the moment a tile was
+// clicked. Tailwind's xl breakpoint is 1280px; this hook mirrors use-mobile.
+const XL_BREAKPOINT = 1280;
+
+function useIsXlUp() {
+  const [isXlUp, setIsXlUp] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    const mql = window.matchMedia(`(min-width: ${XL_BREAKPOINT}px)`);
+    const onChange = () => setIsXlUp(window.innerWidth >= XL_BREAKPOINT);
+    mql.addEventListener("change", onChange);
+    setIsXlUp(window.innerWidth >= XL_BREAKPOINT);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  return !!isXlUp;
+}
+
 // Route → context-bar title. The shell owns the one header for Command
 // Center, Report, the four spine stages (titled by the active ?tab via
 // spineStages.ts so the title names the tab you're on) and their standalone
@@ -78,10 +100,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const isXlUp = useIsXlUp();
   const activeTab = new URLSearchParams(search).get("tab");
   const title = shellTitleFor(location, activeTab);
   const ownsContextBar = title !== null;
-  const inspectorOpen = ownsContextBar && inspector !== null;
+  // Exactly one presentation is live at a time. Below xl the overlay Sheet
+  // owns it; at xl+ the inline aside does. Never both — see useIsXlUp above.
+  const showInlineInspector = ownsContextBar && inspector !== null && isXlUp;
+  const showSheetInspector = ownsContextBar && inspector !== null && !isXlUp;
 
   const inspectorApi: InspectorApi = {
     open: (payload) => setInspector(payload),
@@ -159,7 +185,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
             {/* Zone 3 — inspector (desktop xl+; Command Center only). Quiet
                 surface-3; only mounts when something is selected. */}
-            {inspectorOpen && (
+            {showInlineInspector && (
               <aside
                 className="hidden w-[340px] shrink-0 border-l border-border bg-[var(--bg-surface-3)] xl:block print:hidden"
                 aria-label={inspector.title}
@@ -183,10 +209,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        {/* Mobile / tablet inspector — overlay sheet (Command Center only). */}
+        {/* Mobile / tablet inspector — overlay sheet (Command Center only).
+            `open` is gated by !isXlUp so the modal overlay + scroll-lock never
+            activate at xl+, where the inline aside is the live presentation. */}
         {ownsContextBar && (
           <Sheet
-            open={inspector !== null}
+            open={showSheetInspector}
             onOpenChange={(o) => {
               if (!o) inspectorApi.close();
             }}

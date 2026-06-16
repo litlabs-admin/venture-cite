@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { RefreshCw, Loader2, AlertTriangle } from "lucide-react";
+import { RefreshCw, Loader2, AlertTriangle, Plus } from "lucide-react";
 
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -19,6 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -34,7 +41,7 @@ import { ManualPasteCard } from "@/components/fact-sheet/ManualPasteCard";
 import { ConflictPair, type ConflictPairData } from "@/components/fact-sheet/ConflictPair";
 import { FactRow, type ResolvedFact } from "@/components/fact-sheet/FactRow";
 import { DomainGroupHeader } from "@/components/fact-sheet/DomainGroupHeader";
-import { DOMAINS, type Domain } from "@/components/fact-sheet/domainIcons";
+import { DOMAINS, DOMAIN_LABELS, type Domain } from "@/components/fact-sheet/domainIcons";
 import { formatRelativeTime, daysSince } from "@/lib/formatRelativeTime";
 
 // Plan 2.5 components.
@@ -114,6 +121,21 @@ export default function BrandFactSheet() {
   const queryClient = useQueryClient();
   const { selectedBrandId, selectedBrand } = useBrandSelection();
   const [editingFact, setEditingFact] = useState<ResolvedFact | null>(null);
+
+  /* ---------- manual "Add fact" ---------- */
+  type NewFactDraft = {
+    domain: Domain;
+    factKey: string;
+    factValue: string;
+    sourceUrl: string;
+  };
+  const emptyDraft: NewFactDraft = {
+    domain: "identity",
+    factKey: "",
+    factValue: "",
+    sourceUrl: "",
+  };
+  const [newFact, setNewFact] = useState<NewFactDraft | null>(null);
 
   /* ---------- server-driven re-scrape ----------
    * The browser no longer orchestrates the scrape (no /plan + scrape-one
@@ -349,6 +371,39 @@ export default function BrandFactSheet() {
       });
     },
   });
+
+  const createFactMutation = useMutation({
+    mutationFn: async (draft: NewFactDraft) => {
+      const factKey = draft.factKey.trim();
+      const factValue = draft.factValue.trim();
+      const res = await apiRequest("POST", "/api/brand-facts", {
+        brandId: selectedBrandId,
+        domain: draft.domain,
+        // Manual facts use the field name for both the controlled-vocab key
+        // and the human subcategory label (the server requires subcategory).
+        subcategory: factKey,
+        factKey,
+        factValue,
+        sourceUrl: draft.sourceUrl.trim() || undefined,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand-facts", selectedBrandId] });
+      setNewFact(null);
+      toast({ title: "Fact added", description: "Your fact was added to the sheet." });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add fact. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const canSaveNewFact =
+    !!newFact && newFact.factKey.trim().length > 0 && newFact.factValue.trim().length > 0;
 
   /* ---------- diff handlers ---------- */
   const handleUseMine = (pair: ConflictPairData) =>
@@ -661,8 +716,21 @@ export default function BrandFactSheet() {
           {/* TODO(spec-2 Plan 2.5): delta indicators (new / changed / removed) — needs prior-run comparison query */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Resolved facts</CardTitle>
-              <CardDescription>Verified facts about {selectedBrand.name}.</CardDescription>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg">Resolved facts</CardTitle>
+                  <CardDescription>Verified facts about {selectedBrand.name}.</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setNewFact(emptyDraft)}
+                  data-testid="button-add-fact"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add fact
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {resolvedQuery.isLoading ? (
@@ -681,6 +749,12 @@ export default function BrandFactSheet() {
                 <EmptyState
                   title="No facts yet"
                   body="Run a scrape or add facts manually to start building this brand's fact sheet."
+                  cta={
+                    <Button variant="outline" size="sm" onClick={() => setNewFact(emptyDraft)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add fact manually
+                    </Button>
+                  }
                 />
               ) : (
                 <div className="space-y-6">
@@ -713,6 +787,80 @@ export default function BrandFactSheet() {
           </Card>
         </>
       )}
+
+      {/* Add fact dialog — manual user-authoritative entry. */}
+      <Dialog open={!!newFact} onOpenChange={(open) => !open && setNewFact(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add a fact</DialogTitle>
+            <DialogDescription>
+              Manually add a fact about {selectedBrand?.name ?? "this brand"}. Manual facts are
+              treated as authoritative and won&apos;t be overwritten by scrapes.
+            </DialogDescription>
+          </DialogHeader>
+          {newFact && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select
+                  value={newFact.domain}
+                  onValueChange={(v) => setNewFact({ ...newFact, domain: v as Domain })}
+                >
+                  <SelectTrigger data-testid="select-fact-domain">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOMAINS.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {DOMAIN_LABELS[d]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Field name</Label>
+                <Input
+                  value={newFact.factKey}
+                  placeholder="e.g. CEO, Headquarters, Founded"
+                  onChange={(e) => setNewFact({ ...newFact, factKey: e.target.value })}
+                  data-testid="input-fact-key"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Value</Label>
+                <Input
+                  value={newFact.factValue}
+                  placeholder="e.g. Jane Doe"
+                  onChange={(e) => setNewFact({ ...newFact, factValue: e.target.value })}
+                  data-testid="input-fact-value"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Source URL (optional)</Label>
+                <Input
+                  value={newFact.sourceUrl}
+                  placeholder="https://…"
+                  onChange={(e) => setNewFact({ ...newFact, sourceUrl: e.target.value })}
+                  data-testid="input-fact-source"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewFact(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => newFact && createFactMutation.mutate(newFact)}
+              disabled={!canSaveNewFact || createFactMutation.isPending}
+              data-testid="button-save-fact"
+            >
+              {createFactMutation.isPending ? "Adding…" : "Add fact"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit dialog (carried over from prior implementation; valueType editor is Plan 2.5) */}
       <Dialog open={!!editingFact} onOpenChange={(open) => !open && setEditingFact(null)}>

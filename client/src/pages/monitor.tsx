@@ -37,11 +37,45 @@ export default function Monitor() {
     <SpineShell
       defaultTab="overview"
       tabs={[
-        { value: "overview", label: "Overview", icon: BarChart3, Component: MonitorOverview },
-        { value: "citations", label: "Citations", icon: Link2, Component: Citations },
-        { value: "competitors", label: "Competitors", icon: Swords, Component: Competitors },
-        { value: "trends", label: "Trends", icon: History, Component: Trends },
-        { value: "mentions", label: "Mentions", icon: Radar, Component: MentionsScanner },
+        {
+          value: "overview",
+          label: "Overview",
+          icon: BarChart3,
+          Component: MonitorOverview,
+          description:
+            "Where you stand across AI engines at a glance: your visibility score, generative rankings, and citation trend.",
+        },
+        {
+          value: "citations",
+          label: "Citations",
+          icon: Link2,
+          Component: Citations,
+          description:
+            "Every individual AI response we captured and the exact sources it cited, so you can see where your brand shows up.",
+        },
+        {
+          value: "competitors",
+          label: "Competitors",
+          icon: Swords,
+          Component: Competitors,
+          description:
+            "How you rank against competitors in AI answers, with a per-platform citation leaderboard.",
+        },
+        {
+          value: "trends",
+          label: "Trends",
+          icon: History,
+          Component: Trends,
+          description: "How your AI visibility is moving over time across engines and topics.",
+        },
+        {
+          value: "mentions",
+          label: "Mentions",
+          icon: Radar,
+          Component: MentionsScanner,
+          description:
+            "Brand mentions we detected on Reddit and Hacker News (plus manual adds), distinct from posts you author under Act › Community.",
+        },
       ]}
     />
   );

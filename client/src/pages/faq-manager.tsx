@@ -115,6 +115,12 @@ export default function FaqManager() {
       });
       queryClient.invalidateQueries({ queryKey: [`/api/faqs?brandId=${selectedBrandId}`] });
       setGenerateTopic("");
+      // Jump to the Manage FAQs tab so the freshly generated FAQs are visible —
+      // otherwise the user stays on the Generate tab and it looks like "nothing
+      // happened" even though rows were created.
+      if (inserted > 0) {
+        setActiveTab("manage");
+      }
     },
     onError: (err: Error) =>
       toast({
@@ -654,7 +660,9 @@ export default function FaqManager() {
                           </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium mb-2 block">Number of FAQs</label>
+                          <label className="text-sm font-medium mb-2 block">
+                            Number of FAQs to generate
+                          </label>
                           <Select value={generateCount} onValueChange={setGenerateCount}>
                             <SelectTrigger data-testid="select-generate-count">
                               <SelectValue />
@@ -666,6 +674,10 @@ export default function FaqManager() {
                               <SelectItem value="15">15 FAQs</SelectItem>
                             </SelectContent>
                           </Select>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            How many question-and-answer pairs to create. Generated FAQs appear in
+                            the <span className="font-medium">Manage FAQs</span> tab.
+                          </p>
                         </div>
                         <Button
                           onClick={() =>

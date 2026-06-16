@@ -18,6 +18,7 @@ import {
   Plus,
   ExternalLink,
   Info,
+  X,
 } from "lucide-react";
 import type { BrandHallucination, BrandFactSheet } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -113,6 +114,42 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
         variant: "destructive",
       }),
   });
+
+  // "Not a hallucination" — the detector flagged a false positive (e.g. a
+  // differently-worded but accurate description). PATCH remediationStatus to
+  // "dismissed" (a legal transition from pending/in_progress).
+  const dismissHallucinationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("PATCH", `/api/hallucinations/${id}`, { remediationStatus: "dismissed" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/hallucinations?brandId=${selectedBrandId}`],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/hallucinations/stats/${selectedBrandId}`],
+      });
+      toast({ title: "Marked as not a hallucination" });
+    },
+    onError: (err: Error) =>
+      toast({
+        title: "Failed to dismiss",
+        description: err.message || "Unknown error",
+        variant: "destructive",
+      }),
+  });
+
+  // Generic, always-actionable remediation guidance shown when the detector
+  // didn't attach specific steps (it usually doesn't). These are the standard
+  // GEO levers for correcting what AI engines say about a brand.
+  const defaultRemediationSteps = (hal: BrandHallucination): string[] => [
+    `State the correct information clearly on your own site (homepage + an About or FAQ page) so engines have an authoritative source.`,
+    `Add or update structured data (Organization / FAQ schema) so the right value${
+      hal.actualFact ? ` ("${hal.actualFact}")` : ""
+    } is machine-readable.`,
+    `Update your Brand Fact Sheet so detection and content generation use the correct source of truth.`,
+    `Where it matters, get high-authority sources (press, Wikipedia, directories) to reflect the correct information.`,
+  ];
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -214,7 +251,10 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                   <AlertTriangle className="w-5 h-5" />
                   Detected Hallucinations
                 </CardTitle>
-                <CardDescription>AI claims that don't match your brand facts</CardDescription>
+                <CardDescription>
+                  AI claims that don&apos;t match your brand facts. The platform badge shows which
+                  AI engine made the claim.
+                </CardDescription>
               </div>
               <Select value={severityFilter} onValueChange={setSeverityFilter}>
                 <SelectTrigger className="w-40" data-testid="select-severity-filter">
@@ -283,7 +323,11 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                           <Badge variant="outline" className="font-normal">
                             {hal.hallucinationType}
                           </Badge>
-                          <Badge variant="outline" className="font-normal">
+                          <Badge
+                            variant="outline"
+                            className="font-normal"
+                            title={`Claimed by ${hal.aiPlatform}`}
+                          >
                             {hal.aiPlatform}
                           </Badge>
                           {remStatus && (
@@ -304,19 +348,31 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                           <Badge className="bg-[var(--positive)]/10 text-[var(--positive)] border border-[var(--positive)]/20 font-medium shrink-0">
                             Resolved
                           </Badge>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => resolveHallucinationMutation.mutate(hal.id)}
-                            disabled={!actionable || resolveHallucinationMutation.isPending}
-                            data-testid={`button-resolve-${hal.id}`}
-                            className="shrink-0"
-                          >
-                            <CheckCircle className="mr-1 h-4 w-4" />
-                            Mark Resolved
-                          </Button>
-                        )}
+                        ) : actionable ? (
+                          <div className="flex shrink-0 items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => dismissHallucinationMutation.mutate(hal.id)}
+                              disabled={dismissHallucinationMutation.isPending}
+                              data-testid={`button-dismiss-${hal.id}`}
+                              title="The AI's claim is actually accurate — hide this false positive"
+                            >
+                              <X className="mr-1 h-4 w-4" />
+                              Not a hallucination
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => resolveHallucinationMutation.mutate(hal.id)}
+                              disabled={resolveHallucinationMutation.isPending}
+                              data-testid={`button-resolve-${hal.id}`}
+                            >
+                              <CheckCircle className="mr-1 h-4 w-4" />
+                              Mark Resolved
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
 
                       {/* Claim vs. fact: quote-style with semantic accents.
@@ -361,27 +417,35 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                                 data-testid={`link-source-${hal.id}`}
+                                title="Where this claim appeared. Correct it by fixing your own authoritative pages, not this link."
                               >
                                 <ExternalLink className="h-3 w-3" />
-                                Source: {hostname}
+                                Cited from {hostname}
                               </a>
                             );
                           })()}
-                        {hal.remediationSteps && hal.remediationSteps.length > 0 && (
-                          <div className="pt-1">
-                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                              Remediation
-                            </p>
-                            <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">
-                              {hal.remediationSteps.map((step, i) => (
-                                <li key={i} className="flex gap-2">
-                                  <span aria-hidden>·</span>
-                                  <span>{step}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                        {actionable &&
+                          (() => {
+                            const steps =
+                              hal.remediationSteps && hal.remediationSteps.length > 0
+                                ? hal.remediationSteps
+                                : defaultRemediationSteps(hal);
+                            return (
+                              <div className="pt-1">
+                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                                  How to fix this
+                                </p>
+                                <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">
+                                  {steps.map((step, i) => (
+                                    <li key={i} className="flex gap-2">
+                                      <span aria-hidden>·</span>
+                                      <span>{step}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })()}
                       </div>
                     </div>
                   );

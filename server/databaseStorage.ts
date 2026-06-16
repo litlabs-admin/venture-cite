@@ -1337,7 +1337,16 @@ export class DatabaseStorage implements IStorage {
   // "manual" (user deliberately re-added it); otherwise they are kept
   // tombstoned and only lastSeenAt is bumped.
   async createCompetitor(insertCompetitor: InsertCompetitor): Promise<Competitor> {
-    const isManual = (insertCompetitor.discoveredBy ?? "manual") === "manual";
+    const discoveredBy = insertCompetitor.discoveredBy ?? "manual";
+    const isManual = discoveredBy === "manual";
+    // Single source of truth for the tier policy: callers may set tier
+    // explicitly (discovery does, per-source), but when they don't we derive
+    // it so every entry point stays consistent. Manual adds (Add dialog AND
+    // onboarding) and AI profile-inferred competitors are the curated core
+    // set; citation-mined / auto / scheduler rows are the discovered pool.
+    const tier =
+      insertCompetitor.tier ??
+      (discoveredBy === "manual" || discoveredBy === "ai" ? "core" : "discovered");
     // Use raw SQL so we can target the functional unique index
     // (lower(name), lower(coalesce(domain,''))). db.execute returns raw
     // snake_case pg rows — we only use it for the id, then re-read via
@@ -1345,14 +1354,16 @@ export class DatabaseStorage implements IStorage {
     const result = await db.execute<{ id: string }>(sql`
       INSERT INTO competitors (
         brand_id, name, domain, industry, description,
-        discovered_by, deleted_at, is_ignored, last_seen_at
+        discovered_by, tier, relevance_score, deleted_at, is_ignored, last_seen_at
       ) VALUES (
         ${insertCompetitor.brandId},
         ${insertCompetitor.name},
         ${insertCompetitor.domain},
         ${insertCompetitor.industry ?? null},
         ${insertCompetitor.description ?? null},
-        ${insertCompetitor.discoveredBy ?? "manual"},
+        ${discoveredBy},
+        ${tier},
+        ${insertCompetitor.relevanceScore ?? null},
         NULL,
         0,
         now()
@@ -1361,7 +1372,11 @@ export class DatabaseStorage implements IStorage {
       DO UPDATE SET
         industry = COALESCE(EXCLUDED.industry, competitors.industry),
         description = COALESCE(EXCLUDED.description, competitors.description),
+        relevance_score = COALESCE(EXCLUDED.relevance_score, competitors.relevance_score),
         last_seen_at = now(),
+        -- Manual re-add promotes to core; automated re-discovery never demotes
+        -- an existing tier (so a user-curated core row stays core).
+        tier = CASE WHEN ${isManual} THEN 'core' ELSE competitors.tier END,
         -- Revive soft-deleted rows only on manual re-add.
         deleted_at = CASE WHEN ${isManual} THEN NULL ELSE competitors.deleted_at END,
         is_ignored = CASE WHEN ${isManual} THEN 0 ELSE competitors.is_ignored END

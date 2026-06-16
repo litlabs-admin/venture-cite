@@ -1,5 +1,6 @@
 import { Suspense, type ComponentType } from "react";
 import { useLocation, useSearch } from "wouter";
+import { Info } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RouteSpinner } from "@/components/foundations";
 
@@ -15,6 +16,8 @@ export interface SpineTab {
   label: string;
   icon: ComponentType<{ className?: string }>;
   Component: ComponentType;
+  /** Optional one-line purpose shown under the tab strip for the active tab. */
+  description?: string;
   /** Optional tour target; remapped wholesale in Phase 2. */
   tourId?: string;
 }
@@ -57,6 +60,17 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
           );
         })}
       </TabsList>
+      {tabs.map((t) =>
+        t.value === active && t.description ? (
+          <div
+            key={`${t.value}-desc`}
+            className="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4 text-sm"
+          >
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-chart-3" />
+            <p className="text-muted-foreground">{t.description}</p>
+          </div>
+        ) : null,
+      )}
       {tabs.map((t) => {
         const Body = t.Component;
         return (

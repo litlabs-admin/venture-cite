@@ -15,24 +15,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
+  ArrowDownCircle,
+  ArrowUpCircle,
   Award,
   Brain,
+  ChevronDown,
   Crown,
   ExternalLink,
   EyeOff,
   Medal,
   Pencil,
   Plus,
+  RefreshCw,
   Trash2,
   TrendingUp,
   Trophy,
@@ -44,7 +42,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { SiOpenai, SiClaude, SiPerplexity, SiGooglegemini } from "react-icons/si";
 import type { ComponentType, SVGProps } from "react";
-import type { Competitor, Brand } from "@shared/schema";
+import type { Competitor } from "@shared/schema";
 import { AI_PLATFORMS } from "@shared/constants";
 
 const platformIcon: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
@@ -226,8 +224,83 @@ export default function CompetitorsPage() {
     },
   });
 
+  // Re-run server-side discovery on demand (the brand's auto-discovery only
+  // fires once on create). The endpoint upserts, so it never duplicates; we
+  // report how many genuinely new rows landed by diffing the returned list.
+  const rediscoverMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest(
+        "POST",
+        `/api/competitors/discover/${encodeURIComponent(selectedBrandId!)}`,
+      );
+      return (await response.json()) as {
+        success: boolean;
+        data?: { inserted: number; competitors: Competitor[] };
+      };
+    },
+    onSuccess: (result) => {
+      const before = competitorsData?.data?.length ?? 0;
+      const after = result?.data?.competitors?.length ?? before;
+      const added = Math.max(0, after - before);
+      queryClient.invalidateQueries({ queryKey: ["/api/competitors", selectedBrandId] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/competitors/leaderboard", selectedBrandId],
+      });
+      toast({
+        title: added > 0 ? `Added ${added} new competitor${added === 1 ? "" : "s"}` : "Up to date",
+        description:
+          added > 0
+            ? "Freshly discovered competitors are now in your tracking list."
+            : "We rescanned but found no new competitors to add.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to re-discover competitors. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Promote / demote between the curated core set and the discovered pool.
+  const setTierMutation = useMutation({
+    mutationFn: async ({ id, tier }: { id: string; tier: "core" | "discovered" }) =>
+      apiRequest("PATCH", `/api/competitors/${id}`, { tier }),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/competitors", selectedBrandId] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/competitors/leaderboard", selectedBrandId],
+      });
+      toast({ title: vars.tier === "core" ? "Promoted to core" : "Moved to discovered" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update competitor", variant: "destructive" });
+    },
+  });
+
   const competitors = competitorsData?.data || [];
   const leaderboard = leaderboardData?.data || [];
+
+  // Phase 6: curated core set vs the broader discovered pool, ranked by the
+  // relevance score discovery assigns. tier defaults to "discovered".
+  const coreCompetitors = competitors.filter((c) => c.tier === "core");
+  const discoveredCompetitors = competitors
+    .filter((c) => c.tier !== "core")
+    .sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
+
+  const openEdit = (competitor: Competitor) => {
+    setEditingCompetitor(competitor);
+    setEditForm({
+      name: competitor.name || "",
+      domain: competitor.domain || "",
+      industry: competitor.industry || "",
+      description: competitor.description || "",
+      nameVariations: Array.isArray(competitor.nameVariations)
+        ? competitor.nameVariations.join(", ")
+        : "",
+    });
+  };
 
   const getRankIcon = (index: number) => {
     if (index === 0) return <Crown className="w-5 h-5 text-chart-3" />;
@@ -344,15 +417,29 @@ export default function CompetitorsPage() {
                       See how your brand stacks up against competitors in AI citations
                     </CardDescription>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsAddDialogOpen(true)}
-                    data-testid="button-add-competitor"
-                    className="shrink-0"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Competitor
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => rediscoverMutation.mutate()}
+                      disabled={rediscoverMutation.isPending}
+                      title="Re-run AI discovery to find competitors you may be missing"
+                      data-testid="button-rediscover-competitors"
+                    >
+                      <RefreshCw
+                        className={`w-4 h-4 mr-2 ${rediscoverMutation.isPending ? "animate-spin" : ""}`}
+                      />
+                      {rediscoverMutation.isPending ? "Scanning..." : "Re-discover"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setIsAddDialogOpen(true)}
+                      data-testid="button-add-competitor"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Competitor
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -541,93 +628,71 @@ export default function CompetitorsPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {competitors.map((competitor) => {
-                      const discoveredBy = (competitor as any).discoveredBy as string | undefined;
-                      const discoveryLabel =
-                        discoveredBy === "ai"
-                          ? "AI"
-                          : discoveredBy === "citation_mining"
-                            ? "From citations"
-                            : discoveredBy === "citation_auto"
-                              ? "Auto"
-                              : discoveredBy === "scheduler"
-                                ? "Scheduled"
-                                : discoveredBy === "manual"
-                                  ? "Manual"
-                                  : null;
-                      return (
-                        <div
-                          key={competitor.id}
-                          className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
-                          data-testid={`competitor-card-${competitor.id}`}
-                        >
-                          <div className="min-w-0">
-                            <div className="font-medium truncate flex items-center gap-2">
-                              <span className="truncate">{competitor.name}</span>
-                              {discoveryLabel && discoveredBy !== "manual" && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0"
-                                  data-testid={`badge-discovered-${competitor.id}`}
-                                >
-                                  {discoveryLabel}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                              <ExternalLink className="w-3 h-3" />
-                              {competitor.domain}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingCompetitor(competitor);
-                                setEditForm({
-                                  name: competitor.name || "",
-                                  domain: competitor.domain || "",
-                                  industry: competitor.industry || "",
-                                  description: competitor.description || "",
-                                  nameVariations: Array.isArray((competitor as any).nameVariations)
-                                    ? ((competitor as any).nameVariations as string[]).join(", ")
-                                    : "",
-                                });
-                              }}
-                              title="Edit competitor"
-                              data-testid={`button-edit-competitor-${competitor.id}`}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            {discoveredBy && discoveredBy !== "manual" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => ignoreCompetitorMutation.mutate(competitor.id)}
-                                className="text-muted-foreground hover:text-foreground"
-                                title="Mark as false positive — won't be re-discovered"
-                                data-testid={`button-ignore-competitor-${competitor.id}`}
-                              >
-                                <EyeOff className="w-4 h-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deleteCompetitorMutation.mutate(competitor.id)}
-                              className="text-destructive hover:text-destructive"
-                              title="Remove from tracking"
-                              data-testid={`button-delete-competitor-${competitor.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <Tabs
+                    defaultValue={
+                      coreCompetitors.length === 0 && discoveredCompetitors.length > 0
+                        ? "discovered"
+                        : "core"
+                    }
+                  >
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="core" data-testid="tab-core-competitors">
+                        Core ({coreCompetitors.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="discovered" data-testid="tab-discovered-competitors">
+                        Discovered ({discoveredCompetitors.length})
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="core" className="space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        The competitors you track most closely. Add them by hand or promote one from
+                        the discovered pool.
+                      </p>
+                      {coreCompetitors.length === 0 ? (
+                        <p className="py-6 text-center text-sm text-muted-foreground">
+                          No core competitors yet. Add one above, or promote a discovered
+                          competitor.
+                        </p>
+                      ) : (
+                        coreCompetitors.map((competitor) => (
+                          <CompetitorRow
+                            key={competitor.id}
+                            competitor={competitor}
+                            onEdit={openEdit}
+                            onDelete={(id) => deleteCompetitorMutation.mutate(id)}
+                            onIgnore={(id) => ignoreCompetitorMutation.mutate(id)}
+                            onSetTier={(id, tier) => setTierMutation.mutate({ id, tier })}
+                            tierBusy={setTierMutation.isPending}
+                          />
+                        ))
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="discovered" className="space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        Competitors AI discovery surfaced, ranked by relevance. Promote the ones
+                        that matter, ignore the false positives.
+                      </p>
+                      {discoveredCompetitors.length === 0 ? (
+                        <p className="py-6 text-center text-sm text-muted-foreground">
+                          Nothing in the discovered pool. Run Re-discover to surface more.
+                        </p>
+                      ) : (
+                        discoveredCompetitors.map((competitor) => (
+                          <CompetitorRow
+                            key={competitor.id}
+                            competitor={competitor}
+                            onEdit={openEdit}
+                            onDelete={(id) => deleteCompetitorMutation.mutate(id)}
+                            onIgnore={(id) => ignoreCompetitorMutation.mutate(id)}
+                            onSetTier={(id, tier) => setTierMutation.mutate({ id, tier })}
+                            tierBusy={setTierMutation.isPending}
+                          />
+                        ))
+                      )}
+                    </TabsContent>
+                  </Tabs>
                 )}
               </CardContent>
             </Card>
@@ -733,6 +798,181 @@ export default function CompetitorsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// One tracked-competitor row. Expands to a citation drill-down (which AI
+// platforms cite this competitor, and how often) lazily loaded on open, and
+// exposes promote/demote between the core set and the discovered pool.
+function CompetitorRow({
+  competitor,
+  onEdit,
+  onDelete,
+  onIgnore,
+  onSetTier,
+  tierBusy,
+}: {
+  competitor: Competitor;
+  onEdit: (competitor: Competitor) => void;
+  onDelete: (id: string) => void;
+  onIgnore: (id: string) => void;
+  onSetTier: (id: string, tier: "core" | "discovered") => void;
+  tierBusy: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isCore = competitor.tier === "core";
+  const discoveredBy = competitor.discoveredBy;
+  const relevanceScore = competitor.relevanceScore;
+
+  const {
+    data: citationsData,
+    isLoading: citationsLoading,
+    isError: citationsIsError,
+  } = useQuery<{
+    success: boolean;
+    data: { platform: string; count: number }[];
+  }>({
+    queryKey: ["/api/competitors", competitor.id, "latest-citations"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/competitors/${competitor.id}/latest-citations`);
+      return res.json();
+    },
+    enabled: expanded,
+    staleTime: 60_000,
+  });
+  const citations = citationsData?.data ?? [];
+
+  return (
+    <div className="rounded-lg border bg-muted/30" data-testid={`competitor-card-${competitor.id}`}>
+      <div className="flex items-center justify-between gap-2 p-3">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          aria-expanded={expanded}
+          data-testid={`button-expand-competitor-${competitor.id}`}
+        >
+          <ChevronDown
+            className={`h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform ${
+              expanded ? "rotate-180" : ""
+            }`}
+          />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 font-medium">
+              <span className="truncate">{competitor.name}</span>
+              {!isCore && typeof relevanceScore === "number" && (
+                <Badge
+                  variant="outline"
+                  className="h-4 flex-shrink-0 px-1.5 py-0 text-[10px]"
+                  data-testid={`badge-relevance-${competitor.id}`}
+                >
+                  {relevanceScore}% match
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <ExternalLink className="h-3 w-3" />
+              <span className="truncate">{competitor.domain}</span>
+            </div>
+          </div>
+        </button>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          {isCore ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onSetTier(competitor.id, "discovered")}
+              disabled={tierBusy}
+              title="Move to the discovered pool"
+              data-testid={`button-demote-competitor-${competitor.id}`}
+            >
+              <ArrowDownCircle className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onSetTier(competitor.id, "core")}
+              disabled={tierBusy}
+              title="Promote to core competitors"
+              data-testid={`button-promote-competitor-${competitor.id}`}
+            >
+              <ArrowUpCircle className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(competitor)}
+            title="Edit competitor"
+            data-testid={`button-edit-competitor-${competitor.id}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          {discoveredBy && discoveredBy !== "manual" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onIgnore(competitor.id)}
+              className="text-muted-foreground hover:text-foreground"
+              title="Mark as false positive, won't be re-discovered"
+              data-testid={`button-ignore-competitor-${competitor.id}`}
+            >
+              <EyeOff className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(competitor.id)}
+            className="text-destructive hover:text-destructive"
+            title="Remove from tracking"
+            data-testid={`button-delete-competitor-${competitor.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t px-3 py-3">
+          {citationsLoading ? (
+            <div className="flex items-center justify-center py-3">
+              <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary" />
+            </div>
+          ) : citationsIsError ? (
+            <p className="text-xs text-muted-foreground">
+              Couldn&apos;t load citation data. Expand again to retry.
+            </p>
+          ) : citations.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No citations recorded yet. Once a citation scan runs, the AI platforms that cite{" "}
+              {competitor.name} show up here.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Where they&apos;re cited</p>
+              <div className="flex flex-wrap gap-2">
+                {citations.map(({ platform, count }) => {
+                  const Icon = platformIcon[platform.toLowerCase()] ?? Brain;
+                  return (
+                    <div
+                      key={platform}
+                      className="flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs"
+                      data-testid={`citation-${competitor.id}-${platform}`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="capitalize">{platform}</span>
+                      <span className="font-mono font-medium tabular-nums">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

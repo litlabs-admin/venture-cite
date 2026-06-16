@@ -260,6 +260,72 @@ export function setupDashboardRoutes(app: Express): void {
   );
 
   // ==========================================================================
+  // GET /api/dashboard/cited-urls/:brandId
+  //
+  // Flat list of every URL an AI engine cited, drawn from the already-stored
+  // geo_rankings.cited_urls[] array (with citing_outlet_url as a fallback when
+  // the array is empty but the row is cited). Powers the Citations table on the
+  // Monitor Overview + Reports so users can see exactly which pages show up,
+  // without drilling into individual prompt responses. Read-only, no new schema.
+  // ==========================================================================
+  app.get(
+    "/api/dashboard/cited-urls/:brandId",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const { rankings } = await loadRankingsContext(brand.id, { since: parseSinceQuery(req) });
+
+        // One entry per (platform, prompt, url). Dedupe identical URLs that
+        // recur across runs, keeping the most recent citedAt.
+        const seen = new Map<
+          string,
+          { platform: string; prompt: string; url: string; citedAt: Date }
+        >();
+        for (const r of toCitedArr(rankings)) {
+          const urls =
+            Array.isArray(r.citedUrls) && r.citedUrls.length > 0
+              ? r.citedUrls
+              : r.citingOutletUrl
+                ? [r.citingOutletUrl]
+                : [];
+          for (const rawUrl of urls) {
+            const url = (rawUrl ?? "").trim();
+            if (!url) continue;
+            const key = `${r.aiPlatform}|${r.prompt}|${url}`;
+            const existing = seen.get(key);
+            if (!existing || r.checkedAt.getTime() > existing.citedAt.getTime()) {
+              seen.set(key, {
+                platform: r.aiPlatform,
+                prompt: r.prompt,
+                url,
+                citedAt: r.checkedAt,
+              });
+            }
+          }
+        }
+
+        // Cap the payload. After dedupe this is almost always well under the
+        // limit, but a brand with a very large prompt portfolio could otherwise
+        // return thousands of rows; the UI only shows the most recent anyway.
+        const MAX_ITEMS = 500;
+        const all = Array.from(seen.values()).sort(
+          (a, b) => b.citedAt.getTime() - a.citedAt.getTime(),
+        );
+        const items = all.slice(0, MAX_ITEMS);
+
+        res.json({
+          success: true,
+          data: { items, total: all.length, truncated: all.length > MAX_ITEMS },
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to load cited URLs");
+      }
+    }),
+  );
+
+  // ==========================================================================
   // GET /api/dashboard/gap-matrix/:brandId
   // ==========================================================================
   app.get(
