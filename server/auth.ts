@@ -1,6 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import rateLimit from "express-rate-limit";
 import { supabaseAdmin } from "./supabase";
+import { supabaseAuth } from "./lib/supabaseAuth";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { and, eq, isNull } from "drizzle-orm";
@@ -8,6 +9,8 @@ import { waitUntil } from "@vercel/functions";
 import { Sentry } from "./instrument";
 import { logger, requestContext } from "./lib/logger";
 import { authRateKey } from "./lib/authRateKey";
+import { isPasswordLeaked } from "./lib/leakedPassword";
+import { validatePassword } from "@shared/passwordPolicy";
 import { maybeTickActiveRunsForUser } from "./lib/workflowEngine";
 import { sendWelcomeEmail } from "./lib/welcomeEmail";
 
@@ -318,10 +321,12 @@ export function setupAuth(app: Express) {
       if (!email || !password) {
         return res.status(400).json({ success: false, error: "Email and password are required" });
       }
-      if (typeof password !== "string" || password.length < 8) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Password must be at least 8 characters" });
+      // Server-side strength enforcement (the trust boundary — the client
+      // checklist is bypassable). Same shared policy the UI renders, so the
+      // two can't drift. admin.createUser below does NOT enforce these rules.
+      const pwCheck = validatePassword(password);
+      if (!pwCheck.ok) {
+        return res.status(400).json({ success: false, error: pwCheck.error });
       }
 
       const normalizedEmail = String(email).toLowerCase().trim();
@@ -359,6 +364,20 @@ export function setupAuth(app: Express) {
           logger.warn({ err, email: normalizedEmail }, "auth: register signup-email send threw");
         }
       };
+
+      // Leaked-password protection for signup. admin.createUser (below)
+      // bypasses GoTrue's configured leaked-password rules
+      // (supabase/auth#1959), so we run the same HIBP check here that GoTrue
+      // applies to the reset + change-password paths. Fail-open on outage
+      // (see leakedPassword.ts). Done after the duplicate-email-agnostic
+      // checks so a breached password is rejected before any account I/O.
+      if (await isPasswordLeaked(password)) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "This password has appeared in a known data breach. Please choose a different password.",
+        });
+      }
 
       // Plan 4 Task 3: require email verification before the account can
       // be used. No session is issued in this response — the client
@@ -428,7 +447,11 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ success: false, error: "Email and password are required" });
       }
 
-      const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+      // Credential check on the dedicated auth client, NOT supabaseAdmin —
+      // signInWithPassword would otherwise overwrite the admin client's
+      // Authorization header with this user's JWT and break server-side
+      // Storage uploads with RLS errors. See server/lib/supabaseAuth.ts.
+      const { data, error } = await supabaseAuth.auth.signInWithPassword({
         email: String(email).toLowerCase().trim(),
         password: String(password),
       });

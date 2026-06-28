@@ -18,6 +18,11 @@ export default tseslint.config(
       "*.tsbuildinfo",
       "drizzle/**",
       ".husky/**",
+      // Local vendored tool/skill caches — not project source, never lint
+      // (also gitignored). Their browser/UMD bundles otherwise flood the
+      // report and break lint-staged if accidentally staged.
+      ".agents/**",
+      ".codex/**",
     ],
   },
 
@@ -71,6 +76,27 @@ export default tseslint.config(
     rules: {
       // Server is allowed console.log for now (replaced by pino in Wave 0.2)
       "no-console": "off",
+      // Guardrail: never run user-auth (session-minting) calls on the
+      // service-role client. supabase-js stores the returned session on the
+      // calling client and then uses the user's JWT — not the service key —
+      // as the Authorization header, so the next Storage/PostgREST call loses
+      // service_role and fails RLS ("new row violates row-level security
+      // policy"). Use supabaseAuth (server/lib/supabaseAuth.ts) instead.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.object.object.name='supabaseAdmin'][callee.object.property.name='auth'][callee.property.name='signInWithPassword']",
+          message:
+            "Do not call signInWithPassword on supabaseAdmin — it poisons the service-role client's Authorization header and breaks service-role Storage/PostgREST with RLS errors. Use supabaseAuth from server/lib/supabaseAuth.ts.",
+        },
+        {
+          selector:
+            "CallExpression[callee.object.object.name='supabaseAdmin'][callee.object.property.name='auth'][callee.property.name='setSession']",
+          message:
+            "Do not call setSession on supabaseAdmin — it poisons the service-role client. Use supabaseAuth from server/lib/supabaseAuth.ts.",
+        },
+      ],
     },
   },
 

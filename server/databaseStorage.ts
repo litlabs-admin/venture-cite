@@ -2091,6 +2091,10 @@ export class DatabaseStorage implements IStorage {
   // similarity > threshold, or null if none. Falls back to exact-match
   // when the pg_trgm extension or function is unavailable (the
   // similarity() call throws → caller catches and treats as no match).
+  //
+  // similarity() is schema-qualified as extensions.similarity() because
+  // pg_trgm lives in the `extensions` schema (migration 0084), and the
+  // pooler connection's search_path ("$user", public) does not include it.
   async findSimilarFaqQuestion(
     brandId: string,
     question: string,
@@ -2098,10 +2102,10 @@ export class DatabaseStorage implements IStorage {
   ): Promise<{ id: string; question: string; similarity: number } | null> {
     try {
       const rows = await db.execute(sql`
-        SELECT id, question, similarity(question, ${question}) AS sim
+        SELECT id, question, extensions.similarity(question, ${question}) AS sim
         FROM faq_items
         WHERE brand_id = ${brandId}
-          AND similarity(question, ${question}) >= ${threshold}
+          AND extensions.similarity(question, ${question}) >= ${threshold}
         ORDER BY sim DESC
         LIMIT 1
       `);

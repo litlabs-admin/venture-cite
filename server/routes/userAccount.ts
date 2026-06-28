@@ -15,9 +15,11 @@ import type { Express, Request } from "express";
 import { eq, inArray } from "drizzle-orm";
 import rateLimit from "express-rate-limit";
 import { supabaseAdmin } from "../supabase";
+import { supabaseAuth } from "../lib/supabaseAuth";
 import { isAuthenticated } from "../auth";
 import { db } from "../db";
 import * as schema from "@shared/schema";
+import { validatePassword } from "@shared/passwordPolicy";
 import { users } from "@shared/schema";
 import { logger } from "../lib/logger";
 import { logAudit } from "../lib/audit";
@@ -194,7 +196,10 @@ export function setupUserAccountRoutes(app: Express) {
 
         // Re-verify the password against Supabase to guard against session
         // theft. Don't issue a new session — we just want the credential check.
-        const { error: signInErr } = await supabaseAdmin.auth.signInWithPassword({
+        // Use the dedicated auth client, not supabaseAdmin: signInWithPassword
+        // poisons the calling client's Authorization header and would break
+        // service-role Storage uploads (see server/lib/supabaseAuth.ts).
+        const { error: signInErr } = await supabaseAuth.auth.signInWithPassword({
           email: user.email,
           password,
         });
@@ -381,7 +386,7 @@ export function setupUserAccountRoutes(app: Express) {
         const { z } = await import("zod");
         const passwordSchema = z.object({
           currentPassword: z.string().min(1, "Current password required"),
-          newPassword: z.string().min(8, "Password must be at least 8 characters"),
+          newPassword: z.string(),
         });
         const parsed = passwordSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -398,16 +403,27 @@ export function setupUserAccountRoutes(app: Express) {
         }
         const { currentPassword, newPassword } = parsed.data;
 
-        // Re-auth using supabaseAdmin.auth.signInWithPassword — same
-        // pattern as the regular login route in server/auth.ts. The
-        // service-role key works here; constructing a fresh anon-key
-        // client was fragile (anon key isn't reliably present in the
-        // server-side env in production).
-        const { data: signInData, error: signInError } =
-          await supabaseAdmin.auth.signInWithPassword({
+        // Same shared strength policy as registration + the UIs. GoTrue also
+        // enforces its configured rules on admin.updateUserById below, but
+        // validating here keeps the message clear and the policy in one place.
+        const pwCheck = validatePassword(newPassword);
+        if (!pwCheck.ok) {
+          return res.status(400).json({ success: false, error: pwCheck.error });
+        }
+
+        // Re-auth on the dedicated auth client (supabaseAuth), NOT
+        // supabaseAdmin. The old code used supabaseAdmin here "because the
+        // anon-key client was fragile" — but that is exactly what poisoned the
+        // shared service-role client's Authorization header and broke
+        // server-side Storage uploads with RLS errors. supabaseAuth prefers the
+        // anon key and falls back to the service key, so it works in every env
+        // without touching supabaseAdmin (see server/lib/supabaseAuth.ts).
+        const { data: signInData, error: signInError } = await supabaseAuth.auth.signInWithPassword(
+          {
             email: user.email,
             password: currentPassword,
-          });
+          },
+        );
         if (signInError || !signInData?.user) {
           return res.status(401).json({ success: false, error: "Current password incorrect" });
         }
@@ -416,8 +432,18 @@ export function setupUserAccountRoutes(app: Express) {
           password: newPassword,
         });
         if (updateError) {
-          logger.error({ err: updateError, userId: user.id }, "user.password.update failed");
-          return res.status(502).json({ success: false, error: "Password update failed" });
+          // admin.updateUserById enforces password strength + leaked-password
+          // (HIBP) rules, so a rejected password is a user-actionable 4xx — not
+          // an upstream 502. Surface the real reason (e.g. "Password is known to
+          // be compromised") so the user can pick another; keep the generic 502
+          // only for genuine GoTrue/network failures (no internal detail leak).
+          const status = (updateError as { status?: number }).status;
+          const isClientError = typeof status === "number" && status >= 400 && status < 500;
+          logger.warn({ err: updateError, userId: user.id }, "user.password.update failed");
+          return res.status(isClientError ? 400 : 502).json({
+            success: false,
+            error: isClientError ? updateError.message : "Password update failed",
+          });
         }
 
         // Revoke all OTHER sessions (every device except the one used to

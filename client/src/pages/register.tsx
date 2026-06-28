@@ -17,6 +17,7 @@ import { Eye, EyeOff, Loader2, Check, X } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
 import { setSession } from "@/lib/authStore";
 import { Helmet } from "react-helmet-async";
+import { PASSWORD_RULES } from "@shared/passwordPolicy";
 
 // Sessionstorage key that hands the verify-email page the address the
 // user just registered with — avoids a query-string param that could
@@ -34,11 +35,10 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const passwordRequirements = [
-    { label: "At least 8 characters", met: password.length >= 8 },
-    { label: "Contains a number", met: /\d/.test(password) },
-    { label: "Contains uppercase letter", met: /[A-Z]/.test(password) },
-  ];
+  const passwordRequirements = PASSWORD_RULES.map((r) => ({
+    label: r.label,
+    met: r.test(password),
+  }));
 
   const passwordsMatch = password === confirmPassword && password.length > 0;
   const allRequirementsMet = passwordRequirements.every((r) => r.met);

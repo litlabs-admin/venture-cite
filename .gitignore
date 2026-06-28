@@ -95,3 +95,7 @@ graphify-out/
 .replit
 replit.nix
 attached_assets/
+.VSCodeCounter/
+brainstorms/
+.agents/
+.codex/

@@ -18,6 +18,7 @@ import ventureCiteLogo from "@assets/logo.png";
 import { supabase } from "@/lib/supabase";
 import { Sentry } from "@/lib/sentry";
 import { Helmet } from "react-helmet-async";
+import { PASSWORD_RULES } from "@shared/passwordPolicy";
 
 export default function ResetPassword() {
   const [, setLocation] = useLocation();
@@ -55,11 +56,10 @@ export default function ResetPassword() {
     };
   }, []);
 
-  const passwordRequirements = [
-    { label: "At least 8 characters", met: password.length >= 8 },
-    { label: "Contains a number", met: /\d/.test(password) },
-    { label: "Contains uppercase letter", met: /[A-Z]/.test(password) },
-  ];
+  const passwordRequirements = PASSWORD_RULES.map((r) => ({
+    label: r.label,
+    met: r.test(password),
+  }));
 
   const passwordsMatch = password === confirmPassword && password.length > 0;
   const allRequirementsMet = passwordRequirements.every((r) => r.met);
