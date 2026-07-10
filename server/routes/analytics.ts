@@ -662,10 +662,13 @@ export function setupAnalyticsRoutes(app: Express): void {
           const citedAuthority = citedRows
             .map((r) => r.authorityScore)
             .filter((s): s is number => typeof s === "number");
+          // null (not 0) when NO cited row on this platform carries an
+          // authority score → authority is UNMEASURED, so the scorer drops
+          // its 30-pt weight rather than capping the platform score at 70.
           const avgAuthority =
             citedAuthority.length > 0
               ? citedAuthority.reduce((a, b) => a + b, 0) / citedAuthority.length
-              : 0;
+              : null;
           const visibilityScore = computeVisibilityScore(
             citations,
             mentions,
@@ -703,10 +706,20 @@ export function setupAnalyticsRoutes(app: Express): void {
           0,
         );
 
-        // Share of Voice = brand citations / total market citations * 100
+        // Share of Voice = brand citations / total market citations * 100.
+        // The numerator MUST match the own-brand total the leaderboard used
+        // to build the denominator. brandTotalCitations only sums platforms
+        // in AI_PLATFORMS, but the leaderboard's own-brand bucket counts
+        // every platform label — so a citation on a platform outside
+        // AI_PLATFORMS deflated SoV (numerator missed it, denominator kept
+        // it). Read the own row straight from the leaderboard for a
+        // consistent numerator/denominator; fall back defensively if for
+        // some reason there's no own row.
+        const ownLeaderboardRow = leaderboard.find((entry) => entry.isOwn);
+        const brandSovCitations = ownLeaderboardRow?.totalCitations ?? brandTotalCitations;
         const shareOfVoice =
           totalMarketCitations > 0
-            ? Math.round((brandTotalCitations / totalMarketCitations) * 1000) / 10
+            ? Math.round((brandSovCitations / totalMarketCitations) * 1000) / 10
             : 0;
 
         // Overall AI Visibility Score — average of per-platform scores across

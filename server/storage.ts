@@ -748,6 +748,10 @@ export interface IStorage {
   }): Promise<ScanJob>;
   getScanJob(id: string): Promise<(ScanJob & { brandName: string }) | undefined>;
   getActiveScanJobForBrand(brandId: string): Promise<ScanJob | undefined>;
+  // Reaper: flip queued/running scan jobs older than the threshold to failed
+  // so a job orphaned mid-run (serverless timeout/deploy/crash) can't wedge
+  // all future scans for its brand. Returns the count reset.
+  failStaleScanJobs(olderThanMinutes: number): Promise<number>;
   getActiveScanJobsForUser(userId: string): Promise<Array<ScanJob & { brandName: string }>>;
   getLastCompletedScanForBrand(
     brandId: string,

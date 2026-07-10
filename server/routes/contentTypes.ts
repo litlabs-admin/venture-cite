@@ -218,7 +218,8 @@ export function setupContentTypesRoutes(app: Express): void {
       try {
         const user = requireUser(req);
         const brandId = req.query.brandId as string | undefined;
-        if (brandId) {
+        if (typeof brandId === "string" && brandId) {
+          await requireBrand(brandId, user.id);
           const listicles = await storage.getListicles(brandId);
           return res.json({ success: true, data: listicles });
         }
@@ -545,6 +546,7 @@ export function setupContentTypesRoutes(app: Express): void {
         const user = requireUser(req);
         const { brandId, contentType } = req.query;
         if (brandId && typeof brandId === "string") {
+          await requireBrand(brandId, user.id);
           const content = await storage.getBofuContent(brandId, contentType as string);
           return res.json({ success: true, data: content });
         }
@@ -818,6 +820,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
         const user = requireUser(req);
         const { brandId, articleId } = req.query;
         if (brandId && typeof brandId === "string") {
+          await requireBrand(brandId, user.id);
           const faqs = await storage.getFaqItems(brandId, articleId as string);
           return res.json({ success: true, data: faqs });
         }

@@ -120,7 +120,7 @@ export async function sendWeeklyVisibilityReport(data: WeeklyReportData): Promis
     return true;
   }
 
-  const greeting = data.firstName ? `Hi ${data.firstName},` : "Hi,";
+  const greeting = data.firstName ? `Hi ${escapeHtml(data.firstName)},` : "Hi,";
   const weekOf = new Date().toLocaleDateString();
 
   const totalCitedAllBrands = data.brands.reduce((s, b) => s + b.totalCited, 0);
@@ -300,7 +300,7 @@ export async function sendWeeklyDigest(
   }
 
   const { user, brandBriefs } = digestPayload;
-  const greeting = user.firstName ? `Hi ${user.firstName},` : "Hi,";
+  const greeting = user.firstName ? `Hi ${escapeHtml(user.firstName)},` : "Hi,";
   const weekOf = new Date().toLocaleDateString();
   // Match the original line's styling tokens exactly so we don't churn
   // the email design — only the content gets the optional "Week N" suffix.

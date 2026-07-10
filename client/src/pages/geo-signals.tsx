@@ -37,6 +37,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { safeExternalHref } from "@/lib/urlSafety";
 import { Helmet } from "react-helmet-async";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import type { Article, BrandPrompt } from "@shared/schema";
@@ -1497,7 +1498,7 @@ export default function GeoSignals() {
                             </p>
                             {auditedUrl && (
                               <a
-                                href={auditedUrl}
+                                href={safeExternalHref(auditedUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-block text-xs text-primary hover:underline"
@@ -1533,7 +1534,7 @@ export default function GeoSignals() {
                               <span className="font-medium text-foreground">Fetched live</span>
                               {auditedUrl && (
                                 <a
-                                  href={auditedUrl}
+                                  href={safeExternalHref(auditedUrl)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="truncate text-primary hover:underline max-w-[260px]"

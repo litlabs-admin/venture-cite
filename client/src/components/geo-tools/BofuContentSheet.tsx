@@ -24,6 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, Copy, Download, ExternalLink, CheckCircle2 } from "lucide-react";
 import SafeMarkdown from "@/components/SafeMarkdown";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { safeExternalHref } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
 import type { BofuContent } from "@shared/schema";
 
@@ -280,7 +281,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
             </Button>
             {publishedUrl && (
               <a
-                href={publishedUrl}
+                href={safeExternalHref(publishedUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline inline-flex items-center gap-1"

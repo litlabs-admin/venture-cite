@@ -25,6 +25,7 @@ import { getAccessToken } from "@/lib/authStore";
 import BufferConnectDialog from "@/components/articles/BufferConnectDialog";
 import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
+import { isAllowedStripeRedirect } from "@/lib/urlSafety";
 import { Loader2 } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
 import { useTourState, useTourStatePatch } from "@/hooks/useTourState";
@@ -298,7 +299,14 @@ function BillingSection() {
       return json as { url: string };
     },
     onSuccess: ({ url }) => {
-      window.location.href = url;
+      if (isAllowedStripeRedirect(url)) {
+        window.location.href = url;
+      } else {
+        toast({
+          description: "Received an unexpected redirect URL from the server.",
+          variant: "destructive",
+        });
+      }
     },
     onError: (err: unknown) =>
       toast({

@@ -66,28 +66,42 @@ describe("visibilityMetrics — canonical citation rate", () => {
       expect(v).toBe(100);
     });
 
-    it("treats avgRank <= 0 as 'no rank data' (neutral factor 1)", () => {
-      // rate 1, authority 0: 70 * 1 * ((1+1)/2) + 0 = 70
-      expect(computeVisibilityScore(4, 4, 0, 0)).toBe(70);
-      expect(computeVisibilityScore(4, 4, -5, 0)).toBe(70);
+    it("treats avgRank <= 0 as 'no rank data' → NEUTRAL blend (factor 0.5), not best-case", () => {
+      // rate 1, authority measured 0, no rank data: 70 * 1 * ((1+0.5)/2) + 0
+      // = 70 * 0.75 = 52.5 → 53. (Was 70 under the old best-case factor 1 —
+      // the bug where a brand with NO rank data outscored one cited at rank 5.)
+      expect(computeVisibilityScore(4, 4, 0, 0)).toBe(53);
+      expect(computeVisibilityScore(4, 4, -5, 0)).toBe(53);
     });
 
-    it("is exactly the legacy dashboard-hero formula (behaviour-preserving canonicalisation)", () => {
-      // Mirror of the pre-unification hero expression so the refactor is
-      // provably a no-op for the hero surface.
-      const legacyHero = (
+    it("drops the authority weight when authority is UNMEASURED (null), not capping at 70", () => {
+      // rate 1, rank 1, authority null → renormalise to 100: 100 * 1 * 1 = 100.
+      // (Was capped at 70 when unmeasured authority was scored as a genuine 0.)
+      expect(computeVisibilityScore(4, 4, 1, null)).toBe(100);
+      // rate 1, no rank data, authority null → 100 * 1 * 0.75 = 75.
+      expect(computeVisibilityScore(4, 4, 0, null)).toBe(75);
+      // A genuine measured 0 authority STILL costs the 30 pts: 70 * 1 * 1 = 70.
+      expect(computeVisibilityScore(4, 4, 1, 0)).toBe(70);
+    });
+
+    it("matches the documented composite formula (measured + unmeasured authority)", () => {
+      const formula = (
         cited: number,
         total: number,
         avgRank: number,
-        avgAuth: number,
+        avgAuth: number | null,
       ): number => {
-        if (cited === 0) return 0;
+        if (cited <= 0) return 0;
         const rate = total > 0 ? cited / total : 0;
-        const rankFactor = avgRank > 0 ? Math.max(0, 1 - (avgRank - 1) / 10) : 1;
-        const raw = 70 * rate * ((1 + rankFactor) / 2) + 30 * (avgAuth / 100);
+        const rankFactor = avgRank > 0 ? Math.max(0, 1 - (avgRank - 1) / 10) : 0.5;
+        const rankBlend = (1 + rankFactor) / 2;
+        const raw =
+          avgAuth === null
+            ? 100 * rate * rankBlend
+            : 70 * rate * rankBlend + 30 * (Math.max(0, avgAuth) / 100);
         return Math.min(100, Math.max(0, Math.round(raw)));
       };
-      for (const [c, t, r, a] of [
+      const cases: Array<[number, number, number, number | null]> = [
         [0, 0, 0, 0],
         [3, 10, 2, 55],
         [10, 10, 1, 100],
@@ -95,8 +109,12 @@ describe("visibilityMetrics — canonical citation rate", () => {
         [5, 8, 0, 40],
         [12, 40, 4.5, 73],
         [40, 40, 10, 100],
-      ] as const) {
-        expect(computeVisibilityScore(c, t, r, a)).toBe(legacyHero(c, t, r, a));
+        [4, 4, 1, null],
+        [4, 4, 0, null],
+        [8, 10, 3, null],
+      ];
+      for (const [c, t, r, a] of cases) {
+        expect(computeVisibilityScore(c, t, r, a)).toBe(formula(c, t, r, a));
       }
     });
   });

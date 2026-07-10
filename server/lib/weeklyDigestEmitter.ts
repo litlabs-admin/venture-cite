@@ -45,7 +45,10 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
       id: schema.users.id,
       email: schema.users.email,
       firstName: schema.users.firstName,
-      lastWeeklyReportSentAt: schema.users.lastWeeklyReportSentAt,
+      // Digest dedup/window uses its OWN stamp, not the report's — sharing
+      // lastWeeklyReportSentAt meant the Sunday report permanently suppressed
+      // this digest (and corrupted the "alerts since last digest" window).
+      lastWeeklyDigestSentAt: schema.users.lastWeeklyDigestSentAt,
       weeklyReportEnabled: schema.users.weeklyReportEnabled,
       deletedAt: schema.users.deletedAt,
     })
@@ -59,8 +62,8 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
   if (!user.email) return { sent: false, reason: "no_email" };
 
   if (
-    user.lastWeeklyReportSentAt &&
-    Date.now() - new Date(user.lastWeeklyReportSentAt).getTime() < SIX_DAYS_MS
+    user.lastWeeklyDigestSentAt &&
+    Date.now() - new Date(user.lastWeeklyDigestSentAt).getTime() < SIX_DAYS_MS
   ) {
     return { sent: false, reason: "deduped" };
   }
@@ -81,8 +84,8 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
   // Run-change alerts accumulate continuously between weekly sends. Carry
   // every alert raised since the last digest (or the last 7 days on the
   // first send) so the email reflects the whole week, not just the final run.
-  const alertsSince = user.lastWeeklyReportSentAt
-    ? new Date(user.lastWeeklyReportSentAt).getTime()
+  const alertsSince = user.lastWeeklyDigestSentAt
+    ? new Date(user.lastWeeklyDigestSentAt).getTime()
     : Date.now() - 7 * 24 * 60 * 60 * 1000;
 
   const briefs: WeeklyDigestBrandBrief[] = [];
@@ -175,7 +178,7 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
     if (ok) {
       await db
         .update(schema.users)
-        .set({ lastWeeklyReportSentAt: new Date() })
+        .set({ lastWeeklyDigestSentAt: new Date() })
         .where(eq(schema.users.id, user.id));
       return { sent: true };
     }

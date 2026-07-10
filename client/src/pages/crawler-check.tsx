@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { safeExternalHref } from "@/lib/urlSafety";
 import { Helmet } from "react-helmet-async";
 import {
   Bot,
@@ -230,7 +231,7 @@ export default function CrawlerCheck() {
                   Results for {checkResult.url}
                 </span>
                 <a
-                  href={checkResult.robotsTxtUrl}
+                  href={safeExternalHref(checkResult.robotsTxtUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-chart-1 hover:underline flex items-center gap-1"

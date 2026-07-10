@@ -7,7 +7,12 @@
 
 import type { Express } from "express";
 import { storage } from "../storage";
-import { requireUser, requireBrand } from "../lib/ownership";
+import {
+  requireUser,
+  requireBrand,
+  requireCitationRun,
+  sendOwnershipError,
+} from "../lib/ownership";
 import {
   kickoffBrandPromptsRun,
   advanceCitationRun,
@@ -564,7 +569,15 @@ export function setupPromptsRoutes(app: Express): void {
         const user = requireUser(req);
         try {
           await requireBrand(req.params.brandId, user.id);
-        } catch {
+          // `:runId` is a sibling param — verify the run belongs to the
+          // caller's brand, or a user could drive another tenant's run
+          // (cross-tenant mutation + LLM cost). 404 on miss.
+          const run = await requireCitationRun(req.params.runId, user.id);
+          if (run.brandId !== req.params.brandId) {
+            return res.status(404).json({ success: false, error: "Citation run not found" });
+          }
+        } catch (ownErr) {
+          if (sendOwnershipError(res, ownErr)) return;
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
         const runId = req.params.runId;
@@ -593,6 +606,12 @@ export function setupPromptsRoutes(app: Express): void {
       try {
         const user = requireUser(req);
         const brand = await requireBrand(req.params.brandId, user.id);
+        // `:runId` is a sibling param — confirm the run belongs to this brand
+        // before returning its rows (which include raw LLM responses).
+        const run = await requireCitationRun(req.params.runId, user.id);
+        if (run.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Citation run not found" });
+        }
         const rankings = await storage.getGeoRankingsByRunId(req.params.runId);
 
         // Wave 9.2: build a prompt-text → orderIndex map so the result

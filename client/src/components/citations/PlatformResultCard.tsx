@@ -13,6 +13,7 @@ import SafeMarkdown from "@/components/SafeMarkdown";
 import { createHighlightPlugin } from "@/lib/highlightTermsRehype";
 import { useToast } from "@/hooks/use-toast";
 import { PLATFORM_COLORS } from "@/lib/platformColors";
+import { safeExternalHref } from "@/lib/urlSafety";
 
 export type PlatformResult = {
   platform: string;
@@ -234,7 +235,7 @@ export function PlatformResultCard({
                         return (
                           <a
                             key={url}
-                            href={url}
+                            href={safeExternalHref(url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs px-2 py-1 rounded bg-secondary hover:bg-accent transition-colors"

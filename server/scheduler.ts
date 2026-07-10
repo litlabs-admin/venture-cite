@@ -7,7 +7,7 @@ import { generateSuggestedPrompts } from "./lib/suggestionGenerator";
 import { storage } from "./storage";
 import { sendWeeklyVisibilityReport, isEmailConfigured, type BrandReport } from "./emailService";
 import { discoverCompetitors } from "./lib/competitorDiscovery";
-import { withAdvisoryLock, lockKeys } from "./lib/advisoryLock";
+import { withAdvisoryLock, lockKeys, type LockKey } from "./lib/advisoryLock";
 import { runMentionScan } from "./lib/runMentionScan";
 import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
@@ -21,7 +21,29 @@ import { captureAndFlush } from "./lib/sentryReport";
 const WEEKLY_CRON = process.env.WEEKLY_REPORT_CRON || "0 8 * * 0";
 const MAX_BRANDS_PER_USER = Number(process.env.WEEKLY_MAX_BRANDS_PER_USER || 3);
 
+// Advisory-lock keys for jobs that were previously unguarded. Kept in the
+// same 9100xx int8 namespace as lockKeys in ./lib/advisoryLock, but declared
+// locally so that shared constant map stays untouched. Cast to LockKey — the
+// pg key only needs to be a stable, distinct integer per job so overlapping
+// scheduler instances no-op the second concurrent invocation.
+const schedulerLockKeys = {
+  weeklyReport: 910010 as LockKey,
+  autoCitation: 910011 as LockKey,
+  weeklyCatchupKickoff: 910012 as LockKey,
+  accountPurge: 910013 as LockKey,
+  brandPurge: 910014 as LockKey,
+};
+
 export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: number }> {
+  const outcome = await withAdvisoryLock(
+    schedulerLockKeys.weeklyReport,
+    "weekly-report-job",
+    runWeeklyReportJobImpl,
+  );
+  return outcome.ran ? outcome.result : { sent: 0, skipped: 0 };
+}
+
+async function runWeeklyReportJobImpl(): Promise<{ sent: number; skipped: number }> {
   let sent = 0;
   let skipped = 0;
 
@@ -171,6 +193,12 @@ export async function selectBrandsForCitationScan() {
 }
 
 export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
+  await withAdvisoryLock(schedulerLockKeys.autoCitation, "auto-citation-job", () =>
+    runAutoCitationJobImpl(deadlineMs),
+  );
+}
+
+async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
   logger.info("auto-citation job starting");
 
   // Foundations Plan 1 Task 11: iterate every non-soft-deleted brand
@@ -415,6 +443,15 @@ export async function detectFactScrapeFailureRate(): Promise<{ alerted: number }
 const ACCOUNT_PURGE_CRON = process.env.ACCOUNT_PURGE_CRON || "0 3 * * *";
 
 export async function runAccountPurgeJob(): Promise<{ purged: number; failed: number }> {
+  const outcome = await withAdvisoryLock(
+    schedulerLockKeys.accountPurge,
+    "account-purge-job",
+    runAccountPurgeJobImpl,
+  );
+  return outcome.ran ? outcome.result : { purged: 0, failed: 0 };
+}
+
+async function runAccountPurgeJobImpl(): Promise<{ purged: number; failed: number }> {
   const now = new Date();
   const due = await db
     .select({ id: schema.users.id, email: schema.users.email })
@@ -473,6 +510,15 @@ export async function runAccountPurgeJob(): Promise<{ purged: number; failed: nu
 const BRAND_PURGE_CRON = process.env.BRAND_PURGE_CRON || "30 3 * * *";
 
 export async function runBrandPurgeJob(): Promise<{ purged: number; failed: number }> {
+  const outcome = await withAdvisoryLock(
+    schedulerLockKeys.brandPurge,
+    "brand-purge-job",
+    runBrandPurgeJobImpl,
+  );
+  return outcome.ran ? outcome.result : { purged: 0, failed: 0 };
+}
+
+async function runBrandPurgeJobImpl(): Promise<{ purged: number; failed: number }> {
   const now = new Date();
   const due = await db
     .select({ id: schema.brands.id, name: schema.brands.name, userId: schema.brands.userId })
@@ -521,6 +567,19 @@ export async function runBrandPurgeJob(): Promise<{ purged: number; failed: numb
 // firing a second weekly_catchup for a brand that still has a non-terminal
 // run from a prior kickoff.
 export async function runWeeklyCatchupKickoff(): Promise<{
+  started: number;
+  skipped: number;
+  failed: number;
+}> {
+  const outcome = await withAdvisoryLock(
+    schedulerLockKeys.weeklyCatchupKickoff,
+    "weekly-catchup-kickoff-job",
+    runWeeklyCatchupKickoffImpl,
+  );
+  return outcome.ran ? outcome.result : { started: 0, skipped: 0, failed: 0 };
+}
+
+async function runWeeklyCatchupKickoffImpl(): Promise<{
   started: number;
   skipped: number;
   failed: number;

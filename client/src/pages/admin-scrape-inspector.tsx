@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { cn } from "@/lib/utils";
+import { safeExternalHref } from "@/lib/urlSafety";
 
 type Event = {
   id: string;
@@ -268,7 +269,7 @@ export default function AdminScrapeInspector() {
           </h1>
           {brand?.website && (
             <a
-              href={brand.website}
+              href={safeExternalHref(brand.website)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -421,7 +422,7 @@ export default function AdminScrapeInspector() {
                 <tr key={p.id} className="border-t border-border align-top">
                   <td className="py-2">
                     <a
-                      href={p.url}
+                      href={safeExternalHref(p.url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline break-all"

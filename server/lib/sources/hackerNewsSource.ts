@@ -75,6 +75,22 @@ interface HNItem {
 /** Maximum number of stories for which we expand the comment tree. */
 const COMMENT_EXPANSION_CAP = 10;
 
+/** Per-request timeout for Algolia fetches. A hung upstream must not burn the
+ * whole serverless function budget. Mirrors the AbortController pattern in
+ * server/lib/ssrf.ts. */
+const FETCH_TIMEOUT_MS = 10_000;
+
+/** fetch() with an AbortController timeout that is always cleared. */
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Walk an HNItem tree (BFS) and collect all comment nodes that have text.
  */
@@ -135,7 +151,7 @@ export async function scanHackerNewsSource(
         `&hitsPerPage=25` +
         numericFilter;
       try {
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url);
         if (!res.ok) {
           failures.push(`HTTP ${res.status} on "${variation}"`);
           continue;
@@ -239,7 +255,7 @@ export async function scanHackerNewsSource(
       const itemUrl = `https://hn.algolia.com/api/v1/items/${storyHit.objectID}`;
       let itemRes: Response;
       try {
-        itemRes = await fetch(itemUrl);
+        itemRes = await fetchWithTimeout(itemUrl);
       } catch {
         // Network error — skip this story
         continue;

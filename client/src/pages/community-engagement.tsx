@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { safeExternalHref } from "@/lib/urlSafety";
 import { Helmet } from "react-helmet-async";
 import type { CommunityPost } from "@shared/schema";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -611,7 +612,11 @@ export default function CommunityEngagement() {
                               asChild
                               data-testid={`button-visit-${idx}`}
                             >
-                              <a href={group.url} target="_blank" rel="noopener noreferrer">
+                              <a
+                                href={safeExternalHref(group.url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 <ExternalLink className="w-3 h-3 mr-1" /> Visit
                               </a>
                             </Button>
@@ -784,7 +789,7 @@ export default function CommunityEngagement() {
                       </p>
                       {post.postUrl && (
                         <a
-                          href={post.postUrl}
+                          href={safeExternalHref(post.postUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-chart-1 hover:underline flex items-center gap-1 mt-1"

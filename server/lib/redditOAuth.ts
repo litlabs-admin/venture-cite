@@ -3,6 +3,11 @@ import { logger } from "./logger";
 const TOKEN_URL = "https://www.reddit.com/api/v1/access_token";
 export const REDDIT_USER_AGENT = "web:io.litlabs.venturecite:v1.0";
 
+// Every outbound Reddit fetch is wrapped in an AbortController timeout so a
+// hung upstream can't burn the entire serverless function budget. Mirrors the
+// AbortController + setTimeout + clearTimeout pattern in server/lib/ssrf.ts.
+const FETCH_TIMEOUT_MS = 10_000;
+
 let cached: { token: string; expiresAt: number } | null = null;
 
 export function _resetRedditTokenCacheForTests() {
@@ -26,15 +31,23 @@ export async function getRedditAccessToken(): Promise<string> {
   const password = requireEnv("REDDIT_PASSWORD");
 
   const body = new URLSearchParams({ grant_type: "password", username, password });
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": REDDIT_USER_AGENT,
-    },
-    body,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": REDDIT_USER_AGENT,
+      },
+      body,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`reddit oauth ${res.status}: ${text.slice(0, 200)}`);
@@ -47,14 +60,21 @@ export async function getRedditAccessToken(): Promise<string> {
 
 export async function redditFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = await getRedditAccessToken();
-  return fetch(`https://oauth.reddit.com${path}`, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      Authorization: `Bearer ${token}`,
-      "User-Agent": REDDIT_USER_AGENT,
-    },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(`https://oauth.reddit.com${path}`, {
+      ...init,
+      signal: init?.signal ?? controller.signal,
+      headers: {
+        ...(init?.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+        "User-Agent": REDDIT_USER_AGENT,
+      },
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function hasRedditOAuthCredentials(): boolean {
@@ -71,11 +91,18 @@ export function hasRedditOAuthCredentials(): boolean {
 // here, so production reliability is poor — the caller is expected to handle
 // 403/429 by falling back to the RSS endpoint.
 export async function redditPublicFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`https://www.reddit.com${path}`, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      "User-Agent": REDDIT_USER_AGENT,
-    },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(`https://www.reddit.com${path}`, {
+      ...init,
+      signal: init?.signal ?? controller.signal,
+      headers: {
+        ...(init?.headers ?? {}),
+        "User-Agent": REDDIT_USER_AGENT,
+      },
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }

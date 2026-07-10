@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { safeExternalHref } from "@/lib/urlSafety";
 
 export type FactSide = {
   id: string;
@@ -149,7 +150,7 @@ function renderSide(
 
       {!isUser && fact.sourceUrl ? (
         <a
-          href={fact.sourceUrl}
+          href={safeExternalHref(fact.sourceUrl)}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"

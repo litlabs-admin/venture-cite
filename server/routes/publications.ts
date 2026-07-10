@@ -196,7 +196,8 @@ ${articleEntries}
       try {
         const user = requireUser(req);
         const brandId = req.query.brandId as string | undefined;
-        if (brandId) {
+        if (typeof brandId === "string" && brandId) {
+          await requireBrand(brandId, user.id);
           const competitors = await storage.getCompetitors(brandId);
           return res.json({ success: true, data: competitors });
         }

@@ -25,6 +25,7 @@ const stubs = vi.hoisted(() => ({
   setupStripeProducts: vi.fn(async () => undefined),
   advanceCitationRun: vi.fn(async () => ({ done: true, status: "succeeded" })),
   failStuckContentJobs: vi.fn(async () => []),
+  failStaleScanJobs: vi.fn(async () => 0),
   setArticleFailed: vi.fn(async () => undefined),
   refundArticleQuota: vi.fn(async () => undefined),
   listAdvanceablePendingJobs: vi.fn(async () => []),
@@ -114,6 +115,7 @@ vi.mock("../../server/lib/usageLimit", () => ({
 vi.mock("../../server/storage", () => ({
   storage: {
     failStuckContentJobs: stubs.failStuckContentJobs,
+    failStaleScanJobs: stubs.failStaleScanJobs,
     setArticleFailed: stubs.setArticleFailed,
     listAdvanceablePendingJobs: stubs.listAdvanceablePendingJobs,
     claimContentJobForSlice: stubs.claimContentJobForSlice,

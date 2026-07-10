@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { iconForDomain, type Domain } from "./domainIcons";
 import { formatRelativeTime, daysSince } from "@/lib/formatRelativeTime";
+import { safeExternalHref } from "@/lib/urlSafety";
 
 // v2 provenance: every scraped fact carries the list of pages that
 // contributed to it (sources) and any disagreeing values seen on other
@@ -195,7 +196,7 @@ export function FactRow({
                             className="flex items-start gap-2 text-xs text-foreground"
                           >
                             <a
-                              href={s.url}
+                              href={safeExternalHref(s.url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 text-primary hover:underline shrink-0 max-w-[200px] truncate"
@@ -231,7 +232,7 @@ export function FactRow({
                               {alt.sources.map((s, j) => (
                                 <a
                                   key={`a-${i}-s-${j}`}
-                                  href={s.url}
+                                  href={safeExternalHref(s.url)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"

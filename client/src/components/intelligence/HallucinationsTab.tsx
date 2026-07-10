@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type { BrandHallucination, BrandFactSheet } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { safeExternalHref } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
@@ -412,7 +413,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                             if (!hostname || hostname.startsWith("ai://")) return null;
                             return (
                               <a
-                                href={citingUrl}
+                                href={safeExternalHref(citingUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs text-primary hover:underline"

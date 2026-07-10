@@ -33,27 +33,31 @@ export function setupLlmJobsRoutes(app: Express): void {
           return sendError(res, null, "Invalid job id", 400);
         }
 
-        const poll = await pollLlmJob(jobId);
-        if (!poll) {
-          return sendError(res, null, "Job not found", 404);
-        }
-
-        // Own-row gate: caller must be the user who enqueued the job.
-        // (Cron-spawned jobs have userId=null and aren't pollable by
-        // end users — only the admin inspector.)
-        // We re-read the row to get user_id since pollLlmJob doesn't
-        // expose it on the public result.
+        // Ownership gate FIRST — before pollLlmJob, which finalizes the job
+        // and persists its side effects. A caller must not be able to
+        // force-finalize a job they don't own just by knowing its id.
         const ownsJob = await db
           .select({ userId: schema.llmJobs.userId, brandId: schema.llmJobs.brandId })
           .from(schema.llmJobs)
           .where(eq(schema.llmJobs.id, jobId))
           .limit(1);
         const owner = ownsJob[0];
+        // 404 (not 403) on every miss — anti-enumeration, hides existence.
         if (!owner) {
           return sendError(res, null, "Job not found", 404);
         }
-        if (owner.userId && owner.userId !== user.id) {
-          return sendError(res, null, "Forbidden", 403);
+        const isAdminUser = (user as { isAdmin?: number }).isAdmin === 1;
+        // Cron-spawned jobs have userId=null — admin-only (the fail-open
+        // `owner.userId && …` guard previously exposed these to any caller).
+        if (owner.userId === null) {
+          if (!isAdminUser) return sendError(res, null, "Job not found", 404);
+        } else if (owner.userId !== user.id) {
+          return sendError(res, null, "Job not found", 404);
+        }
+
+        const poll = await pollLlmJob(jobId);
+        if (!poll) {
+          return sendError(res, null, "Job not found", 404);
         }
 
         // Cache-Control: prevent browser HTTP cache from confusing the

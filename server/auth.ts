@@ -38,7 +38,21 @@ async function loadPublicUser(id: string) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  if ((req as any).user) return next();
+  // attachUserIfPresent may have already populated req.user (it does NOT
+  // check deletedAt). Re-check here so the post-delete grace-window lockout
+  // below isn't bypassed by the short-circuit for an already-authenticated
+  // (still-refreshing) session on a soft-deleted account.
+  const existing = (req as any).user;
+  if (existing) {
+    if (existing.deletedAt) {
+      return res.status(401).json({
+        success: false,
+        error: "Account scheduled for deletion. Contact support to restore.",
+        code: "account_deleted",
+      });
+    }
+    return next();
+  }
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) {
     return res.status(401).json({ success: false, error: "Not authenticated" });

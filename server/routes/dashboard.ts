@@ -120,8 +120,11 @@ export function setupDashboardRoutes(app: Express): void {
         const authScores = cited
           .map((r) => r.authorityScore)
           .filter((s): s is number => typeof s === "number");
+        // null (not 0) when NO cited row carries an authority score, so the
+        // scorer treats authority as UNMEASURED and drops its 30-pt weight
+        // instead of capping a perfect brand at 70.
         const avgAuthorityScore =
-          authScores.length > 0 ? authScores.reduce((a, b) => a + b, 0) / authScores.length : 0;
+          authScores.length > 0 ? authScores.reduce((a, b) => a + b, 0) / authScores.length : null;
 
         // Average rank across cited rows — lower is better.
         const ranks = cited.map((r) => r.rank).filter((r): r is number => typeof r === "number");
@@ -138,13 +141,18 @@ export function setupDashboardRoutes(app: Express): void {
           avgAuthorityScore,
         );
 
-        // Score delta from most recent metrics_history snapshot of the same
-        // metric type. If we have <2 points, delta is 0.
+        // Trend delta. The stored "visibility_score" series holds the run
+        // CITATION RATE (see metricsSnapshot.ts — and weekly_catchup diffs it
+        // as a rate too). So the delta MUST be rate-vs-rate: comparing the
+        // composite visibilityScore against a stored rate produced a permanent
+        // phantom trend (e.g. a flat brand always showing "+15"). The headline
+        // number stays the composite; the arrow honestly tracks rate change.
         const history = await storage.getMetricsHistory(brand.id, "visibility_score", 90);
         let visibilityDelta = 0;
         if (history.length >= 2) {
           const prior = Number(history[history.length - 2].metricValue);
-          if (!Number.isNaN(prior)) visibilityDelta = visibilityScore - prior;
+          const currentRate = citationRatePct(citedChecks, totalChecks);
+          if (!Number.isNaN(prior)) visibilityDelta = currentRate - prior;
         }
 
         // The hero exposes only metrics we can actually compute. The former
@@ -211,9 +219,16 @@ export function setupDashboardRoutes(app: Express): void {
 
           // Visibility /10: the canonical 0..100 score expressed at a /10
           // scale, so this per-platform number agrees with the brand-level
-          // score and /api/geo-analytics (one number, one meaning).
-          const auth = cited.map((r) => r.authorityScore ?? 0);
-          const avgAuth = auth.length > 0 ? auth.reduce((a, b) => a + b, 0) / auth.length : 0;
+          // score and /api/geo-analytics (one number, one meaning). Authority
+          // is null (not 0) when NO cited row carries a score, so the scorer
+          // drops its weight instead of capping — same as the hero.
+          const authScores = cited
+            .map((r) => r.authorityScore)
+            .filter((s): s is number => typeof s === "number");
+          const avgAuth =
+            authScores.length > 0
+              ? authScores.reduce((a, b) => a + b, 0) / authScores.length
+              : null;
           const score10 = Math.round(
             computeVisibilityScore(citedCount, totalCount, avgRank ?? 0, avgAuth) / 10,
           );
@@ -487,12 +502,14 @@ export function setupDashboardRoutes(app: Express): void {
         const authScores = cited
           .map((r) => r.authorityScore)
           .filter((s): s is number => typeof s === "number");
+        // null (not 0) when authority is UNMEASURED, so the scorer drops its
+        // weight instead of capping at 70 — consistent with the hero and
+        // /api/geo-analytics (one number, one meaning across screens).
         const avgAuthority =
-          authScores.length > 0 ? authScores.reduce((a, b) => a + b, 0) / authScores.length : 0;
+          authScores.length > 0 ? authScores.reduce((a, b) => a + b, 0) / authScores.length : null;
 
         // Canonical visibility score — the same definition as the
-        // dashboard hero and /api/geo-analytics. (Previously this used a
-        // different, authority-less 100·rate·rankFactor formula.)
+        // dashboard hero and /api/geo-analytics.
         const score = computeVisibilityScore(citedCount, totalChecks, avgRank ?? 0, avgAuthority);
         const label: "Weak" | "Moderate" | "Strong" =
           score >= 60 ? "Strong" : score >= 30 ? "Moderate" : "Weak";

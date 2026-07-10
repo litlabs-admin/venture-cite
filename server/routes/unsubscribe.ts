@@ -51,27 +51,57 @@ export function setupUnsubscribeRoutes(app: Express) {
         const token = String(req.query.token ?? "");
         const verified = verifyUnsubscribeToken(token);
         if (!verified) {
-          return res.status(400).json({ success: false, error: "Invalid or expired link." });
+          // HTML, not JSON: this is reached both by RFC 8058 one-click mail
+          // clients (which ignore the body) AND by a human submitting the GET
+          // confirmation form — the human must see a page, not raw JSON.
+          return res
+            .status(400)
+            .type("html")
+            .send(htmlPage("Invalid link", "This unsubscribe link is invalid or has expired."));
         }
         const { ok } = await applyUnsubscribe(verified.userId, verified.list);
         if (!ok) {
-          return res.status(400).json({ success: false, error: "Unknown list." });
+          return res
+            .status(400)
+            .type("html")
+            .send(
+              htmlPage("Unknown list", "We couldn't find that email list to unsubscribe from."),
+            );
         }
         logger.info(
           { userId: verified.userId, list: verified.list },
           "unsubscribe: applied (POST)",
         );
-        return res.status(200).json({ success: true });
+        return res
+          .status(200)
+          .type("html")
+          .send(
+            htmlPage(
+              "You're unsubscribed",
+              "You won't receive these emails anymore. You can re-enable them anytime from your account settings.",
+            ),
+          );
       } catch (err) {
         logger.error({ err }, "unsubscribe POST failed");
         captureAndFlush(err, { tags: { source: "unsubscribe-post" } });
-        return res.status(500).json({ success: false, error: "Failed to process unsubscribe." });
+        return res
+          .status(500)
+          .type("html")
+          .send(
+            htmlPage(
+              "Something went wrong",
+              "We couldn't process your unsubscribe right now. Please try the link again.",
+            ),
+          );
       }
     }),
   );
 
-  // GET = browser landing page. Returns a small HTML confirmation so the
-  // user gets visual feedback when they click the link manually.
+  // GET = browser landing page. MUST NOT mutate: email link-prefetchers
+  // (Gmail image proxy, corporate link scanners) auto-issue GET requests,
+  // which would otherwise silently unsubscribe users. So GET only verifies
+  // the HMAC token and renders a confirmation page whose button POSTs back
+  // to this same endpoint — the POST handler above performs the real change.
   app.get(
     "/api/unsubscribe",
     asyncHandler(async (req, res) => {
@@ -90,15 +120,25 @@ export function setupUnsubscribeRoutes(app: Express) {
               ),
             );
         }
-        await applyUnsubscribe(verified.userId, verified.list);
-        logger.info({ userId: verified.userId, list: verified.list }, "unsubscribe: applied (GET)");
+        // NON-mutating: render a confirmation page only. The button POSTs
+        // the same signed token back to /api/unsubscribe, where the real
+        // mutation happens. This prevents automated GET prefetches from
+        // unsubscribing users without an explicit click.
+        logger.info(
+          { userId: verified.userId, list: verified.list },
+          "unsubscribe: confirmation page shown (GET)",
+        );
+        const listLabel = escape(verified.list.replace("_", " "));
         return res
           .type("html")
           .send(
             htmlPage(
-              "You're unsubscribed",
-              `You won't receive any more <strong>${escape(verified.list.replace("_", " "))}</strong> emails. ` +
-                "You can re-enable them anytime from your account settings.",
+              "Confirm unsubscribe",
+              `You're about to stop receiving <strong>${listLabel}</strong> emails. ` +
+                "Click the button below to confirm — you can re-enable them anytime from your account settings." +
+                `<form method="POST" action="/api/unsubscribe?token=${encodeURIComponent(token)}" style="margin-top:24px">` +
+                `<button type="submit" style="display:inline-block;background:#7c3aed;color:#fff;border:0;padding:12px 24px;border-radius:6px;font-size:16px;cursor:pointer">Confirm unsubscribe</button>` +
+                "</form>",
             ),
           );
       } catch (err) {

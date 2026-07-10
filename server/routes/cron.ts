@@ -56,6 +56,7 @@ const ORCHESTRATOR_BUDGET_MS = CRON_TOTAL_BUDGET_MS;
 // internally and bail mid-loop.
 const STEP_CAPS_MS = {
   "fail-stuck-content-jobs": 5_000,
+  "fail-stale-scan-jobs": 5_000,
   "reconcile-orphan-citation-runs": 5_000,
   "resume-in-flight-autopilots": 10_000,
   "drain-pending-content-jobs": 8_000,
@@ -230,6 +231,14 @@ async function failStuckContentJobsForOrchestrator(): Promise<{ failed: number }
   return { failed: stale.length };
 }
 
+// Reaper for mention-scan jobs orphaned mid-run (serverless timeout, deploy,
+// crash). Without this a dead 'running' job wedges all future scans for that
+// brand.
+async function failStaleScanJobsForOrchestrator(): Promise<{ failed: number }> {
+  const failed = await storage.failStaleScanJobs(30);
+  return { failed };
+}
+
 export function setupCronRoutes(app: Express): void {
   app.post(
     "/api/cron/daily-orchestrator",
@@ -250,6 +259,7 @@ export function setupCronRoutes(app: Express): void {
       // unconditionally so orphans get reconciled even on a fully-loaded
       // cron tick.
       await orch.run("fail-stuck-content-jobs", () => failStuckContentJobsForOrchestrator());
+      await orch.run("fail-stale-scan-jobs", () => failStaleScanJobsForOrchestrator());
       await orch.run("reconcile-orphan-citation-runs", () => reconcileOrphanCitationRuns());
       await orch.run("resume-in-flight-autopilots", (deadline) =>
         resumeInFlightAutopilots(deadline),

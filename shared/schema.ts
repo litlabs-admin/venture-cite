@@ -39,6 +39,12 @@ export const users = pgTable("users", {
   emailVerified: integer("email_verified").default(0).notNull(),
   weeklyReportEnabled: integer("weekly_report_enabled").default(1).notNull(),
   lastWeeklyReportSentAt: timestamp("last_weekly_report_sent_at"),
+  // Separate dedup stamp for the weekly DIGEST (weekly_catchup terminal
+  // email). It previously shared lastWeeklyReportSentAt with the Sunday
+  // visibility-report job, so whichever fired first stamped the column and
+  // permanently suppressed the other. A dedicated stamp lets both send and
+  // keeps the digest's "alerts since last digest" window accurate.
+  lastWeeklyDigestSentAt: timestamp("last_weekly_digest_sent_at"),
   visibilityGuideVisitedAt: timestamp("visibility_guide_visited_at"),
   // Wave 4.7: free-form bag of onboarding flags, persisted server-side
   // so dismiss state syncs across devices. Keys defined in

@@ -32,6 +32,7 @@ import {
   Flag,
 } from "lucide-react";
 import SafeMarkdown from "@/components/SafeMarkdown";
+import { safeExternalHref } from "@/lib/urlSafety";
 import type { BrandMention } from "@shared/schema";
 
 // ---------------------------------------------------------------------------
@@ -271,7 +272,7 @@ export default function MentionDetailSheet({
                 ) : (
                   <Button variant="outline" size="sm" asChild>
                     <a
-                      href={mention.sourceUrl}
+                      href={safeExternalHref(mention.sourceUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={openOnLabel(mention.platform)}

@@ -166,6 +166,25 @@ export async function requireChatbotThread(id: string, userId: string) {
   return row;
 }
 
+// Citation runs are brand-owned. Resolve the run and confirm the caller owns
+// its brand — used so routes that take a `:runId` sibling to a validated
+// `:brandId` can't be pointed at another tenant's run (BOLA). 404 on miss.
+export async function requireCitationRun(id: string, userId: string) {
+  const [row] = await db
+    .select()
+    .from(schema.citationRuns)
+    .where(eq(schema.citationRuns.id, id))
+    .limit(1);
+  if (!row) throw new OwnershipError(404, "Citation run not found");
+  const [brand] = await db
+    .select({ id: schema.brands.id })
+    .from(schema.brands)
+    .where(and(eq(schema.brands.id, row.brandId), eq(schema.brands.userId, userId)))
+    .limit(1);
+  if (!brand) throw new OwnershipError(404, "Citation run not found");
+  return row;
+}
+
 // Citations are user-owned directly via citations.userId.
 export async function requireCitation(id: string, userId: string) {
   const [row] = await db

@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { safeExternalHref } from "@/lib/urlSafety";
 import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import type { Listicle, BofuContent, WikipediaMention, Competitor } from "@shared/schema";
@@ -690,7 +691,7 @@ export default function GeoTools() {
                                       <StatusDot tone="neutral" className="mt-2" />
                                       <div className="flex-1 min-w-0">
                                         <a
-                                          href={l.url}
+                                          href={safeExternalHref(l.url)}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="font-medium text-chart-1 hover:underline flex items-center gap-1"
@@ -853,7 +854,7 @@ export default function GeoTools() {
                                         className="border rounded-md p-3 hover:bg-muted/40"
                                       >
                                         <a
-                                          href={m.pageUrl}
+                                          href={safeExternalHref(m.pageUrl)}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="font-medium text-chart-1 hover:underline flex items-center gap-1"
@@ -904,7 +905,7 @@ export default function GeoTools() {
                                       >
                                         <div className="flex items-start justify-between gap-2">
                                           <a
-                                            href={m.pageUrl}
+                                            href={safeExternalHref(m.pageUrl)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="font-medium text-chart-1 hover:underline flex items-center gap-1 min-w-0"

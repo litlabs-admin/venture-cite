@@ -388,9 +388,10 @@ mentionsRouter.post("/scans/:brandId", isAuthenticated, async (req, res) => {
     return res.json({ scanId: active.id, attached: true });
   }
 
-  // Manual scan cooldown: disabled per user request. Re-enable by setting
-  // COOLDOWN_MS > 0 (e.g. 4 * 60 * 60 * 1000 for 4 hours).
-  const COOLDOWN_MS = 0;
+  // Manual scan cooldown: throttle manual scans to at most one per 4h window.
+  // Measured from the last *completed* manual scan, so a first-ever scan (no
+  // prior completed row) is always allowed.
+  const COOLDOWN_MS = 4 * 60 * 60 * 1000;
   if (COOLDOWN_MS > 0) {
     const last = await storage.getMostRecentManualScanForBrand(brandId);
     if (last?.completedAt) {

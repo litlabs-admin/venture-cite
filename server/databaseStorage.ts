@@ -102,6 +102,11 @@ import {
 export { applyTourStateOp } from "./lib/tourStateOps";
 import { applyTourStateOp } from "./lib/tourStateOps";
 
+// A scan job older than this that is still 'queued'/'running' is considered
+// dead (serverless timeout, deploy, or crash). Used both by the freshness
+// bound in getActiveScanJobForBrand and by the failStaleScanJobs reaper.
+const SCAN_JOB_STALE_MINUTES = 30;
+
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const result = await db.select().from(schema.users).where(eq(schema.users.id, id));
@@ -592,8 +597,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGeoRanking(insertRanking: InsertGeoRanking): Promise<GeoRanking> {
-    const result = await db.insert(schema.geoRankings).values(insertRanking).returning();
-    return result[0];
+    // onConflictDoNothing guards the partial unique index on
+    // (run_id, brand_prompt_id, ai_platform) — migration 0085. The unlocked
+    // kickoff-inline run and the cron drain can otherwise both write the same
+    // (run, prompt, platform) cell, and the run aggregate COUNT(*)/SUM would
+    // then double-count, corrupting total_checks / citation_rate.
+    const result = await db
+      .insert(schema.geoRankings)
+      .values(insertRanking)
+      .onConflictDoNothing()
+      .returning();
+    if (result[0]) return result[0];
+    // Conflict: a row for this (run, prompt, platform) already exists — the
+    // index only fires when both run_id and brand_prompt_id are non-null, so
+    // both are safe to filter on here. Return the existing row so the caller's
+    // contract (always get a row back) holds.
+    const [existing] = await db
+      .select()
+      .from(schema.geoRankings)
+      .where(
+        and(
+          eq(schema.geoRankings.runId, insertRanking.runId as string),
+          eq(schema.geoRankings.brandPromptId, insertRanking.brandPromptId as string),
+          eq(schema.geoRankings.aiPlatform, insertRanking.aiPlatform),
+        ),
+      )
+      .limit(1);
+    return existing;
   }
 
   async getGeoRankings(articleId?: string): Promise<GeoRanking[]> {
@@ -4300,6 +4330,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveScanJobForBrand(brandId: string): Promise<ScanJob | undefined> {
+    // Freshness bound: never attach a new scan to a job older than the stale
+    // threshold. A scan killed mid-run stays status='running' forever; without
+    // this bound every future scan would attach to the dead job and wedge
+    // scanning permanently. The cron reaper (failStaleScanJobs) flips these to
+    // 'failed', but this guard makes attachment safe even before the reaper
+    // has run.
+    const staleCutoff = new Date(Date.now() - SCAN_JOB_STALE_MINUTES * 60 * 1000);
     const [row] = await db
       .select()
       .from(schema.scanJobs)
@@ -4307,11 +4344,36 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(schema.scanJobs.brandId, brandId),
           or(eq(schema.scanJobs.status, "queued"), eq(schema.scanJobs.status, "running")),
+          sql`${schema.scanJobs.createdAt} >= ${staleCutoff}`,
         ),
       )
       .orderBy(desc(schema.scanJobs.createdAt))
       .limit(1);
     return row;
+  }
+
+  // Stale-job reaper. A scan job killed mid-run (serverless timeout, deploy,
+  // crash) is never reset and stays 'queued'/'running' forever, wedging all
+  // future scans for that brand. Flip anything older than the threshold to
+  // 'failed'. Mirrors failStuckContentJobs. Uses created_at because queued
+  // jobs may never have started_at set.
+  async failStaleScanJobs(olderThanMinutes: number): Promise<number> {
+    const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000);
+    const result = await db
+      .update(schema.scanJobs)
+      .set({
+        status: "failed",
+        error: "Scan was interrupted (timeout, deploy, or crash).",
+        completedAt: new Date(),
+      })
+      .where(
+        and(
+          or(eq(schema.scanJobs.status, "queued"), eq(schema.scanJobs.status, "running")),
+          sql`${schema.scanJobs.createdAt} < ${cutoff}`,
+        ),
+      )
+      .returning({ id: schema.scanJobs.id });
+    return result.length;
   }
 
   async getActiveScanJobsForUser(userId: string): Promise<Array<ScanJob & { brandName: string }>> {

@@ -96,6 +96,54 @@ export async function assertSafeUrl(raw: string): Promise<URL> {
   return url;
 }
 
+// Perform a fetch that re-runs assertSafeUrl on EVERY redirect hop, closing
+// the SSRF hole where a public URL 302-redirects to a private/loopback/
+// metadata address. `redirect: "follow"` (undici's default) validates only
+// the first hop, so it must never be used for user/scraped URLs. Returns the
+// final Response with its body still unread; the caller reads it with a cap.
+async function fetchRevalidatingRedirects(
+  raw: string,
+  opts: { headers?: Record<string, string>; signal?: AbortSignal } = {},
+): Promise<Response> {
+  const MAX_REDIRECTS = 5;
+  let currentUrl = raw;
+  const visited = new Set<string>();
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const validated = await assertSafeUrl(currentUrl);
+    const key = validated.toString();
+    if (visited.has(key)) throw new Error("Redirect loop detected");
+    visited.add(key);
+
+    const res = await fetch(validated.toString(), {
+      redirect: "manual",
+      signal: opts.signal,
+      headers: {
+        "User-Agent": "VentureCiteBot/1.0",
+        ...opts.headers,
+      },
+    });
+
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (!loc) return res; // 3xx without Location — treat as terminal
+      currentUrl = new URL(loc, validated).toString();
+      // Drain the redirect body to release the socket.
+      try {
+        const r = res.body?.getReader();
+        while (r) {
+          const { done } = await r.read();
+          if (done) break;
+        }
+      } catch {
+        // ignore drain errors on redirect responses
+      }
+      continue;
+    }
+    return res;
+  }
+  throw new Error(`Exceeded ${MAX_REDIRECTS} redirects`);
+}
+
 // Binary variant — used for images (logo proxy). Same SSRF + size caps as
 // safeFetchText but returns a raw Buffer so the caller doesn't have to round
 // through UTF-8.
@@ -103,20 +151,15 @@ export async function safeFetchBuffer(
   raw: string,
   opts: { maxBytes?: number; timeoutMs?: number; headers?: Record<string, string> } = {},
 ): Promise<{ status: number; buffer: Buffer; contentType: string }> {
-  const url = await assertSafeUrl(raw);
   const maxBytes = opts.maxBytes ?? 2 * 1024 * 1024;
   const timeoutMs = opts.timeoutMs ?? 10_000;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url.toString(), {
-      redirect: "follow",
+    const res = await fetchRevalidatingRedirects(raw, {
+      headers: opts.headers,
       signal: controller.signal,
-      headers: {
-        "User-Agent": "VentureCiteBot/1.0",
-        ...opts.headers,
-      },
     });
     const contentType = res.headers.get("content-type") ?? "";
     const reader = res.body?.getReader();
@@ -149,20 +192,15 @@ export async function safeFetchText(
   raw: string,
   opts: { maxBytes?: number; timeoutMs?: number; headers?: Record<string, string> } = {},
 ): Promise<{ status: number; text: string; contentType: string }> {
-  const url = await assertSafeUrl(raw);
   const maxBytes = opts.maxBytes ?? 2 * 1024 * 1024; // 2 MB default
   const timeoutMs = opts.timeoutMs ?? 10_000;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url.toString(), {
-      redirect: "follow",
+    const res = await fetchRevalidatingRedirects(raw, {
+      headers: opts.headers,
       signal: controller.signal,
-      headers: {
-        "User-Agent": "VentureCiteBot/1.0",
-        ...opts.headers,
-      },
     });
     const contentType = res.headers.get("content-type") ?? "";
     const reader = res.body?.getReader();

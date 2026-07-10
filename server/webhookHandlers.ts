@@ -37,6 +37,22 @@ async function markStripeEventProcessed(eventId: string): Promise<void> {
   `);
 }
 
+// True only once the event's side effects have fully completed (processed_at
+// stamped). A row can exist with processed_at IS NULL if a prior attempt
+// recorded the event but then threw mid-processing — in which case Stripe's
+// retry MUST be allowed to re-run the handler, not skipped as a duplicate.
+async function isStripeEventProcessed(eventId: string): Promise<boolean> {
+  const result = await db.execute(sql`
+    select processed_at
+    from public.stripe_webhook_events
+    where event_id = ${eventId}
+    limit 1
+  `);
+  const rows = (result as any).rows ?? (result as any);
+  const row = rows?.[0];
+  return Boolean(row && row.processed_at);
+}
+
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -53,15 +69,25 @@ export class WebhookHandlers {
       throw new Error(`Webhook signature verification failed: ${err.message}`);
     }
 
-    // Idempotency: Stripe retries on any non-2xx. If we've seen this event
-    // before, return immediately without re-applying side effects.
+    // Idempotency: Stripe retries on any non-2xx. Skip ONLY events whose side
+    // effects previously completed (processed_at stamped). An event recorded
+    // but not finished — because a prior attempt threw mid-handler — must be
+    // re-run, not silently dropped (that used to permanently lose paid
+    // upgrades on any transient DB/Stripe error). Handlers here are idempotent
+    // (setter-style updates), so re-running is safe.
     const isFirstTime = await recordStripeEvent(event.id, event.type);
     if (!isFirstTime) {
-      logger.info(
+      if (await isStripeEventProcessed(event.id)) {
+        logger.info(
+          { eventId: event.id, type: event.type },
+          "stripe webhook: duplicate event (already processed) — skipping",
+        );
+        return;
+      }
+      logger.warn(
         { eventId: event.id, type: event.type },
-        "stripe webhook: duplicate event — skipping",
+        "stripe webhook: event recorded but not finished on a prior attempt — reprocessing",
       );
-      return;
     }
 
     switch (event.type) {

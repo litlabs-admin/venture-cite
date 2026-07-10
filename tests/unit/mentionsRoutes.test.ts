@@ -333,13 +333,25 @@ describe("POST /api/brand-mentions/scans/:brandId", () => {
     expect(stubs.createScanJob).not.toHaveBeenCalled();
   });
 
-  it("10. cooldown disabled: recent scan does not block a new one", async () => {
-    // COOLDOWN_MS is currently 0 in routes/mentions.ts. Even with a recent
-    // completed scan, a new scan should be permitted (returns 202).
+  it("10. cooldown: a manual scan within the 4h window is blocked (429)", async () => {
+    // COOLDOWN_MS is 4h. A scan completed 2h ago is inside the window, so a
+    // new manual scan must be refused with 429 and no job created.
     const recentCompletedAt = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2h ago
     stubs.getMostRecentManualScanForBrand.mockResolvedValue({
       id: SCAN_UUID,
       completedAt: recentCompletedAt,
+    });
+    const r = await call(app, "POST", `/scans/${BRAND_UUID}`);
+    expect(r.status).toBe(429);
+    expect(r.body).toMatchObject({ error: "cooldown" });
+    expect(stubs.createScanJob).not.toHaveBeenCalled();
+  });
+
+  it("10b. cooldown: a scan completed more than 4h ago is allowed", async () => {
+    const oldCompletedAt = new Date(Date.now() - 5 * 60 * 60 * 1000); // 5h ago
+    stubs.getMostRecentManualScanForBrand.mockResolvedValue({
+      id: SCAN_UUID,
+      completedAt: oldCompletedAt,
     });
     stubs.createScanJob.mockResolvedValue({ id: "new-scan-id" });
     const r = await call(app, "POST", `/scans/${BRAND_UUID}`);

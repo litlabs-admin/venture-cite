@@ -319,7 +319,10 @@ export async function computeSignals(
     const parsed = new Date(articleUpdatedAt);
     if (!Number.isNaN(parsed.getTime())) {
       freshnessApplicable = true;
-      const ageDays = (Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24);
+      // Clamp to >= 0 so a future / clock-skewed timestamp scores as
+      // "most recent" (age 0) rather than a NEGATIVE age that would still
+      // pass the `<= 30` gate. Normal (past) dates are unaffected.
+      const ageDays = Math.max(0, (Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24));
       if (ageDays <= 30) {
         freshnessScore = 10;
         freshnessStatus = "excellent";
