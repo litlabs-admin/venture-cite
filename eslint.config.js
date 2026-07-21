@@ -23,6 +23,11 @@ export default tseslint.config(
       // report and break lint-staged if accidentally staged.
       ".agents/**",
       ".codex/**",
+      // Standalone Next.js reference build for the /home2 marketing page. It
+      // has its own toolchain (Next lint rules this config can't resolve) and
+      // its own node_modules/.next; linting it here yields tens of thousands
+      // of bogus findings. The ported copy in client/src/pages/home2 IS linted.
+      "trakkr.ai/**",
     ],
   },
 

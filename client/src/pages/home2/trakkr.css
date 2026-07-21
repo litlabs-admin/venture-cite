@@ -1,0 +1,222 @@
+/*
+ * Trakkr marketing homepage — scoped stylesheet.
+ *
+ * Everything here is confined to the `.trakkr-home` subtree so it can coexist
+ * with the app's dark-by-default OKLCH token system. Ported from
+ * trakkr.ai/app/globals.css (custom-property + keyframe blocks only — the
+ * Tailwind-default @theme palette is not copied, Tailwind v3 already ships it)
+ * and trakkr.ai/app/tds-tokens.css.
+ *
+ * Color utilities (bg-tk-surface, text-tk-primary, …) come from the `tk` key in
+ * tailwind.config.ts, not from here. The vars below exist only because a
+ * handful of components reference them from inline styles.
+ */
+
+.trakkr-home {
+  /* The app renders under <html class="dark">; this page is light-only. */
+  color-scheme: light;
+  color: #1c1917;
+
+  /* Warm gray ramp — brand override, NOT Tailwind's stock cool gray. */
+  --color-gray-50: #fafaf9;
+  --color-gray-100: #f5f5f4;
+  --color-gray-200: #e7e5e4;
+  --color-gray-300: #d6d3d1;
+  --color-gray-400: #a8a29e;
+  --color-gray-500: #78716c;
+  --color-gray-600: #57534e;
+  --color-gray-700: #44403c;
+  --color-gray-800: #292524;
+  --color-gray-900: #1c1917;
+
+  --color-green-50: #e4f6f2;
+  --color-green-100: #c8ede5;
+  --color-green-500: #0e9373;
+  --color-green-600: #0c7a60;
+
+  --color-page: #fff;
+  --color-surface: #fff;
+  --color-muted: var(--color-gray-100);
+  --color-primary: var(--color-gray-900);
+  --color-secondary: var(--color-gray-600);
+  --color-tertiary: var(--color-gray-500);
+  --color-placeholder: var(--color-gray-500);
+  --color-text-muted: var(--color-gray-500);
+  --color-default: var(--color-gray-200);
+  --color-subtle: var(--color-gray-100);
+  --color-hover: var(--color-gray-300);
+  --color-faint: var(--color-gray-300);
+  --color-accent: var(--color-green-500);
+  --color-accent-subtle: var(--color-green-50);
+  --color-accent-hover: var(--color-green-600);
+
+  --chart-1: var(--color-accent);
+  --chart-2: var(--color-gray-400);
+  --chart-grid: var(--color-gray-100);
+  --chart-axis: var(--color-gray-500);
+
+  --mkt-dot-opacity: 0.08;
+  --mkt-dot-spacing: 9px;
+  --mkt-dot-size: 0.8px;
+}
+
+/*
+ * The app's base layer applies `border-color: var(--border)` (a dark zinc) to
+ * every element. Reset it to the marketing gray for this subtree. :where()
+ * zeroes the specificity so real border-* utilities still win regardless of
+ * stylesheet order.
+ */
+:where(.trakkr-home) *,
+:where(.trakkr-home) *::before,
+:where(.trakkr-home) *::after {
+  border-color: #e7e5e4;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────
+   Ported verbatim from trakkr.ai/app/globals.css, which took them from the
+   compiled source (_reference/index.html inline <style> blocks). Only the
+   keyframes this page actually uses — not the ~124 in the dashboard bundle. */
+
+/* Why Now marquee rows — _reference/index.html:1808-1839 */
+@keyframes drift-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+@keyframes drift-right {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+.trakkr-home .drift-left {
+  animation: drift-left 240s linear infinite;
+}
+.trakkr-home .drift-right {
+  animation: drift-right 260s linear infinite;
+}
+.trakkr-home .drift-left:hover,
+.trakkr-home .drift-right:hover {
+  animation-play-state: paused;
+}
+
+/* Decorative dot grid behind the Closing CTA — index-CjQYU9CS.css:9192 */
+.trakkr-home .mkt-dot-grid {
+  background-image: radial-gradient(
+    circle,
+    rgba(0, 0, 0, var(--mkt-dot-opacity)) var(--mkt-dot-size),
+    transparent var(--mkt-dot-size)
+  );
+  background-size: var(--mkt-dot-spacing) var(--mkt-dot-spacing);
+}
+
+/* Philosophy — pulsing dot on in-progress chat tags. index.html:2427-2439 */
+@keyframes assistant-breath {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.trakkr-home .assistant-breath {
+  animation: assistant-breath 1.4s ease-in-out infinite;
+}
+
+/* Philosophy card 03's looping chat transcript — simplified choreography,
+   speed (36s) not verified against source. */
+@keyframes chat-scroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+.trakkr-home .chat-scroll {
+  animation: chat-scroll 36s linear infinite;
+}
+.trakkr-home .chat-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* Hero Bento — chart width override + mobile snap-carousel scrollbar hiding.
+   index.html:1115-1138 and 1799-1803. */
+.trakkr-home .hero-bento-chart .recharts-wrapper,
+.trakkr-home .hero-bento-chart .recharts-surface {
+  width: min(calc(66.6667vw - 59.67px), 836.33px) !important;
+}
+@media (max-width: 1023px) {
+  .trakkr-home .hero-bento-chart .recharts-wrapper,
+  .trakkr-home .hero-bento-chart .recharts-surface {
+    width: calc(100vw - 48px) !important;
+  }
+}
+.trakkr-home .hero-bento-row2-scroll {
+  scrollbar-width: none;
+}
+.trakkr-home .hero-bento-row2-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Trakkr Data System tokens ────────────────────────────────────────────
+   Verbatim subset of _reference/assets/theme-CQDk0Xff.css. Only `.tds` and
+   `.tds-mono` are referenced on this page (Learn/Research inline chart). */
+.trakkr-home .tds {
+  --tds-bg: #ffffff;
+  --tds-surface: #ffffff;
+  --tds-inset: #f1f3f6;
+  --tds-hover: #f5f6f8;
+  --tds-rail: #ffffff;
+  --tds-border: #e9eaee;
+  --tds-border-strong: #dcdee4;
+  --tds-divider: #f0f1f4;
+  --tds-ink: #16171b;
+  --tds-ink-2: #5a5c63;
+  --tds-ink-3: #8b8d96;
+  --tds-ink-4: #b8bac1;
+  --tds-accent: #0e9373;
+  --tds-accent-ink: #0c7a60;
+  --tds-accent-weak: #e8f5f0;
+  --tds-accent-line: #c9e9df;
+  --tds-pos: #0e9373;
+  --tds-pos-weak: #e8f5f0;
+  --tds-neg: #d6453d;
+  --tds-neg-weak: #fdeceb;
+  --tds-s1: #0e9373;
+  --tds-s2: #3f6fd6;
+  --tds-s3: #e0913a;
+  --tds-s4: #8b5cf6;
+  --tds-s5: #d6608a;
+  --tds-s6: #2aa5b0;
+  --tds-r-lg: 12px;
+  --tds-r: 10px;
+  --tds-r-sm: 7px;
+  --tds-r-xs: 4px;
+  --tds-rail-w: 248px;
+  --tds-topbar-h: 56px;
+  --tds-section-gap: 96px;
+  background: var(--tds-bg);
+  color: var(--tds-ink);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    Segoe UI,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.trakkr-home .tds-mono {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: 0;
+}

@@ -10,8 +10,8 @@
       FOUC blocker: apply the right theme class to <html> BEFORE any CSS
       loads or React mounts. Mirrors the logic in client/src/lib/theme.ts
       (kept tiny and dependency-free so it can run synchronously in <head>).
-      Dark is the fallback when no signal is available, matching the
-      dark-first token system in client/src/index.css.
+      Light is the fallback when no signal is available, matching the
+      light-first token system in client/src/index.css.
     -->
     <script>
       (function () {
@@ -26,20 +26,20 @@
           if (stored === "light" || stored === "dark") {
             resolved = stored;
           } else {
-            // "system" or unset — read OS preference, fall back to dark.
+            // "system" or unset — read OS preference, fall back to light.
             var mql =
               typeof window.matchMedia === "function"
-                ? window.matchMedia("(prefers-color-scheme: light)")
+                ? window.matchMedia("(prefers-color-scheme: dark)")
                 : null;
-            resolved = mql && mql.matches ? "light" : "dark";
+            resolved = mql && mql.matches ? "dark" : "light";
           }
           var root = document.documentElement;
           if (resolved === "dark") root.classList.add("dark");
           root.style.colorScheme = resolved;
         } catch (e) {
-          // Last-ditch fallback: dark.
-          document.documentElement.classList.add("dark");
-          document.documentElement.style.colorScheme = "dark";
+          // Last-ditch fallback: light.
+          document.documentElement.classList.remove("dark");
+          document.documentElement.style.colorScheme = "light";
         }
       })();
     </script>

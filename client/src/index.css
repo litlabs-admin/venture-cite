@@ -4,52 +4,66 @@
 @tailwind utilities;
 
 /* ───────────────────────────────────────────────────────────────────────────
-   Token system — "monochrome zinc" (Vercel-lane premium restraint).
-   Two layers: primitive tokens, then the shadcn semantic vars mapped onto
-   them. .dark redefines the theme-varying primitives; the shadcn mappings
-   live once in :root and follow automatically. DARK is the default the
-   user lands on (`<html class="dark">` in index.html); light stays fully
-   themed for an optional toggle + the printed /report.
-   OKLCH throughout; no #000/#fff. DARK neutrals are cool zinc (hue ~285);
-   LIGHT is a Modern-SaaS scheme: slate-50 canvas (#F8FAFC), white cards,
-   slate text; DARK keeps the cool zinc near-black/near-white. Indigo
-   #6366F1 is the PRIMARY accent (primary action + focus ring), teal #14B8A6
-   the secondary accent / chart lead; active nav is still a neutral raised
-   chip, not an indigo fill.
+   Token system. Two layers: primitive tokens, then the shadcn semantic vars
+   mapped onto them. .dark redefines the theme-varying primitives; the shadcn
+   mappings live once in :root and follow automatically.
+
+   LIGHT is the canonical theme and the default the user lands on (see the
+   FOUC blocker in index.html + lib/theme.ts). It is the Trakkr "TDS" system,
+   transcribed from trakkr.ai/_reference/assets/theme-CQDk0Xff.css: white
+   canvas, recessed #f1f3f6 surfaces, cool-neutral ink ramp (hue ~273), and a
+   green #0e9373 accent. It is border-first — depth comes from 1px rules, not
+   shadows. Every light value below carries its TDS source hex in a comment;
+   they should stay greppable against that file.
+
+   DARK is unchanged and deliberately NOT a sibling of light: cool zinc
+   (hue ~285) with the old indigo accent. TDS ships no dark variant, so
+   inventing one was out of scope.
+
+   OKLCH throughout, except pure white (TDS's canvas really is #ffffff).
    positive/warning/negative are FUNCTIONAL-ONLY (status/destructive), never
-   brand or decoration — required for usability, used sparingly.
+   brand or decoration — required for usability, used sparingly. NOTE: under
+   TDS, --positive and --brand-accent are the same green. That is Trakkr's
+   own choice and it does collide with the rule above; flagged, not resolved.
    ─────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Primitives — LIGHT (Modern SaaS: slate-50 canvas, WHITE cards, slate
-     borders + text). Background is the 70% tone (slate-50 #F8FAFC); cards
-     and popovers are white (the 20%); muted / sidebar sit one step deeper
-     for recession. Slate hue ~247; white cards float above the canvas. */
-  --bg-base: oklch(0.984 0.003 247); /* slate-50 #F8FAFC — page background */
-  --bg-surface-1: oklch(0.962 0.006 247); /* slate-100 — muted / sidebar */
-  --bg-surface-2: oklch(0.9985 0.001 247); /* white #FFFFFF — cards */
-  --bg-surface-3: oklch(0.9985 0.001 247); /* white — popovers / elevated */
-  --border-subtle: oklch(0.945 0.007 247);
-  --border-default: oklch(0.912 0.011 247); /* slate-200 #E2E8F0 */
-  --border-strong: oklch(0.842 0.018 247); /* slate-300 #CBD5E1 */
-  --fg-primary: oklch(0.25 0.03 263); /* slate-900 #0F172A */
-  --fg-secondary: oklch(0.45 0.035 258); /* slate-600 #475569 */
-  --fg-tertiary: oklch(0.55 0.03 257); /* slate-500 #64748B */
-  --fg-disabled: oklch(0.68 0.03 257); /* slate-400 #94A3B8 */
-  /* Primary accent — Indigo #6366F1 (primary action, links, focus ring).
-     L0.585 carries white text at AA; ~10% usage, not a nav fill. */
-  --brand-accent: oklch(0.585 0.205 277);
-  --brand-accent-hover: oklch(0.535 0.2 277);
-  --brand-accent-press: oklch(0.485 0.2 277);
-  --brand-accent-fg: oklch(0.99 0.01 277);
-  --brand-accent-subtle: oklch(0.585 0.205 277 / 0.1);
-  /* Secondary accent — Teal #14B8A6. Complementary highlights / secondary
-     emphasis + the chart lead; pair sparingly with the indigo primary. */
-  --brand-accent-secondary: oklch(0.71 0.13 184);
-  /* Functional status — Emerald / Orange / Rose. Used sparingly. */
-  --positive: oklch(0.7 0.15 162);
-  --warning: oklch(0.7 0.19 48);
-  --negative: oklch(0.645 0.225 14);
+  /* Primitives — LIGHT (Trakkr TDS). White canvas AND white cards; the
+     recessed step (--tds-inset) is what muted/sidebar use, so separation
+     comes from borders rather than from stacking tones. */
+  --bg-base: oklch(1 0 0); /* --tds-bg #ffffff — page background */
+  --bg-surface-1: oklch(0.9635 0.0045 258.3); /* --tds-inset #f1f3f6 — muted / sidebar */
+  --bg-surface-2: oklch(1 0 0); /* --tds-surface #ffffff — cards */
+  --bg-surface-3: oklch(1 0 0); /* --tds-surface #ffffff — popovers / elevated */
+  --border-subtle: oklch(0.9582 0.0041 271.4); /* --tds-divider #f0f1f4 */
+  --border-default: oklch(0.9374 0.0055 275); /* --tds-border #e9eaee */
+  --border-strong: oklch(0.9008 0.0084 271.3); /* --tds-border-strong #dcdee4 */
+  --fg-primary: oklch(0.2053 0.0081 274.5); /* --tds-ink #16171b */
+  --fg-secondary: oklch(0.4754 0.0115 273.2); /* --tds-ink-2 #5a5c63 */
+  --fg-tertiary: oklch(0.6446 0.0135 276); /* --tds-ink-3 #8b8d96 */
+  --fg-disabled: oklch(0.7894 0.0101 273.3); /* --tds-ink-4 #b8bac1 */
+  /* Primary accent — TDS green. DELIBERATE DEVIATION: --tds-accent #0e9373
+     only reaches 3.86:1 against white, under WCAG AA for normal text, and
+     Trakkr does put white labels on it. So the flat green stays as
+     --brand-accent for borders, text-on-white, focus rings and the chart
+     lead, while anything that carries a white LABEL fills with
+     --brand-accent-fill (--tds-accent-ink #0c7a60) at 5.29:1. Hover/press
+     step down from the fill so the ramp stays monotonic. To match Trakkr
+     exactly instead, point --primary at --brand-accent. */
+  --brand-accent: oklch(0.5912 0.1145 170); /* --tds-accent #0e9373 */
+  --brand-accent-fill: oklch(0.5171 0.0988 170.6); /* --tds-accent-ink #0c7a60 */
+  --brand-accent-hover: oklch(0.4671 0.0895 170.6); /* derived from the fill */
+  --brand-accent-press: oklch(0.4171 0.08 170.6); /* derived from the fill */
+  --brand-accent-fg: oklch(1 0 0); /* white label on the accent fill */
+  --brand-accent-subtle: oklch(0.9591 0.0152 171.1); /* --tds-accent-weak #e8f5f0 */
+  /* Secondary accent — TDS's teal series colour, keeping the cool-secondary
+     role the old #14B8A6 played. */
+  --brand-accent-secondary: oklch(0.6624 0.1033 204.1); /* --tds-s6 #2aa5b0 */
+  /* Functional status. TDS ships pos + neg only; --warning is derived from
+     --tds-s3, its one warm hue. */
+  --positive: oklch(0.5912 0.1145 170); /* --tds-pos #0e9373 */
+  --warning: oklch(0.7224 0.1378 64.6); /* derived from --tds-s3 #e0913a */
+  --negative: oklch(0.5954 0.1829 27.3); /* --tds-neg #d6453d */
   /* Stable cool near-white for text on saturated status fills
      (destructive/positive/negative). Theme-agnostic — NOT redefined. */
   --color-on-strong: oklch(0.99 0.003 285);
@@ -61,9 +75,13 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
 
-  /* Elevation (light = slate-tinted shadow to match the neutrals) */
-  --elevation-raised: 0 1px 2px oklch(0.16 0.012 263 / 0.06);
-  --elevation-overlay: 0 8px 24px -8px oklch(0.16 0.012 263 / 0.18);
+  /* Elevation. TDS is border-first: depth comes from 1px rules, and its only
+     two real shadows are a hairline lift and a wide, very soft overlay
+     (theme-CQDk0Xff.css: .tds-card-hover, .tds-command-surface). Tinted with
+     TDS's #14161e rather than slate. */
+  --elevation-raised: 0 1px 2px oklch(0.2019 0.0163 273.9 / 0.04);
+  --elevation-overlay:
+    0 1px 2px oklch(0.2019 0.0163 273.9 / 0.06), 0 14px 36px -28px oklch(0.2019 0.0163 273.9 / 0.28);
 
   /* ── shadcn semantic layer, mapped onto the primitives ──────────────── */
   --background: var(--bg-base);
@@ -72,7 +90,9 @@
   --card-foreground: var(--fg-primary);
   --popover: var(--bg-surface-3);
   --popover-foreground: var(--fg-primary);
-  --primary: var(--brand-accent);
+  /* The FILL, not the flat brand green — it carries white label text at
+     5.29:1 where --brand-accent manages only 3.86:1. See the accent block. */
+  --primary: var(--brand-accent-fill);
   --primary-foreground: var(--brand-accent-fg);
   --secondary: var(--bg-surface-2);
   --secondary-foreground: var(--fg-primary);
@@ -89,13 +109,14 @@
   --border: var(--border-default);
   --input: var(--border-strong);
   --ring: var(--brand-accent);
-  /* Categorical data ramp = the brand palette: indigo, teal, emerald,
-     orange, rose. Vibrant but cohesive across multi-series charts. */
-  --chart-1: oklch(0.585 0.205 277); /* indigo */
-  --chart-2: oklch(0.71 0.13 184); /* teal */
-  --chart-3: oklch(0.7 0.15 162); /* emerald */
-  --chart-4: oklch(0.7 0.19 48); /* orange */
-  --chart-5: oklch(0.645 0.225 14); /* rose */
+  /* Categorical data ramp = TDS's series colours, in TDS's order. The lead
+     is the brand green, so the first series and the accent match. TDS also
+     ships a sixth (--tds-s6 #2aa5b0), exposed here as --brand-accent-secondary. */
+  --chart-1: oklch(0.5912 0.1145 170); /* --tds-s1 #0e9373 green */
+  --chart-2: oklch(0.5632 0.1669 263.3); /* --tds-s2 #3f6fd6 blue */
+  --chart-3: oklch(0.7224 0.1378 64.6); /* --tds-s3 #e0913a amber */
+  --chart-4: oklch(0.6056 0.2189 292.7); /* --tds-s4 #8b5cf6 violet */
+  --chart-5: oklch(0.6457 0.154 0); /* --tds-s5 #d6608a pink */
   --sidebar-background: var(--bg-surface-1);
   --sidebar-foreground: var(--fg-secondary);
   /* Monochrome lane: the active nav item is a raised NEUTRAL chip with
@@ -111,20 +132,26 @@
   --font-sans: "Inter", system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, Monaco, Consolas, monospace;
-  --radius: 0.5rem;
-  --shadow-2xs: 0px 1px 2px 0px oklch(0.16 0.012 263 / 0.04);
-  --shadow-xs: 0px 1px 3px 0px oklch(0.16 0.012 263 / 0.06);
-  --shadow-sm:
-    0px 2px 4px 0px oklch(0.16 0.012 263 / 0.06), 0px 1px 2px -1px oklch(0.16 0.012 263 / 0.03);
+  --radius: 10px; /* --tds-r; Tailwind derives md 8px / sm 6px from it */
+  /* Shadow scale, flattened to TDS's border-first depth and retinted from
+     slate to #14161e. The wide, heavily-negative-spread second layer is what
+     gives TDS surfaces their soft lift without a visible drop shadow. */
+  --shadow-2xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.03);
+  --shadow-xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04);
+  --shadow-sm: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05);
   --shadow:
-    0px 4px 6px -1px oklch(0.16 0.012 263 / 0.08), 0px 2px 4px -2px oklch(0.16 0.012 263 / 0.04);
+    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04),
+    0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.18);
   --shadow-md:
-    0px 6px 10px -1px oklch(0.16 0.012 263 / 0.08), 0px 4px 6px -2px oklch(0.16 0.012 263 / 0.04);
+    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05),
+    0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.22);
   --shadow-lg:
-    0px 10px 15px -3px oklch(0.16 0.012 263 / 0.08), 0px 4px 6px -4px oklch(0.16 0.012 263 / 0.04);
+    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
+    0px 14px 36px -28px oklch(0.2019 0.0163 273.9 / 0.28);
   --shadow-xl:
-    0px 20px 25px -5px oklch(0.16 0.012 263 / 0.1), 0px 8px 10px -6px oklch(0.16 0.012 263 / 0.04);
-  --shadow-2xl: 0px 25px 50px -12px oklch(0.16 0.012 263 / 0.2);
+    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
+    0px 20px 44px -30px oklch(0.2019 0.0163 273.9 / 0.32);
+  --shadow-2xl: 0px 28px 60px -36px oklch(0.2019 0.0163 273.9 / 0.36);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
@@ -147,6 +174,10 @@
   --fg-tertiary: oklch(0.55 0.006 285);
   --fg-disabled: oklch(0.42 0.005 285);
   --brand-accent: oklch(0.66 0.19 278);
+  /* Must be redeclared here: --primary points at --brand-accent-fill, and
+     without this line dark would inherit :root's light green fill. Dark's
+     indigo needs no AA adjustment, so fill == accent. */
+  --brand-accent-fill: oklch(0.66 0.19 278);
   --brand-accent-hover: oklch(0.71 0.18 278);
   --brand-accent-press: oklch(0.6 0.18 278);
   --brand-accent-fg: oklch(0.99 0.004 285);
@@ -211,9 +242,13 @@
   }
 
   /* Tabular numerics — apply to any figure that updates so it doesn't
-     shimmy (DESIGN.md: mandatory on live numbers). */
+     shimmy (mandatory on live numbers). Matches TDS's .tds-mono, which
+     deliberately inherits the body face and only switches on tabular
+     figures: Inter's tnum set aligns without the width/colour shift of
+     dropping into a separate mono family mid-sentence. --font-mono is
+     still the right choice for code, just not for numerals. */
   .tnum {
-    font-family: var(--font-mono);
+    font-family: inherit;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
@@ -258,24 +293,27 @@
 
 /* Print: the /report one-pager must be legible on white regardless of the
    on-screen theme. Re-declare the light primitive token values under .dark
-   for print only; the shadcn semantic vars reference these and follow. */
+   for print only; the shadcn semantic vars reference these and follow.
+   Keep this block in sync with :root above — if it drifts, printed reports
+   silently come out in a different palette than the screen. */
 @media print {
   .dark {
-    --bg-base: oklch(0.984 0.003 247);
-    --bg-surface-1: oklch(0.962 0.006 247);
-    --bg-surface-2: oklch(0.9985 0.001 247);
-    --bg-surface-3: oklch(0.9985 0.001 247);
-    --border-subtle: oklch(0.945 0.007 247);
-    --border-default: oklch(0.912 0.011 247);
-    --border-strong: oklch(0.842 0.018 247);
-    --fg-primary: oklch(0.25 0.03 263);
-    --fg-secondary: oklch(0.45 0.035 258);
-    --fg-tertiary: oklch(0.55 0.03 257);
-    --brand-accent: oklch(0.585 0.205 277);
-    --brand-accent-fg: oklch(0.99 0.01 277);
-    --positive: oklch(0.7 0.15 162);
-    --warning: oklch(0.7 0.19 48);
-    --negative: oklch(0.645 0.225 14);
+    --bg-base: oklch(1 0 0);
+    --bg-surface-1: oklch(0.9635 0.0045 258.3);
+    --bg-surface-2: oklch(1 0 0);
+    --bg-surface-3: oklch(1 0 0);
+    --border-subtle: oklch(0.9582 0.0041 271.4);
+    --border-default: oklch(0.9374 0.0055 275);
+    --border-strong: oklch(0.9008 0.0084 271.3);
+    --fg-primary: oklch(0.2053 0.0081 274.5);
+    --fg-secondary: oklch(0.4754 0.0115 273.2);
+    --fg-tertiary: oklch(0.6446 0.0135 276);
+    --brand-accent: oklch(0.5912 0.1145 170);
+    --brand-accent-fill: oklch(0.5171 0.0988 170.6);
+    --brand-accent-fg: oklch(1 0 0);
+    --positive: oklch(0.5912 0.1145 170);
+    --warning: oklch(0.7224 0.1378 64.6);
+    --negative: oklch(0.5954 0.1829 27.3);
   }
   body {
     background: #fff;

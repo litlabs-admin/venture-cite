@@ -6,10 +6,10 @@
 //    and "dark" are explicit overrides. This is what GitHub, Vercel, and
 //    Linear ship — anything less feels primitive in 2026.
 //
-// 2. Dark is the FALLBACK when no signal is available. The CSS in index.css
-//    is hand-tuned for dark-first ("DARK is the default the user lands on").
+// 2. Light is the FALLBACK when no signal is available. Light is now the
+//    product's canonical look ("LIGHT is the default the user lands on").
 //    If localStorage has no preference AND the browser cannot read a system
-//    preference, we apply dark. Users with an explicit OS preference get
+//    preference, we apply light. Users with an explicit OS preference get
 //    their OS choice respected through `theme = "system"`.
 //
 // 3. Class strategy, not data-attribute. tailwind.config.ts is configured
@@ -26,7 +26,8 @@
 //
 // 6. Graceful degradation. localStorage in private mode can throw; we
 //    catch and treat it as "no stored preference." matchMedia unavailable
-//    on very old browsers; we default to dark.
+//    on very old browsers; we default to light, since light is the
+//    product's canonical look.
 //
 // No React imports here — this module is pure logic so it can also be
 // imported by the preload-script generator without dragging React into the
@@ -40,8 +41,9 @@ export type ResolvedTheme = "light" | "dark";
 export const THEME_STORAGE_KEY = "vc-theme-v1";
 
 /** When no signal is available anywhere, we land here. Hand-tuned to match
- *  the CSS token system, which is dark-first. */
-const FALLBACK_THEME: ResolvedTheme = "dark";
+ *  the CSS token system, which is light-first — light is the product's
+ *  canonical look. */
+const FALLBACK_THEME: ResolvedTheme = "light";
 
 /** All values we accept from storage. Anything else is treated as missing. */
 const VALID_THEMES = new Set<Theme>(["system", "light", "dark"]);
@@ -80,11 +82,12 @@ export function getSystemTheme(): ResolvedTheme {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return FALLBACK_THEME;
   }
-  // We deliberately check ONLY the dark query. The "no preference" media
-  // query was deprecated and most browsers report a default (usually light)
-  // even when the user hasn't set one. We treat dark as the explicit signal;
-  // everything else falls through to our dark-first fallback only via
-  // resolveTheme below.
+  // We check both queries explicitly so an OS preference in either
+  // direction is honored. Dark is checked first because it's the
+  // stronger explicit signal (browsers without a set preference tend to
+  // report "light" by default under the deprecated no-preference query
+  // behavior); anything that reports neither falls through to our
+  // light-first fallback.
   try {
     if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
     if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";

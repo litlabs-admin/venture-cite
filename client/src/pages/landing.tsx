@@ -534,6 +534,9 @@ export default function Landing2() {
           name="description"
           content="Track and optimize your brand's visibility in AI-powered search. Monitor citations across ChatGPT, Claude, Perplexity, and more."
         />
+        {/* Retired homepage, still reachable at /oldhome. noindex so it can't
+            compete with the live homepage for the same terms. */}
+        <meta name="robots" content="noindex" />
       </Helmet>
 
       {/* ═════ NAV ═════ */}

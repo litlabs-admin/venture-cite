@@ -17,7 +17,7 @@ import { RouteSpinner } from "@/components/foundations";
 // Eager: first-paint + auth flow. Everything else is lazy so the initial
 // bundle doesn't carry recharts / react-markdown / framer-motion etc.
 import NotFound from "@/pages/not-found";
-import Landing from "@/pages/landing";
+import Home2 from "@/pages/home2";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -39,6 +39,8 @@ const Settings = lazy(() => import("@/pages/settings"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Welcome = lazy(() => import("@/pages/welcome"));
 const Glossary = lazy(() => import("@/pages/glossary"));
+// Retired marketing homepage, kept at /oldhome for reference.
+const OldLanding = lazy(() => import("@/pages/landing"));
 const AdminScrapeInspector = lazy(() => import("@/pages/admin-scrape-inspector"));
 const AdminScrapeRuns = lazy(() => import("@/pages/admin-scrape-runs"));
 
@@ -72,7 +74,7 @@ function HomePage() {
   // Authenticated users land here post-signup (register.tsx → setLocation("/")).
   // Route through FirstRunGate so brand-less users get redirected to /welcome
   // before the dashboard renders.
-  return isAuthenticated ? <FirstRunGate component={Home} /> : <Landing />;
+  return isAuthenticated ? <FirstRunGate component={Home} /> : <Home2 />;
 }
 
 function AuthenticatedRoute({ component: Component }: { component: ComponentType }) {
@@ -157,6 +159,18 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
+      {/* /home2 was where this page was built; it is the homepage now.
+          Redirect rather than 404 so existing links keep working. */}
+      <Route path="/home2">{() => <Redirect to="/" />}</Route>
+      {/* Retired predecessor, kept reachable for comparison. noindex'd in
+          the page's own Helmet so it can't compete with / in search. */}
+      <Route path="/oldhome">
+        {() => (
+          <Suspense fallback={<RouteSpinner />}>
+            <OldLanding />
+          </Suspense>
+        )}
+      </Route>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />

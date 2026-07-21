@@ -61,6 +61,45 @@ export default {
           border: "var(--sidebar-border)",
           ring: "var(--sidebar-ring)",
         },
+        // Trakkr marketing-page tokens, used only by client/src/pages/home2.
+        // Literal hex (not vars) so opacity modifiers like bg-tk-muted/60 work,
+        // and namespaced under `tk` so they can't collide with the shadcn keys
+        // above. Values copied verbatim from trakkr.ai/app/globals.css @theme.
+        // NOTE: `muted` and `text-muted` are deliberately different colors —
+        // the source's .text-muted resolves to gray-500, .bg-muted to gray-100.
+        tk: {
+          surface: "#fff",
+          page: "#fff",
+          primary: "#1c1917",
+          secondary: "#57534e",
+          tertiary: "#78716c",
+          "text-muted": "#78716c",
+          placeholder: "#78716c",
+          muted: "#f5f5f4",
+          subtle: "#f5f5f4",
+          default: "#e7e5e4",
+          hover: "#d6d3d1",
+          faint: "#d6d3d1",
+          accent: "#0e9373",
+          "accent-subtle": "#e4f6f2",
+          "accent-hover": "#0c7a60",
+          success: "#0e9373",
+        },
+      },
+      boxShadow: {
+        "tk-card": "0 1px 3px 0 #0000000a",
+        "tk-overlay": "0 4px 16px -4px #00000014",
+      },
+      // Trakkr steps that Tailwind v3 has no equivalent for. 250ms came from
+      // the source's --duration-250 token; 450ms + the easing were arbitrary
+      // values in v4 (`duration-[450ms]`, `ease-[cubic-bezier(...)]`), which
+      // v3 rejects as ambiguous and silently drops.
+      transitionDuration: {
+        "250": "250ms",
+        "450": "450ms",
+      },
+      transitionTimingFunction: {
+        tk: "cubic-bezier(0.16, 1, 0.3, 1)",
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
