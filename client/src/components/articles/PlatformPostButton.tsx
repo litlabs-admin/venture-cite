@@ -57,7 +57,7 @@ export default function PlatformPostButton({
           asChild
           variant="outline"
           size="sm"
-          className="text-green-700 border-green-300 dark:text-green-400 dark:border-green-800"
+          className="text-positive border-positive"
           data-testid={`button-buffer-posted-${platform.toLowerCase()}`}
         >
           <a href={BUFFER_QUEUE_URL} target="_blank" rel="noopener noreferrer">
@@ -116,7 +116,7 @@ export default function PlatformPostButton({
   const renderError = () =>
     error ? (
       <p
-        className="text-sm text-red-600 mt-1"
+        className="text-sm text-destructive mt-1"
         data-testid={`text-buffer-post-error-${platform.toLowerCase()}`}
       >
         {error}

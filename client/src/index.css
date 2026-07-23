@@ -64,6 +64,13 @@
   --positive: oklch(0.5912 0.1145 170); /* --tds-pos #0e9373 */
   --warning: oklch(0.7224 0.1378 64.6); /* derived from --tds-s3 #e0913a */
   --negative: oklch(0.5954 0.1829 27.3); /* --tds-neg #d6453d */
+  /* Weak status tints, for badge/callout backgrounds. These exist as real
+     tokens because Tailwind v3 cannot apply an opacity modifier to a bare
+     var() colour — `bg-destructive/10` silently generates nothing — so the
+     tinted variants have to be their own values. */
+  --positive-subtle: oklch(0.9591 0.0152 171.1); /* --tds-pos-weak #e8f5f0 */
+  --negative-subtle: oklch(0.9563 0.0186 21.6); /* --tds-neg-weak #fdeceb */
+  --warning-subtle: oklch(0.9685 0.0203 74.7); /* derived to match the pair above */
   /* Stable cool near-white for text on saturated status fills
      (destructive/positive/negative). Theme-agnostic — NOT redefined. */
   --color-on-strong: oklch(0.99 0.003 285);
@@ -185,6 +192,12 @@
   --positive: oklch(0.72 0.13 162);
   --warning: oklch(0.78 0.12 86);
   --negative: oklch(0.66 0.18 25);
+  /* Dark's weak tints are alpha over the dark canvas rather than pale
+     pastels, which would glare. Same reason as light: these must be real
+     tokens because v3 can't put an opacity modifier on a bare var(). */
+  --positive-subtle: oklch(0.72 0.13 162 / 0.16);
+  --warning-subtle: oklch(0.78 0.12 86 / 0.16);
+  --negative-subtle: oklch(0.66 0.18 25 / 0.16);
 
   /* Dark elevation = surface-lightening + a lit top edge; shadows recede. */
   --elevation-raised: inset 0 1px 0 oklch(1 0 0 / 0.04);

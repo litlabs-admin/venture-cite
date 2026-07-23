@@ -23,7 +23,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts";
 import {
   AlertTriangle,
@@ -525,7 +524,7 @@ export default function MonitorOverview() {
         <div
           className={`-mx-4 -mt-4 px-4 py-2 border-b transition-opacity duration-500 ${
             isAutopilotFailed
-              ? "bg-destructive/5 border-destructive/30"
+              ? "bg-destructive-subtle border-destructive"
               : "bg-primary/5 border-primary/20"
           } ${autopilot?.status === "completed" ? "opacity-0" : "opacity-100"}`}
           data-testid="autopilot-banner"
@@ -640,8 +639,8 @@ export default function MonitorOverview() {
                             <span
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
                                 heroData.visibilityDelta > 0
-                                  ? "bg-chart-4/10 text-chart-4"
-                                  : "bg-destructive/10 text-destructive"
+                                  ? "bg-positive-subtle text-positive"
+                                  : "bg-destructive-subtle text-destructive"
                               }`}
                             >
                               {heroData.visibilityDelta > 0 ? (
@@ -959,7 +958,7 @@ export default function MonitorOverview() {
                         </span>
                         <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-destructive/70"
+                            className="h-full rounded-full bg-destructive"
                             style={{ width: `${Math.max(6, pct)}%` }}
                           />
                         </div>
@@ -987,7 +986,15 @@ export default function MonitorOverview() {
             ) : sovDonutData.length === 0 ? (
               <p className="text-sm text-muted-foreground">No share-of-voice data yet.</p>
             ) : (
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid md:grid-cols-2 gap-6 md:items-center">
+                {/*
+                  Donut only — no Recharts <Legend>. The right-hand list below
+                  IS the legend (same DONUT_COLORS index, plus the percentage),
+                  so the built-in legend was duplicate data that wrapped to
+                  several rows for long/many brand names and overflowed its
+                  reserved band up into the chart. Dropping it lets the donut
+                  sit centered in its own h-64 box directly under the header.
+                */}
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -1004,33 +1011,40 @@ export default function MonitorOverview() {
                         ))}
                       </Pie>
                       <ReTooltip
+                        formatter={(value: number, name: string) => [`${Math.round(value)}%`, name]}
                         contentStyle={{
                           background: "var(--popover)",
                           border: "1px solid var(--border)",
                           borderRadius: 6,
                         }}
                       />
-                      <Legend />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-2 py-4">
+                <ul className="space-y-2">
                   {sovDonutData.map((slice, i) => (
-                    <div
+                    // gap-3 + min-w-0 on the label and shrink-0 on the dot and
+                    // the percentage keep the % pinned right and legible even
+                    // when a brand name is very long ("VCA Emergency Animal
+                    // Hospital & Referral Center") — the name wraps instead of
+                    // pushing the number off the row.
+                    <li
                       key={slice.name}
-                      className="flex items-center justify-between text-sm py-1"
+                      className="flex items-start justify-between gap-3 text-sm py-1"
                     >
-                      <span className="flex items-center gap-2">
+                      <span className="flex min-w-0 items-start gap-2">
                         <span
-                          className="w-2.5 h-2.5 rounded-full"
+                          className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }}
                         />
-                        {slice.name}
+                        <span className="min-w-0 break-words">{slice.name}</span>
                       </span>
-                      <span className="font-semibold">{Math.round(slice.value)}%</span>
-                    </div>
+                      <span className="shrink-0 font-semibold tabular-nums">
+                        {Math.round(slice.value)}%
+                      </span>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
           </Section>
@@ -1191,7 +1205,7 @@ export default function MonitorOverview() {
               </p>
             ) : !showVerbatim ? (
               hasMeasured ? (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
+                <div className="rounded-md border border-destructive bg-destructive-subtle p-4 flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm">
@@ -1269,11 +1283,7 @@ function SentimentCard({
   tone: "amber" | "emerald" | "destructive";
 }) {
   const toneClass =
-    tone === "emerald"
-      ? "text-emerald-400"
-      : tone === "amber"
-        ? "text-amber-400"
-        : "text-destructive";
+    tone === "emerald" ? "text-positive" : tone === "amber" ? "text-warning" : "text-destructive";
   return (
     <div className="rounded-md border border-border bg-card px-4 py-3 text-center">
       <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
@@ -1307,18 +1317,18 @@ function PromptCoverageMap({
           {appearing} of {categories.length}
         </span>
         <span className="text-muted-foreground">AI query types</span>
-        <span className="ml-auto font-semibold text-emerald-400">{pct}%</span>
+        <span className="ml-auto font-semibold text-positive">{pct}%</span>
       </div>
       <ul className="space-y-1.5">
         {categories.map((cat) => {
           const state = brandRow.cells[cat] ?? "unknown";
           const appears = state === "yes" || state === "partial";
           const absentRowClasses = hasMeasured
-            ? "border-destructive/20 bg-destructive/5"
+            ? "border-destructive bg-destructive-subtle"
             : "border-border bg-muted/30";
           const absentLabelClasses = hasMeasured ? "text-destructive" : "text-muted-foreground";
           const absentGlyphBg = hasMeasured
-            ? "bg-destructive/20 text-destructive"
+            ? "bg-destructive-subtle text-destructive"
             : "bg-muted text-muted-foreground";
           const absentLabel = hasMeasured ? "Absent" : "Pending";
           return (
@@ -1326,12 +1336,12 @@ function PromptCoverageMap({
               key={cat}
               className={
                 "flex items-center justify-between px-3 py-2 rounded-md border " +
-                (appears ? "border-emerald-500/20 bg-emerald-500/5" : absentRowClasses)
+                (appears ? "border-positive bg-positive-subtle" : absentRowClasses)
               }
             >
               <span className="flex items-center gap-2 text-sm">
                 {appears ? (
-                  <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 grid place-items-center text-[10px]">
+                  <span className="w-4 h-4 rounded-full bg-positive-subtle text-positive grid place-items-center text-[10px]">
                     ✓
                   </span>
                 ) : (
@@ -1345,7 +1355,7 @@ function PromptCoverageMap({
                 )}
                 {cat}
               </span>
-              <span className={"text-xs " + (appears ? "text-emerald-400" : absentLabelClasses)}>
+              <span className={"text-xs " + (appears ? "text-positive" : absentLabelClasses)}>
                 {appears ? "You appear" : absentLabel}
               </span>
             </li>
@@ -1402,7 +1412,7 @@ function RedditVisibility({
       </div>
       {mentionCount === 0 &&
         (hasMeasured ? (
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-6 text-center">
+          <div className="rounded-md border border-destructive bg-destructive-subtle p-6 text-center">
             <MessageSquare className="w-8 h-8 text-destructive mx-auto mb-2" />
             <p className="font-semibold">No Reddit presence found</p>
             <p className="text-sm text-muted-foreground mt-1">

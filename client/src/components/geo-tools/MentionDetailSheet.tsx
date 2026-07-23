@@ -78,17 +78,17 @@ const SENTIMENT_MAP: Record<SentimentKey, SentimentConfig> = {
   positive: {
     label: "Positive",
     icon: <ThumbsUp className="h-3.5 w-3.5" />,
-    className: "bg-green-100 text-green-800 border-green-200",
+    className: "bg-positive-subtle text-positive border-positive",
   },
   neutral: {
     label: "Neutral",
     icon: <Minus className="h-3.5 w-3.5" />,
-    className: "bg-slate-100 text-slate-700 border-slate-200",
+    className: "bg-muted text-muted-foreground border-border",
   },
   negative: {
     label: "Negative",
     icon: <AlertTriangle className="h-3.5 w-3.5" />,
-    className: "bg-red-100 text-red-800 border-red-200",
+    className: "bg-destructive-subtle text-destructive border-destructive",
   },
 };
 
@@ -111,14 +111,14 @@ function getPlatformConfig(platform: string): PlatformConfig {
     case "reddit":
       return {
         label: "Reddit",
-        icon: <MessageSquare className="h-4 w-4 text-orange-500" />,
+        icon: <MessageSquare className="h-4 w-4 text-muted-foreground" />,
       };
     case "hackernews":
     case "hacker_news":
     case "hn":
       return {
         label: "Hacker News",
-        icon: <Globe className="h-4 w-4 text-orange-600" />,
+        icon: <Globe className="h-4 w-4 text-muted-foreground" />,
       };
     default:
       return {

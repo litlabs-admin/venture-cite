@@ -170,24 +170,24 @@ export default function Pricing() {
           </div>
 
           {success && (
-            <div className="mb-8 p-4 bg-green-100 border border-green-300 rounded-lg text-center">
-              <Check className="w-6 h-6 inline mr-2 text-green-600" />
-              <span className="text-green-800 font-medium">
+            <div className="mb-8 p-4 bg-positive-subtle border border-positive rounded-lg text-center">
+              <Check className="w-6 h-6 inline mr-2 text-positive" />
+              <span className="text-positive font-medium">
                 Payment successful! Your subscription is now active.
               </span>
             </div>
           )}
 
           {canceled && (
-            <div className="mb-8 p-4 bg-yellow-100 border border-yellow-300 rounded-lg text-center">
-              <span className="text-yellow-800 font-medium">
+            <div className="mb-8 p-4 bg-warning-subtle border border-warning rounded-lg text-center">
+              <span className="text-warning font-medium">
                 Checkout was canceled. No charges were made.
               </span>
             </div>
           )}
 
           <div className="text-center mb-12">
-            <Badge className="mb-4 bg-purple-100 text-purple-700 hover:bg-purple-100">
+            <Badge className="mb-4 bg-muted text-muted-foreground hover:bg-muted">
               <Sparkles className="w-3 h-3 mr-1" /> Launch Pricing
             </Badge>
             <h1 className="text-4xl font-bold mb-4" data-testid="text-page-title">
@@ -217,12 +217,12 @@ export default function Pricing() {
             ).map((plan, idx) => (
               <Card
                 key={plan.name}
-                className={`relative ${plan.popular ? "border-2 border-purple-500 shadow-lg scale-105" : ""}`}
+                className={`relative ${plan.popular ? "border-2 border-primary shadow-lg scale-105" : ""}`}
                 data-testid={`pricing-card-${plan.name.toLowerCase()}`}
               >
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-purple-500">
+                    <Badge className="bg-primary">
                       <Crown className="w-3 h-3 mr-1" /> Most Popular
                     </Badge>
                   </div>
@@ -239,7 +239,7 @@ export default function Pricing() {
                   <ul className="space-y-3 text-left">
                     {plan.features.map((feature, i) => (
                       <li key={i} className="flex items-start gap-2">
-                        <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                        <Check className="w-5 h-5 text-positive flex-shrink-0 mt-0.5" />
                         <span className="text-sm">{feature}</span>
                       </li>
                     ))}
@@ -247,7 +247,7 @@ export default function Pricing() {
                 </CardContent>
                 <CardFooter>
                   <Button
-                    className={`w-full ${plan.popular ? "bg-purple-600 hover:bg-purple-700" : ""}`}
+                    className={`w-full ${plan.popular ? "bg-primary" : ""}`}
                     variant={plan.popular ? "default" : "outline"}
                     onClick={() => {
                       if ((plan as any).priceId) {

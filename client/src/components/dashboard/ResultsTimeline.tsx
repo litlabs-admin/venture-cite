@@ -111,7 +111,7 @@ export default function ResultsTimeline({ compact = false }: { compact?: boolean
               >
                 <div className="flex items-center gap-2">
                   {done ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-500" aria-hidden="true" />
+                    <CheckCircle2 className="h-4 w-4 text-positive" aria-hidden="true" />
                   ) : (
                     <Circle
                       className={"h-4 w-4 " + (current ? "text-primary" : "text-muted-foreground")}

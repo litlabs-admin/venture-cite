@@ -2,7 +2,7 @@ import logoPath from "@assets/logo.png";
 import { ProductMegaMenu } from "./ProductMegaMenu";
 import { ResourcesMegaMenu } from "./ResourcesMegaMenu";
 import { MobileMenu } from "./MobileMenu";
-import { pricingLink, demoLink, containerMaxWidth } from "./data";
+import { demoLink, containerMaxWidth } from "./data";
 
 export function Nav() {
   return (
@@ -20,12 +20,6 @@ export function Nav() {
         <div className="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
           <ProductMegaMenu />
           <ResourcesMegaMenu />
-          <a
-            href={pricingLink.href}
-            className="h-9 px-4 text-[13px] font-medium text-tk-secondary hover:text-tk-primary hover:bg-tk-muted transition-all duration-250 rounded inline-flex items-center"
-          >
-            {pricingLink.name}
-          </a>
           <a
             href={demoLink.href}
             className="h-9 px-4 text-[13px] font-medium text-tk-secondary hover:text-tk-primary hover:bg-tk-muted transition-all duration-250 rounded inline-flex items-center"

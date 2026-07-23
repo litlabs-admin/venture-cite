@@ -393,7 +393,7 @@ export default function Brands() {
                       handleCreateFromWebsite();
                     }
                   }}
-                  className="bg-white dark:bg-slate-900 text-base h-11"
+                  className="bg-card text-base h-11"
                   disabled={createFromWebsiteMutation.isPending}
                   data-testid="input-website-url"
                 />

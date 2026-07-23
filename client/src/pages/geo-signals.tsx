@@ -1285,7 +1285,7 @@ export default function GeoSignals() {
                       {chunks.map((chunk, idx) => (
                         <div
                           key={idx}
-                          className={`p-4 rounded-lg border ${chunk.extractable ? "bg-chart-4/10 border-chart-4/30" : "bg-destructive/10 border-destructive/30"}`}
+                          className={`p-4 rounded-lg border ${chunk.extractable ? "bg-positive-subtle border-positive" : "bg-destructive-subtle border-destructive"}`}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
@@ -1298,12 +1298,15 @@ export default function GeoSignals() {
                             </div>
                             <div className="flex gap-2">
                               {chunk.hasHeading && (
-                                <Badge variant="outline" className="text-chart-4 border-chart-4/50">
+                                <Badge variant="outline" className="text-positive border-positive">
                                   Has Heading
                                 </Badge>
                               )}
                               {chunk.questionBased && (
-                                <Badge variant="outline" className="text-sky-600 border-sky-500/50">
+                                <Badge
+                                  variant="outline"
+                                  className="text-muted-foreground border-border"
+                                >
                                   Question H2
                                 </Badge>
                               )}
@@ -1318,7 +1321,7 @@ export default function GeoSignals() {
                             {chunk.content}
                           </p>
                           {chunk.issues.length > 0 && (
-                            <div className="text-sm text-red-500">
+                            <div className="text-sm text-warning">
                               {chunk.issues.map((issue, iIdx) => (
                                 <p key={iIdx}>⚠️ {issue}</p>
                               ))}

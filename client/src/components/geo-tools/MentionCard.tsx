@@ -3,7 +3,9 @@ import {
   AlertTriangle,
   Check,
   Globe,
+  MessageCircle,
   MessageSquare,
+  Newspaper,
   Minus,
   MoreHorizontal,
   Trash2,
@@ -51,11 +53,11 @@ function formatAgeSeconds(s: number): string {
 // Status display map (mirrors MENTION_STATUS_DISPLAY in geo-tools.tsx).
 // ---------------------------------------------------------------------------
 const MENTION_STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
-  new: { label: "New", className: "bg-slate-100 text-slate-700" },
-  acknowledged: { label: "Acknowledged", className: "bg-blue-100 text-blue-800" },
-  replied: { label: "Replied", className: "bg-emerald-100 text-emerald-800" },
-  false_positive: { label: "False positive", className: "bg-amber-100 text-amber-800" },
-  ignored: { label: "Ignored", className: "bg-gray-200 text-gray-600" },
+  new: { label: "New", className: "bg-muted text-foreground" },
+  acknowledged: { label: "Acknowledged", className: "bg-muted text-foreground" },
+  replied: { label: "Replied", className: "bg-positive-subtle text-positive" },
+  false_positive: { label: "False positive", className: "bg-warning-subtle text-warning" },
+  ignored: { label: "Ignored", className: "bg-muted text-muted-foreground" },
 };
 
 type MentionStatus = "new" | "acknowledged" | "replied" | "false_positive" | "ignored";
@@ -81,12 +83,17 @@ function allowedTransitions(current: string): MentionStatus[] {
 // ---------------------------------------------------------------------------
 function PlatformIcon({ platform, className }: { platform: string; className?: string }) {
   switch (platform.toLowerCase()) {
+    // Neither Reddit nor Hacker News has a lucide brand mark. These used to
+    // share one glyph and were told apart only by orange-500 vs orange-700 —
+    // indistinguishable at 16px, and colour-only encoding besides. Distinct
+    // shapes carry the difference now. No aria-label here: the wrapping span
+    // already announces platformLabel(), so labelling the icon too would
+    // double-announce.
     case "reddit":
-      // Reddit's brand icon isn't in lucide; use MessageSquare as a stand-in.
-      return <MessageSquare className={cn("h-4 w-4 text-orange-500", className)} />;
+      return <MessageCircle className={cn("h-4 w-4 text-muted-foreground", className)} />;
     case "hackernews":
     case "hacker_news":
-      return <MessageSquare className={cn("h-4 w-4 text-orange-700", className)} />;
+      return <Newspaper className={cn("h-4 w-4 text-muted-foreground", className)} />;
     default:
       return <Globe className={cn("h-4 w-4 text-muted-foreground", className)} />;
   }
@@ -111,28 +118,28 @@ function SentimentBadge({ sentiment }: { sentiment: string | null | undefined })
   switch (sentiment) {
     case "positive":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+        <span className="inline-flex items-center gap-1 rounded-full border border-positive bg-positive-subtle px-2 py-0.5 text-xs font-medium text-positive">
           <Check className="h-3 w-3 shrink-0" aria-hidden="true" />
           Positive
         </span>
       );
     case "negative":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-destructive/20 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+        <span className="inline-flex items-center gap-1 rounded-full border border-destructive bg-destructive-subtle px-2 py-0.5 text-xs font-medium text-destructive">
           <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
           Negative
         </span>
       );
     case "pending":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500">
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
           <Minus className="h-3 w-3 shrink-0" aria-hidden="true" />
           Pending
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
           <Minus className="h-3 w-3 shrink-0" aria-hidden="true" />
           Neutral
         </span>
@@ -261,7 +268,7 @@ export default function MentionCard({
         <div className="flex shrink-0 items-center gap-2">
           {/* "New" badge for recently discovered mentions */}
           {isNew && (
-            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
               New
             </span>
           )}
@@ -320,7 +327,7 @@ export default function MentionCard({
         {/* Row 2: badges + date */}
         <div className="flex flex-wrap items-center gap-1.5">
           {isNew && (
-            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
               New
             </span>
           )}
@@ -433,7 +440,7 @@ function ActionsMenu({
         {/* Mark false positive */}
         {mention.status !== "false_positive" && (
           <DropdownMenuItem onSelect={() => onMarkFalsePositive(mention.id)}>
-            <XCircle className="h-4 w-4 text-amber-500" aria-hidden="true" />
+            <XCircle className="h-4 w-4 text-warning" aria-hidden="true" />
             Mark false positive
           </DropdownMenuItem>
         )}

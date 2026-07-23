@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { scrollRevealEase } from "@/pages/home2/hooks/useScrollReveal";
-import { DomainCaptureForm } from "./DomainCaptureForm";
-import { AiLogoRow } from "./AiLogoRow";
 
 // Verbatim from _reference/index.html lines 898-1063.
 //
@@ -15,9 +13,13 @@ import { AiLogoRow } from "./AiLogoRow";
 // Unlike the sections below it, the hero is not scroll-triggered: the source
 // snapshot shows it already settled (opacity-100 translate-y-0) immediately
 // on load, so it fades in unconditionally on mount rather than via
-// useScrollReveal's IntersectionObserver. The four inner blocks stagger via
-// the exact transition-delay values present in the source (0ms / 100ms /
-// 200ms / 300ms).
+// useScrollReveal's IntersectionObserver. The remaining headline/subheadline
+// blocks stagger via the exact transition-delay values present in the source
+// (0ms / 100ms). The lead-capture form and AI-logo row that originally
+// followed (200ms / 300ms delays) have been removed from this render, and
+// the bottom spacing that was sized around them has been trimmed to suit —
+// the source's pb-14/16/20 plus the subheadline's mb-7 left ~148px of dead
+// air above the dashboard card once the form was gone.
 export function Hero() {
   const [mounted, setMounted] = useState(false);
 
@@ -29,7 +31,7 @@ export function Hero() {
     <section className="relative bg-tk-surface pt-20 sm:pt-24 lg:pt-[140px] pb-0">
       <div className="px-4 lg:px-8">
         <div className="mx-auto" style={{ maxWidth: 1120 }}>
-          <div className="text-center mx-auto relative pb-14 sm:pb-16 lg:pb-20">
+          <div className="text-center mx-auto relative pb-2 sm:pb-3 lg:pb-4">
             <div
               className={`transition-all duration-700 ${
                 mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
@@ -42,7 +44,7 @@ export function Hero() {
               </h1>
 
               <p
-                className={`text-[14px] lg:text-[16px] text-tk-secondary leading-relaxed mb-7 max-w-[540px] mx-auto transition-all duration-500 ${
+                className={`text-[14px] lg:text-[16px] text-tk-secondary leading-relaxed max-w-[540px] mx-auto transition-all duration-500 ${
                   mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
                 style={{ transitionDelay: "100ms" }}
@@ -50,25 +52,6 @@ export function Hero() {
                 Find where AI overlooks, misreads or undersells you, then fix the pages and sources
                 shaping every answer.
               </p>
-
-              <div
-                className={`transition-all duration-500 max-w-[460px] mx-auto ${
-                  mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-                }`}
-                style={{ transitionDelay: "200ms" }}
-              >
-                <DomainCaptureForm />
-              </div>
-
-              <div
-                className={`flex items-center justify-between max-[359px]:flex-col max-[359px]:gap-2 max-w-[460px] mx-auto mt-3 transition-all duration-500 ${
-                  mounted ? "opacity-100" : "opacity-0"
-                }`}
-                style={{ transitionDelay: "300ms" }}
-              >
-                <p className="text-[12px] text-tk-text-muted">First report in about ten minutes</p>
-                <AiLogoRow />
-              </div>
             </div>
           </div>
         </div>

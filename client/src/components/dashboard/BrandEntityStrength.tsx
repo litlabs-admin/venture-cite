@@ -17,9 +17,9 @@ export interface EntityStrengthData {
 export default function BrandEntityStrength({ data }: { data: EntityStrengthData }) {
   const tone =
     data.label === "Strong"
-      ? "text-emerald-400"
+      ? "text-positive"
       : data.label === "Moderate"
-        ? "text-amber-400"
+        ? "text-warning"
         : "text-destructive";
 
   const explainer =

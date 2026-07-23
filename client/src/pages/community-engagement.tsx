@@ -75,7 +75,7 @@ interface GeneratedContent {
 
 const platformIcons: Record<string, JSX.Element> = {
   reddit: <SiReddit className="w-4 h-4" />,
-  hackernews: <Globe className="w-4 h-4 text-orange-500" />,
+  hackernews: <Globe className="w-4 h-4 text-muted-foreground" />,
 };
 
 const platformColors: Record<string, string> = {
@@ -746,7 +746,7 @@ export default function CommunityEngagement() {
                         onClick={() => deletePostMutation.mutate(post.id)}
                         data-testid={`button-delete-draft-${post.id}`}
                       >
-                        <Trash2 className="w-3 h-3 text-red-500" />
+                        <Trash2 className="w-3 h-3 text-destructive" />
                       </Button>
                     </div>
                   </div>
@@ -888,7 +888,7 @@ export default function CommunityEngagement() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
             <div className="space-y-2">
               <h4 className="font-medium flex items-center gap-2">
-                <SiReddit className="w-4 h-4 text-orange-500" /> Reddit
+                <SiReddit className="w-4 h-4 text-muted-foreground" /> Reddit
               </h4>
               <ul className="space-y-1 text-muted-foreground text-xs">
                 <li>Read the subreddit rules before posting</li>
@@ -900,7 +900,7 @@ export default function CommunityEngagement() {
             </div>
             <div className="space-y-2">
               <h4 className="font-medium flex items-center gap-2">
-                <Globe className="w-4 h-4 text-orange-500" /> Hacker News
+                <Globe className="w-4 h-4 text-muted-foreground" /> Hacker News
               </h4>
               <ul className="space-y-1 text-muted-foreground text-xs">
                 <li>Focus on technical depth and original insights</li>

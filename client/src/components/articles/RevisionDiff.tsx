@@ -59,8 +59,8 @@ export default function RevisionDiff({ before, after, context }: RevisionDiffPro
   return (
     <div className="space-y-2">
       <div className="text-xs text-muted-foreground">
-        <span className="text-green-600 dark:text-green-400 font-medium">+{stats.added}</span>{" "}
-        <span className="text-red-600 dark:text-red-400 font-medium">−{stats.removed}</span>
+        <span className="text-positive font-medium">+{stats.added}</span>{" "}
+        <span className="text-destructive font-medium">−{stats.removed}</span>
       </div>
       <pre className="text-xs font-mono leading-relaxed border rounded-md bg-muted p-3 overflow-x-auto max-h-[60vh]">
         {rendered.map((l, idx) => {
@@ -75,9 +75,9 @@ export default function RevisionDiff({ before, after, context }: RevisionDiffPro
           const line = l as DiffLine;
           const cls =
             line.op === "added"
-              ? "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20"
+              ? "text-positive bg-positive-subtle"
               : line.op === "removed"
-                ? "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20"
+                ? "text-destructive bg-destructive-subtle"
                 : "text-muted-foreground";
           const prefix = line.op === "added" ? "+ " : line.op === "removed" ? "− " : "  ";
           return (

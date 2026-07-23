@@ -57,7 +57,7 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
           aria-label="View completed onboarding"
           data-testid="sidebar-onboarding-complete-button"
         >
-          <CheckCircle2 className="h-4 w-4 text-green-500" aria-hidden="true" />
+          <CheckCircle2 className="h-4 w-4 text-positive" aria-hidden="true" />
           Setup complete
         </Button>
       ) : (

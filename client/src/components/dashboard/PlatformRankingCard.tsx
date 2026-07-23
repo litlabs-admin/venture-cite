@@ -26,17 +26,17 @@ export default function PlatformRankingCard({
   const found = platform.citedCount > 0;
   const showDestructive = hasMeasured && !found;
   const rankTone = found
-    ? "text-emerald-400"
+    ? "text-positive"
     : showDestructive
       ? "text-destructive"
       : "text-muted-foreground";
   const cardBorder = found
-    ? "border-emerald-500/20 bg-emerald-500/5"
+    ? "border-positive bg-positive-subtle"
     : showDestructive
       ? "border-destructive/20 bg-destructive/5"
       : "border-border bg-muted/30";
   const pillClasses = platform.isCitedSnippet
-    ? "text-emerald-400 bg-emerald-500/10"
+    ? "text-positive bg-positive-subtle"
     : showDestructive
       ? "text-destructive bg-destructive/10"
       : "text-muted-foreground bg-muted";

@@ -7,8 +7,6 @@ import { WhyNow } from "./sections/WhyNow/WhyNow";
 import { Platform } from "./sections/Platform/Platform";
 import { Philosophy } from "./sections/Philosophy/Philosophy";
 import { Revenue } from "./sections/Revenue/Revenue";
-import { Testimonials } from "./sections/Testimonials/Testimonials";
-import { Pricing } from "./sections/Pricing/Pricing";
 import { LearnResearch } from "./sections/LearnResearch/LearnResearch";
 import { ClosingCta } from "./sections/ClosingCta/ClosingCta";
 import { Footer } from "./sections/Footer/Footer";
@@ -48,8 +46,6 @@ export default function Home2() {
         <Platform />
         <Philosophy />
         <Revenue />
-        <Testimonials />
-        <Pricing />
         <LearnResearch />
         <ClosingCta />
       </main>

@@ -20,9 +20,9 @@ import { ArrowRightIcon } from "./icons";
 // item (Enterprise) has no trailing separator.
 const items: { label: string; href?: string }[] = [
   { label: "Brand teams" },
-  { label: "Marketing agencies", href: "/register" },
-  { label: "Startups", href: "/register" },
-  { label: "Enterprise", href: "/register" },
+  { label: "Marketing agencies" },
+  { label: "Startups" },
+  { label: "Enterprise" },
 ];
 
 export function BuiltForStrip({ isVisible }: { isVisible: boolean }) {

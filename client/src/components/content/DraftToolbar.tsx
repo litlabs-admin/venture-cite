@@ -84,11 +84,11 @@ export default function DraftToolbar({
                             variant="secondary"
                             className={`text-[10px] px-1.5 py-0 h-4 ${
                               status === "generating"
-                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                ? "bg-warning-subtle text-warning"
                                 : status === "failed"
-                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                  ? "bg-destructive-subtle text-destructive"
                                   : status === "ready"
-                                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    ? "bg-positive-subtle text-positive"
                                     : "bg-muted text-muted-foreground"
                             }`}
                           >

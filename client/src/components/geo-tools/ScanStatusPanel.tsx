@@ -104,7 +104,7 @@ function ActiveSourceChip({
   }
   if (s === "running") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-blue-600 border-blue-200 bg-blue-50">
+      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-foreground border-border bg-muted">
         {label} <Loader2 className="h-3 w-3 animate-spin" />
       </span>
     );
@@ -112,21 +112,21 @@ function ActiveSourceChip({
   if (s === "done") {
     const count = progress?.count ?? 0;
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-green-700 border-green-200 bg-green-50">
+      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-positive border-positive bg-positive-subtle">
         {label} ✓ {count}
       </span>
     );
   }
   if (s === "rate_limited") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-amber-700 border-amber-200 bg-amber-50">
+      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-warning border-warning bg-warning-subtle">
         {label} ⚠ rate-limited
       </span>
     );
   }
   // error fallback
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-red-700 border-red-200 bg-red-50">
+    <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-destructive border-destructive bg-destructive-subtle">
       {label} ⚠ error
     </span>
   );
@@ -143,11 +143,11 @@ function CompletedSourceChip({
   const label = SOURCE_LABELS[source];
 
   if (!progress || progress.status === "rate_limited") {
-    return <span className="text-amber-700">⚠ {label} rate-limited</span>;
+    return <span className="text-warning">⚠ {label} rate-limited</span>;
   }
   const count = progress.count ?? 0;
   return (
-    <span className="text-green-700">
+    <span className="text-positive">
       ✓ {label} {count}
     </span>
   );
@@ -240,7 +240,7 @@ export function ScanStatusPanel({
         <div className="space-y-2">
           {/* First-scan banner (flow F) */}
           {isFirstScan && (
-            <div className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
+            <div className="rounded-md bg-muted px-3 py-2 text-sm text-foreground">
               First scan — pulling up to 1 year of history; this may take longer than usual.
             </div>
           )}

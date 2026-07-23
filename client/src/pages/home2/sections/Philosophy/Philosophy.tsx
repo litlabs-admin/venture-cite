@@ -41,7 +41,7 @@ export function Philosophy() {
               <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-tk-default">
                 <PlaybookCard
                   number="01"
-                  href="/register"
+                  href="#platform-section"
                   title="Every major engine, not a sample"
                   body="ChatGPT, Claude, Perplexity, Gemini, Copilot, Google AI Overview. Each one surfaces different brands for the same query. Tracking two or three is guessing."
                   ctaLabel="See all features"
@@ -53,7 +53,7 @@ export function Philosophy() {
 
                 <PlaybookCard
                   number="02"
-                  href="/register"
+                  href="#revenue-section"
                   title="Actions, not dashboards"
                   body="Every week, VentureCite synthesizes your citation and GEO signals into prioritized actions you can execute today. Not reports you file. A playbook you run."
                   ctaLabel="See how actions work"
@@ -65,7 +65,7 @@ export function Philosophy() {
 
                 <PlaybookCard
                   number="03"
-                  href="/register"
+                  href="#learn-research-section"
                   title="An assistant that fixes it"
                   body="VentureCite's assistant diagnoses what's costing you citations, drafts the fix, and walks you through it end to end. Nothing ships without your approval."
                   ctaLabel="See how it works"

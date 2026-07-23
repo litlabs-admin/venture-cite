@@ -350,9 +350,9 @@ export default function EducationAssistant() {
                 )}
 
                 {chatbot.budgetExceeded && (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3.5">
+                  <div className="rounded-lg border border-warning bg-warning-subtle p-3.5">
                     <div className="flex items-start gap-2.5">
-                      <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
                       <div className="text-sm">
                         <div className="font-medium text-foreground">
                           Daily AI Tutor limit reached
@@ -366,7 +366,7 @@ export default function EducationAssistant() {
                 )}
 
                 {chatbot.error && (
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-start gap-2.5">
+                  <div className="rounded-lg border border-destructive bg-destructive-subtle p-3 flex items-start gap-2.5">
                     <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                     <div className="flex-1 text-sm">
                       <div className="text-foreground">{chatbot.error}</div>
@@ -435,7 +435,7 @@ export default function EducationAssistant() {
                 <div className="flex items-center justify-between mt-1.5 text-[10px] text-muted-foreground px-1">
                   <span>Enter to send · Shift+Enter for newline</span>
                   {showCharCount && (
-                    <span className={cn(charCount > 1900 && "text-amber-600")}>
+                    <span className={cn(charCount > 1900 && "text-warning")}>
                       {charCount} / 2000
                     </span>
                   )}

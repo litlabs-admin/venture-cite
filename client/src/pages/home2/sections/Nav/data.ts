@@ -92,7 +92,9 @@ export const resourcesFeatured: NavItem = {
 
 // Resources mega-menu list. The source listed an API Reference and an MCP
 // Server here; VentureCite ships neither, so those rows are gone rather than
-// renamed. Remaining rows point at routes that exist.
+// renamed. The Pricing row is gone too — the page's Pricing section was
+// removed, and there is no other honest destination for it. Remaining rows
+// point at routes that exist.
 export const resourcesList: NavItem[] = [
   {
     name: "How it works",
@@ -101,15 +103,9 @@ export const resourcesList: NavItem[] = [
     iconSrc: "/trakkr/images/resources/api.png",
   },
   {
-    name: "Pricing",
-    href: "#pricing-section",
-    description: "Plans for teams and agencies",
-    iconSrc: "/trakkr/images/resources/mcp.png",
-  },
-  {
-    name: "Privacy",
-    href: "/privacy",
-    description: "How we handle your data",
+    name: "Why now",
+    href: "#why-now-section",
+    description: "What changed about discovery",
     iconSlug: "data",
   },
 ];
@@ -117,20 +113,19 @@ export const resourcesList: NavItem[] = [
 // Resources mega-menu footer row — appears together, delay 240ms (not staggered per-item).
 export const resourcesFooterLinks = [
   { name: "Glossary", href: "/glossary" },
-  { name: "Privacy", href: "/privacy" },
   { name: "Log in", href: "/login" },
   { name: "Get started", href: "/register" },
 ];
 
-// Plain nav links (no mega-menu).
-export const pricingLink = { name: "Pricing", href: "#pricing-section" };
-export const demoLink = { name: "Log in", href: "/login" };
+// Plain nav link (no mega-menu). The Pricing link that used to sit beside
+// this one is gone — the page's Pricing section was removed.
+export const demoLink = { name: "How it works", href: "#platform-section" };
 
 // Mobile menu top link list ($e in TrakkrNav-JAUeEuWq.js). Index 0 ("Features")
-// is always rendered with the accent/active treatment, per the source.
+// is always rendered with the accent/active treatment, per the source. The
+// Pricing entry that used to sit here is gone along with the Pricing section.
 export const mobileTopLinks = [
   { label: "Platform", href: "#platform-section" },
-  { label: "Pricing", href: "#pricing-section" },
   { label: "Glossary", href: "/glossary" },
   { label: "Log in", href: "/login" },
   { label: "Get started", href: "/register" },

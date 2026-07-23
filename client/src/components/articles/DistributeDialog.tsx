@@ -400,9 +400,9 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
         </div>
 
         {!bufferConnected ? (
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3 mb-3 flex items-center justify-between gap-3">
+          <div className="bg-muted border border-border rounded-lg p-3 mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm">
-              <Link2 className="w-4 h-4 text-blue-600" />
+              <Link2 className="w-4 h-4 text-muted-foreground" />
               <span className="text-foreground">Connect Buffer to post directly</span>
             </div>
             <BufferConnectDialog
@@ -413,11 +413,11 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
           </div>
         ) : (
           <div
-            className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg p-3 mb-3 flex items-center justify-between gap-3"
+            className="bg-positive-subtle border border-positive rounded-lg p-3 mb-3 flex items-center justify-between gap-3"
             data-testid="banner-buffer-connected"
           >
             <div className="flex items-center gap-2 text-sm">
-              <Link2 className="w-4 h-4 text-green-600" />
+              <Link2 className="w-4 h-4 text-positive" />
               <span className="text-foreground">
                 Buffer connected ·{" "}
                 {bufferProfiles.length === 0

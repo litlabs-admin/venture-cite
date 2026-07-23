@@ -123,7 +123,7 @@ export function Platform() {
                         heading="See exactly where you show up across every AI platform"
                         body="Monitor your visibility across ChatGPT, Claude, Perplexity, Gemini, and more. Know your position for every prompt that matters to your business."
                         linkText="Explore tracking"
-                        href="/register"
+                        href="#why-now-section"
                         isVisible={isVisible}
                       />
                     </div>
@@ -146,7 +146,7 @@ export function Platform() {
                         heading="See why you're winning or losing"
                         body="Discover which sources AI cites when it mentions you. See the queries driving recommendations and the gaps in your coverage."
                         linkText="See how it works"
-                        href="/register"
+                        href="#revenue-section"
                         isVisible={isVisible}
                       />
                     </div>
@@ -163,7 +163,7 @@ export function Platform() {
                         heading="Turn signals into content AI engines want to cite"
                         body="Generate citation-ready articles and FAQs, scored against the same GEO signals AI engines reward, and publish straight to your channels."
                         linkText="Start improving"
-                        href="/register"
+                        href="#philosophy-section"
                         isVisible={isVisible}
                       />
                     </div>

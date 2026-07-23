@@ -20,17 +20,17 @@ export const solutionsLinks: FooterLink[] = [
   { name: "For Enterprise", href: "/register" },
 ];
 
-// Mobile Product column (Free Tools trigger removed — no honest destination).
+// Mobile Product column (Free Tools trigger removed — no honest destination;
+// Pricing removed along with the page's Pricing section).
 export const mobileProductLinks: FooterLink[] = [
   { name: "Platform", href: "#platform-section" },
-  { name: "Pricing", href: "#pricing-section" },
   { name: "Content", href: "#philosophy-section" },
 ];
 
-// Desktop Product column (Free Tools trigger removed — no honest destination).
+// Desktop Product column (Free Tools trigger removed — no honest destination;
+// Pricing removed along with the page's Pricing section).
 export const desktopProductLinks: FooterLink[] = [
   { name: "Platform", href: "#platform-section" },
-  { name: "Pricing", href: "#pricing-section" },
   { name: "Content", href: "#philosophy-section" },
   { name: "GEO Signals", href: "#philosophy-section" },
   { name: "Competitors", href: "#revenue-section" },
@@ -48,9 +48,3 @@ export const desktopLearnLinks: FooterLink[] = [
   { name: "Glossary", href: "/glossary" },
   { name: "Research", href: "#learn-research-section" },
 ];
-
-// Mobile Company column.
-export const mobileCompanyLinks: FooterLink[] = [{ name: "Privacy", href: "/privacy" }];
-
-// Desktop Company column.
-export const desktopCompanyLinks: FooterLink[] = [{ name: "Privacy", href: "/privacy" }];

@@ -40,6 +40,22 @@ export default {
         destructive: {
           DEFAULT: "var(--destructive)",
           foreground: "var(--destructive-foreground)",
+          subtle: "var(--negative-subtle)",
+        },
+        /* Functional status. These exist as Tailwind keys so components can
+           stop reaching for raw palette classes (text-green-600, bg-amber-50,
+           …), which bypass the theme entirely and don't follow light/dark.
+           `subtle` is the badge/callout background; use it instead of an
+           opacity modifier, which v3 cannot compute on a bare var(). */
+        positive: {
+          DEFAULT: "var(--positive)",
+          subtle: "var(--positive-subtle)",
+          foreground: "var(--color-on-strong)",
+        },
+        warning: {
+          DEFAULT: "var(--warning)",
+          subtle: "var(--warning-subtle)",
+          foreground: "var(--color-on-strong)",
         },
         border: "var(--border)",
         input: "var(--input)",

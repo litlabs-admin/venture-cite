@@ -238,7 +238,7 @@ export default function FaqManager() {
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-chart-4";
     if (score >= 60) return "text-chart-3";
-    return "text-red-500";
+    return "text-destructive";
   };
 
   const getScoreBadge = (score: number) => {

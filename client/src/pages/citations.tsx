@@ -375,13 +375,13 @@ export default function Citations() {
           flight for this brand. /citation-runs/state polling feeds the
           progress %; the active-runs gate provides the gating boolean. */}
       {showBanner && headlineProgress && (
-        <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30">
+        <Card className="border-border bg-muted">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2 gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="relative flex h-2 w-2 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
                 </span>
                 <span className="text-sm font-medium truncate">
                   Citation run in progress — {headlineProgress.progressPct}%

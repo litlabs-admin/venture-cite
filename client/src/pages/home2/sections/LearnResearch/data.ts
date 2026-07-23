@@ -40,11 +40,11 @@ export const resourceCards: ResourceCardData[] = [
     showMobileEyebrow: false,
   },
   {
-    href: "#pricing-section",
+    href: "#revenue-section",
     iconSrc: "/trakkr/images/resources/mcp.png",
     iconClassName: "w-[38px] sm:w-[46px] h-[38px] sm:h-[46px]",
-    title: "Pricing",
-    subtitle: "Plans for teams and agencies",
+    title: "Proof",
+    subtitle: "Where your AI visibility comes from",
     delayMs: 120,
     showMobileEyebrow: false,
   },
@@ -89,7 +89,7 @@ export const dataTiles: DataTileData[] = [
     delayMs: 205,
   },
   {
-    href: "/register",
+    href: "#revenue-section",
     iconSlug: "ai-traffic",
     iconExtraClassName: "opacity-[0.85]",
     title: "Share of answer",

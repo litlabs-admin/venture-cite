@@ -19,7 +19,7 @@ interface Props {
 function renderCell(state: CellState) {
   if (state === "yes")
     return (
-      <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-emerald-500/15 text-emerald-400">
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-positive-subtle text-positive">
         <Check className="w-3 h-3" />
       </span>
     );
@@ -31,7 +31,7 @@ function renderCell(state: CellState) {
     );
   if (state === "partial")
     return (
-      <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-amber-500/15 text-amber-400 text-xs">
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-warning-subtle text-warning text-xs">
         ~
       </span>
     );
@@ -58,10 +58,10 @@ export default function CompetitorGapMatrix({ categories, rows }: Props) {
           <span className="w-2.5 h-2.5 rounded bg-destructive/40" /> They appear, you don&apos;t
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded bg-emerald-500/40" /> You appear, they don&apos;t
+          <span className="w-2.5 h-2.5 rounded bg-positive-subtle" /> You appear, they don&apos;t
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded bg-amber-500/40" /> Partial
+          <span className="w-2.5 h-2.5 rounded bg-warning-subtle" /> Partial
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded bg-muted/40" /> Neither

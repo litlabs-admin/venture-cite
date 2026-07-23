@@ -23,10 +23,10 @@ export default function UsageWidget({ data }: UsageWidgetProps) {
             <div
               className={`w-2 h-2 rounded-full ${
                 data.articlesRemaining === 0
-                  ? "bg-red-500"
+                  ? "bg-destructive"
                   : data.articlesRemaining <= 5
-                    ? "bg-yellow-500"
-                    : "bg-green-500"
+                    ? "bg-warning"
+                    : "bg-positive"
               }`}
             />
             <span className="text-sm text-muted-foreground">
@@ -51,7 +51,7 @@ export default function UsageWidget({ data }: UsageWidgetProps) {
             {data.articlesRemaining > 0 &&
               data.articlesRemaining <= 5 &&
               data.articlesLimit !== -1 && (
-                <span className="text-xs text-yellow-500 font-medium">
+                <span className="text-xs text-warning font-medium">
                   {data.articlesRemaining} remaining
                 </span>
               )}

@@ -19,7 +19,7 @@ const priorityTone = (p: string) => {
     case "high":
       return "bg-destructive/10 text-destructive";
     case "medium":
-      return "bg-amber-500/15 text-amber-400";
+      return "bg-warning-subtle text-warning";
     default:
       return "bg-muted text-muted-foreground";
   }

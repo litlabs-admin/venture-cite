@@ -80,24 +80,24 @@ function triggerLabel(value: string): string {
 
 const STATUS_BADGE_VARIANT: Record<string, { className: string; label: string }> = {
   succeeded: {
-    className: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20",
+    className: "bg-positive-subtle text-positive border-positive",
     label: "Succeeded",
   },
   partial: {
-    className: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20",
+    className: "bg-warning-subtle text-warning border-warning",
     label: "Partial",
   },
   failed: {
-    className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
+    className: "bg-destructive-subtle text-destructive border-destructive",
     label: "Failed",
   },
   cancelled: { className: "bg-muted text-muted-foreground border-border", label: "Cancelled" },
   running: {
-    className: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
+    className: "bg-muted text-foreground border-border",
     label: "Running",
   },
   pending: {
-    className: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
+    className: "bg-muted text-foreground border-border",
     label: "Pending",
   },
 };
@@ -367,7 +367,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                         <span className="text-sm font-medium">{run.citationRate}%</span>
                         {delta !== 0 && (
                           <span
-                            className={`text-xs ${delta > 0 ? "text-green-600" : "text-red-500"}`}
+                            className={`text-xs ${delta > 0 ? "text-positive" : "text-destructive"}`}
                           >
                             {delta > 0 ? `+${delta}` : delta}%
                           </span>
@@ -407,7 +407,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span
-                                  className="inline-flex items-center text-amber-600 dark:text-amber-500"
+                                  className="inline-flex items-center text-warning"
                                   data-testid={`disagreement-${run.id}`}
                                 >
                                   <AlertTriangle className="h-3 w-3" />

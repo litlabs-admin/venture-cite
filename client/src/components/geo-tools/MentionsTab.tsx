@@ -297,7 +297,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
       {stats && (
         <div className="flex gap-2" aria-label="Mention statistics">
           <StatCard label="Total" value={stats.total} />
-          <StatCard label="Positive" value={stats.bySentiment.positive} accent="text-green-600" />
+          <StatCard label="Positive" value={stats.bySentiment.positive} accent="text-positive" />
           <StatCard label="Neutral" value={stats.bySentiment.neutral} />
           <StatCard label="Negative" value={stats.bySentiment.negative} accent="text-destructive" />
         </div>
@@ -355,7 +355,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+          className="h-8 gap-1.5 text-xs text-destructive hover:bg-destructive-subtle hover:text-destructive"
           onClick={() => setDeleteAllOpen(true)}
         >
           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />

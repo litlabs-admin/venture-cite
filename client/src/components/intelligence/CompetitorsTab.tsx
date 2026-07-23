@@ -309,7 +309,7 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-yellow-500" />
+              <BarChart3 className="w-5 h-5" />
               Citation Leaderboard
             </CardTitle>
             <CardDescription>How you rank vs competitors across AI platforms</CardDescription>

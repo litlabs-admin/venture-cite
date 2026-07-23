@@ -4,15 +4,15 @@ export default function PlatformVisibilityBar({ platform }: { platform: Platform
   const pct = Math.round((platform.visibilityScore / 10) * 100);
   const tone =
     platform.strengthLabel === "Strong"
-      ? "bg-emerald-500"
+      ? "bg-positive"
       : platform.strengthLabel === "Moderate"
-        ? "bg-amber-500"
+        ? "bg-warning"
         : "bg-destructive";
   const toneText =
     platform.strengthLabel === "Strong"
-      ? "text-emerald-400"
+      ? "text-positive"
       : platform.strengthLabel === "Moderate"
-        ? "text-amber-400"
+        ? "text-warning"
         : "text-destructive";
 
   return (

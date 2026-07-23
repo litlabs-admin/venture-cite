@@ -318,7 +318,7 @@ export default function PromptsTab({
           <div className="flex items-start justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-red-500" />
+                <Sparkles className="h-5 w-5 text-muted-foreground" />
                 Tracked prompts{" "}
                 {hasPrompts && (
                   <span className="text-sm text-muted-foreground font-normal">
@@ -577,7 +577,7 @@ export default function PromptsTab({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-amber-500" />
+                  <Lightbulb className="h-5 w-5 text-warning" />
                   Suggested prompts{" "}
                   {suggestions.length > 0 && (
                     <span className="text-sm text-muted-foreground font-normal">
@@ -642,11 +642,11 @@ export default function PromptsTab({
                 {suggestions.map((s) => (
                   <div
                     key={s.id}
-                    className="border border-border rounded-lg p-4 bg-amber-50/40 dark:bg-amber-900/10"
+                    className="border border-border rounded-lg p-4 bg-warning-subtle"
                     data-testid={`suggestion-${s.id}`}
                   >
                     <div className="flex items-start gap-3">
-                      <Lightbulb className="h-4 w-4 text-amber-500 mt-1 shrink-0" />
+                      <Lightbulb className="h-4 w-4 text-warning mt-1 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground">{s.prompt}</p>
                         {s.rationale && (
@@ -720,8 +720,8 @@ export default function PromptsTab({
                   <div className="space-y-3">
                     {/* New-prompt preview is shown in both modes. */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="text-sm p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded">
-                        <div className="text-amber-700 dark:text-amber-300 font-medium text-xs uppercase tracking-wide mb-1">
+                      <div className="text-sm p-3 bg-warning-subtle border border-warning rounded">
+                        <div className="text-warning font-medium text-xs uppercase tracking-wide mb-1">
                           {hasOpenSlot ? "Will be added" : "New (will be tracked)"}
                         </div>
                         <div className="text-foreground">{acceptingSuggestion.prompt}</div>
@@ -737,15 +737,13 @@ export default function PromptsTab({
                         <div
                           className={`text-sm p-3 rounded border ${
                             acceptReplaceId
-                              ? "border-red-300 bg-red-50/50 dark:bg-red-900/20 dark:border-red-900"
+                              ? "border-destructive bg-destructive-subtle"
                               : "border-dashed border-muted-foreground/40 bg-muted/30"
                           }`}
                         >
                           <div
                             className={`font-medium text-xs uppercase tracking-wide mb-1 ${
-                              acceptReplaceId
-                                ? "text-red-700 dark:text-red-400"
-                                : "text-muted-foreground"
+                              acceptReplaceId ? "text-destructive" : "text-muted-foreground"
                             }`}
                           >
                             Replacing (will be archived)
@@ -780,7 +778,7 @@ export default function PromptsTab({
                         {prompts.map((p, i) => (
                           <label
                             key={p.id}
-                            className={`flex items-start gap-2 p-2 rounded border cursor-pointer hover:bg-muted/40 ${acceptReplaceId === p.id ? "border-red-500 bg-red-50 dark:bg-red-900/20" : "border-border"}`}
+                            className={`flex items-start gap-2 p-2 rounded border cursor-pointer hover:bg-muted/40 ${acceptReplaceId === p.id ? "border-destructive bg-destructive-subtle" : "border-border"}`}
                           >
                             <input
                               type="radio"

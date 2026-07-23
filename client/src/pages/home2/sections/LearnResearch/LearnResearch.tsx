@@ -7,7 +7,7 @@ import { resourceCards } from "./data";
 
 // Learn/Research section — _reference/index.html lines 3410-3592. Unlike the
 // other numbered sections, this one carries its own top margin and inlines
-// its own "[07]" eyebrow directly (no separate sibling SectionHeader div),
+// its own "[05]" eyebrow directly (no separate sibling SectionHeader div),
 // so it does not use the shared SectionHeader component.
 //
 // One bordered panel (max-width 1120px) containing three stacked pieces,
@@ -33,7 +33,7 @@ export function LearnResearch() {
         style={{ left: "calc(50% - 624px)", transitionTimingFunction: scrollRevealEase }}
       >
         <span className="text-[11px] font-semibold tracking-[0.08em] text-tk-accent tabular-nums">
-          [07]
+          [05]
         </span>
       </div>
 

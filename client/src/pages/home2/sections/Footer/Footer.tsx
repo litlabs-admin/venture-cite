@@ -7,8 +7,6 @@ import {
   desktopProductLinks,
   mobileLearnLinks,
   desktopLearnLinks,
-  mobileCompanyLinks,
-  desktopCompanyLinks,
 } from "./data";
 
 // index.html:3627-3769. Every reveal block in the source is already
@@ -73,9 +71,7 @@ export function Footer() {
               <div>
                 <FooterColumn title="Learn" links={mobileLearnLinks} size="mobile" />
               </div>
-              <div>
-                <FooterColumn title="Company" links={mobileCompanyLinks} size="mobile" />
-              </div>
+              <div></div>
             </div>
 
             <div className={revealY(isVisible)} style={{ transitionDelay: "100ms" }}>
@@ -140,9 +136,7 @@ export function Footer() {
                 isVisible,
               )}`}
               style={{ transitionDelay: "125ms" }}
-            >
-              <FooterColumn title="Company" links={desktopCompanyLinks} size="desktop" />
-            </div>
+            ></div>
 
             <div
               className={`col-span-3 lg:col-span-1 lg:py-8 lg:px-5 flex flex-col ${revealY(isVisible)}`}

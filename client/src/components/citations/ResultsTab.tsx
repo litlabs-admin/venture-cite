@@ -211,10 +211,10 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
           state instead of a sad zero. Hidden when ≥1% so the normal
           summary takes over. */}
       {results.citationRate === 0 && (
-        <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+        <Card className="border-warning bg-warning-subtle">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+              <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium text-foreground">All platforms missed your brand</p>
                 <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc pl-5">
@@ -258,7 +258,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-muted-foreground">Best Platform</p>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 className="h-4 w-4 text-positive" />
             </div>
             {/* Wave 9: when no platform has hit the min-sample threshold,
                 surface "Need more data" rather than a misleading winner. */}

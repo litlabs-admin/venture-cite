@@ -166,10 +166,12 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
             <Badge variant="outline">{content.contentType}</Badge>
             <Badge>{content.status ?? "draft"}</Badge>
             {content.publishedAt && (
-              <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Published</Badge>
+              <Badge className="bg-positive-subtle text-positive hover:bg-positive-subtle">
+                Published
+              </Badge>
             )}
             {lastCitedAt && (
-              <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+              <Badge className="bg-muted text-foreground hover:bg-muted">
                 Cited recently · {lastCitedAt}
               </Badge>
             )}
@@ -342,7 +344,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
 
         {content.publishedAt && (
           <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3 text-green-500" />
+            <CheckCircle2 className="h-3 w-3 text-positive" />
             Published {new Date(content.publishedAt as any).toLocaleDateString()}
           </div>
         )}

@@ -46,11 +46,30 @@ function hashHue(s: string): number {
   return Math.abs(h) % 360;
 }
 
+// Wave 9 → theme tokens: unknown platforms are categorical data (like the
+// known-platform badges), so they draw from the chart-1…chart-5 ramp
+// instead of a raw hashed HSL value that couldn't follow the theme.
+// Class names must stay string literals (not template-interpolated) so
+// Tailwind's content scanner can find them.
+const CHART_TEXT_CLASSES = [
+  "text-chart-1",
+  "text-chart-2",
+  "text-chart-3",
+  "text-chart-4",
+  "text-chart-5",
+];
+const CHART_BORDER_CLASSES = [
+  "border-chart-1",
+  "border-chart-2",
+  "border-chart-3",
+  "border-chart-4",
+  "border-chart-5",
+];
+
 function colorClassForPlatform(platform: string): string {
   if (PLATFORM_COLORS[platform]) return PLATFORM_COLORS[platform];
-  // hsl-based inline style won't work via class; render as Tailwind arbitrary value.
-  const hue = hashHue(platform);
-  return `border [color:hsl(${hue},70%,40%)] dark:[color:hsl(${hue},70%,70%)] [background-color:hsl(${hue},70%,95%)] dark:[background-color:hsl(${hue},70%,15%)] [border-color:hsl(${hue},70%,80%)] dark:[border-color:hsl(${hue},70%,30%)]`;
+  const idx = hashHue(platform) % CHART_TEXT_CLASSES.length;
+  return `bg-muted ${CHART_TEXT_CLASSES[idx]} ${CHART_BORDER_CLASSES[idx]}`;
 }
 
 // Wave 9: deep-link templates. ChatGPT supports ?q=... on the share URL,
@@ -122,13 +141,13 @@ export function PlatformResultCard({
         </div>
         {result.isCited ? (
           <>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-positive-subtle text-positive border border-positive">
               <CheckCircle2 className="h-3 w-3" />
               Cited
             </div>
             {result.reDetectedAt ? (
               <div
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground border border-border"
                 title="Revealed by a stored-data re-check using an updated name variation. Rank isn't available because the original run didn't see this brand."
               >
                 Re-detected
@@ -151,8 +170,8 @@ export function PlatformResultCard({
           way to see WHY the platform didn't respond without clicking
           through. Show it inline + tinted red so it's unmissable. */}
       {isError && (
-        <div className="px-3 py-2 border-t bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900">
-          <div className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400">
+        <div className="px-3 py-2 border-t bg-destructive-subtle border-destructive">
+          <div className="flex items-start gap-2 text-xs text-destructive">
             <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>{result.snippet}</span>
           </div>

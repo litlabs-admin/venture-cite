@@ -424,7 +424,7 @@ export default function CrawlerCheck() {
                                       </p>
                                     </div>
                                     {crawler.recommendation && (
-                                      <div className="p-3 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                                      <div className="p-3 bg-warning-subtle rounded-lg">
                                         <p className="text-sm font-medium mb-2">Recommendation:</p>
                                         <pre className="text-sm font-mono whitespace-pre-wrap">
                                           {crawler.recommendation}

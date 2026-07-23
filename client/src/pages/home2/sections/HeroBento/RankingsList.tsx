@@ -77,7 +77,7 @@ export function RankingsList() {
               <span
                 className={
                   "text-[10px] tabular-nums w-8 text-right flex-shrink-0 font-mono " +
-                  (row.deltaPositive ? "text-tk-accent" : "text-rose-400")
+                  (row.deltaPositive ? "text-tk-accent" : "text-[#d6453d]")
                 }
               >
                 {row.delta}

@@ -40,7 +40,7 @@ export function CrawlersPanel() {
           <span className="text-[22px] font-semibold tracking-tight text-tk-primary tabular-nums leading-none">
             7,247
           </span>
-          <span className="flex items-center gap-0.5 text-[11px] font-medium text-emerald-500 tabular-nums">
+          <span className="flex items-center gap-0.5 text-[11px] font-medium text-tk-accent tabular-nums">
             ↑12%
           </span>
         </div>
