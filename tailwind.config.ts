@@ -77,13 +77,13 @@ export default {
           border: "var(--sidebar-border)",
           ring: "var(--sidebar-ring)",
         },
-        // Trakkr marketing-page tokens, used only by client/src/pages/home2.
-        // Literal hex (not vars) so opacity modifiers like bg-tk-muted/60 work,
+        // VentureCite marketing-page tokens, used only by client/src/pages/home2.
+        // Literal hex (not vars) so opacity modifiers like bg-vc-muted/60 work,
         // and namespaced under `tk` so they can't collide with the shadcn keys
         // above. Values copied verbatim from trakkr.ai/app/globals.css @theme.
         // NOTE: `muted` and `text-muted` are deliberately different colors —
         // the source's .text-muted resolves to gray-500, .bg-muted to gray-100.
-        tk: {
+        vc: {
           surface: "#fff",
           page: "#fff",
           primary: "#1c1917",
@@ -103,8 +103,8 @@ export default {
         },
       },
       boxShadow: {
-        "tk-card": "0 1px 3px 0 #0000000a",
-        "tk-overlay": "0 4px 16px -4px #00000014",
+        "vc-card": "0 1px 3px 0 #0000000a",
+        "vc-overlay": "0 4px 16px -4px #00000014",
       },
       // Trakkr steps that Tailwind v3 has no equivalent for. 250ms came from
       // the source's --duration-250 token; 450ms + the easing were arbitrary
@@ -115,7 +115,7 @@ export default {
         "450": "450ms",
       },
       transitionTimingFunction: {
-        tk: "cubic-bezier(0.16, 1, 0.3, 1)",
+        vc: "cubic-bezier(0.16, 1, 0.3, 1)",
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

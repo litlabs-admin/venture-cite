@@ -3,6 +3,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { logger } from "./logger";
 import { generateBrandPrompts } from "./promptGenerator";
+import { discoverCompetitors } from "./competitorDiscovery";
 import { runBrandPrompts } from "../citationChecker";
 import { runFullScrapeForBrand } from "./factAgent/v2/runFullScrape";
 import { cronStepBudget } from "./factAgent/v2/vercelBudget";
@@ -117,6 +118,18 @@ export async function runOnboardingAutopilot(
         autopilotError: null,
         autopilotProgress: {},
       } as never);
+
+      // Discover competitors BEFORE prompt generation so the first prompt set
+      // can build grounded "alternatives to <competitor>" comparison questions
+      // (that's where citations happen). Best-effort — never block onboarding.
+      try {
+        await discoverCompetitors(brandId);
+      } catch (err) {
+        logger.warn(
+          { err, brandId },
+          "onboardingAutopilot: competitor discovery failed (non-fatal)",
+        );
+      }
 
       const result = await generateBrandPrompts(brand);
       const promptsGenerated = result.saved.length;

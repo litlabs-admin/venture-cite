@@ -1,0 +1,6 @@
+# VentureCite — crawlers welcome. AI answer engines explicitly allowed.
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://venturecite.com/sitemap.xml

@@ -5,7 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
-    <title>VentureCite</title>
+    <title>VentureCite — Get cited by AI search engines</title>
+
+    <!--
+      AI / crawler-readable metadata. This app is a client-rendered SPA, so
+      non-JS crawlers (ClaudeBot, GPTBot, PerplexityBot, most LLM fetchers)
+      only ever see this <head>. Everything an answer engine needs to describe
+      VentureCite lives here as static markup. Copy is kept in sync with the
+      landing hero in client/src/pages/landing/sections/Hero/Hero.tsx.
+      NOTE: absolute URLs use the canonical marketing origin below — change
+      SITE_ORIGIN references if the public domain is not https://venturecite.com.
+    -->
+    <meta
+      name="description"
+      content="VentureCite shows you where AI overlooks, misreads or undersells your brand, then fixes the pages and sources shaping every AI answer. Take control of how AI search engines cite you."
+    />
+    <link rel="canonical" href="https://venturecite.com/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VentureCite" />
+    <meta property="og:title" content="VentureCite — Get cited by AI search engines" />
+    <meta
+      property="og:description"
+      content="Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer."
+    />
+    <meta property="og:url" content="https://venturecite.com/" />
+    <meta property="og:image" content="https://venturecite.com/favicon.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="VentureCite — Get cited by AI search engines" />
+    <meta
+      name="twitter:description"
+      content="Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer."
+    />
+    <meta name="twitter:image" content="https://venturecite.com/favicon.png" />
+
+    <!-- Structured data: this is what AI answer engines ingest to describe the product. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "VentureCite",
+        "applicationCategory": "BusinessApplication",
+        "url": "https://venturecite.com/",
+        "description": "VentureCite is a Generative Engine Optimization (GEO) platform that shows brands where AI search engines overlook, misread or undersell them, then fixes the pages and sources shaping every AI answer.",
+        "offers": { "@type": "Offer", "category": "SaaS" }
+      }
+    </script>
     <!--
       FOUC blocker: apply the right theme class to <html> BEFORE any CSS
       loads or React mounts. Mirrors the logic in client/src/lib/theme.ts
@@ -45,16 +94,67 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Only the two web fonts the design system actually uses: Inter (--font-sans)
+      and JetBrains Mono (--font-mono). --font-serif is Georgia (a system font).
+      The prior link loaded ~35 families, ~33 of them referenced nowhere in the
+      codebase — a large render-blocking request for fonts that never rendered.
+      If a per-brand font picker is added later, load the chosen family
+      dynamically rather than restoring the bulk list.
+    -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fira+Code:wght@300..700&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Oxanium:wght@200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Roboto:ital,wght@0,100..900;1,100..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      Crawler / no-JS fallback. This app is a client-rendered SPA, so without
+      this block a non-JS crawler (ClaudeBot, GPTBot, PerplexityBot) sees an
+      empty page. React 18's createRoot().render() REPLACES #root's children on
+      mount, so this static mirror is served to crawlers and no-JS visitors and
+      is silently swapped for the live app the moment JS runs. Copy mirrors the
+      landing sections in client/src/pages/landing/sections/*.
+      ponytail: hand-kept mirror of the marketing copy — cheap and robust, but
+      it must be updated by hand if the landing copy changes. Upgrade path when
+      the page starts churning: real SSG (vite-react-ssg) to single-source it.
+    -->
+    <div id="root">
+      <main
+        style="
+          max-width: 640px;
+          margin: 0 auto;
+          padding: 64px 24px;
+          font-family: system-ui, sans-serif;
+          line-height: 1.5;
+        "
+      >
+        <h1>AI is shaping how buyers see your brand. Take control of the story.</h1>
+        <p>
+          Find where AI overlooks, misreads or undersells you, then fix the pages and sources
+          shaping every answer.
+        </p>
+        <p><a href="/register">Get started</a> &middot; <a href="/login">Sign in</a></p>
+
+        <h2>See exactly where you show up across every AI platform</h2>
+        <p>
+          Track every mention across ChatGPT, Claude, Perplexity, Gemini, Copilot, and Google AI
+          Overview — every major engine, not a sample.
+        </p>
+
+        <h2>Actions, not dashboards</h2>
+        <p>
+          An assistant that fixes it: turn signals into content AI engines want to cite, and see the
+          draft before you publish.
+        </p>
+
+        <h2>Get cited by AI search engines</h2>
+        <p>
+          VentureCite is a Generative Engine Optimization platform. Track every mention, optimize
+          every prompt. <a href="/register">Get cited by AI search engines</a>.
+        </p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- impeccable-live-start -->
-    <script src="http://localhost:8400/live.js"></script>
-    <!-- impeccable-live-end -->
   </body>
 </html>

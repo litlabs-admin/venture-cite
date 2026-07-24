@@ -17,7 +17,6 @@ import { RouteSpinner } from "@/components/foundations";
 // Eager: first-paint + auth flow. Everything else is lazy so the initial
 // bundle doesn't carry recharts / react-markdown / framer-motion etc.
 import NotFound from "@/pages/not-found";
-import Home2 from "@/pages/home2";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -31,6 +30,11 @@ import VerifyEmail from "@/pages/verify-email";
 // here — they are reached through the workflow spine and their old paths
 // 301 into it via SpineRedirect below. Their components are still
 // code-split, just lazy-imported by the spine shell pages instead.
+// Marketing landing (recharts + all marketing sections). Lazy so it stays out
+// of the main bundle: authenticated users never load it, and the static #root
+// fallback in index.html covers the logged-out first paint while the chunk
+// loads (fetched during the useAuth loading window, so no added spinner).
+const Landing = lazy(() => import("@/pages/landing"));
 const Content = lazy(() => import("@/pages/content"));
 const Articles = lazy(() => import("@/pages/articles"));
 const Brands = lazy(() => import("@/pages/brands"));
@@ -39,8 +43,6 @@ const Settings = lazy(() => import("@/pages/settings"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Welcome = lazy(() => import("@/pages/welcome"));
 const Glossary = lazy(() => import("@/pages/glossary"));
-// Retired marketing homepage, kept at /oldhome for reference.
-const OldLanding = lazy(() => import("@/pages/landing"));
 const AdminScrapeInspector = lazy(() => import("@/pages/admin-scrape-inspector"));
 const AdminScrapeRuns = lazy(() => import("@/pages/admin-scrape-runs"));
 
@@ -74,7 +76,13 @@ function HomePage() {
   // Authenticated users land here post-signup (register.tsx → setLocation("/")).
   // Route through FirstRunGate so brand-less users get redirected to /welcome
   // before the dashboard renders.
-  return isAuthenticated ? <FirstRunGate component={Home} /> : <Home2 />;
+  return isAuthenticated ? (
+    <FirstRunGate component={Home} />
+  ) : (
+    <Suspense fallback={<RouteSpinner />}>
+      <Landing />
+    </Suspense>
+  );
 }
 
 function AuthenticatedRoute({ component: Component }: { component: ComponentType }) {
@@ -162,15 +170,6 @@ function Router() {
       {/* /home2 was where this page was built; it is the homepage now.
           Redirect rather than 404 so existing links keep working. */}
       <Route path="/home2">{() => <Redirect to="/" />}</Route>
-      {/* Retired predecessor, kept reachable for comparison. noindex'd in
-          the page's own Helmet so it can't compete with / in search. */}
-      <Route path="/oldhome">
-        {() => (
-          <Suspense fallback={<RouteSpinner />}>
-            <OldLanding />
-          </Suspense>
-        )}
-      </Route>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />

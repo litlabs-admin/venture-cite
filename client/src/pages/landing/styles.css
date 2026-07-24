@@ -1,0 +1,222 @@
+/*
+ * VentureCite marketing homepage — scoped stylesheet.
+ *
+ * Everything here is confined to the `.vc-home` subtree so it can coexist
+ * with the app's dark-by-default OKLCH token system. Ported from
+ * trakkr.ai/app/globals.css (custom-property + keyframe blocks only — the
+ * Tailwind-default @theme palette is not copied, Tailwind v3 already ships it)
+ * and trakkr.ai/app/vc-ds-tokens.css.
+ *
+ * Color utilities (bg-vc-surface, text-vc-primary, …) come from the `tk` key in
+ * tailwind.config.ts, not from here. The vars below exist only because a
+ * handful of components reference them from inline styles.
+ */
+
+.vc-home {
+  /* The app renders under <html class="dark">; this page is light-only. */
+  color-scheme: light;
+  color: #1c1917;
+
+  /* Warm gray ramp — brand override, NOT Tailwind's stock cool gray. */
+  --color-gray-50: #fafaf9;
+  --color-gray-100: #f5f5f4;
+  --color-gray-200: #e7e5e4;
+  --color-gray-300: #d6d3d1;
+  --color-gray-400: #a8a29e;
+  --color-gray-500: #78716c;
+  --color-gray-600: #57534e;
+  --color-gray-700: #44403c;
+  --color-gray-800: #292524;
+  --color-gray-900: #1c1917;
+
+  --color-green-50: #e4f6f2;
+  --color-green-100: #c8ede5;
+  --color-green-500: #0e9373;
+  --color-green-600: #0c7a60;
+
+  --color-page: #fff;
+  --color-surface: #fff;
+  --color-muted: var(--color-gray-100);
+  --color-primary: var(--color-gray-900);
+  --color-secondary: var(--color-gray-600);
+  --color-tertiary: var(--color-gray-500);
+  --color-placeholder: var(--color-gray-500);
+  --color-text-muted: var(--color-gray-500);
+  --color-default: var(--color-gray-200);
+  --color-subtle: var(--color-gray-100);
+  --color-hover: var(--color-gray-300);
+  --color-faint: var(--color-gray-300);
+  --color-accent: var(--color-green-500);
+  --color-accent-subtle: var(--color-green-50);
+  --color-accent-hover: var(--color-green-600);
+
+  --chart-1: var(--color-accent);
+  --chart-2: var(--color-gray-400);
+  --chart-grid: var(--color-gray-100);
+  --chart-axis: var(--color-gray-500);
+
+  --vc-mkt-dot-opacity: 0.08;
+  --vc-mkt-dot-spacing: 9px;
+  --vc-mkt-dot-size: 0.8px;
+}
+
+/*
+ * The app's base layer applies `border-color: var(--border)` (a dark zinc) to
+ * every element. Reset it to the marketing gray for this subtree. :where()
+ * zeroes the specificity so real border-* utilities still win regardless of
+ * stylesheet order.
+ */
+:where(.vc-home) *,
+:where(.vc-home) *::before,
+:where(.vc-home) *::after {
+  border-color: #e7e5e4;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────
+   Ported verbatim from trakkr.ai/app/globals.css, which took them from the
+   compiled source (_reference/index.html inline <style> blocks). Only the
+   keyframes this page actually uses — not the ~124 in the dashboard bundle. */
+
+/* Why Now marquee rows — _reference/index.html:1808-1839 */
+@keyframes drift-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+@keyframes drift-right {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+.vc-home .drift-left {
+  animation: drift-left 240s linear infinite;
+}
+.vc-home .drift-right {
+  animation: drift-right 260s linear infinite;
+}
+.vc-home .drift-left:hover,
+.vc-home .drift-right:hover {
+  animation-play-state: paused;
+}
+
+/* Decorative dot grid behind the Closing CTA — index-CjQYU9CS.css:9192 */
+.vc-home .mkt-dot-grid {
+  background-image: radial-gradient(
+    circle,
+    rgba(0, 0, 0, var(--vc-mkt-dot-opacity)) var(--vc-mkt-dot-size),
+    transparent var(--vc-mkt-dot-size)
+  );
+  background-size: var(--vc-mkt-dot-spacing) var(--vc-mkt-dot-spacing);
+}
+
+/* Philosophy — pulsing dot on in-progress chat tags. index.html:2427-2439 */
+@keyframes assistant-breath {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.vc-home .assistant-breath {
+  animation: assistant-breath 1.4s ease-in-out infinite;
+}
+
+/* Philosophy card 03's looping chat transcript — simplified choreography,
+   speed (36s) not verified against source. */
+@keyframes chat-scroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+.vc-home .chat-scroll {
+  animation: chat-scroll 36s linear infinite;
+}
+.vc-home .chat-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* Hero Bento — chart width override + mobile snap-carousel scrollbar hiding.
+   index.html:1115-1138 and 1799-1803. */
+.vc-home .hero-bento-chart .recharts-wrapper,
+.vc-home .hero-bento-chart .recharts-surface {
+  width: min(calc(66.6667vw - 59.67px), 836.33px) !important;
+}
+@media (max-width: 1023px) {
+  .vc-home .hero-bento-chart .recharts-wrapper,
+  .vc-home .hero-bento-chart .recharts-surface {
+    width: calc(100vw - 48px) !important;
+  }
+}
+.vc-home .hero-bento-row2-scroll {
+  scrollbar-width: none;
+}
+.vc-home .hero-bento-row2-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Trakkr Data System tokens ────────────────────────────────────────────
+   Verbatim subset of _reference/assets/theme-CQDk0Xff.css. Only `.vc-ds` and
+   `.vc-ds-mono` are referenced on this page (Learn/Research inline chart). */
+.vc-home .vc-ds {
+  --vc-ds-bg: #ffffff;
+  --vc-ds-surface: #ffffff;
+  --vc-ds-inset: #f1f3f6;
+  --vc-ds-hover: #f5f6f8;
+  --vc-ds-rail: #ffffff;
+  --vc-ds-border: #e9eaee;
+  --vc-ds-border-strong: #dcdee4;
+  --vc-ds-divider: #f0f1f4;
+  --vc-ds-ink: #16171b;
+  --vc-ds-ink-2: #5a5c63;
+  --vc-ds-ink-3: #8b8d96;
+  --vc-ds-ink-4: #b8bac1;
+  --vc-ds-accent: #0e9373;
+  --vc-ds-accent-ink: #0c7a60;
+  --vc-ds-accent-weak: #e8f5f0;
+  --vc-ds-accent-line: #c9e9df;
+  --vc-ds-pos: #0e9373;
+  --vc-ds-pos-weak: #e8f5f0;
+  --vc-ds-neg: #d6453d;
+  --vc-ds-neg-weak: #fdeceb;
+  --vc-ds-s1: #0e9373;
+  --vc-ds-s2: #3f6fd6;
+  --vc-ds-s3: #e0913a;
+  --vc-ds-s4: #8b5cf6;
+  --vc-ds-s5: #d6608a;
+  --vc-ds-s6: #2aa5b0;
+  --vc-ds-r-lg: 12px;
+  --vc-ds-r: 10px;
+  --vc-ds-r-sm: 7px;
+  --vc-ds-r-xs: 4px;
+  --vc-ds-rail-w: 248px;
+  --vc-ds-topbar-h: 56px;
+  --vc-ds-section-gap: 96px;
+  background: var(--vc-ds-bg);
+  color: var(--vc-ds-ink);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    Segoe UI,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.vc-home .vc-ds-mono {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: 0;
+}
