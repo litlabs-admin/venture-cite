@@ -51,11 +51,12 @@ app.use(
         frameSrc: ["js.stripe.com"],
         connectSrc,
         imgSrc,
-        // 'unsafe-inline' is required because Recharts injects per-chart
+        // 'unsafe-inline' is required because Radix UI and framer-motion
+        // set inline styles at runtime, and Recharts (used directly in
+        // TrendsTab, HistoryTab, and monitor-overview) injects per-chart
         // theme styles via dangerouslySetInnerHTML at component-render
-        // time (see client/src/components/ui/chart.tsx). Tightening this
-        // to a nonce-based policy is on the post-launch backlog if a
-        // security audit requires it.
+        // time. Tightening this to a nonce-based policy is on the
+        // post-launch backlog if a security audit requires it.
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       },
