@@ -449,8 +449,12 @@ export function setupAuth(app: Express) {
         email: normalizedEmail,
       });
     } catch (error: any) {
+      // Catch-all: can surface DB/driver errors (e.g. from db.update calls
+      // above), not just Supabase auth errors. Never echo error.message to
+      // the client — log/Sentry retain the detail.
+      logger.error({ err: error }, "auth: register failed");
       captureAndFlush(error, { tags: { source: "auth.ts:register" } });
-      res.status(500).json({ success: false, error: error.message || "Registration failed" });
+      res.status(500).json({ success: false, error: "Registration failed" });
     }
   });
 
@@ -570,7 +574,12 @@ export function setupAuth(app: Express) {
         expires_at: data.session.expires_at,
       });
     } catch (error: any) {
-      res.status(401).json({ success: false, error: error.message || "Login failed" });
+      // Catch-all: wraps supabaseAuth.signInWithPassword + loadPublicUser
+      // (a DB query), so this can surface driver errors. Previously had no
+      // logging at all — add it so the detail isn't simply discarded now
+      // that error.message is no longer echoed to the client.
+      logger.error({ err: error }, "auth: login failed");
+      res.status(401).json({ success: false, error: "Login failed" });
     }
   });
 

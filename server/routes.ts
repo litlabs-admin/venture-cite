@@ -153,9 +153,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tier: user.accessTier || "free",
           },
         });
-      } catch (error: any) {
-        captureAndFlush(error, { tags: { source: "routes.ts:243" } });
-        res.status(500).json({ success: false, error: error.message });
+      } catch (error) {
+        // Catch-all around storage.getUserUsage (DB query) — use the
+        // shared sendError helper so the client never sees error.message.
+        sendError(res, error, "Failed to fetch usage data");
       }
     }),
   );
@@ -278,9 +279,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUserStripeInfo(user.id, { accessTier: inviteCode.accessTier });
 
         res.json({ success: true, accessTier: inviteCode.accessTier });
-      } catch (error: any) {
-        captureAndFlush(error, { tags: { source: "routes.ts:377" } });
-        res.status(500).json({ success: false, error: error.message });
+      } catch (error) {
+        // Catch-all around storage.useBetaInviteCode / updateUserStripeInfo
+        // (DB queries) — sendError keeps error.message out of the response.
+        sendError(res, error, "Failed to validate invite code");
       }
     }),
   );
@@ -313,9 +315,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           after: inviteCode,
         });
         res.json({ success: true, data: inviteCode });
-      } catch (error: any) {
-        captureAndFlush(error, { tags: { source: "routes.ts:407" } });
-        res.status(500).json({ success: false, error: error.message });
+      } catch (error) {
+        // Catch-all around storage.createBetaInviteCode (DB insert) —
+        // sendError keeps error.message out of the response.
+        sendError(res, error, "Failed to create invite code");
       }
     }),
   );
@@ -328,9 +331,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const codes = await storage.getAllBetaInviteCodes();
         res.json({ success: true, data: codes });
-      } catch (error: any) {
-        captureAndFlush(error, { tags: { source: "routes.ts:417" } });
-        res.status(500).json({ success: false, error: error.message });
+      } catch (error) {
+        // Catch-all around storage.getAllBetaInviteCodes (DB query) —
+        // sendError keeps error.message out of the response.
+        sendError(res, error, "Failed to fetch invite codes");
       }
     }),
   );

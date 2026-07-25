@@ -66,7 +66,13 @@ export function setupBillingRoutes(app: Express): void {
         const publishableKey = await getStripePublishableKey();
         res.json({ success: true, publishableKey });
       } catch (error: any) {
-        res.json({ success: false, error: error.message });
+        // Catch-all around a dynamic import + env lookup — previously had
+        // no logging and echoed error.message straight to the client.
+        // Status intentionally left as the pre-existing implicit 200 (not
+        // touching status semantics here).
+        logger.error({ err: error }, "stripe.publishable-key failed");
+        captureAndFlush(error, { tags: { source: "billing.ts:publishable-key" } });
+        res.json({ success: false, error: "Unable to load billing configuration" });
       }
     }),
   );
@@ -183,8 +189,12 @@ export function setupBillingRoutes(app: Express): void {
 
         res.json({ success: true, url: session.url });
       } catch (error: any) {
+        // Catch-all around a raw SQL lookup (db.execute) + Stripe API
+        // calls — this is the confirmed leak site: error.message could
+        // contain the SQL statement text. Never echo it to the client.
+        logger.error({ err: error }, "stripe.checkout failed");
         captureAndFlush(error, { tags: { source: "billing.ts:137" } });
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: "Failed to create checkout session" });
       }
     }),
   );
