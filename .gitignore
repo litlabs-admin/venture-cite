@@ -109,3 +109,5 @@ attached_assets/
 brainstorms/
 .agents/
 .codex/
+# Superpowers specs, plans and baselines
+!docs/superpowers/**/*.md
