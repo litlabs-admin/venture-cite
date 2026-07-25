@@ -20,6 +20,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
     "test:fact-sheet": "tsx scripts/run-fact-sheet-benchmark.ts --against=scripts/fact-sheet-benchmark.baseline.json",
     "test:fact-sheet:full": "tsx scripts/run-fact-sheet-benchmark.ts --full --against=scripts/fact-sheet-benchmark.baseline.json",
     "test:fact-sheet:llm": "tsx scripts/run-fact-sheet-benchmark.ts --full --llm --against=scripts/fact-sheet-benchmark.baseline.json",
@@ -107,6 +109,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@sentry/vite-plugin": "^5.2.1",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.1.3",

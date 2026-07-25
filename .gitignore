@@ -65,6 +65,16 @@ coverage/
 .next/
 .vercel/
 
+# ─── Playwright e2e output — includes .auth/state.json, a real ──
+# ─── session token; must never be committed ─────────────────────
+test-results/
+playwright-report/
+blob-report/
+
+# ─── Playwright shared e2e auth state — playwright/.auth/state.json ────
+# ─── holds a real Supabase session token; must never be committed ──────
+playwright/.auth/
+
 # ─── Runtime ─────────────────────────────────────────────────────
 pids
 *.pid
