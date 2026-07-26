@@ -22,6 +22,7 @@ export default tseslint.config(
       // (also gitignored). Their browser/UMD bundles otherwise flood the
       // report and break lint-staged if accidentally staged.
       ".agents/**",
+      ".claude/**",
       ".codex/**",
       // Standalone Next.js reference build for the /home2 marketing page. It
       // has its own toolchain (Next lint rules this config can't resolve) and
@@ -107,7 +108,7 @@ export default tseslint.config(
 
   // Tests — Vitest globals + relaxed rules
   {
-    files: ["tests/**/*.ts", "**/*.test.ts", "**/*.spec.ts"],
+    files: ["tests/**/*.{ts,tsx}", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     languageOptions: {
       globals: {
         ...globals.node,

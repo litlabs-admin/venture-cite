@@ -17,7 +17,7 @@
 - 🔴 **TypeScript goes to 6.0.3, NOT 7.** TypeScript 7 ships no compiler API and `typescript-eslint` hard-caps at `typescript <6.1.0`. 6.0.3 is the highest version that keeps type-aware linting working.
 - **The verification gate after every task** is all four of:
   - `npm run check` — clean
-  - `npm run lint` — clean
+  - `npm run lint` — **0 errors**. Roughly 829 warnings are expected and non-blocking: the config deliberately grades `no-explicit-any`, `no-unescaped-entities`, `prefer-const` and others as warnings ("Track as warnings; don't gate CI"). Watch the error count, not the total.
   - `npm test` — 148 unit/integration files passing
   - `npm run test:e2e` — **61 passed / 2 skipped / 0 failed**
 - The e2e suite performs 2 real logins per run against a limit of 10 per (IP, email) per 15 minutes. Roughly five runs fit in a window. Exceeding it appears as `TimeoutError: page.waitForURL`, not a visible 429 — do not misdiagnose that as a regression.
@@ -25,6 +25,15 @@
 - Never print secrets. `.env` is gitignored and must stay that way.
 
 ---
+
+## Prerequisite already applied
+
+`eslint.config.js` had two gaps that made `npm run lint` report **2218 errors**, which would have rendered the gate above meaningless:
+
+- `.claude/**` was absent from the ignore list, even though its siblings `.agents/**` and `.codex/**` are there under a comment reading "Local vendored tool/skill caches — not project source, never lint". The directory filled with plugin files and produced 2120 `no-undef` errors.
+- Test globals were declared for `tests/**/*.ts` and `**/*.test.ts` only, so `tests/unit/*.test.tsx` and `tests/component/*.test.tsx` received neither Node nor browser globals.
+
+Both are now fixed, taking lint to **0 errors**. Neither was caused by any dependency change; they were latent.
 
 ## Pre-existing state this plan assumes
 
@@ -40,24 +49,26 @@ Ten packages were already removed as dead code before this phase, which deleted 
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `package.json` / `package-lock.json` | Every task modifies these |
-| `server/vite.ts` | Task 6 — two `app.use("*")` wildcards invalid under Express 5 |
-| `server/routes/*.ts` | Task 7 — 13 `ZodError.errors` sites |
-| `tailwind.config.ts`, `postcss.config.js`, `client/src/index.css`, `vite.config.ts` | Task 8 — Tailwind 4 config model |
-| `client/src/components/intelligence/TrendsTab.tsx` | Task 3 — `connectNulls` semantics |
-| `tests/e2e/billing.spec.ts` | Task 9 — only if Stripe changes the error shape |
-| `tsconfig.json` | Task 10 — explicit `target`, verify `baseUrl` |
+| File                                                                                | Responsibility                                                |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `package.json` / `package-lock.json`                                                | Every task modifies these                                     |
+| `server/vite.ts`                                                                    | Task 6 — two `app.use("*")` wildcards invalid under Express 5 |
+| `server/routes/*.ts`                                                                | Task 7 — 13 `ZodError.errors` sites                           |
+| `tailwind.config.ts`, `postcss.config.js`, `client/src/index.css`, `vite.config.ts` | Task 8 — Tailwind 4 config model                              |
+| `client/src/components/intelligence/TrendsTab.tsx`                                  | Task 3 — `connectNulls` semantics                             |
+| `tests/e2e/billing.spec.ts`                                                         | Task 9 — only if Stripe changes the error shape               |
+| `tsconfig.json`                                                                     | Task 10 — explicit `target`, verify `baseUrl`                 |
 
 ---
 
 ### Task 1: Low-risk batch
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: a clean starting point; later tasks assume these are current.
 
@@ -84,6 +95,7 @@ Expected: ≥ 19. shepherd.js 15 dropped Node 18. If your Node is older, stop an
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e **61 passed / 2 skipped / 0 failed**.
 
 - [ ] **Step 5: Visually smoke-test the tour engine**
@@ -101,10 +113,12 @@ Suggested message: `chore(deps): upgrade drizzle-kit, framer-motion, shepherd.js
 ### Task 1b: lucide-react 1.x
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`
 - Possibly modify: any of the 109 files importing icons
 
 **Interfaces:**
+
 - Consumes: Task 1.
 - Produces: nothing later tasks depend on.
 
@@ -143,6 +157,7 @@ Report how many icon-only controls you checked and how many needed a label.
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e 61/2/0.
 
 - [ ] **Step 5: Report, do not commit**
@@ -154,9 +169,11 @@ Suggested message: `chore(deps): upgrade lucide-react to 1.x`
 ### Task 2: React 19
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`
 
 **Interfaces:**
+
 - Consumes: Task 1.
 - Produces: React 19 runtime — Tasks 3 and 5 depend on it.
 
@@ -181,6 +198,7 @@ React 19's types changed in three ways that can surface here: `ReactElement["pro
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e 61/2/0.
 
 - [ ] **Step 4: Report, do not commit**
@@ -192,10 +210,12 @@ Suggested message: `chore(deps): upgrade to React 19`
 ### Task 3: Recharts 3
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`
 - Possibly modify: `client/src/components/intelligence/TrendsTab.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 2.
 - Produces: nothing later tasks depend on.
 
@@ -228,6 +248,7 @@ If it does treat nulls as zero, filter the nulls out of the series rather than s
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e 61/2/0.
 
 - [ ] **Step 5: Report, do not commit**
@@ -239,9 +260,11 @@ Suggested message: `chore(deps): upgrade recharts to 3.x`
 ### Task 4: Sentry 10
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`, `server/instrument.ts`, `client/src/lib/sentry.ts` (if needed)
 
 **Interfaces:**
+
 - Consumes: Task 2.
 - Produces: nothing later tasks depend on.
 
@@ -281,6 +304,7 @@ Expected: clean, or errors only at the sites you found in Step 1.
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e 61/2/0.
 
 - [ ] **Step 5: Verify errors still actually reach Sentry**
@@ -298,9 +322,11 @@ Suggested message: `chore(deps): upgrade Sentry SDKs to 10.x`
 ### Task 5: Vite 8
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`
 
 **Interfaces:**
+
 - Consumes: Task 2.
 - Produces: build toolchain that Task 8 depends on.
 
@@ -331,6 +357,7 @@ Expected: succeeds. Then inspect `dist/public/` — confirm assets are present a
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e 61/2/0.
 
 - [ ] **Step 5: Report, do not commit**
@@ -342,9 +369,11 @@ Suggested message: `chore(deps): upgrade Vite to 8.x`
 ### Task 6: Express 5
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`, `server/vite.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1.
 - Produces: nothing later tasks depend on.
 
@@ -366,10 +395,14 @@ Both are terminal catch-alls, so drop the path argument entirely:
 
 ```ts
 // before
-app.use("*", (req, res) => { /* ... */ });
+app.use("*", (req, res) => {
+  /* ... */
+});
 
 // after
-app.use((req, res) => { /* ... */ });
+app.use((req, res) => {
+  /* ... */
+});
 ```
 
 Scope note: these run only under `npm run dev` and `npm start`. Vercel bypasses them via `vercel.json`'s SPA rewrite, so production traffic is unaffected — but local dev breaks hard without the fix.
@@ -403,10 +436,12 @@ Suggested message: `chore(deps): upgrade Express to 5.x`
 ### Task 7: Zod 4 and drizzle-zod
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`
 - Modify: `server/routes/assistant.ts`, `brands.ts`, `factSheet.ts`, `factSheetV2.ts`, `userAccount.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1.
 - Produces: nothing later tasks depend on.
 
@@ -461,6 +496,7 @@ Expected: passing. Also confirm the generated schema still has the expected shap
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e 61/2/0.
 
 - [ ] **Step 7: Report, do not commit**
@@ -472,11 +508,13 @@ Suggested message: `chore(deps): upgrade Zod to 4.x and drizzle-zod to 0.8.x`
 ### Task 8: Tailwind 4
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`, `client/src/index.css`, `vite.config.ts`
 - Delete: `postcss.config.js`
 - Possibly modify: `tailwind.config.ts`, ~41 component files
 
 **Interfaces:**
+
 - Consumes: Task 5 (Vite 8).
 - Produces: nothing later tasks depend on.
 
@@ -511,7 +549,9 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [
-    react({ /* existing babel config unchanged */ }),
+    react({
+      /* existing babel config unchanged */
+    }),
     tailwindcss(),
     ...(sentryPlugin ? [sentryPlugin] : []),
   ],
@@ -543,6 +583,7 @@ Two changes need eyes, not a typecheck:
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e 61/2/0. Note the e2e suite asserts behaviour, not appearance — it will **not** catch a visual regression, which is why Step 5 exists.
 
 - [ ] **Step 7: Report, do not commit**
@@ -554,9 +595,11 @@ Suggested message: `chore(deps): upgrade Tailwind to 4.x and tailwind-merge to 3
 ### Task 9: Stripe 22
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`
 
 **Interfaces:**
+
 - Consumes: Task 1.
 - Produces: nothing later tasks depend on.
 
@@ -605,15 +648,17 @@ Suggested message: `chore(deps): upgrade Stripe SDK to 22.x`
 ### Task 10: TypeScript 6.0.3
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`, `tsconfig.json`
 
 **Interfaces:**
+
 - Consumes: all prior tasks.
 - Produces: nothing.
 
 🔴 **Ships alone.** TypeScript majors interact with every other package's types; bundling this with anything else makes a failure impossible to attribute.
 
-**6.0.3, not 7.** Verified against the npm registry: `6.0.2` and `6.0.3` are real stable releases, and `typescript-eslint` peers `typescript >=4.8.4 <6.1.0` — so 6.0.3 is the **highest** version that keeps type-aware linting working. TypeScript 7 ships no compiler API and the typescript-eslint issue to support it was closed *not planned*.
+**6.0.3, not 7.** Verified against the npm registry: `6.0.2` and `6.0.3` are real stable releases, and `typescript-eslint` peers `typescript >=4.8.4 <6.1.0` — so 6.0.3 is the **highest** version that keeps type-aware linting working. TypeScript 7 ships no compiler API and the typescript-eslint issue to support it was closed _not planned_.
 
 - [ ] **Step 1: Upgrade**
 
@@ -652,6 +697,7 @@ Expected: clean, with type-aware rules still running. If `typescript-eslint` rep
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e 61/2/0.
 
 - [ ] **Step 6: Report, do not commit**
@@ -663,9 +709,11 @@ Suggested message: `chore(deps): upgrade TypeScript to 6.0.3`
 ### Task 11: Test and lint tooling
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`
 
 **Interfaces:**
+
 - Consumes: Task 10.
 - Produces: the final Phase 1 state.
 
@@ -710,6 +758,7 @@ Expected: clean. If it crashes rather than reporting rule violations, something 
 ```bash
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
+
 Expected: all clean; e2e 61/2/0.
 
 - [ ] **Step 6: Report, do not commit**
@@ -721,6 +770,7 @@ Suggested message: `chore(deps): upgrade vitest to 4.x and eslint plugins`
 ### Task 12: Record the Phase 1 baseline
 
 **Files:**
+
 - Create: `docs/superpowers/plans/phase1-baseline.md`
 
 - [ ] **Step 1: Capture the final state**
