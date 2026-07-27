@@ -98,9 +98,43 @@ inventory feeding the implementation plan.
 
 ### Express mounting
 
+> ⚠️ **CORRECTED 2026-07-27 after API research.** This section previously said
+> `fromNodeMiddleware()`. That mechanism is **stale** — it predates Start going
+> Vite-native. The current stack is Nitro 3 + srvx + h3v2, where an Express app
+> is adapted with **`srvx/node`'s `toFetchHandler(expressApp)`**, producing a
+> `(Request) => Promise<Response>` that is wired into a splat server route
+> (`src/routes/api/$.ts`).
+>
+> Verified against srvx's own documentation and TanStack's `custom-basepath`
+> e2e example. **Not** verified: whether Start ships a first-party wrapper
+> around this or expects a direct `srvx` dependency. Resolve that before
+> writing the mount, not during.
+
 A single catch-all server route forwards `/api/*`, `/webhooks/*` and `/health`
-into the existing Express app using Nitro/h3's `fromNodeMiddleware()`. No
-changes to `server/`.
+into the existing Express app. No changes to `server/`.
+
+### Client-only dashboard — confirmed mechanism
+
+The design's central assumption — public pages server-render while the
+dashboard does not — is supported directly: **`createFileRoute` takes an
+`ssr: false` option**, and setting it on a parent layout route makes the whole
+subtree client-only (children inherit and cannot loosen it).
+
+So the `_app` layout gets `ssr: false` once, and every gated route beneath it
+is browser-rendered. That is what keeps auth untouched and avoids
+server-rendering the files that read `localStorage` during render.
+
+**Consequence if a route is NOT opted out:** untouched `window` /
+`localStorage` access during render throws server-side and crashes that
+request. The SSR-hazard inventory is therefore load-bearing for the three
+public routes only.
+
+### Version status
+
+`@tanstack/react-start@1.168.32` is the `latest` dist-tag with **no
+prerelease suffix**; the last six published versions are all stable. Verified
+directly against the npm registry, not from release notes — the `beta` and
+`alpha` tags are stranded on much older versions and are misleading.
 
 **Known behavioural difference:** on Render the process is persistent, so long
 AI jobs run unbounded. On Vercel the same code runs as a function subject to
