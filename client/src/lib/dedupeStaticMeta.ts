@@ -17,16 +17,27 @@
 export function startStaticMetaDescriptionDedup(): () => void {
   const head = document.head;
 
+  // React 19 hoists <title>/<meta>/<link> into <head> natively, and it does
+  // so WITHOUT any library marker — react-helmet-async's data-rh attribute no
+  // longer appears at all, because React gets there first. So identify the
+  // static tag explicitly by the data-static-fallback marker in index.html
+  // rather than by identifying the framework-managed one.
   const dedupe = () => {
-    const tags = head.querySelectorAll<HTMLMetaElement>('meta[name="description"]');
-    if (tags.length < 2) return;
-    const helmetManaged = head.querySelector<HTMLMetaElement>(
-      'meta[name="description"][data-rh="true"]',
+    const staticTag = head.querySelector<HTMLMetaElement>(
+      'meta[name="description"][data-static-fallback]',
     );
-    if (!helmetManaged) return;
-    tags.forEach((tag) => {
-      if (tag !== helmetManaged) tag.remove();
-    });
+    if (!staticTag) return;
+
+    // Only drop the fallback once a real page-specific description exists,
+    // so pages that set none keep it rather than ending up with nothing.
+    // Array.from rather than spread: tsconfig sets no explicit `target`, so
+    // NodeList spread trips TS2802 (downlevelIteration).
+    const hasPageSpecific = Array.from(
+      head.querySelectorAll<HTMLMetaElement>('meta[name="description"]'),
+    ).some((tag) => tag !== staticTag);
+    if (!hasPageSpecific) return;
+
+    staticTag.remove();
   };
 
   dedupe();

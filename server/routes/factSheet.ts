@@ -49,7 +49,7 @@ export function setupFactSheetRoutes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid query",
+            error: parsed.error.issues[0]?.message ?? "Invalid query",
           });
         }
         const { brandId, limit } = parsed.data;
@@ -377,7 +377,7 @@ export function setupFactSheetRoutes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const fact = await storage.getBrandFactById(req.params.factId);
@@ -465,7 +465,7 @@ export function setupFactSheetRoutes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const { brandId, side, domain, runId } = parsed.data;
@@ -511,7 +511,7 @@ export function setupFactSheetRoutes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid query",
+            error: parsed.error.issues[0]?.message ?? "Invalid query",
           });
         }
         await requireBrand(parsed.data.brandId, user.id);
@@ -555,7 +555,7 @@ export function setupFactSheetRoutes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid query",
+            error: parsed.error.issues[0]?.message ?? "Invalid query",
           });
         }
         const { brandId } = parsed.data;
@@ -596,7 +596,7 @@ export function setupFactSheetRoutes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         await requireBrand(req.params.brandId, user.id);

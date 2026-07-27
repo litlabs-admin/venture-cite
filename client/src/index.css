@@ -1,9 +1,307 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap")
+layer(base);
+@import "tailwindcss";
 
-/* ───────────────────────────────────────────────────────────────────────────
+@plugin 'tailwindcss-animate';
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--negative-subtle);
+
+  --color-positive: var(--positive);
+  --color-positive-subtle: var(--positive-subtle);
+  --color-positive-foreground: var(--color-on-strong);
+
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-foreground: var(--color-on-strong);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar-background);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-vc-surface: #fff;
+  --color-vc-page: #fff;
+  --color-vc-primary: #1c1917;
+  --color-vc-secondary: #57534e;
+  --color-vc-tertiary: #78716c;
+  --color-vc-text-muted: #78716c;
+  --color-vc-placeholder: #78716c;
+  --color-vc-muted: #f5f5f4;
+  --color-vc-subtle: #f5f5f4;
+  --color-vc-default: #e7e5e4;
+  --color-vc-hover: #d6d3d1;
+  --color-vc-faint: #d6d3d1;
+  --color-vc-accent: #0e9373;
+  --color-vc-accent-subtle: #e4f6f2;
+  --color-vc-accent-hover: #0c7a60;
+  --color-vc-success: #0e9373;
+
+  --shadow-vc-card: 0 1px 3px 0 #0000000a;
+  --shadow-vc-overlay: 0 4px 16px -4px #00000014;
+
+  --transition-duration-250: 250ms;
+  --transition-duration-450: 450ms;
+
+  --ease-vc: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-mono);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in-up: fade-in-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.8s ease-out both;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-soft: pulse-soft 3s ease-in-out infinite;
+  --animate-marquee: marquee 30s linear infinite;
+  --animate-gradient-shift: gradient-shift 8s ease infinite;
+  --animate-shimmer: shimmer 2.5s linear infinite;
+  --animate-blob-drift: blob-drift 14s ease-in-out infinite;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+  @keyframes fade-in-up {
+    0% {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.85;
+      transform: scale(1.04);
+    }
+  }
+  @keyframes marquee {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes gradient-shift {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes blob-drift {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+    }
+    33% {
+      transform: translate(20px, -30px) scale(1.05);
+    }
+    66% {
+      transform: translate(-20px, 20px) scale(0.95);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility reveal {
+  /* Quiet reveal — DESIGN.md easing/duration, 6px settle (was 24px/0.8s
+     editorial). prefers-reduced-motion → opacity only, no movement. */
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity var(--motion-base) var(--ease-out),
+    transform var(--motion-base) var(--ease-out);
+  &.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transform: none;
+    transition: opacity var(--motion-instant) linear;
+  }
+}
+
+@utility in-view {
+  &.reveal {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility reveal-delay-1 {
+  transition-delay: 0.04s;
+}
+
+@utility reveal-delay-2 {
+  transition-delay: 0.08s;
+}
+
+@utility reveal-delay-3 {
+  transition-delay: 0.12s;
+}
+
+@utility reveal-delay-4 {
+  transition-delay: 0.16s;
+}
+
+@utility reveal-delay-5 {
+  transition-delay: 0.2s;
+}
+
+@utility reveal-delay-6 {
+  transition-delay: 0.24s;
+}
+
+@utility tnum {
+  /* Tabular numerics — apply to any figure that updates so it doesn't
+     shimmy (mandatory on live numbers). Matches TDS's .tds-mono, which
+     deliberately inherits the body face and only switches on tabular
+     figures: Inter's tnum set aligns without the width/colour shift of
+     dropping into a separate mono family mid-sentence. --font-mono is
+     still the right choice for code, just not for numerals. */
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@utility shimmer-bg {
+  /* Landing-only decorative utilities (out of this slice's scope; flagged
+     in the roadmap for the future landing pass). Left intact so the
+     marketing page keeps working. */
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+}
+
+@utility card-lift {
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out);
+  &:hover {
+    transform: translateY(-4px);
+  }
+}
+
+@layer utilities {
+  /* ───────────────────────────────────────────────────────────────────────────
    Token system. Two layers: primitive tokens, then the shadcn semantic vars
    mapped onto them. .dark redefines the theme-varying primitives; the shadcn
    mappings live once in :root and follow automatically.
@@ -27,22 +325,22 @@
    own choice and it does collide with the rule above; flagged, not resolved.
    ─────────────────────────────────────────────────────────────────────── */
 
-:root {
-  /* Primitives — LIGHT (Trakkr TDS). White canvas AND white cards; the
+  :root {
+    /* Primitives — LIGHT (Trakkr TDS). White canvas AND white cards; the
      recessed step (--tds-inset) is what muted/sidebar use, so separation
      comes from borders rather than from stacking tones. */
-  --bg-base: oklch(1 0 0); /* --tds-bg #ffffff — page background */
-  --bg-surface-1: oklch(0.9635 0.0045 258.3); /* --tds-inset #f1f3f6 — muted / sidebar */
-  --bg-surface-2: oklch(1 0 0); /* --tds-surface #ffffff — cards */
-  --bg-surface-3: oklch(1 0 0); /* --tds-surface #ffffff — popovers / elevated */
-  --border-subtle: oklch(0.9582 0.0041 271.4); /* --tds-divider #f0f1f4 */
-  --border-default: oklch(0.9374 0.0055 275); /* --tds-border #e9eaee */
-  --border-strong: oklch(0.9008 0.0084 271.3); /* --tds-border-strong #dcdee4 */
-  --fg-primary: oklch(0.2053 0.0081 274.5); /* --tds-ink #16171b */
-  --fg-secondary: oklch(0.4754 0.0115 273.2); /* --tds-ink-2 #5a5c63 */
-  --fg-tertiary: oklch(0.6446 0.0135 276); /* --tds-ink-3 #8b8d96 */
-  --fg-disabled: oklch(0.7894 0.0101 273.3); /* --tds-ink-4 #b8bac1 */
-  /* Primary accent — TDS green. DELIBERATE DEVIATION: --tds-accent #0e9373
+    --bg-base: oklch(1 0 0); /* --tds-bg #ffffff — page background */
+    --bg-surface-1: oklch(0.9635 0.0045 258.3); /* --tds-inset #f1f3f6 — muted / sidebar */
+    --bg-surface-2: oklch(1 0 0); /* --tds-surface #ffffff — cards */
+    --bg-surface-3: oklch(1 0 0); /* --tds-surface #ffffff — popovers / elevated */
+    --border-subtle: oklch(0.9582 0.0041 271.4); /* --tds-divider #f0f1f4 */
+    --border-default: oklch(0.9374 0.0055 275); /* --tds-border #e9eaee */
+    --border-strong: oklch(0.9008 0.0084 271.3); /* --tds-border-strong #dcdee4 */
+    --fg-primary: oklch(0.2053 0.0081 274.5); /* --tds-ink #16171b */
+    --fg-secondary: oklch(0.4754 0.0115 273.2); /* --tds-ink-2 #5a5c63 */
+    --fg-tertiary: oklch(0.6446 0.0135 276); /* --tds-ink-3 #8b8d96 */
+    --fg-disabled: oklch(0.7894 0.0101 273.3); /* --tds-ink-4 #b8bac1 */
+    /* Primary accent — TDS green. DELIBERATE DEVIATION: --tds-accent #0e9373
      only reaches 3.86:1 against white, under WCAG AA for normal text, and
      Trakkr does put white labels on it. So the flat green stays as
      --brand-accent for borders, text-on-white, focus rings and the chart
@@ -50,158 +348,160 @@
      --brand-accent-fill (--tds-accent-ink #0c7a60) at 5.29:1. Hover/press
      step down from the fill so the ramp stays monotonic. To match Trakkr
      exactly instead, point --primary at --brand-accent. */
-  --brand-accent: oklch(0.5912 0.1145 170); /* --tds-accent #0e9373 */
-  --brand-accent-fill: oklch(0.5171 0.0988 170.6); /* --tds-accent-ink #0c7a60 */
-  --brand-accent-hover: oklch(0.4671 0.0895 170.6); /* derived from the fill */
-  --brand-accent-press: oklch(0.4171 0.08 170.6); /* derived from the fill */
-  --brand-accent-fg: oklch(1 0 0); /* white label on the accent fill */
-  --brand-accent-subtle: oklch(0.9591 0.0152 171.1); /* --tds-accent-weak #e8f5f0 */
-  /* Secondary accent — TDS's teal series colour, keeping the cool-secondary
+    --brand-accent: oklch(0.5912 0.1145 170); /* --tds-accent #0e9373 */
+    --brand-accent-fill: oklch(0.5171 0.0988 170.6); /* --tds-accent-ink #0c7a60 */
+    --brand-accent-hover: oklch(0.4671 0.0895 170.6); /* derived from the fill */
+    --brand-accent-press: oklch(0.4171 0.08 170.6); /* derived from the fill */
+    --brand-accent-fg: oklch(1 0 0); /* white label on the accent fill */
+    --brand-accent-subtle: oklch(0.9591 0.0152 171.1); /* --tds-accent-weak #e8f5f0 */
+    /* Secondary accent — TDS's teal series colour, keeping the cool-secondary
      role the old #14B8A6 played. */
-  --brand-accent-secondary: oklch(0.6624 0.1033 204.1); /* --tds-s6 #2aa5b0 */
-  /* Functional status. TDS ships pos + neg only; --warning is derived from
+    --brand-accent-secondary: oklch(0.6624 0.1033 204.1); /* --tds-s6 #2aa5b0 */
+    /* Functional status. TDS ships pos + neg only; --warning is derived from
      --tds-s3, its one warm hue. */
-  --positive: oklch(0.5912 0.1145 170); /* --tds-pos #0e9373 */
-  --warning: oklch(0.7224 0.1378 64.6); /* derived from --tds-s3 #e0913a */
-  --negative: oklch(0.5954 0.1829 27.3); /* --tds-neg #d6453d */
-  /* Weak status tints, for badge/callout backgrounds. These exist as real
+    --positive: oklch(0.5912 0.1145 170); /* --tds-pos #0e9373 */
+    --warning: oklch(0.7224 0.1378 64.6); /* derived from --tds-s3 #e0913a */
+    --negative: oklch(0.5954 0.1829 27.3); /* --tds-neg #d6453d */
+    /* Weak status tints, for badge/callout backgrounds. These exist as real
      tokens because Tailwind v3 cannot apply an opacity modifier to a bare
      var() colour — `bg-destructive/10` silently generates nothing — so the
      tinted variants have to be their own values. */
-  --positive-subtle: oklch(0.9591 0.0152 171.1); /* --tds-pos-weak #e8f5f0 */
-  --negative-subtle: oklch(0.9563 0.0186 21.6); /* --tds-neg-weak #fdeceb */
-  --warning-subtle: oklch(0.9685 0.0203 74.7); /* derived to match the pair above */
-  /* Stable cool near-white for text on saturated status fills
+    --positive-subtle: oklch(0.9591 0.0152 171.1); /* --tds-pos-weak #e8f5f0 */
+    --negative-subtle: oklch(0.9563 0.0186 21.6); /* --tds-neg-weak #fdeceb */
+    --warning-subtle: oklch(0.9685 0.0203 74.7); /* derived to match the pair above */
+    /* Stable cool near-white for text on saturated status fills
      (destructive/positive/negative). Theme-agnostic — NOT redefined. */
-  --color-on-strong: oklch(0.99 0.003 285);
+    --color-on-strong: oklch(0.99 0.003 285);
 
-  /* Motion (DESIGN.md) */
-  --motion-instant: 80ms;
-  --motion-fast: 140ms;
-  --motion-base: 220ms;
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+    /* Motion (DESIGN.md) */
+    --motion-instant: 80ms;
+    --motion-fast: 140ms;
+    --motion-base: 220ms;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
 
-  /* Elevation. TDS is border-first: depth comes from 1px rules, and its only
+    /* Elevation. TDS is border-first: depth comes from 1px rules, and its only
      two real shadows are a hairline lift and a wide, very soft overlay
      (theme-CQDk0Xff.css: .tds-card-hover, .tds-command-surface). Tinted with
      TDS's #14161e rather than slate. */
-  --elevation-raised: 0 1px 2px oklch(0.2019 0.0163 273.9 / 0.04);
-  --elevation-overlay:
-    0 1px 2px oklch(0.2019 0.0163 273.9 / 0.06), 0 14px 36px -28px oklch(0.2019 0.0163 273.9 / 0.28);
+    --elevation-raised: 0 1px 2px oklch(0.2019 0.0163 273.9 / 0.04);
+    --elevation-overlay:
+      0 1px 2px oklch(0.2019 0.0163 273.9 / 0.06),
+      0 14px 36px -28px oklch(0.2019 0.0163 273.9 / 0.28);
 
-  /* ── shadcn semantic layer, mapped onto the primitives ──────────────── */
-  --background: var(--bg-base);
-  --foreground: var(--fg-primary);
-  --card: var(--bg-surface-2);
-  --card-foreground: var(--fg-primary);
-  --popover: var(--bg-surface-3);
-  --popover-foreground: var(--fg-primary);
-  /* The FILL, not the flat brand green — it carries white label text at
+    /* ── shadcn semantic layer, mapped onto the primitives ──────────────── */
+    --background: var(--bg-base);
+    --foreground: var(--fg-primary);
+    --card: var(--bg-surface-2);
+    --card-foreground: var(--fg-primary);
+    --popover: var(--bg-surface-3);
+    --popover-foreground: var(--fg-primary);
+    /* The FILL, not the flat brand green — it carries white label text at
      5.29:1 where --brand-accent manages only 3.86:1. See the accent block. */
-  --primary: var(--brand-accent-fill);
-  --primary-foreground: var(--brand-accent-fg);
-  --secondary: var(--bg-surface-2);
-  --secondary-foreground: var(--fg-primary);
-  --muted: var(--bg-surface-1);
-  --muted-foreground: var(--fg-tertiary);
-  /* shadcn `accent` is the NEUTRAL hover/selected surface, not the brand
+    --primary: var(--brand-accent-fill);
+    --primary-foreground: var(--brand-accent-fg);
+    --secondary: var(--bg-surface-2);
+    --secondary-foreground: var(--fg-primary);
+    --muted: var(--bg-surface-1);
+    --muted-foreground: var(--fg-tertiary);
+    /* shadcn `accent` is the NEUTRAL hover/selected surface, not the brand
      colour. Brand colour is `--primary` (← --brand-accent above). With white
      cards, the hover/selected surface is the slate muted step so it stays
      visible on white (surface-2 would be invisible card-on-card). */
-  --accent: var(--bg-surface-1);
-  --accent-foreground: var(--fg-primary);
-  --destructive: var(--negative);
-  --destructive-foreground: var(--color-on-strong);
-  --border: var(--border-default);
-  --input: var(--border-strong);
-  --ring: var(--brand-accent);
-  /* Categorical data ramp = TDS's series colours, in TDS's order. The lead
+    --accent: var(--bg-surface-1);
+    --accent-foreground: var(--fg-primary);
+    --destructive: var(--negative);
+    --destructive-foreground: var(--color-on-strong);
+    --border: var(--border-default);
+    --input: var(--border-strong);
+    --ring: var(--brand-accent);
+    /* Categorical data ramp = TDS's series colours, in TDS's order. The lead
      is the brand green, so the first series and the accent match. TDS also
      ships a sixth (--tds-s6 #2aa5b0), exposed here as --brand-accent-secondary. */
-  --chart-1: oklch(0.5912 0.1145 170); /* --tds-s1 #0e9373 green */
-  --chart-2: oklch(0.5632 0.1669 263.3); /* --tds-s2 #3f6fd6 blue */
-  --chart-3: oklch(0.7224 0.1378 64.6); /* --tds-s3 #e0913a amber */
-  --chart-4: oklch(0.6056 0.2189 292.7); /* --tds-s4 #8b5cf6 violet */
-  --chart-5: oklch(0.6457 0.154 0); /* --tds-s5 #d6608a pink */
-  --sidebar-background: var(--bg-surface-1);
-  --sidebar-foreground: var(--fg-secondary);
-  /* Monochrome lane: the active nav item is a raised NEUTRAL chip with
+    --chart-1: oklch(0.5912 0.1145 170); /* --tds-s1 #0e9373 green */
+    --chart-2: oklch(0.5632 0.1669 263.3); /* --tds-s2 #3f6fd6 blue */
+    --chart-3: oklch(0.7224 0.1378 64.6); /* --tds-s3 #e0913a amber */
+    --chart-4: oklch(0.6056 0.2189 292.7); /* --tds-s4 #8b5cf6 violet */
+    --chart-5: oklch(0.6457 0.154 0); /* --tds-s5 #d6608a pink */
+    --sidebar-background: var(--bg-surface-1);
+    --sidebar-foreground: var(--fg-secondary);
+    /* Monochrome lane: the active nav item is a raised NEUTRAL chip with
      full-contrast text, not an indigo fill. Indigo stays reserved for the
      single primary action + the focus ring (--primary / --ring). */
-  --sidebar-primary: var(--bg-surface-3);
-  --sidebar-primary-foreground: var(--fg-primary);
-  --sidebar-accent: var(--bg-surface-2);
-  --sidebar-accent-foreground: var(--fg-primary);
-  --sidebar-border: var(--border-subtle);
-  --sidebar-ring: var(--brand-accent);
+    --sidebar-primary: var(--bg-surface-3);
+    --sidebar-primary-foreground: var(--fg-primary);
+    --sidebar-accent: var(--bg-surface-2);
+    --sidebar-accent-foreground: var(--fg-primary);
+    --sidebar-border: var(--border-subtle);
+    --sidebar-ring: var(--brand-accent);
 
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, Monaco, Consolas, monospace;
-  --radius: 10px; /* --tds-r; Tailwind derives md 8px / sm 6px from it */
-  /* Shadow scale, flattened to TDS's border-first depth and retinted from
+    --font-sans: "Inter", system-ui, sans-serif;
+    --font-serif: Georgia, serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Monaco, Consolas, monospace;
+    --radius: 10px; /* --tds-r; Tailwind derives md 8px / sm 6px from it */
+    /* Shadow scale, flattened to TDS's border-first depth and retinted from
      slate to #14161e. The wide, heavily-negative-spread second layer is what
      gives TDS surfaces their soft lift without a visible drop shadow. */
-  --shadow-2xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.03);
-  --shadow-xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04);
-  --shadow-sm: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05);
-  --shadow:
-    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04),
-    0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.18);
-  --shadow-md:
-    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05),
-    0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.22);
-  --shadow-lg:
-    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
-    0px 14px 36px -28px oklch(0.2019 0.0163 273.9 / 0.28);
-  --shadow-xl:
-    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
-    0px 20px 44px -30px oklch(0.2019 0.0163 273.9 / 0.32);
-  --shadow-2xl: 0px 28px 60px -36px oklch(0.2019 0.0163 273.9 / 0.36);
-  --tracking-normal: 0em;
-  --spacing: 0.25rem;
-}
+    --shadow-2xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.03);
+    --shadow-xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04);
+    --shadow-sm: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05);
+    --shadow:
+      0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04),
+      0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.18);
+    --shadow-md:
+      0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05),
+      0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.22);
+    --shadow-lg:
+      0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
+      0px 14px 36px -28px oklch(0.2019 0.0163 273.9 / 0.28);
+    --shadow-xl:
+      0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
+      0px 20px 44px -30px oklch(0.2019 0.0163 273.9 / 0.32);
+    --shadow-2xl: 0px 28px 60px -36px oklch(0.2019 0.0163 273.9 / 0.36);
+    --tracking-normal: 0em;
+    --spacing: 0.25rem;
+  }
 
-.dark {
-  /* Redefine ONLY the theme-varying primitives — the shadcn mappings in
+  .dark {
+    /* Redefine ONLY the theme-varying primitives — the shadcn mappings in
      :root reference these and follow automatically. */
-  /* DARK = the default. Sophisticated zinc near-black (NOT pure black —
+    /* DARK = the default. Sophisticated zinc near-black (NOT pure black —
      that reads as an undesigned void), crisp near-white text at very high
      contrast, indigo near-absent. */
-  --bg-base: oklch(0.165 0.003 285);
-  --bg-surface-1: oklch(0.195 0.004 285);
-  --bg-surface-2: oklch(0.225 0.0045 285);
-  --bg-surface-3: oklch(0.265 0.005 285);
-  --border-subtle: oklch(0.255 0.005 285);
-  --border-default: oklch(0.31 0.006 285);
-  --border-strong: oklch(0.41 0.007 285);
-  --fg-primary: oklch(0.97 0.003 285);
-  --fg-secondary: oklch(0.72 0.005 285);
-  --fg-tertiary: oklch(0.55 0.006 285);
-  --fg-disabled: oklch(0.42 0.005 285);
-  --brand-accent: oklch(0.66 0.19 278);
-  /* Must be redeclared here: --primary points at --brand-accent-fill, and
+    --bg-base: oklch(0.165 0.003 285);
+    --bg-surface-1: oklch(0.195 0.004 285);
+    --bg-surface-2: oklch(0.225 0.0045 285);
+    --bg-surface-3: oklch(0.265 0.005 285);
+    --border-subtle: oklch(0.255 0.005 285);
+    --border-default: oklch(0.31 0.006 285);
+    --border-strong: oklch(0.41 0.007 285);
+    --fg-primary: oklch(0.97 0.003 285);
+    --fg-secondary: oklch(0.72 0.005 285);
+    --fg-tertiary: oklch(0.55 0.006 285);
+    --fg-disabled: oklch(0.42 0.005 285);
+    --brand-accent: oklch(0.66 0.19 278);
+    /* Must be redeclared here: --primary points at --brand-accent-fill, and
      without this line dark would inherit :root's light green fill. Dark's
      indigo needs no AA adjustment, so fill == accent. */
-  --brand-accent-fill: oklch(0.66 0.19 278);
-  --brand-accent-hover: oklch(0.71 0.18 278);
-  --brand-accent-press: oklch(0.6 0.18 278);
-  --brand-accent-fg: oklch(0.99 0.004 285);
-  --brand-accent-subtle: oklch(0.66 0.19 278 / 0.16);
-  --positive: oklch(0.72 0.13 162);
-  --warning: oklch(0.78 0.12 86);
-  --negative: oklch(0.66 0.18 25);
-  /* Dark's weak tints are alpha over the dark canvas rather than pale
+    --brand-accent-fill: oklch(0.66 0.19 278);
+    --brand-accent-hover: oklch(0.71 0.18 278);
+    --brand-accent-press: oklch(0.6 0.18 278);
+    --brand-accent-fg: oklch(0.99 0.004 285);
+    --brand-accent-subtle: oklch(0.66 0.19 278 / 0.16);
+    --positive: oklch(0.72 0.13 162);
+    --warning: oklch(0.78 0.12 86);
+    --negative: oklch(0.66 0.18 25);
+    /* Dark's weak tints are alpha over the dark canvas rather than pale
      pastels, which would glare. Same reason as light: these must be real
      tokens because v3 can't put an opacity modifier on a bare var(). */
-  --positive-subtle: oklch(0.72 0.13 162 / 0.16);
-  --warning-subtle: oklch(0.78 0.12 86 / 0.16);
-  --negative-subtle: oklch(0.66 0.18 25 / 0.16);
+    --positive-subtle: oklch(0.72 0.13 162 / 0.16);
+    --warning-subtle: oklch(0.78 0.12 86 / 0.16);
+    --negative-subtle: oklch(0.66 0.18 25 / 0.16);
 
-  /* Dark elevation = surface-lightening + a lit top edge; shadows recede. */
-  --elevation-raised: inset 0 1px 0 oklch(1 0 0 / 0.04);
-  --elevation-overlay: 0 8px 24px -8px oklch(0 0 0 / 0.55);
+    /* Dark elevation = surface-lightening + a lit top edge; shadows recede. */
+    --elevation-raised: inset 0 1px 0 oklch(1 0 0 / 0.04);
+    --elevation-overlay: 0 8px 24px -8px oklch(0 0 0 / 0.55);
+  }
 }
 
 @layer base {
@@ -211,82 +511,6 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-  }
-}
-
-@layer utilities {
-  /* Quiet reveal — DESIGN.md easing/duration, 6px settle (was 24px/0.8s
-     editorial). prefers-reduced-motion → opacity only, no movement. */
-  .reveal {
-    opacity: 0;
-    transform: translateY(6px);
-    transition:
-      opacity var(--motion-base) var(--ease-out),
-      transform var(--motion-base) var(--ease-out);
-  }
-  .reveal.in-view {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  .reveal-delay-1 {
-    transition-delay: 0.04s;
-  }
-  .reveal-delay-2 {
-    transition-delay: 0.08s;
-  }
-  .reveal-delay-3 {
-    transition-delay: 0.12s;
-  }
-  .reveal-delay-4 {
-    transition-delay: 0.16s;
-  }
-  .reveal-delay-5 {
-    transition-delay: 0.2s;
-  }
-  .reveal-delay-6 {
-    transition-delay: 0.24s;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .reveal {
-      transform: none;
-      transition: opacity var(--motion-instant) linear;
-    }
-  }
-
-  /* Tabular numerics — apply to any figure that updates so it doesn't
-     shimmy (mandatory on live numbers). Matches TDS's .tds-mono, which
-     deliberately inherits the body face and only switches on tabular
-     figures: Inter's tnum set aligns without the width/colour shift of
-     dropping into a separate mono family mid-sentence. --font-mono is
-     still the right choice for code, just not for numerals. */
-  .tnum {
-    font-family: inherit;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum" 1;
-  }
-
-  /* Landing-only decorative utilities (out of this slice's scope; flagged
-     in the roadmap for the future landing pass). Left intact so the
-     marketing page keeps working. */
-  .shimmer-bg {
-    background-image: linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.6) 50%,
-      rgba(255, 255, 255, 0) 100%
-    );
-    background-size: 200% 100%;
-  }
-
-  .card-lift {
-    transition:
-      transform var(--motion-base) var(--ease-out),
-      box-shadow var(--motion-base) var(--ease-out),
-      border-color var(--motion-fast) var(--ease-out);
-  }
-  .card-lift:hover {
-    transform: translateY(-4px);
   }
 }
 

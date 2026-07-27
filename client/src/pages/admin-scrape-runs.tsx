@@ -94,7 +94,7 @@ export default function AdminScrapeRuns() {
                 return (
                   <Link key={run.id} href={`/admin/scrape/${run.id}`}>
                     <div
-                      className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:bg-[var(--bg-surface-2)] focus-within:ring-2 focus-within:ring-ring transition-colors cursor-pointer"
+                      className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:bg-(--bg-surface-2) focus-within:ring-2 focus-within:ring-ring transition-colors cursor-pointer"
                       data-testid={`run-row-${run.id}`}
                     >
                       <div className="shrink-0">
@@ -103,7 +103,7 @@ export default function AdminScrapeRuns() {
                         ) : tone === "fail" ? (
                           <XCircle className="h-4 w-4 text-destructive" />
                         ) : (
-                          <Loader2 className="h-4 w-4 text-[var(--warning)] animate-spin" />
+                          <Loader2 className="h-4 w-4 text-(--warning) animate-spin" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -118,7 +118,7 @@ export default function AdminScrapeRuns() {
                                 ? "bg-chart-4/10 text-chart-4"
                                 : tone === "fail"
                                   ? "bg-destructive/10 text-destructive"
-                                  : "bg-[var(--warning)]/10 text-[var(--warning)]",
+                                  : "bg-(--warning)/10 text-(--warning)",
                             )}
                           >
                             {run.status}

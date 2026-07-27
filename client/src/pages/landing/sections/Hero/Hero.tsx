@@ -38,7 +38,7 @@ export function Hero() {
               }`}
               style={{ transitionTimingFunction: scrollRevealEase }}
             >
-              <h1 className="text-[22px] sm:text-[26px] lg:text-[32px] font-semibold text-vc-primary tracking-[-0.025em] leading-[1.2] mb-4 max-w-[820px] mx-auto">
+              <h1 className="text-[22px] sm:text-[26px] lg:text-[32px] font-semibold text-vc-primary tracking-tight leading-[1.2] mb-4 max-w-[820px] mx-auto">
                 <span>AI is shaping how buyers see your brand. Take control of the story</span>
                 <span className="text-vc-accent">.</span>
               </h1>

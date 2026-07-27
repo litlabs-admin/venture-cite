@@ -496,6 +496,7 @@ export default function Citations() {
                       size="icon"
                       className="shrink-0"
                       data-testid="button-citations-overflow"
+                      aria-label="More actions"
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>

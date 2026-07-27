@@ -245,7 +245,7 @@ export default function MentionCard({
         "group relative w-full cursor-pointer rounded-lg border bg-card text-left transition-colors",
         "hover:border-primary/40 hover:shadow-sm",
         // Focus ring
-        "focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+        "focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden",
         // Active state (currently shown in detail sheet)
         isActive && "border-primary/60 bg-primary/5",
       )}
@@ -412,7 +412,7 @@ function ActionsMenu({
         className={cn(
           "flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground",
           "hover:bg-muted hover:text-foreground",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary",
           "transition-colors",
         )}
       >

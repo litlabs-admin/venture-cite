@@ -1,6 +1,6 @@
-import Stripe from "stripe";
+import { getStripeClient } from "../server/stripeClient";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = getStripeClient();
 
 async function createProducts() {
   console.log("Creating Stripe products...\n");

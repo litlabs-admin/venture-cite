@@ -46,7 +46,41 @@ const KNOWN_ROUTES: RegExp[] = [
   /^\/brand-fact-sheet$/,
   /^\/community$/,
   /^\/settings$/,
+
+  // --- Added 2026-07-25 ---
+  // This list had silently drifted out of sync with App.tsx. It was invisible
+  // because the handler used to be mounted as `app.use("*", …)`, and Express
+  // strips the mount prefix — so `req.path` was ALWAYS "/" inside it and
+  // `isKnownRoute` always matched. The 200/404 branch below was dead code.
+  // Removing the bare "*" (required by Express 5 / path-to-regexp v8) made the
+  // check live for the first time, revealing real routes returning 404.
+  /^\/home2$/,
+  /^\/verify-email$/,
+  /^\/welcome$/,
+  /^\/glossary$/,
+  // Workflow spine
+  /^\/monitor$/,
+  /^\/diagnose$/,
+  /^\/act$/,
+  /^\/setup$/,
+  /^\/report$/,
+  // Dynamic segments
+  /^\/content\/[^/]+$/,
+  /^\/admin\/scrape$/,
+  /^\/admin\/scrape\/[^/]+$/,
 ];
+
+// NOTE: this list is also stale in the other direction — it still contains
+// paths that are no longer routed in App.tsx (/pricing, /article/:id,
+// /geo-rankings, /revenue-analytics, /publications, /agent, /outreach,
+// /ai-traffic, /analytics-integrations). Those currently return 200 when they
+// should 404. Not removed here because that flips 200 -> 404 and needs its own
+// verification pass against the e2e suite.
+//
+// Structurally, a hand-maintained mirror of the router will keep drifting. The
+// TanStack Start migration replaces this entirely — its file-based routing
+// knows its own routes, so this whole allowlist disappears rather than being
+// re-synced.
 
 function isKnownRoute(pathname: string): boolean {
   return KNOWN_ROUTES.some((re) => re.test(pathname));
@@ -66,9 +100,20 @@ export async function setupVite(app: Express, server: Server) {
     configFile: false,
     customLogger: {
       ...viteLogger,
+      // Log Vite errors, but do NOT kill the process. This previously called
+      // process.exit(1), which meant any dev-mode Vite error — a transform
+      // failure, an unresolved import, an HMR hiccup — terminated the whole
+      // server. That produced a silent death: exit code 1, no stack trace
+      // (process.exit truncates buffered output) and no graceful-shutdown log,
+      // because no signal was ever sent.
+      //
+      // It made the e2e suite impossible to complete: the server survived
+      // while idle and died partway through the first specs that navigate real
+      // pages through vite.middlewares. Vite recovers from these errors on its
+      // own and surfaces them in the browser overlay, so exiting gained
+      // nothing and cost all in-flight requests.
       error: (msg, options) => {
         viteLogger.error(msg, options);
-        process.exit(1);
       },
     },
     server: serverOptions,
@@ -76,7 +121,7 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
+  app.use(async (req, res, next) => {
     const url = req.originalUrl;
 
     try {
@@ -110,7 +155,7 @@ export function serveStatic(app: Express) {
   // SPA fallback — serve index.html for everything that didn't match a
   // static asset. Return 404 for unknown paths so Googlebot doesn't index
   // garbage URLs; the client router still renders the NotFound page.
-  app.use("*", (req, res) => {
+  app.use((req, res) => {
     const pathname = req.path.split("?")[0];
     const status = isKnownRoute(pathname) ? 200 : 404;
     res.status(status).sendFile(path.resolve(distPath, "index.html"));

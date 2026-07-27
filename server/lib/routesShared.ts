@@ -6,7 +6,7 @@
 // pulling in the rest of routes.ts.
 
 import OpenAI from "openai";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import type { Request, Response } from "express";
 import { attachAiLogger } from "./aiLogger";
 import { sendOwnershipError } from "./ownership";
@@ -45,7 +45,7 @@ export const MAX_CONTENT_LENGTH = 40_000;
 const aiRateKey = (req: Request) => {
   const user = (req as unknown as { user?: { id?: string } }).user;
   if (user?.id) return `user:${user.id}`;
-  return `ip:${req.ip ?? "unknown"}`;
+  return `ip:${ipKeyGenerator(req.ip ?? "unknown")}`;
 };
 
 export const aiLimitMiddleware = rateLimit({

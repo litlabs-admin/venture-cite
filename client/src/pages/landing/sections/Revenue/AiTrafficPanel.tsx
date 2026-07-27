@@ -128,12 +128,12 @@ export function AiTrafficPanel({ isVisible }: { isVisible: boolean }) {
                 alt={page.alt}
                 width={14}
                 height={14}
-                className="w-3.5 h-3.5 object-contain flex-shrink-0 opacity-70"
+                className="w-3.5 h-3.5 object-contain shrink-0 opacity-70"
               />
               <span className="flex-1 text-[11px] text-vc-secondary font-mono truncate group-hover:text-vc-primary transition-colors">
                 {page.path}
               </span>
-              <span className="text-[10px] tabular-nums text-vc-text-muted flex-shrink-0 transition-all duration-300">
+              <span className="text-[10px] tabular-nums text-vc-text-muted shrink-0 transition-all duration-300">
                 {page.time}
               </span>
             </div>

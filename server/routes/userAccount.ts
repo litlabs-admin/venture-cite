@@ -13,7 +13,7 @@
 
 import type { Express, Request } from "express";
 import { eq, inArray } from "drizzle-orm";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { supabaseAdmin } from "../supabase";
 import { supabaseAuth } from "../lib/supabaseAuth";
 import { isAuthenticated } from "../auth";
@@ -47,7 +47,7 @@ const exportRateLimit = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req: Request) => {
     const u = (req as unknown as { user?: { id: string } }).user;
-    return u?.id ?? `ip:${req.ip ?? "unknown"}`;
+    return u?.id ?? `ip:${ipKeyGenerator(req.ip ?? "unknown")}`;
   },
   message: {
     success: false,
@@ -324,7 +324,7 @@ export function setupUserAccountRoutes(app: Express) {
         const parsed = profileSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
           const errorMessage =
-            parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ") ||
+            parsed.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ") ||
             "Invalid input";
           return res.status(400).json({ success: false, error: errorMessage });
         }
@@ -391,7 +391,7 @@ export function setupUserAccountRoutes(app: Express) {
         const parsed = passwordSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
           const errorMessage =
-            parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ") ||
+            parsed.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ") ||
             "Invalid input";
           return res.status(400).json({ success: false, error: errorMessage });
         }

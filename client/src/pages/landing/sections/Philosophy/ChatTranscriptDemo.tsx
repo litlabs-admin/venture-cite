@@ -118,7 +118,7 @@ function TranscriptRow({ message }: { message: Message }) {
   return (
     <div className="flex items-center gap-2.5" style={{ height: 38 }}>
       <span
-        className={`w-[26px] flex-shrink-0 text-[9px] font-medium uppercase tracking-wider ${
+        className={`w-[26px] shrink-0 text-[9px] font-medium uppercase tracking-wider ${
           message.role === "You" ? "text-vc-text-muted" : "text-vc-accent"
         }`}
       >
@@ -133,7 +133,7 @@ function TranscriptRow({ message }: { message: Message }) {
       </span>
       {message.tag && (
         <span
-          className={`ml-auto flex flex-shrink-0 items-center gap-1.5 text-[10px] font-medium ${
+          className={`ml-auto flex shrink-0 items-center gap-1.5 text-[10px] font-medium ${
             message.tag.pulsing ? "text-vc-text-muted" : "text-vc-accent"
           }`}
         >

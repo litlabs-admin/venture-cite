@@ -1,4 +1,5 @@
 import type { Request } from "express";
+import { ipKeyGenerator } from "express-rate-limit";
 
 // Bucket key for express-rate-limit on the auth endpoints.
 //
@@ -6,8 +7,14 @@ import type { Request } from "express";
 // outbound IP (CGNAT, office NAT) can retry independently of each other.
 // Falls back to IP-only when the request body hasn't supplied an email
 // (e.g. malformed POST or endpoints that don't take an email at all).
+//
+// The IP component is normalized through express-rate-limit's
+// `ipKeyGenerator` helper (required as of v8) so IPv6 addresses are
+// collapsed to a /56 subnet instead of keyed per-address — otherwise an
+// attacker can trivially rotate through billions of addresses in their
+// own /64 to bypass the limit. IPv4 addresses pass through unchanged.
 export function authRateKey(req: Request): string {
-  const ip = req.ip ?? "unknown";
+  const ip = ipKeyGenerator(req.ip ?? "unknown");
   const rawEmail =
     req.body &&
     typeof req.body === "object" &&

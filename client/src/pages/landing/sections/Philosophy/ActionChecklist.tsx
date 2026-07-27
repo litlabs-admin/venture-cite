@@ -15,7 +15,7 @@ export function ActionChecklist() {
       {items.map((item) => (
         <div key={item.label} className="flex min-h-[28px] items-center justify-between gap-3">
           <span className="flex min-w-0 items-center gap-2.5">
-            <span className="w-[15px] h-[15px] rounded-[3px] border flex items-center justify-center flex-shrink-0 transition-colors duration-300 border-vc-default bg-vc-surface">
+            <span className="w-[15px] h-[15px] rounded-[3px] border flex items-center justify-center shrink-0 transition-colors duration-300 border-vc-default bg-vc-surface">
               <ChecklistTickIcon />
             </span>
             <span className="text-[12px] truncate transition-colors duration-300 text-vc-tertiary">

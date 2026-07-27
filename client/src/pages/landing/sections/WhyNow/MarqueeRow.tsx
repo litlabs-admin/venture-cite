@@ -1,5 +1,5 @@
 // One AI-logo + query "pill". Verbatim shape from _reference/index.html
-// (e.g. line 1902): a bordered, flex-shrink-0 chip with a dimmed logo that
+// (e.g. line 1902): a bordered, shrink-0 chip with a dimmed logo that
 // brightens on hover, and query text that darkens to text-primary on hover.
 export interface MarqueeQuery {
   alt: string;
@@ -37,7 +37,7 @@ export function MarqueeRow({
         {duplicated.map(({ key, alt, src, query }) => (
           <div
             key={key}
-            className="flex-shrink-0 flex items-center gap-2.5 px-5 py-2.5 border-r border-vc-default bg-vc-surface group"
+            className="shrink-0 flex items-center gap-2.5 px-5 py-2.5 border-r border-vc-default bg-vc-surface group"
           >
             <img
               src={src}

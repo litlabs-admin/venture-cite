@@ -127,9 +127,7 @@ export function HistoryView({
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    {isActive && (
-                      <Check className="h-3 w-3 text-primary flex-shrink-0" aria-hidden />
-                    )}
+                    {isActive && <Check className="h-3 w-3 text-primary shrink-0" aria-hidden />}
                     <div className="text-sm font-medium truncate">{t.title}</div>
                   </div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">

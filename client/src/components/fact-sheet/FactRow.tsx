@@ -107,7 +107,7 @@ export function FactRow({
       data-testid={`fact-row-${fact.id}`}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
-        <Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
+        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
@@ -133,7 +133,7 @@ export function FactRow({
             {alternatives.length > 0 && (
               <Badge
                 variant="outline"
-                className="text-[10px] font-normal border-[var(--warning)]/30 text-[var(--warning)]"
+                className="text-[10px] font-normal border-(--warning)/30 text-(--warning)"
                 data-testid={`alternatives-count-${fact.id}`}
               >
                 {alternatives.length} variant{alternatives.length === 1 ? "" : "s"}
@@ -168,7 +168,7 @@ export function FactRow({
               <button
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
-                className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
                 aria-expanded={expanded}
                 aria-controls={`provenance-${fact.id}`}
                 data-testid={`btn-provenance-${fact.id}`}
@@ -182,7 +182,7 @@ export function FactRow({
               {expanded && (
                 <div
                   id={`provenance-${fact.id}`}
-                  className="mt-2 space-y-3 rounded-md border border-border bg-[var(--bg-surface-1)] p-3"
+                  className="mt-2 space-y-3 rounded-md border border-border bg-(--bg-surface-1) p-3"
                 >
                   {sources.length > 0 && (
                     <div>
@@ -221,7 +221,7 @@ export function FactRow({
                   )}
                   {alternatives.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--warning)] mb-1.5">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-(--warning) mb-1.5">
                         Other values found
                       </p>
                       <ul className="space-y-2">

@@ -128,7 +128,7 @@ export function NavItemIcon({
         aria-hidden="true"
         width={size}
         height={size}
-        className={`object-contain flex-shrink-0 ${className}`}
+        className={`object-contain shrink-0 ${className}`}
       />
     );
   }
@@ -139,7 +139,7 @@ export function NavItemIcon({
       size={size}
       strokeWidth={1.5}
       aria-hidden="true"
-      className={`text-vc-accent flex-shrink-0 ${className}`}
+      className={`text-vc-accent shrink-0 ${className}`}
     />
   );
 }

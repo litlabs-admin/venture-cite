@@ -422,7 +422,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
                       }
                       aria-checked={selectedIds.has(mention.id)}
                       role="checkbox"
-                      className="mt-3 shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="mt-3 shrink-0 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                       onClick={() => toggleSelect(mention.id)}
                     >
                       {selectedIds.has(mention.id) ? (

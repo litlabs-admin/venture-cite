@@ -50,7 +50,7 @@ export function Footer() {
             <div
               className={`flex items-start gap-3 mb-5 pb-5 border-b border-vc-default ${revealY(isVisible)}`}
             >
-              <a href="/" className="flex-shrink-0">
+              <a href="/" className="shrink-0">
                 <img src={logoPath} alt="VentureCite" className="h-6 w-auto" />
               </a>
               <p className="text-[11px] text-vc-secondary leading-relaxed">

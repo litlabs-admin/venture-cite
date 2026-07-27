@@ -294,8 +294,9 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
                       variant="ghost"
                       size="icon"
                       onClick={() => deleteCompetitorMutation.mutate(comp.id)}
-                      className="text-muted-foreground hover:text-destructive flex-shrink-0"
+                      className="text-muted-foreground hover:text-destructive shrink-0"
                       data-testid={`button-delete-comp-${comp.id}`}
+                      aria-label={`Delete competitor ${comp.name}`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

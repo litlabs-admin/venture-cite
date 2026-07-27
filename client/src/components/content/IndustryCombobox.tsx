@@ -48,7 +48,7 @@ export default function IndustryCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 w-[--radix-popover-trigger-width]">
+      <PopoverContent className="p-0 w-(--radix-popover-trigger-width)">
         <Command>
           <CommandInput placeholder="Type to filter…" />
           <CommandList>

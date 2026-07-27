@@ -50,7 +50,7 @@ function ChatTrigger({ onClick }: { onClick: () => void }) {
       className={cn(
         "fixed bottom-6 right-6 z-40",
         "flex items-center gap-2 rounded-full pl-3 pr-4 h-12",
-        "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground",
+        "bg-linear-to-br from-primary to-primary/80 text-primary-foreground",
         "shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30",
         "transition-all hover:scale-105 active:scale-95",
         "ring-1 ring-primary/20",
@@ -187,7 +187,7 @@ export default function EducationAssistant() {
           <SheetHeader className="px-4 py-3 pr-12 border-b space-y-0">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center flex-shrink-0">
+                <div className="h-8 w-8 rounded-lg bg-linear-to-br from-primary to-primary/70 flex items-center justify-center shrink-0">
                   <Sparkles className="h-4 w-4 text-primary-foreground" />
                 </div>
                 <div className="min-w-0">
@@ -322,7 +322,7 @@ export default function EducationAssistant() {
                     {chatbot.isStreaming &&
                       chatbot.messages[chatbot.messages.length - 1]?.role === "user" && (
                         <div className="flex gap-2.5">
-                          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center">
+                          <div className="h-7 w-7 rounded-full bg-linear-to-br from-primary/20 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center">
                             <Bot className="h-3.5 w-3.5 text-primary" />
                           </div>
                           <div className="rounded-2xl rounded-tl-md bg-muted px-3.5 py-2.5 flex items-center gap-2 text-sm text-muted-foreground">
@@ -336,7 +336,7 @@ export default function EducationAssistant() {
 
                 {chatbot.brandSwitchNotice && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-2.5">
-                    <Sparkles className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                     <div className="flex-1 text-sm text-foreground">
                       {chatbot.brandSwitchNotice}
                       <button
@@ -352,7 +352,7 @@ export default function EducationAssistant() {
                 {chatbot.budgetExceeded && (
                   <div className="rounded-lg border border-warning bg-warning-subtle p-3.5">
                     <div className="flex items-start gap-2.5">
-                      <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
                       <div className="text-sm">
                         <div className="font-medium text-foreground">
                           Daily AI Tutor limit reached
@@ -367,7 +367,7 @@ export default function EducationAssistant() {
 
                 {chatbot.error && (
                   <div className="rounded-lg border border-destructive bg-destructive-subtle p-3 flex items-start gap-2.5">
-                    <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                     <div className="flex-1 text-sm">
                       <div className="text-foreground">{chatbot.error}</div>
                       <button
@@ -408,7 +408,7 @@ export default function EducationAssistant() {
                           size="icon"
                           variant="outline"
                           aria-label="Stop generating"
-                          className="min-h-[44px] min-w-[44px] flex-shrink-0"
+                          className="min-h-[44px] min-w-[44px] shrink-0"
                         >
                           <Square className="h-4 w-4 fill-current" />
                         </Button>
@@ -423,7 +423,7 @@ export default function EducationAssistant() {
                           disabled={!input.trim() || chatbot.budgetExceeded}
                           size="icon"
                           aria-label="Send message"
-                          className="min-h-[44px] min-w-[44px] flex-shrink-0"
+                          className="min-h-[44px] min-w-[44px] shrink-0"
                         >
                           <Send className="h-4 w-4" />
                         </Button>

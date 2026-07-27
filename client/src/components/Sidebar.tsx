@@ -60,7 +60,7 @@ function NavItem({
       <div
         className={[
           "relative flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
           active
             ? "bg-sidebar-primary text-sidebar-primary-foreground"
             : "text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
@@ -172,7 +172,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 flex-1 min-w-0 px-2 py-2 rounded-lg hover:bg-sidebar-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <button className="flex items-center gap-2 flex-1 min-w-0 px-2 py-2 rounded-lg hover:bg-sidebar-accent transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
                 <Avatar className="h-8 w-8 shrink-0">
                   <AvatarImage src={user?.profileImageUrl || undefined} />
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">

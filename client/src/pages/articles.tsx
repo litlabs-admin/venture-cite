@@ -429,7 +429,7 @@ export default function Articles() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <CardTitle
-                              className="text-xl break-words"
+                              className="text-xl wrap-break-word"
                               data-testid={`title-${article.id}`}
                             >
                               {article.title || "Untitled"}

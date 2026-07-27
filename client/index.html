@@ -16,7 +16,14 @@
       NOTE: absolute URLs use the canonical marketing origin below — change
       SITE_ORIGIN references if the public domain is not https://venturecite.com.
     -->
+    <!-- data-static-fallback marks this as the pre-hydration crawler copy.
+         Non-JS crawlers read it; once React renders a page-specific
+         description, client/src/lib/dedupeStaticMeta.ts removes this one so
+         only a single description remains. The marker is explicit because
+         React 19 hoists page metadata natively WITHOUT any library attribute
+         to key off (react-helmet-async's data-rh no longer appears). -->
     <meta
+      data-static-fallback="true"
       name="description"
       content="VentureCite shows you where AI overlooks, misreads or undersells your brand, then fixes the pages and sources shaping every AI answer. Take control of how AI search engines cite you."
     />

@@ -201,7 +201,7 @@ export function ScrapePagesPanel({
           <summary
             className={cn(
               "flex cursor-pointer items-center justify-between p-4 text-sm font-medium",
-              "select-none hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "select-none hover:bg-accent/30 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
             )}
             data-testid="scrape-pages-panel-summary"
           >

@@ -31,14 +31,14 @@ export function RankingsList() {
             >
               <span
                 className={
-                  "w-7 text-[11px] tabular-nums flex-shrink-0 " +
+                  "w-7 text-[11px] tabular-nums shrink-0 " +
                   (row.highlighted ? "text-vc-primary font-medium" : "text-vc-tertiary")
                 }
               >
                 #{row.rank}
               </span>
               <span
-                className="flex-shrink-0 inline-flex items-center justify-center w-4 h-4"
+                className="shrink-0 inline-flex items-center justify-center w-4 h-4"
                 style={
                   row.dimmed
                     ? { filter: "grayscale(1) contrast(0.92) brightness(1.05)", opacity: 0.55 }
@@ -50,7 +50,7 @@ export function RankingsList() {
                   className={
                     row.highlighted
                       ? "w-[18px] h-[18px] rounded-sm object-contain shrink-0"
-                      : "flex-shrink-0 rounded"
+                      : "shrink-0 rounded"
                   }
                   style={
                     row.highlighted ? undefined : { width: row.logoSizePx, height: row.logoSizePx }
@@ -76,7 +76,7 @@ export function RankingsList() {
               </span>
               <span
                 className={
-                  "text-[10px] tabular-nums w-8 text-right flex-shrink-0 font-mono " +
+                  "text-[10px] tabular-nums w-8 text-right shrink-0 font-mono " +
                   (row.deltaPositive ? "text-vc-accent" : "text-[#d6453d]")
                 }
               >

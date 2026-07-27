@@ -11,7 +11,7 @@ export function Nav() {
         className="w-full mx-auto flex items-center justify-between relative"
         style={{ maxWidth: containerMaxWidth }}
       >
-        <a href="/" className="flex-shrink-0" aria-label="VentureCite home">
+        <a href="/" className="shrink-0" aria-label="VentureCite home">
           {/* Wordmark is 779x258 (~3:1), not the square mark this replaced —
               height-constrained with w-auto so it can't squash. */}
           <img src={logoPath} alt="VentureCite" className="h-[26px] w-auto" />
@@ -28,7 +28,7 @@ export function Nav() {
           </a>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="hidden lg:flex items-center gap-2">
             <a
               href="/login"

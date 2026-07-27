@@ -21,7 +21,7 @@ export default function VerbatimResponseCard({
           AI
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{response}</p>
+          <p className="text-sm text-foreground whitespace-pre-wrap wrap-break-word">{response}</p>
           {(platform || prompt) && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
               {platform && (

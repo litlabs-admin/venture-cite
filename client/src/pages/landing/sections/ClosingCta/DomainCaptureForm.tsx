@@ -81,7 +81,7 @@ export function DomainCaptureForm() {
           spellCheck={false}
           inputMode="url"
           autoComplete="url"
-          className="w-full h-9 pl-9 pr-2 text-[14px] text-vc-primary placeholder:text-vc-tertiary bg-transparent focus:outline-none"
+          className="w-full h-9 pl-9 pr-2 text-[14px] text-vc-primary placeholder:text-vc-tertiary bg-transparent focus:outline-hidden"
           type="text"
           value={domain}
           onChange={(e) => setDomain(e.target.value)}
@@ -90,7 +90,7 @@ export function DomainCaptureForm() {
       <button
         type="submit"
         disabled={domain.trim().length === 0}
-        className="flex-shrink-0 h-9 px-4 rounded bg-vc-accent-subtle text-vc-accent text-[13px] font-medium hover:bg-vc-accent hover:text-white disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-vc-accent-subtle disabled:hover:text-vc-accent transition-colors duration-150 flex items-center gap-1.5"
+        className="shrink-0 h-9 px-4 rounded bg-vc-accent-subtle text-vc-accent text-[13px] font-medium hover:bg-vc-accent hover:text-white disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-vc-accent-subtle disabled:hover:text-vc-accent transition-colors duration-150 flex items-center gap-1.5"
       >
         Get started
         <ArrowRightIcon className="lucide lucide-arrow-right" />

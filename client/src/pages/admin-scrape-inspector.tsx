@@ -122,7 +122,7 @@ type InspectorResponse = {
 const STEP_COLORS: Record<string, string> = {
   sitemap_discovery: "bg-primary/10 text-primary",
   page_extract: "bg-chart-4/10 text-chart-4",
-  terminal: "bg-[var(--positive)]/10 text-[var(--positive)]",
+  terminal: "bg-(--positive)/10 text-(--positive)",
   unknown: "bg-muted text-muted-foreground",
 };
 
@@ -146,7 +146,7 @@ function EventCard({ event }: { event: Event }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+        className="flex w-full items-start justify-between gap-3 text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
       >
         <div className="flex items-start gap-2 min-w-0">
           <OutcomeIcon outcome={event.outcome} />
@@ -176,7 +176,7 @@ function EventCard({ event }: { event: Event }) {
         />
       </button>
       {open && (
-        <pre className="mt-2 max-h-72 overflow-auto rounded bg-[var(--bg-surface-1)] p-2 text-[11px] text-foreground font-mono">
+        <pre className="mt-2 max-h-72 overflow-auto rounded bg-(--bg-surface-1) p-2 text-[11px] text-foreground font-mono">
           {JSON.stringify(event.metadata, null, 2)}
         </pre>
       )}
@@ -197,7 +197,7 @@ function Stat({
     tone === "ok"
       ? "text-chart-4"
       : tone === "warn"
-        ? "text-[var(--warning)]"
+        ? "text-(--warning)"
         : tone === "fail"
           ? "text-destructive"
           : "text-foreground";
@@ -289,7 +289,7 @@ export default function AdminScrapeInspector() {
                 ? "bg-chart-4/10 text-chart-4"
                 : run.status === "failed"
                   ? "bg-destructive/10 text-destructive"
-                  : "bg-[var(--warning)]/10 text-[var(--warning)]"
+                  : "bg-(--warning)/10 text-(--warning)"
             }
           >
             {run.status}

@@ -196,7 +196,7 @@ export function UnderstandMockup({ isVisible }: { isVisible: boolean }) {
                         )}
                       </div>
                     ))}
-                    <span className="text-[10px] text-vc-text-muted tabular-nums whitespace-nowrap flex-shrink-0">
+                    <span className="text-[10px] text-vc-text-muted tabular-nums whitespace-nowrap shrink-0">
                       +19 more
                     </span>
                   </div>
@@ -212,7 +212,7 @@ export function UnderstandMockup({ isVisible }: { isVisible: boolean }) {
                         key={q.query}
                         className="flex items-center gap-3 group -mx-2 px-2 py-1 rounded"
                       >
-                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-vc-accent" />
+                        <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-vc-accent" />
                         <span className="flex-1 text-[11px] text-vc-secondary truncate group-hover:text-vc-primary transition-colors duration-150">
                           {q.query}
                         </span>

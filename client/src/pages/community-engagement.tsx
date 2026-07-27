@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,7 +73,7 @@ interface GeneratedContent {
   bestTimeToPost: string;
 }
 
-const platformIcons: Record<string, JSX.Element> = {
+const platformIcons: Record<string, ReactElement> = {
   reddit: <SiReddit className="w-4 h-4" />,
   hackernews: <Globe className="w-4 h-4 text-muted-foreground" />,
 };

@@ -76,7 +76,7 @@ export function MobileMenu() {
                       onClick={() => setIsOpen(false)}
                       className="flex items-center gap-3 px-4 py-2.5 text-[14px] text-vc-secondary hover:bg-vc-muted hover:text-vc-primary rounded transition-colors"
                     >
-                      <div className="w-7 h-7 rounded bg-vc-muted flex items-center justify-center flex-shrink-0">
+                      <div className="w-7 h-7 rounded bg-vc-muted flex items-center justify-center shrink-0">
                         <PlaceholderIcon size={14} className="text-vc-text-muted" />
                       </div>
                       <span className="font-medium">{item.name}</span>
@@ -95,7 +95,7 @@ export function MobileMenu() {
                       "flex items-center gap-3 px-4 py-2.5 text-[14px] text-vc-secondary hover:bg-vc-muted hover:text-vc-primary rounded transition-colors";
                     const content = (
                       <>
-                        <div className="w-7 h-7 rounded bg-vc-muted flex items-center justify-center flex-shrink-0">
+                        <div className="w-7 h-7 rounded bg-vc-muted flex items-center justify-center shrink-0">
                           <PlaceholderIcon size={14} className="text-vc-text-muted" />
                         </div>
                         <span className="font-medium">{item.name}</span>

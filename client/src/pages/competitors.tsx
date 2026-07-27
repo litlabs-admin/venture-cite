@@ -40,13 +40,14 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
-import { SiOpenai, SiClaude, SiPerplexity, SiGooglegemini } from "react-icons/si";
+import { BsOpenai } from "react-icons/bs";
+import { SiClaude, SiPerplexity, SiGooglegemini } from "react-icons/si";
 import type { ComponentType, SVGProps } from "react";
 import type { Competitor } from "@shared/schema";
 import { AI_PLATFORMS } from "@shared/constants";
 
 const platformIcon: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
-  chatgpt: SiOpenai,
+  chatgpt: BsOpenai,
   claude: SiClaude,
   perplexity: SiPerplexity,
   gemini: SiGooglegemini,
@@ -480,7 +481,7 @@ export default function CompetitorsPage() {
                         }`}
                         data-testid={`leaderboard-entry-${index}`}
                       >
-                        <div className="flex-shrink-0">{getRankIcon(index)}</div>
+                        <div className="shrink-0">{getRankIcon(index)}</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span
@@ -854,7 +855,7 @@ function CompetitorRow({
           data-testid={`button-expand-competitor-${competitor.id}`}
         >
           <ChevronDown
-            className={`h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform ${
+            className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
               expanded ? "rotate-180" : ""
             }`}
           />
@@ -864,7 +865,7 @@ function CompetitorRow({
               {!isCore && typeof relevanceScore === "number" && (
                 <Badge
                   variant="outline"
-                  className="h-4 flex-shrink-0 px-1.5 py-0 text-[10px]"
+                  className="h-4 shrink-0 px-1.5 py-0 text-[10px]"
                   data-testid={`badge-relevance-${competitor.id}`}
                 >
                   {relevanceScore}% match
@@ -877,7 +878,7 @@ function CompetitorRow({
             </div>
           </div>
         </button>
-        <div className="flex flex-shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           {isCore ? (
             <Button
               variant="ghost"

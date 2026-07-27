@@ -46,19 +46,19 @@ export function VisibilityChartPanel() {
               />
               <button
                 type="button"
-                className="relative z-[1] px-2.5 py-1 text-[11px] font-medium rounded transition-colors duration-200 cursor-pointer text-vc-text-muted hover:text-vc-secondary"
+                className="relative z-1 px-2.5 py-1 text-[11px] font-medium rounded transition-colors duration-200 cursor-pointer text-vc-text-muted hover:text-vc-secondary"
               >
                 7D
               </button>
               <button
                 type="button"
-                className="relative z-[1] px-2.5 py-1 text-[11px] font-medium rounded transition-colors duration-200 cursor-pointer text-vc-text-muted hover:text-vc-secondary"
+                className="relative z-1 px-2.5 py-1 text-[11px] font-medium rounded transition-colors duration-200 cursor-pointer text-vc-text-muted hover:text-vc-secondary"
               >
                 14D
               </button>
               <button
                 type="button"
-                className="relative z-[1] px-2.5 py-1 text-[11px] font-medium rounded transition-colors duration-200 cursor-pointer text-vc-primary"
+                className="relative z-1 px-2.5 py-1 text-[11px] font-medium rounded transition-colors duration-200 cursor-pointer text-vc-primary"
               >
                 30D
               </button>

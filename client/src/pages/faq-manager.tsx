@@ -553,6 +553,7 @@ export default function FaqManager() {
                                                   setEditAnswer(faq.answer);
                                                 }}
                                                 data-testid={`button-edit-faq-${faq.id}`}
+                                                aria-label={`Edit FAQ: ${faq.question}`}
                                               >
                                                 <Edit className="h-4 w-4" />
                                               </Button>
@@ -563,6 +564,7 @@ export default function FaqManager() {
                                                 onClick={() => optimizeFaqMutation.mutate(faq.id)}
                                                 disabled={optimizeFaqMutation.isPending}
                                                 data-testid={`button-optimize-faq-${faq.id}`}
+                                                aria-label={`Optimize FAQ: ${faq.question}`}
                                               >
                                                 <Zap className="h-4 w-4" />
                                               </Button>
@@ -572,6 +574,7 @@ export default function FaqManager() {
                                                 className="h-7 w-7 text-destructive hover:text-destructive/80"
                                                 onClick={() => deleteFaqMutation.mutate(faq.id)}
                                                 data-testid={`button-delete-faq-${faq.id}`}
+                                                aria-label={`Delete FAQ: ${faq.question}`}
                                               >
                                                 <Trash2 className="h-4 w-4" />
                                               </Button>

@@ -108,7 +108,7 @@ export default {
       },
       // Trakkr steps that Tailwind v3 has no equivalent for. 250ms came from
       // the source's --duration-250 token; 450ms + the easing were arbitrary
-      // values in v4 (`duration-[450ms]`, `ease-[cubic-bezier(...)]`), which
+      // values in v4 (`duration-450`, `ease-[cubic-bezier(...)]`), which
       // v3 rejects as ambiguous and silently drops.
       transitionDuration: {
         "250": "250ms",

@@ -316,7 +316,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
               </Button>
             </div>
             <ScrollArea className="h-[40vh] border rounded-md p-3">
-              <pre className="text-xs whitespace-pre-wrap break-words">{jsonLd}</pre>
+              <pre className="text-xs whitespace-pre-wrap wrap-break-word">{jsonLd}</pre>
             </ScrollArea>
           </TabsContent>
         </Tabs>
@@ -357,7 +357,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   return (
     <div className="grid grid-cols-3 gap-3 py-1.5 border-b last:border-b-0">
       <span className="text-muted-foreground">{label}</span>
-      <span className="col-span-2 break-words">{children}</span>
+      <span className="col-span-2 wrap-break-word">{children}</span>
     </div>
   );
 }

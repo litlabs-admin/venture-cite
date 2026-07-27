@@ -528,7 +528,7 @@ export default function Welcome() {
                           <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
                         )}
                       </div>
-                      <Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground">{log.message}</p>
                       </div>
@@ -550,7 +550,7 @@ export default function Welcome() {
               {scrapeError ? (
                 <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="flex-1">
                       <p className="font-medium">We hit a snag</p>
                       <p className="mt-1">{scrapeError}</p>
@@ -870,7 +870,7 @@ function ActivationPanel({
             const isCitations = phase.key === "citations";
             return (
               <li key={phase.key} className="flex gap-3 rounded-md px-2 py-2.5">
-                <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
                   {state === "done" ? (
                     <CheckCircle className="h-5 w-5 text-primary" aria-hidden="true" />
                   ) : state === "working" && !failed ? (
@@ -1022,7 +1022,7 @@ function TagField({
           }}
           onBlur={commitDraft}
           placeholder={values.length ? "" : "Type and press Enter"}
-          className="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          className="flex-1 min-w-[120px] bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
         />
       </div>
     </div>

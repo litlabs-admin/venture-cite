@@ -78,14 +78,14 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
   const getRemediationPillClass = (status: string | null | undefined) => {
     switch (status) {
       case "in_progress":
-        return "bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border-[var(--brand-accent)]/20";
+        return "bg-(--brand-accent)/10 text-(--brand-accent) border-(--brand-accent)/20";
       case "resolved":
       case "verified":
-        return "bg-[var(--positive)]/10 text-[var(--positive)] border-[var(--positive)]/20";
+        return "bg-(--positive)/10 text-(--positive) border-(--positive)/20";
       case "dismissed":
         return "bg-muted text-muted-foreground border-transparent";
       default:
-        return "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20"; // pending / null
+        return "bg-(--warning)/10 text-(--warning) border-(--warning)/20"; // pending / null
     }
   };
 
@@ -155,11 +155,11 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "critical":
-        return "bg-[var(--negative)]/10 text-[var(--negative)] border border-[var(--negative)]/20";
+        return "bg-(--negative)/10 text-(--negative) border border-(--negative)/20";
       case "high":
-        return "bg-[var(--warning)]/10 text-[var(--warning)] border border-[var(--warning)]/20";
+        return "bg-(--warning)/10 text-(--warning) border border-(--warning)/20";
       case "medium":
-        return "bg-[var(--warning)]/8 text-[var(--warning)] border border-[var(--warning)]/15";
+        return "bg-(--warning)/8 text-(--warning) border border-(--warning)/15";
       case "low":
         return "bg-muted text-muted-foreground border border-border";
       default:
@@ -195,7 +195,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
           </CardHeader>
           <CardContent>
             <div
-              className="tnum text-3xl font-semibold leading-none text-[var(--positive)]"
+              className="tnum text-3xl font-semibold leading-none text-(--positive)"
               data-testid="stat-resolved"
             >
               {halStats.resolved}
@@ -216,7 +216,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
           </CardHeader>
           <CardContent>
             <div
-              className="tnum text-3xl font-semibold leading-none text-[var(--negative)]"
+              className="tnum text-3xl font-semibold leading-none text-(--negative)"
               data-testid="stat-critical"
             >
               {halStats.bySeverity?.critical || 0}
@@ -274,10 +274,10 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
           <CardContent>
             {factSheetTooSmall && (
               <div
-                className="mb-4 flex items-start gap-2 rounded-md border border-[var(--warning)]/20 bg-[var(--warning)]/10 p-3 text-sm text-[var(--warning)]"
+                className="mb-4 flex items-start gap-2 rounded-md border border-(--warning)/20 bg-(--warning)/10 p-3 text-sm text-(--warning)"
                 data-testid="warning-facts-too-small"
               >
-                <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
                   <strong>Hallucination detection is inactive.</strong> Your fact sheet has{" "}
                   {activeFactCount} active {activeFactCount === 1 ? "entry" : "entries"}; we need at
@@ -290,7 +290,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
             )}
             {hallucinations.length === 0 ? (
               <div className="py-8 text-center">
-                <Shield className="mx-auto mb-4 h-12 w-12 text-[var(--positive)]" />
+                <Shield className="mx-auto mb-4 h-12 w-12 text-(--positive)" />
                 <p className="text-sm font-medium text-foreground">
                   {severityFilter === "all"
                     ? "No hallucinations detected"
@@ -313,7 +313,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                   return (
                     <div
                       key={hal.id}
-                      className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-[var(--border-strong)]"
+                      className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-(--border-strong)"
                     >
                       {/* Header: severity + type + platform + (resolve action) */}
                       <div className="mb-3 flex items-start justify-between gap-3">
@@ -346,7 +346,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                           )}
                         </div>
                         {hal.isResolved === 1 ? (
-                          <Badge className="bg-[var(--positive)]/10 text-[var(--positive)] border border-[var(--positive)]/20 font-medium shrink-0">
+                          <Badge className="bg-(--positive)/10 text-(--positive) border border-(--positive)/20 font-medium shrink-0">
                             Resolved
                           </Badge>
                         ) : actionable ? (
@@ -381,7 +381,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                           encode importance, not category. The left rule does
                           the work; the text reads cleanly on a neutral card. */}
                       <div className="space-y-3">
-                        <div className="border-l-2 border-[var(--negative)] pl-3">
+                        <div className="border-l-2 border-(--negative) pl-3">
                           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                             AI claimed
                           </p>
@@ -390,7 +390,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                           </p>
                         </div>
                         {hal.actualFact && (
-                          <div className="border-l-2 border-[var(--positive)] pl-3">
+                          <div className="border-l-2 border-(--positive) pl-3">
                             <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                               Actual fact
                             </p>

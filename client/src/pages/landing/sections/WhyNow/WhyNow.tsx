@@ -156,7 +156,7 @@ export function WhyNow() {
                   }`}
                   style={{ transitionDelay: "100ms", transitionTimingFunction: EASE }}
                 >
-                  <h2 className="text-[17px] sm:text-[22px] lg:text-[26px] font-semibold text-vc-primary tracking-[-0.02em] leading-[1.25] mb-2">
+                  <h2 className="text-[17px] sm:text-[22px] lg:text-[26px] font-semibold text-vc-primary tracking-[-0.02em] leading-tight mb-2">
                     make AI their first stop before buying
                   </h2>
                   <p className="text-[12px] sm:text-[13px] text-vc-secondary leading-relaxed mb-3 max-w-lg">
@@ -171,8 +171,8 @@ export function WhyNow() {
 
               {/* Marquee rows — nested inside the same bordered panel, divided by border-t */}
               <div className="relative overflow-hidden bg-vc-surface border-t border-vc-default">
-                <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-20 z-10 pointer-events-none bg-gradient-to-r from-vc-surface to-transparent" />
-                <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-20 z-10 pointer-events-none bg-gradient-to-l from-vc-surface to-transparent" />
+                <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-20 z-10 pointer-events-none bg-linear-to-r from-vc-surface to-transparent" />
+                <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-20 z-10 pointer-events-none bg-linear-to-l from-vc-surface to-transparent" />
                 <div className="divide-y divide-vc-default">
                   <MarqueeRow
                     direction="left"

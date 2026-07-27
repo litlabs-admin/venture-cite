@@ -818,8 +818,8 @@ export default function MonitorOverview() {
                         border: "1px solid var(--border)",
                         borderRadius: 6,
                       }}
-                      formatter={(value: number, _n, payload: any) => [
-                        `${value}% (${payload.payload.cited}/${payload.payload.total} cited)`,
+                      formatter={(value, _n, item) => [
+                        `${value}% (${item.payload.cited}/${item.payload.total} cited)`,
                         "Citation rate",
                       ]}
                     />
@@ -1011,7 +1011,10 @@ export default function MonitorOverview() {
                         ))}
                       </Pie>
                       <ReTooltip
-                        formatter={(value: number, name: string) => [`${Math.round(value)}%`, name]}
+                        formatter={(value, name) => [
+                          `${typeof value === "number" ? Math.round(value) : value}%`,
+                          name ?? "",
+                        ]}
                         contentStyle={{
                           background: "var(--popover)",
                           border: "1px solid var(--border)",
@@ -1037,7 +1040,7 @@ export default function MonitorOverview() {
                           className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }}
                         />
-                        <span className="min-w-0 break-words">{slice.name}</span>
+                        <span className="min-w-0 wrap-break-word">{slice.name}</span>
                       </span>
                       <span className="shrink-0 font-semibold tabular-nums">
                         {Math.round(slice.value)}%

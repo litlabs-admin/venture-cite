@@ -182,7 +182,7 @@ export function setupAssistantRoutes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const { threadId, messages, brandId } = parsed.data;

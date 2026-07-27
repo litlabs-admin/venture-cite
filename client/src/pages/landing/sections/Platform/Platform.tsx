@@ -56,7 +56,7 @@ function FeatureText({
         }}
       >
         <div
-          className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold tracking-[-0.05em] tabular-nums select-none leading-none transition-colors duration-700 text-[#e7e5e4]/50"
+          className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold tracking-tighter tabular-nums select-none leading-none transition-colors duration-700 text-vc-default/50"
           aria-hidden="true"
         >
           {number}

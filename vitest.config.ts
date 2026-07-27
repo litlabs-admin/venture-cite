@@ -15,7 +15,11 @@ export default defineConfig({
     environment: "node",
     globals: false,
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx", "tests/**/*.spec.ts"],
-    exclude: ["node_modules", "dist", "build", "coverage"],
+    // tests/e2e/** are Playwright specs — they need a browser and a running
+    // server, and vitest cannot execute them. The include glob above matches
+    // *.spec.ts, which is Playwright's naming convention here, so they must
+    // be excluded explicitly. Run them with `npm run test:e2e`.
+    exclude: ["node_modules", "dist", "build", "coverage", "tests/e2e/**"],
     setupFiles: ["./tests/setup.ts"],
     coverage: {
       provider: "v8",

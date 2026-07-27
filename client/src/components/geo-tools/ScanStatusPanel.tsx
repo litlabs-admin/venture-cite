@@ -226,7 +226,7 @@ export function ScanStatusPanel({
           <span className="mx-1 text-muted-foreground">·</span>
           <button
             onClick={onAddVariation}
-            className="inline-flex items-center gap-0.5 text-xs text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex items-center gap-0.5 text-xs text-primary underline-offset-2 hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Add search variation"
           >
             <Plus className="h-3 w-3" />
@@ -329,7 +329,7 @@ export function ScanStatusPanel({
               Mention monitoring is paused for this brand.{" "}
               <button
                 onClick={() => onToggleMonitor(true)}
-                className="text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="text-primary underline-offset-2 hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Resume daily scans
               </button>

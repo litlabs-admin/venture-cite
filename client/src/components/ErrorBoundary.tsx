@@ -42,7 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <AlertTriangle className="w-5 h-5 text-foreground" />
           </div>
           <h2 className="text-lg font-semibold">Something went wrong</h2>
-          <p className="text-sm text-muted-foreground break-words">
+          <p className="text-sm text-muted-foreground wrap-break-word">
             {this.state.error.message || "An unexpected error occurred while rendering this view."}
           </p>
           <div className="flex gap-2 justify-center">

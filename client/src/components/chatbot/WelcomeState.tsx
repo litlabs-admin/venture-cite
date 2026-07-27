@@ -33,7 +33,7 @@ export function WelcomeState({
 }) {
   return (
     <div className="flex flex-col items-center text-center pt-6 pb-2">
-      <div className="rounded-full bg-gradient-to-br from-primary/20 to-primary/5 p-4 mb-3 ring-1 ring-primary/10">
+      <div className="rounded-full bg-linear-to-br from-primary/20 to-primary/5 p-4 mb-3 ring-1 ring-primary/10">
         <Sparkles className="h-7 w-7 text-primary" />
       </div>
       <h3 className="text-base font-semibold">Hey 👋 I'm your VentureCite tutor</h3>

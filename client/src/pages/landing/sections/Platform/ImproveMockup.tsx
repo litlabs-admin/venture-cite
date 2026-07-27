@@ -6,13 +6,13 @@ const dotGridStyle = { "--vc-mkt-dot-opacity": 0.1 } as CSSProperties;
 
 // Syntax-highlighting color spans used inside the diff lines below. Verbatim
 // from index.html — punctuation/tags use the arbitrary-value classes
-// text-[var(--color-gray-400)] / text-[var(--color-gray-700)], attribute
+// text-gray-400 / text-[var(--color-gray-700)], attribute
 // names use the plain text-tertiary class, and string values use
 // text-[var(--color-green-600)]. Kept as literal Tailwind arbitrary-value
 // classes (not swapped for a different token) to match source exactly.
-const GRAY_400 = "text-[var(--color-gray-400)]";
-const GRAY_700 = "text-[var(--color-gray-700)]";
-const GREEN_600 = "text-[var(--color-green-600)]";
+const GRAY_400 = "text-gray-400";
+const GRAY_700 = "text-gray-700";
+const GREEN_600 = "text-green-600";
 
 type Span = { text: string; className?: string };
 type DiffRow =
@@ -164,15 +164,15 @@ export function ImproveMockup({ isVisible }: { isVisible: boolean }) {
               {/* File tab header */}
               <div className="flex items-center justify-between gap-3 px-3.5 h-11 border-b border-vc-default">
                 <div className="flex items-center gap-2 min-w-0">
-                  <FileCodeCornerIcon className="text-vc-accent flex-shrink-0" />
+                  <FileCodeCornerIcon className="text-vc-accent shrink-0" />
                   <span className="text-[12px] font-mono text-vc-primary truncate">
                     running-shoes/index.html
                   </span>
-                  <span className="text-[10px] font-mono font-medium text-vc-accent bg-vc-accent-subtle px-1.5 py-0.5 rounded-[3px] tabular-nums flex-shrink-0">
+                  <span className="text-[10px] font-mono font-medium text-vc-accent bg-vc-accent-subtle px-1.5 py-0.5 rounded-[3px] tabular-nums shrink-0">
                     +8
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <span className="relative w-3 h-3 flex items-center justify-center">
                     <span className="absolute w-1.5 h-1.5 rounded-full bg-vc-accent animate-atl-pulse" />
                     <CheckIcon className="text-vc-accent absolute opacity-0 scale-[0.7]" />
@@ -195,7 +195,7 @@ export function ImproveMockup({ isVisible }: { isVisible: boolean }) {
                         key={`hunk-${row.step}-${i}`}
                         className="flex items-center gap-2 pl-[60px] pr-4 h-7"
                       >
-                        <span className="w-[15px] h-[15px] rounded-[3px] bg-vc-accent-subtle text-vc-accent text-[9px] font-mono font-semibold flex items-center justify-center flex-shrink-0 tabular-nums">
+                        <span className="w-[15px] h-[15px] rounded-[3px] bg-vc-accent-subtle text-vc-accent text-[9px] font-mono font-semibold flex items-center justify-center shrink-0 tabular-nums">
                           {row.step}
                         </span>
                         <span className="text-[11px] font-medium text-vc-accent">{row.label}</span>
@@ -205,11 +205,11 @@ export function ImproveMockup({ isVisible }: { isVisible: boolean }) {
                         key={`line-${row.num}`}
                         className="flex items-stretch font-mono text-[11px] leading-[1.85]"
                       >
-                        <span className="w-10 flex-shrink-0 pr-2 text-right tabular-nums text-[var(--color-gray-400)] select-none border-r border-vc-subtle">
+                        <span className="w-10 shrink-0 pr-2 text-right tabular-nums text-gray-400 select-none border-r border-vc-subtle">
                           {row.num}
                         </span>
                         <span
-                          className={`w-5 flex-shrink-0 text-center select-none ${row.added ? "text-vc-accent/70" : "text-transparent"}`}
+                          className={`w-5 shrink-0 text-center select-none ${row.added ? "text-vc-accent/70" : "text-transparent"}`}
                         >
                           +
                         </span>

@@ -136,8 +136,7 @@ type PerArticleState = {
 };
 type ReducerState = Record<string, PerArticleState>;
 type ReducerAction =
-  | { type: "set"; key: string; tab: TabName; data: any }
-  | { type: "reset"; key: string };
+  { type: "set"; key: string; tab: TabName; data: any } | { type: "reset"; key: string };
 
 function geoReducer(state: ReducerState, action: ReducerAction): ReducerState {
   switch (action.type) {
@@ -726,7 +725,7 @@ export default function GeoSignals() {
             inside the Signals tab is now the canonical headline. */}
 
         {/* Sticky article toolbar — anchored below the SpineShell stage
-            tablist (which is also sticky at z-20). top-[3.5rem] keeps
+            tablist (which is also sticky at z-20). top-14 keeps
             this strip directly underneath the stage tabs so they stack
             cleanly without overlap. The previous top-0 made this float
             up to viewport top while the stage tabs were scrolled away
@@ -736,7 +735,7 @@ export default function GeoSignals() {
             Signal Scorecard the article picker sits inline next to the query
             (one line, no duplicate picker). */}
         {activeTab !== "signals" && (
-          <div className="sticky top-[3.5rem] z-10 -mx-2 border-b bg-background/95 px-2 py-3 backdrop-blur">
+          <div className="sticky top-14 z-10 -mx-2 border-b bg-background/95 px-2 py-3 backdrop-blur">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
                 <Label className="whitespace-nowrap text-sm font-medium text-foreground">
@@ -828,7 +827,7 @@ export default function GeoSignals() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent
-                        className="w-[--radix-popover-trigger-width] p-0"
+                        className="w-(--radix-popover-trigger-width) p-0"
                         align="start"
                       >
                         <Command>

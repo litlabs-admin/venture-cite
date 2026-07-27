@@ -58,8 +58,8 @@ type LeaderRow = {
 // importance, not state").
 const TILE_BASE =
   "group block rounded-lg border border-border bg-card p-5 transition-colors " +
-  "hover:bg-accent/40 hover:border-[var(--border-strong)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "hover:bg-accent/40 hover:border-(--border-strong) " +
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 
 function TileLabel({
   icon: Icon,
@@ -92,9 +92,7 @@ function DeltaPill({ value }: { value: number }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-        up
-          ? "bg-[var(--positive)]/10 text-[var(--positive)]"
-          : "bg-[var(--negative)]/10 text-[var(--negative)]"
+        up ? "bg-(--positive)/10 text-(--positive)" : "bg-(--negative)/10 text-(--negative)"
       }`}
     >
       {up ? (
@@ -368,9 +366,9 @@ export default function Home() {
                 <span
                   className={`tnum text-3xl font-semibold leading-none ${
                     weekDelta.delta > 0
-                      ? "text-[var(--positive)]"
+                      ? "text-(--positive)"
                       : weekDelta.delta < 0
-                        ? "text-[var(--negative)]"
+                        ? "text-(--negative)"
                         : "text-foreground"
                   }`}
                 >
@@ -440,7 +438,7 @@ export default function Home() {
               <ul className="space-y-1.5">
                 {issues.map((i) => (
                   <li key={i} className="flex items-baseline gap-2 text-sm text-foreground">
-                    <span className="text-[var(--negative)]" aria-hidden>
+                    <span className="text-(--negative)" aria-hidden>
                       •
                     </span>
                     <span>{i}</span>
@@ -492,7 +490,7 @@ export default function Home() {
       {/* 5. Cadence ribbon — slimmer chrome to signal "ambient", not a tile. */}
       <Link
         href="/monitor"
-        className="group mt-3 flex items-center gap-3 rounded-lg border border-border bg-card px-5 py-3 text-sm transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group mt-3 flex items-center gap-3 rounded-lg border border-border bg-card px-5 py-3 text-sm transition-colors hover:bg-accent/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
       >
         {scanRunning ? (
           <>

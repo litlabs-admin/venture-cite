@@ -27,7 +27,7 @@ export function ConversationsPanel() {
       </div>
 
       <div className="relative mb-3">
-        <div className="flex gap-[1px]">
+        <div className="flex gap-px">
           {CONVERSATION_BARS.map((bar, i) => (
             <div key={i} className="flex-1 relative cursor-pointer">
               <div

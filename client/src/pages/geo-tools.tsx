@@ -170,7 +170,7 @@ function CompetitorCombobox({ options, value, onChange, placeholder }: Competito
             </span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
           <Command shouldFilter={false}>
             <CommandInput
               placeholder="Search or type a name..."
@@ -697,7 +697,7 @@ export default function GeoTools() {
                                           className="font-medium text-chart-1 hover:underline flex items-center gap-1"
                                         >
                                           <span className="line-clamp-1">{l.title}</span>
-                                          <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                          <ExternalLink className="h-3 w-3 shrink-0" />
                                         </a>
                                         <div className="flex flex-wrap gap-2 mt-2">
                                           <Badge
@@ -735,7 +735,7 @@ export default function GeoTools() {
                                           </p>
                                         )}
                                       </div>
-                                      <div className="flex-shrink-0">
+                                      <div className="shrink-0">
                                         <Select
                                           value={(l as any).outreachStatus ?? "new"}
                                           onValueChange={(v) =>
@@ -911,12 +911,12 @@ export default function GeoTools() {
                                             className="font-medium text-chart-1 hover:underline flex items-center gap-1 min-w-0"
                                           >
                                             <span className="line-clamp-2">{m.pageTitle}</span>
-                                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                            <ExternalLink className="h-3 w-3 shrink-0" />
                                           </a>
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            className="flex-shrink-0"
+                                            className="shrink-0"
                                             onClick={async () => {
                                               const data = await draftWikipediaMutation
                                                 .mutateAsync(m.id)

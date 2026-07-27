@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import path from "path";
 
@@ -32,6 +33,7 @@ export default defineConfig({
           : [],
       },
     }),
+    tailwindcss(),
     ...(sentryPlugin ? [sentryPlugin] : []),
   ],
   resolve: {
@@ -42,6 +44,17 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
+  css: {
+    // v4 styling runs entirely through the @tailwindcss/vite plugin above,
+    // not PostCSS — postcss.config.js was deleted for that reason. But
+    // Vite's postcss-load-config still walks UP the filesystem looking for
+    // one, and this worktree lives nested under the main checkout, which
+    // still has its own (Tailwind v3) postcss.config.js. Left unset, that
+    // ancestor config gets picked up and the build resolves the wrong
+    // tailwindcss major version. An explicit empty inline config stops the
+    // upward search.
+    postcss: {},
+  },
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,

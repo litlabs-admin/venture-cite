@@ -363,7 +363,7 @@ Be specific and accurate based on the content. If you can't determine something,
         if (error instanceof z.ZodError) {
           return res
             .status(400)
-            .json({ success: false, error: "Invalid brand data", details: error.errors });
+            .json({ success: false, error: "Invalid brand data", details: error.issues });
         }
         captureAndFlush(error, { tags: { source: "brands.ts:363" } });
         res.status(500).json({ success: false, error: "Failed to create brand" });
@@ -417,7 +417,7 @@ Be specific and accurate based on the content. If you can't determine something,
         if (error instanceof z.ZodError) {
           return res
             .status(400)
-            .json({ success: false, error: "Invalid brand data", details: error.errors });
+            .json({ success: false, error: "Invalid brand data", details: error.issues });
         }
         sendError(res, error, "Failed to update brand");
       }

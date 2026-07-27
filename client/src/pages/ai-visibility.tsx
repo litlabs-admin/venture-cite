@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactElement } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -45,7 +45,8 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { SiOpenai, SiGoogle } from "react-icons/si";
+import { BsOpenai } from "react-icons/bs";
+import { SiGoogle } from "react-icons/si";
 import type { Brand } from "@shared/schema";
 
 interface EngineStep {
@@ -64,7 +65,7 @@ interface EngineStep {
 interface AIEngine {
   id: string;
   name: string;
-  icon: JSX.Element;
+  icon: ReactElement;
   color: string;
   bgColor: string;
   description: string;
@@ -181,7 +182,7 @@ const aiEngines: AIEngine[] = [
   {
     id: "chatgpt",
     name: "ChatGPT",
-    icon: <SiOpenai className="w-6 h-6" />,
+    icon: <BsOpenai className="w-6 h-6" />,
     color: "text-foreground",
     bgColor: "bg-muted",
     description:
@@ -1178,9 +1179,9 @@ export default function AIVisibility() {
                               </p>
                             </div>
                             {isCompleted ? (
-                              <CheckCircle2 className="w-5 h-5 text-foreground flex-shrink-0" />
+                              <CheckCircle2 className="w-5 h-5 text-foreground shrink-0" />
                             ) : (
-                              <Circle className="w-5 h-5 text-muted-foreground/40 flex-shrink-0" />
+                              <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />
                             )}
                           </div>
                         </AccordionTrigger>

@@ -40,7 +40,7 @@ export function QuickThemeToggle({ className }: { className?: string }) {
       aria-label={`Switch to ${next} mode`}
       data-testid="quick-theme-toggle"
       className={
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring " +
         (className ?? "")
       }
     >

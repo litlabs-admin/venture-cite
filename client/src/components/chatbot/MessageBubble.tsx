@@ -27,7 +27,7 @@ export function MessageBubble({
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3.5 py-2 text-sm whitespace-pre-wrap break-words">
+        <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3.5 py-2 text-sm whitespace-pre-wrap wrap-break-word">
           {msg.content}
         </div>
       </div>
@@ -36,8 +36,8 @@ export function MessageBubble({
 
   return (
     <div className="flex gap-2.5 group">
-      <div className="flex-shrink-0 mt-0.5">
-        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center">
+      <div className="shrink-0 mt-0.5">
+        <div className="h-7 w-7 rounded-full bg-linear-to-br from-primary/20 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center">
           <Bot className="h-3.5 w-3.5 text-primary" />
         </div>
       </div>

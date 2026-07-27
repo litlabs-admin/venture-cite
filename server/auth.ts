@@ -1,5 +1,5 @@
 import type { Express, RequestHandler } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { supabaseAdmin } from "./supabase";
 import { supabaseAuth } from "./lib/supabaseAuth";
 import { db } from "./db";
@@ -257,7 +257,7 @@ const registerRateLimit = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `ip:${req.ip ?? "unknown"}`,
+  keyGenerator: (req) => `ip:${ipKeyGenerator(req.ip ?? "unknown")}`,
   message: RATE_LIMIT_MESSAGE,
 });
 
@@ -282,7 +282,7 @@ const resetPasswordRateLimit = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `ip:${req.ip ?? "unknown"}`,
+  keyGenerator: (req) => `ip:${ipKeyGenerator(req.ip ?? "unknown")}`,
   message: RATE_LIMIT_MESSAGE,
 });
 

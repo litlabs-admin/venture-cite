@@ -72,21 +72,21 @@ export function Revenue() {
                 >
                   <div className="flex flex-wrap items-center gap-2.5 sm:gap-4 lg:gap-6">
                     <span className="text-[10px] sm:text-[12px] text-vc-secondary flex items-center gap-1">
-                      <CheckCircleIcon className="w-3 h-3 text-vc-accent flex-shrink-0" />
+                      <CheckCircleIcon className="w-3 h-3 text-vc-accent shrink-0" />
                       10-min setup
                     </span>
                     <span className="text-[10px] sm:text-[12px] text-vc-secondary flex items-center gap-1">
-                      <CheckCircleIcon className="w-3 h-3 text-vc-accent flex-shrink-0" />
+                      <CheckCircleIcon className="w-3 h-3 text-vc-accent shrink-0" />
                       No code
                     </span>
                     <span className="hidden sm:flex text-[10px] sm:text-[12px] text-vc-secondary items-center gap-1.5">
-                      <CheckCircleIcon className="w-3 h-3 text-vc-accent flex-shrink-0" />
+                      <CheckCircleIcon className="w-3 h-3 text-vc-accent shrink-0" />
                       Weekly reports
                     </span>
                   </div>
                   <a
                     href="/register"
-                    className="text-[10px] sm:text-[12px] font-medium text-vc-accent hover:text-vc-accent-hover flex items-center gap-1 transition-colors flex-shrink-0"
+                    className="text-[10px] sm:text-[12px] font-medium text-vc-accent hover:text-vc-accent-hover flex items-center gap-1 transition-colors shrink-0"
                   >
                     Get Started
                     <ArrowRightIcon size={12} />

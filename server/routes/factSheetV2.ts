@@ -150,7 +150,7 @@ export function setupFactSheetV2Routes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const { runId, pageId } = parsed.data;
@@ -266,7 +266,7 @@ export function setupFactSheetV2Routes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const { runId } = parsed.data;
@@ -332,7 +332,7 @@ export function setupFactSheetV2Routes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const { runId } = parsed.data;
@@ -407,7 +407,7 @@ export function setupFactSheetV2Routes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const { brandId, triggeredBy } = parsed.data;
@@ -509,7 +509,7 @@ export function setupFactSheetV2Routes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const { brandId } = parsed.data;
@@ -612,7 +612,7 @@ export function setupFactSheetV2Routes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const { runId } = parsed.data;
@@ -654,7 +654,7 @@ export function setupFactSheetV2Routes(app: Express): void {
         if (!parsed.success) {
           return res.status(400).json({
             success: false,
-            error: parsed.error.errors[0]?.message ?? "Invalid request",
+            error: parsed.error.issues[0]?.message ?? "Invalid request",
           });
         }
         const runId = req.params.runId;

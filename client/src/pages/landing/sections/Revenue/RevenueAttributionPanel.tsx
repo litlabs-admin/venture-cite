@@ -84,7 +84,7 @@ export function RevenueAttributionPanel({ isVisible }: { isVisible: boolean }) {
                 alt={source.alt}
                 width={14}
                 height={14}
-                className="w-3.5 h-3.5 object-contain flex-shrink-0"
+                className="w-3.5 h-3.5 object-contain shrink-0"
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5">

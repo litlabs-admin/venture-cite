@@ -305,7 +305,7 @@ export default function CitedUrlsCard({
                       <button
                         type="button"
                         onClick={() => toggleOpen(g.key)}
-                        className="-ml-1 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="-ml-1 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         aria-expanded={isOpen}
                         aria-label={isOpen ? "Collapse details" : "Expand details"}
                         data-testid="cited-url-group-toggle"

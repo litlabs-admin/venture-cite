@@ -187,7 +187,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 surface-3; only mounts when something is selected. */}
             {showInlineInspector && (
               <aside
-                className="hidden w-[340px] shrink-0 border-l border-border bg-[var(--bg-surface-3)] xl:block print:hidden"
+                className="hidden w-[340px] shrink-0 border-l border-border bg-(--bg-surface-3) xl:block print:hidden"
                 aria-label={inspector.title}
               >
                 <div className="sticky top-[73px] flex max-h-[calc(100vh-73px)] flex-col">
@@ -197,7 +197,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                       type="button"
                       aria-label="Close inspector"
                       onClick={inspectorApi.close}
-                      className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <X className="h-4 w-4" />
                     </button>

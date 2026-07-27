@@ -272,7 +272,7 @@ export default function Pulse() {
         <button
           type="button"
           onClick={() => recsQ.refetch()}
-          className="font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="font-medium text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
         >
           Retry
         </button>
@@ -332,7 +332,7 @@ export default function Pulse() {
               type="button"
               onClick={() => handleDismiss(it.dismissKey!)}
               aria-label="Dismiss"
-              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>

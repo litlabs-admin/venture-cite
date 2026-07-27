@@ -115,6 +115,14 @@ const formSchema = z.object({
     .transform((v) => v || undefined),
 });
 
+// react-hook-form's resolver types split the field-values generic from the
+// submit-handler generic: `useForm`'s values (defaultValues, watch, etc.)
+// see the *input* shape zod accepts, while `handleSubmit` callbacks see the
+// *output* shape after `.transform()`/`.default()` run. @hookform/resolvers
+// 5.x + zod 4 type the resolver against both, so both must be threaded
+// through explicitly (previously they coincided closely enough that a
+// single z.infer alias worked).
+type FormInput = z.input<typeof formSchema>;
 type FormValues = z.infer<typeof formSchema>;
 
 export default function Brands() {
@@ -136,7 +144,7 @@ export default function Brands() {
 
   const brands = brandsResponse?.data;
 
-  const form = useForm<FormValues>({
+  const form = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(formSchema),
     // Wave 6.2: validate on blur so users see errors after they leave a
     // field instead of only on submit. Matches HIG expectation on web forms.
@@ -321,12 +329,7 @@ export default function Brands() {
       description: brand.description ?? "",
       website: brand.website ?? "",
       tone: (brand.tone ?? "professional") as
-        | "professional"
-        | "casual"
-        | "friendly"
-        | "formal"
-        | "conversational"
-        | "authoritative",
+        "professional" | "casual" | "friendly" | "formal" | "conversational" | "authoritative",
       targetAudience: brand.targetAudience ?? "",
       products: Array.isArray(brand.products) ? brand.products.join(", ") : "",
       keyValues: Array.isArray(brand.keyValues) ? brand.keyValues.join(", ") : "",
@@ -369,7 +372,7 @@ export default function Brands() {
       <Card className="mb-8 border border-border bg-card" data-testid="card-add-brand">
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center shrink-0">
               <Sparkles className="w-6 h-6 text-foreground" />
             </div>
             <div className="flex-1 space-y-4">
@@ -400,7 +403,7 @@ export default function Brands() {
                 <Button
                   onClick={handleCreateFromWebsite}
                   disabled={createFromWebsiteMutation.isPending}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 px-6 flex-shrink-0"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 px-6 shrink-0"
                   data-testid="button-analyze-website"
                   data-tour-id="brands.addButton"
                 >
@@ -596,7 +599,7 @@ export default function Brands() {
           <Card className="mt-6 border border-border bg-card" data-testid="card-next-step">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
                   <Shield className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div className="flex-1">
@@ -611,7 +614,7 @@ export default function Brands() {
                 </div>
                 <Link href="/ai-visibility">
                   <Button
-                    className="bg-primary hover:bg-primary/90 text-white gap-2 flex-shrink-0"
+                    className="bg-primary hover:bg-primary/90 text-white gap-2 shrink-0"
                     data-testid="button-ai-visibility"
                   >
                     Open Checklists

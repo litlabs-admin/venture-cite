@@ -12,7 +12,7 @@ export function ResourceCard({ item, isVisible }: { item: ResourceCardData; isVi
       }
       style={{ transitionDelay: `${item.delayMs}ms`, transitionTimingFunction: scrollRevealEase }}
     >
-      <div className="box-border w-[72px] min-h-[72px] flex-shrink-0 overflow-hidden self-stretch border-r border-vc-default bg-white p-2 flex items-center justify-center">
+      <div className="box-border w-[72px] min-h-[72px] shrink-0 overflow-hidden self-stretch border-r border-vc-default bg-white p-2 flex items-center justify-center">
         <img
           src={item.iconSrc}
           alt=""
