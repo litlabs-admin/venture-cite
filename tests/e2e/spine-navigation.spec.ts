@@ -140,7 +140,27 @@ test.describe("Workflow spine navigation", () => {
         // "No articles yet" (articles.tsx:253-263, empty-state.tsx:31 — an
         // <h2>). That heading only renders on this specific, verified branch
         // of articles.tsx — not on a crash.
-        await expect(page.getByRole("heading", { name: "No articles yet" })).toBeVisible();
+        // articles.tsx:253 branches on `articles.length === 0 &&
+        // statusFilter === "ready"`: that branch renders <EmptyState> with
+        // heading "No articles yet" and NO toolbar; the else branch renders
+        // the search/filter toolbar and the list. The two are mutually
+        // exclusive, so there is no single always-present element.
+        //
+        // This previously asserted only the empty state, which coupled the
+        // test to the account happening to own zero ready articles. That
+        // broke for real: url-state.spec.ts creates a fixture article in
+        // beforeAll and deletes it in afterAll, and when the dev server died
+        // mid-run the cleanup never executed — leaving a ready article behind
+        // and failing this unrelated spec.
+        //
+        // Asserting "one of the two real states rendered" is state-
+        // independent without being weaker: both are genuine page content,
+        // and neither matches ErrorBoundary's "Something went wrong".
+        await expect(
+          page
+            .getByRole("heading", { name: "No articles yet" })
+            .or(page.getByTestId("input-articles-search")),
+        ).toBeVisible();
       } else if (path === "/brands") {
         // client/src/pages/brands.tsx's "Add Your Brand" panel
         // (brands.tsx:369-469) is unconditional — rendered above every

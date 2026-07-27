@@ -13,7 +13,14 @@ import React from "react";
 // ---------------------------------------------------------------------------
 // vitest-axe — enabled in Task 24
 // ---------------------------------------------------------------------------
-import { axe, toHaveNoViolations } from "vitest-axe";
+// `toHaveNoViolations` was never actually exported from vitest-axe's main
+// entry (it only lives in "vitest-axe/matchers") — importing it from
+// "vitest-axe" silently resolved to `undefined` under vitest 3's more
+// lenient expect.extend(). vitest 4's expect.extend() accesses matcher
+// internals eagerly and throws on an undefined matcher, which is what
+// surfaced this pre-existing bad import.
+import { axe } from "vitest-axe";
+import { toHaveNoViolations } from "vitest-axe/matchers.js";
 
 expect.extend({ toHaveNoViolations });
 

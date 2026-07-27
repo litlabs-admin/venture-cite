@@ -8,15 +8,20 @@ import { emptyTourState, wildcardSuppressedTourState } from "../fixtures/tourSta
 
 vi.mock("shepherd.js", () => ({
   default: {
-    Tour: vi.fn(() => ({
-      addStep: vi.fn(),
-      start: vi.fn(),
-      cancel: vi.fn(),
-      complete: vi.fn(),
-      back: vi.fn(),
-      next: vi.fn(),
-      on: vi.fn(),
-    })),
+    // vitest 4 calls this with `new` (Shepherd.Tour is instantiated via
+    // `new`), so the implementation must be a real function — arrow
+    // functions cannot be constructor-called and would throw.
+    Tour: vi.fn(function () {
+      return {
+        addStep: vi.fn(),
+        start: vi.fn(),
+        cancel: vi.fn(),
+        complete: vi.fn(),
+        back: vi.fn(),
+        next: vi.fn(),
+        on: vi.fn(),
+      };
+    }),
   },
 }));
 
@@ -57,6 +62,13 @@ function wrap() {
 describe("TourOrchestrator", () => {
   beforeEach(() => {
     mockedState = emptyTourState;
+    // The first test's auto-fire effect can resolve asynchronously after
+    // its own assertions finish, leaking a Shepherd.Tour() call into the
+    // next test's spy. Clear call history (not implementations) so each
+    // test's assertions only see calls it caused itself. This was
+    // previously invisible because the whole file crashed at import time
+    // with "React is not defined" before either test ever ran.
+    vi.clearAllMocks();
   });
 
   it("mounts and renders nothing visible", () => {

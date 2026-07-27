@@ -25,12 +25,17 @@ describe("pageGuards", () => {
   });
 
   describe("isSoft404", () => {
+    // 2026-05-28 (pageGuards.ts): isSoft404 now requires >= 2
+    // NOT_FOUND_PATTERNS hits, not 1 — a single hit (e.g. the word "not"
+    // in unrelated copy) was flagging legitimate sparse pages as soft
+    // 404s. These fixtures need two distinct markers to match the
+    // tightened rule.
     it("flags pages with 'Page Not Found' prominent + no hydration", () => {
-      const text = "Page Not Found — the page you requested does not exist.";
+      const text = "404 - Page Not Found. The page you requested does not exist.";
       expect(isSoft404(text, false)).toBe(true);
     });
     it("flags pages with 'coming soon' prominent + no hydration", () => {
-      expect(isSoft404("Coming soon. We're launching shortly.", false)).toBe(true);
+      expect(isSoft404("Coming soon. This page does not exist yet.", false)).toBe(true);
     });
     it("does not flag a real article that mentions 'page not found' inside content", () => {
       expect(

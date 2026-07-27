@@ -8,9 +8,14 @@ vi.mock("../../server/lib/llmConcurrency", () => ({
 }));
 
 vi.mock("openai", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    chat: { completions: { create: createMock } },
-  })),
+  // vitest 4 calls this with `new` (the OpenAI client is instantiated via
+  // `new`), so the implementation must be a real function — arrow
+  // functions cannot be constructor-called and would throw.
+  default: vi.fn().mockImplementation(function () {
+    return {
+      chat: { completions: { create: createMock } },
+    };
+  }),
 }));
 
 // openaiMock surface used in tests

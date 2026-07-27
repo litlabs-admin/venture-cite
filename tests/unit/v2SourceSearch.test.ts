@@ -67,6 +67,13 @@ describe("runSearchSource", () => {
   });
 
   it("calls Perplexity via OpenRouter on cache miss, drops off-allowlist facts", async () => {
+    // Both facts must use factKeys from the controlled vocabulary
+    // (@shared/factAgent/schema ALLOWED_KEYS): sourceSearch.ts now runs
+    // the same vocab guard extractionPrompt.ts always had (see the
+    // "Controlled-vocabulary guard" comment in sourceSearch.ts), so an
+    // arbitrary/synthetic factKey like "real"/"fake" gets dropped before
+    // the domain-allowlist check this test is actually exercising ever
+    // runs.
     mockCreate.mockResolvedValueOnce({
       choices: [
         {
@@ -76,7 +83,7 @@ describe("runSearchSource", () => {
                 {
                   domain: "identity",
                   subcategory: "x",
-                  factKey: "real",
+                  factKey: "tagline",
                   factValue: "v",
                   valueType: "string",
                   confidence: 0.9,
@@ -86,7 +93,7 @@ describe("runSearchSource", () => {
                 {
                   domain: "identity",
                   subcategory: "x",
-                  factKey: "fake",
+                  factKey: "description",
                   factValue: "v",
                   valueType: "string",
                   confidence: 0.9,
@@ -102,7 +109,7 @@ describe("runSearchSource", () => {
     const out = await runSearchSource(baseArgs);
     expect(out.status).toBe("done");
     expect(out.facts).toHaveLength(1);
-    expect(out.facts[0].factKey).toBe("real");
+    expect(out.facts[0].factKey).toBe("tagline");
     expect(out.diagnostics.cacheHit).toBe(false);
     expect(storage.upsertFactScrapeCache).toHaveBeenCalled();
   });

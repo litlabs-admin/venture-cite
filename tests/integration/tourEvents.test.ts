@@ -1,4 +1,8 @@
 // tests/integration/tourEvents.test.ts
+// dotenv must load BEFORE the server/db import so DATABASE_URL is set when
+// the pool initializes. Global setup intentionally doesn't load dotenv —
+// see tests/setup.ts.
+import "dotenv/config";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { db } from "../../server/db";
 import { users, tourEvents } from "../../shared/schema";

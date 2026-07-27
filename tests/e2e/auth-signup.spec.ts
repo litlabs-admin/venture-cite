@@ -11,21 +11,25 @@ test.describe("Registration and password reset", () => {
   test("register page renders every field and is marked noindex", async ({ page }) => {
     await page.goto("/register");
     await expect(page).toHaveTitle(/Create Account/i);
-    // client/index.html ships a static crawler-fallback
-    // meta[name="robots"] (content="index, follow, ..."), and
-    // react-helmet-async *appends* its own page-specific tag rather than
-    // replacing it, so /register legitimately renders two
-    // meta[name="robots"] elements, with Helmet's always second and
-    // carrying data-rh="true" (see tests/e2e/public-pages.spec.ts for the
-    // same pattern with meta[name="description"]). Target that one
-    // specifically — a bare meta[name="robots"] locator matches both tags
-    // (a Playwright strict-mode violation) and, worse, would still find
+    // client/index.html ships a static crawler-fallback meta[name="robots"]
+    // (content="index, follow, max-image-preview:large, max-snippet:-1"),
+    // and react-helmet-async *appends* its own page-specific tag rather
+    // than replacing it, so /register legitimately renders two
+    // meta[name="robots"] elements.
+    //
+    // React 19 hoists <title>/<meta>/<link> children rendered anywhere in
+    // the tree directly into <head> itself, so Helmet's data-rh="true"
+    // marker no longer appears on the tags it manages — react-helmet-async
+    // is expected to be removed entirely once the framework migration
+    // lands, at which point this marker disappears for good. Locate the
+    // tag by its exact page-specific content instead: a bare
+    // meta[name="robots"] locator matches both tags (a Playwright
+    // strict-mode violation) and, worse, would still find non-empty
     // "content" text if the noindex Helmet tag were deleted, since the
-    // static fallback's content also happens to be non-empty.
-    await expect(page.locator('meta[name="robots"][data-rh="true"]')).toHaveAttribute(
-      "content",
-      /noindex/,
-    );
+    // static fallback's content is also non-empty. Matching the exact
+    // literal content="noindex" only matches this page's own tag, never
+    // the static "index, follow, ..." fallback.
+    await expect(page.locator('meta[name="robots"][content="noindex"]')).toHaveCount(1);
     await expect(page.locator(SEL.firstNameInput)).toBeVisible();
     await expect(page.locator(SEL.lastNameInput)).toBeVisible();
     await expect(page.locator(SEL.emailInput)).toBeVisible();
@@ -65,25 +69,19 @@ test.describe("Registration and password reset", () => {
   test("forgot-password page renders and is marked noindex", async ({ page }) => {
     await page.goto("/forgot-password");
     await expect(page).toHaveTitle(/Reset Password/i);
-    // See the register test above for why this must target the
-    // Helmet-managed tag (data-rh="true") rather than a bare
-    // meta[name="robots"] locator.
-    await expect(page.locator('meta[name="robots"][data-rh="true"]')).toHaveAttribute(
-      "content",
-      /noindex/,
-    );
+    // See the register test above for why this must target the exact
+    // literal content="noindex" tag rather than a bare
+    // meta[name="robots"] locator or the now-absent data-rh="true" marker.
+    await expect(page.locator('meta[name="robots"][content="noindex"]')).toHaveCount(1);
     await expect(page.locator(SEL.emailInput)).toBeVisible();
   });
 
   test("verify-email page renders and is marked noindex", async ({ page }) => {
     await page.goto("/verify-email");
     await expect(page).toHaveTitle(/Verify your email/i);
-    // See the register test above for why this must target the
-    // Helmet-managed tag (data-rh="true") rather than a bare
-    // meta[name="robots"] locator.
-    await expect(page.locator('meta[name="robots"][data-rh="true"]')).toHaveAttribute(
-      "content",
-      /noindex/,
-    );
+    // See the register test above for why this must target the exact
+    // literal content="noindex" tag rather than a bare
+    // meta[name="robots"] locator or the now-absent data-rh="true" marker.
+    await expect(page.locator('meta[name="robots"][content="noindex"]')).toHaveCount(1);
   });
 });

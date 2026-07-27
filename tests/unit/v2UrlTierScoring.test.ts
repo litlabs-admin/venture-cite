@@ -22,7 +22,7 @@ describe("scoreUrl", () => {
     expect(scoreUrl("https://x.com/security")).toBe(2);
   });
 
-  it("Tier 3 (drop): blog/*, author/*, tag/*, category/*, legal/*, privacy*, terms*, cookie*, integrations/*, /p/*", () => {
+  it("Tier 3 (drop): blog/*, author/*, tag/*, category/*, legal/*, privacy*, terms*, cookie*, /p/*", () => {
     expect(scoreUrl("https://x.com/blog/article-1")).toBe(3);
     expect(scoreUrl("https://x.com/author/alice")).toBe(3);
     expect(scoreUrl("https://x.com/tag/marketing")).toBe(3);
@@ -32,8 +32,18 @@ describe("scoreUrl", () => {
     expect(scoreUrl("https://x.com/privacy-policy")).toBe(3);
     expect(scoreUrl("https://x.com/terms")).toBe(3);
     expect(scoreUrl("https://x.com/cookie-policy")).toBe(3);
-    expect(scoreUrl("https://x.com/integrations/slack")).toBe(3);
     expect(scoreUrl("https://x.com/p/some-slug")).toBe(3);
+  });
+
+  // urlTierScoring.ts (2026-05-28 revision) deliberately moved
+  // individual /integrations/<vendor> pages OUT of tier 3: "for some
+  // brands (Zapier, Make) integrations ARE the product" (see the
+  // TIER_3 comment block). Verified: scoreUrl("/integrations/slack")
+  // === 0 (untiered, included if room remains), matching that
+  // documented intent — this used to be asserted as tier 3 above,
+  // which was stale.
+  it("Tier 0: individual /integrations/<vendor> pages are untiered, not dropped", () => {
+    expect(scoreUrl("https://x.com/integrations/slack")).toBe(0);
   });
 
   it("untiered (default): everything else", () => {

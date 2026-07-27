@@ -59,6 +59,11 @@ describe("citation scan scheduler — Foundations Plan 1 Task 11", () => {
   });
 
   it("selectBrandsForCitationScan filters only on deletedAt IS NULL — no cadence gate", async () => {
+    // scheduler.ts pulls in a large module graph (node-cron, drizzle,
+    // citationChecker, emailService, workflowEngine, ...). That import
+    // alone takes ~4.5s in isolation and can tip over the default 5s
+    // vitest timeout when the full suite runs under load. Give this
+    // specific test more headroom rather than weakening the assertions.
     const { selectBrandsForCitationScan } = await import("../../server/scheduler");
     await selectBrandsForCitationScan();
 
@@ -83,5 +88,5 @@ describe("citation scan scheduler — Foundations Plan 1 Task 11", () => {
     expect(andCalls).toHaveLength(0);
     // isNull was called exactly once, and only for deleted_at.
     expect(isNullCalls).toHaveLength(1);
-  });
+  }, 20000);
 });

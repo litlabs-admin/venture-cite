@@ -11,7 +11,14 @@ const { storageMock, openaiMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../server/storage", () => ({ storage: storageMock }));
-vi.mock("openai", () => ({ default: vi.fn().mockImplementation(() => openaiMock) }));
+// vitest 4 calls this with `new` (the OpenAI client is instantiated via
+// `new`), so the implementation must be a real function — arrow functions
+// cannot be constructor-called and would throw.
+vi.mock("openai", () => ({
+  default: vi.fn().mockImplementation(function () {
+    return openaiMock;
+  }),
+}));
 vi.mock("../../server/lib/aiLogger", () => ({ attachAiLogger: vi.fn() }));
 
 import { judgeSentimentBatch } from "../../server/lib/sentimentBatcher";

@@ -20,31 +20,44 @@ test.describe("Public pages (unauthenticated)", () => {
     await expect(page).toHaveTitle(/VentureCite/i);
     // client/index.html ships a static crawler-fallback meta[name="description"]
     // (see the "AI / crawler-readable metadata" block) for non-JS crawlers and
-    // the pre-hydration document. react-helmet-async *appends* its own
-    // page-specific tag rather than replacing it, so client/src/lib/
-    // dedupeStaticMeta.ts removes the static duplicate once Helmet mounts its
-    // data-rh="true" tag, leaving exactly one meta[name="description"] after
-    // hydration. Target the data-rh attribute explicitly anyway — it's the
-    // one guaranteed to carry this page's own copy, so asserting against
-    // .first() (or against /.+/) would still pass even if this page's
-    // <Helmet> block were deleted.
-    const description = page.locator('meta[name="description"][data-rh="true"]');
-    await expect(description).toHaveAttribute(
-      "content",
-      /Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer\./,
+    // the pre-hydration document, with different copy ("VentureCite shows you
+    // where AI overlooks, misreads or undersells your brand, then fixes the
+    // pages and sources shaping every AI answer. Take control of how AI
+    // search engines cite you."). react-helmet-async *appends* its own
+    // page-specific tag rather than replacing it.
+    //
+    // React 19 hoists <title>/<meta>/<link> children rendered anywhere in the
+    // tree directly into <head> itself, so Helmet's data-rh="true" marker no
+    // longer appears on the tags it manages — react-helmet-async is expected
+    // to be removed entirely once the framework migration lands, at which
+    // point this marker disappears for good, and client/src/lib/
+    // dedupeStaticMeta.ts (which keys off data-rh to remove the static
+    // duplicate) can no longer find Helmet's tag either, so both the static
+    // and page-specific description tags may now coexist in <head>. Locate
+    // the tag by its exact page-specific content instead of by the marker or
+    // by .first()/a loose regex — either of those would still pass even if
+    // this page's own <Helmet> description were deleted, since it would
+    // simply fall back to matching the static tag.
+    const description = page.locator(
+      'meta[name="description"][content="Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer."]',
     );
+    await expect(description).toHaveCount(1);
     await expect(page.locator("body")).toContainText(/VentureCite/i);
   });
 
   test("privacy page is reachable without logging in", async ({ page }) => {
     await page.goto("/privacy");
     await expect(page).toHaveTitle(/Privacy/i);
-    // See the landing test above for why this targets the Helmet-managed
-    // tag (data-rh="true") explicitly.
-    await expect(page.locator('meta[name="description"][data-rh="true"]')).toHaveAttribute(
-      "content",
-      /How VentureCite collects, uses, and protects your data\./,
-    );
+    // See the landing test above for why this targets the exact
+    // page-specific content rather than the now-absent data-rh="true"
+    // marker: client/index.html's static description tag carries different
+    // copy, so matching the literal content string is what actually
+    // discriminates this page's <Helmet> tag from the static fallback.
+    await expect(
+      page.locator(
+        'meta[name="description"][content="How VentureCite collects, uses, and protects your data."]',
+      ),
+    ).toHaveCount(1);
     await expect(page).not.toHaveURL(/\/login/);
   });
 

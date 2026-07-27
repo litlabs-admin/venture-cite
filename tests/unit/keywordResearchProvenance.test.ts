@@ -30,9 +30,20 @@ describe("keyword_research provenance column", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Behavioral test for the AI-discovery insert path. Mocks the OpenAI client
-// and storage, drives the actual /api/keyword-research/discover route, and
-// asserts the createKeywordResearch payload is tagged with provenance.
+// Behavioral test for the AI-discovery insert path.
+//
+// POST /api/keyword-research/discover no longer runs the OpenAI call inline
+// and inserts synchronously — it now enqueues a Vercel-Hobby-safe background
+// job via enqueueLlmJob() (server/lib/llmJobs.ts) and returns 202 + jobId
+// immediately. The actual OpenAI Responses run happens on OpenAI's
+// infrastructure; the client polls GET /api/llm-jobs/:jobId, which calls
+// pollLlmJob() -> openai.responses.retrieve() -> the "keyword_discovery"
+// handler registered by server/routes/content.ts. That handler is what
+// tags rows with provenance='ai-estimate' (see content.ts, the
+// registerLlmJobHandler({kind: "keyword_discovery", ...}) block). So this
+// test drives the full enqueue -> poll -> finalize cycle: mock the "openai"
+// package's Responses API and a minimal in-memory llm_jobs table, then
+// assert the persisted row via the mocked storage.createKeywordResearch.
 // ---------------------------------------------------------------------------
 
 process.env.OPENAI_API_KEY ??= "test-key";
@@ -46,6 +57,8 @@ const stubs = vi.hoisted(() => ({
   getKeywordResearch: vi.fn(async () => [] as any[]),
   getCompetitors: vi.fn(async () => [] as any[]),
   openaiCreate: vi.fn(),
+  responsesCreate: vi.fn(),
+  responsesRetrieve: vi.fn(),
 }));
 
 vi.mock("../../server/auth", () => ({
@@ -115,23 +128,106 @@ vi.mock("../../server/lib/sentryReport", () => ({
   captureAndFlush: vi.fn(),
 }));
 
-vi.mock("../../server/db", () => {
-  const chain: any = {};
-  chain.set = () => chain;
-  chain.where = () => chain;
-  chain.from = () => chain;
-  chain.limit = () => Promise.resolve([]);
-  chain.values = () => ({ returning: async () => [] });
+// Minimal in-memory llm_jobs table. enqueueLlmJob()/pollLlmJob() (server/lib/
+// llmJobs.ts) and the ownership check in server/routes/llmJobs.ts all read
+// and write schema.llmJobs directly (bypassing the storage layer), so the
+// generic no-op chain used for every other table isn't enough here — we need
+// insert to actually persist a row that a later select can find by id.
+vi.mock("../../server/db", async () => {
+  const schema = await vi.importActual<any>("@shared/schema");
+  const genericChain: any = {};
+  genericChain.set = () => genericChain;
+  genericChain.where = () => genericChain;
+  genericChain.from = () => genericChain;
+  genericChain.limit = () => Promise.resolve([]);
+  genericChain.values = () => ({ returning: async () => [] });
+
+  let jobRow: Record<string, unknown> | null = null;
+  let counter = 0;
+
   return {
     db: {
-      select: () => chain,
-      update: () => chain,
-      insert: () => chain,
-      delete: () => chain,
+      select: () => ({
+        from: (table: unknown) => {
+          if (table !== schema.llmJobs) return genericChain;
+          return { where: () => ({ limit: () => Promise.resolve(jobRow ? [jobRow] : []) }) };
+        },
+      }),
+      insert: (table: unknown) => {
+        if (table !== schema.llmJobs) return genericChain;
+        return {
+          values: (vals: Record<string, unknown>) => ({
+            returning: async () => {
+              counter += 1;
+              jobRow = {
+                // The poll route rejects ids shorter than 8 chars as
+                // malformed, so pad well past that floor.
+                id: `test-job-${counter}`,
+                status: "pending",
+                responseId: null,
+                result: null,
+                errorKind: null,
+                errorMessage: null,
+                startedAt: null,
+                completedAt: null,
+                createdAt: new Date(),
+                ...vals,
+              };
+              return [{ id: jobRow.id }];
+            },
+          }),
+        };
+      },
+      update: (table: unknown) => {
+        if (table !== schema.llmJobs) return genericChain;
+        let pendingVals: Record<string, unknown> | null = null;
+        const chain: any = {
+          set(vals: Record<string, unknown>) {
+            pendingVals = vals;
+            return chain;
+          },
+          where() {
+            if (jobRow && pendingVals) Object.assign(jobRow, pendingVals);
+            return Promise.resolve(undefined);
+          },
+        };
+        return chain;
+      },
+      delete: () => genericChain,
     },
-    pool: {},
+    // rateLimitBuckets.ts's tryAcquire() (called by the discover route via
+    // acquireOrWait) talks to Postgres directly through a raw pg client,
+    // not Drizzle. Fake a client that always reports plenty of tokens so
+    // the rate-limit gate never blocks the test.
+    pool: {
+      connect: async () => ({
+        query: async (sql: string) => {
+          if (/^\s*SELECT/i.test(sql)) {
+            return { rows: [{ tokens: "999", last_refill_at: new Date() }] };
+          }
+          return { rows: [] };
+        },
+        release: () => undefined,
+      }),
+    },
+    __resetLlmJobsRowForTests: () => {
+      jobRow = null;
+    },
   };
 });
+
+// enqueueLlmJob()/pollLlmJob() use a standalone `new OpenAI(...)` client
+// (server/lib/llmJobs.ts), separate from the routesShared client mocked
+// below. Mock the Responses API surface it calls.
+vi.mock("openai", () => ({
+  default: class FakeOpenAI {
+    responses = {
+      create: stubs.responsesCreate,
+      retrieve: stubs.responsesRetrieve,
+    };
+    chat = { completions: { create: vi.fn() } };
+  },
+}));
 
 vi.mock("../../server/contentGenerationWorker", () => ({
   runArticleSlice: vi.fn(),
@@ -160,11 +256,16 @@ vi.mock("../../server/lib/routesShared", async () => {
 });
 
 const { setupContentRoutes } = await import("../../server/routes/content");
+const { setupLlmJobsRoutes } = await import("../../server/routes/llmJobs");
+const { __resetLlmJobsRowForTests } = (await import("../../server/db")) as unknown as {
+  __resetLlmJobsRowForTests: () => void;
+};
 
 function buildApp(): express.Express {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
   setupContentRoutes(app);
+  setupLlmJobsRoutes(app);
   return app;
 }
 
@@ -222,41 +323,57 @@ beforeEach(() => {
   stubs.getCompetitors.mockReset();
   stubs.getCompetitors.mockResolvedValue([]);
   stubs.openaiCreate.mockReset();
+  stubs.responsesCreate.mockReset();
+  stubs.responsesRetrieve.mockReset();
+  __resetLlmJobsRowForTests();
 });
 
 describe("POST /api/keyword-research/discover", () => {
   it("tags inserted rows with provenance='ai-estimate'", async () => {
-    stubs.openaiCreate.mockResolvedValue({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              keywords: [
-                {
-                  keyword: "best ai citation tool",
-                  searchVolume: 5000,
-                  difficulty: 40,
-                  opportunityScore: 80,
-                  aiCitationPotential: 90,
-                  intent: "commercial",
-                  category: "tools",
-                  competitorGap: 30,
-                  suggestedContentType: "comparison",
-                  relatedKeywords: ["ai citation"],
-                },
-              ],
-            }),
-          },
-        },
-      ],
-    });
+    // Kickoff: enqueueLlmJob() calls openai.responses.create({background:
+    // true, store: true, ...}) and only needs the response id back.
+    stubs.responsesCreate.mockResolvedValue({ id: "resp-1", status: "queued" });
 
     const app = buildApp();
-    const { status } = await call(app, "POST", "/api/keyword-research/discover", {
+    const kickoff = await call(app, "POST", "/api/keyword-research/discover", {
       brandId: BRAND_ID,
     });
+    // The route no longer inserts synchronously — it enqueues a background
+    // job and returns 202 with a jobId to poll.
+    expect(kickoff.status).toBe(202);
+    expect(kickoff.body?.jobId).toBeTruthy();
+    expect(stubs.responsesCreate).toHaveBeenCalledTimes(1);
+    expect(stubs.createKeywordResearch).not.toHaveBeenCalled();
 
-    expect(status).toBe(200);
+    // Poll: openai.responses.retrieve() reports the background run as
+    // completed. pollLlmJob() then dispatches to the "keyword_discovery"
+    // handler registered by server/routes/content.ts, which is what
+    // actually persists rows tagged with provenance='ai-estimate'.
+    stubs.responsesRetrieve.mockResolvedValue({
+      status: "completed",
+      output_text: JSON.stringify({
+        keywords: [
+          {
+            keyword: "best ai citation tool",
+            searchVolume: 5000,
+            difficulty: 40,
+            opportunityScore: 80,
+            aiCitationPotential: 90,
+            intent: "commercial",
+            category: "tools",
+            competitorGap: 30,
+            suggestedContentType: "comparison",
+            relatedKeywords: ["ai citation"],
+          },
+        ],
+      }),
+      usage: { input_tokens: 100, output_tokens: 50 },
+    });
+
+    const poll = await call(app, "GET", `/api/llm-jobs/${kickoff.body.jobId}`);
+    expect(poll.status).toBe(200);
+    expect(poll.body?.status).toBe("succeeded");
+
     expect(stubs.createKeywordResearch).toHaveBeenCalledTimes(1);
     const payload = stubs.createKeywordResearch.mock.calls[0]?.[0] as any;
     expect(payload).toBeDefined();

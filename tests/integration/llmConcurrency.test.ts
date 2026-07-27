@@ -15,7 +15,15 @@ import {
 } from "../../server/lib/llmConcurrency";
 
 async function clearSlots() {
-  await db.execute(sql`DELETE FROM llm_concurrency_slots`);
+  // Scoped to exclude the 'lifecycle-test-%' namespace: tests/unit/
+  // v2LifecycleStorage.test.ts owns rows in that prefix, and vitest runs
+  // test files concurrently against the same real DB. An unscoped DELETE
+  // here was racing that file's beforeEach/assertions and intermittently
+  // wiping its rows out from under it, causing
+  // deleteExpiredLlmConcurrencySlots() to see 0 rows.
+  await db.execute(
+    sql`DELETE FROM llm_concurrency_slots WHERE slot_id NOT LIKE 'lifecycle-test-%'`,
+  );
 }
 
 describe("llmConcurrency token bucket", () => {

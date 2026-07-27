@@ -127,9 +127,20 @@ vi.mock("../../server/supabase", () => ({
   supabaseAdmin: {
     auth: {
       admin: { createUser: stubs.createUser },
-      signInWithPassword: stubs.signInWithPassword,
       resend: stubs.resend,
       getUser: vi.fn(async () => ({ data: { user: null }, error: null })),
+    },
+  },
+}));
+
+// Login re-auth happens on the dedicated supabaseAuth client (server/lib/
+// supabaseAuth.ts), NOT supabaseAdmin — see server/auth.ts. Mock the real
+// module (which otherwise constructs a real supabase-js client from
+// SUPABASE_URL and would attempt a genuine network call).
+vi.mock("../../server/lib/supabaseAuth", () => ({
+  supabaseAuth: {
+    auth: {
+      signInWithPassword: stubs.signInWithPassword,
     },
   },
 }));
@@ -275,7 +286,7 @@ describe("POST /api/auth/register (requires verification)", () => {
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/auth/register", {
       email: "New@Example.com",
-      password: "averylongpassword",
+      password: "Averylongpassword1",
       firstName: "Ada",
       lastName: "Lovelace",
     });
@@ -305,7 +316,7 @@ describe("POST /api/auth/register (requires verification)", () => {
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/auth/register", {
       email: "New@Example.com",
-      password: "averylongpassword",
+      password: "Averylongpassword1",
     });
     expect(status).toBe(200);
     expect(body?.requiresVerification).toBe(true);
@@ -329,7 +340,7 @@ describe("POST /api/auth/register (requires verification)", () => {
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/auth/register", {
       email: "stuck@example.com",
-      password: "averylongpassword",
+      password: "Averylongpassword1",
     });
     expect(status).toBe(200);
     expect(body?.success).toBe(true);
@@ -353,7 +364,7 @@ describe("POST /api/auth/register (requires verification)", () => {
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/auth/register", {
       email: "weak@example.com",
-      password: "averylongpassword",
+      password: "Averylongpassword1",
     });
     expect(status).toBe(400);
     expect(body?.success).toBe(false);

@@ -58,9 +58,44 @@ setup("authenticate", async ({ browser }) => {
       const page = await context.newPage();
       await page.goto(GATED_ROUTE);
       await expectAuthenticated(page);
+
+      // A page-level check alone is NOT sufficient, and trusting it caused
+      // real failures. The in-page Supabase client silently refreshes its
+      // session, so a gated route can render fine while the *stored* JWT
+      // snapshot in this file is already expired. Specs that call the API
+      // directly (billing.spec.ts, welcome-brand.spec.ts) extract that raw
+      // token via support/bearer-token.ts and got 401s — intermittently at
+      // first, since the tests latest in the run are most exposed, then
+      // consistently once the token fully lapsed.
+      //
+      // So validate the token the specs actually use, against a real
+      // authenticated endpoint, before trusting the cache.
+      const token = await page.evaluate(() => {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k || !k.includes("auth-token")) continue;
+          try {
+            const parsed = JSON.parse(localStorage.getItem(k) ?? "");
+            if (parsed?.access_token) return parsed.access_token as string;
+          } catch {
+            /* not the entry we want */
+          }
+        }
+        return null;
+      });
+      if (!token) throw new Error("no access_token in cached storage state");
+
+      const probe = await page.request.get("/api/brands", {
+        headers: { authorization: `Bearer ${token}` },
+        failOnStatusCode: false,
+      });
+      if (probe.status() !== 200) {
+        throw new Error(`cached bearer token rejected: /api/brands -> ${probe.status()}`);
+      }
+
       reused = true;
       console.log(
-        "[auth.setup] Cached storage state is still valid — reusing it, 0 logins performed.",
+        "[auth.setup] Cached storage state is still valid (page + bearer token verified) — reusing it, 0 logins performed.",
       );
     } catch {
       console.log("[auth.setup] Cached storage state is stale/expired — logging in fresh.");

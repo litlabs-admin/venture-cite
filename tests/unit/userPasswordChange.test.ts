@@ -42,10 +42,19 @@ vi.mock("../../server/db", () => {
 vi.mock("../../server/supabase", () => ({
   supabaseAdmin: {
     auth: {
-      // Re-auth path now uses supabaseAdmin.auth.signInWithPassword
-      // (matches the login route in server/auth.ts).
-      signInWithPassword: stubs.signInWithPassword,
       admin: { updateUserById: stubs.updateUserById, signOut: stubs.signOut },
+    },
+  },
+}));
+
+// Re-auth now happens on the dedicated supabaseAuth client (server/lib/
+// supabaseAuth.ts), NOT supabaseAdmin — see server/routes/userAccount.ts.
+// Mock the real module (which otherwise constructs a real supabase-js
+// client from SUPABASE_URL and would attempt a genuine network call).
+vi.mock("../../server/lib/supabaseAuth", () => ({
+  supabaseAuth: {
+    auth: {
+      signInWithPassword: stubs.signInWithPassword,
     },
   },
 }));
@@ -153,7 +162,7 @@ describe("POST /api/user/password", () => {
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/user/password", {
       currentPassword: "oldpassword",
-      newPassword: "newpassword123",
+      newPassword: "Newpassword123",
     });
     expect(status).toBe(200);
     expect(body?.success).toBe(true);
@@ -161,7 +170,7 @@ describe("POST /api/user/password", () => {
     expect(stubs.updateUserById).toHaveBeenCalledTimes(1);
     const args = stubs.updateUserById.mock.calls[0] as unknown as [string, { password: string }];
     expect(args[0]).toBe(USER_ID);
-    expect(args[1].password).toBe("newpassword123");
+    expect(args[1].password).toBe("Newpassword123");
     // Other sessions are revoked after a successful password update.
     expect(stubs.signOut).toHaveBeenCalledTimes(1);
     const signOutArgs = stubs.signOut.mock.calls[0] as unknown as [string, string];
@@ -179,7 +188,7 @@ describe("POST /api/user/password", () => {
     const app = buildApp();
     const { status, body } = await call(app, "POST", "/api/user/password", {
       currentPassword: "oldpassword",
-      newPassword: "newpassword123",
+      newPassword: "Newpassword123",
     });
     expect(status).toBe(200);
     expect(body?.success).toBe(true);
@@ -194,7 +203,7 @@ describe("POST /api/user/password", () => {
     const app = buildApp();
     const { status } = await call(app, "POST", "/api/user/password", {
       currentPassword: "wrong",
-      newPassword: "newpassword123",
+      newPassword: "Newpassword123",
     });
     expect(status).toBe(401);
     expect(stubs.updateUserById).not.toHaveBeenCalled();
