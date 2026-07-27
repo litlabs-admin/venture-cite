@@ -422,10 +422,21 @@ work: file sweeps, test authoring, config generation, inventory.
     11). If checkout were working, Stripe would return paying customers to a
     not-found page. Fix the route or the redirect target before billing is
     revived.
-16. `CardTitle` renders a `<div>` rather than a heading element, so card titles
+16. **URL tier scoring mis-classifies short paths as locale prefixes.**
+    `server/lib/factAgent/v2/urlTierScoring.ts`'s `LOCALE_PREFIX` regex
+    treats **any** bare 2–3 letter path segment as an ISO locale code.
+    `/api`, `/faq` and `/ceo` are all stripped to `/`, which then matches the
+    homepage rule and scores Tier 1. Confirmed by
+    `tests/unit/v2UrlTierScoring.test.ts:51`, which expects
+    `scoreUrl("https://x.com/api") === 0` and gets `1`. **The test is correct
+    and the code is wrong.** Left unfixed deliberately: correcting it changes
+    scoring output, which may affect stored results and user-visible
+    metrics, so it is your call rather than a silent fix. Constrain the regex
+    to a real ISO-639-1 list, or require a region suffix.
+17. `CardTitle` renders a `<div>` rather than a heading element, so card titles
     sit outside the document heading hierarchy. Accessibility nit, found in
     Task 9.
-17. **Broken legacy redirect.** `/ai-intelligence` redirects to
+18. **Broken legacy redirect.** `/ai-intelligence` redirects to
     `/monitor?tab=share-of-answer`, but `share-of-answer` is no longer a tab on
     `monitor.tsx` (actual tabs: `overview`, `citations`, `competitors`,
     `trends`, `mentions`). `SpineShell` falls back to `overview`, so the link

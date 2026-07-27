@@ -15,10 +15,18 @@
 - 🚫 **RUN NO GIT COMMANDS.** No `add`, `commit`, `push`, `checkout`, `reset`, `stash`. The user commits manually. Each task ends by reporting a suggested commit message, never by running one.
 - 🔴 **ESLint stays at 9.x.** `eslint-plugin-react` has no ESLint-10-compatible release; ESLint 10 removed `context.getFilename()`, which its `react/display-name` rule calls, and this repo spreads `react.configs.recommended.rules` across every `client/**/*.tsx`. Upgrading would crash `npm run lint` and the husky pre-commit hook. Verified against the npm registry: `eslint-plugin-react@latest` peers cap at `eslint ^9.7`.
 - 🔴 **TypeScript goes to 6.0.3, NOT 7.** TypeScript 7 ships no compiler API and `typescript-eslint` hard-caps at `typescript <6.1.0`. 6.0.3 is the highest version that keeps type-aware linting working.
+- ⚠️ **Never chain `npm test` and `npm run test:e2e` in one command.** Both hit the same database — the vitest integration suite writes to it, and the Playwright dev server reads from it. Running them back-to-back produces spurious failures that look exactly like regressions. This was hit during Task 2: two `billing.spec.ts` tests failed in a chained run and passed 6/6 in isolation moments later. Run them as separate commands.
+- ⚠️ **Several tests flake under parallel load, so the unit count is a band, not a number.** Known flaky, all confirmed passing in isolation:
+  - `tests/integration/v2SearchLlmSmoke.test.ts` — calls a live LLM through OpenRouter.
+  - `tests/unit/citationCronUnconditional.test.ts` — DB-heavy, takes ~15s alone; times out under contention.
+  - `tests/integration/llmConcurrency.test.ts` and `tests/integration/v2Lifecycle*` — DB contention.
+
+  **Only `tests/unit/v2UrlTierScoring.test.ts` fails deterministically**, and it does so deliberately. Before treating any other failure as a regression, **re-run that file alone** — most resolve. Escalate only if it fails in isolation too.
+
 - **The verification gate after every task** is all four of:
   - `npm run check` — clean
   - `npm run lint` — **0 errors**. Roughly 829 warnings are expected and non-blocking: the config deliberately grades `no-explicit-any`, `no-unescaped-entities`, `prefer-const` and others as warnings ("Track as warnings; don't gate CI"). Watch the error count, not the total.
-  - `npm test` — 148 unit/integration files passing
+  - `npm test` — **146 passed / 1 failed / 1 skipped (148 files)**. The single expected failure is `tests/unit/v2UrlTierScoring.test.ts`, which correctly exposes a real application bug (see the prerequisite note). Any _second_ failure is a regression.
   - `npm run test:e2e` — **61 passed / 2 skipped / 0 failed**
 - The e2e suite performs 2 real logins per run against a limit of 10 per (IP, email) per 15 minutes. Roughly five runs fit in a window. Exceeding it appears as `TimeoutError: page.waitForURL`, not a visible 429 — do not misdiagnose that as a regression.
 - **If a test goes red, fix the code, not the test.** The only legitimate reason to change an assertion is a behaviour change that is intentional and reported. Two assertions are expected to need updating and are called out explicitly in Tasks 4 and 8.
@@ -34,6 +42,10 @@
 - Test globals were declared for `tests/**/*.ts` and `**/*.test.ts` only, so `tests/unit/*.test.tsx` and `tests/component/*.test.tsx` received neither Node nor browser globals.
 
 Both are now fixed, taking lint to **0 errors**. Neither was caused by any dependency change; they were latent.
+
+A third gap made the `npm test` gate equally meaningless. `vitest.config.ts` included `tests/**/*.spec.ts`, and `.spec.ts` is Playwright's naming convention in this repo — so vitest was attempting to execute browser tests it cannot run. This was latent with a single e2e file and became visible when Phase 0 added nine more. `tests/e2e/**` is now excluded explicitly, which recovered 8 files.
+
+**Unit-test baseline after that fix: 133 passed / 14 failed / 1 skipped (148 files), 876 passed / 21 failed / 3 skipped (900 tests).** The 14 remaining failures are pre-existing and unrelated to any dependency change — confirmed by downgrading and re-running. They are being classified separately into broken-test versus broken-code; until that lands, this is the number to compare against.
 
 ## Pre-existing state this plan assumes
 
@@ -307,7 +319,15 @@ npm run check && npm run lint && npm test && npm run test:e2e
 
 Expected: all clean; e2e 61/2/0.
 
-- [ ] **Step 5: Verify errors still actually reach Sentry**
+- [ ] **Step 5: Verify errors still reach Sentry — ⚠️ USER ACTION, not verifiable locally**
+
+> **`SENTRY_DSN` and `VITE_SENTRY_DSN` are not set in `.env`.** Per `server/instrument.ts`, error capture is a **no-op** without them. So no local check can confirm reporting works — an agent claiming otherwise is claiming something it cannot know.
+>
+> This must be confirmed against a deployed environment where the DSN is set. It matters more than usual: the error-sanitisation work earlier in this branch made Sentry the **only** place error detail exists. If the SDK upgrade silently broke reporting, there is no user-visible symptom and nothing fails — you simply stop receiving errors.
+>
+> After deploying, trigger a known 500 (`POST /api/stripe/checkout` with an unrecognised `priceId`) and confirm the event appears in your Sentry project.
+
+The original step text follows, retained for the deployed check:
 
 A silently broken error reporter is worse than none, and the gate cannot detect it. Trigger a real error — request `/api/stripe/checkout` with an unknown `priceId`, which is a known 500 — and confirm it appears in your Sentry project.
 
@@ -319,7 +339,15 @@ Suggested message: `chore(deps): upgrade Sentry SDKs to 10.x`
 
 ---
 
-### Task 5: Vite 8
+> 🔴 **PLAN DEFECT FOUND DURING EXECUTION — Vite 8 and vitest 4 are a coupled pair.**
+>
+> `vitest@3.2.4` declares `vite: "^5 || ^6 || ^7.0.0-0"` as a plain **dependency**, not a peer. It does not support Vite 8, so npm nests a private `vite@7.3.6` for vitest while `vitest.config.ts`'s plugin instance resolves against the root `vite@8.1.5`. The two-instance skew breaks automatic JSX-runtime injection, producing `ReferenceError: React is not defined` across six component test files (21 tests). Confirmed by isolation: forcing a single deduped Vite tree-wide passes.
+>
+> This plan originally sequenced vitest at Task 11, _after_ Vite — which cannot work. **The vitest portion of Task 11 is pulled forward into this task.** The ESLint plugin bumps in Task 11 are independent and stay there.
+>
+> Also required and unplanned: `esbuild` 0.25.0 → 0.28.1, because Vite 8's optional peer needs `^0.27 || ^0.28`.
+
+### Task 5: Vite 8 (+ vitest 4, coupled)
 
 **Files:**
 
@@ -453,7 +481,11 @@ Suggested message: `chore(deps): upgrade Express to 5.x`
 npm install zod@4.4.3 drizzle-zod@0.8.3
 ```
 
-- [ ] **Step 2: Fix the 13 `.errors` sites**
+- [ ] **Step 2: Fix the `.errors` sites — there are 18, not 13**
+
+> ⚠️ A pre-analysis pass found the original audit **undercounted by five**. It missed both `server/routes/brands.ts` catch-block sites, which use an `instanceof ZodError` pattern rather than `safeParse().error.errors`, and it undercounted repeated occurrences in `factSheet.ts` and `factSheetV2.ts`. Nine further sites already use `.issues` correctly and must not be touched.
+>
+> **The authoritative, verified list with exact line numbers and surrounding expressions is in `scratchpad/p1/tailwind-zod-analysis.md`.** Work from that, not from the list below, which is retained only to show what the original audit believed.
 
 `ZodError.errors` was **removed** in v4 — not deprecated, gone. Accessing it yields `undefined` and throws on any malformed request. Replace with `.issues` at exactly these sites:
 
@@ -549,9 +581,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [
-    react({
-      /* existing babel config unchanged */
-    }),
+    react({/* existing babel config unchanged */}),
     tailwindcss(),
     ...(sentryPlugin ? [sentryPlugin] : []),
   ],
@@ -575,7 +605,10 @@ This is the single highest-value check in the task — if the tokens broke, ever
 
 Two changes need eyes, not a typecheck:
 
-- **`space-x` / `space-y` / `divide`** changed selector from `:not([hidden]) ~ :not([hidden])` to `:not(:last-child)` — **330 occurrences across 85 files**. Functionally equivalent in the common case, but diverges when a middle child is conditionally hidden. This codebase renders conditionally a lot. Walk the main dashboard pages and look for spacing that has collapsed or doubled.
+- **`space-x` / `space-y` / `divide`** changed selector from `:not([hidden]) ~ :not([hidden])` to `:not(:last-child)` — **326 occurrences across 84 files**. Do **not** eyeball all of them. A pre-analysis pass narrowed this: **55 sites have a conditionally-rendered direct child**, and of those **17 have the conditional as the _last_ child** — exactly where the new selector diverges, so they will visibly gain or lose trailing spacing.
+
+  Check those 17 first. They include `brands.tsx:536`, `community-engagement.tsx:341/526/657/758`, `crawler-check.tsx:154/225/417`, and `geo-signals.tsx:915/1051/1204/1476`. The complete list is in `scratchpad/p1/tailwind-zod-analysis.md`. If all 17 are correct, the remaining 271 unconditional sites are safe by construction.
+
 - **`ring` and `border` default colours changed.** A naive grep found only 3 literal `ring` classNames, but usages inside `cva()` and `cn()` template strings were not captured. Check focus rings on inputs and buttons specifically.
 
 - [ ] **Step 6: Full gate**
@@ -642,6 +675,47 @@ Expected: all clean; e2e 61/2/0.
 - [ ] **Step 5: Report, do not commit**
 
 Suggested message: `chore(deps): upgrade Stripe SDK to 22.x`
+
+---
+
+> 🔴 **PLAN GAP FOUND DURING EXECUTION — this plan covered 17 packages; 59 were outdated.**
+>
+> The dependency audit was scoped to the 17 packages listed in the design spec's §7 table, which was written as "the interesting ones" rather than "all of them". **Neither the audit nor this plan ever ran `npm outdated`**, so the full baseline was never established — while the stated goal was "every dependency to its latest safe version".
+>
+> Discovered while investigating an `openai`/`zod` peer warning during Task 9. Tasks 9b–9d below close it.
+>
+> Four majors remain **deliberately held**, each with a documented reason: `eslint` 9→10 (blocked by `eslint-plugin-react`), `eslint-plugin-react-hooks` 5→7 (a separate project, not a bump), `typescript` (going to 6.0.3, not 7), `@vitejs/plugin-react` 5→6 (pulls in the React Compiler, out of scope).
+
+### Task 9b: Bulk minor/patch sweep
+
+**~44 packages**, no major version changes — mostly Radix primitives, plus `@supabase/supabase-js`, `@tanstack/react-query`, `@playwright/test`.
+
+Low risk as a batch precisely because none crosses a major boundary. Run as one install and one gate rather than 44 rounds.
+
+- [ ] Install all outstanding minor/patch updates in one command.
+- [ ] Full gate. Any failure is attributable to a small, bounded set — bisect only if something breaks.
+- [ ] Report, do not commit.
+
+### Task 9c: Low-risk missed majors
+
+Test and tooling only, so a break is visible immediately and cannot reach production:
+
+`@testing-library/jest-dom` 6→7 · `@types/supertest` 6→7 · `lint-staged` 15→17 · `globals` 15→17 · `uuid` 11→14 · `@types/node` 20→26
+
+`@types/node` is the one to watch — a six-major jump in ambient Node types can surface type errors across `server/`.
+
+- [ ] Install, resolve any type errors **at the type level**, full gate.
+
+### Task 9d: High-scrutiny missed majors
+
+Four packages that touch production behaviour. Each needs its own reasoning, not a batch install:
+
+- **`openai` 5→6** — core to the product. Check the client construction, streaming, and structured-output paths. The app does **not** use `openai/helpers/zod` (verified), so the optional zod peer is irrelevant.
+- **`pino` 9→10 + `pino-pretty` 11→13** — logging throughout `server/`. A logger that silently changes format or drops fields is hard to notice and hard to debug later.
+- **`express-rate-limit` 7→8** — this is the login limiter (10 per IP/email per 15 min). A behaviour change here affects both security and the e2e suite's budget.
+- **`@hookform/resolvers` 3→5** — two majors, and it bridges `react-hook-form` to zod, which just moved to v4.
+
+- [ ] Upgrade one at a time with a gate between, so attribution stays cheap.
 
 ---
 

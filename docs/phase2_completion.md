@@ -213,10 +213,10 @@ The following items were identified during the Phase 2 audit but deferred. Each 
 Phase 2 pages had accumulated three separate "personal styles":
 
 1. Some wrapped content in a redundant `container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl` — duplicating AppLayout's own container.
-2. Some used gradient full-page backgrounds (`bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950`, `bg-stone-50`, etc.).
+2. Some used gradient full-page backgrounds (`bg-linear-to-br from-slate-950 via-slate-900 to-violet-950`, `bg-stone-50`, etc.).
 3. Gradient KPI cards with hardcoded `text-white`, `text-blue-100`, `w-8 h-8` icons — invisible in light mode.
 4. Manual back-to-home buttons, even though the sidebar handles navigation.
-5. Custom `h1` with `text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent` instead of the shared `PageHeader` component.
+5. Custom `h1` with `text-4xl font-bold bg-linear-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent` instead of the shared `PageHeader` component.
 
 ### Files Changed
 
@@ -3286,7 +3286,7 @@ A baseline audit found:
 - 5 `border-violet-600` route-loading spinners in App.tsx (violet isn't in the design system at all).
 - Page-wide violet identity in Brand Fact Sheet (~8 locations).
 - Hardcoded chart hex like `#3b82f6, #f97316, #eab308, #22c55e, #ef4444, #8b5cf6, #ec4899, #14b8a6, #a855f7, #f59e0b` in dashboard chart code.
-- 4 `bg-gradient-to-br from-purple-500/20 to-blue-500/20`-style cards on Geo Analytics (gradients explicitly forbidden by design.json).
+- 4 `bg-linear-to-br from-purple-500/20 to-blue-500/20`-style cards on Geo Analytics (gradients explicitly forbidden by design.json).
 - ~12 unique empty-state implementations across pages, all hand-rolled.
 - KPI numerics rendered in `text-3xl font-semibold` everywhere instead of `font-mono tabular-nums`.
 - `truncate` used on description paragraphs (silently cuts copy) where `line-clamp-2` was required.
@@ -3323,7 +3323,7 @@ Twenty-two page files swept against a canonical token map. Each sweep replaced r
 - `client/src/pages/keyword-research.tsx` (score-color thresholds → `text-chart-4` / `text-chart-3` / `text-destructive`; two `bg-red-600` buttons → default `bg-primary`)
 - `client/src/pages/geo-signals.tsx` (~30 swaps — pipeline 48px stage badges kept full size with token swap rather than restructured to 8px StatusDot, per "don't restructure JSX" rule)
 - `client/src/pages/geo-tools.tsx` (4px `border-l-4 border-l-purple-500` listicle row → 1px `border-l border-border` + `<StatusDot tone="neutral">` at row start — **landing Plan 1 §4.5 item o**)
-- `client/src/pages/faq-manager.tsx` (4px colored left-borders → 1px hairline + score-driven `<StatusDot>` per FAQ item — **landing Plan 1 §4.5 item p**; gradient CTA `bg-gradient-to-r from-purple-600 to-blue-600` → `bg-primary`; 3 inline hex score values → chart tokens)
+- `client/src/pages/faq-manager.tsx` (4px colored left-borders → 1px hairline + score-driven `<StatusDot>` per FAQ item — **landing Plan 1 §4.5 item p**; gradient CTA `bg-linear-to-r from-purple-600 to-blue-600` → `bg-primary`; 3 inline hex score values → chart tokens)
 - `client/src/pages/crawler-check.tsx` (~11 swaps — status icon helpers, badge variants, summary cards to chart tokens)
 - `client/src/pages/client-reports.tsx` (7 swaps including violet icons → primary, green-500 success dots → `bg-chart-4`, error badge `bg-red-500/20 text-red-400` → `bg-destructive/20 text-destructive`)
 - `client/src/pages/brands.tsx` (2 `truncate` description-style → `line-clamp-2` with `break-all` for long URLs)
@@ -3523,7 +3523,7 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 
 **Fix.**
 
-| File                            | Change                                                                                                                                                                                                                                                                                                                                                                |
+| File | Change |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------- |
 | `client/src/pages/settings.tsx` | Added `getApiErrorMessage(err: unknown, fallback: string)` helper at module scope. Prefers `(err as ApiError).body.error`, else strips the leading `\d+:\s*` prefix from `err.message`, else returns the fallback. Applied across `updateProfile`, `changePassword`, `openPortal`, `deleteMutation`, `exportMutation` onError handlers. Removed all dead `if (!res.ok |     | json.success === false)` branches in mutationFns. |
 
@@ -4282,13 +4282,13 @@ Imports added: `waitUntil` from `@vercel/functions` (line 42 of brands.ts). `cap
 
 The Foundations spec §6 Success Criteria called for zero `border-violet-*`, `bg-red-{600,700}` on primary CTAs, and `bg-gradient-to-*` on authenticated routes. Plan 2 swept most of this but several stragglers remained:
 
-| File:line                                                  | Before                                                                    | After                                                                             |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `client/src/components/geo-tools/MentionCard.tsx:302, 359` | `border-violet-200 bg-violet-50 text-violet-700` on Manual badge          | `border-border bg-muted text-muted-foreground` (decorative chrome)                |
-| `client/src/components/citations/PromptsTab.tsx:410`       | `bg-red-600 hover:bg-red-700` on "Generate prompts" CTA                   | `bg-primary hover:bg-primary/90`                                                  |
-| `client/src/components/geo-tools/ScanStatusPanel.tsx:217`  | `bg-red-600 ... text-white` on failure-alert banner (not a CTA)           | `bg-destructive ... text-destructive-foreground` (semantically correct for alert) |
-| `client/src/pages/pricing.tsx:160`                         | `bg-gradient-to-br from-slate-50 to-blue-50` page background              | `bg-muted/30`                                                                     |
-| `client/src/pages/pricing.tsx:282`                         | `bg-gradient-to-br from-amber-400 to-orange-500` icon circle + white icon | `bg-muted` + `text-muted-foreground`                                              |
+| File:line                                                  | Before                                                                  | After                                                                             |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `client/src/components/geo-tools/MentionCard.tsx:302, 359` | `border-violet-200 bg-violet-50 text-violet-700` on Manual badge        | `border-border bg-muted text-muted-foreground` (decorative chrome)                |
+| `client/src/components/citations/PromptsTab.tsx:410`       | `bg-red-600 hover:bg-red-700` on "Generate prompts" CTA                 | `bg-primary hover:bg-primary/90`                                                  |
+| `client/src/components/geo-tools/ScanStatusPanel.tsx:217`  | `bg-red-600 ... text-white` on failure-alert banner (not a CTA)         | `bg-destructive ... text-destructive-foreground` (semantically correct for alert) |
+| `client/src/pages/pricing.tsx:160`                         | `bg-linear-to-br from-slate-50 to-blue-50` page background              | `bg-muted/30`                                                                     |
+| `client/src/pages/pricing.tsx:282`                         | `bg-linear-to-br from-amber-400 to-orange-500` icon circle + white icon | `bg-muted` + `text-muted-foreground`                                              |
 
 **Grep audits after fixes:**
 
