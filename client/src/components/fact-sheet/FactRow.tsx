@@ -110,10 +110,18 @@ export function FactRow({
         <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+            {/* fact.subcategory is already the human label derived from
+                factKey (subcategoryFor in shared/factAgent/schema.ts) — e.g.
+                factKey "tagline" -> subcategory "Tagline". A second element
+                spelling out the raw factKey stated the row's name twice;
+                keep it available on hover instead. */}
+            <Badge
+              variant="secondary"
+              className="text-[10px] uppercase tracking-wide"
+              title={`Field: ${fact.factKey}`}
+            >
               {fact.subcategory}
             </Badge>
-            <span className="text-sm font-medium text-foreground">{fact.factKey}</span>
             <span
               className="text-[10px] text-muted-foreground"
               title={`Source: ${badge.label}`}

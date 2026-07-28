@@ -1,4 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
+import SafeMarkdown from "@/components/SafeMarkdown";
+import { stripTrackingParams } from "@/lib/stripTrackingParams";
 
 export interface PlatformRanking {
   aiPlatform: string;
@@ -71,9 +73,11 @@ export default function PlatformRankingCard({
         </div>
 
         {hasMeasured && platform.latestSnippet ? (
-          <p className="text-xs text-muted-foreground italic line-clamp-4 leading-snug">
-            &ldquo;{platform.latestSnippet}&rdquo;
-          </p>
+          <div className="prose prose-sm dark:prose-invert line-clamp-4 max-w-none text-xs italic leading-snug text-muted-foreground prose-p:my-0 prose-p:inline">
+            <span aria-hidden="true">&ldquo;</span>
+            <SafeMarkdown>{stripTrackingParams(platform.latestSnippet)}</SafeMarkdown>
+            <span aria-hidden="true">&rdquo;</span>
+          </div>
         ) : null}
       </CardContent>
     </Card>

@@ -217,10 +217,12 @@ export function setupDashboardRoutes(app: Express): void {
           const avgRank =
             ranks.length > 0 ? Math.round(ranks.reduce((a, b) => a + b, 0) / ranks.length) : null;
 
-          // Visibility /10: the canonical 0..100 score expressed at a /10
-          // scale, so this per-platform number agrees with the brand-level
-          // score and /api/geo-analytics (one number, one meaning). Authority
-          // is null (not 0) when NO cited row carries a score, so the scorer
+          // Canonical 0..100 score — same scale as the hero and
+          // /api/geo-analytics's platformBreakdown (one number, one
+          // meaning across every screen that shows a per-platform score;
+          // this used to be divided by 10 here only, which made Overview
+          // and Report disagree for the same platform). Authority is null
+          // (not 0) when NO cited row carries a score, so the scorer
           // drops its weight instead of capping — same as the hero.
           const authScores = cited
             .map((r) => r.authorityScore)
@@ -229,12 +231,10 @@ export function setupDashboardRoutes(app: Express): void {
             authScores.length > 0
               ? authScores.reduce((a, b) => a + b, 0) / authScores.length
               : null;
-          const score10 = Math.round(
-            computeVisibilityScore(citedCount, totalCount, avgRank ?? 0, avgAuth) / 10,
-          );
+          const score = computeVisibilityScore(citedCount, totalCount, avgRank ?? 0, avgAuth);
 
           const strengthLabel: "Weak" | "Moderate" | "Strong" =
-            score10 >= 7 ? "Strong" : score10 >= 4 ? "Moderate" : "Weak";
+            score >= 70 ? "Strong" : score >= 40 ? "Moderate" : "Weak";
 
           // Snippet preference: show a cited response if this platform has any
           // cited rows, otherwise fall back to the most recent non-cited response.
@@ -259,7 +259,7 @@ export function setupDashboardRoutes(app: Express): void {
             rank: avgRank,
             citedCount,
             totalCount,
-            visibilityScore: score10,
+            visibilityScore: score,
             strengthLabel,
             latestSnippet,
             latestSnippetPrompt,

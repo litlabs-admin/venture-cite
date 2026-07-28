@@ -451,7 +451,7 @@ export default function Home() {
             ) : (
               <p className="text-sm text-muted-foreground">
                 {hasMeasured
-                  ? "No blocking issues flagged. Open Diagnose for the full check."
+                  ? "No citation-rate or ranking issues found. Open Diagnose for hallucinations, signals & crawler checks."
                   : "Run a citation check, then issues surface here."}
               </p>
             )}

@@ -482,6 +482,10 @@ export interface IStorage {
   createScrapeRun(run: InsertBrandFactScrapeRun): Promise<BrandFactScrapeRun>;
   getScrapeRunById(runId: string): Promise<BrandFactScrapeRun | null>;
   listScrapeRunsForBrand(brandId: string, limit?: number): Promise<BrandFactScrapeRun[]>;
+  /** Latest run with status 'completed', regardless of how many failed runs
+   *  sit in front of it. listScrapeRunsForBrand() is page-bounded and cannot
+   *  answer this once a brand accumulates failures. */
+  getLatestCompletedScrapeRun(brandId: string): Promise<BrandFactScrapeRun | null>;
   getInFlightScrapeRun(brandId: string): Promise<{ id: string } | null>;
   getLastCompletedScrapeRunAt(brandId: string): Promise<Date | null>;
   updateScrapeRunStatus(

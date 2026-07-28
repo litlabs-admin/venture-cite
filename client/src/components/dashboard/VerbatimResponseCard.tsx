@@ -1,3 +1,6 @@
+import SafeMarkdown from "@/components/SafeMarkdown";
+import { stripTrackingParams } from "@/lib/stripTrackingParams";
+
 interface VerbatimResponseCardProps {
   platform?: string | null;
   prompt?: string | null;
@@ -21,7 +24,9 @@ export default function VerbatimResponseCard({
           AI
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-foreground whitespace-pre-wrap wrap-break-word">{response}</p>
+          <div className="prose prose-sm dark:prose-invert max-w-none wrap-break-word text-sm text-foreground prose-p:my-1.5 prose-p:leading-relaxed">
+            <SafeMarkdown>{stripTrackingParams(response)}</SafeMarkdown>
+          </div>
           {(platform || prompt) && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
               {platform && (

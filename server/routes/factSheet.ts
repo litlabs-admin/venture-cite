@@ -66,6 +66,56 @@ export function setupFactSheetRoutes(app: Express): void {
   );
 
   // ────────────────────────────────────────────────────────────────────────
+  // UI audit #10: GET /api/brand-fact-sheet/runs/latest-completed?brandId=...
+  //
+  // `GET /runs` above is capped at (at most) 50 rows and defaults to 10 —
+  // it exists to drive the run-history UI, not to answer "when did the
+  // last successful scrape finish?" A brand with several consecutive
+  // failed/cancelled runs can push every completed run off that page,
+  // which made the client wrongly report "Never" even though a completed
+  // run exists further back. Query the latest completed run directly so
+  // the answer isn't bounded by the history page size.
+  //
+  // Must be registered BEFORE the `/:runId` route below so Express doesn't
+  // match "latest-completed" as a runId.
+  // ────────────────────────────────────────────────────────────────────────
+  const latestCompletedQuerySchema = z.object({
+    brandId: z.string().min(1),
+  });
+
+  app.get(
+    "/api/brand-fact-sheet/runs/latest-completed",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+      try {
+        const user = requireUser(req);
+        const parsed = latestCompletedQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+          return res.status(400).json({
+            success: false,
+            error: parsed.error.issues[0]?.message ?? "Invalid query",
+          });
+        }
+        const { brandId } = parsed.data;
+        await requireBrand(brandId, user.id);
+
+        // Goes through storage rather than querying db directly. This module is
+        // imported by route tests that mock `storage`; a direct `db` import
+        // pulls in the real connection at module load, which throws without
+        // DATABASE_URL and took seven factSheet specs down at collection time.
+        const run = await storage.getLatestCompletedScrapeRun(brandId);
+
+        return res.status(200).json({ success: true, run: run ?? null });
+      } catch (error) {
+        if (error instanceof OwnershipError) {
+          return res.status(error.status).json({ success: false, error: error.message });
+        }
+        return sendError(res, error, "Failed to load latest completed run");
+      }
+    }),
+  );
+
+  // ────────────────────────────────────────────────────────────────────────
   // Task 3: GET /api/brand-fact-sheet/runs/:runId
   // ────────────────────────────────────────────────────────────────────────
   app.get(

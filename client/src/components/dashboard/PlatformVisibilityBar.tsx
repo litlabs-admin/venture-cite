@@ -1,7 +1,10 @@
 import type { PlatformRanking } from "./PlatformRankingCard";
 
 export default function PlatformVisibilityBar({ platform }: { platform: PlatformRanking }) {
-  const pct = Math.round((platform.visibilityScore / 10) * 100);
+  // visibilityScore is 0..100 (server/routes/dashboard.ts) — the bar width
+  // IS the score, no rescale. Previously this divided by 10 first, which
+  // assumed a 0..10 scale the server no longer emits.
+  const pct = Math.round(platform.visibilityScore);
   const tone =
     platform.strengthLabel === "Strong"
       ? "bg-positive"

@@ -159,6 +159,9 @@ export default function BrandFactSheet() {
       queryClient.invalidateQueries({
         queryKey: ["/api/brand-fact-sheet/runs", { brandId: selectedBrandId }],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-fact-sheet/runs/latest-completed", { brandId: selectedBrandId }],
+      });
     },
     onError: (err: unknown) => {
       // /full-rescrape returns the same structured 409 shape as /plan
@@ -170,6 +173,9 @@ export default function BrandFactSheet() {
         setExpectingRun(true);
         queryClient.invalidateQueries({
           queryKey: ["/api/brand-fact-sheet/runs", { brandId: selectedBrandId }],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["/api/brand-fact-sheet/runs/latest-completed", { brandId: selectedBrandId }],
         });
         return;
       }
@@ -228,8 +234,19 @@ export default function BrandFactSheet() {
 
   const runs = runsQuery.data?.runs ?? [];
   const activeRun = runs.find((r) => ACTIVE_STATUSES.includes(r.status)) ?? null;
-  const latestCompleted = runs.find((r) => r.status === "completed") ?? null;
   const latestRun = runs[0] ?? null;
+
+  // "Last scraped" (and the manual-paste / bulk-accept run target) must not
+  // be derived from `runs` above: that list is capped at the 10 most recent
+  // runs, so several consecutive failed/cancelled runs push every completed
+  // run off the page and the UI would wrongly claim no scrape ever
+  // succeeded. Query the latest completed run directly instead — see UI
+  // audit #10 and server/routes/factSheet.ts's `/runs/latest-completed`.
+  const latestCompletedQuery = useQuery<{ success: boolean; run: ScrapeRun | null }>({
+    queryKey: ["/api/brand-fact-sheet/runs/latest-completed", { brandId: selectedBrandId }],
+    enabled: !!selectedBrandId,
+  });
+  const latestCompleted = latestCompletedQuery.data?.run ?? null;
 
   /* ---------- SSE: live progress for active run ----------
    * Plan 2.3 hook is parameter-less; call .start(runId) when an active run
@@ -282,6 +299,9 @@ export default function BrandFactSheet() {
     if (liveProgress.sawDone) {
       queryClient.invalidateQueries({
         queryKey: ["/api/brand-fact-sheet/runs", { brandId: selectedBrandId }],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/brand-fact-sheet/runs/latest-completed", { brandId: selectedBrandId }],
       });
     }
   }, [liveProgress.lastEvent, liveProgress.sawDone, activeRunId, selectedBrandId]);
@@ -416,6 +436,24 @@ export default function BrandFactSheet() {
 
   /* ---------- "last scraped" subline ---------- */
   const lastScrapedAt = latestCompleted?.completedAt ?? null;
+
+  // Second legitimate path (UI audit #10): legacy v1-scraped facts have no
+  // run row at all — `POST /api/brand-facts/scrape/:brandId` was removed in
+  // favor of the run-based pipeline (see server/routes/publications.ts) —
+  // but the facts themselves still carry a `lastVerified` timestamp. When
+  // there's no completed run on record, fall back to the most recent
+  // `lastVerified` across resolved facts so the page doesn't claim "Never"
+  // when it actually has verification history, just not a run row for it.
+  const legacyVerifiedAt = useMemo(() => {
+    if (lastScrapedAt) return null;
+    const facts = resolvedQuery.data?.data ?? [];
+    let latest: string | null = null;
+    for (const f of facts) {
+      if (f.lastVerified && (!latest || f.lastVerified > latest)) latest = f.lastVerified;
+    }
+    return latest;
+  }, [lastScrapedAt, resolvedQuery.data]);
+
   const lastScrapedDays = daysSince(lastScrapedAt);
   const lastScrapedColor =
     lastScrapedDays === null
@@ -520,7 +558,11 @@ export default function BrandFactSheet() {
                 <div className="min-w-0 text-sm">
                   <div className="text-xs text-muted-foreground">Last scraped</div>
                   <div className={lastScrapedColor} data-testid="text-last-scraped">
-                    {lastScrapedAt ? formatRelativeTime(lastScrapedAt) : "Never"}
+                    {lastScrapedAt
+                      ? formatRelativeTime(lastScrapedAt)
+                      : legacyVerifiedAt
+                        ? `No scrape run on record — facts verified ${formatRelativeTime(legacyVerifiedAt)}`
+                        : "Never"}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">

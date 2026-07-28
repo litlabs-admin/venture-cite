@@ -33,6 +33,21 @@ const SEVERITY_RANK: Record<string, number> = {
   low: 3,
 };
 
+// Generic, always-actionable remediation guidance for correcting what AI
+// engines say about a brand. Hoisted to a single section-level panel: the
+// detector always writes remediationStatus: "pending" with no
+// remediationSteps (server/lib/hallucinationDetector.ts), so per-card
+// rendering of this same boilerplate repeated once per hallucination.
+const GENERIC_REMEDIATION_STEPS: readonly string[] = [
+  "State the correct information clearly on your own site (homepage + an About or FAQ page) so engines have an authoritative source.",
+  "Add or update structured data (Organization / FAQ schema) so the correct value is machine-readable.",
+  "Update your Brand Fact Sheet so detection and content generation use the correct source of truth.",
+  "Where it matters, get high-authority sources (press, Wikipedia, directories) to reflect the correct information.",
+];
+
+const isActionableRemediation = (remStatus: string | null | undefined) =>
+  !remStatus || remStatus === "pending" || remStatus === "in_progress";
+
 export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId: string }) {
   const { toast } = useToast();
   const [severityFilter, setSeverityFilter] = useState<string>("all");
@@ -74,6 +89,12 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
 
   const activeFactCount = facts.filter((f: any) => f.isActive !== 0).length;
   const factSheetTooSmall = activeFactCount < 3;
+
+  // Gates the section-level "how to fix this" panel: only show it when at
+  // least one visible hallucination is still open (not resolved/dismissed).
+  const hasActionableHallucinations = hallucinations.some((h) =>
+    isActionableRemediation(h.remediationStatus),
+  );
 
   const getRemediationPillClass = (status: string | null | undefined) => {
     switch (status) {
@@ -140,28 +161,18 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
       }),
   });
 
-  // Generic, always-actionable remediation guidance shown when the detector
-  // didn't attach specific steps (it usually doesn't). These are the standard
-  // GEO levers for correcting what AI engines say about a brand.
-  const defaultRemediationSteps = (hal: BrandHallucination): string[] => [
-    `State the correct information clearly on your own site (homepage + an About or FAQ page) so engines have an authoritative source.`,
-    `Add or update structured data (Organization / FAQ schema) so the right value${
-      hal.actualFact ? ` ("${hal.actualFact}")` : ""
-    } is machine-readable.`,
-    `Update your Brand Fact Sheet so detection and content generation use the correct source of truth.`,
-    `Where it matters, get high-authority sources (press, Wikipedia, directories) to reflect the correct information.`,
-  ];
-
+  // Severity ramp collapsed to two visually distinct treatments: critical
+  // and high both need action; medium and low are informational. The old
+  // 4-step ramp had high and medium differing only by 10% vs 8% background
+  // alpha — not a perceptible tier. The precise severity word is still
+  // shown as the badge's text, so no information is lost.
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "critical":
-        return "bg-(--negative)/10 text-(--negative) border border-(--negative)/20";
       case "high":
-        return "bg-(--warning)/10 text-(--warning) border border-(--warning)/20";
+        return "bg-(--negative)/10 text-(--negative) border border-(--negative)/20";
       case "medium":
-        return "bg-(--warning)/8 text-(--warning) border border-(--warning)/15";
       case "low":
-        return "bg-muted text-muted-foreground border border-border";
       default:
         return "bg-muted text-muted-foreground border border-border";
     }
@@ -244,7 +255,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -304,12 +315,33 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
               </div>
             ) : (
               <div className="space-y-3">
+                {hasActionableHallucinations && (
+                  <div
+                    className="rounded-md border border-border bg-(--bg-surface-1) p-3"
+                    data-testid="remediation-guidance-panel"
+                  >
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      How to fix flagged hallucinations
+                    </p>
+                    <ul className="mt-1.5 space-y-1 text-sm text-muted-foreground">
+                      {GENERIC_REMEDIATION_STEPS.map((step, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span aria-hidden>·</span>
+                          <span className="min-w-0 break-words">{step}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      The specific correction to publish is quoted as "Actual fact" on each card
+                      below.
+                    </p>
+                  </div>
+                )}
                 {hallucinations.map((hal) => {
-                  const citingUrl = (hal as any).citingOutletUrl as string | null | undefined;
-                  const remStatus = (hal as any).remediationStatus as string | null | undefined;
-                  const seenCount = (hal as any).seenCount as number | undefined;
-                  const actionable =
-                    !remStatus || remStatus === "pending" || remStatus === "in_progress";
+                  const citingUrl = hal.citingOutletUrl;
+                  const remStatus = hal.remediationStatus;
+                  const seenCount = hal.seenCount;
+                  const actionable = isActionableRemediation(remStatus);
                   return (
                     <div
                       key={hal.id}
@@ -321,9 +353,10 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                           <Badge className={`${getSeverityColor(hal.severity)} font-medium`}>
                             {hal.severity}
                           </Badge>
-                          <Badge variant="outline" className="font-normal">
-                            {hal.hallucinationType}
-                          </Badge>
+                          {/* hal.hallucinationType intentionally not rendered: the
+                              detector only ever emits "fact_contradiction"
+                              (server/lib/hallucinationDetector.ts), so a chip for
+                              it differentiates nothing. */}
                           <Badge
                             variant="outline"
                             className="font-normal"
@@ -380,21 +413,21 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                           No heavy block fills — DESIGN.md asks colour to
                           encode importance, not category. The left rule does
                           the work; the text reads cleanly on a neutral card. */}
-                      <div className="space-y-3">
-                        <div className="border-l-2 border-(--negative) pl-3">
+                      <div className="min-w-0 space-y-3">
+                        <div className="min-w-0 border-l-2 border-(--negative) pl-3">
                           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                             AI claimed
                           </p>
-                          <p className="mt-0.5 text-sm leading-snug text-foreground">
+                          <p className="mt-0.5 min-w-0 break-words text-sm leading-snug text-foreground">
                             {hal.claimedStatement}
                           </p>
                         </div>
                         {hal.actualFact && (
-                          <div className="border-l-2 border-(--positive) pl-3">
+                          <div className="min-w-0 border-l-2 border-(--positive) pl-3">
                             <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                               Actual fact
                             </p>
-                            <p className="mt-0.5 text-sm leading-snug text-foreground">
+                            <p className="mt-0.5 min-w-0 break-words text-sm leading-snug text-foreground">
                               {hal.actualFact}
                             </p>
                           </div>
@@ -425,28 +458,28 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                               </a>
                             );
                           })()}
-                        {actionable &&
-                          (() => {
-                            const steps =
-                              hal.remediationSteps && hal.remediationSteps.length > 0
-                                ? hal.remediationSteps
-                                : defaultRemediationSteps(hal);
-                            return (
-                              <div className="pt-1">
-                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                                  How to fix this
-                                </p>
-                                <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">
-                                  {steps.map((step, i) => (
-                                    <li key={i} className="flex gap-2">
-                                      <span aria-hidden>·</span>
-                                      <span>{step}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            );
-                          })()}
+                        {/* Generic guidance now lives once in the section-level
+                            panel above the list. Only render this per-card
+                            block when a detection carries genuinely specific
+                            steps — the pipeline never populates
+                            remediationSteps today, but the field exists on
+                            the schema, so a future producer isn't silently
+                            dropped. */}
+                        {actionable && hal.remediationSteps && hal.remediationSteps.length > 0 && (
+                          <div className="min-w-0 pt-1">
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                              How to fix this
+                            </p>
+                            <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">
+                              {hal.remediationSteps.map((step, i) => (
+                                <li key={i} className="flex gap-2">
+                                  <span aria-hidden>·</span>
+                                  <span className="min-w-0 break-words">{step}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -456,7 +489,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
@@ -482,13 +515,22 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
             ) : (
               <div className="space-y-3">
                 {facts.map((fact) => (
-                  <div key={fact.id} className="p-3 border rounded-lg">
+                  <div key={fact.id} className="min-w-0 p-3 border rounded-lg">
                     <div className="flex items-center justify-between">
-                      <Badge variant="outline">{fact.subcategory}</Badge>
+                      {/* fact.subcategory is already the human label derived
+                          from factKey (see subcategoryFor in
+                          shared/factAgent/schema.ts) — e.g. factKey "tagline"
+                          -> subcategory "Tagline". Rendering both said the
+                          same name twice; the raw key is still available on
+                          hover for debugging/provenance. */}
+                      <Badge variant="outline" title={`Field: ${fact.factKey}`}>
+                        {fact.subcategory}
+                      </Badge>
                       <span className="text-xs text-muted-foreground">Verified</span>
                     </div>
-                    <p className="font-medium mt-2">{fact.factKey}</p>
-                    <p className="text-sm text-muted-foreground">{fact.factValue}</p>
+                    <p className="mt-2 min-w-0 break-words text-sm text-foreground">
+                      {fact.factValue}
+                    </p>
                   </div>
                 ))}
               </div>

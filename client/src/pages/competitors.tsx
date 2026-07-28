@@ -534,7 +534,7 @@ export default function CompetitorsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-chart-4" />
+                  <TrendingUp className="w-5 h-5 text-muted-foreground" />
                   Platform Breakdown
                 </CardTitle>
                 <CardDescription>Citations by AI platform for top performers</CardDescription>
@@ -601,6 +601,7 @@ export default function CompetitorsPage() {
                 </CardTitle>
                 <CardDescription>
                   {competitors.length} competitor{competitors.length !== 1 ? "s" : ""} being tracked
+                  — the leaderboard above adds your brand as its own row.
                 </CardDescription>
               </CardHeader>
               <CardContent>

@@ -3240,6 +3240,21 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
+  async getLatestCompletedScrapeRun(brandId: string): Promise<BrandFactScrapeRun | null> {
+    const rows = await db
+      .select()
+      .from(schema.brandFactScrapeRuns)
+      .where(
+        and(
+          eq(schema.brandFactScrapeRuns.brandId, brandId),
+          eq(schema.brandFactScrapeRuns.status, "completed"),
+        ),
+      )
+      .orderBy(desc(schema.brandFactScrapeRuns.startedAt))
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
   async getInFlightScrapeRun(brandId: string): Promise<{ id: string } | null> {
     const rows = await db
       .select({ id: schema.brandFactScrapeRuns.id })
