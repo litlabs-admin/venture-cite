@@ -9,7 +9,11 @@ build
 out
 server/public
 *.tsbuildinfo
-api/_bundle.js
+# Nitro's own build output (TanStack Start). Lands under client/ today
+# because Nitro resolves it relative to Vite's `root`, not the repo root —
+# see the Phase 2 Task 2 report for why that's a live, unresolved conflict
+# with the existing `build.outDir: dist/public` convention.
+.output/
 
 # ─── Environment variables — NEVER commit ───────────────────────
 .env
@@ -29,6 +33,8 @@ logs/
 !docs/phase1_completion.md
 !docs/phase2_goals.md
 !docs/phase2_completion.md
+# Operational, not notes — needed by anyone deploying this.
+!docs/deploy-runbook.md
 
 # ─── Editor / IDE ────────────────────────────────────────────────
 .vscode
