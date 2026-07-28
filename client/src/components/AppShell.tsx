@@ -186,7 +186,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <div className="flex min-h-0 flex-1">
             {/* Canvas */}
             <main id="main-content" className="min-w-0 flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+              {/* The AI Tutor pill (EducationAssistant.tsx) is `fixed bottom-6
+                  right-6 h-12` — anchored to the viewport, not this canvas —
+                  and covers roughly the bottom 72px on the right for every
+                  authenticated route. It is not dismissible, so content that
+                  ends near the bottom needs its own clearance. `pb-24` (96px)
+                  covers the pill's ~72px zone with margin to spare. Above
+                  ~1450px the centred max-w-[1400px] column no longer reaches
+                  into the pill's corner (it sits in the gutter instead), so
+                  the extra padding reverts to the original py-6 value there. */}
+              <div className="mx-auto w-full max-w-[1400px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 min-[1450px]:pb-6">
                 {children}
               </div>
             </main>

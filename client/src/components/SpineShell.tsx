@@ -79,12 +79,20 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
       </TabsList>
       {tabs.map((t) =>
         t.value === active && t.description ? (
+          // Demoted from a bordered/tinted callout to a plain header-style
+          // caption: this renders on every tab of every spine stage (17
+          // tabs across Monitor/Diagnose/Act/Report/Setup), and the content
+          // is a routine one-line purpose statement, not something that
+          // needs attention. No border, no bg fill, and the glyph is
+          // uncoloured (`currentColor` off the muted text) rather than the
+          // amber `text-chart-3` it had — amber is this design system's
+          // attention colour and this isn't an attention case.
           <div
             key={`${t.value}-desc`}
-            className="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4 text-sm"
+            className="flex items-center gap-2 text-sm text-muted-foreground"
           >
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-chart-3" />
-            <p className="text-muted-foreground">{t.description}</p>
+            <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <p>{t.description}</p>
           </div>
         ) : null,
       )}

@@ -5,7 +5,14 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  // Disabled state is its own neutral treatment, not a dimmed variant: a
+  // disabled bg-primary button used to render as `opacity-50` over the
+  // brand green, which reads as "secondary" rather than "unavailable".
+  // `disabled:bg-muted` + `disabled:text-(--fg-disabled)` carry no accent
+  // hue in either theme, and beat every variant's own bg-*/text-* utility
+  // because the `:disabled` pseudo-class selector outranks a plain class
+  // selector on CSS specificity — no !important needed.
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:bg-muted disabled:text-(--fg-disabled) [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
