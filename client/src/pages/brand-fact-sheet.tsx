@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Helmet } from "react-helmet-async";
 import { RefreshCw, Loader2, AlertTriangle, Plus } from "lucide-react";
 
 import { apiRequest, ApiError } from "@/lib/queryClient";
@@ -497,11 +496,12 @@ export default function BrandFactSheet() {
 
   /* ---------- render ---------- */
   return (
+    // This component is only ever rendered client-side, as a lazy tab
+    // inside client/src/pages/setup.tsx (no route of its own to attach
+    // `head()` to) — see this task's report. Title/meta removed per this
+    // task's blanket "metadata belongs to the route" rule; /setup falls
+    // back to the root's site-wide defaults.
     <div className="space-y-8">
-      <Helmet>
-        <title>Brand Fact Sheet - VentureCite</title>
-      </Helmet>
-
       {selectedBrand && (
         <>
           {/* HEADER SECTION — Task 8 */}

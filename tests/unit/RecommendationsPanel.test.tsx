@@ -12,10 +12,21 @@ vi.mock("@/hooks/use-brand-selection", () => ({
   useBrandSelection: vi.fn(),
 }));
 
-// Mock Wouter Link as a plain anchor — renders the children directly.
-vi.mock("wouter", () => ({
-  Link: ({ href, children, className }: any) => (
-    <a href={href} className={className}>
+// Render TanStack's Link as a plain anchor. Partial mock via importOriginal:
+// the module also exports createFileRoute and the route-tree machinery, so the
+// whole module must not be replaced. Note the prop is `to`, not `href`.
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  Link: ({
+    to,
+    children,
+    className,
+  }: {
+    to: string;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <a href={to} className={className}>
       {children}
     </a>
   ),

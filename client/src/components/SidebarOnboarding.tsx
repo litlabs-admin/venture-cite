@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import { Rocket, CheckCircle2, ArrowRight } from "lucide-react";
 import { STEPS, type OnboardingData, isOnboardingComplete } from "@/lib/onboardingSteps";
+// Onboarding step links are typed as plain `string` in onboardingSteps.ts, so
+// they cannot be narrowed to route literals here.
+import { toLinkTarget } from "@/lib/linkTarget";
 
 export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => void }) {
   const [open, setOpen] = useState(false);
@@ -127,6 +130,7 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
             {STEPS.map((step, idx) => {
               const done = step.checkFn(data);
               const isNext = !done && idx === nextStepIndex;
+              const target = toLinkTarget(step.link);
               const Icon = step.icon;
               return (
                 <div
@@ -172,37 +176,39 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
                       {step.description}
                     </p>
                     {!done && (
-                      <Link href={step.link}>
-                        <Button
-                          size="sm"
-                          variant={isNext ? "default" : "outline"}
-                          className="mt-3"
-                          onClick={() => {
-                            setOpen(false);
-                            onNavigate?.();
-                          }}
-                          data-testid={`button-step-${step.id}`}
-                        >
+                      <Button
+                        asChild
+                        size="sm"
+                        variant={isNext ? "default" : "outline"}
+                        className="mt-3"
+                        onClick={() => {
+                          setOpen(false);
+                          onNavigate?.();
+                        }}
+                        data-testid={`button-step-${step.id}`}
+                      >
+                        <Link to={target.to} search={target.search}>
                           {step.linkText}
                           <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                        </Button>
-                      </Link>
+                        </Link>
+                      </Button>
                     )}
                     {done && (
-                      <Link href={step.link}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-3"
-                          onClick={() => {
-                            setOpen(false);
-                            onNavigate?.();
-                          }}
-                        >
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="mt-3"
+                        onClick={() => {
+                          setOpen(false);
+                          onNavigate?.();
+                        }}
+                      >
+                        <Link to={target.to} search={target.search}>
                           Revisit
                           <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                        </Button>
-                      </Link>
+                        </Link>
+                      </Button>
                     )}
                   </div>
                 </div>

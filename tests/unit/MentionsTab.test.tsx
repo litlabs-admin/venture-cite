@@ -25,27 +25,36 @@ import { toHaveNoViolations } from "vitest-axe/matchers.js";
 expect.extend({ toHaveNoViolations });
 
 // ---------------------------------------------------------------------------
-// Mock wouter — control search string so URL-driven tests work
+// Mock TanStack Router's navigation hooks so URL-driven tests work.
+//
+// useSearch returns a parsed OBJECT (src/router.tsx pins the router to
+// string-in/string-out search params); the old wouter shim returned a raw
+// query STRING. navigate() receives { to, search, replace } where `search`
+// is an UPDATER FUNCTION, so unrelated params survive.
 // ---------------------------------------------------------------------------
 
 let _location = "/geo-tools";
-let _search = "";
-const setLocationMock = vi.fn((next: string, _opts?: unknown) => {
-  const qIdx = next.indexOf("?");
-  if (qIdx === -1) {
-    _location = next;
-    _search = "";
-  } else {
-    _location = next.slice(0, qIdx);
-    _search = next.slice(qIdx + 1);
-  }
-});
+let _search: Record<string, string> = {};
+const navigateMock = vi.fn(
+  (opts: {
+    to?: string;
+    search?: (prev: Record<string, string>) => Record<string, string>;
+    replace?: boolean;
+  }) => {
+    if (opts.to) _location = opts.to;
+    if (typeof opts.search === "function") {
+      _search = opts.search(_search) as Record<string, string>;
+    }
+  },
+);
 
-vi.mock("wouter", () => ({
-  useLocation: () => [_location, setLocationMock],
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  useNavigate: () => navigateMock,
+  useRouterState: () => _location,
   useSearch: () => _search,
-  Link: ({ href, children }: { href: string; children: React.ReactNode }) =>
-    React.createElement("a", { href }, children),
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) =>
+    React.createElement("a", { href: to }, children),
 }));
 
 // ---------------------------------------------------------------------------
@@ -234,14 +243,14 @@ function makeHookReturn(overrides: Record<string, unknown> = {}) {
     loadMore: vi.fn(),
     filters: {},
     setFilter: vi.fn((key: string, value: unknown) => {
-      // Simulate URL update
-      const params = new URLSearchParams(_search);
+      // Simulate URL update against the parsed search object.
+      const next = { ..._search };
       if (value === undefined || value === "" || value === false) {
-        params.delete(key);
+        delete next[key];
       } else {
-        params.set(key, String(value));
+        next[key] = String(value);
       }
-      _search = params.toString();
+      _search = next;
     }),
     clearFilters: vi.fn(),
     stats: DEFAULT_STATS,
@@ -293,8 +302,8 @@ function renderTab(brandId: string | null) {
 describe("MentionsTab", () => {
   beforeEach(() => {
     _location = "/geo-tools";
-    _search = "";
-    setLocationMock.mockClear();
+    _search = {};
+    navigateMock.mockClear();
     toastMock.mockClear();
     apiRequestMock.mockResolvedValue(
       new Response(JSON.stringify({ rows: [] }), {
@@ -390,11 +399,19 @@ describe("MentionsTab", () => {
     renderTab(BRAND_ID);
     const card = screen.getByTestId("mention-card-m1");
     await userEvent.click(card);
-    // URL should now include mention=m1
-    expect(setLocationMock).toHaveBeenCalledWith(
-      expect.stringContaining("mention=m1"),
-      expect.anything(),
+    // URL should now include mention=m1. navigate() takes `search` as an
+    // updater function, so assert on what the updater actually produces —
+    // a shallow argument match cannot see through the closure.
+    expect(navigateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ replace: true, search: expect.any(Function) }),
     );
+    const call = navigateMock.mock.calls.at(-1)?.[0] as {
+      search: (prev: Record<string, string>) => Record<string, string>;
+    };
+    expect(call.search({})).toEqual({ mention: "m1" });
+    // Unrelated params must survive — dropping brandId here would silently
+    // reset the user's brand selection when they open a mention.
+    expect(call.search({ brandId: "b1" })).toEqual({ brandId: "b1", mention: "m1" });
   });
 
   // 7. Status filter URL persistence

@@ -20,9 +20,19 @@ test.describe("Authentication", () => {
   test.describe("logged out", () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    test("valid credentials log the user in and land on /", async ({ page }) => {
+    test("valid credentials log the user in and land in the authenticated app", async ({
+      page,
+    }) => {
       await login(page);
-      await expect(page).toHaveURL((url) => new URL(url).pathname === "/");
+      // login.tsx still navigates to "/", but "/" is now the public,
+      // server-rendered landing page and redirects authenticated visitors to
+      // "/dashboard" after hydration (src/routes/index.tsx). A brand-less
+      // account is then bounced on to "/welcome" by FirstRunGate. Landing
+      // BACK on "/" would mean the redirect never fired — i.e. an
+      // authenticated user stuck on the marketing page.
+      await expect(page).toHaveURL((url) =>
+        ["/dashboard", "/welcome"].includes(new URL(url).pathname),
+      );
     });
 
     test("invalid password shows an error and stays on /login", async ({ page }) => {

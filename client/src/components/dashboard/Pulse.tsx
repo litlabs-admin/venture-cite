@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StatusDot, type StatusDotTone } from "@/components/foundations";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { toLinkTarget, withBrand, type LinkTarget } from "@/lib/linkTarget";
 
 // ─── Pulse ───────────────────────────────────────────────────────────────────
 // The Command Center's action-first worklist. One ranked list answering "what
@@ -66,7 +67,7 @@ type PulseItem = {
   kind: string;
   title: React.ReactNode;
   why: string;
-  href: string;
+  target: LinkTarget;
   cta: string;
   emphasised: boolean; // render a real Button (regressions + P0 blockers)
 };
@@ -77,15 +78,13 @@ const ACTIONABLE_ALERTS: Record<string, { href: string; cta: string }> = {
   new_hallucinations: { href: "/diagnose?tab=hallucinations", cta: "Review hallucinations" },
 };
 
-/** Append the active brand to a deep-link when it doesn't already carry one,
- *  so navigating from Pulse keeps the selected brand sticky. */
-function withBrand(href: string, brandId: string): string {
-  if (!brandId) return href;
-  const [path, qs = ""] = href.split("?");
-  const params = new URLSearchParams(qs);
-  if (!params.get("brandId")) params.set("brandId", brandId);
-  const out = params.toString();
-  return out ? `${path}?${out}` : path;
+/** Resolve a row's destination: decompose the href (a mix of local
+ *  `/stage?tab=…` literals and server-supplied `ctaHref`/`nextHref` strings —
+ *  never a compile-time route literal), then carry the active brand so the
+ *  selection stays sticky when navigating from Pulse. Decomposed once here
+ *  rather than round-tripping through a URL string on the way to the Link. */
+function resolveTarget(href: string, brandId: string): LinkTarget {
+  return withBrand(toLinkTarget(href), brandId);
 }
 
 function readDismissed(key: string | null): Record<string, string> {
@@ -175,7 +174,7 @@ export default function Pulse() {
         kind: "Regression",
         title: a.message,
         why: "Detected on your most recent scan.",
-        href: withBrand(href, selectedBrandId),
+        target: resolveTarget(href, selectedBrandId),
         cta,
         emphasised: true,
       });
@@ -192,7 +191,7 @@ export default function Pulse() {
         kind: r.priority === "P0" ? "Required" : r.priority === "P1" ? "Suggested" : "Optional",
         title: r.title,
         why: r.why,
-        href: withBrand(r.ctaHref, selectedBrandId),
+        target: resolveTarget(r.ctaHref, selectedBrandId),
         cta: r.ctaLabel,
         emphasised: r.priority === "P0",
       });
@@ -217,7 +216,7 @@ export default function Pulse() {
             </>
           ),
           why: "AI engines are stating things your fact sheet contradicts.",
-          href: withBrand("/diagnose?tab=hallucinations", selectedBrandId),
+          target: resolveTarget("/diagnose?tab=hallucinations", selectedBrandId),
           cta: "Review hallucinations",
           emphasised: false,
         });
@@ -312,20 +311,24 @@ export default function Pulse() {
             </span>
             <p className="mt-0.5 text-sm font-medium text-foreground">{it.title}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">{it.why}</p>
-            {it.emphasised ? (
-              <Link href={it.href} asChild>
-                <Button size="sm" className="mt-2">
-                  {it.cta} →
+            {(() => {
+              const target = it.target;
+              return it.emphasised ? (
+                <Button asChild size="sm" className="mt-2">
+                  <Link to={target.to} search={target.search}>
+                    {it.cta} →
+                  </Link>
                 </Button>
-              </Link>
-            ) : (
-              <Link
-                href={it.href}
-                className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
-              >
-                {it.cta} →
-              </Link>
-            )}
+              ) : (
+                <Link
+                  to={target.to}
+                  search={target.search}
+                  className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
+                >
+                  {it.cta} →
+                </Link>
+              );
+            })()}
           </div>
           {it.dismissKey && (
             <button

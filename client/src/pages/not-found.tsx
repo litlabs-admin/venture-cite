@@ -1,16 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
-import { Helmet } from "react-helmet-async";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   return (
+    // Title/robots moved to src/routes/_app/$.tsx's `head()` — metadata
+    // belongs to the route, not this component.
     <div className="min-h-screen w-full flex items-center justify-center bg-muted">
-      <Helmet>
-        <title>Page Not Found - VentureCite</title>
-        <meta name="robots" content="noindex" />
-      </Helmet>
       <Card className="w-full max-w-md mx-4">
         <CardContent className="pt-6">
           <div className="flex mb-4 gap-2 items-center">
@@ -22,7 +19,7 @@ export default function NotFound() {
             The page you&apos;re looking for doesn&apos;t exist or has been moved.
           </p>
           <div className="mt-6">
-            <Link href="/">
+            <Link to="/">
               <Button variant="default">Go home</Button>
             </Link>
           </div>

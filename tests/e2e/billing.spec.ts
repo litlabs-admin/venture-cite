@@ -12,23 +12,19 @@
 // The one exception below opts out with an empty storageState, matching the
 // pattern in tests/e2e/public-pages.spec.ts.
 //
-// IMPORTANT FINDING — client/src/pages/pricing.tsx is dead code. It is a
-// fully implemented page (products grid, checkout mutation, success/canceled
-// banners) but client/src/App.tsx's <Router>/<Switch> never imports or
-// routes it — grep confirms no "/pricing" <Route> exists anywhere in
-// App.tsx. Corroborated by the landing page's own nav/footer data comments:
-// client/src/pages/landing/sections/Nav/data.ts:95 — "The Pricing row is
-// gone too — the page's Pricing section was removed." — and
-// .../Footer/data.ts:24/31 make the same statement. So "/pricing" falls
-// through to the catch-all `<Route component={NotFound} />`. wouter's
-// <Switch> matches on pathname alone, before any auth check runs, so this is
-// true regardless of login state — confirmed both by code inspection and by
-// the two describe blocks below (authenticated + explicitly logged-out).
+// HISTORY — client/src/pages/pricing.tsx used to be dead code. The component
+// was fully implemented (products grid, checkout mutation, success/canceled
+// banners) but no route ever mounted it, so "/pricing" fell through to the
+// catch-all 404. This spec pinned that reality rather than the assumed
+// "renders its title and description", per the rule that when behaviour
+// differs from assumptions, the app is right — encode reality and report it.
 //
-// The tests below encode that REAL behavior rather than the originally
-// planned "pricing page renders its title and description" assertion, per
-// this phase's rule: when behavior differs from assumptions, the app is
-// right — encode reality and report it.
+// It has since been routed deliberately: src/routes/pricing.tsx mounts it as
+// a TOP-LEVEL, server-rendered public page (a sibling of privacy.tsx and
+// glossary.tsx), NOT under the `_app` layout that carries `ssr: false` — a
+// public marketing page has to be crawlable. The assertions below were
+// inverted to match, and extended to cover the SSR guarantee that the old
+// 404 behaviour never had.
 import { test, expect } from "@playwright/test";
 import { getBearerToken } from "./support/bearer-token";
 
@@ -47,37 +43,47 @@ import { getBearerToken } from "./support/bearer-token";
 
 test.describe("Billing", () => {
   test.describe("pricing page (authenticated)", () => {
-    test("/pricing is not wired into the router — falls through to the 404 page", async ({
-      page,
-    }) => {
+    test("/pricing is routed and renders the plans", async ({ page }) => {
       await page.goto("/pricing");
-      await expect(page).toHaveTitle(/Not Found/i);
-      await expect(
-        page.getByRole("heading", { name: /404 Page Not Found/i, level: 1 }),
-      ).toBeVisible();
+      await expect(page).toHaveTitle(/Pricing - VentureCite/i);
+      await expect(page.getByRole("heading", { name: /Choose Your GEO Plan/i })).toBeVisible();
+      // Must NOT be the old catch-all outcome.
+      await expect(page.getByRole("heading", { name: /404 Page Not Found/i })).toHaveCount(0);
     });
 
-    test("stripe success/canceled query params don't change the 404 outcome", async ({ page }) => {
-      // pricing.tsx's success/canceled banners (lines ~172-187) read these
-      // params, but since the page is never routed at all, that logic is
-      // unreachable — pinning this so a later migration doesn't silently
-      // change what "/pricing?success=true" renders without anyone noticing.
+    test("stripe success/canceled query params reach the page's banners", async ({ page }) => {
+      // pricing.tsx reads these params to show post-checkout banners. That
+      // logic was unreachable while the page was unrouted; this pins that it
+      // is now actually reachable, and that the params survive the router's
+      // search handling (src/router.tsx pins search to string-in/string-out).
       await page.goto("/pricing?success=true");
-      await expect(page).toHaveTitle(/Not Found/i);
+      await expect(page).toHaveTitle(/Pricing - VentureCite/i);
+      await expect(page).toHaveURL(/success=true/);
 
       await page.goto("/pricing?canceled=true");
-      await expect(page).toHaveTitle(/Not Found/i);
+      await expect(page).toHaveTitle(/Pricing - VentureCite/i);
+      await expect(page).toHaveURL(/canceled=true/);
     });
   });
 
   test.describe("pricing page (unauthenticated)", () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    test("/pricing 404s the same way logged out — not an auth gate, genuinely unrouted", async ({
+    test("/pricing is public — reachable logged out, and server-rendered", async ({
       page,
+      request,
     }) => {
       await page.goto("/pricing");
-      await expect(page).toHaveTitle(/Not Found/i);
+      await expect(page).toHaveTitle(/Pricing - VentureCite/i);
+      await expect(page.getByRole("heading", { name: /Choose Your GEO Plan/i })).toBeVisible();
+
+      // The point of routing this page at the top level rather than under the
+      // `ssr: false` _app layout: the plan copy must be in the served bytes,
+      // before any JavaScript runs. `request` is a plain HTTP client that
+      // never executes scripts, so this fails if /pricing regresses to being
+      // client-rendered — which a browser-based assertion could not detect.
+      const raw = await (await request.get("/pricing")).text();
+      expect(raw).toContain("Choose Your GEO Plan");
     });
   });
 

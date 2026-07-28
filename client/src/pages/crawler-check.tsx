@@ -16,7 +16,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { safeExternalHref } from "@/lib/urlSafety";
-import { Helmet } from "react-helmet-async";
 import {
   Bot,
   CheckCircle2,
@@ -151,11 +150,11 @@ export default function CrawlerCheck() {
   };
 
   return (
+    // Only ever rendered client-side, as a lazy tab inside
+    // client/src/pages/diagnose.tsx (no route of its own) — title/meta
+    // removed per this task's blanket rule; /diagnose falls back to root
+    // defaults.
     <div className="space-y-8">
-      <Helmet>
-        <title>Crawler Check - VentureCite</title>
-      </Helmet>
-
       <Card className="mb-8">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

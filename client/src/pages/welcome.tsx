@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Lock,
@@ -178,7 +178,7 @@ function activeIndexFor(status: AutopilotStatus): number {
 }
 
 export default function Welcome() {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const rqClient = useQueryClient();
 
@@ -433,16 +433,28 @@ export default function Welcome() {
   };
 
   // Auto-advance into the Command Center the moment the baseline is ready.
-  // The spine's global-welcome tour auto-fires at `/`, so the guided tour
-  // runs alongside whatever finishes in the background. Failures do NOT
-  // auto-redirect — the user chooses retry or proceed.
+  // The spine's global-welcome tour auto-fires at `/dashboard`, so the
+  // guided tour runs alongside whatever finishes in the background.
+  // Failures do NOT auto-redirect — the user chooses retry or proceed.
+  //
+  // Native-router note: this used to target bare "/" with a `?brandId=`
+  // query string. Post-migration, "/" is the public Landing route
+  // (src/routes/index.tsx) — for an authenticated visitor it hard-redirects
+  // to "/dashboard" via `window.location.href`, which drops the query
+  // string entirely. Targeting "/dashboard" directly (where FirstRunGate
+  // now mounts the Home/Command Center component) is what actually
+  // preserves the old behavior: landing on the dashboard with the
+  // just-created brand selected.
   useEffect(() => {
     if (scene !== "activating" || !newBrandId) return;
     if (autopilot?.status === "completed") {
-      const t = setTimeout(() => setLocation(`/?brandId=${newBrandId}`), 1100);
+      const t = setTimeout(
+        () => navigate({ to: "/dashboard", search: { brandId: newBrandId } }),
+        1100,
+      );
       return () => clearTimeout(t);
     }
-  }, [autopilot?.status, scene, newBrandId, setLocation]);
+  }, [autopilot?.status, scene, newBrandId, navigate]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -796,7 +808,7 @@ export default function Welcome() {
           <ActivationPanel
             brandName={editName || scrapedData?.brandName || "your brand"}
             autopilot={autopilot}
-            onGoToDashboard={() => setLocation(`/?brandId=${newBrandId}`)}
+            onGoToDashboard={() => navigate({ to: "/dashboard", search: { brandId: newBrandId } })}
             onRetry={() => retryMutation.mutate()}
             retrying={retryMutation.isPending}
           />

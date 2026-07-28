@@ -16,19 +16,23 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
 // ---------------------------------------------------------------------------
-// Mock wouter so we control search params
+// Mock TanStack Router's navigation hooks so we control search params.
+//
+// Partial mock via importOriginal: the module also exports createFileRoute and
+// the route-tree machinery, and replacing the whole module would break any
+// import chain that touches it.
+//
+// useSearch now returns a parsed OBJECT (src/router.tsx pins the router to
+// string-in/string-out search params), where the old wouter shim returned a
+// raw query STRING.
 // ---------------------------------------------------------------------------
 
-let _location = "/geo-tools";
-let _search = "";
-const setLocationMock = vi.fn((next: string) => {
-  const [path, qs] = next.split("?");
-  _location = path;
-  _search = qs ?? "";
-});
+let _search: Record<string, string> = {};
+const navigateMock = vi.fn();
 
-vi.mock("wouter", () => ({
-  useLocation: () => [_location, setLocationMock],
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  useNavigate: () => navigateMock,
   useSearch: () => _search,
 }));
 
@@ -145,8 +149,7 @@ import { useMentions } from "@/hooks/useMentions";
 describe("useMentions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    _location = "/geo-tools";
-    _search = "";
+    _search = {};
 
     // Default: GET /api/brand-mentions/{brandId} returns page 1
     apiRequestMock.mockImplementation(async (method: string, url: string) => {
@@ -188,10 +191,20 @@ describe("useMentions", () => {
       result.current.setFilter("status", "new");
     });
 
-    // setLocation should have been called with the ?status=new param
-    expect(setLocationMock).toHaveBeenCalledWith(expect.stringContaining("status=new"), {
-      replace: true,
-    });
+    // Assert on the real navigate() call. setFilter passes `search` as an
+    // UPDATER function (so unrelated params like brandId survive), which is
+    // why this invokes the updater and checks what it actually produces —
+    // a shallow toHaveBeenCalledWith could not see through the closure.
+    expect(navigateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ replace: true, search: expect.any(Function) }),
+    );
+    const call = navigateMock.mock.calls.at(-1)?.[0] as {
+      search: (prev: Record<string, unknown>) => Record<string, unknown>;
+    };
+    expect(call.search({})).toEqual({ status: "new" });
+    // Unrelated params must be preserved, not clobbered — dropping brandId
+    // here would silently reset the user's brand selection.
+    expect(call.search({ brandId: "b1" })).toEqual({ brandId: "b1", status: "new" });
   });
 
   // -------------------------------------------------------------------------

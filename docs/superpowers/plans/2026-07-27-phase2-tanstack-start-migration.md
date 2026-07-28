@@ -68,6 +68,35 @@ Dual-host auto-detection **proven with real builds**: no preset + no env → `pr
 
 ---
 
+## 🔴 REVISED AFTER TASK 2 — the migration cannot be incremental
+
+Task 2 scaffolded Start successfully and left the existing app working, but proved that **Start and wouter cannot both serve routes from one dev server**. There is no configuration where both work:
+
+- With Vite's `root: client` (the current setup), Nitro's SSR-entry auto-detection does not find Start's entry, so **Start's SSR silently no-ops** — it serves the static `client/index.html` with HTTP 200 and the wrong content. Silent, not an error.
+- Adding `nitro({ rootDir: <repo root> })` makes Start's SSR genuinely work — confirmed with real SSR output — but Nitro's dev routing then **intercepts every request**, 404ing every wouter route Start does not yet know.
+
+Task 2 shipped **without** `rootDir`, protecting the existing app.
+
+**Consequence: the routing switch is atomic.** The original Tasks 4–7 assumed routes could migrate a few at a time with a green gate between each. They cannot. Those four tasks collapse into **one task that migrates every route and flips the entry point in a single change**, during which the gate is legitimately red.
+
+That is consistent with the big-bang branch strategy already chosen, but it changes how the work is verified: there is no green-gate checkpoint inside the switch, so the checkpoint is the **route table** — every path in `App.tsx` accounted for — and the gate only returns at the end.
+
+**Also found:** an isolated `vite build` writes client output to `client/.output/public`, not the configured `dist/public`. That breaks production `serveStatic()` and **none of the three gate commands catch it** — only a real build does. Fix it as part of the switch.
+
+### Pre-stable dependencies — know what this rests on
+
+|                                  |                                                                 |
+| -------------------------------- | --------------------------------------------------------------- |
+| `@tanstack/react-start@1.168.32` | **Stable.** `latest` dist-tag, no prerelease suffix.            |
+| `nitro@3.0.260610-beta`          | **Beta — and that IS `latest`.** Nitro 3 has no stable channel. |
+| `srvx`'s `toFetchHandler`        | **`@experimental`** per its own JSDoc.                          |
+
+Start itself is stable; its server and deployment layer is not. Both pre-stable pieces are exactly the ones carrying "keep Express whole" and "deploy to Render and Vercel from one config". They work today — the spike proved both, including raw-body webhooks. But if either breaks, the fallback is rewriting 24 Express route modules as Start server routes, which is the work this design exists to avoid.
+
+Not a reason to stop. A reason to pin exact versions and not upgrade them casually.
+
+---
+
 ## 🔴 The design decision this plan makes: splitting `/`
 
 `/` is currently auth-conditional — `HomePage()` renders `<Landing/>` when logged out and `<FirstRunGate component={Home}/>` when logged in, **at the same URL**. That cannot survive a per-route SSR flag: the landing must server-render, the dashboard must not.

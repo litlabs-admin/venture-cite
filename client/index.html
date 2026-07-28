@@ -6,162 +6,48 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
     <title>VentureCite — Get cited by AI search engines</title>
-
     <!--
-      AI / crawler-readable metadata. This app is a client-rendered SPA, so
-      non-JS crawlers (ClaudeBot, GPTBot, PerplexityBot, most LLM fetchers)
-      only ever see this <head>. Everything an answer engine needs to describe
-      VentureCite lives here as static markup. Copy is kept in sync with the
-      landing hero in client/src/pages/landing/sections/Hero/Hero.tsx.
-      NOTE: absolute URLs use the canonical marketing origin below — change
-      SITE_ORIGIN references if the public domain is not https://venturecite.com.
-    -->
-    <!-- data-static-fallback marks this as the pre-hydration crawler copy.
-         Non-JS crawlers read it; once React renders a page-specific
-         description, client/src/lib/dedupeStaticMeta.ts removes this one so
-         only a single description remains. The marker is explicit because
-         React 19 hoists page metadata natively WITHOUT any library attribute
-         to key off (react-helmet-async's data-rh no longer appears). -->
-    <meta
-      data-static-fallback="true"
-      name="description"
-      content="VentureCite shows you where AI overlooks, misreads or undersells your brand, then fixes the pages and sources shaping every AI answer. Take control of how AI search engines cite you."
-    />
-    <link rel="canonical" href="https://venturecite.com/" />
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+      Phase 2 Task 6a: this document is no longer what gets served to real
+      requests. TanStack Start's own SSR document — rendered from
+      src/routes/__root.tsx's RootDocument, for every route, including the
+      ssr:false ones (only THEIR content is skipped during SSR, not the
+      root shell) — replaces it entirely once Start owns routing. Confirmed
+      by reading @tanstack/react-start-server's renderRouterToStream /
+      StartServer pipeline: there is no step anywhere in it that reads or
+      merges this file.
 
-    <!-- Open Graph -->
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="VentureCite" />
-    <meta property="og:title" content="VentureCite — Get cited by AI search engines" />
-    <meta
-      property="og:description"
-      content="Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer."
-    />
-    <meta property="og:url" content="https://venturecite.com/" />
-    <meta property="og:image" content="https://venturecite.com/favicon.png" />
+      Two things that used to live here were REMOVED, not moved, because
+      they are now genuinely dead/duplicate rather than merely relocated:
+        - The static crawler-fallback <div id="root"><main>...</main></div>
+          body (a hand-kept mirror of the marketing landing copy for non-JS
+          crawlers). "/" is now real SSR (src/routes/index.tsx renders the
+          actual Landing component), which is strictly better, live content
+          — the static mirror was already flagged in Task 4's report as a
+          known duplication to resolve here.
+        - The data-static-fallback <meta name="description"> and the
+          runtime dedup it required (client/src/lib/dedupeStaticMeta.ts,
+          left in place per this task's instructions but no longer called
+          from anywhere as of this change — see the Task 6a report). React
+          19's native per-key <title>/<meta> hoisting already makes a
+          page-specific tag win over a root-level default with no runtime
+          JS needed, which is what src/routes/__root.tsx's RootDocument now
+          relies on for its own default title/description.
 
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="VentureCite — Get cited by AI search engines" />
-    <meta
-      name="twitter:description"
-      content="Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer."
-    />
-    <meta name="twitter:image" content="https://venturecite.com/favicon.png" />
-
-    <!-- Structured data: this is what AI answer engines ingest to describe the product. -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "VentureCite",
-        "applicationCategory": "BusinessApplication",
-        "url": "https://venturecite.com/",
-        "description": "VentureCite is a Generative Engine Optimization (GEO) platform that shows brands where AI search engines overlook, misread or undersell them, then fixes the pages and sources shaping every AI answer.",
-        "offers": { "@type": "Offer", "category": "SaaS" }
-      }
-    </script>
-    <!--
-      FOUC blocker: apply the right theme class to <html> BEFORE any CSS
-      loads or React mounts. Mirrors the logic in client/src/lib/theme.ts
-      (kept tiny and dependency-free so it can run synchronously in <head>).
-      Light is the fallback when no signal is available, matching the
-      light-first token system in client/src/index.css.
+      Everything else that used to live in this <head> (favicon, canonical,
+      robots, Open Graph, Twitter Card, the JSON-LD SoftwareApplication
+      schema, the theme FOUC-blocking script, and the Inter/JetBrains Mono
+      font preconnect + stylesheet links) MOVED verbatim into
+      src/routes/__root.tsx's RootDocument, so it is not duplicated here —
+      keeping two hand-kept copies in sync was exactly the kind of drift
+      risk this migration is meant to remove. What remains below (charset,
+      viewport, favicon, a default title) is kept only as a minimal,
+      honest fallback shell in case this file is ever actually served by
+      some path outside Start's routing (e.g. a static-asset edge case);
+      it makes no SEO/crawler-content claims it can't back up.
     -->
-    <script>
-      (function () {
-        try {
-          var stored = null;
-          try {
-            stored = window.localStorage.getItem("vc-theme-v1");
-          } catch (e) {
-            /* private mode — fall through to system */
-          }
-          var resolved;
-          if (stored === "light" || stored === "dark") {
-            resolved = stored;
-          } else {
-            // "system" or unset — read OS preference, fall back to light.
-            var mql =
-              typeof window.matchMedia === "function"
-                ? window.matchMedia("(prefers-color-scheme: dark)")
-                : null;
-            resolved = mql && mql.matches ? "dark" : "light";
-          }
-          var root = document.documentElement;
-          if (resolved === "dark") root.classList.add("dark");
-          root.style.colorScheme = resolved;
-        } catch (e) {
-          // Last-ditch fallback: light.
-          document.documentElement.classList.remove("dark");
-          document.documentElement.style.colorScheme = "light";
-        }
-      })();
-    </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!--
-      Only the two web fonts the design system actually uses: Inter (--font-sans)
-      and JetBrains Mono (--font-mono). --font-serif is Georgia (a system font).
-      The prior link loaded ~35 families, ~33 of them referenced nowhere in the
-      codebase — a large render-blocking request for fonts that never rendered.
-      If a per-brand font picker is added later, load the chosen family
-      dynamically rather than restoring the bulk list.
-    -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
-      rel="stylesheet"
-    />
   </head>
   <body>
-    <!--
-      Crawler / no-JS fallback. This app is a client-rendered SPA, so without
-      this block a non-JS crawler (ClaudeBot, GPTBot, PerplexityBot) sees an
-      empty page. React 18's createRoot().render() REPLACES #root's children on
-      mount, so this static mirror is served to crawlers and no-JS visitors and
-      is silently swapped for the live app the moment JS runs. Copy mirrors the
-      landing sections in client/src/pages/landing/sections/*.
-      ponytail: hand-kept mirror of the marketing copy — cheap and robust, but
-      it must be updated by hand if the landing copy changes. Upgrade path when
-      the page starts churning: real SSG (vite-react-ssg) to single-source it.
-    -->
-    <div id="root">
-      <main
-        style="
-          max-width: 640px;
-          margin: 0 auto;
-          padding: 64px 24px;
-          font-family: system-ui, sans-serif;
-          line-height: 1.5;
-        "
-      >
-        <h1>AI is shaping how buyers see your brand. Take control of the story.</h1>
-        <p>
-          Find where AI overlooks, misreads or undersells you, then fix the pages and sources
-          shaping every answer.
-        </p>
-        <p><a href="/register">Get started</a> &middot; <a href="/login">Sign in</a></p>
-
-        <h2>See exactly where you show up across every AI platform</h2>
-        <p>
-          Track every mention across ChatGPT, Claude, Perplexity, Gemini, Copilot, and Google AI
-          Overview — every major engine, not a sample.
-        </p>
-
-        <h2>Actions, not dashboards</h2>
-        <p>
-          An assistant that fixes it: turn signals into content AI engines want to cite, and see the
-          draft before you publish.
-        </p>
-
-        <h2>Get cited by AI search engines</h2>
-        <p>
-          VentureCite is a Generative Engine Optimization platform. Track every mention, optimize
-          every prompt. <a href="/register">Get cited by AI search engines</a>.
-        </p>
-      </main>
-    </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

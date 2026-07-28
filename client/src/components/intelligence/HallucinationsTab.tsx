@@ -24,7 +24,7 @@ import type { BrandHallucination, BrandFactSheet } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { safeExternalHref } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 
 const SEVERITY_RANK: Record<string, number> = {
   critical: 0,
@@ -282,7 +282,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                   <strong>Hallucination detection is inactive.</strong> Your fact sheet has{" "}
                   {activeFactCount} active {activeFactCount === 1 ? "entry" : "entries"}; we need at
                   least 3 to run the detector.{" "}
-                  <Link href="/brand-fact-sheet" className="underline">
+                  <Link to="/brand-fact-sheet" className="underline">
                     Add more facts →
                   </Link>
                 </div>
@@ -472,12 +472,12 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                 <p className="text-sm text-muted-foreground">
                   Add verified facts about your brand to enable hallucination detection
                 </p>
-                <Link href="/brand-fact-sheet">
-                  <Button className="mt-4" data-testid="button-add-fact">
+                <Button asChild className="mt-4" data-testid="button-add-fact">
+                  <Link to="/brand-fact-sheet">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Brand Fact
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             ) : (
               <div className="space-y-3">

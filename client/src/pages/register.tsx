@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, Check, X } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
 import { setSession } from "@/lib/authStore";
-import { Helmet } from "react-helmet-async";
 import { PASSWORD_RULES } from "@shared/passwordPolicy";
 
 // Sessionstorage key that hands the verify-email page the address the
@@ -25,7 +24,7 @@ import { PASSWORD_RULES } from "@shared/passwordPolicy";
 const PENDING_VERIFY_EMAIL_KEY = "venturecite:pending-verify-email";
 
 export default function Register() {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [firstName, setFirstName] = useState("");
@@ -76,7 +75,7 @@ export default function Register() {
           // verify-email page falls back to a generic message in that
           // case, which is still fine.
         }
-        setLocation("/verify-email");
+        navigate({ to: "/verify-email" });
         return;
       }
       // Legacy path — kept so an older server (or a future flag flip
@@ -86,7 +85,7 @@ export default function Register() {
         await setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
         queryClient.setQueryData(["/api/auth/me"], data.user);
         toast({ title: "Account created successfully!" });
-        setLocation("/");
+        navigate({ to: "/" });
       }
     },
     onError: (error: Error) => {
@@ -108,11 +107,9 @@ export default function Register() {
   };
 
   return (
+    // Title/robots moved to src/routes/_app/register.tsx's `head()` —
+    // metadata belongs to the route, not this component.
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Helmet>
-        <title>Create Account - VentureCite</title>
-        <meta name="robots" content="noindex" />
-      </Helmet>
       <Card className="w-full max-w-md relative">
         <a
           href="/"

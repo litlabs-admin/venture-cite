@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,11 +17,10 @@ import { Eye, EyeOff, Loader2, Check, X, CheckCircle } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
 import { supabase } from "@/lib/supabase";
 import { Sentry } from "@/lib/sentry";
-import { Helmet } from "react-helmet-async";
 import { PASSWORD_RULES } from "@shared/passwordPolicy";
 
 export default function ResetPassword() {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -102,7 +101,7 @@ export default function ResetPassword() {
           </CardHeader>
           <CardContent className="text-center">
             <Button
-              onClick={() => setLocation("/forgot-password")}
+              onClick={() => navigate({ to: "/forgot-password" })}
               className="bg-primary hover:bg-primary/90"
             >
               Request new reset link
@@ -132,7 +131,7 @@ export default function ResetPassword() {
             <Button
               onClick={async () => {
                 await supabase.auth.signOut();
-                setLocation("/login");
+                navigate({ to: "/login" });
               }}
               className="w-full bg-primary hover:bg-primary/90"
               data-testid="button-go-login"
@@ -146,11 +145,9 @@ export default function ResetPassword() {
   }
 
   return (
+    // Title/robots moved to src/routes/_app/reset-password.tsx's `head()`
+    // — metadata belongs to the route, not this component.
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Helmet>
-        <title>Set New Password - VentureCite</title>
-        <meta name="robots" content="noindex" />
-      </Helmet>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">

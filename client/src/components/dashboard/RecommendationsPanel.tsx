@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +9,9 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { StatusDot } from "@/components/foundations";
+// `ctaHref` comes straight off the /recommendations API response, so it is
+// never a compile-time route literal.
+import { toLinkTarget } from "@/lib/linkTarget";
 
 const DISMISS_KEY_PREFIX = "venturecite-recs-dismissed:";
 const DISMISS_DURATION_DAYS = 7;
@@ -188,20 +191,24 @@ export default function RecommendationsPanel() {
                 </div>
                 <p className="text-sm font-medium mt-1">{rec.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{rec.why}</p>
-                {rec.priority === "P0" ? (
-                  <Link href={rec.ctaHref} asChild>
-                    <Button size="sm" className="mt-2">
-                      {rec.ctaLabel} →
+                {(() => {
+                  const target = toLinkTarget(rec.ctaHref);
+                  return rec.priority === "P0" ? (
+                    <Button asChild size="sm" className="mt-2">
+                      <Link to={target.to} search={target.search}>
+                        {rec.ctaLabel} →
+                      </Link>
                     </Button>
-                  </Link>
-                ) : (
-                  <Link
-                    href={rec.ctaHref}
-                    className="inline-block mt-2 text-xs font-medium text-primary hover:underline"
-                  >
-                    {rec.ctaLabel} →
-                  </Link>
-                )}
+                  ) : (
+                    <Link
+                      to={target.to}
+                      search={target.search}
+                      className="inline-block mt-2 text-xs font-medium text-primary hover:underline"
+                    >
+                      {rec.ctaLabel} →
+                    </Link>
+                  );
+                })()}
               </div>
               {rec.dismissible && (
                 <button

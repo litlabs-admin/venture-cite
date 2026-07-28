@@ -2,9 +2,8 @@
 // scrape runs across all brands with one-click links into the
 // inspector. Gated to admin via server-side isAdmin middleware.
 
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Helmet } from "react-helmet-async";
 import { CheckCircle, ChevronRight, Loader2, XCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,9 +57,8 @@ export default function AdminScrapeRuns() {
 
   return (
     <div className="container mx-auto max-w-5xl py-8 space-y-6">
-      <Helmet>
-        <title>Recent scrapes — admin</title>
-      </Helmet>
+      {/* Title moved to src/routes/_app/admin.scrape.tsx's `head()` —
+          metadata belongs to the route, not this component. */}
 
       <div className="flex items-center justify-between">
         <div>
@@ -92,7 +90,7 @@ export default function AdminScrapeRuns() {
               {(data?.data ?? []).map((run) => {
                 const tone = statusToVariant(run.status);
                 return (
-                  <Link key={run.id} href={`/admin/scrape/${run.id}`}>
+                  <Link key={run.id} to="/admin/scrape/$runId" params={{ runId: run.id }}>
                     <div
                       className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:bg-(--bg-surface-2) focus-within:ring-2 focus-within:ring-ring transition-colors cursor-pointer"
                       data-testid={`run-row-${run.id}`}

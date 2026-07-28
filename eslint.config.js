@@ -18,14 +18,6 @@ export default tseslint.config(
       "*.tsbuildinfo",
       "drizzle/**",
       ".husky/**",
-      // esbuild output from `npm run build`:
-      //   esbuild server/vercelEntry.ts … --outfile=api/_bundle.js
-      // It is gitignored (.gitignore:12) but sits in a source directory, so
-      // if a build runs before lint, ESLint parses the minified bundle and
-      // emits ~275 bogus no-undef errors (process/Buffer/URL/setTimeout).
-      // Scoped to the artifact, NOT `api/**` — api/index.ts is the real
-      // Vercel entry point and must keep being linted.
-      "api/_bundle.js",
       // Local vendored tool/skill caches — not project source, never lint
       // (also gitignored). Their browser/UMD bundles otherwise flood the
       // report and break lint-staged if accidentally staged.

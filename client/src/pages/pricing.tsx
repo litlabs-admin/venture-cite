@@ -12,8 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Helmet } from "react-helmet-async";
-import { Link, useSearch } from "wouter";
+import { Link, useSearch } from "@tanstack/react-router";
 import { apiRequest } from "@/lib/queryClient";
 import { isAllowedStripeRedirect } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
@@ -35,10 +34,13 @@ interface StripeProduct {
 export default function Pricing() {
   const { toast } = useToast();
   const [betaCode, setBetaCode] = useState("");
-  const searchString = useSearch();
-  const searchParams = new URLSearchParams(searchString);
-  const success = searchParams.get("success") === "true";
-  const canceled = searchParams.get("canceled") === "true";
+  // Stripe redirects back with a plain `?success=true` / `?canceled=true`
+  // query string. TanStack's default search parser JSON-parses primitive
+  // values, so these arrive as the boolean `true`, not the string "true" —
+  // check for both so this survives either encoding.
+  const search = useSearch({ strict: false }) as Record<string, unknown>;
+  const success = search.success === true || search.success === "true";
+  const canceled = search.canceled === true || search.canceled === "true";
 
   const { data: productsData, isLoading } = useQuery<{ success: boolean; data: StripeProduct[] }>({
     queryKey: ["/api/stripe/products"],
@@ -148,180 +150,174 @@ export default function Pricing() {
   ];
 
   return (
-    <>
-      <Helmet>
-        <title>Pricing - GEO Platform</title>
-        <meta
-          name="description"
-          content="Choose the right plan for your GEO optimization needs. Free, Pro, and Enterprise options available."
-        />
-      </Helmet>
+    // Mounted by src/routes/pricing.tsx, a server-rendered top-level route
+    // (not under `_app`, which is ssr:false). Title/meta come from that
+    // route's `head()` — this component renders none of its own, per the
+    // project's "metadata belongs to the route" rule.
+    <div className="min-h-screen bg-muted/30">
+      <div className="container mx-auto px-4 py-12">
+        <div className="mb-8">
+          <Link
+            to="/"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+            data-testid="link-back"
+          >
+            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Home
+          </Link>
+        </div>
 
-      <div className="min-h-screen bg-muted/30">
-        <div className="container mx-auto px-4 py-12">
-          <div className="mb-8">
-            <Link
-              href="/"
-              className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
-              data-testid="link-back"
+        {success && (
+          <div className="mb-8 p-4 bg-positive-subtle border border-positive rounded-lg text-center">
+            <Check className="w-6 h-6 inline mr-2 text-positive" />
+            <span className="text-positive font-medium">
+              Payment successful! Your subscription is now active.
+            </span>
+          </div>
+        )}
+
+        {canceled && (
+          <div className="mb-8 p-4 bg-warning-subtle border border-warning rounded-lg text-center">
+            <span className="text-warning font-medium">
+              Checkout was canceled. No charges were made.
+            </span>
+          </div>
+        )}
+
+        <div className="text-center mb-12">
+          <Badge className="mb-4 bg-muted text-muted-foreground hover:bg-muted">
+            <Sparkles className="w-3 h-3 mr-1" /> Launch Pricing
+          </Badge>
+          <h1 className="text-4xl font-bold mb-4" data-testid="text-page-title">
+            Choose Your GEO Plan
+          </h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Optimize your brand's visibility in AI search engines with our comprehensive GEO
+            platform
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8 mb-12 max-w-5xl mx-auto">
+          {(products.length > 0
+            ? products.map((product, idx) => ({
+                name: product.name,
+                description: product.description || "",
+                price: product.prices[0]
+                  ? formatPrice(product.prices[0].unit_amount, product.prices[0].currency)
+                  : "$0",
+                interval: product.prices[0]?.recurring?.interval || "month",
+                features: (product.metadata?.features || "").split(",").filter(Boolean),
+                priceId: product.prices[0]?.id,
+                popular: product.metadata?.popular === "true",
+                tier: product.metadata?.tier || "pro",
+              }))
+            : defaultPlans
+          ).map((plan, idx) => (
+            <Card
+              key={plan.name}
+              className={`relative ${plan.popular ? "border-2 border-primary shadow-lg scale-105" : ""}`}
+              data-testid={`pricing-card-${plan.name.toLowerCase()}`}
             >
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back to Home
-            </Link>
-          </div>
-
-          {success && (
-            <div className="mb-8 p-4 bg-positive-subtle border border-positive rounded-lg text-center">
-              <Check className="w-6 h-6 inline mr-2 text-positive" />
-              <span className="text-positive font-medium">
-                Payment successful! Your subscription is now active.
-              </span>
-            </div>
-          )}
-
-          {canceled && (
-            <div className="mb-8 p-4 bg-warning-subtle border border-warning rounded-lg text-center">
-              <span className="text-warning font-medium">
-                Checkout was canceled. No charges were made.
-              </span>
-            </div>
-          )}
-
-          <div className="text-center mb-12">
-            <Badge className="mb-4 bg-muted text-muted-foreground hover:bg-muted">
-              <Sparkles className="w-3 h-3 mr-1" /> Launch Pricing
-            </Badge>
-            <h1 className="text-4xl font-bold mb-4" data-testid="text-page-title">
-              Choose Your GEO Plan
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Optimize your brand's visibility in AI search engines with our comprehensive GEO
-              platform
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 mb-12 max-w-5xl mx-auto">
-            {(products.length > 0
-              ? products.map((product, idx) => ({
-                  name: product.name,
-                  description: product.description || "",
-                  price: product.prices[0]
-                    ? formatPrice(product.prices[0].unit_amount, product.prices[0].currency)
-                    : "$0",
-                  interval: product.prices[0]?.recurring?.interval || "month",
-                  features: (product.metadata?.features || "").split(",").filter(Boolean),
-                  priceId: product.prices[0]?.id,
-                  popular: product.metadata?.popular === "true",
-                  tier: product.metadata?.tier || "pro",
-                }))
-              : defaultPlans
-            ).map((plan, idx) => (
-              <Card
-                key={plan.name}
-                className={`relative ${plan.popular ? "border-2 border-primary shadow-lg scale-105" : ""}`}
-                data-testid={`pricing-card-${plan.name.toLowerCase()}`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-primary">
-                      <Crown className="w-3 h-3 mr-1" /> Most Popular
-                    </Badge>
-                  </div>
-                )}
-                <CardHeader className="text-center pb-2">
-                  <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                    <span className="text-muted-foreground">/{plan.interval}</span>
-                  </div>
-                  <ul className="space-y-3 text-left">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <Check className="w-5 h-5 text-positive shrink-0 mt-0.5" />
-                        <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    className={`w-full ${plan.popular ? "bg-primary" : ""}`}
-                    variant={plan.popular ? "default" : "outline"}
-                    onClick={() => {
-                      if ((plan as any).priceId) {
-                        checkoutMutation.mutate((plan as any).priceId);
-                      } else if (plan.tier === "free") {
-                        window.location.href = "/";
-                      } else {
-                        toast({
-                          title: "Products not configured yet. Please set up Stripe products.",
-                        });
-                      }
-                    }}
-                    disabled={checkoutMutation.isPending}
-                    data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
-                  >
-                    {checkoutMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : null}
-                    {plan.tier === "free"
-                      ? "Get Started"
-                      : plan.tier === "enterprise"
-                        ? "Contact Sales"
-                        : "Start Free Trial"}
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-
-          <Card className="max-w-md mx-auto">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-2">
-                <Gift className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <CardTitle>Have a Beta Invite Code?</CardTitle>
-              <CardDescription>Enter your code to unlock beta access for free</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter invite code"
-                  value={betaCode}
-                  onChange={(e) => setBetaCode(e.target.value.toUpperCase())}
-                  className="flex-1"
-                  data-testid="input-beta-code"
-                />
+              {plan.popular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-primary">
+                    <Crown className="w-3 h-3 mr-1" /> Most Popular
+                  </Badge>
+                </div>
+              )}
+              <CardHeader className="text-center pb-2">
+                <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                <CardDescription>{plan.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <div className="mb-6">
+                  <span className="text-4xl font-bold">{plan.price}</span>
+                  <span className="text-muted-foreground">/{plan.interval}</span>
+                </div>
+                <ul className="space-y-3 text-left">
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="w-5 h-5 text-positive shrink-0 mt-0.5" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              <CardFooter>
                 <Button
-                  onClick={() => betaCodeMutation.mutate(betaCode)}
-                  disabled={!betaCode || betaCodeMutation.isPending}
-                  data-testid="button-redeem-code"
+                  className={`w-full ${plan.popular ? "bg-primary" : ""}`}
+                  variant={plan.popular ? "default" : "outline"}
+                  onClick={() => {
+                    if ("priceId" in plan && plan.priceId) {
+                      checkoutMutation.mutate(plan.priceId);
+                    } else if (plan.tier === "free") {
+                      window.location.href = "/";
+                    } else {
+                      toast({
+                        title: "Products not configured yet. Please set up Stripe products.",
+                      });
+                    }
+                  }}
+                  disabled={checkoutMutation.isPending}
+                  data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
                 >
-                  {betaCodeMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    "Redeem"
-                  )}
+                  {checkoutMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  {plan.tier === "free"
+                    ? "Get Started"
+                    : plan.tier === "enterprise"
+                      ? "Contact Sales"
+                      : "Start Free Trial"}
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
 
-          <div className="mt-16 text-center">
-            <h3 className="text-xl font-semibold mb-4">Trusted by Leading Brands</h3>
-            <p className="text-muted-foreground mb-8">
-              Join hundreds of companies optimizing their AI search visibility
-            </p>
-            <div className="flex justify-center gap-8 flex-wrap opacity-50">
-              <Users className="w-12 h-12" />
-              <Zap className="w-12 h-12" />
-              <Sparkles className="w-12 h-12" />
+        <Card className="max-w-md mx-auto">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-2">
+              <Gift className="w-6 h-6 text-muted-foreground" />
             </div>
+            <CardTitle>Have a Beta Invite Code?</CardTitle>
+            <CardDescription>Enter your code to unlock beta access for free</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter invite code"
+                value={betaCode}
+                onChange={(e) => setBetaCode(e.target.value.toUpperCase())}
+                className="flex-1"
+                data-testid="input-beta-code"
+              />
+              <Button
+                onClick={() => betaCodeMutation.mutate(betaCode)}
+                disabled={!betaCode || betaCodeMutation.isPending}
+                data-testid="button-redeem-code"
+              >
+                {betaCodeMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Redeem"
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="mt-16 text-center">
+          <h3 className="text-xl font-semibold mb-4">Trusted by Leading Brands</h3>
+          <p className="text-muted-foreground mb-8">
+            Join hundreds of companies optimizing their AI search visibility
+          </p>
+          <div className="flex justify-center gap-8 flex-wrap opacity-50">
+            <Users className="w-12 h-12" />
+            <Zap className="w-12 h-12" />
+            <Sparkles className="w-12 h-12" />
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -27,7 +27,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { safeExternalHref } from "@/lib/urlSafety";
-import { Helmet } from "react-helmet-async";
 import type { CommunityPost } from "@shared/schema";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { ErrorState } from "@/components/ui/error-state";
@@ -301,11 +300,10 @@ export default function CommunityEngagement() {
   const postedPosts = posts.filter((p) => p.status === "posted");
 
   return (
+    // Only ever rendered client-side, as a lazy tab inside
+    // client/src/pages/act.tsx (no route of its own) — title/meta removed
+    // per this task's blanket rule; /act falls back to root defaults.
     <div className="space-y-8">
-      <Helmet>
-        <title>Community Engagement - VentureCite</title>
-      </Helmet>
-
       <div className="flex flex-wrap items-center gap-4 mb-6">
         <Button
           onClick={handleDiscover}

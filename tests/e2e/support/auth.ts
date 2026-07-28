@@ -32,17 +32,25 @@ if (!TEST_EMAIL || !TEST_PASSWORD) {
 }
 
 // Destinations the app can land an authenticated user on straight out of
-// login.tsx:62 (setLocation("/")). "/" renders through FirstRunGate
-// (client/src/App.tsx), which redirects brand-less accounts to "/welcome"
-// instead of rendering <Home>. Both are valid "logged in" outcomes.
-const AUTHENTICATED_PATHS = new Set(["/", "/welcome"]);
+// login.tsx, which still navigates to "/".
+//
+// "/" is now the PUBLIC, server-rendered landing page (src/routes/index.tsx).
+// A per-route SSR flag cannot straddle "landing for logged-out visitors,
+// dashboard for logged-in ones" at one URL, so the TanStack Start migration
+// split them: "/" always renders Landing, and authenticated visitors are
+// redirected to "/dashboard" client-side after hydration. "/dashboard" then
+// renders through FirstRunGate, which bounces brand-less accounts to
+// "/welcome" instead of rendering <Home>.
+//
+// So a login settles on "/dashboard" or "/welcome". "/" is deliberately NOT
+// in this set even though the browser passes through it: it is a transient
+// hop, and accepting it as terminal would let waitForURL resolve before the
+// redirect fires, leaving expectAuthenticated() to assert against the
+// marketing page and fail intermittently.
+const AUTHENTICATED_PATHS = new Set(["/dashboard", "/welcome"]);
 
 /**
  * Logs in and waits until the authenticated app has rendered.
- * NOTE: login.tsx:62 redirects to "/" — NOT "/dashboard". Asserting on
- * /dashboard is the bug that made the original tours.spec.ts unrunnable.
- * A brand-less test account gets bounced from "/" to "/welcome" by
- * FirstRunGate; both are treated as a successful login here.
  */
 export async function login(page: Page): Promise<void> {
   await page.goto("/login");
@@ -56,21 +64,19 @@ export async function login(page: Page): Promise<void> {
 /**
  * Asserts the authenticated app rendered rather than the marketing page.
  *
- * "/" renders through App.tsx's HomePage(), which picks between the
- * authenticated dashboard (AppShell-wrapped) and the logged-out marketing
- * landing page (client/src/pages/landing/index.tsx) based on useAuth()'s
- * isAuthenticated — both live at the SAME url. The landing page also
- * renders a bare <main>, so SEL.appMain ("main") cannot tell them apart: if
- * auth silently broke and the app fell back to the landing page, a plain
- * "main is visible" check would still pass. We therefore assert on
+ * The dashboard and the marketing landing page no longer share a URL — the
+ * TanStack Start migration split them ("/" is public and server-rendered,
+ * "/dashboard" is the authenticated app). But the landing page still renders
+ * a bare <main>, so SEL.appMain ("main") cannot tell the two apart: if auth
+ * silently broke and a redirect dropped the user back on the landing page, a
+ * plain "main is visible" check would still pass. We therefore assert on
  * SEL.authenticatedMain ("main#main-content"), which only AppShell renders
  * (client/src/components/AppShell.tsx:180) — see selectors.ts for the
  * uniqueness evidence.
  *
- * "/welcome" is rendered by AuthenticatedBareRoute (client/src/App.tsx),
- * which does NOT wrap with AppShell — client/src/pages/welcome.tsx has no
- * <main> element at all — so on that path we assert on the welcome screen's
- * own onboarding input instead.
+ * "/welcome" is rendered without AppShell (src/routes/_app/welcome.tsx) —
+ * client/src/pages/welcome.tsx has no <main> element at all — so on that
+ * path we assert on the welcome screen's own onboarding input instead.
  */
 export async function expectAuthenticated(page: Page): Promise<void> {
   await expect(page).not.toHaveURL(/\/login/);

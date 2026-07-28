@@ -5,7 +5,7 @@
 // activeTourRef to prevent StrictMode double-fires.
 
 import { useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../hooks/use-auth";
 import { useBrandSelection } from "../../hooks/use-brand-selection";
@@ -97,7 +97,7 @@ export function TourOrchestrator() {
   const brandId = selectedBrandId || null;
   const { state } = useTourState();
   const { mutate: patchState } = useTourStatePatch();
-  const [location] = useLocation();
+  const location = useRouterState({ select: (s) => s.location.pathname });
   const counts = useCounts(brandId);
 
   const activeRef = useRef<RunningTour | null>(null);

@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle, Loader2, Mail } from "lucide-react";
-import { Helmet } from "react-helmet-async";
 
 // Post-register "check your email" screen. Register.tsx drops the
 // pending email in sessionStorage and routes here; the resend button
@@ -85,11 +84,9 @@ export default function VerifyEmail() {
   const canResend = isValidEmail && cooldown === 0 && !resendMutation.isPending;
 
   return (
+    // Title/robots moved to src/routes/_app/verify-email.tsx's `head()` —
+    // metadata belongs to the route, not this component.
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Helmet>
-        <title>Verify your email - VentureCite</title>
-        <meta name="robots" content="noindex" />
-      </Helmet>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">

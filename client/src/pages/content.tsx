@@ -23,7 +23,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation, useRoute, useSearch } from "wouter";
+import { Link, useNavigate, useParams, useRouterState, useSearch } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -113,48 +113,57 @@ function friendlyErrorMessage(errorKind: string | null, fallback: string | null)
 export default function Content() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [loc, setLocation] = useLocation();
-  const [, params] = useRoute("/content/:articleId");
-  const articleIdFromRoute = params?.articleId ?? null;
+  const navigate = useNavigate();
+  const loc = useRouterState({ select: (s) => s.location.pathname });
+  // Content is mounted at both /_app/content (no articleId) and
+  // /_app/content/$articleId (see content.tsx / content.$articleId.tsx route
+  // files) — strict:false reads whichever of those actually matched, exactly
+  // like the old wouter useRoute() match-against-current-pathname did.
+  const routeParams = useParams({ strict: false });
+  const articleIdFromRoute = routeParams.articleId ?? null;
 
   // Seed params from /content?keyword=...&industry=...&type=...&brandId=...
   // Sent by the Keyword Research page when the user clicks "Generate Content"
   // on a row. When present AND we're at bare /content (no article id yet),
   // we create a fresh draft pre-populated with these values instead of
   // recycling the most recent draft. See keyword-research.tsx → handleGenerateContent.
-  const searchString = useSearch();
+  //
+  // Content is mounted at three routes (/content, /content/:articleId, and
+  // embedded as the Act › Create tab at /act), so — like routeParams above —
+  // this reads search with { strict: false } rather than a single route's
+  // typed Route.useSearch(). /_app/content.tsx, /_app/content.$articleId.tsx,
+  // and /_app/act.tsx all declare validateSearch (searchSchemas.ts), so every
+  // field read below is a real typed string, not a manual URLSearchParams
+  // parse of the raw query string.
+  const search = useSearch({ strict: false });
   const seedParams = useMemo(() => {
-    const p = new URLSearchParams(searchString);
-    const keyword = p.get("keyword");
-    const industry = p.get("industry");
-    const type = p.get("type");
-    const brandId = p.get("brandId");
+    const { keyword, industry, type, brandId } = search;
     const hasAny = !!(keyword || industry || type || brandId);
-    return hasAny
-      ? {
-          keyword: keyword ?? undefined,
-          industry: industry ?? undefined,
-          type: type ?? undefined,
-          brandId: brandId ?? undefined,
-        }
-      : null;
-  }, [searchString]);
+    return hasAny ? { keyword, industry, type, brandId } : null;
+  }, [search.keyword, search.industry, search.type, search.brandId]);
 
   // Shell-awareness. Content is BOTH a standalone route (/content,
   // /content/:articleId) AND the Act › Create tab (/act?tab=create). When
   // embedded under /act, path-based article selection would navigate the app
   // out of the spine, so the active article rides on ?article= instead of the
-  // path. Standalone behavior is unchanged. wouter's useLocation() returns the
-  // pathname only (no query), so a prefix check is sufficient.
+  // path. Standalone behavior is unchanged.
   const embedded = loc.startsWith("/act");
-  const articleIdFromQuery = new URLSearchParams(searchString).get("article");
+  const articleIdFromQuery = search.article ?? null;
   const articleId = embedded ? articleIdFromQuery : articleIdFromRoute;
-  const goToArticle = (id: string, opts?: { replace?: boolean }) =>
-    embedded
-      ? setLocation(`/act?tab=create&article=${id}`, opts)
-      : setLocation(`/content/${id}`, opts);
-  const goToCreateRoot = (opts?: { replace?: boolean }) =>
-    embedded ? setLocation(`/act?tab=create`, opts) : setLocation(`/content`, opts);
+  const goToArticle = (id: string, opts?: { replace?: boolean }) => {
+    if (embedded) {
+      navigate({ to: "/act", search: { tab: "create", article: id }, replace: opts?.replace });
+    } else {
+      navigate({ to: "/content/$articleId", params: { articleId: id }, replace: opts?.replace });
+    }
+  };
+  const goToCreateRoot = (opts?: { replace?: boolean }) => {
+    if (embedded) {
+      navigate({ to: "/act", search: { tab: "create" }, replace: opts?.replace });
+    } else {
+      navigate({ to: "/content", replace: opts?.replace });
+    }
+  };
 
   // ── Brands / usage / drafts list ──────────────────────────────────────────
 
@@ -613,7 +622,7 @@ export default function Content() {
             description="Articles are tied to a brand so AI-citation tracking can attribute the result correctly."
             action={{
               label: "Add a brand",
-              onClick: () => setLocation("/brands"),
+              onClick: () => navigate({ to: "/brands" }),
               href: "/brands",
             }}
           />
@@ -793,7 +802,7 @@ function ReadyEditor({
             <span className="truncate">{article.title || "Untitled"}</span>
             {article.aiGenerated && <AIGeneratedPill />}
           </span>
-          <Link href={`/articles?edit=${article.id}`}>
+          <Link to="/articles" search={{ edit: article.id }}>
             <Button variant="outline" size="sm">
               Open in Articles
             </Button>

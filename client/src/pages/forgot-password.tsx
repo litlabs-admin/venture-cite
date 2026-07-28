@@ -15,7 +15,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
-import { Helmet } from "react-helmet-async";
 
 export default function ForgotPassword() {
   const { toast } = useToast();
@@ -103,11 +102,9 @@ export default function ForgotPassword() {
   }
 
   return (
+    // Title/robots moved to src/routes/_app/forgot-password.tsx's `head()`
+    // — metadata belongs to the route, not this component.
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Helmet>
-        <title>Reset Password - VentureCite</title>
-        <meta name="robots" content="noindex" />
-      </Helmet>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">

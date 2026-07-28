@@ -1,13 +1,20 @@
-// Local dev entry point (`npm run dev` / `npm start`).
+// Local dev entry point (`npm run dev` ONLY).
 //
-// Vercel uses server/vercelEntry.ts instead — this file never runs on
-// Vercel. Boot side-effects (migrations, scheduler, autopilot resume)
-// only run here; on Vercel the daily cron orchestrator handles the
-// equivalents.
+// Phase 2 Task 7: this file is no longer the production entry point on any
+// host. Production (`npm start`) now runs Nitro's own generated server
+// (dist/server/index.mjs) directly on BOTH hosts — Vercel via Nitro's vercel
+// preset, which supersedes the hand-written server/vercelEntry.ts + api/
+// entry that used to serve it (both deleted in this task).
+// Boot side-effects (migrations, scheduler, autopilot resume,
+// Stripe setup) run here in dev, AND separately in production via the
+// Nitro startup plugin at server/nitroBoot.ts (registered in
+// vite.config.ts's nitro({ plugins: [...] })) — the plugin no-ops unless
+// NODE_ENV=production, so the two never double-run. On Vercel the daily
+// cron orchestrator handles the equivalents, same as always.
 
 import { app, prepareApp } from "./app";
 import { Sentry } from "./instrument";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, log } from "./vite";
 import { setupStripeProducts } from "./setupProducts";
 import { pool } from "./db";
 import { initScheduler } from "./scheduler";
@@ -47,7 +54,15 @@ import { logger } from "./lib/logger";
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    // server/index.ts is the LOCAL DEV entry point only (see top-of-file
+    // comment) — production runs Nitro's generated server instead. Throw
+    // loudly rather than silently serving nothing (serveStatic()/dist/public
+    // were removed in Phase 2 Task 7) if this file is ever run with
+    // NODE_ENV=production by mistake.
+    throw new Error(
+      "server/index.ts must not run with NODE_ENV=production. " +
+        "Production runs `node dist/server/index.mjs` (npm start) instead.",
+    );
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);

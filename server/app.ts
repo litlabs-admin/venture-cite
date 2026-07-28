@@ -1,12 +1,20 @@
 // Shared Express app builder + lifecycle helpers.
 //
 // The same configured app instance is reused by:
-//   - server/index.ts        (local dev: app.listen)
-//   - server/vercelEntry.ts  (Vercel function default export)
+//   - server/index.ts             (local dev: app.listen)
+//   - src/server/expressBridge.ts (Nitro/TanStack Start server routes,
+//                                   used by both the built Nitro production
+//                                   server and by `npm run dev`'s own Vite
+//                                   middleware for page/SSR requests)
 //
-// Boot side-effects (migrations, scheduler, autopilot resume) only run
-// on local dev and are kicked from server/index.ts. On Vercel the daily
-// cron orchestrator (/api/cron/daily-orchestrator) handles them.
+// Boot side-effects (migrations, scheduler, autopilot resume, Stripe
+// setup) are kicked from server/index.ts on local dev, and from the Nitro
+// startup plugin (server/nitroBoot.ts, registered in vite.config.ts) in
+// built production — see that file for why it's safe for both to exist
+// without double-running. On Vercel the daily cron orchestrator
+// (/api/cron/daily-orchestrator) handles the equivalents instead, because
+// Vercel is serverless and neither of the above two "runs once on a
+// long-lived process" mechanisms applies there.
 
 import "dotenv/config";
 import "./env";
@@ -315,6 +323,37 @@ export function prepareApp(): Promise<Server> {
   if (prepared) return prepared;
   prepared = (async () => {
     const server = await registerRoutes(app);
+
+    // ─── Terminal 404 for /api/* and /webhooks/* (Phase 2 Task 7) ───
+    //
+    // srvx's toFetchHandler (src/server/expressBridge.ts — the bridge the
+    // Nitro/TanStack Start server routes at src/routes/api/$.ts and
+    // src/routes/webhooks/$.ts use to reach this Express app) turns
+    // Express's own unmatched-route fallthrough into an EMPTY-BODY 200
+    // instead of a real 404. That's invisible for /api/* only because
+    // requireAuthForApi (inside registerRoutes, above) already intercepts
+    // every /api/* request and returns a real 401 body before an unmatched
+    // path could ever reach here. It is NOT masked for /webhooks/*, which
+    // has no equivalent global guard: a misconfigured Stripe/Resend webhook
+    // URL hitting an unmatched path would get back a 200 and the provider
+    // would mark the event delivered while it was silently dropped.
+    //
+    // Registering explicit, real Express handlers here — rather than
+    // relying on Express's own implicit default 404 — guarantees a genuine
+    // non-2xx status and JSON body reach the client through EITHER entry
+    // point (server/index.ts's direct app.listen, or the Nitro/srvx
+    // bridge), the same way every other real JSON-returning route here
+    // already does (proven working through the bridge in Task 3).
+    //
+    // Registered last, after every real route above, so real routes always
+    // win; before the global error handler below, which only fires on
+    // next(err), not on a normal unmatched request.
+    app.all("/api/*splat", (_req, res) => {
+      res.status(404).json({ success: false, error: "Not Found" });
+    });
+    app.all("/webhooks/*splat", (_req, res) => {
+      res.status(404).json({ success: false, error: "Not Found" });
+    });
 
     // Global error handler — appended last so all earlier routes can
     // throw and have it normalize the response shape.

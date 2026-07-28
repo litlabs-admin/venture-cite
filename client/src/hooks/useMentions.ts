@@ -6,8 +6,8 @@
 // markFalsePositive, manualAdd).
 //
 // All server interactions go through TanStack Query so cache invalidation is
-// automatic. Filter state is URL-persisted via wouter's useSearch / useLocation
-// so filters survive refresh and are shareable.
+// automatic. Filter state is URL-persisted via TanStack Router's useSearch /
+// useNavigate so filters survive refresh and are shareable.
 
 import React, { useCallback, useMemo } from "react";
 import {
@@ -17,7 +17,7 @@ import {
   useQueryClient,
   InfiniteData,
 } from "@tanstack/react-query";
-import { useLocation, useSearch } from "wouter";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { apiRequest, isApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction, type ToastActionElement } from "@/components/ui/toast";
@@ -101,52 +101,72 @@ async function restoreMention(row: BrandMention, brandId: string): Promise<void>
 export function useMentions(brandId: string | null) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [location, setLocation] = useLocation();
-  const searchString = useSearch();
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false });
 
   // -------------------------------------------------------------------------
   // Filter state — URL is the single source of truth
+  //
+  // This hook is mounted from multiple routes, so search is read/written
+  // loosely ({ strict: false } / to: ".") rather than against one route's
+  // typed search — see native-api-contract.md rule 3. None of the mention
+  // filter keys (status/platform/sentiment/from/to/q/sort/newSinceLastScan)
+  // are declared in src/routes/-shared/searchSchemas.ts — they're not owned
+  // by any single route — so they fall through each schema's `.passthrough()`
+  // catchall, which types unknown keys as `unknown`; no cast is needed to
+  // index `search` with a dynamic key. Every value is still coerced
+  // explicitly rather than trusted as-is: `src/router.tsx` pins the whole
+  // app's parser to plain string-in/string-out, so `newSinceLastScan`
+  // arrives as the literal string "true"/"false" (never a real boolean) and
+  // must be normalized to the boolean shape MentionFilters expects.
   // -------------------------------------------------------------------------
 
   const filters = useMemo<MentionFilters>(() => {
-    const params = new URLSearchParams(searchString);
     const f: MentionFilters = {};
     for (const key of FILTER_KEYS) {
-      const raw = params.get(key);
-      if (raw === null || raw === "") continue;
+      const raw = search[key];
+      if (raw === undefined || raw === null || raw === "") continue;
       if (key === "newSinceLastScan") {
-        f[key] = raw === "true";
+        f[key] = raw === true || raw === "true";
       } else {
-        (f as Record<string, string>)[key] = raw;
+        (f as Record<string, string>)[key] = String(raw);
       }
     }
     return f;
-  }, [searchString]);
+  }, [search]);
 
   const setFilter = useCallback(
     (key: string, value: string | undefined | boolean) => {
-      const params = new URLSearchParams(searchString);
-      if (value === undefined || value === "" || value === false) {
-        params.delete(key);
-      } else {
-        params.set(key, String(value));
-      }
-      const qs = params.toString();
-      const path = location.split("?")[0];
-      setLocation(qs ? `${path}?${qs}` : path, { replace: true });
+      navigate({
+        to: ".",
+        search: (prev: Record<string, unknown>) => {
+          const next = { ...prev };
+          if (value === undefined || value === "" || value === false) {
+            delete next[key];
+          } else {
+            next[key] = value;
+          }
+          return next;
+        },
+        replace: true,
+      });
     },
-    [location, searchString, setLocation],
+    [navigate],
   );
 
   const clearFilters = useCallback(() => {
-    const params = new URLSearchParams(searchString);
-    for (const key of FILTER_KEYS) {
-      params.delete(key);
-    }
-    const qs = params.toString();
-    const path = location.split("?")[0];
-    setLocation(qs ? `${path}?${qs}` : path, { replace: true });
-  }, [location, searchString, setLocation]);
+    navigate({
+      to: ".",
+      search: (prev: Record<string, unknown>) => {
+        const next = { ...prev };
+        for (const key of FILTER_KEYS) {
+          delete next[key];
+        }
+        return next;
+      },
+      replace: true,
+    });
+  }, [navigate]);
 
   // -------------------------------------------------------------------------
   // List query — infinite scroll

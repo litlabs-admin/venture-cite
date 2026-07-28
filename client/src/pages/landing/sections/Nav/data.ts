@@ -117,13 +117,17 @@ export const resourcesFooterLinks = [
   { name: "Get started", href: "/register" },
 ];
 
-// Plain nav link (no mega-menu). The Pricing link that used to sit beside
-// this one is gone — the page's Pricing section was removed.
+// Plain nav link (no mega-menu). Pricing is a real server-rendered route
+// again (src/routes/pricing.tsx) — it's rendered directly in Nav.tsx as its
+// own TanStack `<Link>` next to this one, not added here, since demoLink is
+// an in-page "#" anchor and Pricing should navigate client-side to a
+// different route.
 export const demoLink = { name: "How it works", href: "#platform-section" };
 
 // Mobile menu top link list ($e in TrakkrNav-JAUeEuWq.js). Index 0 ("Features")
-// is always rendered with the accent/active treatment, per the source. The
-// Pricing entry that used to sit here is gone along with the Pricing section.
+// is always rendered with the accent/active treatment, per the source.
+// Pricing is restored directly in MobileMenu.tsx as its own TanStack `<Link>`
+// after this list, not as an entry here — see this array's rendering site.
 export const mobileTopLinks = [
   { label: "Platform", href: "#platform-section" },
   { label: "Glossary", href: "/glossary" },

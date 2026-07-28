@@ -31,10 +31,17 @@
 // prior crashed run already broke an unrelated spec once by leaving a stray
 // fixture brand behind. Do not add a scenario that lets a real submit through.
 import { test, expect } from "@playwright/test";
+import { dismissTourIfPresent } from "./support/tour";
 
 test.describe("Brand form client-side validation", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/brands");
+    // The product tour auto-fires per browser session and its Shepherd
+    // overlay swallows pointer events, so the click below times out with a
+    // message that looks like a selector problem but is not. Whether it
+    // fires here depends on shared account state and test order — this spec
+    // passes in isolation and fails in a full run without this.
+    await dismissTourIfPresent(page);
     // Opens the manual-entry dialog and calls form.reset() (brands.tsx:462-467),
     // so every test starts from the same all-empty, all-default form state.
     await page.getByTestId("link-manual-entry").click();

@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import logoPath from "@assets/logo.png";
 import { ProductMegaMenu } from "./ProductMegaMenu";
 import { ResourcesMegaMenu } from "./ResourcesMegaMenu";
@@ -11,11 +12,11 @@ export function Nav() {
         className="w-full mx-auto flex items-center justify-between relative"
         style={{ maxWidth: containerMaxWidth }}
       >
-        <a href="/" className="shrink-0" aria-label="VentureCite home">
+        <Link to="/" className="shrink-0" aria-label="VentureCite home">
           {/* Wordmark is 779x258 (~3:1), not the square mark this replaced —
               height-constrained with w-auto so it can't squash. */}
           <img src={logoPath} alt="VentureCite" className="h-[26px] w-auto" />
-        </a>
+        </Link>
 
         <div className="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
           <ProductMegaMenu />
@@ -26,22 +27,31 @@ export function Nav() {
           >
             {demoLink.name}
           </a>
+          {/* Real (server-rendered) route, unlike the # anchors above — a
+              TanStack `<Link>` so it navigates client-side instead of a
+              full reload. */}
+          <Link
+            to="/pricing"
+            className="h-9 px-4 text-[13px] font-medium text-vc-secondary hover:text-vc-primary hover:bg-vc-muted transition-all duration-250 rounded inline-flex items-center"
+          >
+            Pricing
+          </Link>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <div className="hidden lg:flex items-center gap-2">
-            <a
-              href="/login"
+            <Link
+              to="/login"
               className="h-9 px-4 text-[13px] font-medium text-vc-secondary hover:text-vc-primary transition-colors duration-150 rounded inline-flex items-center"
             >
               Sign in
-            </a>
-            <a
-              href="/register"
+            </Link>
+            <Link
+              to="/register"
               className="h-9 px-4 bg-vc-accent-subtle text-vc-accent text-[13px] font-medium rounded hover:bg-vc-accent hover:text-white transition-all duration-150 inline-flex items-center"
             >
               Get started
-            </a>
+            </Link>
           </div>
           <MobileMenu />
         </div>

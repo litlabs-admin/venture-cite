@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Home,
   Activity,
@@ -42,6 +42,11 @@ import { ThemeMenuItems, QuickThemeToggle } from "@/components/ThemeMenuItems";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+/** The fixed set of top-level spine destinations this nav renders — kept as
+ *  a literal union (not `string`) so every `<Link to={href}>` below stays
+ *  type-checked against the generated route tree. */
+type SpineHref = "/" | "/setup" | "/monitor" | "/diagnose" | "/act" | "/report";
+
 function NavItem({
   href,
   label,
@@ -49,14 +54,14 @@ function NavItem({
   active,
   onNavigate,
 }: {
-  href: string;
+  href: SpineHref;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   active: boolean;
   onNavigate?: () => void;
 }) {
   return (
-    <Link href={href} onClick={onNavigate}>
+    <Link to={href} onClick={onNavigate}>
       <div
         className={[
           "relative flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer",
@@ -77,7 +82,8 @@ function NavItem({
 // ─── Shared content (used in both desktop aside and mobile Sheet) ────────────
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const [location, navigate] = useLocation();
+  const location = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
 
   const getInitials = () => {
@@ -99,7 +105,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col bg-sidebar">
       {/* Logo */}
       <div className="flex items-center px-5 h-14 border-b border-sidebar-border shrink-0">
-        <Link href="/" onClick={onNavigate}>
+        <Link to="/" onClick={onNavigate}>
           <img src={logoPath} alt="VentureCite" className="h-9 w-auto cursor-pointer" />
         </Link>
       </div>
@@ -194,7 +200,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => {
-                  navigate("/settings");
+                  navigate({ to: "/settings" });
                   onNavigate?.();
                 }}
                 className="cursor-pointer"

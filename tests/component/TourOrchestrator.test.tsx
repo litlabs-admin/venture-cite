@@ -41,9 +41,11 @@ vi.mock("../../client/src/hooks/use-brand-selection", () => ({
   useBrandSelection: () => ({ selectedBrandId: "b1", selectedBrand: { name: "Brand A" } }),
 }));
 
-vi.mock("wouter", () => ({
-  useLocation: () => ["/dashboard"],
-  useSearch: () => "",
+// Partial mock — the module also exports createFileRoute and the route-tree
+// machinery, so the whole module must not be replaced.
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  useRouterState: () => "/dashboard",
 }));
 
 let mockedState = emptyTourState;

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ToastAction } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,9 +130,13 @@ function Section({
   );
 }
 
-function SeeAllLink({ href, label = "See all" }: { href: string; label?: string }) {
+// The four call sites all point at /monitor with a different `?tab=` value
+// (citations / competitors / share-of-answer) — decomposed into a route
+// literal + a search object per the native-router migration contract rather
+// than passing a pre-built "/monitor?tab=..." string as `to`.
+function SeeAllLink({ tab, label = "See all" }: { tab: string; label?: string }) {
   return (
-    <Link href={href}>
+    <Link to="/monitor" search={{ tab }}>
       <Button
         variant="ghost"
         size="sm"
@@ -249,7 +253,7 @@ export default function MonitorOverview() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const completedToastFired = useRef(false);
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: autopilotData } = useQuery<{ success: boolean; data: AutopilotStatusData }>({
@@ -319,13 +323,13 @@ export default function MonitorOverview() {
         title: "Report ready",
         description: "Your AI visibility report is live.",
         action: (
-          <ToastAction altText="View report" onClick={() => setLocation("/report")}>
+          <ToastAction altText="View report" onClick={() => navigate({ to: "/report" })}>
             View report
           </ToastAction>
         ),
       });
     }
-  }, [autopilot?.status, toast, setLocation]);
+  }, [autopilot?.status, toast, navigate]);
 
   // Wave 9: live-refresh during citation runs. The hook returns the
   // refetch cadence we thread directly into each useQuery via
@@ -770,7 +774,7 @@ export default function MonitorOverview() {
           <Section
             title="Citation Trend"
             description="Weekly citation rate over the last 8 weeks"
-            action={<SeeAllLink href="/monitor?tab=citations" />}
+            action={<SeeAllLink tab="citations" />}
           >
             {trend.isError ? (
               <ErrorState
@@ -906,7 +910,7 @@ export default function MonitorOverview() {
                 <Badge variant="secondary" className="text-xs">
                   {leaderboardRows.filter((e) => !e.isOwn).length} detected
                 </Badge>
-                <SeeAllLink href="/monitor?tab=competitors" />
+                <SeeAllLink tab="competitors" />
               </div>
             }
           >
@@ -973,7 +977,7 @@ export default function MonitorOverview() {
           <Section
             title="Share of AI Voice"
             description="% of AI answers in your category that mention each brand"
-            action={<SeeAllLink href="/monitor?tab=share-of-answer" />}
+            action={<SeeAllLink tab="share-of-answer" />}
           >
             {leaderboard.isError ? (
               <ErrorState
@@ -1056,7 +1060,7 @@ export default function MonitorOverview() {
           <Section
             title="Competitor Gap Analysis"
             description="Exact query types where each competitor beats you — your attack surface"
-            action={<SeeAllLink href="/monitor?tab=competitors" />}
+            action={<SeeAllLink tab="competitors" />}
           >
             {gap.isError ? (
               <ErrorState

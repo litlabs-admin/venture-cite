@@ -23,7 +23,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import { useToast } from "@/hooks/use-toast";
 import {
   CheckCircle2,
@@ -49,6 +49,24 @@ import { BsOpenai } from "react-icons/bs";
 import { SiGoogle } from "react-icons/si";
 import type { Brand } from "@shared/schema";
 
+// Every in-app destination a quickAction links to today. Kept as an explicit
+// literal union (rather than widening to `string`) so `<Link to>` below stays
+// type-checked against the real route tree.
+type InternalQuickActionPath =
+  | "/crawler-check"
+  | "/content"
+  | "/brand-fact-sheet"
+  | "/geo-tools"
+  | "/keyword-research"
+  | "/geo-signals"
+  | "/faq-manager"
+  | "/citations";
+
+// quickAction targets are either an in-app route (rendered with TanStack's
+// typed <Link>) or an external/mailto URL (rendered as a plain <a> — see the
+// Phase 2 migration contract: router Links must never carry external URLs).
+type QuickAction = { label: string; to: InternalQuickActionPath } | { label: string; href: string };
+
 interface EngineStep {
   id: string;
   title: string;
@@ -56,10 +74,7 @@ interface EngineStep {
   howTo: string;
   priority: "high" | "medium" | "low";
   estimatedImpact: string;
-  quickAction?: {
-    label: string;
-    link: string;
-  };
+  quickAction?: QuickAction;
 }
 
 interface AIEngine {
@@ -160,18 +175,30 @@ function QuickWinCard({
             data-testid={`quick-checkbox-${step.id}`}
           />
           <span className="text-sm">{isDone ? "Done" : "Mark as done"}</span>
-          {step.quickAction && (
-            <Link href={step.quickAction.link}>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ml-auto"
-                data-testid={`quick-action-${step.id}`}
-              >
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-          )}
+          {step.quickAction &&
+            ("to" in step.quickAction ? (
+              <Link to={step.quickAction.to}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  data-testid={`quick-action-${step.id}`}
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
+            ) : (
+              <a href={step.quickAction.href}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  data-testid={`quick-action-${step.id}`}
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </a>
+            ))}
         </div>
       </CardContent>
     </Card>
@@ -205,7 +232,7 @@ const aiEngines: AIEngine[] = [
         estimatedImpact: "Critical - ChatGPT search uses Bing's index",
         quickAction: {
           label: "Visit Bing Webmaster Tools",
-          link: "https://www.bing.com/webmasters",
+          href: "https://www.bing.com/webmasters",
         },
       },
       {
@@ -217,7 +244,7 @@ const aiEngines: AIEngine[] = [
           "Visit chatgpt.com/merchants and apply with your business details. You'll need Stripe integration. Products get featured in ChatGPT's product search mode. Free discovery; small fee only on purchases.",
         priority: "high",
         estimatedImpact: "Very High for e-commerce - Direct product recommendations",
-        quickAction: { label: "Register as Merchant", link: "https://chatgpt.com/merchants/" },
+        quickAction: { label: "Register as Merchant", href: "https://chatgpt.com/merchants/" },
       },
       {
         id: "chatgpt-reg-3",
@@ -228,7 +255,7 @@ const aiEngines: AIEngine[] = [
           "Add the following to your robots.txt:\n\nUser-agent: ChatGPT-User\nAllow: /\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nThen submit your sitemap URL.",
         priority: "high",
         estimatedImpact: "Critical - Required for ChatGPT to access your content",
-        quickAction: { label: "Robots.txt Generator", link: "/crawler-check" },
+        quickAction: { label: "Robots.txt Generator", to: "/crawler-check" },
       },
       {
         id: "chatgpt-1",
@@ -239,7 +266,7 @@ const aiEngines: AIEngine[] = [
           "If your brand qualifies for notability, create a Wikipedia page following their guidelines. Otherwise, contribute verified information to industry-related Wikipedia articles that naturally mention your brand.",
         priority: "high",
         estimatedImpact: "Very High - Wikipedia is heavily weighted in ChatGPT's training data",
-        quickAction: { label: "Wikipedia Monitor", link: "/geo-tools" },
+        quickAction: { label: "Wikipedia Monitor", to: "/geo-tools" },
       },
       {
         id: "chatgpt-2",
@@ -250,7 +277,7 @@ const aiEngines: AIEngine[] = [
           "Create a detailed Brand Fact Sheet with your key facts, founding story, products, and USPs. Share this information consistently across all platforms.",
         priority: "high",
         estimatedImpact: "High - Reduces hallucinations and improves citation accuracy",
-        quickAction: { label: "Create Fact Sheet", link: "/brand-fact-sheet" },
+        quickAction: { label: "Create Fact Sheet", to: "/brand-fact-sheet" },
       },
       {
         id: "chatgpt-3",
@@ -261,7 +288,7 @@ const aiEngines: AIEngine[] = [
           "Create in-depth guides, whitepapers, and research pieces. Include statistics, expert quotes, and cite reputable sources. Where to publish: start on your own blog (you control it and it builds domain authority), then syndicate to high-reach platforms like Medium and LinkedIn Articles, and pitch industry publications. High-authority placements (Forbes, Business Insider, TechCrunch, and a Wikipedia entry once you qualify) carry the most weight with AI engines.",
         priority: "high",
         estimatedImpact: "High - Establishes topical authority",
-        quickAction: { label: "Generate Content", link: "/content" },
+        quickAction: { label: "Generate Content", to: "/content" },
       },
       {
         id: "chatgpt-4",
@@ -319,7 +346,7 @@ const aiEngines: AIEngine[] = [
           "Add to your robots.txt:\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: anthropic-ai\nAllow: /\n\nUser-agent: Claude-Web\nAllow: /\n\nUser-agent: Claude-SearchBot\nAllow: /\n\nContact claudebot@anthropic.com for crawler issues.",
         priority: "high",
         estimatedImpact: "Critical - Required for Claude to index your content",
-        quickAction: { label: "Robots.txt Generator", link: "/crawler-check" },
+        quickAction: { label: "Robots.txt Generator", to: "/crawler-check" },
       },
       {
         id: "claude-reg-2",
@@ -340,7 +367,7 @@ const aiEngines: AIEngine[] = [
           "When creating content, address counterarguments, acknowledge limitations, and present balanced viewpoints. Avoid absolutist language.",
         priority: "high",
         estimatedImpact: "High - Aligns with Claude's reasoning approach",
-        quickAction: { label: "Generate Content", link: "/content" },
+        quickAction: { label: "Generate Content", to: "/content" },
       },
       {
         id: "claude-2",
@@ -403,7 +430,7 @@ const aiEngines: AIEngine[] = [
           "Add to your robots.txt:\n\nUser-agent: PerplexityBot\nAllow: /\n\nAlso ensure your site loads fast and has a valid sitemap.xml. Perplexity prioritizes well-structured, fast-loading sites.",
         priority: "high",
         estimatedImpact: "Critical - Required for Perplexity citations",
-        quickAction: { label: "Robots.txt Generator", link: "/crawler-check" },
+        quickAction: { label: "Robots.txt Generator", to: "/crawler-check" },
       },
       {
         id: "perplexity-reg-2",
@@ -414,7 +441,7 @@ const aiEngines: AIEngine[] = [
           "Email publishers@perplexity.ai with your company overview, content specialty, traffic metrics, and why you'd be a good fit. Current partners include TIME, Fortune, and other major publishers. Even smaller publishers can apply.",
         priority: "high",
         estimatedImpact: "Very High - Revenue sharing + enhanced visibility",
-        quickAction: { label: "Email Perplexity", link: "mailto:publishers@perplexity.ai" },
+        quickAction: { label: "Email Perplexity", href: "mailto:publishers@perplexity.ai" },
       },
       {
         id: "perplexity-1",
@@ -425,7 +452,7 @@ const aiEngines: AIEngine[] = [
           "Check your robots.txt allows Perplexity's crawler. Add sitemap.xml and ensure pages load quickly.",
         priority: "high",
         estimatedImpact: "Critical - Required for any citations",
-        quickAction: { label: "Check Crawler Access", link: "/crawler-check" },
+        quickAction: { label: "Check Crawler Access", to: "/crawler-check" },
       },
       {
         id: "perplexity-2",
@@ -465,7 +492,7 @@ const aiEngines: AIEngine[] = [
           "Create pillar pages with supporting articles. Link related content together to show topical depth.",
         priority: "medium",
         estimatedImpact: "Medium - Signals expertise on topics",
-        quickAction: { label: "Research Keywords", link: "/keyword-research" },
+        quickAction: { label: "Research Keywords", to: "/keyword-research" },
       },
     ],
   },
@@ -490,7 +517,7 @@ const aiEngines: AIEngine[] = [
         estimatedImpact: "Critical - Foundation for Google AI visibility",
         quickAction: {
           label: "Google Search Console",
-          link: "https://search.google.com/search-console",
+          href: "https://search.google.com/search-console",
         },
       },
       {
@@ -502,7 +529,7 @@ const aiEngines: AIEngine[] = [
           "Go to business.google.com, claim your business, verify ownership, then complete every field: hours, services, products, photos, Q&A. Respond to all reviews. Keep information 100% current.",
         priority: "high",
         estimatedImpact: "Very High for local/service businesses",
-        quickAction: { label: "Google Business Profile", link: "https://business.google.com" },
+        quickAction: { label: "Google Business Profile", href: "https://business.google.com" },
       },
       {
         id: "google-reg-3",
@@ -523,7 +550,7 @@ const aiEngines: AIEngine[] = [
           "Follow Google's SEO best practices: optimize page speed, mobile experience, core web vitals, and on-page SEO.",
         priority: "high",
         estimatedImpact: "Critical - Foundation for AI visibility",
-        quickAction: { label: "Analyze Signals", link: "/geo-signals" },
+        quickAction: { label: "Analyze Signals", to: "/geo-signals" },
       },
       {
         id: "google-2",
@@ -543,7 +570,7 @@ const aiEngines: AIEngine[] = [
           "Research common questions in your industry. Structure content with the question as H2 and answer immediately following.",
         priority: "high",
         estimatedImpact: "High - Improves AI Overview selection",
-        quickAction: { label: "Manage FAQs", link: "/faq-manager" },
+        quickAction: { label: "Manage FAQs", to: "/faq-manager" },
       },
       {
         id: "google-4",
@@ -591,7 +618,7 @@ const aiEngines: AIEngine[] = [
         estimatedImpact: "Critical - Same data source as Google AI",
         quickAction: {
           label: "Google Search Console",
-          link: "https://search.google.com/search-console",
+          href: "https://search.google.com/search-console",
         },
       },
       {
@@ -603,7 +630,7 @@ const aiEngines: AIEngine[] = [
           "Visit merchants.google.com, create an account, upload your product feed with complete data (titles, descriptions, prices, images, availability). Keep the feed updated daily.",
         priority: "high",
         estimatedImpact: "Very High for product/e-commerce brands",
-        quickAction: { label: "Google Merchant Center", link: "https://merchants.google.com" },
+        quickAction: { label: "Google Merchant Center", href: "https://merchants.google.com" },
       },
       {
         id: "gemini-1",
@@ -614,7 +641,7 @@ const aiEngines: AIEngine[] = [
           "Focus on ranking for your target keywords in Google Search. Use Search Console to monitor and improve performance.",
         priority: "high",
         estimatedImpact: "Critical - Primary data source",
-        quickAction: { label: "Track Citations", link: "/citations" },
+        quickAction: { label: "Track Citations", to: "/citations" },
       },
       {
         id: "gemini-2",
@@ -681,7 +708,7 @@ const aiEngines: AIEngine[] = [
           "Apply for X Verified Organizations at the X business portal. You'll need business documentation, an official email matching your domain, and an active website. Gold verification costs ~$1,000/month but provides significant credibility.",
         priority: "high",
         estimatedImpact: "Very High - Gold verification signals strong authority to Grok",
-        quickAction: { label: "X Verified Organizations", link: "https://business.x.com" },
+        quickAction: { label: "X Verified Organizations", href: "https://business.x.com" },
       },
       {
         id: "grok-reg-2",
@@ -692,7 +719,7 @@ const aiEngines: AIEngine[] = [
           "Add to your robots.txt:\n\nUser-agent: xai-grok\nAllow: /\n\nAlso ensure your site has a valid sitemap.xml and loads quickly.",
         priority: "high",
         estimatedImpact: "High - Required for web-based Grok answers",
-        quickAction: { label: "Robots.txt Generator", link: "/crawler-check" },
+        quickAction: { label: "Robots.txt Generator", to: "/crawler-check" },
       },
       {
         id: "grok-1",
@@ -733,7 +760,7 @@ const aiEngines: AIEngine[] = [
           "Verify your robots.txt allows crawling. Ensure fast page loads and mobile optimization.",
         priority: "medium",
         estimatedImpact: "Medium - Foundation for web-based answers",
-        quickAction: { label: "Check Crawler Access", link: "/crawler-check" },
+        quickAction: { label: "Check Crawler Access", to: "/crawler-check" },
       },
       {
         id: "grok-5",
@@ -771,7 +798,7 @@ const aiEngines: AIEngine[] = [
           "Test your site with JavaScript disabled. Key content (product info, pricing, services, contact) should be visible in the HTML. Use server-side rendering where possible. Check that navigation works without JS.",
         priority: "high",
         estimatedImpact: "Critical - Manus needs to browse your site successfully",
-        quickAction: { label: "Check Crawler Access", link: "/crawler-check" },
+        quickAction: { label: "Check Crawler Access", to: "/crawler-check" },
       },
       {
         id: "manus-reg-2",
@@ -812,7 +839,7 @@ const aiEngines: AIEngine[] = [
           "Use semantic HTML, clear navigation, and ensure content loads without JavaScript when possible.",
         priority: "high",
         estimatedImpact: "Critical - Required for browsing access",
-        quickAction: { label: "Check Crawler Access", link: "/crawler-check" },
+        quickAction: { label: "Check Crawler Access", to: "/crawler-check" },
       },
       {
         id: "manus-4",
@@ -860,7 +887,7 @@ const aiEngines: AIEngine[] = [
           "Add to robots.txt:\nUser-agent: DeepSeekBot\nAllow: /\n\nVerify with your server logs that DeepSeekBot is fetching pages.",
         priority: "high",
         estimatedImpact: "Critical - Required for DeepSeek to index your content",
-        quickAction: { label: "Check Crawler Access", link: "/crawler-check" },
+        quickAction: { label: "Check Crawler Access", to: "/crawler-check" },
       },
       {
         id: "deepseek-1",
@@ -1202,19 +1229,32 @@ export default function AIVisibility() {
                                   {step.estimatedImpact}
                                 </span>
                               </div>
-                              {step.quickAction && (
-                                <Link href={step.quickAction.link}>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="gap-2"
-                                    data-testid={`action-${step.id}`}
-                                  >
-                                    {step.quickAction.label}
-                                    <ArrowRight className="w-4 h-4" />
-                                  </Button>
-                                </Link>
-                              )}
+                              {step.quickAction &&
+                                ("to" in step.quickAction ? (
+                                  <Link to={step.quickAction.to}>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="gap-2"
+                                      data-testid={`action-${step.id}`}
+                                    >
+                                      {step.quickAction.label}
+                                      <ArrowRight className="w-4 h-4" />
+                                    </Button>
+                                  </Link>
+                                ) : (
+                                  <a href={step.quickAction.href}>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="gap-2"
+                                      data-testid={`action-${step.id}`}
+                                    >
+                                      {step.quickAction.label}
+                                      <ArrowRight className="w-4 h-4" />
+                                    </Button>
+                                  </a>
+                                ))}
                             </div>
                           </div>
                         </AccordionContent>

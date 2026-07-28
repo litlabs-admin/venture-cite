@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -315,10 +314,11 @@ export default function CompetitorsPage() {
   };
 
   return (
+    // Only ever rendered client-side, as a lazy tab inside
+    // client/src/pages/monitor.tsx (no route of its own) — title/meta
+    // removed per this task's blanket rule; /monitor falls back to root
+    // defaults.
     <div className="space-y-8">
-      <Helmet>
-        <title>Competitors - VentureCite</title>
-      </Helmet>
       {/* Competitors/leaderboard are scoped to a single brand */}
       {(brandsLoading || brands.length === 0) && (
         <Card>

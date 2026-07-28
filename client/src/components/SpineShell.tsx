@@ -1,5 +1,5 @@
 import { Suspense, type ComponentType } from "react";
-import { useLocation, useSearch } from "wouter";
+import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { Info } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RouteSpinner } from "@/components/foundations";
@@ -23,18 +23,35 @@ export interface SpineTab {
 }
 
 export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; tabs: SpineTab[] }) {
-  const [location, setLocation] = useLocation();
-  const searchString = useSearch();
+  // SpineShell hosts under whichever stage route mounted it (monitor,
+  // diagnose, act, setup, report) — it has no single `from` route, so this
+  // reads/writes search loosely ({ strict: false } / to: location) rather
+  // than against one route's typed `Route.useSearch()` — see
+  // native-api-contract.md rule 3. `tab` is declared (as an optional string)
+  // on every one of those routes' schemas in
+  // src/routes/-shared/searchSchemas.ts.
+  const navigate = useNavigate();
+  const location = useRouterState({ select: (s) => s.location.pathname });
+  const search = useSearch({ strict: false });
 
-  const params = new URLSearchParams(searchString);
-  const requested = params.get("tab");
-  const active = tabs.some((t) => t.value === requested) ? (requested as string) : defaultTab;
+  const requested = typeof search.tab === "string" ? search.tab : undefined;
+  const active =
+    requested !== undefined && tabs.some((t) => t.value === requested) ? requested : defaultTab;
 
   const setTab = (value: string) => {
-    const next = new URLSearchParams(searchString);
-    next.set("tab", value);
-    const path = location.split("?")[0];
-    setLocation(`${path}?${next.toString()}`, { replace: true });
+    // `to: location` rather than a route literal: this component isn't
+    // tied to one route (it mounts under monitor/diagnose/act/setup/report),
+    // so `location` (the current pathname) is a runtime `string`, not a
+    // literal — TanStack Router accepts a plain `string` `to` for exactly
+    // this case (see native-api-contract.md). `search` is a function of the
+    // previous search object so every existing param (notably `brandId`,
+    // read by useBrandSelection() from nearly every page) survives — only
+    // `tab` changes.
+    navigate({
+      to: location,
+      search: (prev: Record<string, unknown>) => ({ ...prev, tab: value }),
+      replace: true,
+    });
   };
 
   return (

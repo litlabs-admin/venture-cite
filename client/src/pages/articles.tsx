@@ -11,7 +11,7 @@
 //   data-tour-id="articles.firstResult"
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearch, useLocation } from "wouter";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Loader2, FileText, Eye, Calendar, Tag, Search, Trash2 } from "lucide-react";
-import { Link } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -93,9 +92,14 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function Articles() {
   const { toast } = useToast();
-  const searchString = useSearch();
-  const [, setLocation] = useLocation();
-  const editId = new URLSearchParams(searchString).get("edit");
+  // /_app/articles.tsx declares `validateSearch` (articlesSearchSchema), so
+  // `edit` is a real typed field here — no more manual URLSearchParams
+  // parsing of the raw query string. Named `routeSearch` (not `search`) to
+  // avoid colliding with the free-text search box's own `search` state
+  // below.
+  const routeSearch = useSearch({ strict: false });
+  const navigate = useNavigate();
+  const editId = routeSearch.edit ?? null;
   const qc = useQueryClient();
 
   // Filters
@@ -257,7 +261,7 @@ export default function Articles() {
             description="Generate and save content to see your articles here."
             action={{
               label: "Create Your First Article",
-              onClick: () => setLocation("/content"),
+              onClick: () => navigate({ to: "/content" }),
               href: "/content",
             }}
           />
@@ -514,7 +518,7 @@ export default function Articles() {
                         <ViewEditDialog
                           article={article}
                           autoOpen={editId === article.id}
-                          onAutoOpenHandled={() => setLocation("/articles", { replace: true })}
+                          onAutoOpenHandled={() => navigate({ to: "/articles", replace: true })}
                         />
                         {article.status === "ready" && (
                           <DistributeDialog
@@ -523,14 +527,14 @@ export default function Articles() {
                           />
                         )}
                         {article.status === "draft" && (
-                          <Link href={`/content/${article.id}`}>
+                          <Link to="/content/$articleId" params={{ articleId: article.id }}>
                             <Button variant="outline" size="sm">
                               Continue draft
                             </Button>
                           </Link>
                         )}
                         {article.status === "failed" && (
-                          <Link href={`/content/${article.id}`}>
+                          <Link to="/content/$articleId" params={{ articleId: article.id }}>
                             <Button variant="outline" size="sm">
                               Retry generation
                             </Button>

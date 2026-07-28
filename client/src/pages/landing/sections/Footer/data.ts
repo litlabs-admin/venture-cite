@@ -20,15 +20,18 @@ export const solutionsLinks: FooterLink[] = [
   { name: "For Enterprise", href: "/register" },
 ];
 
-// Mobile Product column (Free Tools trigger removed — no honest destination;
-// Pricing removed along with the page's Pricing section).
+// Mobile Product column (Free Tools trigger removed — no honest destination).
+// Pricing is a real server-rendered route again (src/routes/pricing.tsx) —
+// it's added in Footer.tsx via FooterColumn's `children` slot as a TanStack
+// `<Link>`, not as an entry here, since every href below is a full-reload
+// `<a>` and Pricing should navigate client-side.
 export const mobileProductLinks: FooterLink[] = [
   { name: "Platform", href: "#platform-section" },
   { name: "Content", href: "#philosophy-section" },
 ];
 
-// Desktop Product column (Free Tools trigger removed — no honest destination;
-// Pricing removed along with the page's Pricing section).
+// Desktop Product column (Free Tools trigger removed — no honest destination).
+// Pricing restored the same way as the mobile column above — see that comment.
 export const desktopProductLinks: FooterLink[] = [
   { name: "Platform", href: "#platform-section" },
   { name: "Content", href: "#philosophy-section" },

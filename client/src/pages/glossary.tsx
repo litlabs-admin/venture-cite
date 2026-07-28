@@ -1,11 +1,5 @@
-import { useEffect } from "react";
-import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight } from "lucide-react";
-
-const TITLE = "GEO vs AEO vs SEO — VentureCite Glossary";
-const META_DESCRIPTION =
-  "Plain-English definitions of GEO (Generative Engine Optimization), AEO (Answer Engine Optimization), and SEO (Search Engine Optimization), and how they layer.";
 
 const TERMS = [
   {
@@ -67,35 +61,6 @@ const TERMS = [
 ] as const;
 
 export default function GlossaryPage() {
-  // Inline title + meta tag setter — matches the existing per-page
-  // pattern in this codebase (no React Helmet dependency).
-  useEffect(() => {
-    const prevTitle = document.title;
-    document.title = TITLE;
-    const ensureMeta = (name: string, content: string) => {
-      let el = document.head.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
-      if (!el) {
-        el = document.createElement("meta");
-        el.setAttribute("name", name);
-        document.head.appendChild(el);
-      }
-      const prev = el.getAttribute("content");
-      el.setAttribute("content", content);
-      return () => {
-        if (prev === null) {
-          el?.remove();
-        } else {
-          el?.setAttribute("content", prev);
-        }
-      };
-    };
-    const restoreDescription = ensureMeta("description", META_DESCRIPTION);
-    return () => {
-      document.title = prevTitle;
-      restoreDescription();
-    };
-  }, []);
-
   // JSON-LD DefinedTermSet — gives both AI engines (deliciously meta) and
   // Google's structured-data parser a clean machine-readable definition.
   const jsonLd = {
@@ -113,6 +78,12 @@ export default function GlossaryPage() {
 
   return (
     <div className="container mx-auto max-w-3xl px-4 py-12">
+      {/* Title/description moved to src/routes/glossary.tsx's `head()` —
+          metadata belongs to the route, not this component. The JSON-LD
+          script below stays here: it's page-specific structured data, not
+          a <title>/<meta> tag, and React 19 doesn't hoist a plain
+          <script> the way it hoists <title>/<meta>, so it renders in place
+          in the body — out of this task's scope. */}
       {/* JSON-LD schema for AI engines + Google rich-results */}
       <script
         type="application/ld+json"
@@ -155,12 +126,21 @@ export default function GlossaryPage() {
           <ul className="space-y-1">
             {term.relatedPages.map((p) => (
               <li key={p.href}>
-                <Link
+                {/* Plain <a>, not wouter's <Link>: wouter's Link reads the
+                    default useLocation hook to compute its active state,
+                    which touches the global `location` object during
+                    render — that throws under SSR (no `location` global in
+                    Node) since this page renders outside any wouter
+                    <Router ssrPath=...> that could supply a server
+                    snapshot. These are outbound links to other top-level
+                    routes anyway (not in-page client transitions), so a
+                    full navigation is correct regardless. */}
+                <a
                   href={p.href}
                   className="inline-flex items-center text-sm text-primary hover:underline"
                 >
                   {p.label} <ArrowRight className="h-3 w-3 ml-1" />
-                </Link>
+                </a>
               </li>
             ))}
           </ul>

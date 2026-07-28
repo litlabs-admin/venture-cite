@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Home,
   FileText,
@@ -50,10 +50,19 @@ import { openChatbotPrompt } from "@/lib/openChatbotPrompt";
 
 type Icon = React.ComponentType<{ className?: string }>;
 
+/** Every route this palette links to, as a literal union — not `string` —
+ *  so `navigate({ to: entry.to })` below stays checked against the
+ *  generated route tree. Tab-scoped destinations carry their tab in the
+ *  separate `tab` field rather than baked into the path string. */
+type NavPath = "/" | "/report" | "/monitor" | "/diagnose" | "/act" | "/setup" | "/settings";
+
 type NavEntry = {
   section: string;
   label: string;
-  href: string;
+  to: NavPath;
+  /** Mirrored to the `?tab=` search param on navigate; omitted for
+   *  destinations that don't own a tab strip. */
+  tab?: string;
   icon: Icon;
   brandScoped: boolean;
   keywords?: string;
@@ -63,7 +72,7 @@ const NAV: NavEntry[] = [
   {
     section: "",
     label: "Command Center",
-    href: "/",
+    to: "/",
     icon: Home,
     brandScoped: false,
     keywords: "home dashboard overview start",
@@ -71,7 +80,7 @@ const NAV: NavEntry[] = [
   {
     section: "",
     label: "Report",
-    href: "/report",
+    to: "/report",
     icon: FileText,
     brandScoped: true,
     keywords: "proof export pdf share results",
@@ -80,7 +89,8 @@ const NAV: NavEntry[] = [
   {
     section: "Monitor",
     label: "Overview",
-    href: "/monitor?tab=overview",
+    to: "/monitor",
+    tab: "overview",
     icon: BarChart3,
     brandScoped: true,
     keywords: "analytics visibility report",
@@ -88,7 +98,8 @@ const NAV: NavEntry[] = [
   {
     section: "Monitor",
     label: "Citations",
-    href: "/monitor?tab=citations",
+    to: "/monitor",
+    tab: "citations",
     icon: Link2,
     brandScoped: true,
     keywords: "cited prompts runs scan",
@@ -96,7 +107,8 @@ const NAV: NavEntry[] = [
   {
     section: "Monitor",
     label: "Competitors",
-    href: "/monitor?tab=competitors",
+    to: "/monitor",
+    tab: "competitors",
     icon: Swords,
     brandScoped: true,
     keywords: "rivals share of voice leaderboard",
@@ -104,7 +116,8 @@ const NAV: NavEntry[] = [
   {
     section: "Monitor",
     label: "Trends",
-    href: "/monitor?tab=trends",
+    to: "/monitor",
+    tab: "trends",
     icon: History,
     brandScoped: true,
     keywords: "history over time change",
@@ -112,7 +125,8 @@ const NAV: NavEntry[] = [
   {
     section: "Monitor",
     label: "Mentions",
-    href: "/monitor?tab=mentions",
+    to: "/monitor",
+    tab: "mentions",
     icon: Radar,
     brandScoped: true,
     keywords: "reddit hacker news detected",
@@ -121,7 +135,8 @@ const NAV: NavEntry[] = [
   {
     section: "Diagnose",
     label: "Hallucinations",
-    href: "/diagnose?tab=hallucinations",
+    to: "/diagnose",
+    tab: "hallucinations",
     icon: AlertTriangle,
     brandScoped: true,
     keywords: "inaccurate false claims accuracy",
@@ -129,7 +144,8 @@ const NAV: NavEntry[] = [
   {
     section: "Diagnose",
     label: "Signals",
-    href: "/diagnose?tab=signals",
+    to: "/diagnose",
+    tab: "signals",
     icon: Radio,
     brandScoped: true,
     keywords: "geo chunkability schema readiness",
@@ -137,7 +153,8 @@ const NAV: NavEntry[] = [
   {
     section: "Diagnose",
     label: "Crawler",
-    href: "/diagnose?tab=crawler",
+    to: "/diagnose",
+    tab: "crawler",
     icon: Bug,
     brandScoped: true,
     keywords: "robots gptbot permissions blocked",
@@ -145,7 +162,8 @@ const NAV: NavEntry[] = [
   {
     section: "Act",
     label: "Create",
-    href: "/act?tab=create",
+    to: "/act",
+    tab: "create",
     icon: PenLine,
     brandScoped: true,
     keywords: "generate content write article",
@@ -153,7 +171,8 @@ const NAV: NavEntry[] = [
   {
     section: "Act",
     label: "Library",
-    href: "/act?tab=library",
+    to: "/act",
+    tab: "library",
     icon: FileText,
     brandScoped: true,
     keywords: "articles published drafts",
@@ -161,7 +180,8 @@ const NAV: NavEntry[] = [
   {
     section: "Act",
     label: "Keywords",
-    href: "/act?tab=keywords",
+    to: "/act",
+    tab: "keywords",
     icon: Search,
     brandScoped: true,
     keywords: "research keyword ideas",
@@ -169,7 +189,8 @@ const NAV: NavEntry[] = [
   {
     section: "Act",
     label: "GEO Assets",
-    href: "/act?tab=geo-assets",
+    to: "/act",
+    tab: "geo-assets",
     icon: Wrench,
     brandScoped: true,
     keywords: "tools wikipedia bofu",
@@ -177,7 +198,8 @@ const NAV: NavEntry[] = [
   {
     section: "Act",
     label: "FAQ",
-    href: "/act?tab=faq",
+    to: "/act",
+    tab: "faq",
     icon: HelpCircle,
     brandScoped: true,
     keywords: "questions answers faq manager",
@@ -185,7 +207,8 @@ const NAV: NavEntry[] = [
   {
     section: "Act",
     label: "Community",
-    href: "/act?tab=community",
+    to: "/act",
+    tab: "community",
     icon: Users,
     brandScoped: true,
     keywords: "reddit outreach aeo posts",
@@ -194,7 +217,8 @@ const NAV: NavEntry[] = [
   {
     section: "Setup",
     label: "Brands",
-    href: "/setup?tab=brands",
+    to: "/setup",
+    tab: "brands",
     icon: Building2,
     brandScoped: false,
     keywords: "brand profile create company",
@@ -202,7 +226,8 @@ const NAV: NavEntry[] = [
   {
     section: "Setup",
     label: "Fact Sheet",
-    href: "/setup?tab=fact-sheet",
+    to: "/setup",
+    tab: "fact-sheet",
     icon: Shield,
     brandScoped: true,
     keywords: "facts scrape source of truth",
@@ -210,7 +235,8 @@ const NAV: NavEntry[] = [
   {
     section: "Setup",
     label: "Visibility Checklist",
-    href: "/setup?tab=visibility",
+    to: "/setup",
+    tab: "visibility",
     icon: ScanEye,
     brandScoped: true,
     keywords: "checklist tasks progress",
@@ -219,22 +245,12 @@ const NAV: NavEntry[] = [
   {
     section: "",
     label: "Account settings",
-    href: "/settings",
+    to: "/settings",
     icon: Settings,
     brandScoped: false,
     keywords: "profile password account preferences",
   },
 ];
-
-/** Carry the active brand on brand-scoped deep-links so the selection stays
- *  sticky when navigating from the palette. */
-function withBrand(href: string, brandId: string): string {
-  if (!brandId) return href;
-  const [path, qs = ""] = href.split("?");
-  const params = new URLSearchParams(qs);
-  if (!params.get("brandId")) params.set("brandId", brandId);
-  return `${path}?${params.toString()}`;
-}
 
 export default function CommandPalette({
   open,
@@ -243,7 +259,7 @@ export default function CommandPalette({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const { selectedBrandId } = useBrandSelection();
   const [query, setQuery] = useState("");
 
@@ -255,7 +271,14 @@ export default function CommandPalette({
   }
 
   function go(entry: NavEntry) {
-    setLocation(entry.brandScoped ? withBrand(entry.href, selectedBrandId) : entry.href);
+    // Carry the active brand on brand-scoped deep-links (as `brandId`) so
+    // the selection stays sticky when navigating from the palette, and
+    // mirror the entry's tab (if any) to `?tab=`. Built as a plain object
+    // rather than a query string so `to` stays a literal route path.
+    const search: Record<string, string> = {};
+    if (entry.tab) search.tab = entry.tab;
+    if (entry.brandScoped && selectedBrandId) search.brandId = selectedBrandId;
+    navigate({ to: entry.to, search: Object.keys(search).length > 0 ? search : undefined });
     close();
   }
 
@@ -287,7 +310,7 @@ export default function CommandPalette({
                 const I = entry.icon;
                 return (
                   <CommandItem
-                    key={entry.href}
+                    key={`${entry.to}${entry.tab ? `?tab=${entry.tab}` : ""}`}
                     value={`${section} ${entry.label} ${entry.keywords ?? ""}`}
                     onSelect={() => go(entry)}
                     className="cursor-pointer"

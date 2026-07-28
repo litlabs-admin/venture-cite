@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { useLocation } from "wouter";
+import { useNavigate } from "@tanstack/react-router";
 import { apiRequest } from "@/lib/queryClient";
 import type { ScanJob } from "@shared/schema";
 
@@ -22,7 +22,7 @@ export function ScanCompletionListener() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const seenRef = useRef<Set<string>>(new Set());
 
   const { data } = useQuery<{ rows: Array<ScanJob & { brandName?: string }> }>({
@@ -61,7 +61,7 @@ export function ScanCompletionListener() {
                 action: (
                   <ToastAction
                     altText="View"
-                    onClick={() => setLocation(`/geo-tools?brand=${job.brandId}`)}
+                    onClick={() => navigate({ to: "/geo-tools", search: { brand: job.brandId } })}
                   >
                     View
                   </ToastAction>
@@ -84,7 +84,7 @@ export function ScanCompletionListener() {
     }
 
     seenRef.current = currentIds;
-  }, [data, toast, setLocation, queryClient]);
+  }, [data, toast, navigate, queryClient]);
 
   return null;
 }

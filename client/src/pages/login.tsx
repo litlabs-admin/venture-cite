@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,10 +17,9 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import ventureCiteLogo from "@assets/logo.png";
 import { setSession } from "@/lib/authStore";
-import { Helmet } from "react-helmet-async";
 
 export default function Login() {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
@@ -59,7 +58,7 @@ export default function Login() {
       await setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
       queryClient.setQueryData(["/api/auth/me"], data.user);
       toast({ title: "Welcome back!" });
-      setLocation("/");
+      navigate({ to: "/" });
     },
     onError: (error: Error) => {
       toast({ title: error.message, variant: "destructive" });
@@ -72,11 +71,9 @@ export default function Login() {
   };
 
   return (
+    // Title/robots moved to src/routes/_app/login.tsx's `head()` —
+    // metadata belongs to the route, not this component.
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Helmet>
-        <title>Sign In - VentureCite</title>
-        <meta name="robots" content="noindex" />
-      </Helmet>
       <Card className="w-full max-w-md relative">
         <a
           href="/"

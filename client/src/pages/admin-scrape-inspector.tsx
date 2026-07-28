@@ -13,9 +13,8 @@
 // don't rely on that for security.
 
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Helmet } from "react-helmet-async";
 import {
   AlertTriangle,
   CheckCircle,
@@ -212,7 +211,7 @@ function Stat({
 }
 
 export default function AdminScrapeInspector() {
-  const { runId } = useParams<{ runId: string }>();
+  const { runId } = useParams({ from: "/_app/admin/scrape/$runId" });
   const { data, isLoading, isError, error } = useQuery<InspectorResponse>({
     queryKey: ["/api/admin/scrape", runId],
     queryFn: async () => {
@@ -257,9 +256,10 @@ export default function AdminScrapeInspector() {
 
   return (
     <div className="container mx-auto max-w-6xl py-8 space-y-6">
-      <Helmet>
-        <title>Scrape inspector — {brand?.name ?? run.id}</title>
-      </Helmet>
+      {/* Title moved to src/routes/_app/admin.scrape.$runId.tsx's `head()`
+          — metadata belongs to the route, not this component. That route
+          can only set a static title (no loader computes the brand name
+          server-side), unlike this component's former dynamic title. */}
 
       {/* Header */}
       <div>
@@ -487,7 +487,7 @@ export default function AdminScrapeInspector() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        <Link href="/admin/scrape" className="text-primary hover:underline">
+        <Link to="/admin/scrape" className="text-primary hover:underline">
           ← Back to recent runs
         </Link>
       </p>

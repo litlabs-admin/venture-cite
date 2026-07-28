@@ -1,4 +1,3 @@
-import { Helmet } from "react-helmet-async";
 import "./styles.css";
 import { Nav } from "./sections/Nav/Nav";
 import { Hero } from "./sections/Hero/Hero";
@@ -19,13 +18,8 @@ import { Footer } from "./sections/Footer/Footer";
 export default function Landing() {
   return (
     <div className="vc-home min-h-screen bg-vc-surface relative">
-      <Helmet>
-        <title>VentureCite — Get cited by AI search engines</title>
-        <meta
-          name="description"
-          content="Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer."
-        />
-      </Helmet>
+      {/* Title/description moved to src/routes/index.tsx's `head()` —
+          metadata belongs to the route, not this component. */}
 
       {/* Page-wide column guides, verbatim from index.html:680-681 */}
       <div

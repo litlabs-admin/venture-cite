@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import logoPath from "@assets/logo.png";
 import { FooterColumn } from "./FooterColumn";
 import { LinkedInIcon } from "./icons";
@@ -50,9 +51,9 @@ export function Footer() {
             <div
               className={`flex items-start gap-3 mb-5 pb-5 border-b border-vc-default ${revealY(isVisible)}`}
             >
-              <a href="/" className="shrink-0">
+              <Link to="/" className="shrink-0">
                 <img src={logoPath} alt="VentureCite" className="h-6 w-auto" />
-              </a>
+              </Link>
               <p className="text-[11px] text-vc-secondary leading-relaxed">
                 Get cited by AI search engines. Track every mention. Optimize every prompt.
               </p>
@@ -63,7 +64,18 @@ export function Footer() {
               style={{ transitionDelay: "50ms" }}
             >
               <div>
-                <FooterColumn title="Product" links={mobileProductLinks} size="mobile" />
+                <FooterColumn title="Product" links={mobileProductLinks} size="mobile">
+                  {/* Real (server-rendered) route — a TanStack `<Link>`
+                      via FooterColumn's children slot, not a data-driven
+                      href, since every entry in mobileProductLinks is a
+                      full-reload `<a>`. */}
+                  <Link
+                    to="/pricing"
+                    className="block text-[11px] text-vc-secondary hover:text-vc-accent transition-colors"
+                  >
+                    Pricing
+                  </Link>
+                </FooterColumn>
               </div>
               <div>
                 <FooterColumn title="Solutions" links={solutionsLinks} size="mobile" />
@@ -75,12 +87,12 @@ export function Footer() {
             </div>
 
             <div className={revealY(isVisible)} style={{ transitionDelay: "100ms" }}>
-              <a
-                href="/register"
+              <Link
+                to="/register"
                 className="h-9 w-full bg-vc-accent-subtle text-vc-accent text-[12px] font-medium rounded flex items-center justify-center hover:bg-vc-accent hover:text-white transition-all duration-150"
               >
                 Get started →
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -91,9 +103,9 @@ export function Footer() {
                 isVisible,
               )}`}
             >
-              <a href="/" className="flex items-center mb-4">
+              <Link to="/" className="flex items-center mb-4">
                 <img src={logoPath} alt="VentureCite" className="h-6 w-auto" />
-              </a>
+              </Link>
               <p className="text-[12px] text-vc-secondary leading-relaxed mb-4 max-w-[180px]">
                 Get cited by AI search engines. Track every mention. Optimize every prompt.
               </p>
@@ -114,7 +126,14 @@ export function Footer() {
               className={`lg:py-8 lg:px-5 lg:border-r border-vc-default ${revealY(isVisible)}`}
               style={{ transitionDelay: "50ms" }}
             >
-              <FooterColumn title="Product" links={desktopProductLinks} size="desktop" />
+              <FooterColumn title="Product" links={desktopProductLinks} size="desktop">
+                <Link
+                  to="/pricing"
+                  className="block text-[12px] text-vc-secondary hover:text-vc-accent transition-colors duration-150"
+                >
+                  Pricing
+                </Link>
+              </FooterColumn>
             </div>
 
             <div
@@ -145,12 +164,12 @@ export function Footer() {
               <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vc-text-muted mb-2">
                 Get started
               </div>
-              <a
-                href="/register"
+              <Link
+                to="/register"
                 className="h-9 px-4 bg-vc-accent-subtle text-vc-accent text-[13px] font-medium rounded flex items-center justify-center hover:bg-vc-accent hover:text-white transition-all duration-150"
               >
                 Get started →
-              </a>
+              </Link>
             </div>
           </div>
         </div>

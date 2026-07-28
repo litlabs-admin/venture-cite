@@ -3,7 +3,7 @@
 // NOTE: The eighth row in Spec 2 §4.7 ("Mixed — some pages worked") is rendered
 // by the per-page panel + diff view, NOT here. This component only handles
 // terminal-failure runs.
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
   Ban,
@@ -68,12 +68,14 @@ export function ScrapeFailureState({
             <p>Every URL we tried returned a 4xx error. Did you spell the website URL right?</p>
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link href={`/brands?edit=${brandId}`}>
+                <Link to="/brands" search={{ edit: brandId }}>
                   Edit brand URL <ExternalLink className="ml-1 h-3 w-3" />
                 </Link>
               </Button>
               <Button asChild size="sm" variant="ghost">
-                <Link href={`/brands?edit=${brandId}`}>Or edit your brand description</Link>
+                <Link to="/brands" search={{ edit: brandId }}>
+                  Or edit your brand description
+                </Link>
               </Button>
             </div>
           </AlertDescription>
@@ -92,7 +94,9 @@ export function ScrapeFailureState({
               instead.
             </p>
             <Button asChild size="sm" data-testid="scrape-failure-spa-add-fact">
-              <Link href={`/brands?edit=${brandId}`}>Edit your brand description</Link>
+              <Link to="/brands" search={{ edit: brandId }}>
+                Edit your brand description
+              </Link>
             </Button>
           </AlertDescription>
         </Alert>
@@ -117,12 +121,14 @@ export function ScrapeFailureState({
             </pre>
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link href={`/brands?edit=${brandId}`}>
+                <Link to="/brands" search={{ edit: brandId }}>
                   Edit brand <ExternalLink className="ml-1 h-3 w-3" />
                 </Link>
               </Button>
               <Button asChild size="sm" variant="ghost">
-                <Link href={`/brands?edit=${brandId}`}>Or edit your brand description</Link>
+                <Link to="/brands" search={{ edit: brandId }}>
+                  Or edit your brand description
+                </Link>
               </Button>
             </div>
           </AlertDescription>
@@ -141,7 +147,9 @@ export function ScrapeFailureState({
               <code className="ml-1 rounded bg-muted px-1 py-0.5">VentureCiteBot/1.0</code>.
             </p>
             <Button asChild size="sm" data-testid="scrape-failure-robots-add-fact">
-              <Link href={`/brands?edit=${brandId}`}>Edit your brand description</Link>
+              <Link to="/brands" search={{ edit: brandId }}>
+                Edit your brand description
+              </Link>
             </Button>
           </AlertDescription>
         </Alert>
@@ -195,7 +203,7 @@ export function ScrapeFailureState({
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link href={`/brands?edit=${brandId}`}>
+                <Link to="/brands" search={{ edit: brandId }}>
                   Edit brand URL <ExternalLink className="ml-1 h-3 w-3" />
                 </Link>
               </Button>
@@ -220,7 +228,7 @@ export function ScrapeFailureState({
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link href={`/brands?edit=${brandId}`}>
+                <Link to="/brands" search={{ edit: brandId }}>
                   Edit brand description <ExternalLink className="ml-1 h-3 w-3" />
                 </Link>
               </Button>

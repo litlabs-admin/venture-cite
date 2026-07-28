@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { Link, useLocation, useSearch } from "wouter";
+import { Link, useRouterState, useSearch } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
 import Sidebar, { SidebarContent } from "./Sidebar";
 import EducationAssistant from "./EducationAssistant";
@@ -82,8 +82,13 @@ function shellTitleFor(location: string, tab: string | null): string | null {
 export default function AppShell({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [inspector, setInspector] = useState<InspectorPayload | null>(null);
-  const [location] = useLocation();
-  const search = useSearch();
+  const location = useRouterState({ select: (s) => s.location.pathname });
+  // AppShell mounts above every authenticated route (Command Center, Report,
+  // and all four spine stages), so — like SpineShell — it reads search
+  // loosely rather than against one route's typed search; see
+  // native-api-contract.md rule 3. `tab` is declared (as an optional string)
+  // on every spine stage's schema in src/routes/-shared/searchSchemas.ts.
+  const search = useSearch({ strict: false });
   const [cmdkOpen, setCmdkOpen] = useState(false);
 
   // Global Cmd/Ctrl+K → command palette. Mounted here so it's live on every
@@ -101,7 +106,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   const isXlUp = useIsXlUp();
-  const activeTab = new URLSearchParams(search).get("tab");
+  // `useSearch({ strict: false })`'s FullSearchSchema type widens `tab` across
+  // every route in the tree (including ones that don't declare it), so a
+  // runtime narrow — not a cast — is what gets back to a plain `string | null`.
+  const activeTab = typeof search.tab === "string" ? search.tab : null;
   const title = shellTitleFor(location, activeTab);
   const ownsContextBar = title !== null;
   // Exactly one presentation is live at a time. Below xl the overlay Sheet
@@ -143,7 +151,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
               </SheetContent>
             </Sheet>
-            <Link href="/dashboard">
+            <Link to="/dashboard">
               <img src={logoPath} alt="VentureCite" className="h-8 w-auto cursor-pointer" />
             </Link>
             {/* Mobile help: the desktop context bar is lg:-only, so without

@@ -62,7 +62,7 @@ import {
   ArrowRight,
   Shield,
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { normalizeWebsite, safeExternalHref } from "@/lib/urlSafety";
 import BrandFormFields from "@/components/BrandFormFields";
 import DeleteBrandDialog from "@/components/DeleteBrandDialog";
@@ -127,7 +127,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function Brands() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [showManualForm, setShowManualForm] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -239,7 +239,7 @@ export default function Brands() {
         description: "Reading your website...",
       });
       if (newBrand?.id) {
-        setLocation(`/brand-fact-sheet?autoScrape=${encodeURIComponent(newBrand.id)}`);
+        navigate({ to: "/brand-fact-sheet", search: { autoScrape: newBrand.id } });
       }
     },
     onError: (error: Error) => {
@@ -445,7 +445,7 @@ export default function Brands() {
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <button
                   type="button"
-                  onClick={() => setLocation("/welcome")}
+                  onClick={() => navigate({ to: "/welcome" })}
                   className="hover:text-foreground underline underline-offset-4"
                   data-testid="link-guided-setup"
                 >
@@ -612,7 +612,7 @@ export default function Brands() {
                     brand.
                   </p>
                 </div>
-                <Link href="/ai-visibility">
+                <Link to="/ai-visibility">
                   <Button
                     className="bg-primary hover:bg-primary/90 text-white gap-2 shrink-0"
                     data-testid="button-ai-visibility"

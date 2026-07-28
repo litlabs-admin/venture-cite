@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "@tanstack/react-router";
 import { MenuIcon, XIcon, PlaceholderIcon } from "./icons";
 import { mobileTopLinks, productSolutions, productTools } from "./data";
 
@@ -62,6 +63,17 @@ export function MobileMenu() {
                     {link.label}
                   </a>
                 ))}
+                {/* Real (server-rendered) route, so it gets a TanStack
+                    `<Link>` here rather than joining mobileTopLinks' plain
+                    `<a href>` array (those all point at in-page # anchors or
+                    other full-reload destinations). */}
+                <Link
+                  to="/pricing"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-4 py-2.5 text-[15px] font-medium rounded transition-colors text-vc-secondary hover:bg-vc-muted hover:text-vc-primary"
+                >
+                  Pricing
+                </Link>
               </div>
 
               <div className="mt-5 pt-4 border-t border-vc-default">
@@ -119,20 +131,20 @@ export function MobileMenu() {
               </div>
 
               <div className="mt-5 pt-4 border-t border-vc-default space-y-2">
-                <a
-                  href="/login"
+                <Link
+                  to="/login"
                   onClick={() => setIsOpen(false)}
                   className="block w-full px-4 py-2.5 text-center text-[14px] font-medium text-vc-secondary border border-vc-default rounded hover:border-vc-accent hover:text-vc-accent transition-colors"
                 >
                   Sign in
-                </a>
-                <a
-                  href="/register"
+                </Link>
+                <Link
+                  to="/register"
                   onClick={() => setIsOpen(false)}
                   className="block w-full px-4 py-2.5 text-center text-[14px] font-medium bg-vc-accent text-white rounded hover:bg-vc-accent-hover transition-colors"
                 >
                   Get started
-                </a>
+                </Link>
               </div>
             </div>
           </div>,

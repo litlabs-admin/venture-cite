@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -154,7 +154,7 @@ function VisibilityDrivers({ h }: { h?: HeroData }) {
         <DriverRow label="Last scan" value={formatRelativeTime(h.lastScanAt)} />
       </div>
       <Link
-        href="/monitor"
+        to="/monitor"
         className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
       >
         Open full breakdown in Monitor
@@ -356,7 +356,7 @@ export default function Home() {
         </button>
 
         {/* Week-over-week change. */}
-        <Link href="/monitor" className={`${TILE_BASE} flex flex-col text-left`}>
+        <Link to="/monitor" className={`${TILE_BASE} flex flex-col text-left`}>
           <TileLabel icon={Activity}>This week</TileLabel>
           <div className="mt-4 flex h-9 items-baseline gap-1">
             {trend.isLoading ? (
@@ -394,7 +394,7 @@ export default function Home() {
         </Link>
 
         {/* Cited / total — the raw count. */}
-        <Link href="/monitor" className={`${TILE_BASE} flex flex-col text-left`}>
+        <Link to="/monitor" className={`${TILE_BASE} flex flex-col text-left`}>
           <TileLabel icon={Activity}>Cited checks</TileLabel>
           <div className="mt-4 flex h-9 items-baseline gap-1">
             {hero.isLoading ? (
@@ -429,7 +429,7 @@ export default function Home() {
       {/* 4. Supplementary signals — two equal columns. */}
       <div className="mt-6 grid gap-3 md:grid-cols-2">
         {/* Open issues → Diagnose. */}
-        <Link href="/diagnose" className={TILE_BASE}>
+        <Link to="/diagnose" className={TILE_BASE}>
           <TileLabel icon={Stethoscope}>Open issues</TileLabel>
           <div className="mt-3">
             {hero.isLoading ? (
@@ -459,7 +459,7 @@ export default function Home() {
         </Link>
 
         {/* Competitor pressure → Monitor competitors. */}
-        <Link href="/monitor" className={TILE_BASE}>
+        <Link to="/monitor" className={TILE_BASE}>
           <TileLabel icon={Swords}>Competitor pressure</TileLabel>
           <div className="mt-3">
             {leaderboard.isLoading ? (
@@ -489,7 +489,7 @@ export default function Home() {
 
       {/* 5. Cadence ribbon — slimmer chrome to signal "ambient", not a tile. */}
       <Link
-        href="/monitor"
+        to="/monitor"
         className="group mt-3 flex items-center gap-3 rounded-lg border border-border bg-card px-5 py-3 text-sm transition-colors hover:bg-accent/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
       >
         {scanRunning ? (

@@ -18,8 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { runLlmJob } from "@/lib/llmJobs";
-import { Helmet } from "react-helmet-async";
-import { useLocation } from "wouter";
+import { useNavigate } from "@tanstack/react-router";
 import type { KeywordResearch } from "@shared/schema";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -48,7 +47,7 @@ const contentTypeLabels: Record<string, string> = {
 
 export default function KeywordResearchPage() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const { selectedBrandId, selectedBrand } = useBrandSelection();
   const [statusFilter, setStatusFilter] = usePersistedState<string>("vc_keywords_filter", "all");
 
@@ -147,13 +146,15 @@ export default function KeywordResearchPage() {
   // mutation hook is removed to keep the page lean.)
 
   const handleGenerateContent = (keyword: KeywordResearch) => {
-    const params = new URLSearchParams({
-      keyword: keyword.keyword,
-      industry: selectedBrand?.industry || "",
-      type: keyword.suggestedContentType || "article",
-      brandId: selectedBrandId,
+    navigate({
+      to: "/content",
+      search: {
+        keyword: keyword.keyword,
+        industry: selectedBrand?.industry || "",
+        type: keyword.suggestedContentType || "article",
+        brandId: selectedBrandId,
+      },
     });
-    setLocation(`/content?${params.toString()}`);
   };
 
   const getScoreColor = (score: number) => {
@@ -165,13 +166,8 @@ export default function KeywordResearchPage() {
 
   return (
     <div className="space-y-8">
-      <Helmet>
-        <title>AI Keyword Research | VentureCite</title>
-        <meta
-          name="description"
-          content="Discover high-opportunity keywords for AI search optimization with intelligent research powered by GPT-4."
-        />
-      </Helmet>
+      {/* Title/description moved to src/routes/_app/keyword-research.tsx's
+          `head()` — metadata belongs to the route, not this component. */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <Card className="lg:col-span-1">

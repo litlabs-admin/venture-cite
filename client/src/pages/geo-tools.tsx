@@ -39,8 +39,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { safeExternalHref } from "@/lib/urlSafety";
-import { Helmet } from "react-helmet-async";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import type { Listicle, BofuContent, WikipediaMention, Competitor } from "@shared/schema";
 import { StatusDot } from "@/components/foundations";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
@@ -521,10 +520,12 @@ export default function GeoTools() {
   });
 
   return (
+    // Only ever rendered client-side, as a lazy tab inside
+    // client/src/pages/act.tsx (no route of its own) — title/meta removed
+    // per this task's blanket rule; /act falls back to root defaults.
+    // (Fragment kept: BofuContentSheet/dialogs below are siblings of the
+    // main <div>, not children of it.)
     <>
-      <Helmet>
-        <title>GEO Assets - VentureCite</title>
-      </Helmet>
       <div className="space-y-8">
         {selectedBrandId ? (
           <>
@@ -1149,7 +1150,7 @@ export default function GeoTools() {
               <p className="text-muted-foreground mb-4">
                 Choose a brand above or create one to access GEO tools
               </p>
-              <Link href="/brands">
+              <Link to="/brands">
                 <Button data-testid="button-go-to-brands">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Your First Brand

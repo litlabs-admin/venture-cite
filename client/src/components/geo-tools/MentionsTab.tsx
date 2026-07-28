@@ -14,7 +14,7 @@
 // Bulk-select mode with checkboxes on each card.
 
 import React, { useState, useCallback, useMemo } from "react";
-import { useLocation, useSearch } from "wouter";
+import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2, Plus, CheckSquare, Square, Loader2 } from "lucide-react";
 
@@ -73,8 +73,17 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
 // verify-tour-targets script can statically discover them):
 //   data-tour-id="mentions.firstResult"
 export default function MentionsTab({ brandId }: MentionsTabProps) {
-  const [location, setLocation] = useLocation();
-  const searchString = useSearch();
+  // Mounted under more than one route (the /monitor?tab=mentions spine tab
+  // and the legacy /geo-tools page), so — like SpineShell — this reads/writes
+  // search loosely ({ strict: false } / to: location) rather than against
+  // one route's typed `Route.useSearch()` — see native-api-contract.md rule
+  // 3. `mention` is declared (as an optional string) on /monitor's schema in
+  // src/routes/-shared/searchSchemas.ts; `useSearch({ strict: false })`'s
+  // FullSearchSchema merges across the whole route tree, so it types here
+  // too even when mounted under /geo-tools, which doesn't declare it itself.
+  const navigate = useNavigate();
+  const location = useRouterState({ select: (s) => s.location.pathname });
+  const search = useSearch({ strict: false });
 
   // ── Hook ─────────────────────────────────────────────────────────────────
 
@@ -125,10 +134,10 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
 
   // ── URL-driven detail sheet ───────────────────────────────────────────────
 
-  const openMentionId = useMemo(() => {
-    const params = new URLSearchParams(searchString);
-    return params.get("mention");
-  }, [searchString]);
+  const openMentionId = useMemo(
+    () => (typeof search.mention === "string" ? search.mention : null),
+    [search.mention],
+  );
 
   const activeMention = useMemo(
     () => (openMentionId ? (mentions.find((m) => m.id === openMentionId) ?? null) : null),
@@ -137,22 +146,33 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
 
   const openDetailSheet = useCallback(
     (mention: BrandMention) => {
-      const params = new URLSearchParams(searchString);
-      params.set("mention", mention.id);
-      const qs = params.toString();
-      const path = location.split("?")[0];
-      setLocation(qs ? `${path}?${qs}` : path, { replace: true });
+      // `to: location` rather than a route literal: this tab mounts under
+      // more than one route (see the comment above), so `location` (the
+      // current pathname) is a runtime `string`, not a literal — TanStack
+      // Router accepts a plain `string` `to` for exactly this case. `search`
+      // is a function of the previous search object so every existing param
+      // (notably `brandId`, read by useBrandSelection() from nearly every
+      // page) survives — only `mention` changes.
+      navigate({
+        to: location,
+        search: (prev: Record<string, unknown>) => ({ ...prev, mention: mention.id }),
+        replace: true,
+      });
     },
-    [location, searchString, setLocation],
+    [location, navigate],
   );
 
   const closeDetailSheet = useCallback(() => {
-    const params = new URLSearchParams(searchString);
-    params.delete("mention");
-    const qs = params.toString();
-    const path = location.split("?")[0];
-    setLocation(qs ? `${path}?${qs}` : path, { replace: true });
-  }, [location, searchString, setLocation]);
+    navigate({
+      to: location,
+      search: (prev: Record<string, unknown>) => {
+        const next = { ...prev };
+        delete next.mention;
+        return next;
+      },
+      replace: true,
+    });
+  }, [location, navigate]);
 
   // ── Bulk select ───────────────────────────────────────────────────────────
 
@@ -288,7 +308,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
         onAddVariation={() => {
           // Variation management lives on the brands page. Navigate there;
           // the brand row exposes the name-variations editor.
-          setLocation("/brands");
+          navigate({ to: "/brands" });
         }}
         onToggleMonitor={handleToggleMonitor}
       />
