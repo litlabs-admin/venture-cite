@@ -134,9 +134,25 @@ setup("authenticate", async ({ browser }) => {
         throw new Error(`cached bearer token rejected: /api/brands -> ${probe.status()}`);
       }
 
+      // 🔴 Persist the session back to disk before trusting the reuse.
+      //
+      // Everything above validated the token held by the LIVE PAGE, and the
+      // in-page Supabase client silently refreshes on load — so a state file
+      // whose stored JWT expired hours ago still passes both the page check
+      // and the bearer probe, because both see the refreshed token. Without
+      // this write, the file keeps the dead JWT, every spec loads it via
+      // `storageState`, and the run fails with 401s that look like data bugs
+      // ("Test account has no brands", "checkout returned 401").
+      //
+      // That is not hypothetical: it is exactly how a 3-hour-old state file
+      // produced four unrelated-looking failures while setup logged "still
+      // valid". Re-saving is also what makes the reuse worth having — it
+      // rolls the expiry forward instead of counting down to it.
+      await context.storageState({ path: STORAGE_STATE });
+
       reused = true;
       console.log(
-        "[auth.setup] Cached storage state is still valid (page + bearer token verified) — reusing it, 0 logins performed.",
+        "[auth.setup] Cached storage state is still valid (page + bearer token verified) — refreshed session written back, 0 logins performed.",
       );
     } catch {
       console.log("[auth.setup] Cached storage state is stale/expired — logging in fresh.");
