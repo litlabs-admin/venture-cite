@@ -17,3 +17,9 @@ VentureCite_Phase1_PRD.md
 
 # Standalone Next.js reference build for /home2 — own toolchain.
 trakkr.ai
+
+# TanStack Router codegen. Its own header says to exclude it from linters
+# and formatters: the plugin regenerates it with its own style, so letting
+# prettier reformat it produces a permanent diff that reappears on every
+# dev-server start.
+src/routeTree.gen.ts

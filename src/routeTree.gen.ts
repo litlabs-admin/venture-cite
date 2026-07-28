@@ -8,889 +8,891 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root";
-import { Route as IndexRouteImport } from "./routes/index";
-import { Route as AppRouteImport } from "./routes/_app";
-import { Route as GlossaryRouteImport } from "./routes/glossary";
-import { Route as HealthRouteImport } from "./routes/health";
-import { Route as PricingRouteImport } from "./routes/pricing";
-import { Route as PrivacyRouteImport } from "./routes/privacy";
-import { Route as AppSplatRouteImport } from "./routes/_app/$";
-import { Route as AppActRouteImport } from "./routes/_app/act";
-import { Route as AppAiIntelligenceRouteImport } from "./routes/_app/ai-intelligence";
-import { Route as AppAiVisibilityRouteImport } from "./routes/_app/ai-visibility";
-import { Route as AppArticlesRouteImport } from "./routes/_app/articles";
-import { Route as AppBrandFactSheetRouteImport } from "./routes/_app/brand-fact-sheet";
-import { Route as AppBrandsRouteImport } from "./routes/_app/brands";
-import { Route as AppCitationsRouteImport } from "./routes/_app/citations";
-import { Route as AppCommunityRouteImport } from "./routes/_app/community";
-import { Route as AppCompetitorsRouteImport } from "./routes/_app/competitors";
-import { Route as AppContentRouteImport } from "./routes/_app/content";
-import { Route as AppCrawlerCheckRouteImport } from "./routes/_app/crawler-check";
-import { Route as AppDashboardRouteImport } from "./routes/_app/dashboard";
-import { Route as AppDiagnoseRouteImport } from "./routes/_app/diagnose";
-import { Route as AppFaqManagerRouteImport } from "./routes/_app/faq-manager";
-import { Route as AppForgotPasswordRouteImport } from "./routes/_app/forgot-password";
-import { Route as AppGeoAnalyticsRouteImport } from "./routes/_app/geo-analytics";
-import { Route as AppGeoSignalsRouteImport } from "./routes/_app/geo-signals";
-import { Route as AppGeoToolsRouteImport } from "./routes/_app/geo-tools";
-import { Route as AppHome2RouteImport } from "./routes/_app/home2";
-import { Route as AppKeywordResearchRouteImport } from "./routes/_app/keyword-research";
-import { Route as AppLoginRouteImport } from "./routes/_app/login";
-import { Route as AppMonitorRouteImport } from "./routes/_app/monitor";
-import { Route as AppOpportunitiesRouteImport } from "./routes/_app/opportunities";
-import { Route as AppRegisterRouteImport } from "./routes/_app/register";
-import { Route as AppReportRouteImport } from "./routes/_app/report";
-import { Route as AppResetPasswordRouteImport } from "./routes/_app/reset-password";
-import { Route as AppSettingsRouteImport } from "./routes/_app/settings";
-import { Route as AppSetupRouteImport } from "./routes/_app/setup";
-import { Route as AppVerifyEmailRouteImport } from "./routes/_app/verify-email";
-import { Route as AppWelcomeRouteImport } from "./routes/_app/welcome";
-import { Route as ApiSplatRouteImport } from "./routes/api/$";
-import { Route as WebhooksSplatRouteImport } from "./routes/webhooks/$";
-import { Route as AppAdminScrapeRouteImport } from "./routes/_app/admin.scrape";
-import { Route as AppContentArticleIdRouteImport } from "./routes/_app/content.$articleId";
-import { Route as AppAdminScrapeRunIdRouteImport } from "./routes/_app/admin.scrape.$runId";
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as GlossaryRouteImport } from './routes/glossary'
+import { Route as HealthRouteImport } from './routes/health'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as AppSplatRouteImport } from './routes/_app/$'
+import { Route as AppActRouteImport } from './routes/_app/act'
+import { Route as AppAiIntelligenceRouteImport } from './routes/_app/ai-intelligence'
+import { Route as AppAiVisibilityRouteImport } from './routes/_app/ai-visibility'
+import { Route as AppArticlesRouteImport } from './routes/_app/articles'
+import { Route as AppBrandFactSheetRouteImport } from './routes/_app/brand-fact-sheet'
+import { Route as AppBrandsRouteImport } from './routes/_app/brands'
+import { Route as AppCitationsRouteImport } from './routes/_app/citations'
+import { Route as AppCommunityRouteImport } from './routes/_app/community'
+import { Route as AppCompetitorsRouteImport } from './routes/_app/competitors'
+import { Route as AppContentRouteImport } from './routes/_app/content'
+import { Route as AppCrawlerCheckRouteImport } from './routes/_app/crawler-check'
+import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppDiagnoseRouteImport } from './routes/_app/diagnose'
+import { Route as AppFaqManagerRouteImport } from './routes/_app/faq-manager'
+import { Route as AppForgotPasswordRouteImport } from './routes/_app/forgot-password'
+import { Route as AppGeoAnalyticsRouteImport } from './routes/_app/geo-analytics'
+import { Route as AppGeoSignalsRouteImport } from './routes/_app/geo-signals'
+import { Route as AppGeoToolsRouteImport } from './routes/_app/geo-tools'
+import { Route as AppHome2RouteImport } from './routes/_app/home2'
+import { Route as AppKeywordResearchRouteImport } from './routes/_app/keyword-research'
+import { Route as AppLoginRouteImport } from './routes/_app/login'
+import { Route as AppMonitorRouteImport } from './routes/_app/monitor'
+import { Route as AppOpportunitiesRouteImport } from './routes/_app/opportunities'
+import { Route as AppRegisterRouteImport } from './routes/_app/register'
+import { Route as AppReportRouteImport } from './routes/_app/report'
+import { Route as AppResetPasswordRouteImport } from './routes/_app/reset-password'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppSetupRouteImport } from './routes/_app/setup'
+import { Route as AppVerifyEmailRouteImport } from './routes/_app/verify-email'
+import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
+import { Route as ApiSplatRouteImport } from './routes/api/$'
+import { Route as WebhooksSplatRouteImport } from './routes/webhooks/$'
+import { Route as AppAdminScrapeRouteImport } from './routes/_app/admin.scrape'
+import { Route as AppContentArticleIdRouteImport } from './routes/_app/content.$articleId'
+import { Route as AppAdminScrapeRunIdRouteImport } from './routes/_app/admin.scrape.$runId'
 
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AppRoute = AppRouteImport.update({
-  id: "/_app",
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const GlossaryRoute = GlossaryRouteImport.update({
-  id: "/glossary",
-  path: "/glossary",
+  id: '/glossary',
+  path: '/glossary',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const HealthRoute = HealthRouteImport.update({
-  id: "/health",
-  path: "/health",
+  id: '/health',
+  path: '/health',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const PricingRoute = PricingRouteImport.update({
-  id: "/pricing",
-  path: "/pricing",
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const PrivacyRoute = PrivacyRouteImport.update({
-  id: "/privacy",
-  path: "/privacy",
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AppSplatRoute = AppSplatRouteImport.update({
-  id: "/$",
-  path: "/$",
+  id: '/$',
+  path: '/$',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppActRoute = AppActRouteImport.update({
-  id: "/act",
-  path: "/act",
+  id: '/act',
+  path: '/act',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppAiIntelligenceRoute = AppAiIntelligenceRouteImport.update({
-  id: "/ai-intelligence",
-  path: "/ai-intelligence",
+  id: '/ai-intelligence',
+  path: '/ai-intelligence',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppAiVisibilityRoute = AppAiVisibilityRouteImport.update({
-  id: "/ai-visibility",
-  path: "/ai-visibility",
+  id: '/ai-visibility',
+  path: '/ai-visibility',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppArticlesRoute = AppArticlesRouteImport.update({
-  id: "/articles",
-  path: "/articles",
+  id: '/articles',
+  path: '/articles',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppBrandFactSheetRoute = AppBrandFactSheetRouteImport.update({
-  id: "/brand-fact-sheet",
-  path: "/brand-fact-sheet",
+  id: '/brand-fact-sheet',
+  path: '/brand-fact-sheet',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppBrandsRoute = AppBrandsRouteImport.update({
-  id: "/brands",
-  path: "/brands",
+  id: '/brands',
+  path: '/brands',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppCitationsRoute = AppCitationsRouteImport.update({
-  id: "/citations",
-  path: "/citations",
+  id: '/citations',
+  path: '/citations',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppCommunityRoute = AppCommunityRouteImport.update({
-  id: "/community",
-  path: "/community",
+  id: '/community',
+  path: '/community',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppCompetitorsRoute = AppCompetitorsRouteImport.update({
-  id: "/competitors",
-  path: "/competitors",
+  id: '/competitors',
+  path: '/competitors',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppContentRoute = AppContentRouteImport.update({
-  id: "/content",
-  path: "/content",
+  id: '/content',
+  path: '/content',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppCrawlerCheckRoute = AppCrawlerCheckRouteImport.update({
-  id: "/crawler-check",
-  path: "/crawler-check",
+  id: '/crawler-check',
+  path: '/crawler-check',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
-  id: "/dashboard",
-  path: "/dashboard",
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppDiagnoseRoute = AppDiagnoseRouteImport.update({
-  id: "/diagnose",
-  path: "/diagnose",
+  id: '/diagnose',
+  path: '/diagnose',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppFaqManagerRoute = AppFaqManagerRouteImport.update({
-  id: "/faq-manager",
-  path: "/faq-manager",
+  id: '/faq-manager',
+  path: '/faq-manager',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppForgotPasswordRoute = AppForgotPasswordRouteImport.update({
-  id: "/forgot-password",
-  path: "/forgot-password",
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppGeoAnalyticsRoute = AppGeoAnalyticsRouteImport.update({
-  id: "/geo-analytics",
-  path: "/geo-analytics",
+  id: '/geo-analytics',
+  path: '/geo-analytics',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppGeoSignalsRoute = AppGeoSignalsRouteImport.update({
-  id: "/geo-signals",
-  path: "/geo-signals",
+  id: '/geo-signals',
+  path: '/geo-signals',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppGeoToolsRoute = AppGeoToolsRouteImport.update({
-  id: "/geo-tools",
-  path: "/geo-tools",
+  id: '/geo-tools',
+  path: '/geo-tools',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppHome2Route = AppHome2RouteImport.update({
-  id: "/home2",
-  path: "/home2",
+  id: '/home2',
+  path: '/home2',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppKeywordResearchRoute = AppKeywordResearchRouteImport.update({
-  id: "/keyword-research",
-  path: "/keyword-research",
+  id: '/keyword-research',
+  path: '/keyword-research',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppLoginRoute = AppLoginRouteImport.update({
-  id: "/login",
-  path: "/login",
+  id: '/login',
+  path: '/login',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppMonitorRoute = AppMonitorRouteImport.update({
-  id: "/monitor",
-  path: "/monitor",
+  id: '/monitor',
+  path: '/monitor',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppOpportunitiesRoute = AppOpportunitiesRouteImport.update({
-  id: "/opportunities",
-  path: "/opportunities",
+  id: '/opportunities',
+  path: '/opportunities',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppRegisterRoute = AppRegisterRouteImport.update({
-  id: "/register",
-  path: "/register",
+  id: '/register',
+  path: '/register',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppReportRoute = AppReportRouteImport.update({
-  id: "/report",
-  path: "/report",
+  id: '/report',
+  path: '/report',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppResetPasswordRoute = AppResetPasswordRouteImport.update({
-  id: "/reset-password",
-  path: "/reset-password",
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: "/settings",
-  path: "/settings",
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppSetupRoute = AppSetupRouteImport.update({
-  id: "/setup",
-  path: "/setup",
+  id: '/setup',
+  path: '/setup',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppVerifyEmailRoute = AppVerifyEmailRouteImport.update({
-  id: "/verify-email",
-  path: "/verify-email",
+  id: '/verify-email',
+  path: '/verify-email',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppWelcomeRoute = AppWelcomeRouteImport.update({
-  id: "/welcome",
-  path: "/welcome",
+  id: '/welcome',
+  path: '/welcome',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
-  id: "/api/$",
-  path: "/api/$",
+  id: '/api/$',
+  path: '/api/$',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const WebhooksSplatRoute = WebhooksSplatRouteImport.update({
-  id: "/webhooks/$",
-  path: "/webhooks/$",
+  id: '/webhooks/$',
+  path: '/webhooks/$',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AppAdminScrapeRoute = AppAdminScrapeRouteImport.update({
-  id: "/admin/scrape",
-  path: "/admin/scrape",
+  id: '/admin/scrape',
+  path: '/admin/scrape',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppContentArticleIdRoute = AppContentArticleIdRouteImport.update({
-  id: "/$articleId",
-  path: "/$articleId",
+  id: '/$articleId',
+  path: '/$articleId',
   getParentRoute: () => AppContentRoute,
-} as any);
+} as any)
 const AppAdminScrapeRunIdRoute = AppAdminScrapeRunIdRouteImport.update({
-  id: "/$runId",
-  path: "/$runId",
+  id: '/$runId',
+  path: '/$runId',
   getParentRoute: () => AppAdminScrapeRoute,
-} as any);
+} as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute;
-  "/glossary": typeof GlossaryRoute;
-  "/health": typeof HealthRoute;
-  "/pricing": typeof PricingRoute;
-  "/privacy": typeof PrivacyRoute;
-  "/$": typeof AppSplatRoute;
-  "/act": typeof AppActRoute;
-  "/ai-intelligence": typeof AppAiIntelligenceRoute;
-  "/ai-visibility": typeof AppAiVisibilityRoute;
-  "/articles": typeof AppArticlesRoute;
-  "/brand-fact-sheet": typeof AppBrandFactSheetRoute;
-  "/brands": typeof AppBrandsRoute;
-  "/citations": typeof AppCitationsRoute;
-  "/community": typeof AppCommunityRoute;
-  "/competitors": typeof AppCompetitorsRoute;
-  "/content": typeof AppContentRouteWithChildren;
-  "/crawler-check": typeof AppCrawlerCheckRoute;
-  "/dashboard": typeof AppDashboardRoute;
-  "/diagnose": typeof AppDiagnoseRoute;
-  "/faq-manager": typeof AppFaqManagerRoute;
-  "/forgot-password": typeof AppForgotPasswordRoute;
-  "/geo-analytics": typeof AppGeoAnalyticsRoute;
-  "/geo-signals": typeof AppGeoSignalsRoute;
-  "/geo-tools": typeof AppGeoToolsRoute;
-  "/home2": typeof AppHome2Route;
-  "/keyword-research": typeof AppKeywordResearchRoute;
-  "/login": typeof AppLoginRoute;
-  "/monitor": typeof AppMonitorRoute;
-  "/opportunities": typeof AppOpportunitiesRoute;
-  "/register": typeof AppRegisterRoute;
-  "/report": typeof AppReportRoute;
-  "/reset-password": typeof AppResetPasswordRoute;
-  "/settings": typeof AppSettingsRoute;
-  "/setup": typeof AppSetupRoute;
-  "/verify-email": typeof AppVerifyEmailRoute;
-  "/welcome": typeof AppWelcomeRoute;
-  "/api/$": typeof ApiSplatRoute;
-  "/webhooks/$": typeof WebhooksSplatRoute;
-  "/admin/scrape": typeof AppAdminScrapeRouteWithChildren;
-  "/content/$articleId": typeof AppContentArticleIdRoute;
-  "/admin/scrape/$runId": typeof AppAdminScrapeRunIdRoute;
+  '/': typeof IndexRoute
+  '/glossary': typeof GlossaryRoute
+  '/health': typeof HealthRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/$': typeof AppSplatRoute
+  '/act': typeof AppActRoute
+  '/ai-intelligence': typeof AppAiIntelligenceRoute
+  '/ai-visibility': typeof AppAiVisibilityRoute
+  '/articles': typeof AppArticlesRoute
+  '/brand-fact-sheet': typeof AppBrandFactSheetRoute
+  '/brands': typeof AppBrandsRoute
+  '/citations': typeof AppCitationsRoute
+  '/community': typeof AppCommunityRoute
+  '/competitors': typeof AppCompetitorsRoute
+  '/content': typeof AppContentRouteWithChildren
+  '/crawler-check': typeof AppCrawlerCheckRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/diagnose': typeof AppDiagnoseRoute
+  '/faq-manager': typeof AppFaqManagerRoute
+  '/forgot-password': typeof AppForgotPasswordRoute
+  '/geo-analytics': typeof AppGeoAnalyticsRoute
+  '/geo-signals': typeof AppGeoSignalsRoute
+  '/geo-tools': typeof AppGeoToolsRoute
+  '/home2': typeof AppHome2Route
+  '/keyword-research': typeof AppKeywordResearchRoute
+  '/login': typeof AppLoginRoute
+  '/monitor': typeof AppMonitorRoute
+  '/opportunities': typeof AppOpportunitiesRoute
+  '/register': typeof AppRegisterRoute
+  '/report': typeof AppReportRoute
+  '/reset-password': typeof AppResetPasswordRoute
+  '/settings': typeof AppSettingsRoute
+  '/setup': typeof AppSetupRoute
+  '/verify-email': typeof AppVerifyEmailRoute
+  '/welcome': typeof AppWelcomeRoute
+  '/api/$': typeof ApiSplatRoute
+  '/webhooks/$': typeof WebhooksSplatRoute
+  '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
+  '/content/$articleId': typeof AppContentArticleIdRoute
+  '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute;
-  "/glossary": typeof GlossaryRoute;
-  "/health": typeof HealthRoute;
-  "/pricing": typeof PricingRoute;
-  "/privacy": typeof PrivacyRoute;
-  "/$": typeof AppSplatRoute;
-  "/act": typeof AppActRoute;
-  "/ai-intelligence": typeof AppAiIntelligenceRoute;
-  "/ai-visibility": typeof AppAiVisibilityRoute;
-  "/articles": typeof AppArticlesRoute;
-  "/brand-fact-sheet": typeof AppBrandFactSheetRoute;
-  "/brands": typeof AppBrandsRoute;
-  "/citations": typeof AppCitationsRoute;
-  "/community": typeof AppCommunityRoute;
-  "/competitors": typeof AppCompetitorsRoute;
-  "/content": typeof AppContentRouteWithChildren;
-  "/crawler-check": typeof AppCrawlerCheckRoute;
-  "/dashboard": typeof AppDashboardRoute;
-  "/diagnose": typeof AppDiagnoseRoute;
-  "/faq-manager": typeof AppFaqManagerRoute;
-  "/forgot-password": typeof AppForgotPasswordRoute;
-  "/geo-analytics": typeof AppGeoAnalyticsRoute;
-  "/geo-signals": typeof AppGeoSignalsRoute;
-  "/geo-tools": typeof AppGeoToolsRoute;
-  "/home2": typeof AppHome2Route;
-  "/keyword-research": typeof AppKeywordResearchRoute;
-  "/login": typeof AppLoginRoute;
-  "/monitor": typeof AppMonitorRoute;
-  "/opportunities": typeof AppOpportunitiesRoute;
-  "/register": typeof AppRegisterRoute;
-  "/report": typeof AppReportRoute;
-  "/reset-password": typeof AppResetPasswordRoute;
-  "/settings": typeof AppSettingsRoute;
-  "/setup": typeof AppSetupRoute;
-  "/verify-email": typeof AppVerifyEmailRoute;
-  "/welcome": typeof AppWelcomeRoute;
-  "/api/$": typeof ApiSplatRoute;
-  "/webhooks/$": typeof WebhooksSplatRoute;
-  "/admin/scrape": typeof AppAdminScrapeRouteWithChildren;
-  "/content/$articleId": typeof AppContentArticleIdRoute;
-  "/admin/scrape/$runId": typeof AppAdminScrapeRunIdRoute;
+  '/': typeof IndexRoute
+  '/glossary': typeof GlossaryRoute
+  '/health': typeof HealthRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/$': typeof AppSplatRoute
+  '/act': typeof AppActRoute
+  '/ai-intelligence': typeof AppAiIntelligenceRoute
+  '/ai-visibility': typeof AppAiVisibilityRoute
+  '/articles': typeof AppArticlesRoute
+  '/brand-fact-sheet': typeof AppBrandFactSheetRoute
+  '/brands': typeof AppBrandsRoute
+  '/citations': typeof AppCitationsRoute
+  '/community': typeof AppCommunityRoute
+  '/competitors': typeof AppCompetitorsRoute
+  '/content': typeof AppContentRouteWithChildren
+  '/crawler-check': typeof AppCrawlerCheckRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/diagnose': typeof AppDiagnoseRoute
+  '/faq-manager': typeof AppFaqManagerRoute
+  '/forgot-password': typeof AppForgotPasswordRoute
+  '/geo-analytics': typeof AppGeoAnalyticsRoute
+  '/geo-signals': typeof AppGeoSignalsRoute
+  '/geo-tools': typeof AppGeoToolsRoute
+  '/home2': typeof AppHome2Route
+  '/keyword-research': typeof AppKeywordResearchRoute
+  '/login': typeof AppLoginRoute
+  '/monitor': typeof AppMonitorRoute
+  '/opportunities': typeof AppOpportunitiesRoute
+  '/register': typeof AppRegisterRoute
+  '/report': typeof AppReportRoute
+  '/reset-password': typeof AppResetPasswordRoute
+  '/settings': typeof AppSettingsRoute
+  '/setup': typeof AppSetupRoute
+  '/verify-email': typeof AppVerifyEmailRoute
+  '/welcome': typeof AppWelcomeRoute
+  '/api/$': typeof ApiSplatRoute
+  '/webhooks/$': typeof WebhooksSplatRoute
+  '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
+  '/content/$articleId': typeof AppContentArticleIdRoute
+  '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  "/": typeof IndexRoute;
-  "/_app": typeof AppRouteWithChildren;
-  "/glossary": typeof GlossaryRoute;
-  "/health": typeof HealthRoute;
-  "/pricing": typeof PricingRoute;
-  "/privacy": typeof PrivacyRoute;
-  "/_app/$": typeof AppSplatRoute;
-  "/_app/act": typeof AppActRoute;
-  "/_app/ai-intelligence": typeof AppAiIntelligenceRoute;
-  "/_app/ai-visibility": typeof AppAiVisibilityRoute;
-  "/_app/articles": typeof AppArticlesRoute;
-  "/_app/brand-fact-sheet": typeof AppBrandFactSheetRoute;
-  "/_app/brands": typeof AppBrandsRoute;
-  "/_app/citations": typeof AppCitationsRoute;
-  "/_app/community": typeof AppCommunityRoute;
-  "/_app/competitors": typeof AppCompetitorsRoute;
-  "/_app/content": typeof AppContentRouteWithChildren;
-  "/_app/crawler-check": typeof AppCrawlerCheckRoute;
-  "/_app/dashboard": typeof AppDashboardRoute;
-  "/_app/diagnose": typeof AppDiagnoseRoute;
-  "/_app/faq-manager": typeof AppFaqManagerRoute;
-  "/_app/forgot-password": typeof AppForgotPasswordRoute;
-  "/_app/geo-analytics": typeof AppGeoAnalyticsRoute;
-  "/_app/geo-signals": typeof AppGeoSignalsRoute;
-  "/_app/geo-tools": typeof AppGeoToolsRoute;
-  "/_app/home2": typeof AppHome2Route;
-  "/_app/keyword-research": typeof AppKeywordResearchRoute;
-  "/_app/login": typeof AppLoginRoute;
-  "/_app/monitor": typeof AppMonitorRoute;
-  "/_app/opportunities": typeof AppOpportunitiesRoute;
-  "/_app/register": typeof AppRegisterRoute;
-  "/_app/report": typeof AppReportRoute;
-  "/_app/reset-password": typeof AppResetPasswordRoute;
-  "/_app/settings": typeof AppSettingsRoute;
-  "/_app/setup": typeof AppSetupRoute;
-  "/_app/verify-email": typeof AppVerifyEmailRoute;
-  "/_app/welcome": typeof AppWelcomeRoute;
-  "/api/$": typeof ApiSplatRoute;
-  "/webhooks/$": typeof WebhooksSplatRoute;
-  "/_app/admin/scrape": typeof AppAdminScrapeRouteWithChildren;
-  "/_app/content/$articleId": typeof AppContentArticleIdRoute;
-  "/_app/admin/scrape/$runId": typeof AppAdminScrapeRunIdRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/glossary': typeof GlossaryRoute
+  '/health': typeof HealthRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/_app/$': typeof AppSplatRoute
+  '/_app/act': typeof AppActRoute
+  '/_app/ai-intelligence': typeof AppAiIntelligenceRoute
+  '/_app/ai-visibility': typeof AppAiVisibilityRoute
+  '/_app/articles': typeof AppArticlesRoute
+  '/_app/brand-fact-sheet': typeof AppBrandFactSheetRoute
+  '/_app/brands': typeof AppBrandsRoute
+  '/_app/citations': typeof AppCitationsRoute
+  '/_app/community': typeof AppCommunityRoute
+  '/_app/competitors': typeof AppCompetitorsRoute
+  '/_app/content': typeof AppContentRouteWithChildren
+  '/_app/crawler-check': typeof AppCrawlerCheckRoute
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/diagnose': typeof AppDiagnoseRoute
+  '/_app/faq-manager': typeof AppFaqManagerRoute
+  '/_app/forgot-password': typeof AppForgotPasswordRoute
+  '/_app/geo-analytics': typeof AppGeoAnalyticsRoute
+  '/_app/geo-signals': typeof AppGeoSignalsRoute
+  '/_app/geo-tools': typeof AppGeoToolsRoute
+  '/_app/home2': typeof AppHome2Route
+  '/_app/keyword-research': typeof AppKeywordResearchRoute
+  '/_app/login': typeof AppLoginRoute
+  '/_app/monitor': typeof AppMonitorRoute
+  '/_app/opportunities': typeof AppOpportunitiesRoute
+  '/_app/register': typeof AppRegisterRoute
+  '/_app/report': typeof AppReportRoute
+  '/_app/reset-password': typeof AppResetPasswordRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/setup': typeof AppSetupRoute
+  '/_app/verify-email': typeof AppVerifyEmailRoute
+  '/_app/welcome': typeof AppWelcomeRoute
+  '/api/$': typeof ApiSplatRoute
+  '/webhooks/$': typeof WebhooksSplatRoute
+  '/_app/admin/scrape': typeof AppAdminScrapeRouteWithChildren
+  '/_app/content/$articleId': typeof AppContentArticleIdRoute
+  '/_app/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
+  fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | "/"
-    | "/glossary"
-    | "/health"
-    | "/pricing"
-    | "/privacy"
-    | "/$"
-    | "/act"
-    | "/ai-intelligence"
-    | "/ai-visibility"
-    | "/articles"
-    | "/brand-fact-sheet"
-    | "/brands"
-    | "/citations"
-    | "/community"
-    | "/competitors"
-    | "/content"
-    | "/crawler-check"
-    | "/dashboard"
-    | "/diagnose"
-    | "/faq-manager"
-    | "/forgot-password"
-    | "/geo-analytics"
-    | "/geo-signals"
-    | "/geo-tools"
-    | "/home2"
-    | "/keyword-research"
-    | "/login"
-    | "/monitor"
-    | "/opportunities"
-    | "/register"
-    | "/report"
-    | "/reset-password"
-    | "/settings"
-    | "/setup"
-    | "/verify-email"
-    | "/welcome"
-    | "/api/$"
-    | "/webhooks/$"
-    | "/admin/scrape"
-    | "/content/$articleId"
-    | "/admin/scrape/$runId";
-  fileRoutesByTo: FileRoutesByTo;
+    | '/'
+    | '/glossary'
+    | '/health'
+    | '/pricing'
+    | '/privacy'
+    | '/$'
+    | '/act'
+    | '/ai-intelligence'
+    | '/ai-visibility'
+    | '/articles'
+    | '/brand-fact-sheet'
+    | '/brands'
+    | '/citations'
+    | '/community'
+    | '/competitors'
+    | '/content'
+    | '/crawler-check'
+    | '/dashboard'
+    | '/diagnose'
+    | '/faq-manager'
+    | '/forgot-password'
+    | '/geo-analytics'
+    | '/geo-signals'
+    | '/geo-tools'
+    | '/home2'
+    | '/keyword-research'
+    | '/login'
+    | '/monitor'
+    | '/opportunities'
+    | '/register'
+    | '/report'
+    | '/reset-password'
+    | '/settings'
+    | '/setup'
+    | '/verify-email'
+    | '/welcome'
+    | '/api/$'
+    | '/webhooks/$'
+    | '/admin/scrape'
+    | '/content/$articleId'
+    | '/admin/scrape/$runId'
+  fileRoutesByTo: FileRoutesByTo
   to:
-    | "/"
-    | "/glossary"
-    | "/health"
-    | "/pricing"
-    | "/privacy"
-    | "/$"
-    | "/act"
-    | "/ai-intelligence"
-    | "/ai-visibility"
-    | "/articles"
-    | "/brand-fact-sheet"
-    | "/brands"
-    | "/citations"
-    | "/community"
-    | "/competitors"
-    | "/content"
-    | "/crawler-check"
-    | "/dashboard"
-    | "/diagnose"
-    | "/faq-manager"
-    | "/forgot-password"
-    | "/geo-analytics"
-    | "/geo-signals"
-    | "/geo-tools"
-    | "/home2"
-    | "/keyword-research"
-    | "/login"
-    | "/monitor"
-    | "/opportunities"
-    | "/register"
-    | "/report"
-    | "/reset-password"
-    | "/settings"
-    | "/setup"
-    | "/verify-email"
-    | "/welcome"
-    | "/api/$"
-    | "/webhooks/$"
-    | "/admin/scrape"
-    | "/content/$articleId"
-    | "/admin/scrape/$runId";
+    | '/'
+    | '/glossary'
+    | '/health'
+    | '/pricing'
+    | '/privacy'
+    | '/$'
+    | '/act'
+    | '/ai-intelligence'
+    | '/ai-visibility'
+    | '/articles'
+    | '/brand-fact-sheet'
+    | '/brands'
+    | '/citations'
+    | '/community'
+    | '/competitors'
+    | '/content'
+    | '/crawler-check'
+    | '/dashboard'
+    | '/diagnose'
+    | '/faq-manager'
+    | '/forgot-password'
+    | '/geo-analytics'
+    | '/geo-signals'
+    | '/geo-tools'
+    | '/home2'
+    | '/keyword-research'
+    | '/login'
+    | '/monitor'
+    | '/opportunities'
+    | '/register'
+    | '/report'
+    | '/reset-password'
+    | '/settings'
+    | '/setup'
+    | '/verify-email'
+    | '/welcome'
+    | '/api/$'
+    | '/webhooks/$'
+    | '/admin/scrape'
+    | '/content/$articleId'
+    | '/admin/scrape/$runId'
   id:
-    | "__root__"
-    | "/"
-    | "/_app"
-    | "/glossary"
-    | "/health"
-    | "/pricing"
-    | "/privacy"
-    | "/_app/$"
-    | "/_app/act"
-    | "/_app/ai-intelligence"
-    | "/_app/ai-visibility"
-    | "/_app/articles"
-    | "/_app/brand-fact-sheet"
-    | "/_app/brands"
-    | "/_app/citations"
-    | "/_app/community"
-    | "/_app/competitors"
-    | "/_app/content"
-    | "/_app/crawler-check"
-    | "/_app/dashboard"
-    | "/_app/diagnose"
-    | "/_app/faq-manager"
-    | "/_app/forgot-password"
-    | "/_app/geo-analytics"
-    | "/_app/geo-signals"
-    | "/_app/geo-tools"
-    | "/_app/home2"
-    | "/_app/keyword-research"
-    | "/_app/login"
-    | "/_app/monitor"
-    | "/_app/opportunities"
-    | "/_app/register"
-    | "/_app/report"
-    | "/_app/reset-password"
-    | "/_app/settings"
-    | "/_app/setup"
-    | "/_app/verify-email"
-    | "/_app/welcome"
-    | "/api/$"
-    | "/webhooks/$"
-    | "/_app/admin/scrape"
-    | "/_app/content/$articleId"
-    | "/_app/admin/scrape/$runId";
-  fileRoutesById: FileRoutesById;
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/glossary'
+    | '/health'
+    | '/pricing'
+    | '/privacy'
+    | '/_app/$'
+    | '/_app/act'
+    | '/_app/ai-intelligence'
+    | '/_app/ai-visibility'
+    | '/_app/articles'
+    | '/_app/brand-fact-sheet'
+    | '/_app/brands'
+    | '/_app/citations'
+    | '/_app/community'
+    | '/_app/competitors'
+    | '/_app/content'
+    | '/_app/crawler-check'
+    | '/_app/dashboard'
+    | '/_app/diagnose'
+    | '/_app/faq-manager'
+    | '/_app/forgot-password'
+    | '/_app/geo-analytics'
+    | '/_app/geo-signals'
+    | '/_app/geo-tools'
+    | '/_app/home2'
+    | '/_app/keyword-research'
+    | '/_app/login'
+    | '/_app/monitor'
+    | '/_app/opportunities'
+    | '/_app/register'
+    | '/_app/report'
+    | '/_app/reset-password'
+    | '/_app/settings'
+    | '/_app/setup'
+    | '/_app/verify-email'
+    | '/_app/welcome'
+    | '/api/$'
+    | '/webhooks/$'
+    | '/_app/admin/scrape'
+    | '/_app/content/$articleId'
+    | '/_app/admin/scrape/$runId'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  AppRoute: typeof AppRouteWithChildren;
-  GlossaryRoute: typeof GlossaryRoute;
-  HealthRoute: typeof HealthRoute;
-  PricingRoute: typeof PricingRoute;
-  PrivacyRoute: typeof PrivacyRoute;
-  ApiSplatRoute: typeof ApiSplatRoute;
-  WebhooksSplatRoute: typeof WebhooksSplatRoute;
+  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  GlossaryRoute: typeof GlossaryRoute
+  HealthRoute: typeof HealthRoute
+  PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ApiSplatRoute: typeof ApiSplatRoute
+  WebhooksSplatRoute: typeof WebhooksSplatRoute
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/": {
-      id: "/";
-      path: "/";
-      fullPath: "/";
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/_app": {
-      id: "/_app";
-      path: "";
-      fullPath: "/";
-      preLoaderRoute: typeof AppRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/glossary": {
-      id: "/glossary";
-      path: "/glossary";
-      fullPath: "/glossary";
-      preLoaderRoute: typeof GlossaryRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/health": {
-      id: "/health";
-      path: "/health";
-      fullPath: "/health";
-      preLoaderRoute: typeof HealthRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/pricing": {
-      id: "/pricing";
-      path: "/pricing";
-      fullPath: "/pricing";
-      preLoaderRoute: typeof PricingRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/privacy": {
-      id: "/privacy";
-      path: "/privacy";
-      fullPath: "/privacy";
-      preLoaderRoute: typeof PrivacyRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/_app/$": {
-      id: "/_app/$";
-      path: "/$";
-      fullPath: "/$";
-      preLoaderRoute: typeof AppSplatRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/act": {
-      id: "/_app/act";
-      path: "/act";
-      fullPath: "/act";
-      preLoaderRoute: typeof AppActRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/ai-intelligence": {
-      id: "/_app/ai-intelligence";
-      path: "/ai-intelligence";
-      fullPath: "/ai-intelligence";
-      preLoaderRoute: typeof AppAiIntelligenceRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/ai-visibility": {
-      id: "/_app/ai-visibility";
-      path: "/ai-visibility";
-      fullPath: "/ai-visibility";
-      preLoaderRoute: typeof AppAiVisibilityRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/articles": {
-      id: "/_app/articles";
-      path: "/articles";
-      fullPath: "/articles";
-      preLoaderRoute: typeof AppArticlesRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/brand-fact-sheet": {
-      id: "/_app/brand-fact-sheet";
-      path: "/brand-fact-sheet";
-      fullPath: "/brand-fact-sheet";
-      preLoaderRoute: typeof AppBrandFactSheetRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/brands": {
-      id: "/_app/brands";
-      path: "/brands";
-      fullPath: "/brands";
-      preLoaderRoute: typeof AppBrandsRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/citations": {
-      id: "/_app/citations";
-      path: "/citations";
-      fullPath: "/citations";
-      preLoaderRoute: typeof AppCitationsRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/community": {
-      id: "/_app/community";
-      path: "/community";
-      fullPath: "/community";
-      preLoaderRoute: typeof AppCommunityRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/competitors": {
-      id: "/_app/competitors";
-      path: "/competitors";
-      fullPath: "/competitors";
-      preLoaderRoute: typeof AppCompetitorsRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/content": {
-      id: "/_app/content";
-      path: "/content";
-      fullPath: "/content";
-      preLoaderRoute: typeof AppContentRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/crawler-check": {
-      id: "/_app/crawler-check";
-      path: "/crawler-check";
-      fullPath: "/crawler-check";
-      preLoaderRoute: typeof AppCrawlerCheckRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/dashboard": {
-      id: "/_app/dashboard";
-      path: "/dashboard";
-      fullPath: "/dashboard";
-      preLoaderRoute: typeof AppDashboardRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/diagnose": {
-      id: "/_app/diagnose";
-      path: "/diagnose";
-      fullPath: "/diagnose";
-      preLoaderRoute: typeof AppDiagnoseRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/faq-manager": {
-      id: "/_app/faq-manager";
-      path: "/faq-manager";
-      fullPath: "/faq-manager";
-      preLoaderRoute: typeof AppFaqManagerRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/forgot-password": {
-      id: "/_app/forgot-password";
-      path: "/forgot-password";
-      fullPath: "/forgot-password";
-      preLoaderRoute: typeof AppForgotPasswordRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/geo-analytics": {
-      id: "/_app/geo-analytics";
-      path: "/geo-analytics";
-      fullPath: "/geo-analytics";
-      preLoaderRoute: typeof AppGeoAnalyticsRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/geo-signals": {
-      id: "/_app/geo-signals";
-      path: "/geo-signals";
-      fullPath: "/geo-signals";
-      preLoaderRoute: typeof AppGeoSignalsRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/geo-tools": {
-      id: "/_app/geo-tools";
-      path: "/geo-tools";
-      fullPath: "/geo-tools";
-      preLoaderRoute: typeof AppGeoToolsRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/home2": {
-      id: "/_app/home2";
-      path: "/home2";
-      fullPath: "/home2";
-      preLoaderRoute: typeof AppHome2RouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/keyword-research": {
-      id: "/_app/keyword-research";
-      path: "/keyword-research";
-      fullPath: "/keyword-research";
-      preLoaderRoute: typeof AppKeywordResearchRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/login": {
-      id: "/_app/login";
-      path: "/login";
-      fullPath: "/login";
-      preLoaderRoute: typeof AppLoginRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/monitor": {
-      id: "/_app/monitor";
-      path: "/monitor";
-      fullPath: "/monitor";
-      preLoaderRoute: typeof AppMonitorRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/opportunities": {
-      id: "/_app/opportunities";
-      path: "/opportunities";
-      fullPath: "/opportunities";
-      preLoaderRoute: typeof AppOpportunitiesRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/register": {
-      id: "/_app/register";
-      path: "/register";
-      fullPath: "/register";
-      preLoaderRoute: typeof AppRegisterRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/report": {
-      id: "/_app/report";
-      path: "/report";
-      fullPath: "/report";
-      preLoaderRoute: typeof AppReportRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/reset-password": {
-      id: "/_app/reset-password";
-      path: "/reset-password";
-      fullPath: "/reset-password";
-      preLoaderRoute: typeof AppResetPasswordRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/settings": {
-      id: "/_app/settings";
-      path: "/settings";
-      fullPath: "/settings";
-      preLoaderRoute: typeof AppSettingsRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/setup": {
-      id: "/_app/setup";
-      path: "/setup";
-      fullPath: "/setup";
-      preLoaderRoute: typeof AppSetupRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/verify-email": {
-      id: "/_app/verify-email";
-      path: "/verify-email";
-      fullPath: "/verify-email";
-      preLoaderRoute: typeof AppVerifyEmailRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/welcome": {
-      id: "/_app/welcome";
-      path: "/welcome";
-      fullPath: "/welcome";
-      preLoaderRoute: typeof AppWelcomeRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/api/$": {
-      id: "/api/$";
-      path: "/api/$";
-      fullPath: "/api/$";
-      preLoaderRoute: typeof ApiSplatRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/webhooks/$": {
-      id: "/webhooks/$";
-      path: "/webhooks/$";
-      fullPath: "/webhooks/$";
-      preLoaderRoute: typeof WebhooksSplatRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/_app/admin/scrape": {
-      id: "/_app/admin/scrape";
-      path: "/admin/scrape";
-      fullPath: "/admin/scrape";
-      preLoaderRoute: typeof AppAdminScrapeRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    "/_app/content/$articleId": {
-      id: "/_app/content/$articleId";
-      path: "/$articleId";
-      fullPath: "/content/$articleId";
-      preLoaderRoute: typeof AppContentArticleIdRouteImport;
-      parentRoute: typeof AppContentRoute;
-    };
-    "/_app/admin/scrape/$runId": {
-      id: "/_app/admin/scrape/$runId";
-      path: "/$runId";
-      fullPath: "/admin/scrape/$runId";
-      preLoaderRoute: typeof AppAdminScrapeRunIdRouteImport;
-      parentRoute: typeof AppAdminScrapeRoute;
-    };
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/glossary': {
+      id: '/glossary'
+      path: '/glossary'
+      fullPath: '/glossary'
+      preLoaderRoute: typeof GlossaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/health': {
+      id: '/health'
+      path: '/health'
+      fullPath: '/health'
+      preLoaderRoute: typeof HealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/$': {
+      id: '/_app/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof AppSplatRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/act': {
+      id: '/_app/act'
+      path: '/act'
+      fullPath: '/act'
+      preLoaderRoute: typeof AppActRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ai-intelligence': {
+      id: '/_app/ai-intelligence'
+      path: '/ai-intelligence'
+      fullPath: '/ai-intelligence'
+      preLoaderRoute: typeof AppAiIntelligenceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ai-visibility': {
+      id: '/_app/ai-visibility'
+      path: '/ai-visibility'
+      fullPath: '/ai-visibility'
+      preLoaderRoute: typeof AppAiVisibilityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/articles': {
+      id: '/_app/articles'
+      path: '/articles'
+      fullPath: '/articles'
+      preLoaderRoute: typeof AppArticlesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/brand-fact-sheet': {
+      id: '/_app/brand-fact-sheet'
+      path: '/brand-fact-sheet'
+      fullPath: '/brand-fact-sheet'
+      preLoaderRoute: typeof AppBrandFactSheetRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/brands': {
+      id: '/_app/brands'
+      path: '/brands'
+      fullPath: '/brands'
+      preLoaderRoute: typeof AppBrandsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/citations': {
+      id: '/_app/citations'
+      path: '/citations'
+      fullPath: '/citations'
+      preLoaderRoute: typeof AppCitationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/community': {
+      id: '/_app/community'
+      path: '/community'
+      fullPath: '/community'
+      preLoaderRoute: typeof AppCommunityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/competitors': {
+      id: '/_app/competitors'
+      path: '/competitors'
+      fullPath: '/competitors'
+      preLoaderRoute: typeof AppCompetitorsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/content': {
+      id: '/_app/content'
+      path: '/content'
+      fullPath: '/content'
+      preLoaderRoute: typeof AppContentRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/crawler-check': {
+      id: '/_app/crawler-check'
+      path: '/crawler-check'
+      fullPath: '/crawler-check'
+      preLoaderRoute: typeof AppCrawlerCheckRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/diagnose': {
+      id: '/_app/diagnose'
+      path: '/diagnose'
+      fullPath: '/diagnose'
+      preLoaderRoute: typeof AppDiagnoseRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/faq-manager': {
+      id: '/_app/faq-manager'
+      path: '/faq-manager'
+      fullPath: '/faq-manager'
+      preLoaderRoute: typeof AppFaqManagerRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/forgot-password': {
+      id: '/_app/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof AppForgotPasswordRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/geo-analytics': {
+      id: '/_app/geo-analytics'
+      path: '/geo-analytics'
+      fullPath: '/geo-analytics'
+      preLoaderRoute: typeof AppGeoAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/geo-signals': {
+      id: '/_app/geo-signals'
+      path: '/geo-signals'
+      fullPath: '/geo-signals'
+      preLoaderRoute: typeof AppGeoSignalsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/geo-tools': {
+      id: '/_app/geo-tools'
+      path: '/geo-tools'
+      fullPath: '/geo-tools'
+      preLoaderRoute: typeof AppGeoToolsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/home2': {
+      id: '/_app/home2'
+      path: '/home2'
+      fullPath: '/home2'
+      preLoaderRoute: typeof AppHome2RouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/keyword-research': {
+      id: '/_app/keyword-research'
+      path: '/keyword-research'
+      fullPath: '/keyword-research'
+      preLoaderRoute: typeof AppKeywordResearchRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/login': {
+      id: '/_app/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof AppLoginRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/monitor': {
+      id: '/_app/monitor'
+      path: '/monitor'
+      fullPath: '/monitor'
+      preLoaderRoute: typeof AppMonitorRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/opportunities': {
+      id: '/_app/opportunities'
+      path: '/opportunities'
+      fullPath: '/opportunities'
+      preLoaderRoute: typeof AppOpportunitiesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/register': {
+      id: '/_app/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof AppRegisterRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/report': {
+      id: '/_app/report'
+      path: '/report'
+      fullPath: '/report'
+      preLoaderRoute: typeof AppReportRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reset-password': {
+      id: '/_app/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof AppResetPasswordRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/setup': {
+      id: '/_app/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof AppSetupRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/verify-email': {
+      id: '/_app/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof AppVerifyEmailRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/welcome': {
+      id: '/_app/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof AppWelcomeRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/api/$': {
+      id: '/api/$'
+      path: '/api/$'
+      fullPath: '/api/$'
+      preLoaderRoute: typeof ApiSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/webhooks/$': {
+      id: '/webhooks/$'
+      path: '/webhooks/$'
+      fullPath: '/webhooks/$'
+      preLoaderRoute: typeof WebhooksSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/admin/scrape': {
+      id: '/_app/admin/scrape'
+      path: '/admin/scrape'
+      fullPath: '/admin/scrape'
+      preLoaderRoute: typeof AppAdminScrapeRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/content/$articleId': {
+      id: '/_app/content/$articleId'
+      path: '/$articleId'
+      fullPath: '/content/$articleId'
+      preLoaderRoute: typeof AppContentArticleIdRouteImport
+      parentRoute: typeof AppContentRoute
+    }
+    '/_app/admin/scrape/$runId': {
+      id: '/_app/admin/scrape/$runId'
+      path: '/$runId'
+      fullPath: '/admin/scrape/$runId'
+      preLoaderRoute: typeof AppAdminScrapeRunIdRouteImport
+      parentRoute: typeof AppAdminScrapeRoute
+    }
   }
 }
 
 interface AppContentRouteChildren {
-  AppContentArticleIdRoute: typeof AppContentArticleIdRoute;
+  AppContentArticleIdRoute: typeof AppContentArticleIdRoute
 }
 
 const AppContentRouteChildren: AppContentRouteChildren = {
   AppContentArticleIdRoute: AppContentArticleIdRoute,
-};
+}
 
-const AppContentRouteWithChildren = AppContentRoute._addFileChildren(AppContentRouteChildren);
+const AppContentRouteWithChildren = AppContentRoute._addFileChildren(
+  AppContentRouteChildren,
+)
 
 interface AppAdminScrapeRouteChildren {
-  AppAdminScrapeRunIdRoute: typeof AppAdminScrapeRunIdRoute;
+  AppAdminScrapeRunIdRoute: typeof AppAdminScrapeRunIdRoute
 }
 
 const AppAdminScrapeRouteChildren: AppAdminScrapeRouteChildren = {
   AppAdminScrapeRunIdRoute: AppAdminScrapeRunIdRoute,
-};
+}
 
 const AppAdminScrapeRouteWithChildren = AppAdminScrapeRoute._addFileChildren(
   AppAdminScrapeRouteChildren,
-);
+)
 
 interface AppRouteChildren {
-  AppSplatRoute: typeof AppSplatRoute;
-  AppActRoute: typeof AppActRoute;
-  AppAiIntelligenceRoute: typeof AppAiIntelligenceRoute;
-  AppAiVisibilityRoute: typeof AppAiVisibilityRoute;
-  AppArticlesRoute: typeof AppArticlesRoute;
-  AppBrandFactSheetRoute: typeof AppBrandFactSheetRoute;
-  AppBrandsRoute: typeof AppBrandsRoute;
-  AppCitationsRoute: typeof AppCitationsRoute;
-  AppCommunityRoute: typeof AppCommunityRoute;
-  AppCompetitorsRoute: typeof AppCompetitorsRoute;
-  AppContentRoute: typeof AppContentRouteWithChildren;
-  AppCrawlerCheckRoute: typeof AppCrawlerCheckRoute;
-  AppDashboardRoute: typeof AppDashboardRoute;
-  AppDiagnoseRoute: typeof AppDiagnoseRoute;
-  AppFaqManagerRoute: typeof AppFaqManagerRoute;
-  AppForgotPasswordRoute: typeof AppForgotPasswordRoute;
-  AppGeoAnalyticsRoute: typeof AppGeoAnalyticsRoute;
-  AppGeoSignalsRoute: typeof AppGeoSignalsRoute;
-  AppGeoToolsRoute: typeof AppGeoToolsRoute;
-  AppHome2Route: typeof AppHome2Route;
-  AppKeywordResearchRoute: typeof AppKeywordResearchRoute;
-  AppLoginRoute: typeof AppLoginRoute;
-  AppMonitorRoute: typeof AppMonitorRoute;
-  AppOpportunitiesRoute: typeof AppOpportunitiesRoute;
-  AppRegisterRoute: typeof AppRegisterRoute;
-  AppReportRoute: typeof AppReportRoute;
-  AppResetPasswordRoute: typeof AppResetPasswordRoute;
-  AppSettingsRoute: typeof AppSettingsRoute;
-  AppSetupRoute: typeof AppSetupRoute;
-  AppVerifyEmailRoute: typeof AppVerifyEmailRoute;
-  AppWelcomeRoute: typeof AppWelcomeRoute;
-  AppAdminScrapeRoute: typeof AppAdminScrapeRouteWithChildren;
+  AppSplatRoute: typeof AppSplatRoute
+  AppActRoute: typeof AppActRoute
+  AppAiIntelligenceRoute: typeof AppAiIntelligenceRoute
+  AppAiVisibilityRoute: typeof AppAiVisibilityRoute
+  AppArticlesRoute: typeof AppArticlesRoute
+  AppBrandFactSheetRoute: typeof AppBrandFactSheetRoute
+  AppBrandsRoute: typeof AppBrandsRoute
+  AppCitationsRoute: typeof AppCitationsRoute
+  AppCommunityRoute: typeof AppCommunityRoute
+  AppCompetitorsRoute: typeof AppCompetitorsRoute
+  AppContentRoute: typeof AppContentRouteWithChildren
+  AppCrawlerCheckRoute: typeof AppCrawlerCheckRoute
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppDiagnoseRoute: typeof AppDiagnoseRoute
+  AppFaqManagerRoute: typeof AppFaqManagerRoute
+  AppForgotPasswordRoute: typeof AppForgotPasswordRoute
+  AppGeoAnalyticsRoute: typeof AppGeoAnalyticsRoute
+  AppGeoSignalsRoute: typeof AppGeoSignalsRoute
+  AppGeoToolsRoute: typeof AppGeoToolsRoute
+  AppHome2Route: typeof AppHome2Route
+  AppKeywordResearchRoute: typeof AppKeywordResearchRoute
+  AppLoginRoute: typeof AppLoginRoute
+  AppMonitorRoute: typeof AppMonitorRoute
+  AppOpportunitiesRoute: typeof AppOpportunitiesRoute
+  AppRegisterRoute: typeof AppRegisterRoute
+  AppReportRoute: typeof AppReportRoute
+  AppResetPasswordRoute: typeof AppResetPasswordRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppSetupRoute: typeof AppSetupRoute
+  AppVerifyEmailRoute: typeof AppVerifyEmailRoute
+  AppWelcomeRoute: typeof AppWelcomeRoute
+  AppAdminScrapeRoute: typeof AppAdminScrapeRouteWithChildren
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -926,9 +928,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppVerifyEmailRoute: AppVerifyEmailRoute,
   AppWelcomeRoute: AppWelcomeRoute,
   AppAdminScrapeRoute: AppAdminScrapeRouteWithChildren,
-};
+}
 
-const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren);
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -939,16 +941,16 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ApiSplatRoute: ApiSplatRoute,
   WebhooksSplatRoute: WebhooksSplatRoute,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx";
-import type { createStart } from "@tanstack/react-start";
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
-    ssr: true;
-    router: Awaited<ReturnType<typeof getRouter>>;
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
   }
 }

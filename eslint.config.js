@@ -18,6 +18,10 @@ export default tseslint.config(
       "*.tsbuildinfo",
       "drizzle/**",
       ".husky/**",
+      // TanStack Router codegen — its own header says to exclude it from
+      // linters and formatters. The plugin rewrites it on every dev-server
+      // start, so anything we "fix" here comes straight back.
+      "src/routeTree.gen.ts",
       // Local vendored tool/skill caches — not project source, never lint
       // (also gitignored). Their browser/UMD bundles otherwise flood the
       // report and break lint-staged if accidentally staged.

@@ -34,11 +34,40 @@ import { test as setup } from "@playwright/test";
 import { login, expectAuthenticated, STORAGE_STATE } from "./support/auth";
 
 // Any authenticated-only route works here: an expired/missing/invalid
-// session gets redirected to /login (see client/src/App.tsx's
-// AuthenticatedRoute), which expectAuthenticated() below treats as a
-// failure. "/" is the app's post-login landing route (see auth.ts's
-// AUTHENTICATED_PATHS), so it's guaranteed to be gated.
-const GATED_ROUTE = "/";
+// session gets redirected to /login, which expectAuthenticated() below
+// treats as a failure.
+//
+// This must NOT be "/". It used to be, on the reasoning that "/" was the
+// post-login landing route and therefore gated — that stopped being true
+// when the TanStack Start migration split "/" into a public,
+// server-rendered marketing page. A logged-out visit to "/" now returns a
+// perfectly good 200 instead of bouncing to /login, which makes it a much
+// weaker signal for "is this cached session still real".
+const GATED_ROUTE = "/dashboard";
+
+// Reject a cached token that is technically still valid but about to lapse.
+//
+// The probe below proves the token works *now*; it says nothing about
+// whether it survives the run. A Supabase access token lives an hour, so a
+// cached state reused at minute 59 passes setup and then starts returning
+// 401s partway through — surfacing as unrelated-looking failures ("Test
+// account has no brands") in whichever specs happen to run late. That is
+// exactly what this margin prevents; it costs one extra login, rarely.
+const MIN_REMAINING_TOKEN_MS = 15 * 60 * 1000;
+
+/** Reads the `exp` claim from a JWT without verifying its signature. */
+function tokenExpiryMs(jwt: string): number | null {
+  const payload = jwt.split(".")[1];
+  if (!payload) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      exp?: number;
+    };
+    return typeof decoded.exp === "number" ? decoded.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
 
 setup("authenticate", async ({ browser }) => {
   const forceLogin = process.env.E2E_FORCE_LOGIN === "1";
@@ -84,6 +113,18 @@ setup("authenticate", async ({ browser }) => {
         return null;
       });
       if (!token) throw new Error("no access_token in cached storage state");
+
+      // Check remaining lifetime BEFORE the probe: a token with seconds left
+      // would sail through the probe and then expire mid-run.
+      const expiryMs = tokenExpiryMs(token);
+      if (expiryMs !== null) {
+        const remainingMs = expiryMs - Date.now();
+        if (remainingMs < MIN_REMAINING_TOKEN_MS) {
+          throw new Error(
+            `cached token expires in ${Math.round(remainingMs / 1000)}s — too close to lapse`,
+          );
+        }
+      }
 
       const probe = await page.request.get("/api/brands", {
         headers: { authorization: `Bearer ${token}` },
