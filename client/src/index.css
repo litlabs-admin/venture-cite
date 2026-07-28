@@ -354,9 +354,6 @@ layer(base);
     --brand-accent-press: oklch(0.4171 0.08 170.6); /* derived from the fill */
     --brand-accent-fg: oklch(1 0 0); /* white label on the accent fill */
     --brand-accent-subtle: oklch(0.9591 0.0152 171.1); /* --tds-accent-weak #e8f5f0 */
-    /* Secondary accent — TDS's teal series colour, keeping the cool-secondary
-     role the old #14B8A6 played. */
-    --brand-accent-secondary: oklch(0.6624 0.1033 204.1); /* --tds-s6 #2aa5b0 */
     /* Functional status. TDS ships pos + neg only; --warning is derived from
      --tds-s3, its one warm hue. */
     --positive: oklch(0.5912 0.1145 170); /* --tds-pos #0e9373 */
@@ -417,7 +414,8 @@ layer(base);
     --ring: var(--brand-accent);
     /* Categorical data ramp = TDS's series colours, in TDS's order. The lead
      is the brand green, so the first series and the accent match. TDS also
-     ships a sixth (--tds-s6 #2aa5b0), exposed here as --brand-accent-secondary. */
+     ships a sixth (--tds-s6 #2aa5b0); it is deliberately not exposed as a token,
+     having previously sat unused as --brand-accent-secondary. */
     --chart-1: oklch(0.5912 0.1145 170); /* --tds-s1 #0e9373 green */
     --chart-2: oklch(0.5632 0.1669 263.3); /* --tds-s2 #3f6fd6 blue */
     --chart-3: oklch(0.7224 0.1378 64.6); /* --tds-s3 #e0913a amber */
@@ -465,9 +463,16 @@ layer(base);
   .dark {
     /* Redefine ONLY the theme-varying primitives — the shadcn mappings in
      :root reference these and follow automatically. */
-    /* DARK = the default. Sophisticated zinc near-black (NOT pure black —
-     that reads as an undesigned void), crisp near-white text at very high
-     contrast, indigo near-absent. */
+    /* Dark is a peer theme, NOT the default — light is (see the :root header
+     above and lib/theme.ts's FALLBACK_THEME). The stored preference defaults
+     to "system", so this block renders whenever the OS is dark.
+
+     This comment previously read "DARK = the default", contradicting :root
+     four hundred lines up. That was not harmless: it sent a colour audit to
+     the wrong conclusion about which palette users actually see.
+
+     Sophisticated zinc near-black (NOT pure black — that reads as an
+     undesigned void), crisp near-white text at very high contrast. */
     --bg-base: oklch(0.165 0.003 285);
     --bg-surface-1: oklch(0.195 0.004 285);
     --bg-surface-2: oklch(0.225 0.0045 285);
@@ -479,15 +484,34 @@ layer(base);
     --fg-secondary: oklch(0.72 0.005 285);
     --fg-tertiary: oklch(0.55 0.006 285);
     --fg-disabled: oklch(0.42 0.005 285);
-    --brand-accent: oklch(0.66 0.19 278);
-    /* Must be redeclared here: --primary points at --brand-accent-fill, and
-     without this line dark would inherit :root's light green fill. Dark's
-     indigo needs no AA adjustment, so fill == accent. */
-    --brand-accent-fill: oklch(0.66 0.19 278);
-    --brand-accent-hover: oklch(0.71 0.18 278);
-    --brand-accent-press: oklch(0.6 0.18 278);
-    --brand-accent-fg: oklch(0.99 0.004 285);
-    --brand-accent-subtle: oklch(0.66 0.19 278 / 0.16);
+    /* Dark used to flip the accent to indigo (hue 278) while light stayed
+     green (hue 170), so the brand changed colour with the theme. Dark is now
+     the same green family as light — one accent, product-wide.
+
+     Values are MEASURED, not eyeballed. Light's own green cannot be reused
+     here: --brand-accent-fill #0c7a60 sits at only 3.64:1 on this canvas.
+     Green at hue 170 also cannot carry white text at any usable lightness —
+     the best case is 3.35:1, below the 4.5:1 AA floor — so dark inverts the
+     label to near-black. That is why --brand-accent-fg differs from light's
+     white.
+
+     Measured against --bg-base oklch(0.165 0.003 285):
+       fill  #27b892  7.66:1 vs its own label, 7.66:1 vs canvas  (AA pass)
+       hover #3fc8a1  9.18:1
+       press #24a684  6.32:1   (chroma trimmed to 0.12 — 0.13 clips sRGB)
+
+     Worth recording: the indigo this replaces scored 3.20:1 against its
+     near-white label, i.e. the previous comment here claiming "indigo needs
+     no AA adjustment" was wrong and dark's primary button was failing AA.
+
+     Must be redeclared: --primary points at --brand-accent-fill, so without
+     these lines dark would inherit :root's light-tuned green. */
+    --brand-accent: oklch(0.7 0.13 170);
+    --brand-accent-fill: oklch(0.7 0.13 170);
+    --brand-accent-hover: oklch(0.75 0.13 170);
+    --brand-accent-press: oklch(0.65 0.12 170);
+    --brand-accent-fg: oklch(0.165 0.003 285);
+    --brand-accent-subtle: oklch(0.7 0.13 170 / 0.16);
     --positive: oklch(0.72 0.13 162);
     --warning: oklch(0.78 0.12 86);
     --negative: oklch(0.66 0.18 25);

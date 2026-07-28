@@ -120,8 +120,16 @@ function renderSide(
   const sourceLabel = isUser ? "👤 You" : "🤖 AI";
 
   return (
+    // Only the AI-sourced side gets an accent border, to flag "verify this" —
+    // the user's own entry keeps the card's default neutral border. This used
+    // to be border-primary/40 vs border-chart-4/40, but --primary is the
+    // action-only green accent; using it here to label "your side" (not a
+    // button, not an action) collided with the "green = actions" rule. The
+    // AI side keeps --chart-4 because that use is categorical (which side of
+    // the comparison this is), not a stand-in for "success" — the same kind
+    // of legitimate categorical use as the platform colour ramp.
     <Card
-      className={cn("p-3 text-sm", isUser ? "border-primary/40" : "border-chart-4/40")}
+      className={cn("p-3 text-sm", !isUser && "border-chart-4/40")}
       data-testid={`pair-side-${side}-${fact.id}`}
     >
       <div className="mb-2 flex items-center justify-between text-xs">

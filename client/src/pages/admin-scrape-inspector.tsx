@@ -118,10 +118,13 @@ type InspectorResponse = {
   };
 };
 
+// Neutral, token-based category colours — no chart-4 (data-viz only) and
+// no --positive (data-viz only, not status/chip use per the colour-system
+// decision) standing in for "this step went fine".
 const STEP_COLORS: Record<string, string> = {
   sitemap_discovery: "bg-primary/10 text-primary",
-  page_extract: "bg-chart-4/10 text-chart-4",
-  terminal: "bg-(--positive)/10 text-(--positive)",
+  page_extract: "bg-secondary text-secondary-foreground",
+  terminal: "bg-accent text-accent-foreground",
   unknown: "bg-muted text-muted-foreground",
 };
 
@@ -132,7 +135,7 @@ function fmtDuration(ms: number | null | undefined): string {
 }
 
 function OutcomeIcon({ outcome }: { outcome: "ok" | "skipped" | "failed" }) {
-  if (outcome === "ok") return <CheckCircle className="h-3.5 w-3.5 text-chart-4" />;
+  if (outcome === "ok") return <CheckCircle className="h-3.5 w-3.5 text-foreground" />;
   if (outcome === "failed") return <XCircle className="h-3.5 w-3.5 text-destructive" />;
   return <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />;
 }
@@ -192,17 +195,18 @@ function Stat({
   value: number | string;
   tone?: "ok" | "warn" | "fail";
 }) {
+  // "ok" is neutral text + a check icon, not green/chart-4 — colour never
+  // carries the outcome by itself.
   const toneClass =
-    tone === "ok"
-      ? "text-chart-4"
-      : tone === "warn"
-        ? "text-(--warning)"
-        : tone === "fail"
-          ? "text-destructive"
-          : "text-foreground";
+    tone === "warn" ? "text-(--warning)" : tone === "fail" ? "text-destructive" : "text-foreground";
   return (
     <div className="rounded-md border border-border bg-card p-3">
-      <div className={cn("text-2xl font-semibold tnum", toneClass)}>{value}</div>
+      <div
+        className={cn("text-2xl font-semibold tnum inline-flex items-center gap-1.5", toneClass)}
+      >
+        {tone === "ok" && <CheckCircle className="h-4 w-4" aria-hidden="true" />}
+        {value}
+      </div>
       <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
@@ -286,7 +290,7 @@ export default function AdminScrapeInspector() {
           <Badge
             className={
               run.status === "completed"
-                ? "bg-chart-4/10 text-chart-4"
+                ? "bg-secondary text-secondary-foreground"
                 : run.status === "failed"
                   ? "bg-destructive/10 text-destructive"
                   : "bg-(--warning)/10 text-(--warning)"

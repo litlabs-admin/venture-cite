@@ -75,10 +75,19 @@ function formatReportLines(items: Record<string, number | undefined>): string {
 // Wave 9.4 followup: shared display map for outreach + mention status
 // badges. Rendered on every row so users can see what they previously
 // selected without opening the dropdown.
-const LISTICLE_STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
+const LISTICLE_STATUS_DISPLAY: Record<
+  string,
+  { label: string; className: string; icon?: boolean }
+> = {
   new: { label: "New", className: "bg-muted text-foreground hover:bg-muted" },
   contacted: { label: "Contacted", className: "bg-chart-1/15 text-chart-1 hover:bg-chart-1/15" },
-  won: { label: "Won", className: "bg-chart-4/15 text-chart-4 hover:bg-chart-4/15" },
+  // "Won" is a neutral badge + check icon, not green/chart-4 — green is
+  // reserved for actions, not outcomes.
+  won: {
+    label: "Won",
+    className: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    icon: true,
+  },
   dropped: { label: "Dropped", className: "bg-muted text-muted-foreground hover:bg-muted" },
 };
 
@@ -705,13 +714,16 @@ export default function GeoTools() {
                                             className={statusMeta.className}
                                             data-testid={`badge-listicle-status-${l.id}`}
                                           >
+                                            {statusMeta.icon && (
+                                              <Check className="h-3 w-3 mr-1" aria-hidden="true" />
+                                            )}
                                             {statusMeta.label}
                                           </Badge>
                                           {l.sourcePublication && (
                                             <Badge variant="outline">{l.sourcePublication}</Badge>
                                           )}
                                           {l.isIncluded === 1 ? (
-                                            <Badge className="bg-chart-4 hover:bg-chart-4/90">
+                                            <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
                                               <CheckCircle className="h-3 w-3 mr-1" />
                                               Included at #{l.listPosition ?? "?"} /{" "}
                                               {l.totalListItems ?? "?"}
@@ -835,7 +847,7 @@ export default function GeoTools() {
                           <Card>
                             <CardHeader>
                               <CardTitle className="text-base flex items-center gap-2">
-                                <CheckCircle className="h-4 w-4 text-chart-4" />
+                                <CheckCircle className="h-4 w-4 text-foreground" />
                                 You&apos;re already mentioned ({wikiExistingRows.length})
                               </CardTitle>
                             </CardHeader>
@@ -974,7 +986,7 @@ export default function GeoTools() {
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-chart-4" />
+                        <FileText className="h-5 w-5 text-foreground" />
                         BOFU Content Generator
                       </CardTitle>
                       <CardDescription>
@@ -983,8 +995,8 @@ export default function GeoTools() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="bg-chart-4/10 p-4 rounded-lg mb-6">
-                        <p className="text-sm text-chart-4">
+                      <div className="bg-muted p-4 rounded-lg mb-6">
+                        <p className="text-sm text-foreground">
                           <strong>80% BOFU Strategy:</strong> Comparison articles ("X vs Y") and
                           alternatives guides convert 80% better and get cited heavily by AI systems
                           for purchase decisions.
@@ -1091,7 +1103,8 @@ export default function GeoTools() {
                                         <Badge variant="outline">{content.contentType}</Badge>
                                         <Badge>{content.status ?? "draft"}</Badge>
                                         {content.publishedAt && (
-                                          <Badge className="bg-chart-4/15 text-chart-4 hover:bg-chart-4/15">
+                                          <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                                            <Check className="h-3 w-3 mr-1" aria-hidden="true" />
                                             Published
                                           </Badge>
                                         )}

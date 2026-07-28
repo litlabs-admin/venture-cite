@@ -91,7 +91,7 @@ export default function VerifyEmail() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
-              <CheckCircle className="h-8 w-8 text-chart-4" />
+              <CheckCircle className="h-8 w-8 text-foreground" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-foreground">Check your email</CardTitle>

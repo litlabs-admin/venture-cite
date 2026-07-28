@@ -97,7 +97,7 @@ export default function AdminScrapeRuns() {
                     >
                       <div className="shrink-0">
                         {tone === "ok" ? (
-                          <CheckCircle className="h-4 w-4 text-chart-4" />
+                          <CheckCircle className="h-4 w-4 text-foreground" />
                         ) : tone === "fail" ? (
                           <XCircle className="h-4 w-4 text-destructive" />
                         ) : (
@@ -113,7 +113,7 @@ export default function AdminScrapeRuns() {
                             className={cn(
                               "text-[10px] uppercase tracking-wider",
                               tone === "ok"
-                                ? "bg-chart-4/10 text-chart-4"
+                                ? "bg-secondary text-secondary-foreground"
                                 : tone === "fail"
                                   ? "bg-destructive/10 text-destructive"
                                   : "bg-(--warning)/10 text-(--warning)",

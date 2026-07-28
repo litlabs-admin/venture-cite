@@ -235,13 +235,24 @@ export default function FaqManager() {
   const optimizedCount = faqs.filter((f) => f.isOptimized === 1).length;
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-chart-4";
+    // Zero (including cold-start, no FAQs yet) is a neutral "no data" state,
+    // not a failing one — colour only arrives once there's a real score.
+    if (score <= 0) return "text-foreground";
+    // High score: neutral text, not green/chart-4. The check icon rendered
+    // alongside the value is what signals "good", not colour.
+    if (score >= 80) return "text-foreground";
     if (score >= 60) return "text-chart-3";
     return "text-destructive";
   };
 
   const getScoreBadge = (score: number) => {
-    if (score >= 80) return "default";
+    // Mirrors getScoreColor above. Badge's "default" variant is bg-primary —
+    // the accent — and green marks ACTIONS, never outcomes, so a good score
+    // renders neutral-filled instead of accented. A cold-start 0 is missing
+    // data rather than a failure, so it stays outlined. The exact number is
+    // rendered inside the badge either way ("AI Score: 72%"), so collapsing
+    // "good" and "middling" into one neutral loses no information.
+    if (score <= 0) return "outline";
     if (score >= 60) return "secondary";
     return "destructive";
   };
@@ -286,10 +297,11 @@ export default function FaqManager() {
                   <div>
                     <p className="text-sm text-muted-foreground">Avg AI Score</p>
                     <p
-                      className={`text-2xl font-bold ${getScoreColor(avgScore)}`}
+                      className={`text-2xl font-bold inline-flex items-center gap-1.5 ${getScoreColor(avgScore)}`}
                       data-testid="text-avg-score"
                     >
                       {avgScore}%
+                      {avgScore >= 80 && <CheckCircle className="h-4 w-4" aria-hidden="true" />}
                     </p>
                   </div>
                   <Target className="h-8 w-8 text-chart-5 opacity-50" />
@@ -302,13 +314,13 @@ export default function FaqManager() {
                   <div>
                     <p className="text-sm text-muted-foreground">Optimized</p>
                     <p
-                      className="text-2xl font-bold text-chart-4"
+                      className="text-2xl font-bold text-foreground"
                       data-testid="text-optimized-count"
                     >
                       {optimizedCount}/{faqs.length}
                     </p>
                   </div>
-                  <CheckCircle className="h-8 w-8 text-chart-4 opacity-50" />
+                  <CheckCircle className="h-8 w-8 text-foreground opacity-50" />
                 </div>
               </CardContent>
             </Card>
@@ -592,7 +604,7 @@ export default function FaqManager() {
                                             AI Score: {faq.aiSurfaceScore || 0}%
                                           </Badge>
                                           {faq.isOptimized === 1 && (
-                                            <Badge className="bg-chart-4">
+                                            <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
                                               <CheckCircle className="h-3 w-3 mr-1" />
                                               Optimized
                                             </Badge>
@@ -713,23 +725,23 @@ export default function FaqManager() {
                       </h4>
                       <ul className="space-y-2 text-sm">
                         <li className="flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
+                          <CheckCircle className="h-4 w-4 text-foreground mt-0.5" />
                           <span>Questions formatted for AI extraction (clear, specific)</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
+                          <CheckCircle className="h-4 w-4 text-foreground mt-0.5" />
                           <span>Answers optimized for 500-token chunk limits</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
+                          <CheckCircle className="h-4 w-4 text-foreground mt-0.5" />
                           <span>Structured for Schema.org FAQPage markup</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
+                          <CheckCircle className="h-4 w-4 text-foreground mt-0.5" />
                           <span>Brand context and tone integrated</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-chart-4 mt-0.5" />
+                          <CheckCircle className="h-4 w-4 text-foreground mt-0.5" />
                           <span>AI surface scoring for citation likelihood</span>
                         </li>
                       </ul>
@@ -756,7 +768,7 @@ export default function FaqManager() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-chart-4">
+                          <Badge variant="outline">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             {faqs.length} FAQs included
                           </Badge>
@@ -813,11 +825,14 @@ export default function FaqManager() {
                   <div className="space-y-6">
                     {/* Optimization Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card className="bg-chart-4/10 border-chart-4/30">
+                      <Card className="bg-muted border-border">
                         <CardContent className="pt-4">
                           <div className="text-center">
-                            <p className="text-sm text-chart-4">High Score (80+)</p>
-                            <p className="text-3xl font-bold text-chart-4">
+                            <p className="text-sm text-foreground inline-flex items-center justify-center gap-1">
+                              <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                              High Score (80+)
+                            </p>
+                            <p className="text-3xl font-bold text-foreground">
                               {faqs.filter((f) => (f.aiSurfaceScore || 0) >= 80).length}
                             </p>
                           </div>
@@ -889,7 +904,7 @@ export default function FaqManager() {
                         </div>
                       ) : (
                         <div className="text-center py-8 text-muted-foreground">
-                          <CheckCircle className="h-12 w-12 mx-auto mb-4 text-chart-4" />
+                          <CheckCircle className="h-12 w-12 mx-auto mb-4 text-foreground" />
                           <p>All FAQs are well-optimized!</p>
                         </div>
                       )}

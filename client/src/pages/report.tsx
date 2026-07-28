@@ -78,9 +78,14 @@ function Sparkline({ values }: { values: number[] }) {
 
 function DeltaChip({ delta }: { delta: number }) {
   const Icon = delta > 0 ? ArrowUp : delta < 0 ? ArrowDown : Minus;
+  // An improvement renders neutral: the arrow already says which way it went,
+  // so colour would be a second encoding of the same fact. It used to be
+  // bg-chart-4 (violet) mislabelled as "design-system green" in chartTheme —
+  // see the note there. A decline keeps destructive, because that is the one
+  // case where the direction alone under-states it.
   const cls =
     delta > 0
-      ? "bg-chart-4/10 text-chart-4"
+      ? "bg-muted text-foreground"
       : delta < 0
         ? "bg-destructive/10 text-destructive"
         : "bg-muted text-muted-foreground";

@@ -662,7 +662,9 @@ export default function GeoSignals() {
   // status label so the colour and the icon never contradict.
   const getScoreColor = (score: number, max: number) => {
     const ratio = max > 0 ? score / max : 0;
-    if (ratio >= 0.8) return "text-chart-4";
+    // Top tier: neutral text, not green/chart-4 — the CheckCircle rendered
+    // by getStatusIcon alongside it is what signals "excellent", not colour.
+    if (ratio >= 0.8) return "text-foreground";
     if (ratio >= 0.6) return "text-chart-1";
     if (ratio >= 0.4) return "text-chart-3";
     return "text-destructive";
@@ -671,7 +673,7 @@ export default function GeoSignals() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "excellent":
-        return <CheckCircle className="w-4 h-4 text-chart-4" />;
+        return <CheckCircle className="w-4 h-4 text-foreground" />;
       case "good":
         return <CheckCircle className="w-4 h-4 text-chart-1" />;
       case "needs_improvement":
@@ -679,7 +681,7 @@ export default function GeoSignals() {
       case "poor":
         return <XCircle className="w-4 h-4 text-destructive" />;
       case "pass":
-        return <CheckCircle className="w-4 h-4 text-chart-4" />;
+        return <CheckCircle className="w-4 h-4 text-foreground" />;
       case "warning":
         return <AlertTriangle className="w-4 h-4 text-chart-3" />;
       case "fail":
@@ -1009,7 +1011,7 @@ export default function GeoSignals() {
                       ? "Pick a target query and run analysis"
                       : "Select an article above to begin"
                   }
-                  description="Get honest scores for the 7 content signals — only what's measurable counts toward the headline %."
+                  description="Scores across all 7 signals — six content signals plus freshness. Only what's measurable counts toward the headline %."
                 />
               )}
             </CardContent>
@@ -1089,20 +1091,39 @@ export default function GeoSignals() {
                           <div
                             className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
                               stage.status === "pass"
-                                ? "bg-chart-4"
+                                ? "bg-secondary"
                                 : stage.status === "warning"
                                   ? "bg-chart-3"
                                   : "bg-destructive"
                             }`}
                           >
-                            {stage.stage === "Prepare" && <Brain className="w-6 h-6 text-white" />}
-                            {stage.stage === "Retrieve" && (
-                              <SplitSquareVertical className="w-6 h-6 text-white" />
-                            )}
-                            {stage.stage === "Signal" && (
-                              <Activity className="w-6 h-6 text-white" />
-                            )}
-                            {stage.stage === "Serve" && <Sparkles className="w-6 h-6 text-white" />}
+                            {(() => {
+                              // "pass" is neutral (secondary-foreground on
+                              // secondary), not green/chart-4 — the stage
+                              // status is carried by the check icon + label
+                              // in the detail row below, not this glyph's
+                              // colour alone.
+                              const iconColor =
+                                stage.status === "pass"
+                                  ? "text-secondary-foreground"
+                                  : "text-white";
+                              return (
+                                <>
+                                  {stage.stage === "Prepare" && (
+                                    <Brain className={`w-6 h-6 ${iconColor}`} />
+                                  )}
+                                  {stage.stage === "Retrieve" && (
+                                    <SplitSquareVertical className={`w-6 h-6 ${iconColor}`} />
+                                  )}
+                                  {stage.stage === "Signal" && (
+                                    <Activity className={`w-6 h-6 ${iconColor}`} />
+                                  )}
+                                  {stage.stage === "Serve" && (
+                                    <Sparkles className={`w-6 h-6 ${iconColor}`} />
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                           <p className="text-sm font-medium text-foreground">{stage.stage}</p>
                           <p className="text-xs text-muted-foreground">{stage.score}/100</p>
@@ -1249,7 +1270,7 @@ export default function GeoSignals() {
                     <p className="text-sm text-muted-foreground">Total Chunks</p>
                   </div>
                   <div className="p-4 bg-muted/30 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-chart-4">
+                    <p className="text-2xl font-bold text-foreground">
                       {chunkStats.extractableChunks}
                     </p>
                     <p className="text-sm text-muted-foreground">Extractable</p>
@@ -1509,7 +1530,7 @@ export default function GeoSignals() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <CheckCircle className="h-3.5 w-3.5 text-chart-4" />
+                            <CheckCircle className="h-3.5 w-3.5 text-foreground" />
                             <span className="font-medium text-foreground">Fetched live</span>
                             {auditedUrl && (
                               <a
@@ -1619,7 +1640,7 @@ export default function GeoSignals() {
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2">
                                 {schema.present ? (
-                                  <CheckCircle className="w-5 h-5 text-chart-4" />
+                                  <CheckCircle className="w-5 h-5 text-foreground" />
                                 ) : (
                                   <XCircle className="w-5 h-5 text-destructive" />
                                 )}
@@ -1636,7 +1657,14 @@ export default function GeoSignals() {
                                     {pct}%
                                   </span>
                                 )}
-                                <Badge variant={schema.present ? "default" : "secondary"}>
+                                {/* "default" here was bg-primary — the action
+                                    accent — marking an outcome. Present/Missing
+                                    is a status, so it reads neutral and the
+                                    check glyph carries the meaning. */}
+                                <Badge variant={schema.present ? "secondary" : "outline"}>
+                                  {schema.present && (
+                                    <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />
+                                  )}
                                   {schema.present ? "Present" : "Missing"}
                                 </Badge>
                               </div>
@@ -1654,7 +1682,7 @@ export default function GeoSignals() {
                                     <Badge
                                       key={f}
                                       variant="outline"
-                                      className="text-[11px] font-normal border-chart-4/30 text-chart-4 bg-chart-4/5"
+                                      className="text-[11px] font-normal bg-secondary text-secondary-foreground"
                                     >
                                       <Check className="w-2.5 h-2.5 mr-1" />
                                       {f}
@@ -1747,7 +1775,7 @@ export default function GeoSignals() {
                     key={i}
                     className={
                       row.kind === "add"
-                        ? "bg-chart-4/15 text-chart-4"
+                        ? "bg-secondary text-secondary-foreground"
                         : row.kind === "del"
                           ? "bg-destructive/15 text-destructive line-through"
                           : "text-muted-foreground"

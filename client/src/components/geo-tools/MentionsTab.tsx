@@ -16,7 +16,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Plus, CheckSquare, Square, Loader2 } from "lucide-react";
+import { Trash2, Plus, CheckSquare, Square, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 
 import { useMentions } from "@/hooks/useMentions";
 import { ScanStatusPanel } from "@/components/geo-tools/ScanStatusPanel";
@@ -54,10 +54,32 @@ export type MentionsTabProps = {
 // Helper: stat card
 // ---------------------------------------------------------------------------
 
-function StatCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
+// Sentiment tone: renders as neutral text + an icon, never as a coloured
+// number by itself — and only once there's data to report. A zero count
+// (including cold start, before any scan has run) is a "nothing yet"
+// state and stays neutral rather than rendering as a false signal.
+// `--positive` is reserved for data-viz series per the colour-system
+// decision, not for status chips like this one.
+function StatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: "positive" | "negative";
+}) {
+  const showAccent = !!tone && value > 0;
+  const Icon = tone === "positive" ? ThumbsUp : tone === "negative" ? ThumbsDown : null;
   return (
     <div className="flex flex-1 flex-col items-center rounded-lg border bg-card px-3 py-2 text-center">
-      <span className={cn("text-xl font-bold tabular-nums", accent ?? "text-foreground")}>
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 text-xl font-bold tabular-nums",
+          showAccent && tone === "negative" ? "text-destructive" : "text-foreground",
+        )}
+      >
+        {showAccent && Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
         {value}
       </span>
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -317,9 +339,9 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
       {stats && (
         <div className="flex gap-2" aria-label="Mention statistics">
           <StatCard label="Total" value={stats.total} />
-          <StatCard label="Positive" value={stats.bySentiment.positive} accent="text-positive" />
+          <StatCard label="Positive" value={stats.bySentiment.positive} tone="positive" />
           <StatCard label="Neutral" value={stats.bySentiment.neutral} />
-          <StatCard label="Negative" value={stats.bySentiment.negative} accent="text-destructive" />
+          <StatCard label="Negative" value={stats.bySentiment.negative} tone="negative" />
         </div>
       )}
 

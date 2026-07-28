@@ -8,12 +8,22 @@
 export const chartTheme = {
   series: {
     // Primary "visibility / share-of-answer" metric — the accent-anchored
-    // head of the DESIGN.md data-viz ramp (was a stray hardcoded #3b82f6).
+    // head of the data-viz ramp (was a stray hardcoded #3b82f6).
     visibility: "var(--chart-1)",
-    // Positive / quality — design-system green (consistent in light & dark).
-    quality: "var(--chart-4)",
     // Negative / issues — theme-aware destructive red.
     issues: "var(--destructive)",
+    // There was a third entry here, `quality: "var(--chart-4)"`, commented
+    // "design-system green". It had NO consumers, and --chart-4 is violet
+    // (oklch 0.6056 0.2189 292.7), not green. That mislabel is the most
+    // likely origin of --chart-4 being used as the app's success colour in
+    // components that have nothing to do with charts.
+    //
+    // Removed rather than repointed: aiming it at --positive would not help,
+    // because in the light theme --positive and --chart-1 are the same green,
+    // so a "quality" series would have been indistinguishable from
+    // "visibility" in the very charts it was meant for. A positive series
+    // needs a hue picked against the rest of the ramp, which is a design
+    // decision, not a rename.
   },
   // Categorical palette for multi-series / donut charts (competitor slices
   // etc.). Raw var() — the --chart-* tokens already include hsl().

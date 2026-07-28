@@ -185,7 +185,7 @@ export default function ResetPassword() {
                   {passwordRequirements.map((req, i) => (
                     <li
                       key={i}
-                      className={`flex items-center gap-1 ${req.met ? "text-chart-4" : "text-muted-foreground"}`}
+                      className={`flex items-center gap-1 ${req.met ? "text-foreground" : "text-muted-foreground"}`}
                     >
                       {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                       {req.label}

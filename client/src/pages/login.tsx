@@ -91,8 +91,8 @@ export default function Login() {
         </CardHeader>
         <CardContent>
           {justVerified && (
-            <Alert className="mb-4 border-chart-4/40 bg-chart-4/10">
-              <CheckCircle2 className="h-4 w-4 text-chart-4" />
+            <Alert className="mb-4 bg-muted">
+              <CheckCircle2 className="h-4 w-4 text-foreground" />
               <AlertDescription>Email verified. Please sign in to continue.</AlertDescription>
             </Alert>
           )}

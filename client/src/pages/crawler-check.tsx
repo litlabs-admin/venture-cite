@@ -118,7 +118,7 @@ export default function CrawlerCheck() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "allowed":
-        return <CheckCircle2 className="h-5 w-5 text-chart-4" />;
+        return <CheckCircle2 className="h-5 w-5 text-foreground" />;
       case "blocked":
         return <XCircle className="h-5 w-5 text-destructive" />;
       default:
@@ -130,7 +130,7 @@ export default function CrawlerCheck() {
     switch (status) {
       case "allowed":
         return (
-          <Badge variant="outline" className="border-chart-4/30 text-chart-4">
+          <Badge variant="outline" className="border-border text-foreground">
             Allowed
           </Badge>
         );
@@ -249,9 +249,13 @@ export default function CrawlerCheck() {
                     <p className="text-sm text-muted-foreground">GEO Access Score</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-chart-4/10">
+                <Card className="bg-muted/50">
                   <CardContent className="pt-4 text-center">
-                    <div className="text-3xl font-bold text-chart-4" data-testid="allowed-count">
+                    <div
+                      className="text-3xl font-bold text-foreground inline-flex items-center justify-center gap-1.5"
+                      data-testid="allowed-count"
+                    >
+                      <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
                       {checkResult.summary.allowed}
                     </div>
                     <p className="text-sm text-muted-foreground">Allowed</p>

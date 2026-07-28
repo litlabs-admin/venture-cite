@@ -23,7 +23,16 @@ import type { KeywordResearch } from "@shared/schema";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Search, Sparkles, FileText, Loader2, Trash2, Filter, RefreshCw } from "lucide-react";
+import {
+  Search,
+  Sparkles,
+  FileText,
+  Loader2,
+  Trash2,
+  Filter,
+  RefreshCw,
+  CheckCircle,
+} from "lucide-react";
 
 const intentColors: Record<string, string> = {
   informational: "bg-muted text-muted-foreground border-border",
@@ -158,7 +167,12 @@ export default function KeywordResearchPage() {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-chart-4";
+    // Zero (including cold-start, no data yet) is a neutral "no data" state,
+    // not a failing one — colour only arrives once there's a real score.
+    if (score <= 0) return "text-foreground";
+    // High score: neutral text, not green/chart-4. The check icon rendered
+    // alongside the value is what signals "good", not colour.
+    if (score >= 80) return "text-foreground";
     if (score >= 60) return "text-chart-3";
     if (score >= 40) return "text-chart-3";
     return "text-destructive";
@@ -345,6 +359,9 @@ export default function KeywordResearchPage() {
                                   data-testid={`score-opportunity-${keyword.id}`}
                                 >
                                   {keyword.opportunityScore}
+                                  {keyword.opportunityScore >= 80 && (
+                                    <CheckCircle className="h-3 w-3" aria-hidden="true" />
+                                  )}
                                   <Sparkles className="h-3 w-3 text-muted-foreground" />
                                 </span>
                               </TooltipTrigger>
@@ -366,6 +383,9 @@ export default function KeywordResearchPage() {
                                   data-testid={`score-citation-${keyword.id}`}
                                 >
                                   {keyword.aiCitationPotential}
+                                  {keyword.aiCitationPotential >= 80 && (
+                                    <CheckCircle className="h-3 w-3" aria-hidden="true" />
+                                  )}
                                   <Sparkles className="h-3 w-3 text-muted-foreground" />
                                 </span>
                               </TooltipTrigger>

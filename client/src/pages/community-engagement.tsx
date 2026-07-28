@@ -82,11 +82,15 @@ const platformColors: Record<string, string> = {
   hackernews: "bg-muted text-foreground",
 };
 
+// The badge renders the status word itself, so colour was a second encoding
+// of information already on screen — and it was spending three chart tokens
+// (plus the green accent) on a lifecycle that has no good/bad axis. Neutral
+// throughout; the label carries the meaning.
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
-  ready: "bg-muted text-chart-1",
-  posted: "bg-muted text-chart-4",
-  archived: "bg-muted text-chart-3",
+  ready: "bg-muted text-foreground",
+  posted: "bg-secondary text-secondary-foreground",
+  archived: "bg-muted text-muted-foreground",
 };
 
 export default function CommunityEngagement() {
@@ -452,7 +456,7 @@ export default function CommunityEngagement() {
                       <ul className="mt-1 text-sm space-y-1">
                         {generatedContent.tips.map((tip, i) => (
                           <li key={i} className="flex items-start gap-2">
-                            <CheckCircle2 className="w-3 h-3 mt-1 text-chart-4 shrink-0" />
+                            <CheckCircle2 className="w-3 h-3 mt-1 text-muted-foreground shrink-0" />
                             <span>{tip}</span>
                           </li>
                         ))}
@@ -779,7 +783,10 @@ export default function CommunityEngagement() {
                           {post.platform}
                         </Badge>
                         <span className="font-medium text-sm">{post.groupName}</span>
-                        <Badge className="bg-muted text-chart-4">Posted</Badge>
+                        <Badge className="bg-secondary text-secondary-foreground gap-1">
+                          <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                          Posted
+                        </Badge>
                       </div>
                       {post.title && <p className="font-medium text-sm mt-1">{post.title}</p>}
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
