@@ -50,10 +50,11 @@ import BrandEntityStrength, {
 } from "@/components/dashboard/BrandEntityStrength";
 import VerbatimResponseCard from "@/components/dashboard/VerbatimResponseCard";
 import ResultsTimeline from "@/components/dashboard/ResultsTimeline";
-import RecommendationsPanel from "@/components/dashboard/RecommendationsPanel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import SafeMarkdown from "@/components/SafeMarkdown";
+import { stripTrackingParams } from "@/lib/stripTrackingParams";
 
 interface HeroData {
   visibilityScore: number;
@@ -203,6 +204,11 @@ function useDashboardQueries(
     enabled,
     refetchInterval,
   });
+  // Key shape + explicit queryFn match competitors.tsx's leaderboard query
+  // (`["/api/competitors/leaderboard", brandId]`) so both pages share one
+  // cache entry instead of fetching the same data twice under two
+  // different keys (this page used to key on the full URL string with the
+  // query param baked in, which never matched competitors.tsx's tuple key).
   const leaderboard = useQuery<{
     success: boolean;
     data: {
@@ -213,7 +219,14 @@ function useDashboardQueries(
       shareOfVoice: number;
     }[];
   }>({
-    queryKey: [`/api/competitors/leaderboard?brandId=${brandId}`],
+    queryKey: ["/api/competitors/leaderboard", brandId],
+    queryFn: async () => {
+      const res = await apiRequest(
+        "GET",
+        `/api/competitors/leaderboard?brandId=${encodeURIComponent(brandId)}`,
+      );
+      return res.json();
+    },
     enabled,
     refetchInterval,
   });
@@ -343,7 +356,7 @@ export default function MonitorOverview() {
     [`/api/dashboard/gap-matrix/${selectedBrandId}`],
     [`/api/dashboard/entity-strength/${selectedBrandId}`],
     [`/api/dashboard/citation-trend/${selectedBrandId}`],
-    [`/api/competitors/leaderboard?brandId=${selectedBrandId}`],
+    ["/api/competitors/leaderboard", selectedBrandId],
     ["/api/brand-mentions", selectedBrandId, { platform: "reddit" }],
   ]);
 
@@ -579,9 +592,10 @@ export default function MonitorOverview() {
         </div>
       )}
 
-      {/* Onboarding spine + a single-line "what to expect" caption. The
-          RecommendationsPanel is the canonical next-actions surface; the
-          timeline caption sets timing expectations for everyone. */}
+      {/* Onboarding spine + a single-line "what to expect" caption. Command
+          Center's Pulse (home.tsx) is the canonical next-actions surface —
+          "Recommended next steps" used to duplicate it here and was
+          removed (same /recommendations key + dismissal store as Pulse). */}
       <ResultsTimeline compact />
       {hero.isError && (
         <Alert variant="destructive">
@@ -589,10 +603,6 @@ export default function MonitorOverview() {
           <AlertDescription>Couldn't load dashboard data — please refresh.</AlertDescription>
         </Alert>
       )}
-      <div>
-        <RecommendationsPanel />
-      </div>
-
       {noCitationData ? (
         <EmptyState
           icon={Play}
@@ -874,8 +884,26 @@ export default function MonitorOverview() {
             )}
           </Section>
 
-          {/* ===== 3b. CITED URLS ===== */}
-          <CitedUrlsCard brandId={selectedBrandId} refetchInterval={refetchInterval} />
+          {/* ===== 3b. CITED URLS =====
+              Report owns the full cited-pages surface; Overview shows only
+              a top-5 preview (existing `initialLimit` prop — no new prop
+              added to CitedUrlsCard) and links out to Report for the rest. */}
+          <div className="space-y-2">
+            <CitedUrlsCard
+              brandId={selectedBrandId}
+              refetchInterval={refetchInterval}
+              initialLimit={5}
+              expandable={false}
+            />
+            <div className="text-right">
+              <Link
+                to="/report"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                View full cited-pages report <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
 
           {/* ===== 4. PLATFORM VISIBILITY ===== */}
           <Section
@@ -900,80 +928,7 @@ export default function MonitorOverview() {
             )}
           </Section>
 
-          {/* ===== 5. COMPETITORS DOMINATING ===== */}
-          <Section
-            title="Competitors Dominating AI Results"
-            description="Brands appearing more than you across AI-trusted sources"
-            pendingDot={isAutopilotDataPending}
-            action={
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">
-                  {leaderboardRows.filter((e) => !e.isOwn).length} detected
-                </Badge>
-                <SeeAllLink tab="competitors" />
-              </div>
-            }
-          >
-            {leaderboard.isError ? (
-              <ErrorState
-                title="Couldn't load competitor leaderboard"
-                onRetry={() => leaderboard.refetch()}
-                isRetrying={leaderboard.isRefetching}
-              />
-            ) : leaderboard.isLoading ? (
-              <Skeleton className="h-48 w-full" />
-            ) : leaderboardRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No competitor data yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {leaderboardRows
-                  .filter((e) => !e.isOwn)
-                  .sort((a, b) => b.totalCitations - a.totalCitations)
-                  .slice(0, 10)
-                  .map((entry, i) => {
-                    const max = Math.max(1, leaderboardRows[0]?.totalCitations ?? 1);
-                    const pct = Math.round((entry.totalCitations / max) * 100);
-                    return (
-                      <div
-                        key={entry.domain || entry.name}
-                        className="grid grid-cols-[3rem_1fr_3rem_8rem] items-center gap-3 px-3 py-2 rounded-md border border-border/50"
-                      >
-                        <span className="text-sm text-muted-foreground">#{i + 1}</span>
-                        <span className="flex items-center gap-2 min-w-0">
-                          {entry.domain ? (
-                            <img
-                              src={`/api/logo-proxy?url=${encodeURIComponent(
-                                `https://www.google.com/s2/favicons?domain=${entry.domain}&sz=32`,
-                              )}`}
-                              alt=""
-                              width={16}
-                              height={16}
-                              className="w-4 h-4 rounded-full bg-muted shrink-0"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).src =
-                                  "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
-                              }}
-                            />
-                          ) : null}
-                          <span className="font-medium text-foreground truncate">{entry.name}</span>
-                        </span>
-                        <span className="text-right text-sm text-muted-foreground">
-                          {entry.totalCitations}
-                        </span>
-                        <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-destructive"
-                            style={{ width: `${Math.max(6, pct)}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </Section>
-
-          {/* ===== 6. SHARE OF AI VOICE ===== */}
+          {/* ===== 5. SHARE OF AI VOICE ===== */}
           <Section
             title="Share of AI Voice"
             description="% of AI answers in your category that mention each brand"
@@ -1056,7 +1011,7 @@ export default function MonitorOverview() {
             )}
           </Section>
 
-          {/* ===== 7. COMPETITOR GAP MATRIX ===== */}
+          {/* ===== 6. COMPETITOR GAP MATRIX ===== */}
           <Section
             title="Competitor Gap Analysis"
             description="Exact query types where each competitor beats you — your attack surface"
@@ -1078,7 +1033,7 @@ export default function MonitorOverview() {
             )}
           </Section>
 
-          {/* ===== 8. COVERAGE + ENTITY STRENGTH ===== */}
+          {/* ===== 7. COVERAGE + ENTITY STRENGTH ===== */}
           <div className="grid md:grid-cols-2 gap-4">
             <Section
               title="Prompt Coverage Map"
@@ -1120,7 +1075,7 @@ export default function MonitorOverview() {
             </Section>
           </div>
 
-          {/* ===== 9. AI SENTIMENT & POSITIONING ===== */}
+          {/* ===== 8. AI SENTIMENT & POSITIONING ===== */}
           <Section
             title="AI Sentiment & Positioning"
             description="How AI perceives and positions your brand"
@@ -1157,9 +1112,13 @@ export default function MonitorOverview() {
                 <div className="text-xs uppercase tracking-wide text-primary mb-2">
                   How AI describes {selectedBrand?.name ?? "your brand"}
                 </div>
-                <p className="text-sm text-foreground italic">
-                  &ldquo;{firstPlatformSnippet.latestSnippet}&rdquo;
-                </p>
+                <div className="prose prose-sm dark:prose-invert max-w-none text-sm italic text-foreground prose-p:my-0 prose-p:inline">
+                  <span aria-hidden="true">&ldquo;</span>
+                  <SafeMarkdown>
+                    {stripTrackingParams(firstPlatformSnippet.latestSnippet)}
+                  </SafeMarkdown>
+                  <span aria-hidden="true">&rdquo;</span>
+                </div>
               </div>
             )}
             {hasMeasured && gapsAiIdentifies.length > 0 && (
@@ -1183,7 +1142,7 @@ export default function MonitorOverview() {
             )}
           </Section>
 
-          {/* ===== 10. WHAT AI SAYS ABOUT YOU ===== */}
+          {/* ===== 9. WHAT AI SAYS ABOUT YOU ===== */}
           <Section
             title="What AI Says About You"
             description="Live responses — verbatim what AI tells your potential customers"
@@ -1251,7 +1210,7 @@ export default function MonitorOverview() {
             )}
           </Section>
 
-          {/* ===== 11. REDDIT VISIBILITY ===== */}
+          {/* ===== 10. REDDIT VISIBILITY ===== */}
           <Section
             title="Reddit Visibility"
             description="Your brand's presence in the communities AI platforms index most"

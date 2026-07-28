@@ -143,10 +143,19 @@ export default function CitedUrlsCard({
   brandId,
   refetchInterval = false,
   initialLimit = 10,
+  expandable = true,
 }: {
   brandId: string | null | undefined;
   refetchInterval?: number | false;
   initialLimit?: number;
+  /**
+   * Whether the "Show all N" control is offered. Report owns the full list, so
+   * Overview mounts this as a capped preview with `expandable={false}` and
+   * links out instead — otherwise the preview could expand to the same 115
+   * rows the Report page exists to hold, which is the duplication this split
+   * was meant to remove.
+   */
+  expandable?: boolean;
 }) {
   const [view, setView] = useState<View>("page");
   const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
@@ -392,7 +401,7 @@ export default function CitedUrlsCard({
                 );
               })}
             </ul>
-            {groups.length > initialLimit && (
+            {expandable && groups.length > initialLimit && (
               <div className="mt-3 text-center print:hidden">
                 <Button
                   variant="ghost"

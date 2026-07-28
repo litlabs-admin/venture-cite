@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, type ReactElement } from "react";
+import { useState, useEffect, type ReactElement } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -42,8 +42,6 @@ import {
   TrendingUp,
   AlertCircle,
   Zap,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { BsOpenai } from "react-icons/bs";
 import { SiGoogle } from "react-icons/si";
@@ -86,123 +84,6 @@ interface AIEngine {
   description: string;
   keyFactors: string[];
   steps: EngineStep[];
-}
-
-// One-at-a-time quick-win card per engine. Shows a single high-priority step
-// but lets the user page back/forward through the engine's high-priority steps
-// so completed steps stay reviewable instead of silently disappearing.
-function QuickWinCard({
-  engine,
-  steps,
-  startIndex,
-  completedStepIds,
-  onToggle,
-}: {
-  engine: AIEngine;
-  steps: EngineStep[];
-  startIndex: number;
-  completedStepIds: string[];
-  onToggle: (stepId: string) => void;
-}) {
-  const [viewIndex, setViewIndex] = useState(startIndex);
-  // Auto-follow the first-outstanding step only until the user takes control of
-  // this card (pages or toggles). This handles the async progress load (before
-  // interaction we track startIndex) without yanking the view away from a step
-  // the user deliberately navigated to — completing the viewed step no longer
-  // makes the card jump, it just flips to "Done" and the user pages on.
-  const userControlled = useRef(false);
-  useEffect(() => {
-    if (!userControlled.current) setViewIndex(startIndex);
-  }, [startIndex]);
-
-  const index = Math.min(viewIndex, steps.length - 1);
-  const step = steps[index];
-  const isDone = completedStepIds.includes(step.id);
-
-  const goTo = (next: number) => {
-    userControlled.current = true;
-    setViewIndex(Math.max(0, Math.min(steps.length - 1, next)));
-  };
-  const handleToggle = () => {
-    userControlled.current = true;
-    onToggle(step.id);
-  };
-
-  return (
-    <Card className="bg-card">
-      <CardContent className="pt-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className={engine.color}>{engine.icon}</span>
-            <span className="text-sm font-medium">{engine.name}</span>
-          </div>
-          {steps.length > 1 && (
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6"
-                disabled={index === 0}
-                onClick={() => goTo(index - 1)}
-                aria-label="Previous step"
-                data-testid={`quick-prev-${engine.id}`}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="text-xs tabular-nums">
-                {index + 1}/{steps.length}
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6"
-                disabled={index === steps.length - 1}
-                onClick={() => goTo(index + 1)}
-                aria-label="Next step"
-                data-testid={`quick-next-${engine.id}`}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-        <h4 className="font-medium mb-2">{step.title}</h4>
-        <p className="text-sm text-muted-foreground mb-3">{step.description}</p>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            checked={isDone}
-            onCheckedChange={handleToggle}
-            data-testid={`quick-checkbox-${step.id}`}
-          />
-          <span className="text-sm">{isDone ? "Done" : "Mark as done"}</span>
-          {step.quickAction &&
-            ("to" in step.quickAction ? (
-              <Link to={step.quickAction.to}>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="ml-auto"
-                  data-testid={`quick-action-${step.id}`}
-                >
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              </Link>
-            ) : (
-              <a href={step.quickAction.href}>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="ml-auto"
-                  data-testid={`quick-action-${step.id}`}
-                >
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              </a>
-            ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
 }
 
 const aiEngines: AIEngine[] = [
@@ -1047,6 +928,12 @@ export default function AIVisibility() {
     return { completed, total, percentage };
   };
 
+  // Two visually distinct treatments: High Priority is solid (bg-foreground)
+  // since it's the tier that should draw the eye. Medium and Low share one
+  // muted treatment (variant="secondary") — they were previously two
+  // near-identical near-invisible styles that didn't actually distinguish
+  // from each other; the step title's own priority label still tells them
+  // apart, the styling no longer pretends to.
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case "high":
@@ -1054,37 +941,15 @@ export default function AIVisibility() {
           <Badge className="bg-foreground text-background border-transparent">High Priority</Badge>
         );
       case "medium":
-        return <Badge className="bg-muted text-foreground border-border">Medium</Badge>;
+        return <Badge variant="secondary">Medium</Badge>;
       case "low":
-        return (
-          <Badge variant="outline" className="text-muted-foreground border-border">
-            Low
-          </Badge>
-        );
+        return <Badge variant="secondary">Low</Badge>;
       default:
         return null;
     }
   };
 
   const totalProgress = getTotalProgress();
-
-  // Quick-wins list: ALL high-priority steps per engine (not just the first
-  // outstanding one) plus the index of the first outstanding step. The card
-  // shows one step at a time but lets the user page back/forward to review
-  // what they've already completed — previously, completing a step made it
-  // silently vanish with no way to go back. Memoized so switching engines/tabs
-  // doesn't re-walk every engine + step.
-  const quickWins = useMemo(() => {
-    return aiEngines.flatMap((engine) => {
-      const done = completedSteps[engine.id] || [];
-      const steps = engine.steps.filter((s) => s.priority === "high");
-      if (steps.length === 0) return [];
-      const firstOutstanding = steps.findIndex((s) => !done.includes(s.id));
-      // If every high-priority step is done, land on the last one for review.
-      const startIndex = firstOutstanding === -1 ? steps.length - 1 : firstOutstanding;
-      return [{ engine, steps, startIndex }];
-    });
-  }, [completedSteps]);
 
   return (
     <div className="space-y-8">
@@ -1117,7 +982,8 @@ export default function AIVisibility() {
             <Card
               key={engine.id}
               onClick={() => setSelectedEngineId(engine.id)}
-              className={`${engine.bgColor} border cursor-pointer transition-all hover:border-foreground/40 ${isSelected ? "border-foreground ring-2 ring-foreground/30" : progress.percentage === 100 ? "border-foreground" : "border-border"}`}
+              aria-pressed={isSelected}
+              className={`border cursor-pointer transition-all hover:border-foreground/40 ${isSelected ? "bg-secondary border-border" : `${engine.bgColor} ${progress.percentage === 100 ? "border-foreground" : "border-border"}`}`}
               data-testid={`engine-card-${engine.id}`}
             >
               <CardContent className="pt-4">
@@ -1142,26 +1008,15 @@ export default function AIVisibility() {
 
       {(() => {
         const engine = aiEngines.find((e) => e.id === selectedEngineId) || aiEngines[0];
-        const progress = getEngineProgress(engine);
         return (
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <span className={engine.color}>{engine.icon}</span>
-                      {engine.name} Visibility Checklist
-                    </CardTitle>
-                    <CardDescription className="mt-2">{engine.description}</CardDescription>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold" data-testid={`engine-progress-${engine.id}`}>
-                      {progress.completed}/{progress.total}
-                    </p>
-                    <p className="text-sm text-muted-foreground">completed</p>
-                  </div>
-                </div>
+                <CardTitle className="flex items-center gap-2">
+                  <span className={engine.color}>{engine.icon}</span>
+                  {engine.name} Visibility Checklist
+                </CardTitle>
+                <CardDescription className="mt-2">{engine.description}</CardDescription>
                 <div className="flex flex-wrap gap-2 mt-4">
                   <span className="text-sm font-medium text-muted-foreground">Key factors:</span>
                   {engine.keyFactors.map((factor, i) => (
@@ -1267,32 +1122,6 @@ export default function AIVisibility() {
           </div>
         );
       })()}
-
-      <Card className="mt-8 bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-muted-foreground" />
-            Quick Wins: Start Here
-          </CardTitle>
-          <CardDescription>
-            These high-priority steps give you the best return on effort
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {quickWins.map(({ engine, steps, startIndex }) => (
-              <QuickWinCard
-                key={engine.id}
-                engine={engine}
-                steps={steps}
-                startIndex={startIndex}
-                completedStepIds={completedSteps[engine.id] || []}
-                onToggle={(stepId) => toggleStep(engine.id, stepId)}
-              />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
