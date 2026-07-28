@@ -28,8 +28,19 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
 
-  STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
-  STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
+  // Billing is OPTIONAL at boot. Every consumer already degrades on its own:
+  // stripeClient.ts throws from getStripeKey() only when a client is actually
+  // requested, webhookHandlers.ts checks STRIPE_WEBHOOK_SECRET per request,
+  // and both boot paths (server/index.ts, server/nitroBoot.ts) already guard
+  // product setup behind `if (process.env.STRIPE_SECRET_KEY)`.
+  //
+  // Requiring them here was the one thing that turned "billing not configured"
+  // into "the entire site is down" — including the public marketing pages,
+  // which never touch Stripe. A missing payment integration should disable
+  // payments, not the homepage. Checkout and webhook endpoints still fail
+  // loudly and specifically at the point of use.
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
 
