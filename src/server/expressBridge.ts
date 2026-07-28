@@ -25,6 +25,12 @@ const fetchHandler = toFetchHandler(app);
 // once here just avoids an extra await indirection per request.
 const ready = prepareApp();
 
+// Conditional requests (If-None-Match / If-Modified-Since) never reach here:
+// server/nitroConditionalRequests.ts strips them in Nitro's `request` hook,
+// before routing. That is deliberate and load-bearing — a 304 cannot be
+// constructed as a Response with a body, so any conditional request through
+// this bridge became a 500. See that file for the full reasoning and for why
+// the fix does not belong in this function.
 export async function handleExpressRequest(request: Request): Promise<Response> {
   await ready;
   return fetchHandler(request);

@@ -136,7 +136,13 @@ export default defineConfig({
       // the production entry point. No-ops on Vercel and outside
       // NODE_ENV=production; see server/nitroBoot.ts for the full
       // reasoning and proof of "runs once per process, not per request".
-      plugins: [path.resolve(import.meta.dirname, "server/nitroBoot.ts")],
+      plugins: [
+        path.resolve(import.meta.dirname, "server/nitroBoot.ts"),
+        // Strips If-None-Match/If-Modified-Since before routing. See that file:
+        // a 304 cannot be constructed as a Response with a body, so any
+        // conditional request became a 500.
+        path.resolve(import.meta.dirname, "server/nitroConditionalRequests.ts"),
+      ],
       ...(isVercelBuild
         ? {}
         : {
