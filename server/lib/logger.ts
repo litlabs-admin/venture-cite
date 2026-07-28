@@ -100,9 +100,27 @@ const baseOptions: LoggerOptions = {
 // In development, pretty-print to stdout for readability. In production,
 // emit JSON lines so log aggregators (Datadog, Better Stack, etc.) can
 // parse fields directly.
-export const logger = isProd
-  ? pino(baseOptions)
-  : pino({
+//
+// The pretty transport is built inside a try/catch, and that is load-bearing
+// rather than defensive habit. `transport.target` is resolved by pino from a
+// STRING at runtime, which no bundler can trace — so a bundle that includes
+// this branch but not pino-pretty throws at module load, not at first log.
+// This module is imported by the SSR entry, so that throw took down every
+// route with an opaque 500: the marketing pages, /health, everything.
+//
+// It reached production because `process.env.NODE_ENV` is inlined by the
+// bundler at BUILD time. The Vercel build ran `vite build` without
+// NODE_ENV set (now fixed in package.json), so `isProd` was frozen to
+// `false` in the SSR bundle and stayed false no matter what the runtime
+// environment said.
+//
+// Both halves are fixed, but the guard alone is not enough to rely on: a
+// logging backend must never be able to take the application down. Losing
+// colour in the terminal is an acceptable failure; losing the site is not.
+function createLogger() {
+  if (isProd) return pino(baseOptions);
+  try {
+    return pino({
       ...baseOptions,
       transport: {
         target: "pino-pretty",
@@ -113,3 +131,11 @@ export const logger = isProd
         },
       },
     });
+  } catch {
+    // pino-pretty unavailable (bundled runtime, pruned install). Fall back
+    // to structured JSON on stdout — still fully usable, just not pretty.
+    return pino(baseOptions);
+  }
+}
+
+export const logger = createLogger();
