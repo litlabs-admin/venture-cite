@@ -73,15 +73,45 @@ const MAX_URLS = 10;
 // like /zh-hans/, /zh-hant/) AND non-ISO bucket prefixes (/global/,
 // /worldwide/, /intl/, /international/).
 //
-// 2026-05-28 (revised): widened the 3rd char count from 2-3 to 2-4 to
-// catch /zh-hans, and added a non-locale bucket-prefix alternative.
-const LOCALE_PREFIX = /^\/([a-z]{2,3}(?:[-_][a-z]{2,4})?)(\/|$)/i;
-const NON_ISO_BUCKET = /^\/(global|worldwide|intl|international|en|english)(\/|$)/i;
+// The language subtag is validated against the real ISO 639-1 set rather
+// than matched as "any 2-3 letters". That shape was too permissive and
+// caused a production mis-scoring bug: `/api` parsed as a locale, got
+// stripped to `/`, and `/` matches TIER_1's empty alternative — so `/api`
+// scored as the HOMEPAGE and took top scraping priority. `/faq`, `/seo`,
+// `/app` and `/dev` all did the same, crowding real brand-identity pages
+// out of the 10-URL budget on any site that has them.
+//
+// Requiring a real language code is what makes stripping safe: `/en` and
+// `/en/about` still collapse correctly, while `/api/pricing` no longer
+// masquerades as `/pricing`.
+//
+// Trade-off, deliberate: 3-letter ISO 639-2/3 codes (e.g. `/fil/`) are no
+// longer stripped. Those are rare on marketing sites, and the failure mode
+// is mild — the page falls through to tier 0 (still eligible) rather than
+// being mis-promoted to tier 1. The old behaviour's failure mode was the
+// expensive direction.
+const ISO_639_1 = new Set(
+  (
+    "aa ab ae af ak am an ar as av ay az ba be bg bh bi bm bn bo br bs ca ce ch co cr cs cu cv " +
+    "cy da de dv dz ee el en eo es et eu fa ff fi fj fo fr fy ga gd gl gn gu gv ha he hi ho hr " +
+    "ht hu hy hz ia id ie ig ii ik io is it iu ja jv ka kg ki kj kk kl km kn ko kr ks ku kv kw " +
+    "ky la lb lg li ln lo lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv " +
+    "ny oc oj om or os pa pi pl ps pt qu rm rn ro ru rw sa sc sd se sg si sk sl sm sn so sq sr " +
+    "ss st su sv sw ta te tg th ti tk tl tn to tr ts tt tw ty ug uk ur uz ve vi vo wa wo xh yi " +
+    "yo za zh zu"
+  ).split(" "),
+);
+
+// Captures the language subtag separately so it can be validated above.
+const LOCALE_PREFIX = /^\/([a-z]{2})(?:[-_]([a-z]{2,4}))?(\/|$)/i;
+const NON_ISO_BUCKET = /^\/(global|worldwide|intl|international|english)(\/|$)/i;
 
 function stripLocalePrefix(path: string): string {
   const localeMatch = LOCALE_PREFIX.exec(path);
-  if (localeMatch) {
-    return path.slice(localeMatch[1].length + 1) || "/";
+  if (localeMatch && ISO_639_1.has(localeMatch[1].toLowerCase())) {
+    // Length of the matched segment: language + optional [-_]region.
+    const segment = localeMatch[2] ? `${localeMatch[1]}-${localeMatch[2]}` : localeMatch[1];
+    return path.slice(segment.length + 1) || "/";
   }
   const bucketMatch = NON_ISO_BUCKET.exec(path);
   if (bucketMatch) {

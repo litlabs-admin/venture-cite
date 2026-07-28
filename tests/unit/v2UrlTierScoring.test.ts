@@ -50,6 +50,52 @@ describe("scoreUrl", () => {
     expect(scoreUrl("https://x.com/some-random-page")).toBe(0);
     expect(scoreUrl("https://x.com/api")).toBe(0);
   });
+
+  // Regression: LOCALE_PREFIX used to match any 2-3 letter segment, so short
+  // paths parsed as language codes, got stripped to "/", and "/" matches
+  // TIER_1's empty alternative — scoring them as the HOMEPAGE. That gave
+  // /api, /faq, /seo and friends top scraping priority and pushed real
+  // brand-identity pages out of the 10-URL budget. The language subtag is
+  // now validated against the ISO 639-1 set.
+  describe("short non-locale paths are not mistaken for the homepage", () => {
+    for (const path of ["/api", "/faq", "/seo", "/dev", "/pro", "/biz"]) {
+      it(`${path} is untiered, not tier 1`, () => {
+        expect(scoreUrl(`https://x.com${path}`)).toBe(0);
+      });
+    }
+
+    it("a non-locale prefix does not let a sub-path impersonate a tier-1 page", () => {
+      // The nastiest form of the bug: /api/pricing stripped to /pricing and
+      // scored 1, so API reference pages outranked the real pricing page.
+      expect(scoreUrl("https://x.com/api/pricing")).toBe(0);
+      expect(scoreUrl("https://x.com/faq/about")).toBe(0);
+    });
+  });
+
+  // The counterpart to the above — the fix must not break real locales.
+  describe("real locale prefixes still strip", () => {
+    it("bare ISO 639-1 code is the locale homepage", () => {
+      expect(scoreUrl("https://x.com/en")).toBe(1);
+      expect(scoreUrl("https://x.com/fr")).toBe(1);
+    });
+
+    it("locale-prefixed paths resolve to their underlying tier", () => {
+      expect(scoreUrl("https://x.com/en/about")).toBe(1);
+      expect(scoreUrl("https://x.com/fr/pricing")).toBe(1);
+      expect(scoreUrl("https://x.com/de/features")).toBe(2);
+      expect(scoreUrl("https://x.com/es/blog/post")).toBe(3);
+    });
+
+    it("region and script subtags are handled", () => {
+      expect(scoreUrl("https://x.com/en_US/team")).toBe(1);
+      expect(scoreUrl("https://x.com/zh-hans/about")).toBe(1);
+    });
+
+    it("non-ISO bucket prefixes still strip", () => {
+      expect(scoreUrl("https://x.com/global/about")).toBe(1);
+      expect(scoreUrl("https://x.com/international/pricing")).toBe(1);
+    });
+  });
 });
 
 describe("selectTopUrls", () => {
