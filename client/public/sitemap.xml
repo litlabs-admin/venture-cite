@@ -1,8 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Every server-rendered public route belongs here.
+
+  These are the only routes whose content exists in the served HTML. The rest
+  of the app sits under the pathless `_app` layout, which carries `ssr: false`
+  (src/routes/_app.tsx) because it is auth-gated — listing one of those would
+  advertise a page that crawlers receive empty.
+
+  Keep in sync with the top-level route files in src/routes/*.tsx.
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://venturecite.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://venturecite.com/pricing</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://venturecite.com/glossary</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://venturecite.com/privacy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>

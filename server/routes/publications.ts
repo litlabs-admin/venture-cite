@@ -48,89 +48,20 @@ export function setupPublicationsRoutes(app: Express): void {
 
   // Mention routes moved to server/routes/mentions.ts (mentions rebuild)
 
-  // robots.txt — public pages are crawlable (landing, pricing, privacy,
-  // article permalinks), authenticated app routes are explicitly blocked so
-  // they don't leak into search results. All AI crawlers (GPTBot, Claude,
-  // Perplexity, etc.) get the same allow-list — no preferential treatment
-  // beyond the baseline user-agent rules.
-  app.get(
-    "/robots.txt",
-    asyncHandler(async (req, res) => {
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const robotsTxt = `User-agent: *
-Allow: /
-Allow: /pricing
-Allow: /privacy
-Allow: /article/
-Disallow: /api/
-Disallow: /dashboard
-Disallow: /content
-Disallow: /citations
-Disallow: /articles
-Disallow: /brands
-Disallow: /keyword-research
-Disallow: /ai-visibility
-Disallow: /ai-intelligence
-Disallow: /geo-rankings
-Disallow: /geo-analytics
-Disallow: /geo-tools
-Disallow: /geo-signals
-Disallow: /revenue-analytics
-Disallow: /publications
-Disallow: /competitors
-Disallow: /crawler-check
-Disallow: /opportunities
-Disallow: /agent
-Disallow: /outreach
-Disallow: /ai-traffic
-Disallow: /analytics-integrations
-Disallow: /faq-manager
-Disallow: /brand-fact-sheet
-Disallow: /community
-Disallow: /settings
-Disallow: /login
-Disallow: /register
-Disallow: /forgot-password
-Disallow: /reset-password
-
-Sitemap: ${baseUrl}/sitemap.xml`;
-
-      res.header("Content-Type", "text/plain");
-      res.header("Cache-Control", "public, max-age=3600");
-      res.send(robotsTxt);
-    }),
-  );
-
-  // Sitemap.xml — public pages only. Articles are no longer published on
-  // VentureCite-owned URLs (slug column was dropped in Wave 7). Users link
-  // to their own externally-hosted articles via `articles.externalUrl`,
-  // which is not our concern to advertise.
-  app.get(
-    "/sitemap.xml",
-    asyncHandler(async (req, res) => {
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const now = new Date().toISOString();
-
-      const staticPaths = ["/", "/pricing", "/privacy"];
-      const articleEntries = "";
-
-      const staticEntries = staticPaths
-        .map(
-          (p) => `  <url>\n    <loc>${baseUrl}${p}</loc>\n    <lastmod>${now}</lastmod>\n  </url>`,
-        )
-        .join("\n");
-
-      const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${staticEntries}
-${articleEntries}
-</urlset>`;
-
-      res.header("Content-Type", "application/xml");
-      res.header("Cache-Control", "public, max-age=3600");
-      res.send(xml);
-    }),
-  );
+  // /robots.txt and /sitemap.xml are NOT served here.
+  //
+  // They used to be, generated per-request from the Host header. That was
+  // dead code in production: Nitro serves client/public/ directly, and this
+  // Express app is only bridged at /api/*, /webhooks/* and /health, so the
+  // static files always won. The handlers only ever ran under `npm run dev`,
+  // which meant dev and production served DIFFERENT robots.txt and
+  // sitemap.xml — the dev copies also still listed routes that no longer
+  // exist (/geo-rankings, /revenue-analytics, /publications, /agent,
+  // /outreach, /ai-traffic, /analytics-integrations).
+  //
+  // client/public/{robots.txt,sitemap.xml} are now the single source of
+  // truth, with canonical production URLs — host-derived URLs made preview
+  // deployments advertise their own hostnames to crawlers.
 
   // ========== COMPETITOR TRACKING API ROUTES ==========
 

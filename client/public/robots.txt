@@ -1,6 +1,61 @@
 # VentureCite — crawlers welcome. AI answer engines explicitly allowed.
+#
+# This file is the single source of truth. A dynamic Express-served
+# /robots.txt used to exist alongside it (server/routes/publications.ts) and
+# was removed: Nitro serves this directory's files directly, and the Express
+# app is only bridged at /api/*, /webhooks/* and /health — so the dynamic
+# route was shadowed in production and only ever ran in dev, meaning the two
+# environments served different robots.txt and sitemap.xml files.
+#
+# The URLs here are the canonical production ones on purpose. Generating them
+# from the request host, as the dynamic version did, makes preview and
+# staging deployments advertise their own hostnames to crawlers.
+#
+# Default is crawlable — only authenticated app routes are listed below, so a
+# new public page is indexable without needing an edit here.
+
 User-agent: *
 Allow: /
+
+# Server surfaces — no user-facing content.
 Disallow: /api/
+Disallow: /webhooks/
+
+# Authenticated application. These render client-side behind an auth gate
+# (src/routes/_app.tsx carries ssr: false), so a crawler receives an empty
+# shell — indexing them yields nothing but wasted crawl budget.
+Disallow: /act
+Disallow: /admin
+Disallow: /ai-intelligence
+Disallow: /ai-visibility
+Disallow: /articles
+Disallow: /brand-fact-sheet
+Disallow: /brands
+Disallow: /citations
+Disallow: /community
+Disallow: /competitors
+Disallow: /content
+Disallow: /crawler-check
+Disallow: /dashboard
+Disallow: /diagnose
+Disallow: /faq-manager
+Disallow: /geo-analytics
+Disallow: /geo-signals
+Disallow: /geo-tools
+Disallow: /home2
+Disallow: /keyword-research
+Disallow: /monitor
+Disallow: /opportunities
+Disallow: /report
+Disallow: /settings
+Disallow: /setup
+Disallow: /welcome
+
+# Account flows.
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
 
 Sitemap: https://venturecite.com/sitemap.xml
