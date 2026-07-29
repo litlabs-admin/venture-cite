@@ -23,25 +23,51 @@ export function RankingsList() {
               key={row.domain}
               className={
                 "group relative flex items-center gap-2.5 px-6 py-[7px] transition-colors " +
-                (row.highlighted
-                  ? "cursor-default bg-vc-accent-subtle/55"
-                  : "cursor-pointer hover:bg-[rgba(244,244,240,0.55)]") +
+                (row.highlighted ? "cursor-default" : "cursor-pointer hover:bg-vc-row-hover") +
                 (row.hiddenBelowLg ? " hidden lg:flex" : "")
               }
+              style={
+                row.highlighted
+                  ? {
+                      background:
+                        "linear-gradient(90deg, rgba(238,242,254,0.98) 0%, rgba(238,242,254,0.45) 100%)",
+                    }
+                  : undefined
+              }
             >
+              {/* 2px accent rail marks "your" row without adding a fifth
+                  colour to the row's own type. */}
+              {row.highlighted && (
+                <span
+                  aria-hidden="true"
+                  className="absolute left-0 top-0 bottom-0 w-[2px]"
+                  style={{
+                    background: "linear-gradient(180deg, var(--accent), var(--hb-accent-bright))",
+                  }}
+                />
+              )}
               <span
                 className={
                   "w-7 text-[11px] tabular-nums shrink-0 " +
-                  (row.highlighted ? "text-vc-primary font-medium" : "text-vc-tertiary")
+                  (row.highlighted
+                    ? "text-vc-primary font-semibold"
+                    : row.dimmed
+                      ? "text-vc-tertiary"
+                      : "text-vc-secondary")
                 }
               >
                 #{row.rank}
               </span>
               <span
-                className="shrink-0 inline-flex items-center justify-center w-4 h-4"
+                className={
+                  "shrink-0 inline-flex items-center justify-center " +
+                  (row.highlighted
+                    ? "w-5 h-5 rounded-[5px] bg-white ring-1 ring-[rgba(22,22,46,0.08)] shadow-[var(--hb-shadow-raised)]"
+                    : "w-4 h-4")
+                }
                 style={
                   row.dimmed
-                    ? { filter: "grayscale(1) contrast(0.92) brightness(1.05)", opacity: 0.55 }
+                    ? { filter: "grayscale(0.85) saturate(0.55)", opacity: 0.72 }
                     : { filter: "none", opacity: 1 }
                 }
               >
@@ -61,23 +87,38 @@ export function RankingsList() {
               <span
                 className={
                   "flex-1 text-[12px] truncate transition-colors duration-150 " +
-                  (row.dimmed ? "text-vc-secondary" : "text-vc-primary font-medium")
+                  (row.highlighted
+                    ? "text-vc-primary font-semibold"
+                    : row.dimmed
+                      ? "text-vc-secondary"
+                      : "text-vc-primary font-medium")
                 }
               >
                 {row.name}
               </span>
               <span
                 className={
-                  "text-[12px] tabular-nums text-vc-primary" +
-                  (row.highlighted ? " font-semibold" : "")
+                  "tabular-nums " +
+                  (row.highlighted
+                    ? "text-[13px] font-semibold text-vc-primary"
+                    : row.dimmed
+                      ? "text-[12px] text-vc-secondary"
+                      : "text-[12px] font-medium text-vc-primary")
                 }
               >
                 {row.score}
               </span>
               <span
                 className={
-                  "text-[10px] tabular-nums w-8 text-right shrink-0 font-mono " +
-                  (row.deltaPositive ? "text-vc-accent" : "text-[#d6453d]")
+                  // Your own row states its movement as a filled pill; the
+                  // rest use the ghost weight so one row reads as "you".
+                  "w-[46px] shrink-0 " +
+                  (row.highlighted
+                    ? "inline-flex justify-center hb-pill " +
+                      (row.deltaPositive ? "hb-pill-up" : "hb-pill-down")
+                    : "text-right hb-delta-ghost " +
+                      (row.deltaPositive ? "hb-delta-ghost-up" : "hb-delta-ghost-down") +
+                      (row.dimmed ? " opacity-70" : ""))
                 }
               >
                 {row.delta}

@@ -155,7 +155,10 @@ function TranscriptRow({ message }: { message: Message }) {
 // app/globals.css) was not verified against source — see build report.
 export function ChatTranscriptDemo() {
   return (
-    <div className="w-full">
+    <div
+      className="w-full rounded-lg p-3 ring-1 ring-vc-hairline"
+      style={{ background: "var(--hb-surface-wash)", boxShadow: "var(--hb-shadow-raised)" }}
+    >
       <div
         className="relative overflow-hidden"
         style={{

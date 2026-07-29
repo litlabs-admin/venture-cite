@@ -176,12 +176,17 @@ const THEME_FOUC_SCRIPT = `
     var resolved;
     if (stored === "light" || stored === "dark") {
       resolved = stored;
-    } else {
+    } else if (stored === "system") {
       var mql =
         typeof window.matchMedia === "function"
           ? window.matchMedia("(prefers-color-scheme: dark)")
           : null;
       resolved = mql && mql.matches ? "dark" : "light";
+    } else {
+      // No stored preference: default to light. Must stay in lockstep with
+      // getStoredTheme() in client/src/lib/theme.ts, or the first paint and
+      // React's hydrated state disagree.
+      resolved = "light";
     }
     var root = document.documentElement;
     if (resolved === "dark") root.classList.add("dark");

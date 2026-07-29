@@ -739,6 +739,47 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.brandPrompts.id, id));
   }
 
+  /** Flip a prompt between tracked and archived — the "ON" toggle. Keeps the
+   *  legacy `isActive` int in lockstep with `status` so any older reader that
+   *  still consults it does not see a contradiction. */
+  async setBrandPromptStatus(
+    id: string,
+    status: "tracked" | "archived",
+  ): Promise<BrandPrompt | undefined> {
+    const [row] = await db
+      .update(schema.brandPrompts)
+      .set({ status, isActive: status === "tracked" ? 1 : 0 })
+      .where(eq(schema.brandPrompts.id, id))
+      .returning();
+    return row;
+  }
+
+  /** Persist a manual reordering. Written in one transaction so a failure
+   *  part-way cannot leave two prompts sharing an index. */
+  async reorderBrandPrompts(brandId: string, orderedIds: string[]): Promise<void> {
+    if (orderedIds.length === 0) return;
+    await db.transaction(async (tx) => {
+      for (const [index, id] of orderedIds.entries()) {
+        await tx
+          .update(schema.brandPrompts)
+          .set({ orderIndex: index })
+          .where(and(eq(schema.brandPrompts.id, id), eq(schema.brandPrompts.brandId, brandId)));
+      }
+    });
+  }
+
+  /** Highest orderIndex currently in use, so a newly created prompt lands at
+   *  the bottom of the list instead of colliding with position 0. */
+  async getMaxBrandPromptOrderIndex(brandId: string): Promise<number> {
+    const rows = await db
+      .select({ orderIndex: schema.brandPrompts.orderIndex })
+      .from(schema.brandPrompts)
+      .where(eq(schema.brandPrompts.brandId, brandId))
+      .orderBy(desc(schema.brandPrompts.orderIndex))
+      .limit(1);
+    return rows[0]?.orderIndex ?? -1;
+  }
+
   async promoteSuggestionToTracked(
     suggestionId: string,
     replaceTrackedId: string | null,

@@ -34,8 +34,39 @@ export default function Landing() {
       <Nav />
 
       <main>
-        <Hero />
-        <HeroBento />
+        {/* Hero region — Hero and HeroBento share one background: a vertical
+            gradient running white at the top to saturated blue at the bottom,
+            so the headline reads on white while the dashboard card sits on
+            blue. Anchored bottom so the saturated end always lands behind the
+            card regardless of viewport height.
+
+            Bounded to the 1120px content column so its edges land exactly on
+            the page's vertical grid guides (at calc(50% ± 560px)) rather than
+            bleeding to the viewport.
+
+            Both children paint above it: they are `relative`, and a positioned
+            sibling later in DOM order wins over a z-index:auto absolute
+            sibling. Hero must therefore NOT set its own background. */}
+        <div className="relative">
+          <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div
+              className="mx-auto h-full w-full"
+              style={{
+                maxWidth: 1120,
+                backgroundImage: "url(/venturecite/images/hero-bg-2.avif)",
+                backgroundSize: "cover",
+                backgroundPosition: "center bottom",
+                backgroundRepeat: "no-repeat",
+              }}
+            />
+          </div>
+          <Hero />
+          <HeroBento />
+          {/* Blue floor below the dashboard card. Lives on the wrapper rather
+              than on HeroBento so the bento itself stays rhythm-neutral. */}
+          <div className="h-8 sm:h-10 lg:h-12" />
+        </div>
+
         <WhyNow />
         <Platform />
         <Philosophy />

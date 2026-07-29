@@ -33,7 +33,7 @@ export function Philosophy() {
                   Other tools give you a dashboard.
                 </p>
                 <h2 className="text-[18px] sm:text-[24px] lg:text-[28px] font-semibold text-vc-primary tracking-[-0.02em]">
-                  VentureCite gives you a playbook<span className="text-vc-accent">.</span>
+                  VentureCite gives you a playbook.
                 </h2>
               </div>
 
@@ -43,7 +43,10 @@ export function Philosophy() {
                   number="01"
                   href="#platform-section"
                   title="Every major engine, not a sample"
-                  body="ChatGPT, Claude, Perplexity, Gemini, Copilot, Google AI Overview. Each one surfaces different brands for the same query. Tracking two or three is guessing."
+                  // Keep this list in step with AiLogoGrid — the card's logo
+                  // grid renders the same eight engines, and a copy/visual
+                  // mismatch here reads as a mistake.
+                  body="ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews, Grok, Meta AI, DeepSeek. Each one surfaces different brands for the same query. Tracking two or three is guessing."
                   ctaLabel="See all features"
                   delayMs={100}
                   isVisible={isVisible}

@@ -50,6 +50,7 @@ import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as WebhooksSplatRouteImport } from './routes/webhooks/$'
 import { Route as AppAdminScrapeRouteImport } from './routes/_app/admin.scrape'
 import { Route as AppContentArticleIdRouteImport } from './routes/_app/content.$articleId'
+import { Route as AppPromptsPromptIdRouteImport } from './routes/_app/prompts.$promptId'
 import { Route as AppAdminScrapeRunIdRouteImport } from './routes/_app/admin.scrape.$runId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -256,6 +257,11 @@ const AppContentArticleIdRoute = AppContentArticleIdRouteImport.update({
   path: '/$articleId',
   getParentRoute: () => AppContentRoute,
 } as any)
+const AppPromptsPromptIdRoute = AppPromptsPromptIdRouteImport.update({
+  id: '/prompts/$promptId',
+  path: '/prompts/$promptId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminScrapeRunIdRoute = AppAdminScrapeRunIdRouteImport.update({
   id: '/$runId',
   path: '/$runId',
@@ -303,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/webhooks/$': typeof WebhooksSplatRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
+  '/prompts/$promptId': typeof AppPromptsPromptIdRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
 }
 export interface FileRoutesByTo {
@@ -346,6 +353,7 @@ export interface FileRoutesByTo {
   '/webhooks/$': typeof WebhooksSplatRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
+  '/prompts/$promptId': typeof AppPromptsPromptIdRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
 }
 export interface FileRoutesById {
@@ -391,6 +399,7 @@ export interface FileRoutesById {
   '/webhooks/$': typeof WebhooksSplatRoute
   '/_app/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/_app/content/$articleId': typeof AppContentArticleIdRoute
+  '/_app/prompts/$promptId': typeof AppPromptsPromptIdRoute
   '/_app/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
 }
 export interface FileRouteTypes {
@@ -436,6 +445,7 @@ export interface FileRouteTypes {
     | '/webhooks/$'
     | '/admin/scrape'
     | '/content/$articleId'
+    | '/prompts/$promptId'
     | '/admin/scrape/$runId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -479,6 +489,7 @@ export interface FileRouteTypes {
     | '/webhooks/$'
     | '/admin/scrape'
     | '/content/$articleId'
+    | '/prompts/$promptId'
     | '/admin/scrape/$runId'
   id:
     | '__root__'
@@ -523,6 +534,7 @@ export interface FileRouteTypes {
     | '/webhooks/$'
     | '/_app/admin/scrape'
     | '/_app/content/$articleId'
+    | '/_app/prompts/$promptId'
     | '/_app/admin/scrape/$runId'
   fileRoutesById: FileRoutesById
 }
@@ -826,6 +838,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContentArticleIdRouteImport
       parentRoute: typeof AppContentRoute
     }
+    '/_app/prompts/$promptId': {
+      id: '/_app/prompts/$promptId'
+      path: '/prompts/$promptId'
+      fullPath: '/prompts/$promptId'
+      preLoaderRoute: typeof AppPromptsPromptIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/scrape/$runId': {
       id: '/_app/admin/scrape/$runId'
       path: '/$runId'
@@ -893,6 +912,7 @@ interface AppRouteChildren {
   AppVerifyEmailRoute: typeof AppVerifyEmailRoute
   AppWelcomeRoute: typeof AppWelcomeRoute
   AppAdminScrapeRoute: typeof AppAdminScrapeRouteWithChildren
+  AppPromptsPromptIdRoute: typeof AppPromptsPromptIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -928,6 +948,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppVerifyEmailRoute: AppVerifyEmailRoute,
   AppWelcomeRoute: AppWelcomeRoute,
   AppAdminScrapeRoute: AppAdminScrapeRouteWithChildren,
+  AppPromptsPromptIdRoute: AppPromptsPromptIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

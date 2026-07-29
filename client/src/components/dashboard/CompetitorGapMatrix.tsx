@@ -26,7 +26,7 @@ interface Props {
 }
 
 // Continuous-opacity heatmap, matching the north-star's matrix mechanism
-// (roadmap §1: "every cell is rgba(14, 147, 115, α) ... with α scaled
+// (roadmap §1: "every cell is rgba(var(--brand-accent-rgb), α) ... with α scaled
 // continuously by the cell's value", α ≈ 0.1 + 0.0065·value, text flips
 // white/dark at the α≈0.4 contrast boundary). This is NOT a fixed set of
 // tinted swatches — bg-positive-subtle/bg-warning-subtle bands were replaced

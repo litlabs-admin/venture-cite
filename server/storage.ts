@@ -172,6 +172,12 @@ export interface IStorage {
   archiveSuggestedPrompts(brandId: string): Promise<void>;
   updateBrandPromptText(id: string, prompt: string): Promise<BrandPrompt | undefined>;
   archiveBrandPrompt(id: string): Promise<void>;
+  setBrandPromptStatus(
+    id: string,
+    status: "tracked" | "archived",
+  ): Promise<BrandPrompt | undefined>;
+  reorderBrandPrompts(brandId: string, orderedIds: string[]): Promise<void>;
+  getMaxBrandPromptOrderIndex(brandId: string): Promise<number>;
   // Wave 9.1: replaceTrackedId is optional now. Pass null to add the
   // suggestion as a new tracked prompt without archiving anything (only
   // valid when current tracked count < cap; route enforces).

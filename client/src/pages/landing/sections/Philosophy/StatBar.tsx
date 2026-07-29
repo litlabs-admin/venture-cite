@@ -1,12 +1,16 @@
 const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 
-// Footer stat bar (_reference/index.html:2725-2754). Source's four
-// count-up stats (brands_tracked: 25333, prompts_analyzed: 72197337,
-// citations_analyzed: 1339381, competitors_mapped: 3227398, recoverable
-// from _reference/assets/platform-stats-B-nGzrPY.js) were the OTHER
-// company's real telemetry. VentureCite is pre-launch and has no
-// comparable numbers, so this renders non-numeric capability labels
-// instead — useCountUp is no longer imported/used here (rebrand pass).
+// Footer stat bar (_reference/index.html:2725-2754). The reference renders
+// four count-up numbers (brands_tracked: 25333, prompts_analyzed: 72197337,
+// citations_analyzed: 1339381, competitors_mapped: 3227398, recoverable from
+// _reference/assets/platform-stats-B-nGzrPY.js) on a blue gradient bar.
+//
+// We port the CHROME (gradient bar, inset top hairline, white type, two-line
+// tile layout) but NOT the numbers: those are another company's real
+// telemetry and presenting them as ours would be a lie. VentureCite is
+// pre-launch and has no comparable figures, so each tile shows a capability
+// label only. With no number to animate, useCountUp is deliberately not
+// imported here — reinstate it if/when real metrics exist.
 const stats = [
   { label: "Every major engine", delayMs: 0 },
   { label: "Citations & sources", delayMs: 50 },
@@ -30,7 +34,10 @@ function StatTile({
       }`}
       style={{ transitionDelay: `${delayMs}ms`, transitionTimingFunction: EASE }}
     >
-      <span className="text-[13px] sm:text-[15px] lg:text-[16px] font-semibold tracking-tight text-vc-primary tabular-nums">
+      {/* The reference's tile is two lines (count-up number over a caption).
+          With the fabricated numbers removed there is only the label, so it
+          takes the prominent white slot rather than leaving an empty line. */}
+      <span className="text-[13px] sm:text-[15px] lg:text-[16px] font-semibold tracking-tight text-white text-center leading-tight">
         {label}
       </span>
     </div>
@@ -39,7 +46,12 @@ function StatTile({
 
 export function StatBar({ isVisible }: { isVisible: boolean }) {
   return (
-    <div className="border-t border-vc-default">
+    <div
+      style={{
+        background: "linear-gradient(180deg, #3355ff 0%, rgb(133, 153, 255) 100%)",
+        boxShadow: "inset 0 1px 0 var(--hb-hairline-strong)",
+      }}
+    >
       <div
         className={`grid grid-cols-2 lg:grid-cols-4 transition-all duration-700 ${
           isVisible ? "opacity-100" : "opacity-0"

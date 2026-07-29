@@ -1,18 +1,15 @@
-import type { CSSProperties } from "react";
+import { MockupBackdrop } from "./MockupBackdrop";
 import { scrollRevealEase } from "@/pages/landing/hooks/useScrollReveal";
 import { CheckIcon, FileCodeCornerIcon, RefreshCwIcon } from "./icons";
 
-const dotGridStyle = { "--vc-mkt-dot-opacity": 0.1 } as CSSProperties;
-
-// Syntax-highlighting color spans used inside the diff lines below. Verbatim
-// from index.html — punctuation/tags use the arbitrary-value classes
-// text-gray-400 / text-[var(--color-gray-700)], attribute
-// names use the plain text-tertiary class, and string values use
-// text-[var(--color-green-600)]. Kept as literal Tailwind arbitrary-value
-// classes (not swapped for a different token) to match source exactly.
+// Syntax-highlighting color spans used inside the diff lines below.
+// Punctuation/tags use the grey-ramp classes, attribute names use the plain
+// tertiary class, and string values use text-vc-success-ink — added lines are
+// additions, so their string literals read as the same --success family as the
+// diff's own added-line rail below, not the legacy brand green.
 const GRAY_400 = "text-gray-400";
 const GRAY_700 = "text-gray-700";
-const GREEN_600 = "text-green-600";
+const ADDED_STRING = "text-vc-success-ink";
 
 type Span = { text: string; className?: string };
 type DiffRow =
@@ -40,11 +37,11 @@ const rows: DiffRow[] = [
       { text: " ", className: GRAY_400 },
       { text: "name", className: "text-vc-tertiary" },
       { text: "=", className: GRAY_400 },
-      { text: '"description"', className: GREEN_600 },
+      { text: '"description"', className: ADDED_STRING },
       { text: " ", className: GRAY_400 },
       { text: "content", className: "text-vc-tertiary" },
       { text: "=", className: GRAY_400 },
-      { text: '"Shop Nike running shoes. Free shipping on all orders."', className: GREEN_600 },
+      { text: '"Shop Nike running shoes. Free shipping on all orders."', className: ADDED_STRING },
       { text: " />", className: GRAY_400 },
     ],
   },
@@ -59,7 +56,7 @@ const rows: DiffRow[] = [
       { text: " ", className: GRAY_400 },
       { text: "type", className: "text-vc-tertiary" },
       { text: "=", className: GRAY_400 },
-      { text: '"application/ld+json"', className: GREEN_600 },
+      { text: '"application/ld+json"', className: ADDED_STRING },
       { text: ">", className: GRAY_400 },
     ],
   },
@@ -71,7 +68,7 @@ const rows: DiffRow[] = [
       { text: "{ ", className: GRAY_400 },
       { text: '"@type"', className: GRAY_700 },
       { text: ": ", className: GRAY_400 },
-      { text: '"FAQPage"', className: GREEN_600 },
+      { text: '"FAQPage"', className: ADDED_STRING },
       { text: ",", className: GRAY_400 },
     ],
   },
@@ -93,7 +90,7 @@ const rows: DiffRow[] = [
       { text: "    ", className: GRAY_400 },
       { text: '"name"', className: GRAY_700 },
       { text: ": ", className: GRAY_400 },
-      { text: '"What are the best Nike running shoes?"', className: GREEN_600 },
+      { text: '"What are the best Nike running shoes?"', className: ADDED_STRING },
       { text: ",", className: GRAY_400 },
     ],
   },
@@ -146,11 +143,7 @@ const rows: DiffRow[] = [
 export function ImproveMockup({ isVisible }: { isVisible: boolean }) {
   return (
     <div className="relative bg-white overflow-hidden h-full flex flex-col min-h-[240px] sm:min-h-[320px] lg:min-h-[360px]">
-      <div
-        className="absolute inset-0 pointer-events-none mkt-dot-grid"
-        aria-hidden="true"
-        style={dotGridStyle}
-      />
+      <MockupBackdrop />
       <div className="relative flex-1 flex items-center justify-center py-8">
         <div
           style={{
@@ -160,7 +153,10 @@ export function ImproveMockup({ isVisible }: { isVisible: boolean }) {
           }}
         >
           <div className="p-5 w-full">
-            <div className="mx-auto w-full max-w-[520px] border border-vc-default rounded bg-white overflow-hidden shadow-vc-card">
+            <div
+              className="mx-auto w-full max-w-[520px] rounded bg-vc-surface overflow-hidden ring-1 ring-vc-hairline"
+              style={{ boxShadow: "var(--hb-shadow-float)" }}
+            >
               {/* File tab header */}
               <div className="flex items-center justify-between gap-3 px-3.5 h-11 border-b border-vc-default">
                 <div className="flex items-center gap-2 min-w-0">
@@ -174,7 +170,10 @@ export function ImproveMockup({ isVisible }: { isVisible: boolean }) {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="relative w-3 h-3 flex items-center justify-center">
-                    <span className="absolute w-1.5 h-1.5 rounded-full bg-vc-accent animate-atl-pulse" />
+                    <span
+                      className="absolute w-1.5 h-1.5 rounded-full bg-vc-accent animate-atl-pulse"
+                      style={{ boxShadow: "0 0 0 4px var(--accent-subtle)" }}
+                    />
                     <CheckIcon className="text-vc-accent absolute opacity-0 scale-[0.7]" />
                   </span>
                   <span
@@ -209,7 +208,7 @@ export function ImproveMockup({ isVisible }: { isVisible: boolean }) {
                           {row.num}
                         </span>
                         <span
-                          className={`w-5 shrink-0 text-center select-none ${row.added ? "text-vc-accent/70" : "text-transparent"}`}
+                          className={`w-5 shrink-0 text-center select-none ${row.added ? "text-vc-success" : "text-transparent"}`}
                         >
                           +
                         </span>
@@ -218,8 +217,10 @@ export function ImproveMockup({ isVisible }: { isVisible: boolean }) {
                           style={
                             row.added
                               ? {
-                                  backgroundColor: "rgba(14, 147, 115, 0.04)",
-                                  boxShadow: "rgba(14, 147, 115, 0.35) 2px 0px 0px inset",
+                                  backgroundColor: "var(--success-bg)",
+                                  backgroundImage:
+                                    "linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 60%)",
+                                  boxShadow: "inset 2px 0 0 var(--success)",
                                 }
                               : { backgroundColor: "transparent" }
                           }
@@ -254,7 +255,7 @@ export function ImproveMockup({ isVisible }: { isVisible: boolean }) {
                   <span className="text-[10px] text-vc-tertiary tabular-nums">
                     8 lines · 2 sections
                   </span>
-                  <span className="flex items-center gap-1 text-[10px] font-medium text-vc-accent bg-vc-accent-subtle px-1.5 py-0.5 rounded-[3px]">
+                  <span className="hb-callout flex items-center gap-1 text-[10px] font-medium text-vc-accent bg-vc-accent-subtle px-1.5 py-0.5 rounded-[3px]">
                     <RefreshCwIcon />
                     Re-crawl queued
                   </span>

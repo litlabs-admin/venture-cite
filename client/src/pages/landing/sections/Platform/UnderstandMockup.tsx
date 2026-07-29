@@ -1,9 +1,7 @@
-import type { CSSProperties } from "react";
+import { MockupBackdrop } from "./MockupBackdrop";
 import { scrollRevealEase } from "@/pages/landing/hooks/useScrollReveal";
 import { TrendingUpIcon, MinusIcon } from "./icons";
 import { faviconUrl } from "@/pages/landing/faviconUrl";
-
-const dotGridStyle = { "--vc-mkt-dot-opacity": 0.1 } as CSSProperties;
 
 // Row 02 "Understand" mockup — "Citation footprint" + "Top Sources" +
 // "Search Queries" cards, verbatim structure from
@@ -18,35 +16,15 @@ const dotGridStyle = { "--vc-mkt-dot-opacity": 0.1 } as CSSProperties;
 // widths below are derived directly from these confirmed percentages
 // (43% / 24% / 20% / 13%, summing to 100%), which is a legitimate
 // derivation rather than an invented value.
+// One-family blue ramp (accent -> tint) instead of the neutral grey ramp, so
+// the whole footprint bar reads as a single coherent blue chart rather than
+// "one blue segment among greys" — matches the Hero illustration's mostly-blue
+// treatment.
 const footprintSegments = [
-  {
-    key: "reviews",
-    label: "Reviews",
-    pct: 43,
-    barClassName: "bg-vc-accent",
-    dotClassName: "bg-vc-accent",
-  },
-  {
-    key: "social",
-    label: "Social",
-    pct: 24,
-    barClassName: "bg-vc-accent/60",
-    dotClassName: "bg-vc-accent/60",
-  },
-  {
-    key: "news",
-    label: "News",
-    pct: 20,
-    barClassName: "bg-vc-accent/35",
-    dotClassName: "bg-vc-accent/35",
-  },
-  {
-    key: "other",
-    label: "Other",
-    pct: 13,
-    barClassName: "bg-vc-accent/20",
-    dotClassName: "bg-vc-accent/20",
-  },
+  { key: "reviews", label: "Reviews", pct: 43, color: "var(--accent)" },
+  { key: "social", label: "Social", pct: 24, color: "var(--hb-accent-bright)" },
+  { key: "news", label: "News", pct: 20, color: "var(--accent-tint-1)" },
+  { key: "other", label: "Other", pct: 13, color: "var(--accent-tint-2)" },
 ];
 
 // Verbatim from index.html 2200-2229 (chip labels + citation counts + trend
@@ -105,11 +83,7 @@ const searchQueries = [
 export function UnderstandMockup({ isVisible }: { isVisible: boolean }) {
   return (
     <div className="relative bg-white overflow-hidden h-full flex flex-col min-h-[240px] sm:min-h-[320px] lg:min-h-[360px]">
-      <div
-        className="absolute inset-0 pointer-events-none mkt-dot-grid"
-        aria-hidden="true"
-        style={dotGridStyle}
-      />
+      <MockupBackdrop />
       <div className="relative flex-1 flex items-center justify-center py-8">
         <div
           style={{
@@ -121,7 +95,10 @@ export function UnderstandMockup({ isVisible }: { isVisible: boolean }) {
           <div className="p-6 lg:p-8">
             <div className="flex flex-col gap-6">
               {/* Citation footprint card */}
-              <div className="bg-white border border-vc-default rounded overflow-hidden">
+              <div
+                className="bg-vc-surface rounded overflow-hidden ring-1 ring-vc-hairline"
+                style={{ boxShadow: "var(--hb-shadow-raised)" }}
+              >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-vc-default">
                   <div>
                     <div className="text-[12px] font-semibold text-vc-primary">
@@ -137,19 +114,29 @@ export function UnderstandMockup({ isVisible }: { isVisible: boolean }) {
                   </div>
                 </div>
                 <div className="px-5 py-5">
-                  <div className="h-2.5 flex rounded overflow-hidden bg-vc-muted/30">
+                  <div
+                    className="h-2.5 flex rounded overflow-hidden bg-vc-muted/30"
+                    style={{ boxShadow: "inset 0 1px 2px rgba(16,22,55,0.10)" }}
+                  >
                     {footprintSegments.map((seg) => (
                       <div
                         key={seg.key}
-                        className={seg.barClassName}
-                        style={{ width: `${seg.pct}%` }}
+                        style={{
+                          width: `${seg.pct}%`,
+                          backgroundColor: seg.color,
+                          backgroundImage:
+                            "linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 65%)",
+                        }}
                       />
                     ))}
                   </div>
                   <div className="flex items-center gap-5 mt-4">
                     {footprintSegments.map((seg) => (
                       <div key={seg.key} className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-sm ${seg.dotClassName}`} />
+                        <div
+                          className="w-2 h-2 rounded-sm"
+                          style={{ backgroundColor: seg.color }}
+                        />
                         <span className="text-[11px] text-vc-secondary">{seg.label}</span>
                         <span className="text-[11px] font-semibold tabular-nums text-vc-primary relative">
                           {seg.pct}%
@@ -161,7 +148,10 @@ export function UnderstandMockup({ isVisible }: { isVisible: boolean }) {
               </div>
 
               {/* Top Sources + Search Queries card */}
-              <div className="bg-white border border-vc-default rounded overflow-hidden">
+              <div
+                className="bg-vc-surface rounded overflow-hidden ring-1 ring-vc-hairline"
+                style={{ boxShadow: "var(--hb-shadow-raised)" }}
+              >
                 <div className="px-5 py-4 border-b border-vc-default">
                   <div className="flex items-center justify-between mb-3">
                     <div className="text-[11px] font-semibold text-vc-primary">Top Sources</div>

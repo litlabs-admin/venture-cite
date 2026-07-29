@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import logoPath from "@assets/logo.png";
 import { FooterColumn } from "./FooterColumn";
-import { LinkedInIcon } from "./icons";
+import { ArrowRightIcon, LinkedInIcon } from "./icons";
 import {
   solutionsLinks,
   mobileProductLinks,
@@ -45,7 +45,7 @@ export function Footer() {
   return (
     <footer className="bg-vc-surface">
       <div className="bg-vc-surface border-y border-vc-default relative">
-        <div className="px-4 sm:px-6 lg:px-8 mx-auto" style={{ maxWidth: "1184px" }}>
+        <div className="px-4 sm:px-6 lg:px-8 mx-auto" style={{ maxWidth: 1120 }}>
           {/* Mobile condensed block — index.html:3630-3674 */}
           <div className="sm:hidden py-6">
             <div
@@ -60,7 +60,7 @@ export function Footer() {
             </div>
 
             <div
-              className={`grid grid-cols-4 gap-4 mb-5 pb-5 border-b border-vc-default ${revealY(isVisible)}`}
+              className={`grid grid-cols-3 gap-4 mb-5 pb-5 border-b border-vc-default ${revealY(isVisible)}`}
               style={{ transitionDelay: "50ms" }}
             >
               <div>
@@ -83,21 +83,21 @@ export function Footer() {
               <div>
                 <FooterColumn title="Learn" links={mobileLearnLinks} size="mobile" />
               </div>
-              <div></div>
             </div>
 
             <div className={revealY(isVisible)} style={{ transitionDelay: "100ms" }}>
               <Link
                 to="/register"
-                className="h-9 w-full bg-vc-accent-subtle text-vc-accent text-[12px] font-medium rounded flex items-center justify-center hover:bg-vc-accent hover:text-white transition-all duration-150"
+                className="h-9 w-full bg-vc-accent-subtle text-vc-accent text-[12px] font-medium rounded flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-vc-accent hover:text-white transition-all duration-150"
               >
-                Get started →
+                Get started
+                <ArrowRightIcon size={14} />
               </Link>
             </div>
           </div>
 
           {/* Desktop grid — index.html:3675-3739 */}
-          <div className="hidden sm:grid grid-cols-3 lg:grid-cols-[180px_1fr_1fr_1fr_1fr_160px] gap-6 lg:gap-0 py-10 lg:py-0">
+          <div className="hidden sm:grid grid-cols-3 lg:grid-cols-[180px_1fr_1fr_1fr_160px] gap-6 lg:gap-0 py-10 lg:py-0">
             <div
               className={`col-span-3 lg:col-span-1 lg:py-10 lg:px-6 lg:border-r border-vc-default flex flex-col ${revealY(
                 isVisible,
@@ -151,13 +151,6 @@ export function Footer() {
             </div>
 
             <div
-              className={`col-span-3 lg:col-span-1 lg:py-8 lg:px-5 lg:border-r border-vc-default ${revealY(
-                isVisible,
-              )}`}
-              style={{ transitionDelay: "125ms" }}
-            ></div>
-
-            <div
               className={`col-span-3 lg:col-span-1 lg:py-8 lg:px-5 flex flex-col ${revealY(isVisible)}`}
               style={{ transitionDelay: "150ms" }}
             >
@@ -166,9 +159,10 @@ export function Footer() {
               </div>
               <Link
                 to="/register"
-                className="h-9 px-4 bg-vc-accent-subtle text-vc-accent text-[13px] font-medium rounded flex items-center justify-center hover:bg-vc-accent hover:text-white transition-all duration-150"
+                className="h-9 px-4 bg-vc-accent-subtle text-vc-accent text-[13px] font-medium rounded flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-vc-accent hover:text-white transition-all duration-150"
               >
-                Get started →
+                Get started
+                <ArrowRightIcon size={14} />
               </Link>
             </div>
           </div>
@@ -176,7 +170,7 @@ export function Footer() {
       </div>
 
       {/* Bottom bar — index.html:3742-3752 */}
-      <div className="px-4 sm:px-6 lg:px-16 mx-auto" style={{ maxWidth: "1184px" }}>
+      <div className="px-4 sm:px-6 lg:px-8 mx-auto" style={{ maxWidth: 1120 }}>
         <div
           className={`py-3 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 ${revealOpacity(
             isVisible,

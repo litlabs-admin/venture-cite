@@ -1,21 +1,25 @@
 // AUTO-EXTRACTED VERBATIM from _reference/index.html lines 1064-1807 (the
 // Hero Bento section's real Recharts-rendered "Visibility over time" SVG
 // chart, plus the Crawlers 24-bar micro chart and Conversations 24-bar
-// hourly-activity strip). Every path "d" string, gradient stop, axis label,
-// and bar height/opacity below was extracted programmatically via regex
-// against the literal source markup (see scratchpad extraction scripts run
-// during the build), not retyped by hand, to guarantee byte-for-byte
-// fidelity to the compiled build's coordinates. Do not hand-edit; re-run
-// extraction against a fresh index.html instead.
+// hourly-activity strip). Every path "d" string, axis label, and bar
+// height/opacity below was extracted programmatically via regex against the
+// literal source markup (see scratchpad extraction scripts run during the
+// build), not retyped by hand, to guarantee byte-for-byte fidelity to the
+// compiled build's coordinates. Do not hand-edit path "d" strings or the bar
+// arrays; re-run extraction against a fresh index.html instead.
+//
+// VISUAL-POLISH EXCEPTION: CHART_GRADIENTS below, plus NIKE_END_X/Y,
+// CHART_PLOT, and COMPETITOR_STROKES, are NOT byte-extracted — they are the
+// hero surface-polish pass's replacement gradient/marker treatment (see the
+// scoped exception comment in client/src/pages/landing/styles.css). A
+// re-extraction pass must not blow these away; re-apply this block after
+// re-running extraction.
 //
 // CHART_* below is the "Visibility over time" line+area chart (30D window,
 // the settled/active tab in source): three series — Nike (solid area+line,
-// stroke #0e9373, fill url(#hbBrandGrad)), Adidas (dashed line, #64748B),
-// New Balance (dashed line, #78716C). viewBox is 794x254, matching source's
-// recharts-surface. hbCursorGrad/hbCompGrad0-3 are defined in source's <defs>
-// but never applied to a visible path in the settled snapshot (comparison-
-// series area fills and the hover cursor gradient are interaction-only) —
-// reproduced in defs anyway for byte-fidelity, unused by any rendered shape.
+// stroke var(--accent), fill url(#hbBrandGrad)), Adidas (dashed line), New
+// Balance (dashed line). viewBox is 794x254, matching source's
+// recharts-surface.
 //
 // CRAWLER_BARS (24) and CONVERSATION_BARS (24) are the settled per-bar
 // height%/opacity values for the two hidden md:grid row-2 micro-charts.
@@ -43,78 +47,74 @@ export const CHART_VIEWBOX_HEIGHT = 254;
 
 export const CHART_GRADIENTS: ChartGradient[] = [
   {
+    // Area fill: 4-stop ramp replacing the old flat 0.14/0.14/0, which was
+    // so weak it read as a printing artefact.
     id: "hbBrandGrad",
     x1: "0",
     y1: "0",
     x2: "0",
     y2: "1",
     stops: [
-      { offset: "0%", color: "#0e9373", opacity: 0.14 },
-      { offset: "60%", color: "#0e9373", opacity: 0.14 },
-      { offset: "100%", color: "#0e9373", opacity: 0 },
+      { offset: "0%", color: "var(--accent)", opacity: 0.3 },
+      { offset: "26%", color: "var(--accent)", opacity: 0.17 },
+      { offset: "62%", color: "var(--accent)", opacity: 0.07 },
+      { offset: "100%", color: "var(--accent)", opacity: 0 },
     ],
   },
   {
-    id: "hbCursorGrad",
+    // Line stroke: quiet at the historic (left) end, brightest at "now".
+    id: "hbLineGrad",
+    x1: "0",
+    y1: "0",
+    x2: "1",
+    y2: "0",
+    stops: [
+      { offset: "0%", color: "var(--accent)", opacity: 0.42 },
+      { offset: "34%", color: "var(--accent)", opacity: 0.92 },
+      { offset: "100%", color: "var(--hb-accent-bright)", opacity: 1 },
+    ],
+  },
+  {
+    // Value-callout chip fill.
+    id: "hbCalloutGrad",
     x1: "0",
     y1: "0",
     x2: "0",
     y2: "1",
     stops: [
-      { offset: "0%", color: "#0e9373", opacity: 0.3 },
-      { offset: "100%", color: "#0e9373", opacity: 0 },
+      { offset: "0%", color: "var(--hb-accent-bright)", opacity: 1 },
+      { offset: "100%", color: "var(--hb-accent-deep)", opacity: 1 },
     ],
   },
   {
-    id: "hbCompGrad0",
+    // Horizontal recede mask (white = opaque): applied to the area fill and
+    // both competitor lines so the series emerge out of history.
+    id: "hbFadeGrad",
     x1: "0",
     y1: "0",
-    x2: "0",
-    y2: "1",
+    x2: "1",
+    y2: "0",
     stops: [
-      { offset: "0%", color: "#64748B", opacity: 0.048 },
-      { offset: "100%", color: "#64748B", opacity: 0 },
-    ],
-  },
-  {
-    id: "hbCompGrad1",
-    x1: "0",
-    y1: "0",
-    x2: "0",
-    y2: "1",
-    stops: [
-      { offset: "0%", color: "#78716C", opacity: 0.048 },
-      { offset: "100%", color: "#78716C", opacity: 0 },
-    ],
-  },
-  {
-    id: "hbCompGrad2",
-    x1: "0",
-    y1: "0",
-    x2: "0",
-    y2: "1",
-    stops: [
-      { offset: "0%", color: "#94A3B8", opacity: 0.048 },
-      { offset: "100%", color: "#94A3B8", opacity: 0 },
-    ],
-  },
-  {
-    id: "hbCompGrad3",
-    x1: "0",
-    y1: "0",
-    x2: "0",
-    y2: "1",
-    stops: [
-      { offset: "0%", color: "#A8A29E", opacity: 0.048 },
-      { offset: "100%", color: "#A8A29E", opacity: 0 },
+      { offset: "0%", color: "#ffffff", opacity: 0.3 },
+      { offset: "42%", color: "#ffffff", opacity: 0.82 },
+      { offset: "100%", color: "#ffffff", opacity: 1 },
     ],
   },
 ];
 
+/** Terminal point of NIKE_STROKE_LINE_D — the "now" datum. */
+export const NIKE_END_X = 782;
+export const NIKE_END_Y = 42.396;
+/** Plot rect, matching #hbChartClip. */
+export const CHART_PLOT = { x: 36, y: 16, w: 746, h: 200 } as const;
+/** Unified cool-grey ramp; darker = higher-ranked. Replaces the mismatched
+    #64748B (cool slate) / #78716C (warm stone) pair. */
+export const COMPETITOR_STROKES = { adidas: "#8b8ba6", newBalance: "#b6b6c6" } as const;
+
 // Nike area fill (fill="url(#hbBrandGrad)"), source id="recharts-area-_r_4_"
 export const NIKE_AREA_FILL_D = `M36,128.683C44.575,128.543,53.149,128.402,61.724,127.839C70.299,127.277,78.874,116.83,87.448,116.83C96.023,116.83,104.598,117.714,113.172,118.409C121.747,119.105,130.322,121.004,138.897,121.004C147.471,121.004,156.046,114.087,164.621,112.509C173.195,110.931,181.77,110.142,190.345,110.142C198.92,110.142,207.494,117.652,216.069,118.833C224.644,120.015,233.218,120.605,241.793,120.605C250.368,120.605,258.943,118.416,267.517,115.723C276.092,113.031,284.667,107.119,293.241,104.451C301.816,101.783,310.391,99.718,318.966,99.718C327.54,99.718,336.115,101.329,344.69,101.824C353.264,102.318,361.839,102.684,370.414,102.684C378.989,102.684,387.563,92.251,396.138,89.738C404.713,87.225,413.287,85.968,421.862,85.968C430.437,85.968,439.011,88.643,447.586,88.643C456.161,88.643,464.736,85.394,473.31,81.827C481.885,78.259,490.46,67.236,499.034,67.236C507.609,67.236,516.184,74.325,524.759,74.325C533.333,74.325,541.908,63.896,550.483,62.343C559.057,60.791,567.632,61.129,576.207,60.014C584.782,58.899,593.356,55.653,601.931,55.653C610.506,55.653,619.08,66.302,627.655,66.302C636.23,66.302,644.805,61.052,653.379,58.229C661.954,55.406,670.529,49.364,679.103,49.364C687.678,49.364,696.253,59.954,704.828,59.954C713.402,59.954,721.977,46.09,730.552,46.09C739.126,46.09,747.701,50.012,756.276,50.012C764.851,50.012,773.425,46.204,782,42.396L782,216C773.425,216,764.851,216,756.276,216C747.701,216,739.126,216,730.552,216C721.977,216,713.402,216,704.828,216C696.253,216,687.678,216,679.103,216C670.529,216,661.954,216,653.379,216C644.805,216,636.23,216,627.655,216C619.08,216,610.506,216,601.931,216C593.356,216,584.782,216,576.207,216C567.632,216,559.057,216,550.483,216C541.908,216,533.333,216,524.759,216C516.184,216,507.609,216,499.034,216C490.46,216,481.885,216,473.31,216C464.736,216,456.161,216,447.586,216C439.011,216,430.437,216,421.862,216C413.287,216,404.713,216,396.138,216C387.563,216,378.989,216,370.414,216C361.839,216,353.264,216,344.69,216C336.115,216,327.54,216,318.966,216C310.391,216,301.816,216,293.241,216C284.667,216,276.092,216,267.517,216C258.943,216,250.368,216,241.793,216C233.218,216,224.644,216,216.069,216C207.494,216,198.92,216,190.345,216C181.77,216,173.195,216,164.621,216C156.046,216,147.471,216,138.897,216C130.322,216,121.747,216,113.172,216C104.598,216,96.023,216,87.448,216C78.874,216,70.299,216,61.724,216C53.149,216,44.575,216,36,216Z`;
 
-// Nike stroke line (stroke="#0e9373"), the drawn curve on top of the area fill
+// Nike stroke line (stroke="var(--accent)"), the drawn curve on top of the area fill
 export const NIKE_STROKE_LINE_D = `M36,128.683C44.575,128.543,53.149,128.402,61.724,127.839C70.299,127.277,78.874,116.83,87.448,116.83C96.023,116.83,104.598,117.714,113.172,118.409C121.747,119.105,130.322,121.004,138.897,121.004C147.471,121.004,156.046,114.087,164.621,112.509C173.195,110.931,181.77,110.142,190.345,110.142C198.92,110.142,207.494,117.652,216.069,118.833C224.644,120.015,233.218,120.605,241.793,120.605C250.368,120.605,258.943,118.416,267.517,115.723C276.092,113.031,284.667,107.119,293.241,104.451C301.816,101.783,310.391,99.718,318.966,99.718C327.54,99.718,336.115,101.329,344.69,101.824C353.264,102.318,361.839,102.684,370.414,102.684C378.989,102.684,387.563,92.251,396.138,89.738C404.713,87.225,413.287,85.968,421.862,85.968C430.437,85.968,439.011,88.643,447.586,88.643C456.161,88.643,464.736,85.394,473.31,81.827C481.885,78.259,490.46,67.236,499.034,67.236C507.609,67.236,516.184,74.325,524.759,74.325C533.333,74.325,541.908,63.896,550.483,62.343C559.057,60.791,567.632,61.129,576.207,60.014C584.782,58.899,593.356,55.653,601.931,55.653C610.506,55.653,619.08,66.302,627.655,66.302C636.23,66.302,644.805,61.052,653.379,58.229C661.954,55.406,670.529,49.364,679.103,49.364C687.678,49.364,696.253,59.954,704.828,59.954C713.402,59.954,721.977,46.09,730.552,46.09C739.126,46.09,747.701,50.012,756.276,50.012C764.851,50.012,773.425,46.204,782,42.396`;
 
 // Adidas dashed comparison line (stroke="#64748B"), source id="recharts-line-_r_2_"
@@ -151,9 +151,9 @@ export interface MicroBar {
 }
 
 // Crawlers panel's 24-bar micro bar chart (24h of crawl activity), all bars
-// rgba(14, 147, 115, bgOpacity) -- rgb(14,147,115) is var(--color-accent)
-// (#0e9373) expressed as a literal rgba() triplet in source rather than a
-// CSS var, presumably because these opacity/height values are computed
+// var(--chart-neutral) with the per-bar alpha carried on the element's
+// opacity. Source expressed this as a literal rgba() of the old green,
+// presumably because these opacity/height values are computed
 // per-bar at render time by the dashboard app.
 export const CRAWLER_BARS: MicroBar[] = [
   { heightPct: 90.9091, bgOpacity: 0.58, barOpacity: 0.78 },
@@ -187,7 +187,7 @@ export interface HourlyBar {
 }
 
 // Conversations panel's 24-bar hourly activity strip. Fixed 14px height,
-// varying OPACITY per bar (not height) -- rgba(14, 147, 115, opacity).
+// varying OPACITY per bar (not height), over var(--chart-neutral).
 export const CONVERSATION_BARS: HourlyBar[] = [
   { opacity: 0.804 },
   { opacity: 0.82 },

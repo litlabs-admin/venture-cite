@@ -17,10 +17,12 @@ const BAR_HEIGHTS_PERCENT = [
   40, 30, 22, 18, 17, 20, 28, 42, 58, 72, 80, 88, 94, 98, 100, 97, 92, 85, 80, 83, 90, 95, 99, 97,
 ];
 
-// Confirmed real detail (index.html 2881-3022): the first 40 bars fill with
-// the tinted accent (rgba(14,147,115,0.5)) and only the last 8 (the most
-// recent ~8 of 48 hours) switch to the solid brand color rgb(14,147,115) —
-// not an even half/half split.
+// Confirmed real detail (index.html 2881-3022): the first 40 bars fill at a
+// tinted opacity and only the last 8 (the most recent ~8 of 48 hours) switch
+// to full opacity — not an even half/half split. Per the visual-richness
+// pass this whole histogram is a single blue family (pale accent through to
+// full-saturation accent + glow at "Now") rather than neutral grey; emphasis
+// is carried by both opacity and the gradient/glow on the recent tail.
 const SOLID_FROM_INDEX = 40;
 
 // Recent Pages rows — fully recoverable verbatim from index.html 3031-3054.
@@ -93,11 +95,20 @@ export function AiTrafficPanel({ isVisible }: { isVisible: boolean }) {
               <div key={i} className="flex-1 h-full relative cursor-pointer min-w-0">
                 <div
                   className="absolute bottom-0 left-0 right-0"
-                  style={{
-                    height: `${heightPercent}%`,
-                    backgroundColor:
-                      i < SOLID_FROM_INDEX ? "rgba(14, 147, 115, 0.5)" : "rgb(14, 147, 115)",
-                  }}
+                  style={
+                    i < SOLID_FROM_INDEX
+                      ? {
+                          height: `${heightPercent}%`,
+                          backgroundColor: "var(--accent)",
+                          opacity: 0.22,
+                        }
+                      : {
+                          height: `${heightPercent}%`,
+                          backgroundImage:
+                            "linear-gradient(180deg, var(--hb-accent-bright) 0%, var(--accent) 100%)",
+                          boxShadow: "0 0 6px rgba(59,91,246,0.35)",
+                        }
+                  }
                 />
               </div>
             ))}
@@ -121,7 +132,7 @@ export function AiTrafficPanel({ isVisible }: { isVisible: boolean }) {
           {RECENT_PAGES.map((page, i) => (
             <div
               key={i}
-              className="flex items-center gap-2.5 py-1.5 px-2 rounded hover:bg-vc-muted group cursor-default transition-all duration-300"
+              className="flex items-center gap-2.5 py-1.5 px-2 rounded hover:bg-vc-muted hover:shadow-[var(--hb-shadow-raised)] hover:-translate-y-px group cursor-default transition-all duration-300"
             >
               <img
                 src={page.src}

@@ -23,7 +23,7 @@ export interface ResourceCardData {
 export const resourceCards: ResourceCardData[] = [
   {
     href: "/glossary",
-    iconSrc: "/venturecite/images/resources/documentation.png",
+    iconSrc: "/venturecite/images/resources/documentation-blue.png",
     iconClassName: "w-10 sm:w-12 h-10 sm:h-12",
     title: "Glossary",
     subtitle: "GEO terms, defined",
@@ -32,7 +32,7 @@ export const resourceCards: ResourceCardData[] = [
   },
   {
     href: "#platform-section",
-    iconSrc: "/venturecite/images/resources/api.png",
+    iconSrc: "/venturecite/images/resources/api-blue.png",
     iconClassName: "w-[52px] h-[52px]",
     title: "How It Works",
     subtitle: "Track, understand, improve",
@@ -41,7 +41,7 @@ export const resourceCards: ResourceCardData[] = [
   },
   {
     href: "#revenue-section",
-    iconSrc: "/venturecite/images/resources/mcp.png",
+    iconSrc: "/venturecite/images/resources/mcp-blue.png",
     iconClassName: "w-[38px] sm:w-[46px] h-[38px] sm:h-[46px]",
     title: "Proof",
     subtitle: "Where your AI visibility comes from",

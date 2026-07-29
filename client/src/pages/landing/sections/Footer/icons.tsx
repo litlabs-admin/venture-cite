@@ -55,3 +55,32 @@ export function LinkedInIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** Trailing arrow on the footer's "Get started" buttons. Was previously a
+ *  literal "→" text node, which renders in the UI font instead of matching
+ *  the icon set's stroke weight and optical size. */
+export function ArrowRightIcon({
+  size = 14,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
+  );
+}

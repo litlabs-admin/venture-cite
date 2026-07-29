@@ -9,7 +9,7 @@ function DataTile({ item, isVisible }: { item: DataTileData; isVisible: boolean 
       href={item.href}
       className={
         "group relative flex flex-col gap-3 px-4 sm:px-5 py-5 sm:py-6 min-h-[150px] " +
-        "border-vc-default transition-all duration-500 hover:bg-[rgba(0,0,0,0.012)] " +
+        "border-vc-default transition-all duration-500 hover:bg-[linear-gradient(180deg,var(--hb-row-hover),transparent)] " +
         item.borderClassName +
         " " +
         (isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3")
@@ -17,14 +17,16 @@ function DataTile({ item, isVisible }: { item: DataTileData; isVisible: boolean 
       style={{ transitionDelay: `${item.delayMs}ms`, transitionTimingFunction: scrollRevealEase }}
     >
       <div className="flex items-start justify-between">
-        <NavItemIcon
-          item={item}
-          size={56}
-          className={
-            "w-[52px] h-[52px] sm:w-[56px] sm:h-[56px] -ml-1 -mt-1 transition-transform duration-300 group-hover:scale-[1.06] " +
-            (item.iconExtraClassName ?? "")
-          }
-        />
+        <span className="inline-flex rounded-md p-1.5 -ml-1.5 -mt-1.5 ring-1 ring-transparent transition-all duration-300 group-hover:ring-vc-hairline group-hover:shadow-[var(--hb-shadow-raised)]">
+          <NavItemIcon
+            item={item}
+            size={56}
+            className={
+              "w-[52px] h-[52px] sm:w-[56px] sm:h-[56px] object-contain transition-transform duration-300 group-hover:scale-[1.06] " +
+              (item.iconExtraClassName ?? "")
+            }
+          />
+        </span>
         <ArrowRightIcon
           size={14}
           strokeWidth={1.5}
@@ -36,9 +38,14 @@ function DataTile({ item, isVisible }: { item: DataTileData; isVisible: boolean 
           <h4 className="text-[13px] font-semibold text-vc-primary group-hover:text-vc-accent transition-colors duration-200">
             {item.title}
           </h4>
-          <span className="text-[11px] font-medium tabular-nums text-vc-tertiary">
-            {item.count}
-          </span>
+          {/* The reference shows a live figure here ("9.3K"). We have no
+              such number, so the badge is omitted rather than rendered as an
+              empty span that reserves space for nothing. */}
+          {item.count && (
+            <span className="text-[11px] font-medium tabular-nums text-vc-tertiary">
+              {item.count}
+            </span>
+          )}
         </div>
         <p className="text-[11px] text-vc-secondary truncate mt-0.5">{item.description}</p>
       </div>

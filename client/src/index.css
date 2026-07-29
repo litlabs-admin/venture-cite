@@ -70,6 +70,10 @@
   --color-vc-primary: #1c1917;
   --color-vc-secondary: #57534e;
   --color-vc-tertiary: #78716c;
+  /* Warm gray-400. The reference uses this one step lighter than `tertiary`
+     for panel eyebrows and de-emphasized meta text; without it those labels
+     render a full step too dark. */
+  --color-vc-label: #a8a29e;
   --color-vc-text-muted: #78716c;
   --color-vc-placeholder: #78716c;
   --color-vc-muted: #f5f5f4;
@@ -77,10 +81,22 @@
   --color-vc-default: #e7e5e4;
   --color-vc-hover: #d6d3d1;
   --color-vc-faint: #d6d3d1;
-  --color-vc-accent: #0e9373;
-  --color-vc-accent-subtle: #e4f6f2;
-  --color-vc-accent-hover: #0c7a60;
-  --color-vc-success: #0e9373;
+  --color-vc-accent: #3b5bf6;
+  --color-vc-accent-subtle: #eef2fe;
+  --color-vc-accent-hover: #2e49d4;
+  --color-vc-success: #0891b2;
+
+  /* Marketing surface-polish layer. Declared here so Tailwind emits the
+     utilities; `.vc-home` (landing/styles.css) rebinds the values for the
+     marketing palette. Outside the landing these keep the product neutrals. */
+  --color-vc-hairline: #e7e5e4;
+  --color-vc-hairline-strong: #d6d3d1;
+  --color-vc-row-hover: rgba(244, 244, 240, 0.62);
+  --color-vc-accent-bright: #5b7bff;
+  --color-vc-accent-deep: #2743c9;
+  --color-vc-success-ink: #0e7490;
+  --color-vc-danger-ink: #c81f37;
+  --radius-vc-panel: 10px;
 
   --shadow-vc-card: 0 1px 3px 0 #0000000a;
   --shadow-vc-overlay: 0 4px 16px -4px #00000014;
@@ -402,7 +418,7 @@
    FOUC blocker in index.html + lib/theme.ts). It is the Trakkr "TDS" system,
    transcribed from trakkr.ai/_reference/assets/theme-CQDk0Xff.css: white
    canvas, recessed #f1f3f6 surfaces, cool-neutral ink ramp (hue ~273), and a
-   green #0e9373 accent. It is border-first — depth comes from 1px rules, not
+   blue #3b5bf6 accent. It is border-first — depth comes from 1px rules, not
    shadows. Every light value below carries its TDS source hex in a comment;
    they should stay greppable against that file.
 
@@ -417,7 +433,7 @@
    OKLCH throughout, except pure white (TDS's canvas really is #ffffff).
    positive/warning/negative are FUNCTIONAL-ONLY (status/destructive), never
    brand or decoration — required for usability, used sparingly. NOTE: under
-   TDS, --positive and --brand-accent are the same green. That is Trakkr's
+   The brand accent is blue and --positive is cyan: deliberately separate, so
    own choice and it does collide with the rule above; flagged, not resolved.
    ─────────────────────────────────────────────────────────────────────── */
 
@@ -436,31 +452,32 @@
     --fg-secondary: oklch(0.4754 0.0115 273.2); /* --tds-ink-2 #5a5c63 */
     --fg-tertiary: oklch(0.6446 0.0135 276); /* --tds-ink-3 #8b8d96 */
     --fg-disabled: oklch(0.7894 0.0101 273.3); /* --tds-ink-4 #b8bac1 */
-    /* Primary accent — TDS green. DELIBERATE DEVIATION: --tds-accent #0e9373
-     only reaches 3.86:1 against white, under WCAG AA for normal text, and
-     Trakkr does put white labels on it. So the flat green stays as
-     --brand-accent for borders, text-on-white, focus rings and the chart
-     lead, while anything that carries a white LABEL fills with
-     --brand-accent-fill (--tds-accent-ink #0c7a60) at 5.29:1. Hover/press
-     step down from the fill so the ramp stays monotonic. To match Trakkr
-     exactly instead, point --primary at --brand-accent. */
-    --brand-accent: oklch(0.5912 0.1145 170); /* --tds-accent #0e9373 */
-    --brand-accent-fill: oklch(0.5171 0.0988 170.6); /* --tds-accent-ink #0c7a60 */
-    --brand-accent-hover: oklch(0.4671 0.0895 170.6); /* derived from the fill */
-    --brand-accent-press: oklch(0.4171 0.08 170.6); /* derived from the fill */
+    /* Primary accent — brand blue #3b5bf6.
+     Same two-value split as before: the flat accent carries borders,
+     text-on-white, focus rings and the chart lead; anything with a white
+     LABEL fills with --brand-accent-fill (#2e49d4, 5.9:1 on white) so the
+     label passes AA. Hover/press step down from the fill so the ramp stays
+     monotonic.
+
+     --accent NEVER encodes positive/negative change; deltas use
+     --positive / --negative. */
+    --brand-accent: #3b5bf6;
+    --brand-accent-fill: #2e49d4;
+    --brand-accent-hover: #2743c9;
+    --brand-accent-press: #1f36a8;
     --brand-accent-fg: oklch(1 0 0); /* white label on the accent fill */
-    --brand-accent-subtle: oklch(0.9591 0.0152 171.1); /* --tds-accent-weak #e8f5f0 */
+    --brand-accent-subtle: #eef2fe;
     /* Raw R/G/B channel triplet (space-separated, no rgb() wrapper) for
      rgba(var(--brand-accent-rgb), α) — CSS rgba() needs raw channels, not an
      oklch/hex var, and this is the only place in the app that needs
      continuous (non-token-stepped) opacity over the brand colour: the
      competitor gap matrix's cell fill, whose α scales with the cell's
-     value rather than snapping to a fixed *-subtle tint. Same #0e9373 as
+     value rather than snapping to a fixed *-subtle tint. Same #3b5bf6 as
      --brand-accent above, decomposed. */
-    --brand-accent-rgb: 14 147 115;
+    --brand-accent-rgb: 59 91 246;
     /* Functional status. TDS ships pos + neg only; --warning is derived from
      --tds-s3, its one warm hue. */
-    --positive: oklch(0.5912 0.1145 170); /* --tds-pos #0e9373 */
+    --positive: #0e7490; /* cyan-700 — positive, but never mistakable for the blue accent */
     --warning: oklch(0.7224 0.1378 64.6); /* derived from --tds-s3 #e0913a */
     --negative: oklch(0.5954 0.1829 27.3); /* --tds-neg #d6453d */
     /* Weak status tints, for badge/callout backgrounds. This project is on
@@ -471,7 +488,7 @@
      elsewhere: error-state.tsx, button.tsx, table.tsx). Kept as explicit
      tokens anyway because they match Trakkr's own separate *-subtle tokens
      exactly, not because v4 requires it. */
-    --positive-subtle: oklch(0.9591 0.0152 171.1); /* --tds-pos-weak #e8f5f0 */
+    --positive-subtle: #ecfeff; /* cyan-50, paired with --positive #0e7490 */
     --negative-subtle: oklch(0.9563 0.0186 21.6); /* --tds-neg-weak #fdeceb */
     --warning-subtle: oklch(0.9685 0.0203 74.7); /* derived to match the pair above */
     /* Stable cool near-white for text on saturated status fills
@@ -530,7 +547,7 @@
      is the brand green, so the first series and the accent match. TDS also
      ships a sixth (--tds-s6 #2aa5b0); it is deliberately not exposed as a token,
      having previously sat unused as --brand-accent-secondary. */
-    --chart-1: oklch(0.5912 0.1145 170); /* --tds-s1 #0e9373 green */
+    --chart-1: #3b5bf6; /* brand blue leads the chart ramp */
     --chart-2: oklch(0.5632 0.1669 263.3); /* --tds-s2 #3f6fd6 blue */
     --chart-3: oklch(0.7224 0.1378 64.6); /* --tds-s3 #e0913a amber */
     --chart-4: oklch(0.6056 0.2189 292.7); /* --tds-s4 #8b5cf6 violet */
@@ -584,7 +601,7 @@
      the same green family as light — one accent, product-wide.
 
      Values are MEASURED, not eyeballed. Light's own green cannot be reused
-     here: --brand-accent-fill #0c7a60 sits at only 3.64:1 on this canvas.
+     here: the light-mode --brand-accent-fill #2e49d4 is far too dark on this canvas.
      Green at hue 170 also cannot carry white text at any usable lightness —
      the best case is 3.35:1, below the 4.5:1 AA floor — so dark inverts the
      label to near-black. That is why --brand-accent-fg differs from light's
@@ -601,23 +618,23 @@
 
      Must be redeclared: --primary points at --brand-accent-fill, so without
      these lines dark would inherit :root's light-tuned green. */
-    --brand-accent: oklch(0.7 0.13 170);
-    --brand-accent-fill: oklch(0.7 0.13 170);
-    --brand-accent-hover: oklch(0.75 0.13 170);
-    --brand-accent-press: oklch(0.65 0.12 170);
+    --brand-accent: #7f9bff;
+    --brand-accent-fill: #7f9bff;
+    --brand-accent-hover: #9db1ff;
+    --brand-accent-press: #5b7bff;
     --brand-accent-fg: oklch(0.165 0.003 285);
-    --brand-accent-subtle: oklch(0.7 0.13 170 / 0.16);
-    /* Raw triplet for the fill measured above (#27b892) — see :root's
+    --brand-accent-subtle: oklch(0.68 0.16 268 / 0.16);
+    /* Raw triplet for the fill above (#7f9bff) — see :root's
      --brand-accent-rgb note. */
-    --brand-accent-rgb: 39 184 146;
-    --positive: oklch(0.72 0.13 162);
+    --brand-accent-rgb: 127 155 255;
+    --positive: #22d3ee;
     --warning: oklch(0.78 0.12 86);
     --negative: oklch(0.66 0.18 25);
     /* Dark's weak tints are alpha over the dark canvas rather than pale
      pastels, which would glare. Kept as explicit tokens for parity with
      light's set (see light block's note — the v3 opacity-modifier
      limitation this used to cite doesn't apply on v4). */
-    --positive-subtle: oklch(0.72 0.13 162 / 0.16);
+    --positive-subtle: oklch(0.79 0.13 210 / 0.16);
     --warning-subtle: oklch(0.78 0.12 86 / 0.16);
     --negative-subtle: oklch(0.66 0.18 25 / 0.16);
 
@@ -655,17 +672,17 @@
     --fg-secondary: oklch(0.4754 0.0115 273.2);
     --fg-tertiary: oklch(0.6446 0.0135 276);
     --fg-disabled: oklch(0.7894 0.0101 273.3);
-    --brand-accent: oklch(0.5912 0.1145 170);
-    --brand-accent-fill: oklch(0.5171 0.0988 170.6);
-    --brand-accent-hover: oklch(0.4671 0.0895 170.6);
-    --brand-accent-press: oklch(0.4171 0.08 170.6);
+    --brand-accent: #3b5bf6;
+    --brand-accent-fill: #2e49d4;
+    --brand-accent-hover: #2743c9;
+    --brand-accent-press: #1f36a8;
     --brand-accent-fg: oklch(1 0 0);
-    --brand-accent-subtle: oklch(0.9591 0.0152 171.1);
-    --brand-accent-rgb: 14 147 115;
-    --positive: oklch(0.5912 0.1145 170);
+    --brand-accent-subtle: #eef2fe;
+    --brand-accent-rgb: 59 91 246;
+    --positive: #0e7490;
     --warning: oklch(0.7224 0.1378 64.6);
     --negative: oklch(0.5954 0.1829 27.3);
-    --positive-subtle: oklch(0.9591 0.0152 171.1);
+    --positive-subtle: #ecfeff;
     --warning-subtle: oklch(0.9685 0.0203 74.7);
     --negative-subtle: oklch(0.9563 0.0186 21.6);
     --elevation-raised: 0 1px 2px oklch(0.2019 0.0163 273.9 / 0.04);

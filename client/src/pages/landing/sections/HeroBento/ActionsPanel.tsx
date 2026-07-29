@@ -31,8 +31,8 @@ export function ActionsPanel() {
             type="button"
             className="group flex w-full items-center gap-2.5 px-2 py-2 text-left transition-colors duration-200 hover:bg-vc-muted/50 cursor-pointer rounded"
           >
-            <span className="w-8 shrink-0 text-[10px] font-mono tabular-nums text-vc-accent">
-              {firstRow.delta}
+            <span className="w-[46px] shrink-0">
+              <span className="hb-pill hb-pill-up">{firstRow.delta}</span>
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[11.5px] leading-4 font-medium text-vc-primary">
@@ -72,8 +72,8 @@ export function ActionsPanel() {
               type="button"
               className="group flex w-full items-center gap-2.5 px-2 py-2 text-left transition-colors duration-200 hover:bg-vc-muted/50 cursor-pointer rounded"
             >
-              <span className="w-8 shrink-0 text-[10px] font-mono tabular-nums text-vc-accent">
-                {row.delta}
+              <span className="w-[46px] shrink-0">
+                <span className="hb-pill hb-pill-up">{row.delta}</span>
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[11.5px] leading-4 text-vc-secondary group-hover:text-vc-primary">

@@ -173,13 +173,9 @@ export function MegaMenuLinkRow({
       />
     </>
   );
-  if (item.external) {
-    return (
-      <a href={item.href} className={className} style={style}>
-        {content}
-      </a>
-    );
-  }
+  // The source's external/internal ternary collapsed: no entry in data.ts
+  // sets `external`, and both branches rendered the same <a> once next/Link
+  // was dropped.
   return (
     <a href={item.href} className={className} style={style}>
       {content}

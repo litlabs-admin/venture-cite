@@ -52,16 +52,21 @@ function isTheme(value: unknown): value is Theme {
   return typeof value === "string" && VALID_THEMES.has(value as Theme);
 }
 
-/** Read the stored preference. Returns "system" when nothing is stored
- *  (i.e. "follow OS"), so callers always get a meaningful value. */
+/** Read the stored preference. Defaults to "light" when nothing is stored.
+ *
+ *  The app chrome (sidebar, context bar, Command Center) is a light-only
+ *  surface built against the reference design system, so following the OS
+ *  into dark used to put a light dashboard inside dark chrome. Users who
+ *  explicitly pick dark or system still get it — this is only the default
+ *  for someone who has never chosen. */
 export function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return "light";
   try {
     const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return isTheme(raw) ? raw : "system";
+    return isTheme(raw) ? raw : "light";
   } catch {
     // SecurityError in private mode, or DOMException in some embeds.
-    return "system";
+    return "light";
   }
 }
 

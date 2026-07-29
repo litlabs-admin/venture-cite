@@ -50,17 +50,17 @@ export function HeroBento() {
             <TopChrome />
 
             {/* Row 1 */}
-            <div className="grid grid-cols-12 border-b border-[#EFEEEA] lg:min-h-[296px]">
+            <div className="grid grid-cols-12 border-b border-vc-hairline lg:min-h-[296px]">
               <VisibilityChartPanel />
               <RankingsList />
             </div>
 
             {/* Row 2 — desktop grid */}
             <div className="hidden md:grid md:grid-cols-12 md:min-h-[280px]">
-              <div className="col-span-4 border-r border-[#EFEEEA]">
+              <div className="col-span-4 border-r border-vc-hairline">
                 <CrawlersPanel />
               </div>
-              <div className="col-span-4 border-r border-[#EFEEEA]">
+              <div className="col-span-4 border-r border-vc-hairline">
                 <ConversationsPanel />
               </div>
               <div className="col-span-4">
@@ -73,10 +73,10 @@ export function HeroBento() {
                 components rather than duplicated markup) */}
             <div className="md:hidden relative">
               <div className="hero-bento-row2-scroll flex items-stretch overflow-x-auto snap-x snap-mandatory scroll-smooth">
-                <div className="snap-start shrink-0 w-[84vw] border-r border-[#EFEEEA]">
+                <div className="snap-start shrink-0 w-[84vw] border-r border-vc-hairline">
                   <CrawlersPanel />
                 </div>
-                <div className="snap-start shrink-0 w-[84vw] border-r border-[#EFEEEA]">
+                <div className="snap-start shrink-0 w-[84vw] border-r border-vc-hairline">
                   <ConversationsPanel />
                 </div>
                 <div className="snap-start shrink-0 w-[84vw]">

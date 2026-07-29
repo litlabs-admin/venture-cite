@@ -1,52 +1,48 @@
-// One AI-logo + query "pill". Verbatim shape from _reference/index.html
-// (e.g. line 1902): a bordered, shrink-0 chip with a dimmed logo that
-// brightens on hover, and query text that darkens to text-primary on hover.
+// One AI-logo + query "pill".
+//
+// This was previously an infinitely-drifting marquee (drift-left/drift-right,
+// six queries duplicated 3x per row, 12px text). At that size the queries read
+// as texture rather than as content, so the section now renders a single
+// static row of three pills at 14px — legible at 1x — and the drift animation
+// is gone. See the comment at the call site in WhyNow.tsx.
+//
+// The `drift-left` / `drift-right` keyframes in styles.css are now unused by
+// this section; they are left in place because that file is a curated port of
+// the source stylesheet.
 export interface MarqueeQuery {
   alt: string;
   src: string;
   query: string;
 }
 
-// The source's drift-left/drift-right rows each repeat their 6-item query
-// list 3x back-to-back (verified by counting pill divs at index.html
-// 1902-1936 and 1941-1994 — 18 pills per row, not the ~4x guessed
-// beforehand) so the animation can loop seamlessly at translateX(-50%).
-const DUPLICATION_FACTOR = 3;
-
-export function MarqueeRow({
-  direction,
+export function QueryRow({
   queries,
   isVisible,
   delayMs,
 }: {
-  direction: "left" | "right";
   queries: MarqueeQuery[];
   isVisible: boolean;
   delayMs: number;
 }) {
-  const duplicated = Array.from({ length: DUPLICATION_FACTOR }).flatMap((_, setIndex) =>
-    queries.map((item, itemIndex) => ({ ...item, key: `${setIndex}-${itemIndex}` })),
-  );
-
   return (
     <div
       className={`transition-all duration-500 ${isVisible ? "opacity-100" : "opacity-0"}`}
       style={{ transitionDelay: `${delayMs}ms` }}
     >
-      <div className={direction === "left" ? "drift-left inline-flex" : "drift-right inline-flex"}>
-        {duplicated.map(({ key, alt, src, query }) => (
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-vc-default">
+        {queries.map(({ alt, src, query }) => (
           <div
-            key={key}
-            className="shrink-0 flex items-center gap-2.5 px-5 py-2.5 border-r border-vc-default bg-vc-surface group"
+            key={query}
+            className="flex items-start gap-3 px-5 py-4 sm:px-6 sm:py-5 bg-vc-surface group"
           >
             <img
               src={src}
               alt={alt}
-              width={16}
-              height={16}
-              className="w-4 h-4 object-contain opacity-50 group-hover:opacity-80 transition-opacity duration-150"
+              width={18}
+              height={18}
+              className="w-[18px] h-[18px] object-contain shrink-0 mt-px opacity-60 group-hover:opacity-90 transition-opacity duration-150"
             />
-            <span className="text-[12px] text-vc-secondary group-hover:text-vc-primary whitespace-nowrap transition-colors duration-150">
+            <span className="text-[14px] leading-snug text-vc-secondary group-hover:text-vc-primary transition-colors duration-150">
               {query}
             </span>
           </div>

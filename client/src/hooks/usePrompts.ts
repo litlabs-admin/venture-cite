@@ -23,6 +23,9 @@ import type { BrandPrompt } from "@shared/schema";
 // so a rename/reshape here can't silently desync a consumer from the cache.
 export const promptKeys = {
   list: (brandId: string | null | undefined) => ["/api/brand-prompts", brandId] as const,
+  // Tracked + archived. Distinct key from `list` so the two result sets never
+  // clobber one another.
+  listAll: (brandId: string | null | undefined) => ["/api/brand-prompts", brandId, "all"] as const,
   suggestions: (brandId: string | null | undefined) =>
     ["/api/brand-prompts", brandId, "suggestions"] as const,
   // No `opts` (or an empty `since`) returns the bare 3-element prefix — used
@@ -40,13 +43,21 @@ export const promptKeys = {
     ["/api/brand-prompts", brandId, "run", runId, "details"] as const,
   generations: (brandId: string | null | undefined) =>
     ["/api/brand-prompts", brandId, "generations"] as const,
+  // Per-prompt score series (SCORE / Δ / sparkline columns). Distinct from
+  // `history`, which is the brand-level list of citation runs.
+  scoreHistory: (brandId: string | null | undefined) =>
+    ["/api/brand-prompts", brandId, "prompt-history"] as const,
 };
 
 // ============ Response shapes (server/routes/prompts.ts) ============
 
+type PromptListResponse = { success: boolean; data: BrandPrompt[] };
+
 export type PlatformResultShape = {
   platform: string;
   isCited: boolean;
+  /** Placement in the model's answer, when the run recorded one. */
+  rank?: number | null;
   snippet: string | null;
   fullResponse: string | null;
   checkedAt: string;
@@ -98,6 +109,30 @@ export type PromptGeneration = {
   [key: string]: unknown;
 };
 
+/** One prompt's score over recent runs. `score`/`delta` are null when there
+ *  is nothing to measure — a prompt that has never run, or has run once so no
+ *  change exists yet. Null is not zero and must render as a dash. */
+export type PromptScoreHistory = {
+  promptId: string;
+  score: number | null;
+  delta: number | null;
+  series: Array<{ at: string; score: number; cited: number; checks: number; rank: number | null }>;
+  runs: number;
+  lastRunAt: string | null;
+  /** Mean rank across cited placements in the latest run. */
+  rank: number | null;
+  /** Change in mean rank vs the previous run. POSITIVE MEANS WORSE. */
+  rankDelta: number | null;
+  /** Latest rank per model plus its movement. `isNew` = placed for the
+   *  first time, so there is no delta to show. */
+  byPlatform: Array<{
+    platform: string;
+    rank: number | null;
+    rankDelta: number | null;
+    isNew: boolean;
+  }>;
+};
+
 // ============ Query hooks ============
 
 export function usePrompts(brandId: string | null | undefined) {
@@ -105,6 +140,21 @@ export function usePrompts(brandId: string | null | undefined) {
     queryKey: promptKeys.list(brandId),
     queryFn: async () => {
       const r = await apiRequest("GET", `/api/brand-prompts/${brandId}`);
+      return r.json();
+    },
+    enabled: !!brandId,
+  });
+}
+
+/** Tracked *and* archived prompts. The prompts table needs both so a row
+ *  switched off stays on screen and can be switched back on; every other
+ *  caller wants tracked-only and should keep using `usePrompts`. Separate
+ *  query key so the two never overwrite each other in the cache. */
+export function useAllPrompts(brandId: string | null | undefined) {
+  return useQuery<{ success: boolean; data: BrandPrompt[] }>({
+    queryKey: promptKeys.listAll(brandId),
+    queryFn: async () => {
+      const r = await apiRequest("GET", `/api/brand-prompts/${brandId}?status=all`);
       return r.json();
     },
     enabled: !!brandId,
@@ -179,6 +229,17 @@ export function usePromptGenerations(brandId: string | null | undefined) {
   });
 }
 
+export function usePromptScoreHistory(brandId: string | null | undefined) {
+  return useQuery<{ success: boolean; data: PromptScoreHistory[] }>({
+    queryKey: promptKeys.scoreHistory(brandId),
+    queryFn: async () => {
+      const r = await apiRequest("GET", `/api/brand-prompts/${brandId}/prompt-history`);
+      return r.json();
+    },
+    enabled: !!brandId,
+  });
+}
+
 // ============ Shared invalidation ============
 
 // Everything that can go stale after any prompt-set mutation (generate,
@@ -188,6 +249,7 @@ export function usePromptGenerations(brandId: string | null | undefined) {
 // actually change them (run, re-detect-all).
 function invalidatePromptSet(brandId: string | null | undefined) {
   queryClient.invalidateQueries({ queryKey: promptKeys.list(brandId) });
+  queryClient.invalidateQueries({ queryKey: promptKeys.listAll(brandId) });
   queryClient.invalidateQueries({ queryKey: promptKeys.suggestions(brandId) });
 }
 
@@ -325,6 +387,101 @@ export function useArchivePrompt(brandId: string | null | undefined) {
     onSuccess: (data) => {
       if (data.success) invalidatePromptSet(brandId);
     },
+  });
+}
+
+/** Create one prompt by hand. Surfaces the server's typed refusals
+ *  (`tracked_set_full`, `duplicate_prompt`) so the UI can explain which one
+ *  happened rather than showing a generic failure. */
+export function useCreatePrompt(brandId: string | null | undefined) {
+  return useMutation({
+    mutationFn: async (text: string) => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${brandId}/prompts`, {
+        prompt: text,
+      });
+      return { status: r.status, body: await r.json() };
+    },
+    onSuccess: ({ body }) => {
+      if (body.success) invalidatePromptSet(brandId);
+    },
+  });
+}
+
+/** The row's ON toggle: tracked ⇄ archived. Optimistic, because the dot is
+ *  the feedback — a round-trip delay there reads as an unresponsive control. */
+export function useSetPromptStatus(brandId: string | null | undefined) {
+  return useMutation({
+    mutationFn: async ({
+      promptId,
+      status,
+    }: {
+      promptId: string;
+      status: "tracked" | "archived";
+    }) => {
+      const r = await apiRequest("PATCH", `/api/brand-prompts/${brandId}/prompts/${promptId}`, {
+        status,
+      });
+      return { status: r.status, body: await r.json() };
+    },
+    // Both list caches are patched: the table reads `listAll` (so a row
+    // switched off stays visible) while everything else reads `list`.
+    // Patching only one leaves the visible table unchanged and the toggle
+    // looking dead.
+    onMutate: async ({ promptId, status }) => {
+      const keys = [promptKeys.list(brandId), promptKeys.listAll(brandId)];
+      await Promise.all(keys.map((key) => queryClient.cancelQueries({ queryKey: key })));
+      const snapshots = keys.map(
+        (key) => [key, queryClient.getQueryData<PromptListResponse>(key)] as const,
+      );
+      for (const [key, prev] of snapshots) {
+        if (!prev?.data) continue;
+        queryClient.setQueryData(key, {
+          ...prev,
+          data: prev.data.map((p) => (p.id === promptId ? { ...p, status } : p)),
+        });
+      }
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => {
+      for (const [key, prev] of ctx?.snapshots ?? []) {
+        if (prev) queryClient.setQueryData(key, prev);
+      }
+    },
+    onSettled: () => invalidatePromptSet(brandId),
+  });
+}
+
+/** Persist drag-reordering. Optimistic so the row stays where it was dropped
+ *  instead of snapping back while the request is in flight. */
+export function useReorderPrompts(brandId: string | null | undefined) {
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${brandId}/prompts/reorder`, { ids });
+      return r.json();
+    },
+    onMutate: async (ids) => {
+      const keys = [promptKeys.list(brandId), promptKeys.listAll(brandId)];
+      await Promise.all(keys.map((key) => queryClient.cancelQueries({ queryKey: key })));
+      const snapshots = keys.map(
+        (key) => [key, queryClient.getQueryData<PromptListResponse>(key)] as const,
+      );
+      for (const [key, prev] of snapshots) {
+        if (!prev?.data) continue;
+        const byId = new Map(prev.data.map((p) => [p.id, p]));
+        const reordered = ids.map((id) => byId.get(id)).filter(Boolean) as BrandPrompt[];
+        // Anything not named in `ids` keeps its place at the end rather than
+        // vanishing from the cache.
+        const rest = prev.data.filter((p) => !ids.includes(p.id));
+        queryClient.setQueryData(key, { ...prev, data: [...reordered, ...rest] });
+      }
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => {
+      for (const [key, prev] of ctx?.snapshots ?? []) {
+        if (prev) queryClient.setQueryData(key, prev);
+      }
+    },
+    onSettled: () => invalidatePromptSet(brandId),
   });
 }
 

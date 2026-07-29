@@ -60,19 +60,22 @@ function NavItem({
   active: boolean;
   onNavigate?: () => void;
 }) {
+  // Measured nav-item spec: 12px text, px-2 py-2, rounded-sm, 150ms colors,
+  // 16px icon, accent-subtle fill + accent text when active. No pill, no
+  // heavy weight — the active state is a tint, not a slab.
   return (
     <Link to={href} onClick={onNavigate}>
       <div
         className={[
-          "relative flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer",
-          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
+          "group flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2 py-2 text-[12px] transition-colors duration-150",
+          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-vc-accent/40",
           active
-            ? "bg-sidebar-primary text-sidebar-primary-foreground"
-            : "text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
+            ? "bg-vc-accent-subtle font-medium text-vc-accent"
+            : "text-vc-secondary hover:bg-vc-muted/50 hover:text-vc-primary",
         ].join(" ")}
         tabIndex={0}
       >
-        <Icon className="w-4 h-4 shrink-0" />
+        <Icon className="h-4 w-4 shrink-0" />
         <span className="truncate">{label}</span>
       </div>
     </Link>
@@ -102,11 +105,17 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       : location === href || location.startsWith(`${href}/`) || location.startsWith(`${href}?`);
 
   return (
-    <div className="flex h-full flex-col bg-sidebar">
-      {/* Logo */}
-      <div className="flex items-center px-5 h-14 border-b border-sidebar-border shrink-0">
-        <Link to="/" onClick={onNavigate}>
-          <img src={logoPath} alt="VentureCite" className="h-9 w-auto cursor-pointer" />
+    <div className="flex h-full flex-col bg-white">
+      {/* Brand row — 56px, matching the context bar's height exactly so the
+          two hairlines meet in one unbroken line across the viewport. */}
+      <div className="relative flex h-[56px] shrink-0 items-center border-b border-vc-default px-2.5">
+        <Link
+          to="/"
+          onClick={onNavigate}
+          className="group flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors duration-200 hover:bg-vc-muted/50"
+        >
+          <img src={logoPath} alt="" className="h-5 w-5 shrink-0 rounded" />
+          <span className="truncate text-[13px] font-semibold text-vc-primary">VentureCite</span>
         </Link>
       </div>
 
@@ -114,7 +123,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           actually moves through. Unrolled so the five spine-stage tour
           targets can carry literal data-tour-id strings the build gate
           can grep. */}
-      <nav className="flex-1 overflow-y-auto py-3 space-y-0.5">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-3">
         <NavItem
           href="/"
           label="Command Center"
@@ -170,7 +179,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       {/* Bottom: user */}
-      <div className="shrink-0 border-t border-sidebar-border px-2 py-3 space-y-1">
+      <div className="shrink-0 space-y-1 border-t border-vc-default px-2 py-3">
         <div className="px-1 pt-1">
           <SidebarOnboarding onNavigate={onNavigate} />
         </div>
@@ -178,20 +187,19 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 flex-1 min-w-0 px-2 py-2 rounded-lg hover:bg-sidebar-accent transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
-                <Avatar className="h-8 w-8 shrink-0">
+              <button className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-2 py-1.5 transition-colors duration-150 hover:bg-vc-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-vc-accent/40">
+                <Avatar className="h-6 w-6 shrink-0">
                   <AvatarImage src={user?.profileImageUrl || undefined} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
+                  <AvatarFallback className="bg-vc-accent-subtle text-[10px] font-medium text-vc-accent-hover">
                     {getInitials()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-medium text-sidebar-foreground truncate">
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="truncate text-[12px] text-vc-secondary">
                     {user?.firstName
                       ? `${user.firstName} ${user.lastName ?? ""}`.trim()
                       : "Account"}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
               </button>
             </DropdownMenuTrigger>
@@ -227,7 +235,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden lg:flex flex-col w-[220px] border-r border-sidebar-border">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[200px] flex-col border-r border-vc-default bg-white lg:flex">
       <SidebarContent />
     </aside>
   );

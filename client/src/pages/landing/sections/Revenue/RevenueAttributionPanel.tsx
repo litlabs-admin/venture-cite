@@ -7,21 +7,38 @@ const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 // "width: 0%"; since the real dollar amounts are known, each bar's settled
 // width is derived as (amount / largest) * 100 — proportional to ChatGPT,
 // the largest source — a legitimate derivation, not an invented value.
+// One-family blue ramp instead of the neutral grey ramp — ChatGPT (the
+// leading source) carries the deepest/most saturated blue, the other three
+// step down through lighter blue tints rather than switching to grey.
 const BY_SOURCE = [
   {
     alt: "ChatGPT",
     src: "/venturecite/images/ai-logos/chatgpt.svg",
     name: "ChatGPT",
     amount: 6841,
+    color: "var(--accent)",
   },
   {
     alt: "Perplexity",
     src: "/venturecite/images/ai-logos/perplexity.svg",
     name: "Perplexity",
     amount: 2847,
+    color: "var(--hb-accent-bright)",
   },
-  { alt: "Claude", src: "/venturecite/images/ai-logos/claude.png", name: "Claude", amount: 1853 },
-  { alt: "Gemini", src: "/venturecite/images/ai-logos/gemini.svg", name: "Gemini", amount: 1306 },
+  {
+    alt: "Claude",
+    src: "/venturecite/images/ai-logos/claude.png",
+    name: "Claude",
+    amount: 1853,
+    color: "var(--accent-tint-1)",
+  },
+  {
+    alt: "Gemini",
+    src: "/venturecite/images/ai-logos/gemini.svg",
+    name: "Gemini",
+    amount: 1306,
+    color: "var(--accent-tint-2)",
+  },
 ];
 const MAX_AMOUNT = BY_SOURCE[0].amount;
 
@@ -73,7 +90,10 @@ export function RevenueAttributionPanel({ isVisible }: { isVisible: boolean }) {
         <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vc-text-muted mb-1.5">
           By Source
         </div>
-        <div className="border border-vc-default rounded overflow-hidden divide-y divide-vc-default">
+        <div
+          className="rounded overflow-hidden divide-y divide-vc-default ring-1 ring-vc-hairline"
+          style={{ boxShadow: "var(--hb-shadow-raised)" }}
+        >
           {BY_SOURCE.map((source) => (
             <div
               key={source.name}
@@ -100,10 +120,21 @@ export function RevenueAttributionPanel({ isVisible }: { isVisible: boolean }) {
                 </div>
                 <div className="h-0.5 bg-vc-muted overflow-hidden rounded-sm">
                   <div
-                    className="h-full bg-vc-accent transition-all duration-700"
+                    className="h-full transition-all duration-700"
                     style={{
                       width: isVisible ? `${(source.amount / MAX_AMOUNT) * 100}%` : "0%",
                       transitionTimingFunction: EASE,
+                      backgroundColor: source.color,
+                      ...(source.name === "ChatGPT"
+                        ? {
+                            backgroundImage:
+                              "linear-gradient(90deg, var(--hb-accent-deep), var(--hb-accent-bright))",
+                            boxShadow: "0 0 4px rgba(59,91,246,0.4)",
+                          }
+                        : {
+                            backgroundImage:
+                              "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 70%)",
+                          }),
                     }}
                   />
                 </div>
@@ -115,6 +146,7 @@ export function RevenueAttributionPanel({ isVisible }: { isVisible: boolean }) {
 
       <div
         className={`mt-3 pt-3 flex items-center justify-between transition-all duration-500 ${isVisible ? "opacity-100" : "opacity-0"}`}
+        style={{ boxShadow: "inset 0 1px 0 var(--hb-hairline-strong)" }}
       >
         <div>
           <span className="text-[10px] text-vc-text-muted uppercase tracking-[0.08em]">

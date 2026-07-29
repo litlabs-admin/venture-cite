@@ -18,11 +18,17 @@ import { ArrowRightIcon } from "./icons";
 // The 4 items are separated by a small rounded div "dot" (w-1 h-1
 // rounded-full bg-default), not a literal bullet/pipe character — the last
 // item (Enterprise) has no trailing separator.
+//
+// The source pointed the last three at /trakkr-for/* audience pages, leaving
+// the first plain. VentureCite ships no audience pages, so they point at the
+// in-page sections that actually answer each audience's question — keeping the
+// linked branch live rather than dead. "Brand teams" stays unlinked, as in the
+// source: the platform section is what the whole strip sits under already.
 const items: { label: string; href?: string }[] = [
   { label: "Brand teams" },
-  { label: "Marketing agencies" },
-  { label: "Startups" },
-  { label: "Enterprise" },
+  { label: "Marketing agencies", href: "#revenue-section" },
+  { label: "Startups", href: "#philosophy-section" },
+  { label: "Enterprise", href: "#platform-section" },
 ];
 
 export function BuiltForStrip({ isVisible }: { isVisible: boolean }) {

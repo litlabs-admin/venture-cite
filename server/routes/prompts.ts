@@ -23,6 +23,7 @@ import { generateSuggestedPrompts } from "../lib/suggestionGenerator";
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
 import { detectBrandAndCompetitors, matchEntity } from "../lib/brandMatcher";
 import { logger } from "../lib/logger";
+import { buildPromptScoreHistory, resolvePoints } from "../lib/promptScoreHistory";
 import { waitUntil } from "@vercel/functions";
 
 export function setupPromptsRoutes(app: Express): void {
@@ -207,22 +208,136 @@ export function setupPromptsRoutes(app: Express): void {
     }),
   );
 
-  // Inline-edit the text of a tracked prompt.
+  // Create one prompt by hand. Until now prompts could only arrive via AI
+  // generation or by accepting a suggestion, so "Add a prompt" in the UI had
+  // nothing to call. Subject to the same tracked cap as accept-suggestion —
+  // the cap is a product rule about how many prompts a weekly run covers, not
+  // a property of where the prompt came from.
+  app.post(
+    "/api/brand-prompts/:brandId/prompts",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const text = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
+        if (!text) {
+          return res.status(400).json({ success: false, error: "prompt text required" });
+        }
+        if (text.length > 500) {
+          return res.status(400).json({ success: false, error: "prompt too long (max 500)" });
+        }
+        const all = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
+        const tracked = all.filter((p) => p.status === "tracked");
+        if (tracked.length >= TRACKED_PROMPTS_CAP) {
+          return res.status(409).json({
+            success: false,
+            error: "tracked_set_full",
+            data: { trackedCount: tracked.length, cap: TRACKED_PROMPTS_CAP },
+          });
+        }
+        // Case-insensitive duplicate guard: two identical prompts would double
+        // the weekly run cost and split one prompt's results across two rows.
+        const dupe = tracked.find((p) => p.prompt.trim().toLowerCase() === text.toLowerCase());
+        if (dupe) {
+          return res.status(409).json({ success: false, error: "duplicate_prompt" });
+        }
+        const maxIndex = await storage.getMaxBrandPromptOrderIndex(brand.id);
+        const created = await storage.createBrandPrompt({
+          brandId: brand.id,
+          prompt: text,
+          status: "tracked",
+          isActive: 1,
+          orderIndex: maxIndex + 1,
+        });
+        res.status(201).json({ success: true, data: created });
+      } catch (error) {
+        sendError(res, error, "Failed to create prompt");
+      }
+    }),
+  );
+
+  // Persist a manual reordering of the tracked set. `orderIndex` already
+  // drove read order everywhere; nothing could write it until now.
+  app.post(
+    "/api/brand-prompts/:brandId/prompts/reorder",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const ids: unknown = req.body?.ids;
+        if (!Array.isArray(ids) || ids.some((i) => typeof i !== "string")) {
+          return res.status(400).json({ success: false, error: "ids must be a string array" });
+        }
+        const all = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
+        const owned = new Set(all.map((p) => p.id));
+        // Every id must belong to this brand, or a caller could renumber
+        // another account's prompts by guessing ids.
+        if ((ids as string[]).some((id) => !owned.has(id))) {
+          return res.status(400).json({ success: false, error: "unknown prompt id" });
+        }
+        await storage.reorderBrandPrompts(brand.id, ids as string[]);
+        const updated = await storage.getBrandPromptsByBrandId(brand.id);
+        res.json({ success: true, data: updated });
+      } catch (error) {
+        sendError(res, error, "Failed to reorder prompts");
+      }
+    }),
+  );
+
+  // Inline-edit the text of a tracked prompt, or flip it between tracked and
+  // archived (the row's ON toggle). Body carries `prompt`, `status`, or both.
   app.patch(
     "/api/brand-prompts/:brandId/prompts/:promptId",
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
         const brand = await requireBrand(req.params.brandId, user.id);
-        const newText = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
-        if (!newText) {
+        const hasText = typeof req.body?.prompt === "string";
+        const newText = hasText ? req.body.prompt.trim() : "";
+        const rawStatus = req.body?.status;
+        const hasStatus = rawStatus === "tracked" || rawStatus === "archived";
+
+        if (!hasText && !hasStatus) {
+          return res.status(400).json({ success: false, error: "prompt text or status required" });
+        }
+        if (hasText && !newText) {
           return res.status(400).json({ success: false, error: "prompt text required" });
         }
+
         const all = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
-        const row = all.find((p) => p.id === req.params.promptId && p.status === "tracked");
-        if (!row)
-          return res.status(404).json({ success: false, error: "Tracked prompt not found" });
-        const updated = await storage.updateBrandPromptText(row.id, newText);
+        // A status change has to reach archived rows too — that is the whole
+        // point of switching one back on — so only the text edit is
+        // tracked-only.
+        const row = all.find(
+          (p) =>
+            p.id === req.params.promptId &&
+            (hasStatus ? p.status !== "suggested" : p.status === "tracked"),
+        );
+        if (!row) return res.status(404).json({ success: false, error: "Prompt not found" });
+
+        let updated = row;
+        if (hasText) {
+          updated = (await storage.updateBrandPromptText(row.id, newText)) ?? updated;
+        }
+        if (hasStatus && rawStatus !== row.status) {
+          const trackedCount = all.filter((p) => p.status === "tracked").length;
+          // Same two invariants the other write paths enforce: never leave a
+          // brand with zero tracked prompts, never exceed the cap.
+          if (rawStatus === "archived" && trackedCount <= 1) {
+            return res.status(400).json({
+              success: false,
+              error: "Keep at least one prompt switched on",
+            });
+          }
+          if (rawStatus === "tracked" && trackedCount >= TRACKED_PROMPTS_CAP) {
+            return res.status(409).json({
+              success: false,
+              error: "tracked_set_full",
+              data: { trackedCount, cap: TRACKED_PROMPTS_CAP },
+            });
+          }
+          updated = (await storage.setBrandPromptStatus(row.id, rawStatus)) ?? updated;
+        }
         res.json({ success: true, data: updated });
       } catch (error) {
         sendError(res, error, "Failed to update prompt");
@@ -256,15 +371,53 @@ export function setupPromptsRoutes(app: Express): void {
     }),
   );
 
+  // Per-prompt score history — powers the SCORE, Δ and 7-day sparkline
+  // columns in the prompts table. Bucketing lives in
+  // server/lib/promptScoreHistory.ts so it can be tested without a database.
+  //
+  // The join is on `brandPromptId`. The older /run/:runId/details endpoint
+  // joins on prompt TEXT, which silently loses history whenever a prompt is
+  // edited — this one does not, at the cost of ignoring rows written before
+  // brandPromptId was populated.
+  app.get(
+    "/api/brand-prompts/:brandId/prompt-history",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const prompts = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
+        const ids = prompts.map((p) => p.id);
+        const rankings = await storage.getGeoRankingsByBrandPromptIds(ids);
+        const data = buildPromptScoreHistory(ids, rankings, resolvePoints(req.query.points));
+        res.json({ success: true, data });
+      } catch (error) {
+        sendError(res, error, "Failed to fetch prompt history");
+      }
+    }),
+  );
+
   // List the stored prompts for a brand.
+  //
+  // Defaults to tracked-only, which is what every existing caller expects.
+  // `?status=all` additionally returns archived rows — the prompts table needs
+  // them so a prompt switched OFF stays visible and can be switched back on.
+  // Without this the toggle is a one-way door: the row disappears on the next
+  // refetch and nothing can reach it again.
   app.get(
     "/api/brand-prompts/:brandId",
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
         const brand = await requireBrand(req.params.brandId, user.id);
-        const prompts = await storage.getBrandPromptsByBrandId(brand.id);
-        res.json({ success: true, data: prompts });
+        const requested = req.query.status;
+        // Only "all" is honoured; anything else (including "suggested",
+        // which has its own endpoint) falls back to the safe default.
+        const status = requested === "all" ? "all" : "tracked";
+        const prompts = await storage.getBrandPromptsByBrandId(brand.id, { status });
+        // "all" in storage includes suggestions; those are a separate concept
+        // with their own endpoint and must not leak into the tracked list.
+        const data = status === "all" ? prompts.filter((p) => p.status !== "suggested") : prompts;
+        res.json({ success: true, data });
       } catch (error) {
         sendError(res, error, "Failed to fetch brand prompts");
       }
@@ -908,6 +1061,10 @@ export function setupPromptsRoutes(app: Express): void {
         type PlatformEntry = {
           platform: string;
           isCited: boolean;
+          // Placement within the model's answer, when the run recorded one.
+          // Null for uncited checks and for rows flipped to cited by
+          // re-detection (that pass has no rank signal).
+          rank: number | null;
           snippet: string | null;
           fullResponse: string | null;
           checkedAt: Date;
@@ -969,6 +1126,7 @@ export function setupPromptsRoutes(app: Express): void {
               promptRow.platforms.push({
                 platform: r.aiPlatform,
                 isCited: r.isCited === 1,
+                rank: typeof r.rank === "number" && r.rank > 0 ? r.rank : null,
                 snippet,
                 fullResponse,
                 checkedAt: r.checkedAt,

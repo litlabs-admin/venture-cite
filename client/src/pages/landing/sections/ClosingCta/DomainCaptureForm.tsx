@@ -57,6 +57,10 @@ function ArrowRightIcon({ className }: { className?: string }) {
 // here as live logic rather than rendered as a permanently-disabled button.
 // VentureCite has no live domain-capture backend yet, so submission simply
 // routes to /register — same destination as every other CTA on this page.
+//
+// This is the page's terminal conversion CTA — the same job Hero's form does
+// at the top of the page — so it gets the solid --accent tier rather than the
+// accent-subtle ghost used for secondary actions.
 export function DomainCaptureForm() {
   const [domain, setDomain] = useState("");
 
@@ -90,7 +94,7 @@ export function DomainCaptureForm() {
       <button
         type="submit"
         disabled={domain.trim().length === 0}
-        className="shrink-0 h-9 px-4 rounded bg-vc-accent-subtle text-vc-accent text-[13px] font-medium hover:bg-vc-accent hover:text-white disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-vc-accent-subtle disabled:hover:text-vc-accent transition-colors duration-150 flex items-center gap-1.5"
+        className="shrink-0 h-9 px-4 rounded bg-vc-accent text-white text-[13px] font-medium hover:bg-vc-accent-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-vc-accent transition-colors duration-150 flex items-center gap-1.5"
       >
         Get started
         <ArrowRightIcon className="lucide lucide-arrow-right" />

@@ -1,9 +1,7 @@
-import type { CSSProperties } from "react";
+import { MockupBackdrop } from "./MockupBackdrop";
 import { scrollRevealEase } from "@/pages/landing/hooks/useScrollReveal";
 import { TrendingUpIcon } from "./icons";
 import { faviconUrl } from "@/pages/landing/faviconUrl";
-
-const dotGridStyle = { "--vc-mkt-dot-opacity": 0.1 } as CSSProperties;
 
 // Row 01 "Track" mockup — a fake Nike workspace card, verbatim structure
 // from _reference/index.html 2053-2129. Source captures this card mid
@@ -81,11 +79,7 @@ const byModel = [
 export function TrackMockup({ isVisible }: { isVisible: boolean }) {
   return (
     <div className="relative bg-white overflow-hidden h-full flex flex-col min-h-[240px] sm:min-h-[320px] lg:min-h-[360px]">
-      <div
-        className="absolute inset-0 pointer-events-none mkt-dot-grid"
-        aria-hidden="true"
-        style={dotGridStyle}
-      />
+      <MockupBackdrop />
       <div className="relative flex-1 flex items-center justify-center py-8">
         <div
           style={{
@@ -95,9 +89,15 @@ export function TrackMockup({ isVisible }: { isVisible: boolean }) {
           }}
         >
           <div className="p-6 lg:p-8">
-            <div className="mx-auto w-full max-w-[600px] border border-vc-default rounded overflow-hidden bg-white">
+            <div
+              className="mx-auto w-full max-w-[600px] rounded overflow-hidden bg-vc-surface ring-1 ring-vc-hairline"
+              style={{ boxShadow: "var(--hb-shadow-shell)" }}
+            >
               {/* Header row */}
-              <div className="flex items-stretch border-b border-vc-default">
+              <div
+                className="flex items-stretch border-b border-vc-default"
+                style={{ background: "var(--hb-surface-wash)" }}
+              >
                 <div className="flex items-center gap-2.5 px-4 py-3 border-r border-vc-default w-[180px] shrink-0">
                   {/* Plain <img>, not next/image: this is an external Google
                       favicon-service URL and next.config.ts has no
@@ -173,20 +173,45 @@ export function TrackMockup({ isVisible }: { isVisible: boolean }) {
                         x2="0%"
                         y2="100%"
                       >
-                        <stop offset="0%" stopColor="#0e9373" stopOpacity={0.12} />
-                        <stop offset="40%" stopColor="#0e9373" stopOpacity={0.04} />
-                        <stop offset="100%" stopColor="#0e9373" stopOpacity={0} />
+                        <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.28} />
+                        <stop offset="40%" stopColor="var(--accent)" stopOpacity={0.1} />
+                        <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
                       </linearGradient>
+                      <filter
+                        id="venturecite-line-glow"
+                        x="-20%"
+                        y="-60%"
+                        width="140%"
+                        height="220%"
+                      >
+                        <feGaussianBlur stdDeviation="2.5" />
+                      </filter>
                     </defs>
                     <path d={AREA_FILL_D} fill="url(#venturecite-chart-gradient)" />
+                    {/* Soft glow duplicate behind the crisp line. Nike's own trend
+                        line is the chart's one series, so it carries the accent
+                        blue directly rather than sitting on the neutral ramp. */}
                     <path
                       d={LINE_D}
                       fill="none"
-                      stroke="#0e9373"
+                      stroke="var(--hb-accent-bright)"
+                      strokeWidth={4}
+                      strokeOpacity={0.22}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      filter="url(#venturecite-line-glow)"
+                    />
+                    <path
+                      d={LINE_D}
+                      fill="none"
+                      stroke="var(--accent)"
                       strokeWidth={1.5}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
+                    {/* Halo endpoint marker instead of a bare terminated stroke. */}
+                    <circle cx={317} cy={12.48} r={5} fill="var(--accent)" fillOpacity={0.18} />
+                    <circle cx={317} cy={12.48} r={2.2} fill="var(--accent)" />
                   </svg>
                   <div className="flex items-center justify-between mt-1.5">
                     <span className="text-[9px] text-vc-text-muted font-mono tabular-nums">

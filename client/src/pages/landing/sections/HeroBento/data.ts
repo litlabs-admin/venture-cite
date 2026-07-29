@@ -132,13 +132,17 @@ export interface CrawlerRow {
   mdHidden: boolean;
 }
 
+// Bar colours step down the blue accent ramp rather than using each engine's
+// own brand colour: the row already shows the engine's logo and name, so the
+// bar only needs to encode magnitude. Vendor colours previously put ChatGPT
+// green and Claude amber into a surface that is otherwise entirely blue.
 export const CRAWLER_ROWS: CrawlerRow[] = [
   {
     name: "ChatGPT",
     logoSrc: "/venturecite/images/ai-logos/chatgpt.svg",
     count: 2274,
     widthPct: 48.3727,
-    color: "rgba(16, 163, 127, 0.55)",
+    color: "rgba(59, 91, 246, 0.55)",
     mdHidden: false,
   },
   {
@@ -146,7 +150,7 @@ export const CRAWLER_ROWS: CrawlerRow[] = [
     logoSrc: "/venturecite/images/ai-logos/claude.png",
     count: 1129,
     widthPct: 24.0162,
-    color: "rgba(217, 119, 6, 0.55)",
+    color: "rgba(91, 123, 255, 0.55)",
     mdHidden: false,
   },
   {
@@ -154,7 +158,7 @@ export const CRAWLER_ROWS: CrawlerRow[] = [
     logoSrc: "/venturecite/images/ai-logos/perplexity.svg",
     count: 578,
     widthPct: 12.2953,
-    color: "rgba(32, 178, 170, 0.55)",
+    color: "rgba(129, 155, 255, 0.55)",
     mdHidden: false,
   },
   {
@@ -162,7 +166,7 @@ export const CRAWLER_ROWS: CrawlerRow[] = [
     logoSrc: "/venturecite/images/ai-logos/gemini.svg",
     count: 423,
     widthPct: 8.99809,
-    color: "rgba(66, 133, 244, 0.55)",
+    color: "rgba(168, 189, 249, 0.55)",
     mdHidden: false,
   },
   {
@@ -170,7 +174,7 @@ export const CRAWLER_ROWS: CrawlerRow[] = [
     logoSrc: "/venturecite/images/ai-logos/grok.svg",
     count: 297,
     widthPct: 6.3178,
-    color: "rgba(17, 24, 39, 0.55)",
+    color: "rgba(201, 214, 252, 0.55)",
     mdHidden: true,
   },
 ];

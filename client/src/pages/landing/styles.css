@@ -7,53 +7,162 @@
  * Tailwind-default @theme palette is not copied, Tailwind v3 already ships it)
  * and trakkr.ai/app/vc-ds-tokens.css.
  *
- * Color utilities (bg-vc-surface, text-vc-primary, …) come from the `tk` key in
- * tailwind.config.ts, not from here. The vars below exist only because a
- * handful of components reference them from inline styles.
+ * Color utilities (bg-vc-surface, text-vc-primary, …) are generated from the
+ * `--color-vc-*` keys in the `@theme` block of client/src/index.css — this is
+ * Tailwind v4, CSS-first; there is no tailwind.config.ts in the repo. The vars
+ * below exist only because a handful of components read them from inline
+ * styles or SVG attributes, which `@theme` keys cannot serve.
+ *
+ * SCOPING CAVEAT: `.vc-home` can only override custom properties it declares
+ * itself. Bare names the dark app owns on `:root` — `--accent`, `--border`,
+ * `--primary`, `--chart-1`…`--chart-5` — still resolve to DASHBOARD values
+ * inside this subtree. Never read those from a landing inline style; use the
+ * `--color-*` names declared below.
  */
 
 .vc-home {
   /* The app renders under <html class="dark">; this page is light-only. */
   color-scheme: light;
-  color: #1c1917;
+  color: #16162e;
 
-  /* Warm gray ramp — brand override, NOT Tailwind's stock cool gray. */
-  --color-gray-50: #fafaf9;
-  --color-gray-100: #f5f5f4;
-  --color-gray-200: #e7e5e4;
-  --color-gray-300: #d6d3d1;
-  --color-gray-400: #a8a29e;
-  --color-gray-500: #78716c;
-  --color-gray-600: #57534e;
-  --color-gray-700: #44403c;
-  --color-gray-800: #292524;
-  --color-gray-900: #1c1917;
+  /*
+   * BLUE ACCENT SYSTEM.
+   *
+   * The marketing site runs a cool, blue-accented palette; the product app
+   * stays on the green `vc-*` tokens. Both are expressed through the SAME
+   * utility names (bg-vc-accent, text-vc-primary, …) — Tailwind v4's plain
+   * `@theme` compiles those to `var(--color-vc-*)` references, so redeclaring
+   * the properties here rebinds every landing utility without emitting a
+   * single new class and without touching the dashboard.
+   *
+   * Rules carried over from the source system:
+   *   - --accent is interactive/brand ONLY: primary button fills, active
+   *     states, links. Never decorative (no accent full stops).
+   *   - --accent NEVER encodes positive/negative change. Deltas use
+   *     success/danger.
+   *   - Two button tiers: --ink-fill for the persistent nav CTA, --accent for
+   *     the in-page CTA. Never both blue on one screen.
+   *   - Charts default to --chart-neutral; at most one accent element.
+   */
+  --accent: #3b5bf6;
+  --accent-hover: #2e49d4;
+  --accent-subtle: #eef2fe;
+  --accent-tint-1: #a8bdf9;
+  --accent-tint-2: #c9d6fc;
+  --ink: #16162e;
+  --ink-fill: #1b1b3a;
+  --success: #0891b2;
+  --success-bg: #ecfeff;
+  --danger: #f0475b;
+  --danger-bg: #fdecef;
+  --chart-neutral: #3f3f46;
+  --text-body-color: #6e7280;
+  --text-muted-color: #9ca0ae;
 
-  --color-green-50: #e4f6f2;
-  --color-green-100: #c8ede5;
-  --color-green-500: #0e9373;
-  --color-green-600: #0c7a60;
+  /* Cool gray ramp — replaces the warm stone ramp the product app uses. */
+  --color-gray-50: #fafafc;
+  --color-gray-100: #f2f2f6;
+  --color-gray-200: #e8e8f0;
+  --color-gray-300: #d5d5e0;
+  --color-gray-400: #9ca0ae;
+  --color-gray-500: #6e7280;
+  --color-gray-600: #4b4e5c;
+  --color-gray-700: #383a47;
+  --color-gray-800: #26273a;
+  --color-gray-900: #16162e;
 
-  --color-page: #fff;
+  /* Legacy aliases — still referenced by a few inline styles. */
+  --color-green-50: var(--accent-subtle);
+  --color-green-100: var(--accent-tint-2);
+  --color-green-500: var(--accent);
+  --color-green-600: var(--accent-hover);
+
+  --color-page: #fafafc;
   --color-surface: #fff;
+  --color-surface-tint: #efeff9;
   --color-muted: var(--color-gray-100);
-  --color-primary: var(--color-gray-900);
-  --color-secondary: var(--color-gray-600);
-  --color-tertiary: var(--color-gray-500);
-  --color-placeholder: var(--color-gray-500);
-  --color-text-muted: var(--color-gray-500);
-  --color-default: var(--color-gray-200);
+  --color-primary: var(--ink);
+  --color-ink-fill: var(--ink-fill);
+  --color-secondary: var(--text-body-color);
+  --color-tertiary: var(--text-muted-color);
+  --color-meta: var(--text-muted-color);
+  --color-placeholder: var(--text-muted-color);
+  --color-text-muted: var(--text-muted-color);
+  --color-default: #e8e8f0;
   --color-subtle: var(--color-gray-100);
   --color-hover: var(--color-gray-300);
   --color-faint: var(--color-gray-300);
-  --color-accent: var(--color-green-500);
-  --color-accent-subtle: var(--color-green-50);
-  --color-accent-hover: var(--color-green-600);
+  --color-accent: var(--accent);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-bg);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-bg);
 
-  --chart-1: var(--color-accent);
+  /*
+   * Rebind the app-wide `vc-*` utilities for this subtree only. Everything
+   * outside `.vc-home` keeps the green product palette.
+   */
+  --color-vc-accent: var(--accent);
+  --color-vc-accent-hover: var(--accent-hover);
+  --color-vc-accent-subtle: var(--accent-subtle);
+  --color-vc-primary: var(--ink);
+  --color-vc-secondary: var(--text-body-color);
+  --color-vc-tertiary: var(--text-muted-color);
+  --color-vc-text-muted: var(--text-muted-color);
+  --color-vc-label: var(--text-muted-color);
+  --color-vc-placeholder: var(--text-muted-color);
+  --color-vc-default: #e8e8f0;
+  --color-vc-subtle: var(--color-gray-100);
+  --color-vc-muted: var(--color-gray-100);
+  --color-vc-hover: var(--color-gray-300);
+  --color-vc-faint: var(--color-gray-300);
+  --color-vc-page: #fafafc;
+  --color-vc-surface: #fff;
+  --color-vc-success: var(--success);
+
+  /*
+   * HeroBento surface-polish layer. Hairlines, elevation and the accent
+   * extremes used by gradients, glows and pills.
+   */
+  --hb-hairline: #e6e6ef;
+  --hb-hairline-strong: #dcdce8;
+  --hb-row-hover: rgba(238, 242, 254, 0.62);
+  --hb-accent-deep: #2743c9;
+  --hb-accent-bright: #5b7bff;
+  --hb-success-ink: #0e7490;
+  --hb-danger-ink: #c81f37;
+  --hb-chart-grid: #f0f0f6;
+  --hb-chart-baseline: #e2e2ec;
+  --hb-shadow-raised: 0 1px 2px -1px rgba(16, 22, 55, 0.1), 0 4px 10px -4px rgba(16, 22, 55, 0.1);
+  --hb-shadow-float:
+    0 1px 2px -1px rgba(16, 22, 55, 0.1), 0 8px 18px -6px rgba(16, 22, 55, 0.14),
+    0 20px 40px -18px rgba(16, 22, 55, 0.18);
+  --hb-shadow-shell:
+    0 1px 2px -1px rgba(16, 22, 55, 0.08), 0 4px 10px -3px rgba(16, 22, 55, 0.07),
+    0 18px 36px -12px rgba(16, 22, 55, 0.13), 0 48px 88px -40px rgba(16, 22, 55, 0.22),
+    0 24px 56px -28px rgba(59, 91, 246, 0.16);
+  --hb-ease-reveal: cubic-bezier(0.16, 1, 0.3, 1);
+  --hb-surface-wash: linear-gradient(180deg, #fbfcff 0%, #ffffff 100%);
+
+  --color-vc-hairline: var(--hb-hairline);
+  --color-vc-hairline-strong: var(--hb-hairline-strong);
+  --color-vc-row-hover: var(--hb-row-hover);
+  --color-vc-accent-bright: var(--hb-accent-bright);
+  --color-vc-accent-deep: var(--hb-accent-deep);
+  --color-vc-success-ink: var(--hb-success-ink);
+  --color-vc-danger-ink: var(--hb-danger-ink);
+
+  /* Charts lead with neutral; accent marks at most one series. */
+  --chart-1: var(--chart-neutral);
   --chart-2: var(--color-gray-400);
-  --chart-grid: var(--color-gray-100);
-  --chart-axis: var(--color-gray-500);
+  --chart-3: #3b82f6;
+  --chart-4: #f59e0b;
+  --chart-5: var(--color-gray-600);
+  --chart-6: var(--color-gray-300);
+  --chart-grid: var(--hb-chart-grid);
+  --chart-axis: var(--text-muted-color);
 
   --vc-mkt-dot-opacity: 0.08;
   --vc-mkt-dot-spacing: 9px;
@@ -62,14 +171,21 @@
 
 /*
  * The app's base layer applies `border-color: var(--border)` (a dark zinc) to
- * every element. Reset it to the marketing gray for this subtree. :where()
- * zeroes the specificity so real border-* utilities still win regardless of
- * stylesheet order.
+ * every element. Reset it to the marketing gray for this subtree.
+ *
+ * MUST stay inside `@layer base`. Cascade layers outrank specificity: an
+ * UNLAYERED rule beats everything in `@layer utilities`, so writing this at
+ * the top level silently killed every border-* utility on the landing —
+ * `border-vc-accent`, `border-rose-500`, all of them resolved to this one
+ * colour. `:where()` does not save you; zero specificity is irrelevant across
+ * layers.
  */
-:where(.vc-home) *,
-:where(.vc-home) *::before,
-:where(.vc-home) *::after {
-  border-color: #e7e5e4;
+@layer base {
+  :where(.vc-home) *,
+  :where(.vc-home) *::before,
+  :where(.vc-home) *::after {
+    border-color: var(--color-vc-default, #e8e8f0);
+  }
 }
 
 /* ── Animations ───────────────────────────────────────────────────────────
@@ -181,15 +297,15 @@
   --vc-ds-ink-2: #5a5c63;
   --vc-ds-ink-3: #8b8d96;
   --vc-ds-ink-4: #b8bac1;
-  --vc-ds-accent: #0e9373;
-  --vc-ds-accent-ink: #0c7a60;
-  --vc-ds-accent-weak: #e8f5f0;
-  --vc-ds-accent-line: #c9e9df;
-  --vc-ds-pos: #0e9373;
-  --vc-ds-pos-weak: #e8f5f0;
-  --vc-ds-neg: #d6453d;
-  --vc-ds-neg-weak: #fdeceb;
-  --vc-ds-s1: #0e9373;
+  --vc-ds-accent: var(--accent);
+  --vc-ds-accent-ink: var(--accent-hover);
+  --vc-ds-accent-weak: var(--accent-subtle);
+  --vc-ds-accent-line: var(--accent-tint-2);
+  --vc-ds-pos: var(--success);
+  --vc-ds-pos-weak: var(--success-bg);
+  --vc-ds-neg: var(--danger);
+  --vc-ds-neg-weak: var(--danger-bg);
+  --vc-ds-s1: var(--chart-neutral);
   --vc-ds-s2: #3f6fd6;
   --vc-ds-s3: #e0913a;
   --vc-ds-s4: #8b5cf6;
@@ -219,4 +335,155 @@
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   letter-spacing: 0;
+}
+
+/*
+ * Reduced motion. The marquees, chat transcript and breathing dot are
+ * decorative and run forever; without this they keep animating for users who
+ * have explicitly asked them not to. Mirrors the reference's own block.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .vc-home .drift-left,
+  .vc-home .drift-right,
+  .vc-home .chat-scroll,
+  .vc-home .assistant-breath {
+    animation: none;
+  }
+  .vc-home .animate-ping {
+    animation: none;
+  }
+  .vc-home .hb-draw {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+  .vc-home .hb-area-in,
+  .vc-home .hb-pop {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * HeroBento badge language. Deltas, ranks and tags render as filled pills
+ * rather than bare coloured text — this is what carries the dashboard-card
+ * look in the hero. Ported from the reference's globals.css.
+ */
+.vc-home .hb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vc-home .hb-pill-lg {
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11px;
+  gap: 2px;
+}
+.vc-home .hb-pill-up {
+  color: var(--hb-success-ink);
+  background: var(--success-bg);
+  box-shadow: inset 0 0 0 1px rgba(8, 145, 178, 0.2);
+}
+.vc-home .hb-pill-down {
+  color: var(--hb-danger-ink);
+  background: var(--danger-bg);
+  box-shadow: inset 0 0 0 1px rgba(240, 71, 91, 0.2);
+}
+.vc-home .hb-pill-neutral {
+  color: var(--text-body-color);
+  background: #f3f3f8;
+  box-shadow: inset 0 0 0 1px rgba(22, 22, 46, 0.06);
+}
+.vc-home .hb-pill-accent {
+  color: var(--accent);
+  background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1px rgba(59, 91, 246, 0.16);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 9px;
+}
+.vc-home .hb-delta-ghost {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.vc-home .hb-delta-ghost-up {
+  color: var(--hb-success-ink);
+}
+.vc-home .hb-delta-ghost-down {
+  color: var(--hb-danger-ink);
+}
+
+/* Floating value callouts on the hero + research charts. Hidden below lg,
+   where there is no room for them beside the plot. */
+.vc-home .hb-callout {
+  filter: drop-shadow(0 2px 6px rgba(39, 67, 201, 0.34));
+}
+@media (max-width: 1023px) {
+  .vc-home .hb-callout {
+    display: none;
+  }
+}
+
+/* Hero chart entrance: the line draws, the area fades up under it, then the
+   endpoint marker and its callout pop. */
+@keyframes hb-draw {
+  from {
+    stroke-dashoffset: 900;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes hb-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hb-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.vc-home .hb-draw {
+  stroke-dasharray: 900;
+  animation: hb-draw 1400ms var(--hb-ease-reveal) 120ms both;
+}
+.vc-home .hb-area-in {
+  animation: hb-fade-in 900ms var(--hb-ease-reveal) 480ms both;
+}
+.vc-home .hb-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hb-pop 420ms var(--hb-ease-reveal) 1220ms both;
+}
+
+/* Film grain over the gradient panels (hero backdrop, closing CTA, Revenue
+   and WhyNow stat tiles). */
+.vc-home .mkt-noise {
+  background-image: url("/venturecite/images/noise.png");
+  background-repeat: repeat;
+  background-size: 160px 160px;
+  mix-blend-mode: overlay;
+  opacity: 0.45;
 }

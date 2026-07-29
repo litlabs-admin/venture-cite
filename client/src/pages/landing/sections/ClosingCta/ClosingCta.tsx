@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { useScrollReveal, scrollRevealEase } from "@/pages/landing/hooks/useScrollReveal";
 import { DomainCaptureForm } from "./DomainCaptureForm";
 
@@ -15,19 +14,25 @@ import { DomainCaptureForm } from "./DomainCaptureForm";
 export function ClosingCta() {
   const { ref, isVisible } = useScrollReveal<HTMLElement>();
 
-  const dotGridStyle = {
-    "--vc-mkt-dot-opacity": 0.08,
-    "--vc-mkt-dot-spacing": "9px",
-    "--vc-mkt-dot-size": "0.8px",
-  } as CSSProperties;
-
   return (
     <section id="closing-cta" ref={ref} className="relative bg-vc-surface py-16 sm:py-24 lg:py-32">
+      {/* Gradient art + film grain, bounded to the 1120px column so its edges
+          land on the page's vertical grid guides. `overflow-hidden` keeps the
+          image from bleeding past them. */}
       <div
-        className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-full pointer-events-none"
+        className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-full overflow-hidden pointer-events-none"
         style={{ maxWidth: 1120 }}
       >
-        <div className="absolute inset-0 pointer-events-none mkt-dot-grid" style={dotGridStyle} />
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "url(/venturecite/images/closing-cta-bg.avif)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
+        <div className="absolute inset-0 pointer-events-none mkt-noise" />
       </div>
       <div className="px-4 lg:px-8">
         <div className="mx-auto" style={{ maxWidth: 1120 }}>
@@ -38,7 +43,7 @@ export function ClosingCta() {
             style={{ transitionTimingFunction: scrollRevealEase }}
           >
             <h2 className="text-[20px] sm:text-[28px] lg:text-[32px] font-semibold text-vc-primary tracking-[-0.02em] leading-[1.2] mb-3 sm:mb-4">
-              Get cited by AI search engines<span className="text-vc-accent">.</span>
+              Get cited by AI search engines.
               <br />
               Track every mention. Optimize every prompt.
             </h2>

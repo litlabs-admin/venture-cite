@@ -56,7 +56,7 @@ function FeatureText({
         }}
       >
         <div
-          className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold tracking-tighter tabular-nums select-none leading-none transition-colors duration-700 text-vc-default/50"
+          className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold tracking-tighter tabular-nums select-none leading-none transition-colors duration-300 text-vc-default/50 group-hover:text-vc-accent"
           aria-hidden="true"
         >
           {number}
@@ -115,7 +115,7 @@ export function Platform() {
               <div className="border border-vc-default overflow-hidden bg-white">
                 {/* Row 01 — Track (text left, mockup right) */}
                 <div className="border-b border-vc-default">
-                  <div className="grid grid-cols-1 lg:grid-cols-[40%_60%]">
+                  <div className="group grid grid-cols-1 lg:grid-cols-[40%_60%]">
                     <div className="lg:border-r border-vc-default">
                       <FeatureText
                         number="01"
@@ -135,7 +135,7 @@ export function Platform() {
 
                 {/* Row 02 — Understand (mockup left, text right; order flips via order-1/order-2) */}
                 <div className="border-b border-vc-default">
-                  <div className="grid grid-cols-1 lg:grid-cols-[60%_40%]">
+                  <div className="group grid grid-cols-1 lg:grid-cols-[60%_40%]">
                     <div className="order-2 lg:order-1 border-t lg:border-t-0 lg:border-r border-vc-default">
                       <UnderstandMockup isVisible={isVisible} />
                     </div>
@@ -155,7 +155,7 @@ export function Platform() {
 
                 {/* Row 03 — Improve (text left, mockup right; last row, no border-b) */}
                 <div>
-                  <div className="grid grid-cols-1 lg:grid-cols-[40%_60%]">
+                  <div className="group grid grid-cols-1 lg:grid-cols-[40%_60%]">
                     <div className="lg:border-r border-vc-default">
                       <FeatureText
                         number="03"

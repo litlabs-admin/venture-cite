@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState, useSearch } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { Menu, X } from "lucide-react";
+import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { HeaderActions } from "@/components/command-center/HeaderActions";
 import Sidebar, { SidebarContent } from "./Sidebar";
 import EducationAssistant from "./EducationAssistant";
 import CommandPalette from "./CommandPalette";
@@ -79,6 +82,15 @@ function shellTitleFor(location: string, tab: string | null): string | null {
   return spineTitleFor(location, tab);
 }
 
+/** The Command Center draws its own full-bleed hairline grid and owns its
+ *  horizontal padding. Wrapping it in the shell's padded, max-width canvas
+ *  would inset every row border away from the viewport edge. */
+function isFullBleed(location: string) {
+  // The prompt detail page draws its own top bar, section hairlines and
+  // 340px aside edge-to-edge, so it takes the unpadded canvas too.
+  return location === "/" || location === "/dashboard" || location.startsWith("/prompts/");
+}
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [inspector, setInspector] = useState<InspectorPayload | null>(null);
@@ -106,12 +118,30 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   const isXlUp = useIsXlUp();
+
+  // "Data through <date>" in the context bar. Shares the Command Center's
+  // hero queryKey, so on the dashboard this is a cache read, not a request.
+  const { selectedBrandId, brands } = useBrandSelection();
+  const selectedBrandName = brands.find((b) => b.id === selectedBrandId)?.name ?? "brand";
+  const heroForDate = useQuery<{ success: boolean; data: { lastScanAt: string | null } }>({
+    queryKey: [`/api/dashboard/hero/${selectedBrandId}`],
+    enabled: !!selectedBrandId,
+  });
+  const lastScanAt = heroForDate.data?.data?.lastScanAt ?? null;
+  const lastScanLabel = lastScanAt
+    ? `Data through ${new Date(lastScanAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })}`
+    : null;
   // `useSearch({ strict: false })`'s FullSearchSchema type widens `tab` across
   // every route in the tree (including ones that don't declare it), so a
   // runtime narrow — not a cast — is what gets back to a plain `string | null`.
   const activeTab = typeof search.tab === "string" ? search.tab : null;
   const title = shellTitleFor(location, activeTab);
   const ownsContextBar = title !== null;
+  const fullBleed = isFullBleed(location);
   // Exactly one presentation is live at a time. Below xl the overlay Sheet
   // owns it; at xl+ the inline aside does. Never both — see useIsXlUp above.
   const showInlineInspector = ownsContextBar && inspector !== null && isXlUp;
@@ -124,7 +154,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <InspectorContext.Provider value={inspectorApi}>
-      <div className="flex min-h-screen bg-background">
+      <div className="flex min-h-screen bg-white">
         {/* Skip link — keyboard / screen-reader (carried from AppLayout). */}
         <a
           href="#main-content"
@@ -138,9 +168,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <Sidebar />
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col lg:ml-[220px] print:ml-0">
+        <div className="flex min-w-0 flex-1 flex-col lg:ml-[200px] print:ml-0">
           {/* Mobile top bar (carried from AppLayout). */}
-          <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 lg:hidden print:hidden">
+          <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-vc-default bg-white px-4 lg:hidden print:hidden">
             <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="Open menu">
@@ -163,17 +193,27 @@ export default function AppShell({ children }: { children: ReactNode }) {
             />
           </header>
 
-          {/* Zone 2 — context bar (only the migrated surface owns it). One
-              header app-wide: title + global BrandSelector + help. The wide
-              bar is what fixes the old truncated "C…" / one-word wrapping. */}
+          {/* Zone 2 — context bar. Measured against the reference dashboard:
+              56px tall, px-8, one hairline bottom border, 14px/600 title on
+              the left and the controls right-aligned at h-8. No backdrop
+              blur, no shadow — this chrome is a hairline, not a layer. */}
           {ownsContextBar && (
-            <div className="sticky top-0 z-20 hidden border-b border-border bg-background/95 backdrop-blur-sm lg:block print:hidden">
-              <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4 px-8 py-4">
-                <h1 className="min-w-0 text-xl font-semibold tracking-tight text-foreground">
-                  {title}
-                </h1>
-                <div className="flex shrink-0 items-center gap-2">
-                  <BrandSelector className="w-56" />
+            <div className="sticky top-0 z-20 hidden h-[56px] items-center border-b border-vc-default bg-white px-8 lg:flex print:hidden">
+              <div className="flex w-full items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <img src={logoPath} alt="" className="h-5 w-5 rounded" />
+                  <span className="text-[14px] font-semibold text-vc-primary">{title}</span>
+                </div>
+                <div className="flex flex-shrink-0 items-center gap-2">
+                  {lastScanLabel && (
+                    <span className="mr-2 select-none text-[11px] tabular-nums text-vc-hover">
+                      {lastScanLabel}
+                    </span>
+                  )}
+                  <BrandSelector className="w-48" />
+                  {fullBleed && selectedBrandId && (
+                    <HeaderActions brandId={selectedBrandId} brandName={selectedBrandName} />
+                  )}
                   <PageHeaderHelp
                     tourId={pageTourFor(location, activeTab)}
                     pageLabel={title ?? ""}
@@ -195,9 +235,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   ~1450px the centred max-w-[1400px] column no longer reaches
                   into the pill's corner (it sits in the gutter instead), so
                   the extra padding reverts to the original py-6 value there. */}
-              <div className="mx-auto w-full max-w-[1400px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 min-[1450px]:pb-6">
-                {children}
-              </div>
+              {fullBleed ? (
+                // The Command Center's own grid reaches the viewport edge; the
+                // shell contributes nothing but the max-width column.
+                <div className="mx-auto w-full max-w-[1800px]">{children}</div>
+              ) : (
+                <div className="mx-auto w-full max-w-[1400px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 min-[1450px]:pb-6">
+                  {children}
+                </div>
+              )}
             </main>
 
             {/* Zone 3 — inspector (desktop xl+). Live on every route that owns

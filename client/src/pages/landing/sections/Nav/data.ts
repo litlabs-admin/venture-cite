@@ -87,7 +87,7 @@ export const resourcesFeatured: NavItem = {
   href: "/glossary",
   description: "Every term in generative engine optimization, defined",
   iconSlug: "docs",
-  iconSrc: "/venturecite/images/resources/documentation.png",
+  iconSrc: "/venturecite/images/resources/documentation-blue.png",
 };
 
 // Resources mega-menu list. The source listed an API Reference and an MCP
@@ -100,7 +100,7 @@ export const resourcesList: NavItem[] = [
     name: "How it works",
     href: "#platform-section",
     description: "Track, understand, improve",
-    iconSrc: "/venturecite/images/resources/api.png",
+    iconSrc: "/venturecite/images/resources/api-blue.png",
   },
   {
     name: "Why now",
