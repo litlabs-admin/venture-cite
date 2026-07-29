@@ -16,7 +16,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Plus, CheckSquare, Square, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Trash2, Plus, CheckSquare, Square, ThumbsUp, ThumbsDown } from "lucide-react";
 
 import { useMentions } from "@/hooks/useMentions";
 import { ScanStatusPanel } from "@/components/geo-tools/ScanStatusPanel";
@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import type { BrandMention, ScanJob } from "@shared/schema";
@@ -83,6 +84,27 @@ function StatCard({
         {value}
       </span>
       <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helper: loading placeholder shaped like a mention row
+// ---------------------------------------------------------------------------
+
+function MentionCardSkeleton() {
+  return (
+    <div className="w-full rounded-lg border bg-card px-4 py-3">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-4 w-4 shrink-0 rounded-full" />
+        <Skeleton className="h-4 min-w-0 flex-1" />
+        <div className="flex shrink-0 items-center gap-2">
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-5 w-14 rounded-full" />
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-7 w-7 rounded-md" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -410,11 +432,10 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
 
       {/* ── 5. List ─────────────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2
-            className="h-6 w-6 animate-spin text-muted-foreground"
-            aria-label="Loading mentions"
-          />
+        <div className="flex flex-col gap-2" aria-label="Loading mentions" role="status">
+          <MentionCardSkeleton />
+          <MentionCardSkeleton />
+          <MentionCardSkeleton />
         </div>
       ) : (
         <>

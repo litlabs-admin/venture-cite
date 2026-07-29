@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
+import { usePromptHistory, usePromptRunDetails, type CitationRunEntry } from "@/hooks/usePrompts";
+import { useInspector } from "@/components/AppShell";
+import PromptDetail from "./PromptDetail";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { StatusDot, type StatusDotTone } from "@/components/foundations";
 import {
   TrendingUp,
   Loader2,
@@ -38,23 +41,6 @@ import {
 import { PlatformResultCard, type PlatformResult } from "./PlatformResultCard";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { chartTheme } from "@/lib/chartTheme";
-
-type CitationRunEntry = {
-  id: string;
-  brandId: string;
-  totalChecks: number;
-  totalCited: number;
-  citationRate: number;
-  triggeredBy: string;
-  startedAt: string;
-  completedAt: string | null;
-  platformBreakdown: Record<string, { cited: number; checks: number; rate: number }> | null;
-  // Wave 8/9: lifecycle + observability columns added by migrations
-  // 0034 + 0036. Older rows (pre-migration) come back without them.
-  status?: "pending" | "running" | "succeeded" | "failed" | "partial" | "cancelled";
-  errorMessage?: string | null;
-  disagreementCount?: number;
-};
 
 type ChartFilter = "auto" | "manual" | "re-detect" | "all";
 type DateFilter = "7" | "30" | "90" | "all";
@@ -78,28 +64,17 @@ function triggerLabel(value: string): string {
   return value.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-const STATUS_BADGE_VARIANT: Record<string, { className: string; label: string }> = {
-  succeeded: {
-    className: "bg-positive-subtle text-positive border-positive",
-    label: "Succeeded",
-  },
-  partial: {
-    className: "bg-warning-subtle text-warning border-warning",
-    label: "Partial",
-  },
-  failed: {
-    className: "bg-destructive-subtle text-destructive border-destructive",
-    label: "Failed",
-  },
-  cancelled: { className: "bg-muted text-muted-foreground border-border", label: "Cancelled" },
-  running: {
-    className: "bg-muted text-foreground border-border",
-    label: "Running",
-  },
-  pending: {
-    className: "bg-muted text-foreground border-border",
-    label: "Pending",
-  },
+// Wave 9 -> Phase 2.6: status is a run outcome, not a badge-worthy category —
+// per the app's rule (see foundations/StatusDot.tsx), status renders as a
+// dot + plain text, never a filled/tinted chip. Green is reserved for
+// actions, so "succeeded" uses the neutral check glyph, not a green fill.
+const STATUS_META: Record<string, { tone: StatusDotTone; label: string }> = {
+  succeeded: { tone: "success", label: "Succeeded" },
+  partial: { tone: "warn", label: "Partial" },
+  failed: { tone: "fail", label: "Failed" },
+  cancelled: { tone: "neutral", label: "Cancelled" },
+  running: { tone: "pending", label: "Running" },
+  pending: { tone: "pending", label: "Pending" },
 };
 
 type HistoryTabProps = {
@@ -110,9 +85,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
   // Wave 9: poll history every 6s while a citation run is live so a new
   // row appears as soon as it's created, and progress reflects in real time.
   const { hasActive } = useActiveCitationRuns(selectedBrandId);
-  const { data: historyData } = useQuery<{ success: boolean; data: CitationRunEntry[] }>({
-    queryKey: [`/api/brand-prompts/${selectedBrandId}/history`],
-    enabled: !!selectedBrandId,
+  const { data: historyData } = usePromptHistory(selectedBrandId, {
     refetchInterval: hasActive ? 6_000 : false,
   });
   const runHistory = historyData?.data || [];
@@ -120,6 +93,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
   // Phase 3: derive highlight terms from the selected brand so the
   // PlatformResultCard inside each expanded run highlights brand mentions.
   const { selectedBrand } = useBrandSelection();
+  const inspector = useInspector();
   const highlightTerms = selectedBrand
     ? [selectedBrand.name, ...(selectedBrand.nameVariations ?? [])].filter(Boolean)
     : [];
@@ -163,13 +137,11 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
   >({});
 
   // Drill-down for a specific run. Cache hit short-circuits the fetch.
-  const { data: runDetailData, isLoading: runDetailLoading } = useQuery<{
-    success: boolean;
-    data: { byPrompt: Array<{ prompt: string; platforms: PlatformResult[] }> };
-  }>({
-    queryKey: [`/api/brand-prompts/${selectedBrandId}/run/${expandedRunId}/details`],
-    enabled: !!expandedRunId && !drilldownCache[expandedRunId ?? ""],
-  });
+  const { data: runDetailData, isLoading: runDetailLoading } = usePromptRunDetails(
+    selectedBrandId,
+    expandedRunId,
+    { enabled: !!expandedRunId && !drilldownCache[expandedRunId ?? ""] },
+  );
   // Populate cache once a fetched detail arrives so subsequent re-opens
   // are instant. Eviction: drop oldest key(s) when over the cap.
   if (expandedRunId && runDetailData?.data && !drilldownCache[expandedRunId]) {
@@ -193,7 +165,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="text-section flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
                   Citation Rate Over Time
                 </CardTitle>
@@ -206,7 +178,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                   runs only) so the trend is apples-to-apples. */}
               <div className="flex gap-2 shrink-0">
                 <Select value={chartFilter} onValueChange={(v) => setChartFilter(v as ChartFilter)}>
-                  <SelectTrigger className="w-[130px] h-8 text-xs">
+                  <SelectTrigger className="w-[130px] h-8 text-caption">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -217,7 +189,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                   </SelectContent>
                 </Select>
                 <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as DateFilter)}>
-                  <SelectTrigger className="w-[110px] h-8 text-xs">
+                  <SelectTrigger className="w-[110px] h-8 text-caption">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -286,7 +258,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
                       return (
-                        <div className="bg-popover border border-border rounded-lg shadow-md p-3 text-sm">
+                        <div className="bg-popover border border-border rounded-lg shadow-md p-3 text-ui">
                           <p className="font-medium">{d.fullDate}</p>
                           <p className="text-foreground mt-1">
                             Citation Rate: <span className="font-bold">{d.citationRate}%</span>
@@ -294,7 +266,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                           <p className="text-muted-foreground">
                             {d.totalCited} / {d.totalChecks} cited
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-caption text-muted-foreground mt-1">
                             {triggerLabel(d.triggeredBy)} run
                           </p>
                         </div>
@@ -325,7 +297,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
       {/* Run history as expandable rows */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-section flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Run History
           </CardTitle>
@@ -341,14 +313,14 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                 // are treated as succeeded so we don't visually punish
                 // historical runs.
                 const status = run.status ?? "succeeded";
-                const statusMeta = STATUS_BADGE_VARIANT[status] ?? STATUS_BADGE_VARIANT.succeeded;
+                const statusMeta = STATUS_META[status] ?? STATUS_META.succeeded;
 
                 return (
-                  <div key={run.id} className="border border-border rounded-lg overflow-hidden">
+                  <div key={run.id} className="overflow-hidden rounded">
                     <button
                       type="button"
                       onClick={() => setExpandedRunId(isExpanded ? null : run.id)}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+                      className="w-full flex items-center gap-3 px-2 py-2.5 text-left rounded hover:bg-muted/40 transition-colors"
                     >
                       {isExpanded ? (
                         <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -356,26 +328,28 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium text-sm">
+                        <span className="font-medium text-ui">
                           {format(new Date(run.startedAt), "MMM d, yyyy")}
                         </span>
-                        <span className="text-xs text-muted-foreground ml-2">
+                        <span className="text-caption text-muted-foreground ml-2">
                           {format(new Date(run.startedAt), "h:mm a")}
                         </span>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-sm font-medium">{run.citationRate}%</span>
+                        <span className="text-ui font-medium tabular-nums">
+                          {run.citationRate}%
+                        </span>
                         {delta !== 0 && (
                           <span
-                            className={`text-xs ${delta > 0 ? "text-positive" : "text-destructive"}`}
+                            className={`text-data font-mono tabular-nums ${delta > 0 ? "text-positive" : "text-destructive"}`}
                           >
                             {delta > 0 ? `+${delta}` : delta}%
                           </span>
                         )}
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-caption text-muted-foreground">
                           {run.totalCited}/{run.totalChecks}
                         </span>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-caption">
                           {triggerLabel(run.triggeredBy)}
                         </Badge>
                         {/* Wave 9: status badge — succeeded/partial/failed/cancelled.
@@ -383,13 +357,13 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                         {(status !== "succeeded" || run.errorMessage) && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Badge
-                                className={`text-xs border ${statusMeta.className}`}
-                                variant="outline"
+                              <span
+                                className="inline-flex items-center gap-1.5 text-caption text-muted-foreground"
                                 data-testid={`status-badge-${run.id}`}
                               >
+                                <StatusDot tone={statusMeta.tone} aria-label={statusMeta.label} />
                                 {statusMeta.label}
-                              </Badge>
+                              </span>
                             </TooltipTrigger>
                             {run.errorMessage && (
                               <TooltipContent className="max-w-xs">
@@ -424,7 +398,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                     </button>
 
                     {isExpanded && (
-                      <div className="border-t border-border px-4 py-4 bg-muted/20">
+                      <div className="border-t border-border px-2 py-4 bg-muted/20">
                         {(() => {
                           // Wave 9: cache-first render — re-opening a
                           // previously-fetched run is instant.
@@ -434,7 +408,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                             return (
                               <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                <span className="ml-2 text-sm text-muted-foreground">
+                                <span className="ml-2 text-ui text-muted-foreground">
                                   Loading run details...
                                 </span>
                               </div>
@@ -442,7 +416,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                           }
                           if (!detail?.byPrompt) {
                             return (
-                              <p className="text-sm text-muted-foreground text-center py-4">
+                              <p className="text-ui text-muted-foreground text-center py-4">
                                 No detail data available for this run.
                               </p>
                             );
@@ -458,7 +432,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                                         <Badge variant="outline" className="shrink-0">
                                           {j + 1}
                                         </Badge>
-                                        <span className="flex-1 truncate text-sm">
+                                        <span className="flex-1 truncate text-ui">
                                           {row.prompt}
                                         </span>
                                         <Badge
@@ -470,6 +444,26 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                                       </div>
                                     </AccordionTrigger>
                                     <AccordionContent>
+                                      <div className="flex justify-end mb-2">
+                                        <button
+                                          type="button"
+                                          className="text-caption text-primary hover:underline"
+                                          onClick={() =>
+                                            inspector.open({
+                                              title: row.prompt,
+                                              body: (
+                                                <PromptDetail
+                                                  promptText={row.prompt}
+                                                  brandId={selectedBrandId}
+                                                />
+                                              ),
+                                            })
+                                          }
+                                          data-testid={`button-open-prompt-history-run-${run.id}-${j}`}
+                                        >
+                                          View full history
+                                        </button>
+                                      </div>
                                       <div className="space-y-3">
                                         {row.platforms.map((plat, k) => (
                                           <PlatformResultCard
@@ -498,7 +492,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
               <button
                 type="button"
                 onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
-                className="text-sm text-primary hover:underline"
+                className="text-ui text-primary hover:underline"
                 data-testid="button-load-more-runs"
               >
                 Load {Math.min(PAGE_SIZE, filteredHistory.length - visibleCount)} more

@@ -135,7 +135,7 @@ export default function ForgotPassword() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-primary hover:bg-primary/90"
+              className="w-full"
               disabled={forgotMutation.isPending}
               data-testid="button-send-reset"
             >

@@ -8,6 +8,7 @@ import { StatusDot, type StatusDotTone } from "@/components/foundations";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { toLinkTarget, withBrand, type LinkTarget } from "@/lib/linkTarget";
+import { cn } from "@/lib/utils";
 
 // ─── Pulse ───────────────────────────────────────────────────────────────────
 // The Command Center's action-first worklist. One ranked list answering "what
@@ -234,15 +235,25 @@ export default function Pulse() {
     [items, dismissed],
   );
 
+  // Staggered reveal for the worklist rows (roadmap §1e: a 50ms-per-row
+  // animation-delay increment, reusing the shared `.reveal`/`.in-view`
+  // fade+settle utility). Flips one frame after mount so the transition
+  // actually plays instead of rows arriving already in their end state.
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setRevealed(true));
+    return () => cancelAnimationFrame(id);
+  }, [visible.length]);
+
   if (!user?.id || !selectedBrandId) return null;
 
   const header = (
     <div className="mb-1 flex items-baseline justify-between gap-3">
-      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <h2 className="text-label font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         Worklist
       </h2>
       {visible.length > 0 && (
-        <span className="tnum text-[11px] text-muted-foreground">{visible.length}</span>
+        <span className="tnum text-data text-muted-foreground">{visible.length}</span>
       )}
     </div>
   );
@@ -299,14 +310,18 @@ export default function Pulse() {
 
   return shell(
     <ul className="-mb-3">
-      {visible.map((it) => (
+      {visible.map((it, index) => (
         <li
           key={it.key}
-          className="flex items-start gap-3 border-b border-border/60 py-3 last:border-0"
+          className={cn(
+            "reveal flex items-start gap-3 border-b border-border/60 py-3 last:border-0",
+            revealed && "in-view",
+          )}
+          style={{ transitionDelay: `${index * 50}ms` }}
         >
           <StatusDot tone={it.marker} className="mt-1.5" aria-label={it.kind} />
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="text-label font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {it.kind}
             </span>
             <p className="mt-0.5 text-sm font-medium text-foreground">{it.title}</p>

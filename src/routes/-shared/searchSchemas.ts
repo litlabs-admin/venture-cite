@@ -85,11 +85,18 @@ export const actSearchSchema = z
  *  (client/src/components/geo-tools/MentionsTab.tsx, out of this task's
  *  file scope — it currently reads `location.searchStr` directly rather
  *  than through this schema; declared here for the same
- *  whole-tree-typing reason as `/act`'s `tab`). */
+ *  whole-tree-typing reason as `/act`'s `tab`). `ptab` is the Citations
+ *  tab's own inner tab bar (prompts/results/history/schedule) — the one
+ *  sub-tab bar in the app that used to be localStorage-only
+ *  (`usePersistedState("vc_citations_tab", ...)`) instead of URL-driven
+ *  like every other tab here; client/src/pages/citations.tsx now reads it
+ *  via `useSearch({ strict: false })`, falling back to the persisted
+ *  last-used tab when absent. */
 export const monitorSearchSchema = z
   .object({
     tab: z.string().optional().catch(undefined),
     mention: z.string().optional().catch(undefined),
+    ptab: z.string().optional().catch(undefined),
   })
   .passthrough();
 

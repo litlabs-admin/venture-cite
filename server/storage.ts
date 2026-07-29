@@ -42,8 +42,6 @@ import {
   type InsertBrandMention,
   type TrackedContentUrl,
   type InsertTrackedContentUrl,
-  type PromptPortfolio,
-  type InsertPromptPortfolio,
   type CitationQuality,
   type InsertCitationQuality,
   type BrandHallucination,
@@ -61,8 +59,6 @@ import {
   type InsertAlertSettings,
   type AlertHistory,
   type InsertAlertHistory,
-  type PromptTestRun,
-  type InsertPromptTestRun,
   type AgentTask,
   type InsertAgentTask,
   type BetaInviteCode,
@@ -401,30 +397,6 @@ export interface IStorage {
     mentions: { total: number; unaddressed: number; negative: number };
   }>;
 
-  // Prompt Portfolio methods (Share-of-Answer)
-  createPromptPortfolio(prompt: InsertPromptPortfolio): Promise<PromptPortfolio>;
-  getPromptPortfolio(
-    brandId?: string,
-    filters?: { category?: string; funnelStage?: string; aiPlatform?: string },
-  ): Promise<PromptPortfolio[]>;
-  getPromptPortfolioById(id: string): Promise<PromptPortfolio | undefined>;
-  updatePromptPortfolio(
-    id: string,
-    update: Partial<InsertPromptPortfolio>,
-  ): Promise<PromptPortfolio | undefined>;
-  deletePromptPortfolio(id: string): Promise<boolean>;
-  getShareOfAnswerStats(brandId: string): Promise<{
-    totalPrompts: number;
-    citedPrompts: number;
-    shareOfAnswer: number;
-    byCategory: Record<string, { total: number; cited: number }>;
-    byFunnel: Record<string, { total: number; cited: number }>;
-    byCompetitor: Record<string, { total: number; cited: number; shareAgainst: number }>;
-    avgVolatility: number;
-    avgConsensus: number;
-    volatilityDistribution: { stable: number; moderate: number; volatile: number };
-  }>;
-
   // Citation Quality methods
   createCitationQuality(quality: InsertCitationQuality): Promise<CitationQuality>;
   getCitationQualities(
@@ -613,18 +585,6 @@ export interface IStorage {
   // Alert History methods
   createAlertHistory(history: InsertAlertHistory): Promise<AlertHistory>;
   getAlertHistory(brandId: string, limit?: number): Promise<AlertHistory[]>;
-
-  // Prompt Test Run methods
-  createPromptTestRun(run: InsertPromptTestRun): Promise<PromptTestRun>;
-  getPromptTestRuns(
-    brandId?: string,
-    filters?: { status?: string; promptPortfolioId?: string },
-  ): Promise<PromptTestRun[]>;
-  getPromptTestRunById(id: string): Promise<PromptTestRun | undefined>;
-  updatePromptTestRun(
-    id: string,
-    update: Partial<InsertPromptTestRun>,
-  ): Promise<PromptTestRun | undefined>;
 
   // Agent Task Queue — minimal surface kept for the workflow engine. The
   // /api/agent-tasks routes were deleted with the agent-dashboard page, so

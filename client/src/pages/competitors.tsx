@@ -307,7 +307,7 @@ export default function CompetitorsPage() {
     if (index === 1) return <Award className="w-5 h-5 text-muted-foreground" />;
     if (index === 2) return <Medal className="w-5 h-5 text-chart-3" />;
     return (
-      <span className="w-5 h-5 flex items-center justify-center text-sm font-medium text-muted-foreground">
+      <span className="w-5 h-5 flex items-center justify-center text-ui font-medium text-muted-foreground">
         #{index + 1}
       </span>
     );
@@ -326,7 +326,7 @@ export default function CompetitorsPage() {
             {brandsLoading ? (
               <Skeleton className="h-10 w-full" />
             ) : (
-              <p className="text-muted-foreground text-sm">
+              <p className="text-muted-foreground text-ui">
                 Create a brand first to start tracking competitors.
               </p>
             )}
@@ -451,14 +451,16 @@ export default function CompetitorsPage() {
                     isRetrying={leaderboardIsRefetching}
                   />
                 ) : isLoadingLeaderboard ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <div className="space-y-3">
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
                   </div>
                 ) : leaderboard.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p className="font-medium">No competitors yet</p>
-                    <p className="text-sm">
+                    <p className="text-ui">
                       Add a competitor to start benchmarking your AI citations.
                     </p>
                     <Button
@@ -476,7 +478,7 @@ export default function CompetitorsPage() {
                     {leaderboard.map((entry, index) => (
                       <div
                         key={`${entry.domain}-${index}`}
-                        className={`flex items-center gap-4 p-4 rounded-lg border ${
+                        className={`flex items-center gap-4 p-3 rounded-lg border ${
                           entry.isOwn ? "bg-primary/5 border-primary/20" : "bg-muted/50"
                         }`}
                         data-testid={`leaderboard-entry-${index}`}
@@ -485,41 +487,41 @@ export default function CompetitorsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span
-                              className="font-semibold truncate"
+                              className="text-ui font-semibold truncate"
                               data-testid={`text-competitor-name-${index}`}
                             >
                               {entry.name}
                             </span>
                             {entry.isOwn && (
-                              <Badge variant="default" className="text-xs">
+                              <Badge variant="default" className="text-caption">
                                 Your Brand
                               </Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1 text-body text-muted-foreground">
                             <ExternalLink className="w-3 h-3" />
                             <span className="truncate">{entry.domain}</span>
                           </div>
                         </div>
                         <div className="text-right">
                           <div
-                            className="text-2xl font-bold font-mono tabular-nums"
+                            className="text-metric font-bold font-mono tabular-nums"
                             data-testid={`text-citation-count-${index}`}
                           >
                             {entry.totalCitations}
                           </div>
-                          <div className="text-xs text-muted-foreground">citations</div>
+                          <div className="text-caption text-muted-foreground">citations</div>
                         </div>
                         <div className="hidden md:flex flex-wrap gap-1 max-w-[200px]">
                           {Object.entries(entry.platformBreakdown)
                             .slice(0, 3)
                             .map(([platform, count]) => (
-                              <Badge key={platform} variant="outline" className="text-xs">
+                              <Badge key={platform} variant="outline" className="text-caption">
                                 {platform}: {count}
                               </Badge>
                             ))}
                           {Object.keys(entry.platformBreakdown).length > 3 && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-caption">
                               +{Object.keys(entry.platformBreakdown).length - 3} more
                             </Badge>
                           )}
@@ -542,7 +544,7 @@ export default function CompetitorsPage() {
               <CardContent>
                 {leaderboard.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-sm">Add data to see platform breakdown</p>
+                    <p className="text-ui">Add data to see platform breakdown</p>
                   </div>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2">
@@ -563,11 +565,11 @@ export default function CompetitorsPage() {
                         <div key={platform} className="p-3 rounded-lg border bg-muted/30">
                           <div className="flex items-center gap-2 mb-2">
                             <Icon className="w-4 h-4" />
-                            <span className="font-medium text-sm">{platform}</span>
+                            <span className="font-medium text-ui">{platform}</span>
                           </div>
                           <div className="space-y-1">
                             {platformData.map((entry, idx) => (
-                              <div key={entry.domain} className="flex justify-between text-xs">
+                              <div key={entry.domain} className="flex justify-between text-caption">
                                 <span
                                   className={
                                     entry.isOwn
@@ -612,12 +614,13 @@ export default function CompetitorsPage() {
                     isRetrying={competitorsIsRefetching}
                   />
                 ) : isLoadingCompetitors ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                    <Skeleton className="h-12 w-full rounded-lg" />
                   </div>
                 ) : competitors.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-sm">No competitors added yet</p>
+                    <p className="text-ui">No competitors added yet</p>
                     <Button
                       variant="outline"
                       size="sm"
@@ -647,12 +650,12 @@ export default function CompetitorsPage() {
                     </TabsList>
 
                     <TabsContent value="core" className="space-y-3">
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-caption text-muted-foreground">
                         The competitors you track most closely. Add them by hand or promote one from
                         the discovered pool.
                       </p>
                       {coreCompetitors.length === 0 ? (
-                        <p className="py-6 text-center text-sm text-muted-foreground">
+                        <p className="py-6 text-center text-ui text-muted-foreground">
                           No core competitors yet. Add one above, or promote a discovered
                           competitor.
                         </p>
@@ -672,12 +675,12 @@ export default function CompetitorsPage() {
                     </TabsContent>
 
                     <TabsContent value="discovered" className="space-y-3">
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-caption text-muted-foreground">
                         Competitors AI discovery surfaced, ranked by relevance. Promote the ones
                         that matter, ignore the false positives.
                       </p>
                       {discoveredCompetitors.length === 0 ? (
-                        <p className="py-6 text-center text-sm text-muted-foreground">
+                        <p className="py-6 text-center text-ui text-muted-foreground">
                           Nothing in the discovered pool. Run Re-discover to surface more.
                         </p>
                       ) : (
@@ -764,7 +767,7 @@ export default function CompetitorsPage() {
                 onChange={(e) => setEditForm({ ...editForm, nameVariations: e.target.value })}
                 data-testid="input-edit-competitor-variations"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 Comma-separated. New variants are auto-added when AI responses mention this
                 competitor under a new surface form.
               </p>
@@ -866,14 +869,14 @@ function CompetitorRow({
               {!isCore && typeof relevanceScore === "number" && (
                 <Badge
                   variant="outline"
-                  className="h-4 shrink-0 px-1.5 py-0 text-[10px]"
+                  className="h-4 shrink-0 px-1.5 py-0 text-label"
                   data-testid={`badge-relevance-${competitor.id}`}
                 >
                   {relevanceScore}% match
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1 text-caption text-muted-foreground">
               <ExternalLink className="h-3 w-3" />
               <span className="truncate">{competitor.domain}</span>
             </div>
@@ -940,28 +943,32 @@ function CompetitorRow({
       {expanded && (
         <div className="border-t px-3 py-3">
           {citationsLoading ? (
-            <div className="flex items-center justify-center py-3">
-              <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary" />
+            <div className="flex flex-wrap gap-2">
+              <Skeleton className="h-6 w-20 rounded-md" />
+              <Skeleton className="h-6 w-20 rounded-md" />
+              <Skeleton className="h-6 w-20 rounded-md" />
             </div>
           ) : citationsIsError ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Couldn&apos;t load citation data. Expand again to retry.
             </p>
           ) : citations.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               No citations recorded yet. Once a citation scan runs, the AI platforms that cite{" "}
               {competitor.name} show up here.
             </p>
           ) : (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Where they&apos;re cited</p>
+              <p className="text-caption font-medium text-muted-foreground">
+                Where they&apos;re cited
+              </p>
               <div className="flex flex-wrap gap-2">
                 {citations.map(({ platform, count }) => {
                   const Icon = platformIcon[platform.toLowerCase()] ?? Brain;
                   return (
                     <div
                       key={platform}
-                      className="flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs"
+                      className="flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-caption"
                       data-testid={`citation-${competitor.id}-${platform}`}
                     >
                       <Icon className="h-3.5 w-3.5" />

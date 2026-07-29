@@ -200,7 +200,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
               </div>
             </main>
 
-            {/* Zone 3 — inspector (desktop xl+; Command Center only). Quiet
+            {/* Zone 3 — inspector (desktop xl+). Live on every route that owns
+                a context bar (ownsContextBar = shellTitleFor(...) !== null:
+                Command Center, Report, and every Monitor/Diagnose/Act/Setup
+                stage + its standalone twins), not Command-Center-only. Quiet
                 surface-3; only mounts when something is selected. */}
             {showInlineInspector && (
               <aside
@@ -226,9 +229,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        {/* Mobile / tablet inspector — overlay sheet (Command Center only).
-            `open` is gated by !isXlUp so the modal overlay + scroll-lock never
-            activate at xl+, where the inline aside is the live presentation. */}
+        {/* Mobile / tablet inspector — overlay sheet, live on every route
+            with a context bar (see Zone 3's comment above — not
+            Command-Center-only). `open` is gated by !isXlUp so the modal
+            overlay + scroll-lock never activate at xl+, where the inline
+            aside is the live presentation. */}
         {ownsContextBar && (
           <Sheet
             open={showSheetInspector}

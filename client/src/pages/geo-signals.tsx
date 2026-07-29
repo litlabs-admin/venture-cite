@@ -35,11 +35,13 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { StatusDot } from "@/components/foundations/StatusDot";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { safeExternalHref } from "@/lib/urlSafety";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
-import type { Article, BrandPrompt } from "@shared/schema";
+import type { Article } from "@shared/schema";
+import { usePrompts } from "@/hooks/usePrompts";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Sparkles,
@@ -253,14 +255,14 @@ function ArticleSelect({
 }) {
   if (!selectedBrandId) {
     return (
-      <div className="flex h-10 items-center text-sm text-muted-foreground">
+      <div className="flex h-10 items-center text-ui text-muted-foreground">
         Select a brand first.
       </div>
     );
   }
   if (articles.length === 0) {
     return (
-      <div className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex h-10 items-center gap-2 text-ui text-muted-foreground">
         <span>No articles yet for {brandName}.</span>
         <Link to="/articles">
           <Button variant="outline" size="sm" data-testid="button-create-article">
@@ -287,8 +289,8 @@ function ArticleSelect({
                 <span className="max-w-xs truncate">{article.title}</span>
                 {showPill && (
                   <Badge
-                    variant={status === "failed" ? "destructive" : "outline"}
-                    className="text-[10px] uppercase"
+                    variant={status === "failed" ? "destructive" : "neutral"}
+                    className="text-label uppercase tracking-wider"
                   >
                     {status}
                   </Badge>
@@ -405,14 +407,13 @@ export default function GeoSignals() {
   const articles = articlesData?.data || [];
   const selectedArticle = articles.find((a) => a.id === selectedArticleId);
 
-  const { data: brandPromptsData } = useQuery<{ data: BrandPrompt[] }>({
-    queryKey: ["/api/brand-prompts", selectedBrandId],
-    enabled: !!selectedBrandId,
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/brand-prompts/${selectedBrandId}`);
-      return res.json();
-    },
-  });
+  // Shared with citations.tsx via client/src/hooks/usePrompts.ts — this used
+  // to be its own independently-shaped query (`["/api/brand-prompts",
+  // selectedBrandId]`, an array key) for the exact same
+  // `/api/brand-prompts/:brandId` endpoint citations.tsx fetches under a
+  // different key, so the two never shared a cache entry and the page
+  // double-fetched. `usePrompts` now gives both callers identical keys.
+  const { data: brandPromptsData } = usePrompts(selectedBrandId);
   const brandPrompts = (brandPromptsData?.data || []).filter(
     (p) => (p as any).status !== "archived",
   );
@@ -734,7 +735,7 @@ export default function GeoSignals() {
         <div className="sticky top-14 z-10 -mx-2 border-b bg-background/95 px-2 py-3 backdrop-blur">
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
-              <Label className="whitespace-nowrap text-sm font-medium text-foreground">
+              <Label className="whitespace-nowrap text-ui font-medium text-foreground">
                 Article to analyze
               </Label>
               <ArticleSelect
@@ -863,7 +864,7 @@ export default function GeoSignals() {
                                 );
                               })}
                               {filteredPrompts.length > 50 && (
-                                <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                                <div className="px-2 py-1.5 text-caption text-muted-foreground">
                                   Showing 50 of {filteredPrompts.length} — refine your search
                                 </div>
                               )}
@@ -917,15 +918,15 @@ export default function GeoSignals() {
                   {overallScore !== null && (
                     <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
                       <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                        <p className="text-label uppercase tracking-wider text-muted-foreground font-medium">
                           Overall score
                         </p>
                         <p
-                          className="text-3xl font-semibold text-foreground tracking-tight"
+                          className="text-stat font-semibold text-foreground tracking-tight"
                           data-testid="stat-overall"
                         >
                           {overallScore}
-                          <span className="text-lg text-muted-foreground">%</span>
+                          <span className="text-ui text-muted-foreground">%</span>
                         </p>
                       </div>
                       <Progress value={overallScore} className="w-1/2 h-2" />
@@ -950,7 +951,7 @@ export default function GeoSignals() {
                                     <HelpCircle className="w-3.5 h-3.5" />
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="text-sm" align="start">
+                                <PopoverContent className="text-ui" align="start">
                                   <p className="font-medium text-foreground mb-1">
                                     How this signal is measured
                                   </p>
@@ -962,7 +963,7 @@ export default function GeoSignals() {
                             )}
                           </div>
                           <span
-                            className={`font-bold ${getScoreColor(signal.score, signal.maxScore)}`}
+                            className={`text-data font-mono font-semibold tabular-nums ${getScoreColor(signal.score, signal.maxScore)}`}
                           >
                             {signal.score}/{signal.maxScore}
                           </span>
@@ -972,7 +973,7 @@ export default function GeoSignals() {
                           className="h-2 mb-2"
                         />
                         {signal.recommendations.length > 0 && (
-                          <ul className="text-sm text-muted-foreground space-y-1">
+                          <ul className="text-ui text-muted-foreground space-y-1">
                             {signal.recommendations.map((rec, rIdx) => (
                               <li key={rIdx} className="flex items-start gap-2">
                                 <ChevronRight className="w-3 h-3 mt-1 text-primary" />
@@ -991,7 +992,7 @@ export default function GeoSignals() {
                     .map((signal, idx) => (
                       <div
                         key={`na-${idx}`}
-                        className="p-3 bg-muted/20 rounded-lg border border-dashed text-sm text-muted-foreground flex items-center gap-2"
+                        className="p-3 bg-muted/20 rounded-lg border border-dashed text-ui text-muted-foreground flex items-center gap-2"
                       >
                         <AlertTriangle className="w-4 h-4" />
                         <span>
@@ -1033,8 +1034,8 @@ export default function GeoSignals() {
             <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3 text-left hover:bg-muted/50">
               <div className="flex items-center gap-2">
                 <Workflow className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Pipeline breakdown</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-ui font-medium text-foreground">Pipeline breakdown</span>
+                <span className="text-caption text-muted-foreground">
                   Prepare → Retrieve → Signal → Serve
                 </span>
               </div>
@@ -1076,7 +1077,7 @@ export default function GeoSignals() {
                   </Button>
                 )}
                 {pipelineStages.length === 0 && !simulatePipelineMutation.isPending && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-caption text-muted-foreground">
                     Maps your content through the 4-stage AI-search pipeline.
                   </span>
                 )}
@@ -1125,8 +1126,10 @@ export default function GeoSignals() {
                               );
                             })()}
                           </div>
-                          <p className="text-sm font-medium text-foreground">{stage.stage}</p>
-                          <p className="text-xs text-muted-foreground">{stage.score}/100</p>
+                          <p className="text-ui font-medium text-foreground">{stage.stage}</p>
+                          <p className="text-data font-mono tabular-nums text-muted-foreground">
+                            {stage.score}/100
+                          </p>
                         </div>
                         {idx < pipelineStages.length - 1 && (
                           <ArrowRight className="w-6 h-6 text-muted-foreground mx-4" />
@@ -1139,25 +1142,25 @@ export default function GeoSignals() {
                       <div key={stage.stage} className="bg-muted/30 rounded-lg border p-4">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            {getStatusIcon(stage.status)}
+                            <StatusDot
+                              tone={
+                                stage.status === "pass"
+                                  ? "success"
+                                  : stage.status === "warning"
+                                    ? "warn"
+                                    : "fail"
+                              }
+                            />
                             <span className="font-medium text-foreground">{stage.stage}</span>
                           </div>
-                          <Badge
-                            variant={
-                              stage.status === "pass"
-                                ? "default"
-                                : stage.status === "warning"
-                                  ? "outline"
-                                  : "destructive"
-                            }
-                          >
+                          <span className="text-data font-mono tabular-nums text-muted-foreground">
                             {stage.score}/100
-                          </Badge>
+                          </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mb-2">
+                        <p className="text-caption text-muted-foreground mb-2">
                           {STAGE_BLURBS[stage.stage]}
                         </p>
-                        <ul className="text-sm text-muted-foreground space-y-1">
+                        <ul className="text-ui text-muted-foreground space-y-1">
                           {stage.details.map((detail, dIdx) => (
                             <li key={dIdx} className="flex items-start gap-2">
                               <ChevronRight className="w-3 h-3 mt-1 text-primary" />
@@ -1189,7 +1192,7 @@ export default function GeoSignals() {
                       <HelpCircle className="w-4 h-4" />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent className="max-w-md text-sm" align="start">
+                  <PopoverContent className="max-w-md text-ui" align="start">
                     <p className="mb-1 font-medium text-foreground">
                       What is &quot;chunking&quot;?
                     </p>
@@ -1266,18 +1269,22 @@ export default function GeoSignals() {
               {chunks.length > 0 && chunkStats && (
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div className="p-4 bg-muted/30 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-foreground">{chunkStats.totalChunks}</p>
-                    <p className="text-sm text-muted-foreground">Total Chunks</p>
+                    <p className="text-metric font-semibold text-foreground tabular-nums">
+                      {chunkStats.totalChunks}
+                    </p>
+                    <p className="text-caption text-muted-foreground">Total Chunks</p>
                   </div>
                   <div className="p-4 bg-muted/30 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-foreground">
+                    <p className="text-metric font-semibold text-foreground tabular-nums">
                       {chunkStats.extractableChunks}
                     </p>
-                    <p className="text-sm text-muted-foreground">Extractable</p>
+                    <p className="text-caption text-muted-foreground">Extractable</p>
                   </div>
                   <div className="p-4 bg-muted/30 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-foreground">{chunkStats.avgTokens}</p>
-                    <p className="text-sm text-muted-foreground">Avg Tokens</p>
+                    <p className="text-metric font-semibold text-foreground tabular-nums">
+                      {chunkStats.avgTokens}
+                    </p>
+                    <p className="text-caption text-muted-foreground">Avg Tokens</p>
                   </div>
                 </div>
               )}
@@ -1288,41 +1295,28 @@ export default function GeoSignals() {
                     {chunks.map((chunk, idx) => (
                       <div
                         key={idx}
-                        className={`p-4 rounded-lg border ${chunk.extractable ? "bg-positive-subtle border-positive" : "bg-destructive-subtle border-destructive"}`}
+                        className={`p-4 rounded-lg border ${chunk.extractable ? "bg-positive-subtle" : "bg-destructive-subtle"}`}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <Badge variant={chunk.extractable ? "default" : "destructive"}>
+                            <Badge variant={chunk.extractable ? "positive" : "destructive"}>
                               Chunk {chunk.chunkNumber}
                             </Badge>
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-caption text-muted-foreground">
                               {chunk.tokenCount} tokens / {chunk.wordCount} words
                             </span>
                           </div>
                           <div className="flex gap-2">
-                            {chunk.hasHeading && (
-                              <Badge variant="outline" className="text-positive border-positive">
-                                Has Heading
-                              </Badge>
-                            )}
-                            {chunk.questionBased && (
-                              <Badge
-                                variant="outline"
-                                className="text-muted-foreground border-border"
-                              >
-                                Question H2
-                              </Badge>
-                            )}
+                            {chunk.hasHeading && <Badge variant="positive">Has Heading</Badge>}
+                            {chunk.questionBased && <Badge variant="neutral">Question H2</Badge>}
                             {chunk.hasDirectAnswer && (
-                              <Badge variant="outline" className="text-primary border-primary">
-                                Direct Answer
-                              </Badge>
+                              <Badge variant="positive">Direct Answer</Badge>
                             )}
                           </div>
                         </div>
-                        <p className="text-sm text-foreground line-clamp-3 mb-2">{chunk.content}</p>
+                        <p className="text-ui text-foreground line-clamp-3 mb-2">{chunk.content}</p>
                         {chunk.issues.length > 0 && (
-                          <div className="text-sm text-warning">
+                          <div className="text-ui text-warning">
                             {chunk.issues.map((issue, iIdx) => (
                               <p key={iIdx}>⚠️ {issue}</p>
                             ))}
@@ -1367,9 +1361,9 @@ export default function GeoSignals() {
                   <Textarea
                     value={optimizedContent}
                     readOnly
-                    className=" text-foreground min-h-[300px] font-mono text-sm"
+                    className=" text-foreground min-h-[300px] font-mono text-ui"
                   />
-                  <p className="text-xs text-muted-foreground mt-2">
+                  <p className="text-caption text-muted-foreground mt-2">
                     "Apply to Article" overwrites the selected article's content with this optimised
                     version. Open it in the Articles page afterwards to review.
                   </p>
@@ -1394,7 +1388,7 @@ export default function GeoSignals() {
                       <HelpCircle className="w-4 h-4" />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent className="max-w-md text-sm" align="start">
+                  <PopoverContent className="max-w-md text-ui" align="start">
                     <p className="mb-1 font-medium text-foreground">What is &quot;schema&quot;?</p>
                     <p className="mb-3 text-muted-foreground">
                       Schema (structured data) is hidden labels in your page&apos;s code that spell
@@ -1426,7 +1420,7 @@ export default function GeoSignals() {
                     className=" text-foreground"
                     data-testid="input-url"
                   />
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-caption text-muted-foreground">
                     {selectedArticle &&
                     !((selectedArticle as any).externalUrl as string | undefined)?.trim()
                       ? // Help users connect Schema Lab → Authority signal.
@@ -1493,7 +1487,7 @@ export default function GeoSignals() {
                           <p className="font-medium text-foreground">
                             Audit couldn't fetch this page
                           </p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-ui text-muted-foreground">
                             {schemaFetchError ?? "Unknown fetch error."}
                           </p>
                           {auditedUrl && (
@@ -1501,13 +1495,13 @@ export default function GeoSignals() {
                               href={safeExternalHref(auditedUrl)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-block text-xs text-primary hover:underline"
+                              className="inline-block text-caption text-primary hover:underline"
                               data-testid="schema-audit-url"
                             >
                               Open {auditedUrl} ↗
                             </a>
                           )}
-                          <p className="text-xs text-muted-foreground pt-1">
+                          <p className="text-caption text-muted-foreground pt-1">
                             Common causes: Cloudflare/WAF bot detection, the URL requires
                             authentication, or the target site is offline. Try a public-facing
                             article URL.
@@ -1515,7 +1509,7 @@ export default function GeoSignals() {
                         </div>
                         <button
                           type="button"
-                          className="text-xs text-muted-foreground underline hover:text-foreground shrink-0"
+                          className="text-caption text-muted-foreground underline hover:text-foreground shrink-0"
                           onClick={() => auditSchemaMutation.mutate({ url })}
                         >
                           Retry
@@ -1524,7 +1518,7 @@ export default function GeoSignals() {
                     </div>
                   ) : (
                     <div
-                      className="rounded-md border bg-card p-3 text-xs"
+                      className="rounded-md border bg-card p-3 text-caption"
                       data-testid="schema-audit-summary"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -1575,7 +1569,7 @@ export default function GeoSignals() {
                         )}
                       </div>
                       {schemaCachedAt && (
-                        <p className="mt-1 text-[11px] text-muted-foreground">
+                        <p className="mt-1 text-caption text-muted-foreground">
                           Cached{" "}
                           {Math.max(
                             0,
@@ -1605,7 +1599,7 @@ export default function GeoSignals() {
                       <button
                         type="button"
                         onClick={() => setShowAllSchemaTypes((v) => !v)}
-                        className="text-xs text-muted-foreground underline hover:text-foreground"
+                        className="text-caption text-muted-foreground underline hover:text-foreground"
                       >
                         {showAllSchemaTypes
                           ? `Hide irrelevant schema types`
@@ -1651,7 +1645,7 @@ export default function GeoSignals() {
                               <div className="flex items-center gap-2">
                                 {schema.present && (
                                   <span
-                                    className="tnum text-sm font-medium text-foreground"
+                                    className="tnum text-data font-medium text-foreground"
                                     data-testid={`schema-pct-${schema.schemaType}`}
                                   >
                                     {pct}%
@@ -1674,15 +1668,15 @@ export default function GeoSignals() {
 
                             {schema.populatedFields.length > 0 && (
                               <div className="mb-3">
-                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                                <p className="text-label font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
                                   Populated ({schema.populatedFields.length})
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
                                   {schema.populatedFields.map((f) => (
                                     <Badge
                                       key={f}
-                                      variant="outline"
-                                      className="text-[11px] font-normal bg-secondary text-secondary-foreground"
+                                      variant="positive"
+                                      className="text-caption font-normal"
                                     >
                                       <Check className="w-2.5 h-2.5 mr-1" />
                                       {f}
@@ -1694,7 +1688,7 @@ export default function GeoSignals() {
 
                             {missingRequired.length > 0 && (
                               <div className="mb-2">
-                                <p className="text-[11px] font-medium uppercase tracking-wider text-destructive mb-1.5">
+                                <p className="text-label font-medium uppercase tracking-wider text-destructive mb-1.5">
                                   Missing required ({missingRequired.length})
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
@@ -1702,7 +1696,7 @@ export default function GeoSignals() {
                                     <Badge
                                       key={f}
                                       variant="destructive"
-                                      className="text-[11px] font-normal"
+                                      className="text-caption font-normal"
                                     >
                                       {f}
                                     </Badge>
@@ -1713,15 +1707,15 @@ export default function GeoSignals() {
 
                             {missingRecommended.length > 0 && (
                               <div>
-                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                                <p className="text-label font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
                                   Missing recommended ({missingRecommended.length})
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
                                   {missingRecommended.map((f) => (
                                     <Badge
                                       key={f}
-                                      variant="secondary"
-                                      className="text-[11px] font-normal"
+                                      variant="warning"
+                                      className="text-caption font-normal"
                                     >
                                       {f}
                                     </Badge>
@@ -1735,12 +1729,12 @@ export default function GeoSignals() {
 
                   {additionalTypes.length > 0 && (
                     <div className="p-4 bg-muted/20 rounded-lg border">
-                      <p className="text-sm font-medium text-foreground mb-2">
+                      <p className="text-ui font-medium text-foreground mb-2">
                         Other schema types found on this page:
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {additionalTypes.map((t) => (
-                          <Badge key={t} variant="outline" className="text-xs">
+                          <Badge key={t} variant="neutral" className="text-caption">
                             {t}
                           </Badge>
                         ))}

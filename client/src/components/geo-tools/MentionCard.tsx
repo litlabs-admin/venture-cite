@@ -24,6 +24,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { BrandMention } from "@shared/schema";
 
@@ -118,31 +119,31 @@ function SentimentBadge({ sentiment }: { sentiment: string | null | undefined })
   switch (sentiment) {
     case "positive":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-positive bg-positive-subtle px-2 py-0.5 text-xs font-medium text-positive">
+        <Badge variant="positive" className="gap-1">
           <Check className="h-3 w-3 shrink-0" aria-hidden="true" />
           Positive
-        </span>
+        </Badge>
       );
     case "negative":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-destructive bg-destructive-subtle px-2 py-0.5 text-xs font-medium text-destructive">
+        <Badge variant="destructive" className="gap-1">
           <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
           Negative
-        </span>
+        </Badge>
       );
     case "pending":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        <Badge variant="neutral" className="gap-1">
           <Minus className="h-3 w-3 shrink-0" aria-hidden="true" />
           Pending
-        </span>
+        </Badge>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        <Badge variant="neutral" className="gap-1">
           <Minus className="h-3 w-3 shrink-0" aria-hidden="true" />
           Neutral
-        </span>
+        </Badge>
       );
   }
 }
@@ -267,18 +268,10 @@ export default function MentionCard({
         {/* Pills row */}
         <div className="flex shrink-0 items-center gap-2">
           {/* "New" badge for recently discovered mentions */}
-          {isNew && (
-            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
-              New
-            </span>
-          )}
+          {isNew && <Badge variant="secondary">New</Badge>}
 
           {/* "Manual" badge */}
-          {isManual && (
-            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              Manual
-            </span>
-          )}
+          {isManual && <Badge variant="outline">Manual</Badge>}
 
           {/* Dead-link indicator */}
           {isDeadLink && (
@@ -326,16 +319,8 @@ export default function MentionCard({
 
         {/* Row 2: badges + date */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {isNew && (
-            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
-              New
-            </span>
-          )}
-          {isManual && (
-            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              Manual
-            </span>
-          )}
+          {isNew && <Badge variant="secondary">New</Badge>}
+          {isManual && <Badge variant="outline">Manual</Badge>}
           {isDeadLink && (
             <span className="inline-flex items-center gap-1 text-xs text-destructive">
               <XCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

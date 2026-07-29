@@ -20,9 +20,10 @@ export default function VisibilityGauge({
   const circumference = 2 * Math.PI * radius;
   const dash = (clamped / 100) * circumference;
   // Semantic, theme-aware tokens (OKLCH; bare var() — never hsl()-wrapped).
-  const resolvedFill =
-    fillColor ??
-    (clamped >= 70 ? "var(--positive)" : clamped >= 40 ? "var(--warning)" : "var(--negative)");
+  // The ring always renders in the single brand accent color regardless of
+  // score — status is communicated via delta text next to the number, not
+  // by recoloring the largest colored object on the page.
+  const resolvedFill = fillColor ?? "var(--brand-accent)";
   const resolvedTrack = trackColor ?? "var(--border-default)";
 
   return (

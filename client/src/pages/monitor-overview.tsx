@@ -13,8 +13,8 @@ import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { Loader2, X, ArrowUp, ArrowDown } from "lucide-react";
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -52,6 +52,7 @@ import VerbatimResponseCard from "@/components/dashboard/VerbatimResponseCard";
 import ResultsTimeline from "@/components/dashboard/ResultsTimeline";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { StatusDot } from "@/components/foundations/StatusDot";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SafeMarkdown from "@/components/SafeMarkdown";
 import { stripTrackingParams } from "@/lib/stripTrackingParams";
@@ -117,11 +118,11 @@ function Section({
       {pendingDot && (
         <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
       )}
-      <CardHeader className="flex-row items-start justify-between space-y-0 gap-4 pb-3">
+      <CardHeader className="flex-row items-start justify-between space-y-0 gap-4 pb-4">
         <div className="min-w-0">
-          <CardTitle className="text-base font-semibold">{title}</CardTitle>
+          <CardTitle className="text-section font-semibold">{title}</CardTitle>
           {description && (
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{description}</p>
+            <p className="text-caption text-muted-foreground mt-0.5 line-clamp-2">{description}</p>
           )}
         </div>
         {action && <div className="shrink-0">{action}</div>}
@@ -141,7 +142,7 @@ function SeeAllLink({ tab, label = "See all" }: { tab: string; label?: string })
       <Button
         variant="ghost"
         size="sm"
-        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+        className="h-7 px-2 text-caption text-muted-foreground hover:text-foreground"
       >
         {label} <ArrowRight className="w-3 h-3 ml-1" />
       </Button>
@@ -536,7 +537,7 @@ export default function MonitorOverview() {
   })();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {bannerVisible && (
         <div
           className={`-mx-4 -mt-4 px-4 py-2 border-b transition-opacity duration-500 ${
@@ -546,7 +547,7 @@ export default function MonitorOverview() {
           } ${autopilot?.status === "completed" ? "opacity-0" : "opacity-100"}`}
           data-testid="autopilot-banner"
         >
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-3 text-ui">
             {isAutopilotFailed ? (
               <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
             ) : (
@@ -558,7 +559,7 @@ export default function MonitorOverview() {
               {isAutopilotFailed ? (autopilot?.error ?? "Autopilot setup failed.") : bannerText}
             </span>
             {!isAutopilotFailed && autopilot && (
-              <span className="text-xs text-muted-foreground shrink-0">
+              <span className="text-caption text-muted-foreground shrink-0">
                 Step {autopilot.step || 1}/3
               </span>
             )}
@@ -624,21 +625,21 @@ export default function MonitorOverview() {
               isRetrying={hero.isRefetching}
             />
           ) : (
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-3">
               {/* AI Visibility Score */}
               <Card data-testid="card-visibility-score" className="relative border-border/60">
                 {isAutopilotDataPending && (
                   <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
                 )}
                 <CardContent className="p-5 flex flex-col h-full">
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
+                  <p className="text-label uppercase tracking-wider text-muted-foreground text-center">
                     AI Visibility Score
                   </p>
                   <div className="flex-1 flex flex-col items-center justify-center py-2">
                     {hero.isLoading ? (
                       <Skeleton className="h-32 w-32 rounded-full" />
                     ) : isAutopilotDataPending && heroData?.visibilityScore === undefined ? (
-                      <div className="h-[140px] w-[140px] rounded-full grid place-items-center text-5xl font-bold text-muted-foreground">
+                      <div className="h-[140px] w-[140px] rounded-full grid place-items-center text-stat font-semibold text-muted-foreground">
                         —
                       </div>
                     ) : (
@@ -651,10 +652,10 @@ export default function MonitorOverview() {
                         {heroData.visibilityDelta !== null && heroData.visibilityDelta !== 0 ? (
                           <div className="flex items-center justify-center">
                             <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                              className={`inline-flex items-center gap-1 text-caption font-medium tabular-nums ${
                                 heroData.visibilityDelta > 0
-                                  ? "bg-positive-subtle text-positive"
-                                  : "bg-destructive-subtle text-destructive"
+                                  ? "text-(--positive)"
+                                  : "text-(--negative)"
                               }`}
                             >
                               {heroData.visibilityDelta > 0 ? (
@@ -667,7 +668,7 @@ export default function MonitorOverview() {
                             </span>
                           </div>
                         ) : null}
-                        <p className="text-[11px] text-muted-foreground mt-1">
+                        <p className="text-caption text-muted-foreground mt-1">
                           Last scan:{" "}
                           {formatRelativeTime(
                             heroData.lastScanAt ?? selectedBrand?.autopilotCompletedAt ?? null,
@@ -685,34 +686,36 @@ export default function MonitorOverview() {
                   <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
                 )}
                 <CardContent className="p-5 flex flex-col h-full">
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
+                  <p className="text-label uppercase tracking-wider text-muted-foreground text-center">
                     Share of AI Voice
                   </p>
                   {leaderboard.isLoading ? (
                     <Skeleton className="mt-4 h-14 w-24 mx-auto" />
                   ) : isAutopilotDataPending && !ownRow ? (
                     <div className="mt-3 text-center">
-                      <div className="text-5xl font-bold text-muted-foreground leading-none">—</div>
-                      <p className="text-xs text-muted-foreground mt-1.5">
+                      <div className="text-stat font-semibold text-muted-foreground leading-none tabular-nums">
+                        —
+                      </div>
+                      <p className="text-caption text-muted-foreground mt-1.5">
                         of AI answers in your category mention you
                       </p>
                     </div>
                   ) : (
                     <div className="mt-3 text-center">
-                      <div className="text-5xl font-bold text-foreground leading-none">
+                      <div className="text-stat font-semibold text-foreground leading-none tabular-nums">
                         {shareOfVoiceAnim}
-                        <span className="text-2xl text-muted-foreground font-semibold">%</span>
+                        <span className="text-body font-medium text-muted-foreground">%</span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1.5">
+                      <p className="text-caption text-muted-foreground mt-1.5">
                         of AI answers in your category mention you
                       </p>
                     </div>
                   )}
-                  <div className="mt-auto pt-4 space-y-1.5 text-xs">
+                  <div className="mt-auto pt-4 space-y-1.5 text-caption">
                     {topCompetitor ? (
                       <div className="flex items-center justify-between text-muted-foreground">
                         <span className="truncate">Top competitor · {topCompetitor.name}</span>
-                        <span className="font-medium text-foreground">
+                        <span className="text-data font-medium text-foreground tabular-nums">
                           {Math.round(topCompetitor.shareOfVoice)}%
                         </span>
                       </div>
@@ -723,7 +726,7 @@ export default function MonitorOverview() {
                     )}
                     <div className="flex items-center justify-between text-muted-foreground">
                       <span>Competitors tracked</span>
-                      <span className="font-medium text-foreground">
+                      <span className="text-data font-medium text-foreground tabular-nums">
                         {leaderboardRows.filter((e) => !e.isOwn).length}
                       </span>
                     </div>
@@ -737,27 +740,29 @@ export default function MonitorOverview() {
                   <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
                 )}
                 <CardContent className="p-5 flex flex-col h-full">
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground text-center">
+                  <p className="text-label uppercase tracking-wider text-muted-foreground text-center">
                     Cited / Total Checks
                   </p>
                   {hero.isLoading ? (
                     <Skeleton className="mt-4 h-14 w-40 mx-auto" />
                   ) : isAutopilotDataPending && heroData?.citedChecks === undefined ? (
                     <div className="mt-3 text-center">
-                      <div className="text-5xl font-bold text-muted-foreground leading-none">—</div>
+                      <div className="text-stat font-semibold text-muted-foreground leading-none tabular-nums">
+                        —
+                      </div>
                     </div>
                   ) : (
                     <div className="mt-3 text-center">
                       <div className="leading-none">
-                        <span className="text-5xl font-bold text-foreground">
+                        <span className="text-stat font-semibold text-foreground tabular-nums">
                           {citedChecksAnim}
                         </span>
-                        <span className="text-2xl font-semibold text-muted-foreground">
+                        <span className="text-body font-medium text-muted-foreground">
                           {" "}
                           / {heroData?.totalChecks ?? 0}
                         </span>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1.5">
+                      <div className="text-caption text-muted-foreground mt-1.5">
                         {heroData?.citationRate ?? 0}% citation rate
                       </div>
                     </div>
@@ -770,7 +775,7 @@ export default function MonitorOverview() {
                       />
                     </div>
                     {heroData?.lastScanAt && (
-                      <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                      <p className="text-caption text-muted-foreground mt-2 text-center">
                         Last scan {new Date(heroData.lastScanAt).toLocaleString()}
                       </p>
                     )}
@@ -811,14 +816,38 @@ export default function MonitorOverview() {
                     strokeLinecap="round"
                   />
                 </svg>
-                <div className="relative h-full flex items-center justify-center text-sm text-muted-foreground">
+                <div className="relative h-full flex items-center justify-center text-ui text-muted-foreground">
                   Run a citation check to start tracking your trend.
                 </div>
               </div>
             ) : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendChartData}>
+                  <AreaChart data={trendChartData}>
+                    {/* Gradient area fill under the line — matches the
+                        reference's Dashboard visibility chart (measured:
+                        stop-color at the series hue, opacity ramping
+                        8.5% → 3% → 0% top-to-bottom) rather than a flat
+                        tint fill. */}
+                    <defs>
+                      <linearGradient id="citationTrendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                          offset="0%"
+                          stopColor={chartTheme.series.visibility}
+                          stopOpacity={0.085}
+                        />
+                        <stop
+                          offset="50%"
+                          stopColor={chartTheme.series.visibility}
+                          stopOpacity={0.03}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor={chartTheme.series.visibility}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                     <YAxis
@@ -837,14 +866,16 @@ export default function MonitorOverview() {
                         "Citation rate",
                       ]}
                     />
-                    <Line
+                    <Area
                       type="monotone"
                       dataKey="score"
                       stroke={chartTheme.series.visibility}
-                      strokeWidth={2}
+                      strokeWidth={1.5}
+                      fill="url(#citationTrendFill)"
                       dot={{ r: 3 }}
+                      {...chartTheme.animation.lineAnimation}
                     />
-                  </LineChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -857,7 +888,7 @@ export default function MonitorOverview() {
             pendingDot={isAutopilotDataPending}
             action={
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="neutral" className="text-caption">
                   {platforms.filter((p) => p.isLive).length}/{platforms.length} live
                 </Badge>
               </div>
@@ -870,13 +901,13 @@ export default function MonitorOverview() {
                 isRetrying={rankings.isRefetching}
               />
             ) : rankings.isLoading ? (
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Skeleton key={i} className="h-40 w-full" />
                 ))}
               </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-3">
                 {platforms.map((p) => (
                   <PlatformRankingCard key={p.aiPlatform} platform={p} hasMeasured={hasMeasured} />
                 ))}
@@ -898,7 +929,7 @@ export default function MonitorOverview() {
             <div className="text-right">
               <Link
                 to="/report"
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground"
               >
                 View full cited-pages report <ArrowRight className="w-3 h-3" />
               </Link>
@@ -932,7 +963,7 @@ export default function MonitorOverview() {
           <Section
             title="Share of AI Voice"
             description="% of AI answers in your category that mention each brand"
-            action={<SeeAllLink tab="share-of-answer" />}
+            action={<SeeAllLink tab="competitors" />}
           >
             {leaderboard.isError ? (
               <ErrorState
@@ -943,7 +974,7 @@ export default function MonitorOverview() {
             ) : leaderboard.isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : sovDonutData.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No share-of-voice data yet.</p>
+              <p className="text-ui text-muted-foreground">No share-of-voice data yet.</p>
             ) : (
               <div className="grid md:grid-cols-2 gap-6 md:items-center">
                 {/*
@@ -964,6 +995,7 @@ export default function MonitorOverview() {
                         innerRadius={48}
                         outerRadius={84}
                         paddingAngle={2}
+                        {...chartTheme.animation.lineAnimation}
                       >
                         {sovDonutData.map((_, i) => (
                           <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
@@ -992,7 +1024,7 @@ export default function MonitorOverview() {
                     // pushing the number off the row.
                     <li
                       key={slice.name}
-                      className="flex items-start justify-between gap-3 text-sm py-1"
+                      className="flex items-start justify-between gap-3 text-ui py-1"
                     >
                       <span className="flex min-w-0 items-start gap-2">
                         <span
@@ -1034,7 +1066,7 @@ export default function MonitorOverview() {
           </Section>
 
           {/* ===== 7. COVERAGE + ENTITY STRENGTH ===== */}
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-5">
             <Section
               title="Prompt Coverage Map"
               description="How many AI queries in your category you appear in"
@@ -1070,17 +1102,18 @@ export default function MonitorOverview() {
               ) : entityData ? (
                 <BrandEntityStrength data={entityData} />
               ) : (
-                <p className="text-sm text-muted-foreground">No data yet.</p>
+                <p className="text-ui text-muted-foreground">No data yet.</p>
               )}
             </Section>
           </div>
 
           {/* ===== 8. AI SENTIMENT & POSITIONING ===== */}
-          <Section
-            title="AI Sentiment & Positioning"
-            description="How AI perceives and positions your brand"
-          >
-            <div className="grid md:grid-cols-3 gap-4 mb-6">
+          {/* No description — "How AI perceives and positions your brand" was a
+              pure restatement of the title, one of several near-duplicate
+              descriptions this Section previously carried by default (see
+              Section's `description` prop, now opt-in). */}
+          <Section title="AI Sentiment & Positioning">
+            <div className="grid md:grid-cols-3 gap-5 mb-6">
               {hasMeasured ? (
                 <>
                   {/* Recognition only when measured. AI Confidence Score and
@@ -1097,22 +1130,22 @@ export default function MonitorOverview() {
                 </>
               ) : (
                 <div className="md:col-span-3 rounded-md border border-border bg-muted/30 px-4 py-6 text-center">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-ui text-muted-foreground">
                     {autopilot?.status === "running_citations" ||
                     autopilot?.status === "generating_prompts" ||
                     autopilot?.status === "pending"
                       ? "Measuring your brand's visibility now — this typically takes 1–2 minutes."
-                      : "We'll surface recognition, sentiment, and confidence after your first citation scan completes."}
+                      : "We'll surface recognition, sentiment, and confidence once your first citation scan completes."}
                   </p>
                 </div>
               )}
             </div>
             {firstPlatformSnippet && firstPlatformSnippet.latestSnippet && (
               <div className="rounded-md border border-primary/20 bg-primary/5 p-4 mb-4">
-                <div className="text-xs uppercase tracking-wide text-primary mb-2">
+                <div className="text-label uppercase tracking-wide text-primary mb-2">
                   How AI describes {selectedBrand?.name ?? "your brand"}
                 </div>
-                <div className="prose prose-sm dark:prose-invert max-w-none text-sm italic text-foreground prose-p:my-0 prose-p:inline">
+                <div className="prose prose-sm dark:prose-invert max-w-none text-ui italic text-foreground prose-p:my-0 prose-p:inline">
                   <span aria-hidden="true">&ldquo;</span>
                   <SafeMarkdown>
                     {stripTrackingParams(firstPlatformSnippet.latestSnippet)}
@@ -1123,12 +1156,12 @@ export default function MonitorOverview() {
             )}
             {hasMeasured && gapsAiIdentifies.length > 0 && (
               <div>
-                <div className="text-xs uppercase tracking-wide text-destructive mb-2">
+                <div className="text-label uppercase tracking-wide text-destructive mb-2">
                   Gaps AI identifies
                 </div>
                 <ul className="space-y-1">
                   {gapsAiIdentifies.map((gap) => (
-                    <li key={gap} className="text-sm text-muted-foreground flex items-center gap-2">
+                    <li key={gap} className="text-ui text-muted-foreground flex items-center gap-2">
                       <AlertTriangle className="w-3.5 h-3.5 text-destructive" /> {gap}
                     </li>
                   ))}
@@ -1136,8 +1169,8 @@ export default function MonitorOverview() {
               </div>
             )}
             {!hasMeasured && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Gaps will appear after your first citation scan.
+              <p className="text-ui text-muted-foreground mt-2">
+                We'll surface gaps once your first citation scan completes.
               </p>
             )}
           </Section>
@@ -1166,7 +1199,7 @@ export default function MonitorOverview() {
             }
           >
             {verbatimBlocks.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-ui text-muted-foreground">
                 No verbatim responses yet — run a citation check to populate.
               </p>
             ) : !showVerbatim ? (
@@ -1174,7 +1207,7 @@ export default function MonitorOverview() {
                 <div className="rounded-md border border-destructive bg-destructive-subtle p-4 flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm">
+                    <p className="text-ui">
                       <span className="font-semibold text-destructive">
                         {selectedBrand?.name ?? "Your brand"}{" "}
                         {(heroData?.citationRate ?? 0) < 50
@@ -1191,8 +1224,8 @@ export default function MonitorOverview() {
               ) : (
                 <div className="rounded-md border border-border bg-muted/30 p-4 flex items-start gap-3">
                   <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                  <p className="text-sm text-muted-foreground">
-                    Verbatim AI responses will populate after your first scan completes.
+                  <p className="text-ui text-muted-foreground">
+                    We'll surface verbatim AI responses once your first citation scan completes.
                   </p>
                 </div>
               )
@@ -1252,8 +1285,8 @@ function SentimentCard({
     tone === "emerald" ? "text-positive" : tone === "amber" ? "text-warning" : "text-destructive";
   return (
     <div className="rounded-md border border-border bg-card px-4 py-3 text-center">
-      <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
-      <p className={`text-xl font-bold ${toneClass}`}>{value}</p>
+      <p className="text-label uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
+      <p className={`text-metric font-semibold ${toneClass}`}>{value}</p>
     </div>
   );
 }
@@ -1269,7 +1302,7 @@ function PromptCoverageMap({
 }) {
   const brandRow = rows.find((r) => r.entityType === "brand");
   if (!brandRow || categories.length === 0) {
-    return <p className="text-sm text-muted-foreground">No prompt coverage data yet.</p>;
+    return <p className="text-ui text-muted-foreground">No prompt coverage data yet.</p>;
   }
   const appearing = categories.filter(
     (c) => brandRow.cells[c] === "yes" || brandRow.cells[c] === "partial",
@@ -1277,51 +1310,38 @@ function PromptCoverageMap({
   const pct = Math.round((appearing / categories.length) * 100);
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex items-center gap-3 text-body">
         <span className="text-muted-foreground">You appear in</span>
-        <span className="font-semibold text-foreground">
+        <span className="font-semibold text-foreground tabular-nums">
           {appearing} of {categories.length}
         </span>
         <span className="text-muted-foreground">AI query types</span>
-        <span className="ml-auto font-semibold text-positive">{pct}%</span>
+        <span className="ml-auto font-semibold text-positive tabular-nums">{pct}%</span>
       </div>
-      <ul className="space-y-1.5">
+      {/* Dot + plain text, no filled chip — matches the Perception-page
+          praised/questioned list pattern (StatusDot's own stated philosophy:
+          green is reserved for actions, so a genuine positive outcome here
+          renders as a neutral check glyph, not a coloured dot). */}
+      <ul className="space-y-1">
         {categories.map((cat) => {
           const state = brandRow.cells[cat] ?? "unknown";
           const appears = state === "yes" || state === "partial";
-          const absentRowClasses = hasMeasured
-            ? "border-destructive bg-destructive-subtle"
-            : "border-border bg-muted/30";
-          const absentLabelClasses = hasMeasured ? "text-destructive" : "text-muted-foreground";
-          const absentGlyphBg = hasMeasured
-            ? "bg-destructive-subtle text-destructive"
-            : "bg-muted text-muted-foreground";
           const absentLabel = hasMeasured ? "Absent" : "Pending";
           return (
-            <li
-              key={cat}
-              className={
-                "flex items-center justify-between px-3 py-2 rounded-md border " +
-                (appears ? "border-positive bg-positive-subtle" : absentRowClasses)
-              }
-            >
-              <span className="flex items-center gap-2 text-sm">
-                {appears ? (
-                  <span className="w-4 h-4 rounded-full bg-positive-subtle text-positive grid place-items-center text-[10px]">
-                    ✓
-                  </span>
-                ) : (
-                  <span
-                    className={
-                      "w-4 h-4 rounded-full grid place-items-center text-[10px] " + absentGlyphBg
-                    }
-                  >
-                    !
-                  </span>
-                )}
+            <li key={cat} className="flex items-center justify-between gap-3 py-1.5 text-body">
+              <span className="flex items-center gap-2 text-foreground">
+                <StatusDot tone={appears ? "success" : hasMeasured ? "fail" : "pending"} />
                 {cat}
               </span>
-              <span className={"text-xs " + (appears ? "text-positive" : absentLabelClasses)}>
+              <span
+                className={
+                  appears
+                    ? "text-muted-foreground"
+                    : hasMeasured
+                      ? "text-destructive"
+                      : "text-muted-foreground"
+                }
+              >
                 {appears ? "You appear" : absentLabel}
               </span>
             </li>
@@ -1358,30 +1378,30 @@ function RedditVisibility({
     <div className="space-y-4">
       <div className="grid md:grid-cols-2 gap-3">
         <div className="rounded-md border border-border bg-card px-4 py-3">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+          <p className="text-label uppercase tracking-wider text-muted-foreground mb-1">
             Brand Mentions
           </p>
           <p
-            className={`text-2xl font-bold ${mentionCount > 0 ? "text-foreground" : hasMeasured ? "text-destructive" : "text-muted-foreground"}`}
+            className={`text-metric font-semibold ${mentionCount > 0 ? "text-foreground" : hasMeasured ? "text-destructive" : "text-muted-foreground"}`}
           >
             {mentionCount}
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">posts name you</p>
+          <p className="text-caption text-muted-foreground mt-0.5">posts name you</p>
         </div>
         <div className="rounded-md border border-border bg-card px-4 py-3">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+          <p className="text-label uppercase tracking-wider text-muted-foreground mb-1">
             Subreddits
           </p>
-          <p className="text-2xl font-bold text-foreground">{communityCount}</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">distinct communities</p>
+          <p className="text-metric font-semibold text-foreground">{communityCount}</p>
+          <p className="text-caption text-muted-foreground mt-0.5">distinct communities</p>
         </div>
       </div>
       {mentionCount === 0 &&
         (hasMeasured ? (
           <div className="rounded-md border border-destructive bg-destructive-subtle p-6 text-center">
             <MessageSquare className="w-8 h-8 text-destructive mx-auto mb-2" />
-            <p className="font-semibold">No Reddit presence found</p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-ui font-semibold">No Reddit presence found</p>
+            <p className="text-ui text-muted-foreground mt-1">
               Your brand has zero visibility on Reddit — a major source AI platforms use for
               recommendations.
             </p>
@@ -1389,9 +1409,9 @@ function RedditVisibility({
         ) : (
           <div className="rounded-md border border-border bg-muted/30 p-6 text-center">
             <MessageSquare className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-            <p className="font-semibold text-foreground">Reddit scan runs weekly</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              We'll surface Reddit visibility here once the first scan has run for this brand.
+            <p className="text-ui font-semibold text-foreground">Reddit scan runs weekly</p>
+            <p className="text-ui text-muted-foreground mt-1">
+              We'll surface Reddit visibility once your first citation scan completes.
             </p>
           </div>
         ))}

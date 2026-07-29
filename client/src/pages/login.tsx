@@ -143,7 +143,7 @@ export default function Login() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-primary hover:bg-primary/90"
+              className="w-full"
               disabled={loginMutation.isPending}
               data-testid="button-login"
             >

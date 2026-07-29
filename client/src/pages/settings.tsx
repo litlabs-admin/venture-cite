@@ -26,8 +26,8 @@ import BufferConnectDialog from "@/components/articles/BufferConnectDialog";
 import PageHeader from "@/components/PageHeader";
 import { pageExplainers } from "@/lib/pageExplainers";
 import { isAllowedStripeRedirect } from "@/lib/urlSafety";
-import { Loader2 } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useTourState, useTourStatePatch } from "@/hooks/useTourState";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
@@ -113,7 +113,7 @@ function ProfileSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profile</CardTitle>
+        <CardTitle className="text-section font-semibold">Profile</CardTitle>
         <CardDescription>
           Signed in as{" "}
           <span className="font-medium text-foreground">{user?.email ?? "(no email)"}</span>
@@ -121,8 +121,10 @@ function ProfileSection() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="firstName">First name</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="firstName" className="text-[12px] font-medium text-muted-foreground">
+              First name
+            </Label>
             <Input
               id="firstName"
               value={firstName}
@@ -131,8 +133,10 @@ function ProfileSection() {
               data-testid="input-first-name"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="lastName">Last name</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="lastName" className="text-[12px] font-medium text-muted-foreground">
+              Last name
+            </Label>
             <Input
               id="lastName"
               value={lastName}
@@ -142,8 +146,10 @@ function ProfileSection() {
             />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="timezone">Timezone</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="timezone" className="text-[12px] font-medium text-muted-foreground">
+            Timezone
+          </Label>
           <Select value={timezone} onValueChange={setTimezone}>
             <SelectTrigger id="timezone" data-testid="select-timezone">
               <SelectValue placeholder="Select timezone" />
@@ -185,7 +191,7 @@ function AppearanceSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Appearance</CardTitle>
+        <CardTitle className="text-section font-semibold">Appearance</CardTitle>
         <CardDescription>
           Choose how VentureCite looks to you. System follows your operating system; Light and Dark
           stay put across reloads and devices on this browser.
@@ -193,7 +199,7 @@ function AppearanceSection() {
       </CardHeader>
       <CardContent className="space-y-3">
         <ThemeToggle />
-        <p className="text-xs text-muted-foreground tnum">{hint}</p>
+        <p className="text-caption text-muted-foreground tnum">{hint}</p>
       </CardContent>
     </Card>
   );
@@ -234,12 +240,17 @@ function PasswordSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Change password</CardTitle>
+        <CardTitle className="text-section font-semibold">Change password</CardTitle>
         <CardDescription>Minimum 8 characters.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="currentPassword">Current password</Label>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="currentPassword"
+            className="text-[12px] font-medium text-muted-foreground"
+          >
+            Current password
+          </Label>
           <Input
             id="currentPassword"
             type="password"
@@ -249,8 +260,10 @@ function PasswordSection() {
             data-testid="input-current-password"
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="newPassword">New password</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="newPassword" className="text-[12px] font-medium text-muted-foreground">
+            New password
+          </Label>
           <Input
             id="newPassword"
             type="password"
@@ -260,8 +273,13 @@ function PasswordSection() {
             data-testid="input-new-password"
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm new password</Label>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="confirmPassword"
+            className="text-[12px] font-medium text-muted-foreground"
+          >
+            Confirm new password
+          </Label>
           <Input
             id="confirmPassword"
             type="password"
@@ -271,7 +289,7 @@ function PasswordSection() {
             data-testid="input-confirm-password"
           />
           {confirmPassword.length > 0 && !passwordsMatch && (
-            <p className="text-sm text-destructive">Passwords don&apos;t match.</p>
+            <p className="text-caption text-destructive">Passwords don&apos;t match.</p>
           )}
         </div>
         <Button
@@ -318,13 +336,13 @@ function BillingSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Billing</CardTitle>
+        <CardTitle className="text-section font-semibold">Billing</CardTitle>
         <CardDescription>
           Manage subscription, payment method, and invoices through Stripe.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground" data-testid="text-billing-plan">
+        <p className="text-ui text-muted-foreground" data-testid="text-billing-plan">
           Current plan: <span className="font-medium text-foreground">{plan}</span>
         </p>
         <Button
@@ -369,13 +387,13 @@ function IntegrationsSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Integrations</CardTitle>
+        <CardTitle className="text-section font-semibold">Integrations</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between rounded-md border border-border p-3">
           <div>
             <p className="font-medium text-foreground">Buffer</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-ui text-muted-foreground">
               {connected ? "Connected" : "Not connected"}
             </p>
           </div>
@@ -533,19 +551,26 @@ export default function Settings() {
       <BillingSection />
       <IntegrationsSection />
 
-      <section className="rounded-lg border p-6 space-y-4">
+      <section className="rounded-lg border border-border p-6 space-y-4">
         <div>
-          <h2 className="text-lg font-semibold">Notifications</h2>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h2 className="text-section font-semibold">Notifications</h2>
+          <p className="text-ui text-muted-foreground mt-1">
             Choose which emails you want to receive. Account and billing notices cannot be turned
             off.
           </p>
         </div>
 
         {prefsLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Loading preferences…</span>
+          <div className="space-y-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-start justify-between gap-4">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <Skeleton className="h-5 w-9 rounded-full" />
+              </div>
+            ))}
           </div>
         ) : prefsIsError ? (
           <ErrorState
@@ -554,7 +579,7 @@ export default function Settings() {
             isRetrying={prefsIsRefetching}
           />
         ) : preferences.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No notification types configured.</p>
+          <p className="text-ui text-muted-foreground">No notification types configured.</p>
         ) : (
           <ul className="space-y-4">
             {preferences.map((pref) => (
@@ -564,10 +589,13 @@ export default function Settings() {
                 data-testid={`notification-pref-${pref.type}`}
               >
                 <div className="flex-1">
-                  <Label htmlFor={`pref-${pref.type}`} className="text-sm font-medium">
+                  <Label
+                    htmlFor={`pref-${pref.type}`}
+                    className="text-[12px] font-medium text-muted-foreground"
+                  >
                     {pref.label}
                   </Label>
-                  <p className="text-sm text-muted-foreground mt-0.5">{pref.description}</p>
+                  <p className="text-caption text-muted-foreground mt-0.5">{pref.description}</p>
                 </div>
                 <Switch
                   id={`pref-${pref.type}`}
@@ -585,14 +613,14 @@ export default function Settings() {
         )}
       </section>
 
-      <section className="rounded-lg border p-4">
-        <h2 className="text-base font-semibold">Onboarding tours</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+      <section className="rounded-lg border border-border p-4">
+        <h2 className="text-section font-semibold">Onboarding tours</h2>
+        <p className="text-ui text-muted-foreground mt-1">
           Auto-firing tours appear on first visit to new pages. Manual replay via the "?" icon stays
           available regardless of this setting.
         </p>
         <div className="flex items-center justify-between mt-4">
-          <label htmlFor="suppress-tours" className="text-sm font-medium">
+          <label htmlFor="suppress-tours" className="text-[12px] font-medium text-muted-foreground">
             Don't auto-show tours
           </label>
           <Switch
@@ -605,16 +633,21 @@ export default function Settings() {
 
       <section className="rounded-lg border border-border p-6 space-y-4">
         <div>
-          <h2 className="text-lg font-semibold">Delete account</h2>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h2 className="text-section font-semibold">Delete account</h2>
+          <p className="text-ui text-muted-foreground mt-1">
             Schedules permanent deletion of your account and every brand, article, and citation tied
             to it. You have 30 days to contact support and cancel; after that the data is
             unrecoverable.
           </p>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="delete-password">Confirm password</Label>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="delete-password"
+            className="text-[12px] font-medium text-muted-foreground"
+          >
+            Confirm password
+          </Label>
           <Input
             id="delete-password"
             type="password"
@@ -625,8 +658,8 @@ export default function Settings() {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="delete-confirm">
+        <div className="space-y-1.5">
+          <Label htmlFor="delete-confirm" className="text-[12px] font-medium text-muted-foreground">
             Type <span className="font-mono font-bold">DELETE</span> to confirm
           </Label>
           <Input
@@ -643,9 +676,9 @@ export default function Settings() {
         </Button>
       </section>
 
-      <section className="rounded-lg border p-6 space-y-3">
-        <h2 className="text-lg font-semibold">Export your data</h2>
-        <p className="text-sm text-muted-foreground">
+      <section className="rounded-lg border border-border p-6 space-y-3">
+        <h2 className="text-section font-semibold">Export your data</h2>
+        <p className="text-ui text-muted-foreground">
           Download every brand, article, and citation tied to your account as a JSON file.
           Rate-limited to one export per day per account.
         </p>

@@ -48,6 +48,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { HelpCircle, Loader2, Sparkles, Plus, Target, X, TrendingUp } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import BeginnerTips from "@/components/content/BeginnerTips";
 import UsageWidget from "@/components/content/UsageWidget";
 import DraftToolbar from "@/components/content/DraftToolbar";
@@ -58,6 +59,7 @@ import IndustryCombobox from "@/components/content/IndustryCombobox";
 import BrandCombobox from "@/components/content/BrandCombobox";
 import { apiRequest } from "@/lib/queryClient";
 import { EmptyState } from "@/components/ui/empty-state";
+import { StatusDot } from "@/components/foundations/StatusDot";
 import { ErrorState } from "@/components/ui/error-state";
 import { useToast } from "@/hooks/use-toast";
 import { useArticleAutoSave } from "@/hooks/useArticleAutoSave";
@@ -633,8 +635,32 @@ export default function Content() {
 
   if (!article) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="space-y-8" aria-hidden="true">
+        <Skeleton className="h-10 w-full max-w-sm" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-40" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-56" />
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -680,8 +706,8 @@ export default function Content() {
         ) : article.status === "generating" ? (
           <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-6">
             <div className="flex items-center gap-3">
-              <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
-              <p className="text-sm font-medium text-muted-foreground">
+              <StatusDot tone="pending" aria-label="Generating" />
+              <p className="text-ui font-medium text-muted-foreground">
                 Generating ({elapsedSeconds}s)
               </p>
               <Button
@@ -711,7 +737,7 @@ export default function Content() {
               ))}
             </div>
 
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Generating your article. This may take 30-90 seconds. You can leave this page —
               generation will continue and you can return to see the finished article.
             </p>
@@ -811,7 +837,7 @@ function ReadyEditor({
       </CardHeader>
       <CardContent>
         <MarkdownEditor value={content} onChange={onContentChange} />
-        <p className="text-xs text-muted-foreground mt-3">
+        <p className="text-caption text-muted-foreground mt-3">
           Edits auto-save. Open in Articles for Auto-Improve, version history, and distribution.
         </p>
       </CardContent>
@@ -899,7 +925,7 @@ function DraftForm(props: DraftFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           {errorBanner && (
-            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-ui text-destructive">
               {errorBanner}
             </div>
           )}
@@ -912,7 +938,7 @@ function DraftForm(props: DraftFormProps) {
                   <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">
+                  <p className="text-ui">
                     The brand this article belongs to. Required so AI-citation tracking can
                     attribute the result correctly.
                   </p>
@@ -930,7 +956,7 @@ function DraftForm(props: DraftFormProps) {
                   <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">
+                  <p className="text-ui">
                     The industry this <em>article</em> targets — can differ from your brand's home
                     industry. Useful when you want to write for an adjacent vertical.
                   </p>
@@ -939,7 +965,7 @@ function DraftForm(props: DraftFormProps) {
             </div>
             <IndustryCombobox value={industry} onChange={setIndustry} />
             {selectedBrand && industry && industry !== selectedBrand.industry && (
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-caption text-muted-foreground mt-1">
                 Different from {selectedBrand.name}'s home industry ({selectedBrand.industry}) —
                 that's fine.
               </p>
@@ -954,7 +980,7 @@ function DraftForm(props: DraftFormProps) {
                   <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">
+                  <p className="text-ui">
                     Press Enter or comma to add a chip. Backspace on an empty input removes the last
                     chip.
                   </p>
@@ -986,7 +1012,7 @@ function DraftForm(props: DraftFormProps) {
                 )}
               </Button>
               {showSuggestions && keywordSuggestions.length === 0 && !suggestionsLoading && (
-                <span className="text-xs text-muted-foreground">No suggestions yet</span>
+                <span className="text-caption text-muted-foreground">No suggestions yet</span>
               )}
             </div>
             {showSuggestions && keywordSuggestions.length > 0 && (
@@ -1004,7 +1030,7 @@ function DraftForm(props: DraftFormProps) {
                           setKeywords([...keywords, s]);
                         }
                       }}
-                      className={`text-xs px-2 py-1 rounded border transition-colors ${
+                      className={`text-caption px-2 py-1 rounded border transition-colors ${
                         already
                           ? "bg-primary/10 border-primary text-primary"
                           : "bg-background border-border hover:bg-muted"
@@ -1022,7 +1048,7 @@ function DraftForm(props: DraftFormProps) {
                 <button
                   type="button"
                   onClick={() => setShowSuggestions(false)}
-                  className="text-xs text-muted-foreground hover:text-foreground ml-2"
+                  className="text-caption text-muted-foreground hover:text-foreground ml-2"
                 >
                   Hide
                 </button>
@@ -1053,7 +1079,7 @@ function DraftForm(props: DraftFormProps) {
                   <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">
+                  <p className="text-ui">
                     B2C is conversational and benefit-first. B2B is professional and data-driven.
                     The brand profile (tone, audience) is layered on top of this choice.
                   </p>
@@ -1070,8 +1096,8 @@ function DraftForm(props: DraftFormProps) {
                     : "border-muted hover:border-muted-foreground/30"
                 }`}
               >
-                <span className="text-sm font-semibold">B2C — Consumer</span>
-                <span className="text-xs text-muted-foreground text-center">
+                <span className="text-ui font-semibold">B2C — Consumer</span>
+                <span className="text-caption text-muted-foreground text-center">
                   Conversational, lifestyle-focused, relatable
                 </span>
               </button>
@@ -1084,8 +1110,8 @@ function DraftForm(props: DraftFormProps) {
                     : "border-muted hover:border-muted-foreground/30"
                 }`}
               >
-                <span className="text-sm font-semibold">B2B — Business</span>
-                <span className="text-xs text-muted-foreground text-center">
+                <span className="text-ui font-semibold">B2B — Business</span>
+                <span className="text-caption text-muted-foreground text-center">
                   Professional, data-driven, industry authority
                 </span>
               </button>
@@ -1104,7 +1130,7 @@ function DraftForm(props: DraftFormProps) {
                 <Target className="w-4 h-4" />
                 Target Audience & Geography
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-caption text-muted-foreground">
                 {showTargetingOptions ? "Hide" : "Show"} options
               </span>
             </Button>
@@ -1116,7 +1142,7 @@ function DraftForm(props: DraftFormProps) {
                     {selectedBrand?.targetAudience && (
                       <button
                         type="button"
-                        className="text-xs text-primary hover:underline"
+                        className="text-caption text-primary hover:underline"
                         onClick={() => setTargetCustomers(selectedBrand.targetAudience ?? "")}
                       >
                         Pull from brand
@@ -1164,7 +1190,7 @@ function DraftForm(props: DraftFormProps) {
             )}
           </Button>
           {!canGenerate && !generating && !usageExhausted && (
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-caption text-muted-foreground text-center">
               {!brandId
                 ? "Pick a brand first."
                 : !industry
@@ -1197,11 +1223,11 @@ function DraftForm(props: DraftFormProps) {
           </CardHeader>
           <CardContent>
             {popularTopicsLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-ui text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading…
               </div>
             ) : popularTopics.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-ui text-muted-foreground">
                 No popular topics for this industry yet.
               </p>
             ) : (
@@ -1219,9 +1245,9 @@ function DraftForm(props: DraftFormProps) {
                   >
                     <Plus className="w-4 h-4 text-muted-foreground mt-0.5" />
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm">{topic.topic}</h4>
+                      <h4 className="font-medium text-ui">{topic.topic}</h4>
                       {topic.description && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
                           {topic.description}
                         </p>
                       )}

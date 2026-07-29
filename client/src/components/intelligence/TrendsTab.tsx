@@ -22,7 +22,7 @@ import { AlertTriangle, Plus, RefreshCw, History, Calendar } from "lucide-react"
 import type { MetricsHistory } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { EmptyState } from "@/components/foundations";
+import { EmptyState } from "@/components/ui/empty-state";
 import { chartTheme } from "@/lib/chartTheme";
 
 export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string }) {
@@ -169,17 +169,18 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
         <EmptyState
           icon={History}
           title="No Historical Data Yet"
-          body="Start recording snapshots to track your metrics over time"
-          cta={
-            <Button
-              onClick={() => recordMetricsMutation.mutate()}
-              disabled={recordMetricsMutation.isPending}
-              data-testid="button-first-snapshot"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Record First Snapshot
-            </Button>
-          }
+          description="Start recording snapshots to track your metrics over time"
+          action={{
+            label: (
+              <>
+                <Plus className="w-4 h-4 mr-2" />
+                Record First Snapshot
+              </>
+            ),
+            onClick: () => recordMetricsMutation.mutate(),
+            disabled: recordMetricsMutation.isPending,
+            "data-testid": "button-first-snapshot",
+          }}
         />
       ) : (
         <div className="grid gap-6">

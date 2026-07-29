@@ -100,10 +100,7 @@ export default function ResetPassword() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button
-              onClick={() => navigate({ to: "/forgot-password" })}
-              className="bg-primary hover:bg-primary/90"
-            >
+            <Button onClick={() => navigate({ to: "/forgot-password" })}>
               Request new reset link
             </Button>
           </CardContent>
@@ -133,7 +130,7 @@ export default function ResetPassword() {
                 await supabase.auth.signOut();
                 navigate({ to: "/login" });
               }}
-              className="w-full bg-primary hover:bg-primary/90"
+              className="w-full"
               data-testid="button-go-login"
             >
               Go to sign in
@@ -213,7 +210,7 @@ export default function ResetPassword() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-primary hover:bg-primary/90"
+              className="w-full"
               disabled={
                 resetMutation.isPending ||
                 !allRequirementsMet ||

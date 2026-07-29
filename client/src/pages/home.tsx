@@ -61,6 +61,16 @@ const TILE_BASE =
   "hover:bg-accent/40 hover:border-(--border-strong) " +
   "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 
+// The three hero KPI tiles read as plain numbers in the reference (§d_0002.png
+// VISIBILITY/MENTIONS/RANK row): no card border, no card background at rest —
+// separated only by whitespace/a hairline divider, never a bordered box.
+// Matches Phase 2.7's "card is flat, chrome is a hover-only affordance" rule,
+// applied narrowly to just this row per the roadmap's explicit callout.
+const KPI_TILE_BASE =
+  "group block rounded-lg p-5 text-left transition-colors " +
+  "hover:bg-accent/40 " +
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
+
 function TileLabel({
   icon: Icon,
   children,
@@ -72,7 +82,7 @@ function TileLabel({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <span className="flex items-center gap-1.5 text-label font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {Icon ? <Icon className="h-3 w-3" aria-hidden /> : null}
         {children}
       </span>
@@ -91,8 +101,8 @@ function DeltaPill({ value }: { value: number }) {
   const up = value > 0;
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-        up ? "bg-(--positive)/10 text-(--positive)" : "bg-(--negative)/10 text-(--negative)"
+      className={`inline-flex items-center gap-1 text-data font-medium tabular-nums ${
+        up ? "text-(--positive)" : "text-(--negative)"
       }`}
     >
       {up ? (
@@ -179,7 +189,7 @@ function Verdict({
     return (
       <div className="flex items-baseline gap-4">
         <Skeleton className="h-7 w-3/4" />
-        <Skeleton className="h-9 w-16" />
+        <Skeleton className="h-8 w-16" />
       </div>
     );
   }
@@ -212,7 +222,7 @@ function Verdict({
         {band}, and {phrase}
       </p>
       <div className="flex items-baseline gap-3">
-        <span className="tnum text-3xl font-semibold leading-none text-foreground">{score}</span>
+        <span className="tnum text-stat font-semibold leading-none text-foreground">{score}</span>
         <span className="text-sm text-muted-foreground">/ 100</span>
       </div>
     </div>
@@ -328,7 +338,7 @@ export default function Home() {
           onClick={() =>
             inspector.open({ title: "Visibility drivers", body: <VisibilityDrivers h={h} /> })
           }
-          className={`${TILE_BASE} flex flex-col text-left`}
+          className={`${KPI_TILE_BASE} flex flex-col`}
         >
           <TileLabel icon={Brain}>AI Visibility</TileLabel>
           <div className="mt-4 flex h-9 items-baseline gap-1">
@@ -336,7 +346,7 @@ export default function Home() {
               <Skeleton className="h-8 w-24" />
             ) : (
               <>
-                <span className="tnum text-3xl font-semibold leading-none text-foreground">
+                <span className="tnum text-stat font-semibold leading-none text-foreground">
                   {h?.visibilityScore ?? 0}
                 </span>
                 <span className="text-sm font-medium text-muted-foreground">
@@ -356,7 +366,10 @@ export default function Home() {
         </button>
 
         {/* Week-over-week change. */}
-        <Link to="/monitor" className={`${TILE_BASE} flex flex-col text-left`}>
+        <Link
+          to="/monitor"
+          className={`${KPI_TILE_BASE} flex flex-col md:border-l md:border-border/60`}
+        >
           <TileLabel icon={Activity}>This week</TileLabel>
           <div className="mt-4 flex h-9 items-baseline gap-1">
             {trend.isLoading ? (
@@ -364,7 +377,7 @@ export default function Home() {
             ) : weekDelta ? (
               <>
                 <span
-                  className={`tnum text-3xl font-semibold leading-none ${
+                  className={`tnum text-stat font-semibold leading-none ${
                     weekDelta.delta > 0
                       ? "text-(--positive)"
                       : weekDelta.delta < 0
@@ -394,14 +407,17 @@ export default function Home() {
         </Link>
 
         {/* Cited / total — the raw count. */}
-        <Link to="/monitor" className={`${TILE_BASE} flex flex-col text-left`}>
+        <Link
+          to="/monitor"
+          className={`${KPI_TILE_BASE} flex flex-col md:border-l md:border-border/60`}
+        >
           <TileLabel icon={Activity}>Cited checks</TileLabel>
           <div className="mt-4 flex h-9 items-baseline gap-1">
             {hero.isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
               <>
-                <span className="tnum text-3xl font-semibold leading-none text-foreground">
+                <span className="tnum text-stat font-semibold leading-none text-foreground">
                   {h?.citedChecks ?? 0}
                 </span>
                 <span className="text-sm font-medium text-muted-foreground">

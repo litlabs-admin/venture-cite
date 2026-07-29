@@ -82,19 +82,14 @@ function DeltaChip({ delta }: { delta: number }) {
   // so colour would be a second encoding of the same fact. It used to be
   // bg-chart-4 (violet) mislabelled as "design-system green" in chartTheme —
   // see the note there. A decline keeps destructive, because that is the one
-  // case where the direction alone under-states it.
+  // case where the direction alone under-states it. Rendered as plain
+  // colored text — no pill background, no border, no padding.
   const cls =
-    delta > 0
-      ? "bg-muted text-foreground"
-      : delta < 0
-        ? "bg-destructive/10 text-destructive"
-        : "bg-muted text-muted-foreground";
+    delta > 0 ? "text-foreground" : delta < 0 ? "text-(--negative)" : "text-muted-foreground";
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}
-    >
+    <span className={`inline-flex items-center gap-1 text-data font-mono font-medium ${cls}`}>
       <Icon className="h-3 w-3" />
-      <span className="tnum">
+      <span className="tabular-nums">
         {delta > 0 ? "+" : ""}
         {delta}
       </span>{" "}
@@ -105,7 +100,7 @@ function DeltaChip({ delta }: { delta: number }) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <p className="mb-3 text-label font-semibold uppercase tracking-wider text-muted-foreground">
       {children}
     </p>
   );
@@ -209,7 +204,7 @@ export default function Report() {
         <p className="max-w-[60ch] text-lg leading-snug text-foreground">{conclusion}</p>
         {scanned && (
           <div className="mt-5 flex items-end gap-4">
-            <span className="tnum text-5xl font-semibold leading-none text-foreground">
+            <span className="tnum text-hero font-semibold leading-none text-foreground">
               {score}
             </span>
             <span className="pb-1 text-sm text-muted-foreground">/ 100</span>
@@ -263,7 +258,7 @@ export default function Report() {
           <Skeleton className="h-32 w-full" />
         ) : engines.length > 0 ? (
           <div>
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 border-b border-border pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 border-b border-border pb-2 text-label font-semibold uppercase tracking-wider text-muted-foreground">
               <span>Engine</span>
               <span className="text-right">Cited</span>
               <span className="text-right">Rate</span>

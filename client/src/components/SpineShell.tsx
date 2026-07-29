@@ -2,7 +2,7 @@ import { Suspense, type ComponentType } from "react";
 import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { Info } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RouteSpinner } from "@/components/foundations";
+import { ContentSkeleton } from "@/components/foundations";
 
 // Phase 0 spine scaffold. A stage (Monitor/Diagnose/Act/Report/Setup) is one
 // route hosting a tab strip. Each tab embeds an EXISTING page component
@@ -101,7 +101,12 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
         return (
           <TabsContent key={t.value} value={t.value}>
             <div className="animate-fade-in-up motion-reduce:animate-none">
-              <Suspense fallback={<RouteSpinner />}>
+              {/* The sidebar/tab strip above is already mounted by the time
+                  this Suspense trips, so the loading shape is knowable at
+                  least at the "content region" level (unlike routeGates.tsx's
+                  whole-page gates, which keep RouteSpinner) — a generic
+                  shape-matched skeleton reads better here than a spinner. */}
+              <Suspense fallback={<ContentSkeleton />}>
                 <Body />
               </Suspense>
             </div>

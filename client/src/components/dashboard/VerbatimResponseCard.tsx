@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import SafeMarkdown from "@/components/SafeMarkdown";
 import { stripTrackingParams } from "@/lib/stripTrackingParams";
 
@@ -30,9 +31,9 @@ export default function VerbatimResponseCard({
           {(platform || prompt) && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
               {platform && (
-                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                <Badge variant="outline" className="px-1.5 py-0.5 font-medium normal-case">
                   {platform}
-                </span>
+                </Badge>
               )}
               {prompt && <span className="italic truncate">Q: {prompt}</span>}
             </div>

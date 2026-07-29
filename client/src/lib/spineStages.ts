@@ -34,7 +34,9 @@ export const SPINE_STAGES: SpineStage[] = [
       hallucinations: "Hallucinations",
       signals: "Signals",
       crawler: "Crawler",
-      issues: "Issues",
+      // No "issues" entry — diagnose.tsx's own header comment records that
+      // tab as retired, and its tabs array no longer declares it. This entry
+      // used to exist here and violated the file-header guarantee above.
     },
   },
   {

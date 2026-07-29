@@ -1,3 +1,5 @@
+import { StatusDot, type StatusDotTone } from "@/components/foundations";
+
 export interface ActionPlanTask {
   id: string;
   taskTitle: string;
@@ -12,20 +14,23 @@ interface Props {
   task: ActionPlanTask;
 }
 
-const priorityTone = (p: string) => {
+// Priority renders as a dot + plain coloured text, never a filled chip
+// (roadmap §1b/§1d: status is a coloured dot + text, not a background pill).
+const priorityTone = (p: string): { dot: StatusDotTone; text: string } => {
   switch (p) {
     case "urgent":
-      return "bg-destructive/15 text-destructive";
+      return { dot: "fail", text: "text-destructive" };
     case "high":
-      return "bg-destructive/10 text-destructive";
+      return { dot: "fail", text: "text-destructive" };
     case "medium":
-      return "bg-warning-subtle text-warning";
+      return { dot: "warn", text: "text-warning" };
     default:
-      return "bg-muted text-muted-foreground";
+      return { dot: "neutral", text: "text-muted-foreground" };
   }
 };
 
 export default function ActionPlanItem({ index, task }: Props) {
+  const tone = priorityTone(task.priority);
   return (
     <div
       className="rounded-md border border-border bg-card px-3.5 py-3 flex items-start gap-3"
@@ -37,7 +42,8 @@ export default function ActionPlanItem({ index, task }: Props) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium text-sm text-foreground">{task.taskTitle}</span>
-          <span className={`text-[11px] px-1.5 py-0.5 rounded ${priorityTone(task.priority)}`}>
+          <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium ${tone.text}`}>
+            <StatusDot tone={tone.dot} />
             {task.priority}
           </span>
         </div>

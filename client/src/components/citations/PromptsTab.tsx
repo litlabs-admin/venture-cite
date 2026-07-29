@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,22 +26,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import type { Brand } from "@shared/schema";
+import type { Brand, BrandPrompt } from "@shared/schema";
+import { useInspector } from "@/components/AppShell";
+import PromptDetail from "@/components/citations/PromptDetail";
+import {
+  usePromptSuggestions,
+  useGeneratePrompts,
+  useResetPrompts,
+  useRefreshSuggestions,
+  useAcceptSuggestion,
+  useDismissSuggestion,
+  useEditPrompt,
+  useArchivePrompt,
+} from "@/hooks/usePrompts";
 
 // Wave 9: client-side cap on prompt length. Mirrors a sensible LLM context
 // budget — 500 chars is plenty for a citation-style question while keeping
 // the textarea readable. Server may impose a different limit; this cap
 // just avoids round-tripping obviously-bad input.
 const PROMPT_MAX_LEN = 500;
-
-type BrandPrompt = {
-  id: string;
-  brandId: string;
-  prompt: string;
-  rationale: string | null;
-  orderIndex: number;
-  createdAt: string;
-};
 
 type PromptsTabProps = {
   selectedBrandId: string;
@@ -63,105 +64,79 @@ export default function PromptsTab({
   promptsAgeLabel,
 }: PromptsTabProps) {
   const { toast } = useToast();
+  const inspector = useInspector();
 
-  const { data: suggestionsData } = useQuery<{ success: boolean; data: BrandPrompt[] }>({
-    queryKey: [`/api/brand-prompts/${selectedBrandId}/suggestions`],
-    enabled: !!selectedBrandId,
-  });
+  const { data: suggestionsData } = usePromptSuggestions(selectedBrandId);
   const suggestions = suggestionsData?.data || [];
 
-  const generateMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest(
-        "POST",
-        `/api/brand-prompts/${selectedBrandId}/generate`,
-        {},
-      );
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        // Instant update: write new prompts directly into cache
-        queryClient.setQueryData([`/api/brand-prompts/${selectedBrandId}`], {
-          success: true,
-          data: data.data,
-        });
-        toast({
-          title: "Prompts generated!",
-          description: `Created ${data.data.length} citation prompts for ${selectedBrand?.name}.`,
-        });
-      } else {
-        toast({
-          title: "Couldn't generate prompts",
-          description: data.error || "Please try again.",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (err: Error) =>
-      toast({
-        title: "Couldn't generate prompts",
-        description: err.message,
-        variant: "destructive",
+  const generateMutationImpl = useGeneratePrompts(selectedBrandId);
+  const generateMutation = {
+    ...generateMutationImpl,
+    mutate: () =>
+      generateMutationImpl.mutate(undefined, {
+        onSuccess: (data: any) => {
+          if (data.success) {
+            toast({
+              title: "Prompts generated!",
+              description: `Created ${data.data.length} citation prompts for ${selectedBrand?.name}.`,
+            });
+          } else {
+            toast({
+              title: "Couldn't generate prompts",
+              description: data.error || "Please try again.",
+              variant: "destructive",
+            });
+          }
+        },
+        onError: (err: Error) =>
+          toast({
+            title: "Couldn't generate prompts",
+            description: err.message,
+            variant: "destructive",
+          }),
       }),
-  });
-
-  const resetMutation = useMutation({
-    mutationFn: async () => {
-      const r = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/reset`, {
-        confirm: true,
-      });
-      return r.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        invalidatePromptQueries();
-        toast({ title: "Prompts reset" });
-      } else {
-        toast({ title: "Reset failed", description: data.error, variant: "destructive" });
-      }
-    },
-    onError: (err: Error) =>
-      toast({ title: "Reset failed", description: err.message, variant: "destructive" }),
-  });
-
-  const invalidatePromptQueries = () => {
-    queryClient.invalidateQueries({ queryKey: [`/api/brand-prompts/${selectedBrandId}`] });
-    queryClient.invalidateQueries({
-      queryKey: [`/api/brand-prompts/${selectedBrandId}/suggestions`],
-    });
   };
 
-  const refreshSuggestionsMutation = useMutation({
-    mutationFn: async () => {
-      const r = await apiRequest(
-        "POST",
-        `/api/brand-prompts/${selectedBrandId}/suggestions/refresh`,
-        {},
-      );
-      return r.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.setQueryData([`/api/brand-prompts/${selectedBrandId}/suggestions`], {
-          success: true,
-          data: data.data,
-        });
-        toast({
-          title: "Suggestions refreshed",
-          description: `${data.data.length} new ideas ready to review.`,
-        });
-      } else {
-        toast({
-          title: "Couldn't refresh",
-          description: data.error || "Try again",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (err: Error) =>
-      toast({ title: "Couldn't refresh", description: err.message, variant: "destructive" }),
-  });
+  const resetMutationImpl = useResetPrompts(selectedBrandId);
+  const resetMutation = {
+    ...resetMutationImpl,
+    mutate: () =>
+      resetMutationImpl.mutate(undefined, {
+        onSuccess: (data: any) => {
+          if (data.success) {
+            toast({ title: "Prompts reset" });
+          } else {
+            toast({ title: "Reset failed", description: data.error, variant: "destructive" });
+          }
+        },
+        onError: (err: Error) =>
+          toast({ title: "Reset failed", description: err.message, variant: "destructive" }),
+      }),
+  };
+
+  const refreshSuggestionsMutationImpl = useRefreshSuggestions(selectedBrandId);
+  const refreshSuggestionsMutation = {
+    ...refreshSuggestionsMutationImpl,
+    mutate: () =>
+      refreshSuggestionsMutationImpl.mutate(undefined, {
+        onSuccess: (data: any) => {
+          if (data.success) {
+            toast({
+              title: "Suggestions refreshed",
+              description: `${data.data.length} new ideas ready to review.`,
+            });
+          } else {
+            toast({
+              title: "Couldn't refresh",
+              description: data.error || "Try again",
+              variant: "destructive",
+            });
+          }
+        },
+        onError: (err: Error) =>
+          toast({ title: "Couldn't refresh", description: err.message, variant: "destructive" }),
+      }),
+  };
 
   // Wave 9.1: Accept can run in two modes.
   //   * Add (tracked count < cap): just promote — no archive needed.
@@ -169,125 +144,76 @@ export default function PromptsTab({
   // Server enforces the cap; client picks the right body shape based on
   // current count so the dialog can render an "Add" UX vs the existing
   // "Replace" radio list.
-  const acceptSuggestionMutation = useMutation({
-    mutationFn: async ({
-      suggestionId,
-      replaceTrackedId,
-    }: {
-      suggestionId: string;
-      replaceTrackedId: string | null;
-    }) => {
-      const r = await apiRequest(
-        "POST",
-        `/api/brand-prompts/${selectedBrandId}/suggestions/${suggestionId}/accept`,
-        replaceTrackedId ? { replaceTrackedId } : {},
-      );
-      return r.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        invalidatePromptQueries();
-        toast({
-          title: "Suggestion accepted",
-          description:
-            data.data?.mode === "added" ? "Added to tracked set." : "Tracked set updated.",
-        });
-      } else {
-        toast({
-          title: "Couldn't accept",
-          description: data.error || "Try again",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (err: Error) =>
-      toast({ title: "Couldn't accept", description: err.message, variant: "destructive" }),
-  });
+  const acceptSuggestionMutationImpl = useAcceptSuggestion(selectedBrandId);
+  const acceptSuggestionMutation = {
+    ...acceptSuggestionMutationImpl,
+    mutate: (vars: { suggestionId: string; replaceTrackedId: string | null }) =>
+      acceptSuggestionMutationImpl.mutate(vars, {
+        onSuccess: (data: any) => {
+          if (data.success) {
+            toast({
+              title: "Suggestion accepted",
+              description:
+                data.data?.mode === "added" ? "Added to tracked set." : "Tracked set updated.",
+            });
+          } else {
+            toast({
+              title: "Couldn't accept",
+              description: data.error || "Try again",
+              variant: "destructive",
+            });
+          }
+        },
+        onError: (err: Error) =>
+          toast({ title: "Couldn't accept", description: err.message, variant: "destructive" }),
+      }),
+  };
 
-  const dismissSuggestionMutation = useMutation({
-    mutationFn: async (suggestionId: string) => {
-      const r = await apiRequest(
-        "DELETE",
-        `/api/brand-prompts/${selectedBrandId}/suggestions/${suggestionId}`,
-      );
-      return r.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.invalidateQueries({
-          queryKey: [`/api/brand-prompts/${selectedBrandId}/suggestions`],
-        });
-      }
-    },
-  });
+  const dismissSuggestionMutation = useDismissSuggestion(selectedBrandId);
 
-  // Wave 9: optimistic update — write the new text into the cache before
-  // the server responds, rollback on error. ~500ms of unresponsive UI per
-  // edit on slow networks goes to instant. Snapshot/restore on error.
-  const editPromptMutation = useMutation({
-    mutationFn: async ({ promptId, text }: { promptId: string; text: string }) => {
-      const r = await apiRequest(
-        "PATCH",
-        `/api/brand-prompts/${selectedBrandId}/prompts/${promptId}`,
-        { prompt: text },
-      );
-      return r.json();
-    },
-    onMutate: async ({ promptId, text }) => {
-      const key = [`/api/brand-prompts/${selectedBrandId}`];
-      await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<{ success: boolean; data: BrandPrompt[] }>(key);
-      if (previous?.data) {
-        queryClient.setQueryData(key, {
-          ...previous,
-          data: previous.data.map((p) => (p.id === promptId ? { ...p, prompt: text } : p)),
-        });
-      }
-      return { previous };
-    },
-    onError: (err: Error, _vars, ctx) => {
-      if (ctx?.previous) {
-        queryClient.setQueryData([`/api/brand-prompts/${selectedBrandId}`], ctx.previous);
-      }
-      toast({ title: "Update failed", description: err.message, variant: "destructive" });
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        invalidatePromptQueries();
-        toast({ title: "Prompt updated" });
-      } else {
-        // Server returned 200 but data.success=false — rollback via invalidate.
-        invalidatePromptQueries();
-        toast({
-          title: "Update failed",
-          description: data.error || "Try again",
-          variant: "destructive",
-        });
-      }
-    },
-  });
+  // Wave 9: optimistic update lives inside useEditPrompt (client/src/hooks/usePrompts.ts) —
+  // it snapshots + writes the new text into the cache before the server
+  // responds and rolls back on error. Toasting stays here since it's a
+  // page-level UI reaction.
+  const editPromptMutationImpl = useEditPrompt(selectedBrandId);
+  const editPromptMutation = {
+    ...editPromptMutationImpl,
+    mutate: (vars: { promptId: string; text: string }) =>
+      editPromptMutationImpl.mutate(vars, {
+        onSuccess: (data: any) => {
+          if (data.success) {
+            toast({ title: "Prompt updated" });
+          } else {
+            toast({
+              title: "Update failed",
+              description: data.error || "Try again",
+              variant: "destructive",
+            });
+          }
+        },
+        onError: (err: Error) =>
+          toast({ title: "Update failed", description: err.message, variant: "destructive" }),
+      }),
+  };
 
-  const archivePromptMutation = useMutation({
-    mutationFn: async (promptId: string) => {
-      const r = await apiRequest(
-        "DELETE",
-        `/api/brand-prompts/${selectedBrandId}/prompts/${promptId}`,
-      );
-      return r.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        invalidatePromptQueries();
-        toast({ title: "Prompt archived" });
-      } else {
-        toast({
-          title: "Couldn't archive",
-          description: data.error || "Try again",
-          variant: "destructive",
-        });
-      }
-    },
-  });
+  const archivePromptMutationImpl = useArchivePrompt(selectedBrandId);
+  const archivePromptMutation = {
+    ...archivePromptMutationImpl,
+    mutate: (promptId: string) =>
+      archivePromptMutationImpl.mutate(promptId, {
+        onSuccess: (data: any) => {
+          if (data.success) {
+            toast({ title: "Prompt archived" });
+          } else {
+            toast({
+              title: "Couldn't archive",
+              description: data.error || "Try again",
+              variant: "destructive",
+            });
+          }
+        },
+      }),
+  };
 
   const generateLoadingMessage = useLoadingMessages(generateMutation.isPending, [
     "Analyzing your brand...",
@@ -321,7 +247,7 @@ export default function PromptsTab({
                 <Sparkles className="h-5 w-5 text-muted-foreground" />
                 Tracked prompts{" "}
                 {hasPrompts && (
-                  <span className="text-sm text-muted-foreground font-normal">
+                  <span className="text-ui text-muted-foreground font-normal">
                     ({prompts.length} of 10)
                   </span>
                 )}
@@ -329,7 +255,9 @@ export default function PromptsTab({
               <CardDescription>
                 These are the fixed questions re-checked every week so you can compare citation
                 trends over time. Edit them to refine what's tracked.
-                {promptsAgeLabel && <span className="ml-2 text-xs">Seeded {promptsAgeLabel}.</span>}
+                {promptsAgeLabel && (
+                  <span className="ml-2 text-caption">Seeded {promptsAgeLabel}.</span>
+                )}
               </CardDescription>
             </div>
             {hasPrompts && (
@@ -355,7 +283,7 @@ export default function PromptsTab({
                   </AlertDialogHeader>
                   {/* Wave 9: explicit checkbox so a misclick can't trigger
                       a destructive 10-prompt rebuild. */}
-                  <label className="flex items-start gap-2 text-sm cursor-pointer mt-2">
+                  <label className="flex items-start gap-2 text-ui cursor-pointer mt-2">
                     <input
                       type="checkbox"
                       checked={resetConfirmed}
@@ -430,7 +358,7 @@ export default function PromptsTab({
                 return (
                   <div
                     key={p.id}
-                    className="border border-border rounded-lg p-4"
+                    className="-mx-2 rounded px-2 py-2.5 transition-colors hover:bg-muted/40"
                     data-testid={`prompt-row-${i}`}
                   >
                     <div className="flex items-start gap-3">
@@ -495,7 +423,7 @@ export default function PromptsTab({
                                 </Button>
                               </div>
                               <span
-                                className={`text-xs tabular-nums ${
+                                className={`text-caption tabular-nums ${
                                   editingText.length >= PROMPT_MAX_LEN
                                     ? "text-destructive"
                                     : "text-muted-foreground"
@@ -506,14 +434,32 @@ export default function PromptsTab({
                             </div>
                           </div>
                         ) : (
-                          <>
-                            <p className="font-medium text-foreground">{p.prompt}</p>
+                          <button
+                            type="button"
+                            className="w-full text-left"
+                            onClick={() =>
+                              inspector.open({
+                                title: p.prompt,
+                                body: (
+                                  <PromptDetail
+                                    promptId={p.id}
+                                    promptText={p.prompt}
+                                    brandId={selectedBrandId}
+                                  />
+                                ),
+                              })
+                            }
+                            data-testid={`button-open-prompt-detail-${i}`}
+                          >
+                            <p className="text-body font-medium text-foreground hover:underline">
+                              {p.prompt}
+                            </p>
                             {p.rationale && (
-                              <p className="text-sm text-muted-foreground mt-1 italic">
+                              <p className="text-caption text-muted-foreground mt-1 italic">
                                 {p.rationale}
                               </p>
                             )}
-                          </>
+                          </button>
                         )}
                       </div>
                       {!isEditing && (
@@ -580,7 +526,7 @@ export default function PromptsTab({
                   <Lightbulb className="h-5 w-5 text-warning" />
                   Suggested prompts{" "}
                   {suggestions.length > 0 && (
-                    <span className="text-sm text-muted-foreground font-normal">
+                    <span className="text-ui text-muted-foreground font-normal">
                       ({suggestions.length})
                     </span>
                   )}
@@ -633,7 +579,7 @@ export default function PromptsTab({
           </CardHeader>
           <CardContent>
             {suggestions.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
+              <p className="text-ui text-muted-foreground py-4 text-center">
                 No suggestions yet. They'll appear after the next weekly run — or click Refresh to
                 generate now.
               </p>
@@ -648,9 +594,11 @@ export default function PromptsTab({
                     <div className="flex items-start gap-3">
                       <Lightbulb className="h-4 w-4 text-warning mt-1 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground">{s.prompt}</p>
+                        <p className="text-body font-medium text-foreground">{s.prompt}</p>
                         {s.rationale && (
-                          <p className="text-sm text-muted-foreground mt-1 italic">{s.rationale}</p>
+                          <p className="text-caption text-muted-foreground mt-1 italic">
+                            {s.rationale}
+                          </p>
                         )}
                       </div>
                       <div className="flex gap-1 shrink-0">
@@ -720,13 +668,13 @@ export default function PromptsTab({
                   <div className="space-y-3">
                     {/* New-prompt preview is shown in both modes. */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="text-sm p-3 bg-warning-subtle border border-warning rounded">
-                        <div className="text-warning font-medium text-xs uppercase tracking-wide mb-1">
+                      <div className="text-ui p-3 bg-warning-subtle border border-warning rounded">
+                        <div className="text-warning font-medium text-label uppercase tracking-wide mb-1">
                           {hasOpenSlot ? "Will be added" : "New (will be tracked)"}
                         </div>
                         <div className="text-foreground">{acceptingSuggestion.prompt}</div>
                         {acceptingSuggestion.rationale && (
-                          <div className="text-xs text-muted-foreground italic mt-1">
+                          <div className="text-caption text-muted-foreground italic mt-1">
                             {acceptingSuggestion.rationale}
                           </div>
                         )}
@@ -735,14 +683,14 @@ export default function PromptsTab({
                           In add mode there's nothing to preview. */}
                       {!hasOpenSlot && (
                         <div
-                          className={`text-sm p-3 rounded border ${
+                          className={`text-ui p-3 rounded border ${
                             acceptReplaceId
                               ? "border-destructive bg-destructive-subtle"
                               : "border-dashed border-muted-foreground/40 bg-muted/30"
                           }`}
                         >
                           <div
-                            className={`font-medium text-xs uppercase tracking-wide mb-1 ${
+                            className={`font-medium text-label uppercase tracking-wide mb-1 ${
                               acceptReplaceId ? "text-destructive" : "text-muted-foreground"
                             }`}
                           >
@@ -757,7 +705,7 @@ export default function PromptsTab({
                                     {old.prompt}
                                   </div>
                                   {old.rationale && (
-                                    <div className="text-xs text-muted-foreground italic mt-1">
+                                    <div className="text-caption text-muted-foreground italic mt-1">
                                       {old.rationale}
                                     </div>
                                   )}
@@ -788,7 +736,7 @@ export default function PromptsTab({
                               onChange={() => setAcceptReplaceId(p.id)}
                               className="mt-1"
                             />
-                            <div className="text-sm">
+                            <div className="text-ui">
                               <span className="text-muted-foreground mr-2">#{i + 1}</span>
                               <span className="text-foreground">{p.prompt}</span>
                             </div>
@@ -828,5 +776,3 @@ export default function PromptsTab({
     </div>
   );
 }
-
-export type { BrandPrompt };

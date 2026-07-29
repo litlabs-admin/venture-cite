@@ -11,6 +11,7 @@ import { Loader2, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { StatusDot } from "@/components/foundations/StatusDot";
 import type { ScanJob } from "@shared/schema";
 
 // ---------------------------------------------------------------------------
@@ -97,37 +98,42 @@ function ActiveSourceChip({
 
   if (!s || s === "pending") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
-        {label} <Loader2 className="h-3 w-3 animate-spin" />
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <StatusDot tone="neutral" aria-label={`${label}: pending`} />
+        {label}
       </span>
     );
   }
   if (s === "running") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-foreground border-border bg-muted">
-        {label} <Loader2 className="h-3 w-3 animate-spin" />
+      <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+        <StatusDot tone="pending" aria-label={`${label}: running`} />
+        {label}
       </span>
     );
   }
   if (s === "done") {
     const count = progress?.count ?? 0;
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-positive border-positive bg-positive-subtle">
-        {label} ✓ {count}
+      <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+        <StatusDot tone="success" aria-label={`${label}: done, ${count} found`} />
+        {label} · {count}
       </span>
     );
   }
   if (s === "rate_limited") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-warning border-warning bg-warning-subtle">
-        {label} ⚠ rate-limited
+      <span className="inline-flex items-center gap-1.5 text-xs text-warning">
+        <StatusDot tone="warn" aria-label={`${label}: rate-limited`} />
+        {label} rate-limited
       </span>
     );
   }
   // error fallback
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-destructive border-destructive bg-destructive-subtle">
-      {label} ⚠ error
+    <span className="inline-flex items-center gap-1.5 text-xs text-destructive">
+      <StatusDot tone="fail" aria-label={`${label}: error`} />
+      {label} error
     </span>
   );
 }
@@ -143,12 +149,18 @@ function CompletedSourceChip({
   const label = SOURCE_LABELS[source];
 
   if (!progress || progress.status === "rate_limited") {
-    return <span className="text-warning">⚠ {label} rate-limited</span>;
+    return (
+      <span className="inline-flex items-center gap-1.5 text-warning">
+        <StatusDot tone="warn" aria-label={`${label}: rate-limited`} />
+        {label} rate-limited
+      </span>
+    );
   }
   const count = progress.count ?? 0;
   return (
-    <span className="text-positive">
-      ✓ {label} {count}
+    <span className="inline-flex items-center gap-1.5 text-foreground">
+      <StatusDot tone="success" aria-label={`${label}: done, ${count} found`} />
+      {label} {count}
     </span>
   );
 }

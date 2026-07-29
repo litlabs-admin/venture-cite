@@ -10,7 +10,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -71,24 +71,24 @@ type SentimentKey = "positive" | "neutral" | "negative";
 interface SentimentConfig {
   label: string;
   icon: React.ReactNode;
-  className: string;
+  variant: BadgeProps["variant"];
 }
 
 const SENTIMENT_MAP: Record<SentimentKey, SentimentConfig> = {
   positive: {
     label: "Positive",
     icon: <ThumbsUp className="h-3.5 w-3.5" />,
-    className: "bg-positive-subtle text-positive border-positive",
+    variant: "positive",
   },
   neutral: {
     label: "Neutral",
     icon: <Minus className="h-3.5 w-3.5" />,
-    className: "bg-muted text-muted-foreground border-border",
+    variant: "neutral",
   },
   negative: {
     label: "Negative",
     icon: <AlertTriangle className="h-3.5 w-3.5" />,
-    className: "bg-destructive-subtle text-destructive border-destructive",
+    variant: "destructive",
   },
 };
 
@@ -228,10 +228,7 @@ export default function MentionDetailSheet({
                   Mention detail for {mention.sourceTitle ?? mention.platform}
                 </SheetDescription>
                 <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                  <Badge
-                    variant="outline"
-                    className={`flex items-center gap-1 text-xs ${sentimentCfg.className}`}
-                  >
+                  <Badge variant={sentimentCfg.variant} className="flex items-center gap-1 text-xs">
                     {sentimentCfg.icon}
                     {sentimentCfg.label}
                   </Badge>

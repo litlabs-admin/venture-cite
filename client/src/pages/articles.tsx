@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -83,7 +84,7 @@ function StatusBadge({ status }: { status: string }) {
         : "bg-muted text-muted-foreground";
   const label = status === "generating" ? "Generating…" : status === "failed" ? "Failed" : "Draft";
   return (
-    <Badge variant="secondary" className={`text-[10px] ${cls}`}>
+    <Badge variant="secondary" className={`text-label ${cls}`}>
       {status === "generating" && <Loader2 className="h-2.5 w-2.5 mr-0.5 animate-spin inline" />}
       {label}
     </Badge>
@@ -235,8 +236,39 @@ export default function Articles() {
     <TooltipProvider>
       <div className="space-y-6">
         {articlesQuery.isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <div className="grid gap-4" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <div className="flex items-start gap-3">
+                    <Skeleton className="h-4 w-4 rounded mt-1.5" />
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <Skeleton className="h-6 w-1/2" />
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                      <Skeleton className="h-4 w-full max-w-md" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap items-center gap-3 mb-3">
+                    <Skeleton className="h-5 w-20" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <Skeleton className="h-5 w-14" />
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-12" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Skeleton className="h-8 w-20" />
+                    <Skeleton className="h-8 w-20" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         ) : articlesIsError ? (
           <ErrorState
@@ -280,7 +312,7 @@ export default function Articles() {
                 {search && (
                   <button
                     onClick={() => setSearch("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-caption text-muted-foreground hover:text-foreground"
                   >
                     Clear
                   </button>
@@ -331,11 +363,11 @@ export default function Articles() {
             {/* Bulk action toolbar — shown when anything is selected. */}
             {selected.size > 0 && (
               <div className="flex items-center justify-between p-2 px-3 border rounded-md bg-muted/50">
-                <span className="text-sm">
+                <span className="text-ui">
                   {selected.size} selected
                   <button
                     onClick={() => setSelected(new Set())}
-                    className="ml-3 text-xs text-muted-foreground hover:text-foreground"
+                    className="ml-3 text-caption text-muted-foreground hover:text-foreground"
                   >
                     Clear
                   </button>
@@ -382,7 +414,7 @@ export default function Articles() {
                 />
                 <label
                   htmlFor="select-all"
-                  className="text-xs text-muted-foreground cursor-pointer"
+                  className="text-caption text-muted-foreground cursor-pointer"
                 >
                   Select all {visible.length} on this page
                 </label>
@@ -433,7 +465,7 @@ export default function Articles() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <CardTitle
-                              className="text-xl wrap-break-word"
+                              className="text-page wrap-break-word"
                               data-testid={`title-${article.id}`}
                             >
                               {article.title || "Untitled"}
@@ -444,13 +476,13 @@ export default function Articles() {
                             </div>
                           </div>
                           {excerpt && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">{excerpt}</p>
+                            <p className="text-ui text-muted-foreground line-clamp-2">{excerpt}</p>
                           )}
                         </div>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-3">
+                      <div className="flex flex-wrap items-center gap-3 text-ui text-muted-foreground mb-3">
                         {brand && (
                           <Badge variant="outline" className="font-normal">
                             {brand.name}
@@ -486,14 +518,14 @@ export default function Articles() {
                       {visibleKeywords.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-4">
                           {visibleKeywords.map((kw, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
+                            <Badge key={idx} variant="outline" className="text-caption">
                               {kw}
                             </Badge>
                           ))}
                           {overflowKeywords.length > 0 && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Badge variant="secondary" className="text-xs cursor-default">
+                                <Badge variant="secondary" className="text-caption cursor-default">
                                   +{overflowKeywords.length} more
                                 </Badge>
                               </TooltipTrigger>
@@ -502,7 +534,7 @@ export default function Articles() {
                                   {overflowKeywords.map((kw, idx) => (
                                     <span
                                       key={idx}
-                                      className="text-[10px] bg-muted px-1.5 py-0.5 rounded"
+                                      className="text-label bg-muted px-1.5 py-0.5 rounded"
                                     >
                                       {kw}
                                     </span>
@@ -581,7 +613,7 @@ export default function Articles() {
                 <button
                   type="button"
                   onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
-                  className="text-sm text-primary hover:underline"
+                  className="text-ui text-primary hover:underline"
                   data-testid="button-load-more-articles"
                 >
                   Load {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more

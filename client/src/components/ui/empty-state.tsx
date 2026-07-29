@@ -3,12 +3,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+export interface EmptyStateAction {
+  label: React.ReactNode;
+  onClick: () => void;
+  href?: string;
+  disabled?: boolean;
+  "data-testid"?: string;
+}
+
 export interface EmptyStateProps {
   icon?: LucideIcon;
   title: string;
   description?: React.ReactNode;
-  action?: { label: string; onClick: () => void; href?: string };
-  secondaryAction?: { label: string; onClick: () => void; href?: string };
+  action?: EmptyStateAction;
+  secondaryAction?: EmptyStateAction;
   className?: string;
 }
 
@@ -36,21 +44,43 @@ export function EmptyState({
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             {action &&
               (action.href ? (
-                <Button asChild size="sm">
+                <Button
+                  asChild
+                  size="sm"
+                  disabled={action.disabled}
+                  data-testid={action["data-testid"]}
+                >
                   <a href={action.href}>{action.label}</a>
                 </Button>
               ) : (
-                <Button size="sm" onClick={action.onClick}>
+                <Button
+                  size="sm"
+                  onClick={action.onClick}
+                  disabled={action.disabled}
+                  data-testid={action["data-testid"]}
+                >
                   {action.label}
                 </Button>
               ))}
             {secondaryAction &&
               (secondaryAction.href ? (
-                <Button asChild variant="outline" size="sm">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  disabled={secondaryAction.disabled}
+                  data-testid={secondaryAction["data-testid"]}
+                >
                   <a href={secondaryAction.href}>{secondaryAction.label}</a>
                 </Button>
               ) : (
-                <Button variant="outline" size="sm" onClick={secondaryAction.onClick}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={secondaryAction.onClick}
+                  disabled={secondaryAction.disabled}
+                  data-testid={secondaryAction["data-testid"]}
+                >
                   {secondaryAction.label}
                 </Button>
               ))}

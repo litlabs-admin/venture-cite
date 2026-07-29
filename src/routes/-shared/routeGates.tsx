@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import AppShell from "@/components/AppShell";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/use-auth";
-import { RouteSpinner } from "@/components/foundations";
+import { RouteSpinner, ContentSkeleton } from "@/components/foundations";
 
 // Phase 2 Task 5: verbatim copies of the four small route-gate helpers that
 // used to live inline in client/src/App.tsx (AuthenticatedRoute, AuthenticatedBareRoute,
@@ -62,7 +62,12 @@ export function AuthenticatedRoute({ component: Component }: { component: Compon
   return (
     <AppShell>
       <ErrorBoundary>
-        <Suspense fallback={<RouteSpinner />}>
+        {/* AppShell (sidebar/header) is already mounted here, so the loading
+            shape is knowable at the content-region level — unlike the bare
+            `isLoading` gate above (no layout rendered yet) and
+            AuthenticatedBareRoute's Suspense below (no shell at all), both
+            of which keep RouteSpinner. */}
+        <Suspense fallback={<ContentSkeleton />}>
           <Component />
         </Suspense>
       </ErrorBoundary>
@@ -84,6 +89,9 @@ export function AuthenticatedBareRoute({ component: Component }: { component: Co
 
   return (
     <ErrorBoundary>
+      {/* No AppShell here — this route has no chrome mounted at all yet, so
+          there's no knowable content shape to skeleton against. Keep the
+          bare spinner. */}
       <Suspense fallback={<RouteSpinner />}>
         <Component />
       </Suspense>
@@ -117,7 +125,9 @@ export function FirstRunGate({ component: Component }: { component: ComponentTyp
   return (
     <AppShell>
       <ErrorBoundary>
-        <Suspense fallback={<RouteSpinner />}>
+        {/* Same reasoning as AuthenticatedRoute above: AppShell is already
+            mounted, so a shape-matched skeleton fits better than a spinner. */}
+        <Suspense fallback={<ContentSkeleton />}>
           <Component />
         </Suspense>
       </ErrorBoundary>

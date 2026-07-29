@@ -1238,36 +1238,6 @@ export const insertTrackedContentUrlSchema = createInsertSchema(trackedContentUr
   createdAt: true,
 });
 
-// Prompt Portfolio - Track prompts by category/intent with share-of-answer
-export const promptPortfolio = pgTable(
-  "prompt_portfolio",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id")
-      .notNull()
-      .references(() => brands.id, { onDelete: "cascade" }),
-    prompt: text("prompt").notNull(),
-    category: text("category").notNull(),
-    funnelStage: text("funnel_stage").notNull(),
-    competitorSet: text("competitor_set").array(),
-    region: text("region").default("global"),
-    aiPlatform: text("ai_platform").notNull(),
-    isBrandCited: integer("is_brand_cited").default(0).notNull(),
-    citationPosition: integer("citation_position"),
-    shareOfAnswer: numeric("share_of_answer", { precision: 5, scale: 2 }).default("0"),
-    sentiment: text("sentiment").default("neutral"),
-    answerVolatility: integer("answer_volatility").default(0),
-    consensusScore: integer("consensus_score").default(0),
-    lastChecked: timestamp("last_checked").defaultNow().notNull(),
-    checkedHistory: jsonb("checked_history"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("prompt_portfolio_brand_id_idx").on(table.brandId)],
-);
-
 // Citation Quality Scoring
 export const citationQuality = pgTable(
   "citation_quality",
@@ -1446,40 +1416,6 @@ export const alertHistory = pgTable(
   (table) => [index("alert_history_brand_id_idx").on(table.brandId)],
 );
 
-// Prompt Test Runs - Scheduled testing of prompts across AI platforms
-export const promptTestRuns = pgTable(
-  "prompt_test_runs",
-  {
-    id: varchar("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    brandId: varchar("brand_id")
-      .notNull()
-      .references(() => brands.id, { onDelete: "cascade" }),
-    promptPortfolioId: varchar("prompt_portfolio_id").references(() => promptPortfolio.id, {
-      onDelete: "set null",
-    }),
-    prompt: text("prompt").notNull(),
-    aiPlatform: text("ai_platform").notNull(),
-    response: text("response"),
-    isBrandCited: integer("is_brand_cited").default(0).notNull(),
-    citationPosition: integer("citation_position"),
-    competitorsFound: text("competitors_found").array(),
-    sentiment: text("sentiment").default("neutral"),
-    shareOfAnswer: numeric("share_of_answer", { precision: 5, scale: 2 }),
-    hallucinationDetected: integer("hallucination_detected").default(0).notNull(),
-    hallucinationDetails: text("hallucination_details"),
-    sourcesCited: jsonb("sources_cited"),
-    runStatus: text("run_status").notNull().default("pending"),
-    scheduledAt: timestamp("scheduled_at"),
-    completedAt: timestamp("completed_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    error: text("error"),
-    metadata: jsonb("metadata"),
-  },
-  (table) => [index("prompt_test_runs_brand_id_idx").on(table.brandId)],
-);
-
 // Agent Tasks - Queue for automated GEO optimization tasks
 export const agentTasks = pgTable(
   "agent_tasks",
@@ -1571,11 +1507,6 @@ export const insertAlertHistorySchema = createInsertSchema(alertHistory).omit({
   sentAt: true,
 });
 
-export const insertPromptTestRunSchema = createInsertSchema(promptTestRuns).omit({
-  id: true,
-  createdAt: true,
-});
-
 export const insertAgentTaskSchema = createInsertSchema(agentTasks).omit({
   id: true,
   createdAt: true,
@@ -1592,12 +1523,6 @@ export const insertWorkflowRunSchema = createInsertSchema(workflowRuns).omit({
 export const insertMetricsHistorySchema = createInsertSchema(metricsHistory).omit({
   id: true,
   snapshotDate: true,
-});
-
-export const insertPromptPortfolioSchema = createInsertSchema(promptPortfolio).omit({
-  id: true,
-  createdAt: true,
-  lastChecked: true,
 });
 
 export const insertCitationQualitySchema = createInsertSchema(citationQuality).omit({
@@ -1653,8 +1578,6 @@ export type InsertFaqItem = z.infer<typeof insertFaqItemSchema>;
 export type FaqItem = typeof faqItems.$inferSelect;
 export type InsertBrandMention = z.infer<typeof insertBrandMentionSchema>;
 export type BrandMention = typeof brandMentions.$inferSelect;
-export type InsertPromptPortfolio = z.infer<typeof insertPromptPortfolioSchema>;
-export type PromptPortfolio = typeof promptPortfolio.$inferSelect;
 export type InsertCitationQuality = z.infer<typeof insertCitationQualitySchema>;
 export type CitationQuality = typeof citationQuality.$inferSelect;
 export type InsertBrandHallucination = z.infer<typeof insertBrandHallucinationSchema>;
@@ -1667,8 +1590,6 @@ export type InsertAlertSettings = z.infer<typeof insertAlertSettingsSchema>;
 export type AlertSettings = typeof alertSettings.$inferSelect;
 export type InsertAlertHistory = z.infer<typeof insertAlertHistorySchema>;
 export type AlertHistory = typeof alertHistory.$inferSelect;
-export type InsertPromptTestRun = z.infer<typeof insertPromptTestRunSchema>;
-export type PromptTestRun = typeof promptTestRuns.$inferSelect;
 export type InsertAgentTask = z.infer<typeof insertAgentTaskSchema>;
 export type AgentTask = typeof agentTasks.$inferSelect;
 export type InsertWorkflowRun = z.infer<typeof insertWorkflowRunSchema>;

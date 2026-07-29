@@ -1,6 +1,15 @@
 import { useMemo } from "react";
 import { StatusDot, type StatusDotTone } from "@/components/foundations/StatusDot";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { BrandFactScrapePage } from "@shared/schema";
 
@@ -63,30 +72,32 @@ function PageRow({
 }) {
   const tone = STATUS_TO_TONE[page.status];
   return (
-    <tr className="border-t border-border text-sm" data-testid={`scrape-page-row-${page.id}`}>
-      <td className="py-2 pr-3">
+    <TableRow className="text-sm hover:bg-transparent" data-testid={`scrape-page-row-${page.id}`}>
+      <TableCell className="py-2 pr-3 px-0">
         <div className="flex items-center gap-2">
           <StatusDot tone={tone} aria-label={`Status: ${STATUS_LABEL[page.status]}`} />
           <span className="text-xs text-muted-foreground">{STATUS_LABEL[page.status]}</span>
         </div>
-      </td>
-      <td className="py-2 pr-3 max-w-xs">
+      </TableCell>
+      <TableCell className="py-2 pr-3 px-0 max-w-xs">
         <span className="line-clamp-1 font-mono text-xs" title={page.url}>
           {truncate(page.url, 60)}
         </span>
-      </td>
-      <td className="py-2 pr-3 text-xs tabular-nums text-muted-foreground">
+      </TableCell>
+      <TableCell className="py-2 pr-3 px-0 text-xs tabular-nums text-muted-foreground">
         {formatBytes(page.bytes)}
-      </td>
-      <td className="py-2 pr-3 text-xs tabular-nums">{page.factCount ?? 0}</td>
-      <td className="py-2 pr-3 text-xs text-muted-foreground">{page.lang ?? "—"}</td>
-      <td className="py-2 pr-3 text-xs text-muted-foreground">
+      </TableCell>
+      <TableCell className="py-2 pr-3 px-0 text-xs tabular-nums">{page.factCount ?? 0}</TableCell>
+      <TableCell className="py-2 pr-3 px-0 text-xs text-muted-foreground">
+        {page.lang ?? "—"}
+      </TableCell>
+      <TableCell className="py-2 pr-3 px-0 text-xs text-muted-foreground">
         {page.errorKind ? truncate(page.errorKind, 20) : "—"}
-      </td>
-      <td className="py-2 text-xs tabular-nums text-muted-foreground">
+      </TableCell>
+      <TableCell className="py-2 px-0 text-xs tabular-nums text-muted-foreground">
         {formatDuration(page.fetchedAt, runStartedAt)}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -94,32 +105,32 @@ function SkeletonRows({ count = 3 }: { count?: number }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
-        <tr key={`skel-${i}`} className="border-t border-border">
-          <td className="py-2 pr-3">
+        <TableRow key={`skel-${i}`} className="hover:bg-transparent">
+          <TableCell className="py-2 pr-3 px-0">
             <div className="flex items-center gap-2">
               <StatusDot tone="pending" />
               <span className="text-xs text-muted-foreground">Queued</span>
             </div>
-          </td>
-          <td className="py-2 pr-3">
-            <div className="h-3 w-40 rounded bg-muted animate-pulse" />
-          </td>
-          <td className="py-2 pr-3">
-            <div className="h-3 w-12 rounded bg-muted animate-pulse" />
-          </td>
-          <td className="py-2 pr-3">
-            <div className="h-3 w-6 rounded bg-muted animate-pulse" />
-          </td>
-          <td className="py-2 pr-3">
-            <div className="h-3 w-6 rounded bg-muted animate-pulse" />
-          </td>
-          <td className="py-2 pr-3">
-            <div className="h-3 w-12 rounded bg-muted animate-pulse" />
-          </td>
-          <td className="py-2">
-            <div className="h-3 w-10 rounded bg-muted animate-pulse" />
-          </td>
-        </tr>
+          </TableCell>
+          <TableCell className="py-2 pr-3 px-0">
+            <Skeleton className="h-3 w-40" />
+          </TableCell>
+          <TableCell className="py-2 pr-3 px-0">
+            <Skeleton className="h-3 w-12" />
+          </TableCell>
+          <TableCell className="py-2 pr-3 px-0">
+            <Skeleton className="h-3 w-6" />
+          </TableCell>
+          <TableCell className="py-2 pr-3 px-0">
+            <Skeleton className="h-3 w-6" />
+          </TableCell>
+          <TableCell className="py-2 pr-3 px-0">
+            <Skeleton className="h-3 w-12" />
+          </TableCell>
+          <TableCell className="py-2 px-0">
+            <Skeleton className="h-3 w-10" />
+          </TableCell>
+        </TableRow>
       ))}
     </>
   );
@@ -135,25 +146,39 @@ function PagesTable({
   runStartedAt?: string | Date | null;
 }) {
   return (
-    <table className="w-full text-left">
-      <thead>
-        <tr className="text-xs uppercase tracking-wide text-muted-foreground">
-          <th className="py-2 pr-3 font-medium">Status</th>
-          <th className="py-2 pr-3 font-medium">URL</th>
-          <th className="py-2 pr-3 font-medium">Bytes</th>
-          <th className="py-2 pr-3 font-medium">Facts</th>
-          <th className="py-2 pr-3 font-medium">Lang</th>
-          <th className="py-2 pr-3 font-medium">Issue</th>
-          <th className="py-2 font-medium">Time</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+            Status
+          </TableHead>
+          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+            URL
+          </TableHead>
+          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+            Bytes
+          </TableHead>
+          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+            Facts
+          </TableHead>
+          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+            Lang
+          </TableHead>
+          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+            Issue
+          </TableHead>
+          <TableHead className="h-auto py-2 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+            Time
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {pages.length === 0 && isStreaming ? <SkeletonRows count={3} /> : null}
         {pages.map((page) => (
           <PageRow key={page.id} page={page} runStartedAt={runStartedAt} />
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 

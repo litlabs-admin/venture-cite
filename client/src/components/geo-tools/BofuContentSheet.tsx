@@ -165,16 +165,8 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
           <SheetDescription className="flex items-center gap-2">
             <Badge variant="outline">{content.contentType}</Badge>
             <Badge>{content.status ?? "draft"}</Badge>
-            {content.publishedAt && (
-              <Badge className="bg-positive-subtle text-positive hover:bg-positive-subtle">
-                Published
-              </Badge>
-            )}
-            {lastCitedAt && (
-              <Badge className="bg-muted text-foreground hover:bg-muted">
-                Cited recently · {lastCitedAt}
-              </Badge>
-            )}
+            {content.publishedAt && <Badge variant="positive">Published</Badge>}
+            {lastCitedAt && <Badge variant="neutral">Cited recently · {lastCitedAt}</Badge>}
           </SheetDescription>
         </SheetHeader>
 

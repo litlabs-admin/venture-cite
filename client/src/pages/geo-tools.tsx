@@ -62,6 +62,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Wave 9.4: pretty-print scan reports as multi-line toast descriptions.
 // Hides zero-valued lines so a clean run shows just the meaningful ones.
@@ -77,18 +78,21 @@ function formatReportLines(items: Record<string, number | undefined>): string {
 // selected without opening the dropdown.
 const LISTICLE_STATUS_DISPLAY: Record<
   string,
-  { label: string; className: string; icon?: boolean }
+  { label: string; variant: "neutral" | "warning" | "positive"; icon?: boolean }
 > = {
-  new: { label: "New", className: "bg-muted text-foreground hover:bg-muted" },
-  contacted: { label: "Contacted", className: "bg-chart-1/15 text-chart-1 hover:bg-chart-1/15" },
+  new: { label: "New", variant: "neutral" },
+  // "Contacted" is in-progress, not a positive outcome yet — warning tint
+  // (amber) reads as "pending action" without claiming success. Previously
+  // used chart-1 (the accent green), which is reserved for actions only.
+  contacted: { label: "Contacted", variant: "warning" },
   // "Won" is a neutral badge + check icon, not green/chart-4 — green is
   // reserved for actions, not outcomes.
   won: {
     label: "Won",
-    className: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    variant: "neutral",
     icon: true,
   },
-  dropped: { label: "Dropped", className: "bg-muted text-muted-foreground hover:bg-muted" },
+  dropped: { label: "Dropped", variant: "neutral" },
 };
 
 // Wave 9.4: header roll-up card. Single-line metric + descriptive
@@ -107,9 +111,9 @@ function SummaryCard({
   return (
     <Card data-testid={testId}>
       <CardContent className="pt-4 pb-4">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className="text-2xl font-semibold mt-1">{primary}</div>
-        <div className="text-xs text-muted-foreground mt-1">{secondary}</div>
+        <div className="text-label uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="text-metric font-semibold mt-1">{primary}</div>
+        <div className="text-caption text-muted-foreground mt-1">{secondary}</div>
       </CardContent>
     </Card>
   );
@@ -633,7 +637,7 @@ export default function GeoTools() {
                     </CardHeader>
                     <CardContent>
                       <div className="bg-chart-1/10 p-4 rounded-lg mb-6">
-                        <p className="text-sm text-chart-1">
+                        <p className="text-ui text-chart-1">
                           <strong>Why Listicles Matter:</strong> Getting included in "Best of"
                           articles is how brands rank #1 on ChatGPT. AI systems heavily cite these
                           curated lists.
@@ -641,8 +645,10 @@ export default function GeoTools() {
                       </div>
 
                       {listiclesLoading ? (
-                        <div className="text-center py-8">
-                          <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
+                        <div className="space-y-4">
+                          <Skeleton className="h-24 w-full rounded-lg" />
+                          <Skeleton className="h-24 w-full rounded-lg" />
+                          <Skeleton className="h-24 w-full rounded-lg" />
                         </div>
                       ) : listiclesIsError ? (
                         <ErrorState
@@ -657,7 +663,7 @@ export default function GeoTools() {
                               Tracked Listicles ({listicles.length})
                             </h3>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-caption text-muted-foreground">
                                 Filter by outreach
                               </span>
                               <Select
@@ -665,7 +671,7 @@ export default function GeoTools() {
                                 onValueChange={setListicleStatusFilter}
                               >
                                 <SelectTrigger
-                                  className="w-[160px] h-8 text-xs"
+                                  className="w-[160px] h-8 text-caption"
                                   data-testid="select-listicle-status-filter"
                                 >
                                   <SelectValue />
@@ -695,7 +701,7 @@ export default function GeoTools() {
                               const statusMeta =
                                 LISTICLE_STATUS_DISPLAY[status] ?? LISTICLE_STATUS_DISPLAY.new;
                               return (
-                                <Card key={l.id} className="border-l border-border">
+                                <Card key={l.id}>
                                   <CardContent className="pt-4">
                                     <div className="flex items-start justify-between gap-4">
                                       <StatusDot tone="neutral" className="mt-2" />
@@ -711,7 +717,7 @@ export default function GeoTools() {
                                         </a>
                                         <div className="flex flex-wrap gap-2 mt-2">
                                           <Badge
-                                            className={statusMeta.className}
+                                            variant={statusMeta.variant}
                                             data-testid={`badge-listicle-status-${l.id}`}
                                           >
                                             {statusMeta.icon && (
@@ -723,13 +729,13 @@ export default function GeoTools() {
                                             <Badge variant="outline">{l.sourcePublication}</Badge>
                                           )}
                                           {l.isIncluded === 1 ? (
-                                            <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                                            <Badge variant="positive">
                                               <CheckCircle className="h-3 w-3 mr-1" />
                                               Included at #{l.listPosition ?? "?"} /{" "}
                                               {l.totalListItems ?? "?"}
                                             </Badge>
                                           ) : (
-                                            <Badge variant="destructive">
+                                            <Badge variant="neutral">
                                               <XCircle className="h-3 w-3 mr-1" />
                                               Not in list
                                             </Badge>
@@ -742,7 +748,7 @@ export default function GeoTools() {
                                           )}
                                         </div>
                                         {competitors.length > 0 && (
-                                          <p className="text-xs text-muted-foreground mt-2">
+                                          <p className="text-caption text-muted-foreground mt-2">
                                             Competitors: {competitors.slice(0, 3).join(", ")}
                                             {extra > 0 ? ` + ${extra} more` : ""}
                                           </p>
@@ -759,7 +765,7 @@ export default function GeoTools() {
                                           }
                                         >
                                           <SelectTrigger
-                                            className="w-[150px] h-8 text-xs"
+                                            className="w-[150px] h-8 text-caption"
                                             data-testid={`select-listicle-status-${l.id}`}
                                           >
                                             <SelectValue />
@@ -827,7 +833,7 @@ export default function GeoTools() {
                     </CardHeader>
                     <CardContent>
                       <div className="bg-chart-3/10 p-4 rounded-lg mb-6">
-                        <p className="text-sm text-chart-3">
+                        <p className="text-ui text-chart-3">
                           <strong>Wikipedia = 40% of AI Citations:</strong> It's the #2 most cited
                           source by AI systems after Reddit. Even a mention on a relevant Wikipedia
                           page can significantly boost your AI visibility.
@@ -846,14 +852,14 @@ export default function GeoTools() {
                         <div className="space-y-6">
                           <Card>
                             <CardHeader>
-                              <CardTitle className="text-base flex items-center gap-2">
+                              <CardTitle className="text-section flex items-center gap-2">
                                 <CheckCircle className="h-4 w-4 text-foreground" />
                                 You&apos;re already mentioned ({wikiExistingRows.length})
                               </CardTitle>
                             </CardHeader>
                             <CardContent>
                               {wikiExistingRows.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-ui text-muted-foreground">
                                   No existing mentions found on Wikipedia yet.
                                 </p>
                               ) : (
@@ -876,12 +882,12 @@ export default function GeoTools() {
                                           <ExternalLink className="h-3 w-3" />
                                         </a>
                                         {m.mentionContext && (
-                                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                          <p className="text-ui text-muted-foreground mt-1 line-clamp-2">
                                             {m.mentionContext}
                                           </p>
                                         )}
                                         {reason && (
-                                          <p className="text-xs text-muted-foreground mt-2 italic">
+                                          <p className="text-caption text-muted-foreground mt-2 italic">
                                             {reason}
                                           </p>
                                         )}
@@ -895,14 +901,14 @@ export default function GeoTools() {
 
                           <Card>
                             <CardHeader>
-                              <CardTitle className="text-base flex items-center gap-2">
+                              <CardTitle className="text-section flex items-center gap-2">
                                 <Target className="h-4 w-4 text-chart-1" />
                                 Pages you could target ({wikiOpportunityRows.length})
                               </CardTitle>
                             </CardHeader>
                             <CardContent>
                               {wikiOpportunityRows.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-ui text-muted-foreground">
                                   No opportunity pages surfaced. Try re-scanning after adding
                                   competitors or products to the brand profile.
                                 </p>
@@ -957,12 +963,12 @@ export default function GeoTools() {
                                           </Button>
                                         </div>
                                         {m.mentionContext && (
-                                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                          <p className="text-ui text-muted-foreground mt-1 line-clamp-2">
                                             {m.mentionContext}
                                           </p>
                                         )}
                                         {reason && (
-                                          <p className="text-xs text-muted-foreground mt-2 italic">
+                                          <p className="text-caption text-muted-foreground mt-2 italic">
                                             {reason}
                                           </p>
                                         )}
@@ -996,7 +1002,7 @@ export default function GeoTools() {
                     </CardHeader>
                     <CardContent>
                       <div className="bg-muted p-4 rounded-lg mb-6">
-                        <p className="text-sm text-foreground">
+                        <p className="text-ui text-foreground">
                           <strong>80% BOFU Strategy:</strong> Comparison articles ("X vs Y") and
                           alternatives guides convert 80% better and get cited heavily by AI systems
                           for purchase decisions.
@@ -1005,7 +1011,7 @@ export default function GeoTools() {
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div>
-                          <label className="text-sm font-medium mb-2 block">Content Type</label>
+                          <label className="text-ui font-medium mb-2 block">Content Type</label>
                           <Select value={bofuType} onValueChange={setBofuType}>
                             <SelectTrigger data-testid="select-bofu-type">
                               <SelectValue />
@@ -1019,7 +1025,7 @@ export default function GeoTools() {
                         </div>
                         {(bofuType === "comparison" || bofuType === "alternatives") && (
                           <div>
-                            <label className="text-sm font-medium mb-2 block">
+                            <label className="text-ui font-medium mb-2 block">
                               {bofuType === "comparison" ? "Compare With" : "Alternatives To"}
                             </label>
                             <CompetitorCombobox
@@ -1032,7 +1038,7 @@ export default function GeoTools() {
                         )}
                         {bofuType === "guide" && (
                           <div>
-                            <label className="text-sm font-medium mb-2 block">Target Keyword</label>
+                            <label className="text-ui font-medium mb-2 block">Target Keyword</label>
                             <Input
                               placeholder="e.g., PR agency guide"
                               value={bofuKeyword}
@@ -1068,14 +1074,15 @@ export default function GeoTools() {
                       <Separator className="my-6" />
 
                       {bofuLoading ? (
-                        <div className="text-center py-8">
-                          <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
+                        <div className="space-y-3">
+                          <Skeleton className="h-20 w-full rounded-lg" />
+                          <Skeleton className="h-20 w-full rounded-lg" />
                         </div>
                       ) : (bofuData as any)?.data?.length > 0 ? (
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <h3 className="font-semibold">Generated Content</h3>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-caption text-muted-foreground">
                               Click any piece to view, copy, or mark as published.
                             </span>
                           </div>
@@ -1089,7 +1096,8 @@ export default function GeoTools() {
                             return (
                               <Card
                                 key={content.id}
-                                className="cursor-pointer hover:bg-muted/40 transition-colors"
+                                interactive
+                                className="cursor-pointer"
                                 onClick={() => {
                                   setActiveBofu(content);
                                   setBofuSheetOpen(true);
@@ -1101,21 +1109,19 @@ export default function GeoTools() {
                                     <div className="min-w-0 flex-1">
                                       <div className="flex flex-wrap items-center gap-2 mb-1">
                                         <Badge variant="outline">{content.contentType}</Badge>
-                                        <Badge>{content.status ?? "draft"}</Badge>
+                                        <Badge variant="neutral">{content.status ?? "draft"}</Badge>
                                         {content.publishedAt && (
-                                          <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                                          <Badge variant="positive">
                                             <Check className="h-3 w-3 mr-1" aria-hidden="true" />
                                             Published
                                           </Badge>
                                         )}
                                         {recentlyCited && (
-                                          <Badge className="bg-chart-1/15 text-chart-1 hover:bg-chart-1/15">
-                                            Cited recently
-                                          </Badge>
+                                          <Badge variant="positive">Cited recently</Badge>
                                         )}
                                       </div>
                                       <h4 className="font-medium line-clamp-2">{content.title}</h4>
-                                      <p className="text-xs text-muted-foreground mt-1">
+                                      <p className="text-caption text-muted-foreground mt-1">
                                         {content.publishedUrl ? (
                                           <span className="line-clamp-2 inline-block max-w-full">
                                             {content.publishedUrl}
@@ -1218,10 +1224,10 @@ export default function GeoTools() {
           </DialogHeader>
           {wikiDraft && (
             <div className="space-y-3">
-              <div className="border rounded-md p-3 bg-muted/30 whitespace-pre-wrap text-sm">
+              <div className="border rounded-md p-3 bg-muted/30 whitespace-pre-wrap text-ui">
                 {wikiDraft.text}
               </div>
-              <ul className="text-xs text-muted-foreground space-y-1">
+              <ul className="text-caption text-muted-foreground space-y-1">
                 {wikiDraft.notes.map((n, i) => (
                   <li key={i}>• {n}</li>
                 ))}

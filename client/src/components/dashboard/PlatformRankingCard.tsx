@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { StatusDot, type StatusDotTone } from "@/components/foundations";
 import SafeMarkdown from "@/components/SafeMarkdown";
 import { stripTrackingParams } from "@/lib/stripTrackingParams";
 
@@ -32,17 +33,12 @@ export default function PlatformRankingCard({
     : showDestructive
       ? "text-destructive"
       : "text-muted-foreground";
-  const cardBorder = found
-    ? "border-positive bg-positive-subtle"
+  const statusTone: StatusDotTone = platform.isCitedSnippet
+    ? "success"
     : showDestructive
-      ? "border-destructive/20 bg-destructive/5"
-      : "border-border bg-muted/30";
-  const pillClasses = platform.isCitedSnippet
-    ? "text-positive bg-positive-subtle"
-    : showDestructive
-      ? "text-destructive bg-destructive/10"
-      : "text-muted-foreground bg-muted";
-  const pillText = platform.isCitedSnippet ? "Cited" : hasMeasured ? "Not cited" : "Pending";
+      ? "fail"
+      : "pending";
+  const statusText = platform.isCitedSnippet ? "Cited" : hasMeasured ? "Not cited" : "Pending";
   const rankText =
     platform.rank !== null
       ? `#${platform.rank}`
@@ -53,17 +49,13 @@ export default function PlatformRankingCard({
           : "Pending";
 
   return (
-    <Card className={"border " + cardBorder} data-testid={`platform-card-${platform.aiPlatform}`}>
+    <Card className="border border-border" data-testid={`platform-card-${platform.aiPlatform}`}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-1.5 gap-2">
           <span className="font-medium text-sm text-foreground">{platform.aiPlatform}</span>
-          <span
-            className={
-              "text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold " +
-              pillClasses
-            }
-          >
-            {pillText}
+          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+            <StatusDot tone={statusTone} aria-label={statusText} />
+            {statusText}
           </span>
         </div>
 

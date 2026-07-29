@@ -218,7 +218,7 @@ export default function Register() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-primary hover:bg-primary/90"
+              className="w-full"
               disabled={registerMutation.isPending || !allRequirementsMet || !passwordsMatch}
               data-testid="button-register"
             >

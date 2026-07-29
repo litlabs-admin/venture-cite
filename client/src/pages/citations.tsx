@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
+import { useSearch, useNavigate, useRouterState } from "@tanstack/react-router";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,11 +27,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatDistanceToNow } from "date-fns";
-import PromptsTab, { type BrandPrompt } from "@/components/citations/PromptsTab";
+import PromptsTab from "@/components/citations/PromptsTab";
 import ResultsTab from "@/components/citations/ResultsTab";
 import HistoryTab from "@/components/citations/HistoryTab";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
+import { usePrompts, useRunPrompts, useBackfillPrompts, promptKeys } from "@/hooks/usePrompts";
 
 export default function Citations() {
   const { toast } = useToast();
@@ -43,13 +44,7 @@ export default function Citations() {
     isError: promptsIsError,
     isRefetching: promptsIsRefetching,
     refetch: refetchPrompts,
-  } = useQuery<{
-    success: boolean;
-    data: BrandPrompt[];
-  }>({
-    queryKey: [`/api/brand-prompts/${selectedBrandId}`],
-    enabled: !!selectedBrandId,
-  });
+  } = usePrompts(selectedBrandId);
   const prompts = promptsData?.data || [];
 
   // Wave 9: POST /run is now async (returns ~100ms with runId). Completion
@@ -57,97 +52,90 @@ export default function Citations() {
   // the mutation toast just confirms the run started. Two-tab races receive
   // 409 with the existing runId — surfaced as an "already running" toast
   // rather than an error.
-  const runMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/brand-prompts/${selectedBrandId}/run`, {});
-      const json = await response.json();
-      return { status: response.status, body: json };
-    },
-    onSuccess: ({ status, body }) => {
-      if (status === 409 && body?.error === "already_running") {
-        toast({
-          title: "Run already in progress",
-          description: "Watching live progress for the existing run.",
-        });
-        // Make sure the active-runs gate ticks immediately so the banner shows.
-        queryClient.invalidateQueries({
-          queryKey: ["/api/brands", selectedBrandId, "citation-runs/active"],
-        });
-        // Wave 9.2: also seed pendingRunId from the existing run so the
-        // banner appears instantly rather than waiting up to 8s for the
-        // gate to confirm.
-        if (body?.data?.runId) setPendingRunId(body.data.runId);
-        return;
-      }
-      if (body?.success) {
-        queryClient.invalidateQueries({ queryKey: ["/api/onboarding-status"] });
-        // Trigger the active-runs gate to refresh now so the live banner
-        // appears in <1s instead of waiting on the 8s polling cadence.
-        queryClient.invalidateQueries({
-          queryKey: ["/api/brands", selectedBrandId, "citation-runs/active"],
-        });
-        // Wave 9.2: optimistic banner. The polling gate still has up to
-        // 8s of latency before it sees the new run; pendingRunId fills
-        // the gap so the banner shows in ~200ms. Cleared by the effect
-        // below once the gate confirms.
-        if (body?.data?.runId) setPendingRunId(body.data.runId);
-        toast({
-          title: "Run started",
-          description: "Watch live progress on this page.",
-        });
-      } else {
-        toast({
-          title: "Couldn't start run",
-          description: body?.error || "Please try again.",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (err: Error) =>
-      toast({ title: "Couldn't start run", description: err.message, variant: "destructive" }),
-  });
+  const runMutationImpl = useRunPrompts(selectedBrandId);
+  // The shared hook only knows the request/response shape; page-specific UI
+  // reactions (toasts, optimistic banner state) live here since they touch
+  // this component's state. `runCheck` wraps `.mutate` so both call sites
+  // (the button below and the one passed down into ResultsTab) get the same
+  // behavior — matching the pre-refactor mutation, whose onSuccess/onError
+  // were baked in at creation and therefore fired for every caller.
+  const runCheck = () => {
+    runMutationImpl.mutate(undefined, {
+      onSuccess: ({ status, body }) => {
+        if (status === 409 && body?.error === "already_running") {
+          toast({
+            title: "Run already in progress",
+            description: "Watching live progress for the existing run.",
+          });
+          // Make sure the active-runs gate ticks immediately so the banner shows.
+          queryClient.invalidateQueries({
+            queryKey: ["/api/brands", selectedBrandId, "citation-runs/active"],
+          });
+          // Wave 9.2: also seed pendingRunId from the existing run so the
+          // banner appears instantly rather than waiting up to 8s for the
+          // gate to confirm.
+          if (body?.data?.runId) setPendingRunId(body.data.runId);
+          return;
+        }
+        if (body?.success) {
+          queryClient.invalidateQueries({ queryKey: ["/api/onboarding-status"] });
+          // Trigger the active-runs gate to refresh now so the live banner
+          // appears in <1s instead of waiting on the 8s polling cadence.
+          queryClient.invalidateQueries({
+            queryKey: ["/api/brands", selectedBrandId, "citation-runs/active"],
+          });
+          // Wave 9.2: optimistic banner. The polling gate still has up to
+          // 8s of latency before it sees the new run; pendingRunId fills
+          // the gap so the banner shows in ~200ms. Cleared by the effect
+          // below once the gate confirms.
+          if (body?.data?.runId) setPendingRunId(body.data.runId);
+          toast({
+            title: "Run started",
+            description: "Watch live progress on this page.",
+          });
+        } else {
+          toast({
+            title: "Couldn't start run",
+            description: body?.error || "Please try again.",
+            variant: "destructive",
+          });
+        }
+      },
+      onError: (err: Error) =>
+        toast({ title: "Couldn't start run", description: err.message, variant: "destructive" }),
+    });
+  };
+  const runMutation = { ...runMutationImpl, mutate: runCheck };
 
   // Re-score stored responses with the current detector. Free (no AI calls).
-  const backfillMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest(
-        "POST",
-        `/api/brand-prompts/${selectedBrandId}/re-detect-all`,
-        {},
-      );
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.invalidateQueries({
-          queryKey: [`/api/brand-prompts/${selectedBrandId}/results`],
-        });
-        queryClient.invalidateQueries({
-          queryKey: [`/api/brand-prompts/${selectedBrandId}/history`],
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/listicles"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/wikipedia-mentions"] });
-        const { counts, durationMs } = data.data as {
-          counts: { rankings: number; listicles: number; wikipedia: number; newlyCited: number };
-          durationMs: number;
-        };
-        const total = counts.rankings + counts.listicles + counts.wikipedia;
-        const description =
-          total === 0
-            ? "No changes — everything already matches the current variant list."
-            : `Updated ${counts.rankings} ranking${counts.rankings === 1 ? "" : "s"}, ${counts.listicles} listicle${counts.listicles === 1 ? "" : "s"}, ${counts.wikipedia} wiki mention${counts.wikipedia === 1 ? "" : "s"}. ${counts.newlyCited} newly re-detected. (${Math.round(durationMs / 100) / 10}s)`;
-        toast({ title: "Re-check complete", description });
-      } else {
-        toast({
-          title: "Re-check failed",
-          description: data.error || "Please try again.",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (err: Error) =>
-      toast({ title: "Re-check failed", description: err.message, variant: "destructive" }),
-  });
+  const backfillMutationImpl = useBackfillPrompts(selectedBrandId);
+  const runBackfill = () => {
+    backfillMutationImpl.mutate(undefined, {
+      onSuccess: (data: any) => {
+        if (data.success) {
+          const { counts, durationMs } = data.data as {
+            counts: { rankings: number; listicles: number; wikipedia: number; newlyCited: number };
+            durationMs: number;
+          };
+          const total = counts.rankings + counts.listicles + counts.wikipedia;
+          const description =
+            total === 0
+              ? "No changes — everything already matches the current variant list."
+              : `Updated ${counts.rankings} ranking${counts.rankings === 1 ? "" : "s"}, ${counts.listicles} listicle${counts.listicles === 1 ? "" : "s"}, ${counts.wikipedia} wiki mention${counts.wikipedia === 1 ? "" : "s"}. ${counts.newlyCited} newly re-detected. (${Math.round(durationMs / 100) / 10}s)`;
+          toast({ title: "Re-check complete", description });
+        } else {
+          toast({
+            title: "Re-check failed",
+            description: data.error || "Please try again.",
+            variant: "destructive",
+          });
+        }
+      },
+      onError: (err: Error) =>
+        toast({ title: "Re-check failed", description: err.message, variant: "destructive" }),
+    });
+  };
+  const backfillMutation = { ...backfillMutationImpl, mutate: runBackfill };
 
   // Wave 8/9: live-update lifecycle. The status-gate hook tells us whether
   // any citation run is in flight; useCitationLiveRefresh fires a one-shot
@@ -156,8 +144,8 @@ export default function Citations() {
   // and HistoryTab themselves now (they each call useActiveCitationRuns).
   const { hasActive, runs: activeRuns } = useActiveCitationRuns(selectedBrandId);
   useCitationLiveRefresh(selectedBrandId, [
-    [`/api/brand-prompts/${selectedBrandId}/results`],
-    [`/api/brand-prompts/${selectedBrandId}/history`],
+    [...promptKeys.results(selectedBrandId)],
+    [...promptKeys.history(selectedBrandId)],
   ]);
 
   // Wave 9: keep the rotating loading messages cycling for the entire run,
@@ -289,7 +277,7 @@ export default function Citations() {
             const newRankings = json.data.runs.some((rn) => rn.rankings.length > 0);
             if (newRankings && selectedBrandId) {
               queryClient.invalidateQueries({
-                queryKey: [`/api/brand-prompts/${selectedBrandId}/results`],
+                queryKey: promptKeys.results(selectedBrandId),
               });
             }
             if (headline.done) {
@@ -349,7 +337,26 @@ export default function Citations() {
   // confirming. `hasActive` lags up to 8s.
   const showBanner = hasActive || !!pendingRunId;
 
-  const [activeTab, setActiveTab] = usePersistedState<string>("vc_citations_tab", "prompts");
+  // URL-addressable inner tab bar (`?ptab=`). citations.tsx renders inside
+  // whichever spine stage route mounted it (/monitor), which has no single
+  // typed `Route.useSearch()` here — same loose-read pattern AppShell.tsx
+  // and SpineShell use for `tab` (see native-api-contract.md rule 3).
+  // `ptab` is declared on monitorSearchSchema in
+  // src/routes/-shared/searchSchemas.ts.
+  const navigate = useNavigate();
+  const location = useRouterState({ select: (s) => s.location.pathname });
+  const search = useSearch({ strict: false });
+  const [lastUsedTab, setLastUsedTab] = usePersistedState<string>("vc_citations_tab", "prompts");
+  const ptabFromUrl = typeof search.ptab === "string" ? search.ptab : undefined;
+  const activeTab = ptabFromUrl ?? lastUsedTab;
+  const setActiveTab = (value: string) => {
+    setLastUsedTab(value);
+    navigate({
+      to: location,
+      search: (prev: Record<string, unknown>) => ({ ...prev, ptab: value }),
+      replace: true,
+    });
+  };
 
   const hasPrompts = prompts.length > 0;
   const promptsAgeLabel = hasPrompts
@@ -383,13 +390,13 @@ export default function Citations() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
                 </span>
-                <span className="text-sm font-medium truncate">
+                <span className="text-ui font-medium truncate">
                   Citation run in progress — {headlineProgress.progressPct}%
                 </span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 {headlineProgress.totalChecks > 0 && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-caption text-muted-foreground">
                     {headlineProgress.totalCited} cited / {headlineProgress.totalChecks} checks
                   </span>
                 )}
@@ -397,7 +404,7 @@ export default function Citations() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-xs"
+                    className="h-7 px-2 text-caption"
                     onClick={() => setActiveTab("results")}
                     data-testid="button-banner-view-live"
                   >
@@ -415,14 +422,14 @@ export default function Citations() {
       {brandsLoading ? (
         <Skeleton className="h-10 w-full" />
       ) : brands.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground text-ui">
           Create a brand first to start tracking citations.
         </p>
       ) : !selectedBrandId ? (
         <Card>
           <CardContent className="py-16 text-center">
             <Sparkles className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">
+            <h3 className="text-page font-semibold text-foreground mb-2">
               Select a Brand to Get Started
             </h3>
             <p className="text-muted-foreground max-w-md mx-auto">
@@ -435,7 +442,7 @@ export default function Citations() {
         <>
           {/* Tab bar + Run Check on the same row. */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border">
-            <div className="flex gap-1">
+            <div className="flex gap-1" role="tablist" aria-label="Citations">
               {TABS.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -443,9 +450,11 @@ export default function Citations() {
                   <button
                     key={tab.id}
                     type="button"
+                    role="tab"
+                    aria-selected={isActive}
                     onClick={() => setActiveTab(tab.id)}
                     data-tour-id={tab.tourId}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                    className={`flex items-center gap-2 px-4 py-2.5 text-ui font-medium transition-colors border-b-2 -mb-px ${
                       isActive
                         ? "border-primary text-foreground"
                         : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
@@ -518,7 +527,7 @@ export default function Citations() {
                       ) : (
                         <div>
                           <div className="font-medium">Re-check stored responses</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-caption text-muted-foreground">
                             Re-apply detection to old runs after adding name variations. Free — no
                             AI calls.
                           </div>
@@ -567,7 +576,7 @@ export default function Citations() {
           {activeTab === "schedule" && (
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-ui text-muted-foreground">
                   Citation scans run weekly for every brand.
                 </p>
               </CardContent>

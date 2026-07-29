@@ -26,7 +26,8 @@ export const chartTheme = {
     // decision, not a rename.
   },
   // Categorical palette for multi-series / donut charts (competitor slices
-  // etc.). Raw var() — the --chart-* tokens already include hsl().
+  // etc.). Raw var() — the --chart-* tokens are oklch(), same as every other
+  // token in this file; never wrap them in hsl() (see the file header).
   palette: [
     "var(--chart-1)",
     "var(--chart-2)",
@@ -39,4 +40,23 @@ export const chartTheme = {
     border: "1px solid var(--border)",
   },
   tooltipLabelStyle: { color: "var(--foreground)" },
+  // Entrance-animation props to spread onto Recharts series components
+  // (Line, Area, Bar, Pie, etc). Wired into monitor-overview.tsx's citation
+  // trend Line and share-of-voice Pie; spread onto any other chart that
+  // wants the same draw-in/fade-in as it's added.
+  animation: {
+    // Line draw-in.
+    lineAnimation: {
+      isAnimationActive: true,
+      animationDuration: 1000,
+      animationEasing: "ease" as const,
+    },
+    // Area fill fade-in, starting after the line begins drawing.
+    areaAnimation: {
+      isAnimationActive: true,
+      animationDuration: 600,
+      animationBegin: 400,
+      animationEasing: "ease" as const,
+    },
+  },
 } as const;

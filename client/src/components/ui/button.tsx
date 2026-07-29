@@ -16,8 +16,17 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // Rests as a tint, goes solid only on :hover — matches the
+        // reference's .btn-primary exactly (color:accent/bg:accent-subtle at
+        // rest, color:surface/bg:accent on hover), confirmed from its
+        // compiled CSS. A saturated filled button should only ever appear
+        // transiently under the cursor, never at rest.
+        default:
+          "bg-(--brand-accent-subtle) text-(--brand-accent) hover:bg-primary hover:text-primary-foreground",
+        // Mirrors .btn-danger: never goes fully solid, even on hover — rest
+        // is neutral (bordered, white), hover moves to a subtle red tint.
+        destructive:
+          "border border-input bg-background text-destructive hover:bg-destructive-subtle hover:text-destructive",
         outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",

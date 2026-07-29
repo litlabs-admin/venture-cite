@@ -1,6 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap")
-layer(base);
 @import "tailwindcss";
+/* Variable-weight Inter + JetBrains Mono load once, in src/routes/__root.tsx —
+   this file used to load a second, static-weight copy from a different URL
+   on every page. Don't re-add an @import here. */
 
 @plugin 'tailwindcss-animate';
 @plugin '@tailwindcss/typography';
@@ -83,6 +84,42 @@ layer(base);
 
   --shadow-vc-card: 0 1px 3px 0 #0000000a;
   --shadow-vc-overlay: 0 4px 16px -4px #00000014;
+
+  /* Elevation scale — moved here from :root/@layer utilities, where Tailwind
+     v4's resolver never saw it (shadow-sm/md/lg were silently falling back to
+     Tailwind's stock black shadows). Values unchanged, just relocated. */
+  --shadow-2xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.03);
+  --shadow-xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04);
+  --shadow-sm: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05);
+  --shadow:
+    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04),
+    0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.18);
+  --shadow-md:
+    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05),
+    0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.22);
+  --shadow-lg:
+    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
+    0px 14px 36px -28px oklch(0.2019 0.0163 273.9 / 0.28);
+  --shadow-xl:
+    0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
+    0px 20px 44px -30px oklch(0.2019 0.0163 273.9 / 0.32);
+  --shadow-2xl: 0px 28px 60px -36px oklch(0.2019 0.0163 273.9 / 0.36);
+
+  /* Named type scale, ported from Trakkr's own compiled @theme block
+     (verified via document.styleSheets against the live site) rather than
+     invented — each name is a UI role, not a t-shirt size. Tailwind
+     auto-generates a text-* utility per key. */
+  --text-hero: 56px;
+  --text-stat: 28px;
+  --text-metric: 24px;
+  --text-page: 20px;
+  --text-section: 16px;
+  --text-dialog: 15px;
+  --text-ui: 14px;
+  --text-body: 13px;
+  --text-caption: 12px;
+  --text-data: 11px;
+  --text-label: 10px;
 
   --transition-duration-250: 250ms;
   --transition-duration-450: 450ms;
@@ -300,6 +337,61 @@ layer(base);
   }
 }
 
+@utility shimmer-sweep {
+  /* Skeleton loading sweep — a highlight passed over a solid base fill via an
+     ::after pseudo-element, matching Trakkr's .skeleton-shimmer recipe
+     exactly (verified from their compiled CSS): 1.5s ease-in-out infinite.
+     Distinct from shimmer-bg above, which is the landing-only gradient. */
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.5), transparent);
+    animation: shimmer-sweep-move 1.5s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      animation: none;
+    }
+  }
+}
+
+@keyframes shimmer-sweep-move {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@utility checkmark-draw {
+  /* Draw-in checkmark for a status-check/progress step flipping from
+     pending to done — matches Trakkr's exact spec (verified from their
+     compiled CSS): stroke-dasharray 24, dashoffset animates 24 -> 0 over
+     0.3s ease-out. Apply to the <path>/<polyline> of a check glyph (e.g.
+     lucide's CheckCircle path), not the wrapping icon container. */
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: checkmark-draw 0.3s ease-out forwards;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes checkmark-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 @layer utilities {
   /* ───────────────────────────────────────────────────────────────────────────
    Token system. Two layers: primitive tokens, then the shadcn semantic vars
@@ -314,9 +406,13 @@ layer(base);
    shadows. Every light value below carries its TDS source hex in a comment;
    they should stay greppable against that file.
 
-   DARK is unchanged and deliberately NOT a sibling of light: cool zinc
-   (hue ~285) with the old indigo accent. TDS ships no dark variant, so
-   inventing one was out of scope.
+   DARK has no Trakkr source to transcribe — TDS ships no dark variant at all
+   (confirmed by a zero-match search of trakkr.ai's compiled CSS for any
+   .dark-scoped rule), so dark's neutral/status palette (cool zinc, hue ~285)
+   is this app's own design, not a transcription. Its accent WAS updated to
+   match light's green (previously indigo, hue 278) — see the .dark block
+   below for the measured values; this line used to say "old indigo accent"
+   after that change already happened and had gone stale.
 
    OKLCH throughout, except pure white (TDS's canvas really is #ffffff).
    positive/warning/negative are FUNCTIONAL-ONLY (status/destructive), never
@@ -354,15 +450,27 @@ layer(base);
     --brand-accent-press: oklch(0.4171 0.08 170.6); /* derived from the fill */
     --brand-accent-fg: oklch(1 0 0); /* white label on the accent fill */
     --brand-accent-subtle: oklch(0.9591 0.0152 171.1); /* --tds-accent-weak #e8f5f0 */
+    /* Raw R/G/B channel triplet (space-separated, no rgb() wrapper) for
+     rgba(var(--brand-accent-rgb), α) — CSS rgba() needs raw channels, not an
+     oklch/hex var, and this is the only place in the app that needs
+     continuous (non-token-stepped) opacity over the brand colour: the
+     competitor gap matrix's cell fill, whose α scales with the cell's
+     value rather than snapping to a fixed *-subtle tint. Same #0e9373 as
+     --brand-accent above, decomposed. */
+    --brand-accent-rgb: 14 147 115;
     /* Functional status. TDS ships pos + neg only; --warning is derived from
      --tds-s3, its one warm hue. */
     --positive: oklch(0.5912 0.1145 170); /* --tds-pos #0e9373 */
     --warning: oklch(0.7224 0.1378 64.6); /* derived from --tds-s3 #e0913a */
     --negative: oklch(0.5954 0.1829 27.3); /* --tds-neg #d6453d */
-    /* Weak status tints, for badge/callout backgrounds. These exist as real
-     tokens because Tailwind v3 cannot apply an opacity modifier to a bare
-     var() colour — `bg-destructive/10` silently generates nothing — so the
-     tinted variants have to be their own values. */
+    /* Weak status tints, for badge/callout backgrounds. This project is on
+     Tailwind v4, where an opacity modifier on a bare var() colour (e.g.
+     `bg-destructive/10`) works fine via color-mix() — the "v3 can't do this"
+     rationale that used to justify these as separate tokens was stale (the
+     codebase already relies on the same opacity-modifier behaviour
+     elsewhere: error-state.tsx, button.tsx, table.tsx). Kept as explicit
+     tokens anyway because they match Trakkr's own separate *-subtle tokens
+     exactly, not because v4 requires it. */
     --positive-subtle: oklch(0.9591 0.0152 171.1); /* --tds-pos-weak #e8f5f0 */
     --negative-subtle: oklch(0.9563 0.0186 21.6); /* --tds-neg-weak #fdeceb */
     --warning-subtle: oklch(0.9685 0.0203 74.7); /* derived to match the pair above */
@@ -402,7 +510,8 @@ layer(base);
     --muted: var(--bg-surface-1);
     --muted-foreground: var(--fg-tertiary);
     /* shadcn `accent` is the NEUTRAL hover/selected surface, not the brand
-     colour. Brand colour is `--primary` (← --brand-accent above). With white
+     colour. Brand colour is `--primary` (← --brand-accent-fill above, not the
+     flat --brand-accent — see the accent block's contrast note). With white
      cards, the hover/selected surface is the slate muted step so it stays
      visible on white (surface-2 would be invisible card-on-card). */
     --accent: var(--bg-surface-1);
@@ -411,7 +520,12 @@ layer(base);
     --destructive-foreground: var(--color-on-strong);
     --border: var(--border-default);
     --input: var(--border-strong);
-    --ring: var(--brand-accent);
+    /* Focus ring uses the TINT, not the flat accent — matches Trakkr's own
+       .input:focus (box-shadow ring in --color-accent-subtle) and .btn's
+       focus-visible ring, both confirmed from their compiled CSS. A
+       full-strength ring is one saturated shape too many next to a tinted
+       button/input that's already following the same rule. */
+    --ring: var(--brand-accent-subtle);
     /* Categorical data ramp = TDS's series colours, in TDS's order. The lead
      is the brand green, so the first series and the accent match. TDS also
      ships a sixth (--tds-s6 #2aa5b0); it is deliberately not exposed as a token,
@@ -436,26 +550,7 @@ layer(base);
     --font-sans: "Inter", system-ui, sans-serif;
     --font-serif: Georgia, serif;
     --font-mono: "JetBrains Mono", ui-monospace, Monaco, Consolas, monospace;
-    --radius: 10px; /* --tds-r; Tailwind derives md 8px / sm 6px from it */
-    /* Shadow scale, flattened to TDS's border-first depth and retinted from
-     slate to #14161e. The wide, heavily-negative-spread second layer is what
-     gives TDS surfaces their soft lift without a visible drop shadow. */
-    --shadow-2xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.03);
-    --shadow-xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04);
-    --shadow-sm: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05);
-    --shadow:
-      0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.04),
-      0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.18);
-    --shadow-md:
-      0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.05),
-      0px 8px 24px -16px oklch(0.2019 0.0163 273.9 / 0.22);
-    --shadow-lg:
-      0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
-      0px 14px 36px -28px oklch(0.2019 0.0163 273.9 / 0.28);
-    --shadow-xl:
-      0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.06),
-      0px 20px 44px -30px oklch(0.2019 0.0163 273.9 / 0.32);
-    --shadow-2xl: 0px 28px 60px -36px oklch(0.2019 0.0163 273.9 / 0.36);
+    --radius: 8px; /* matches Trakkr's source radius scale (sm 4px/md 6px/lg 8px) exactly; Tailwind derives md 6px / sm 4px from it */
     --tracking-normal: 0em;
     --spacing: 0.25rem;
   }
@@ -512,12 +607,16 @@ layer(base);
     --brand-accent-press: oklch(0.65 0.12 170);
     --brand-accent-fg: oklch(0.165 0.003 285);
     --brand-accent-subtle: oklch(0.7 0.13 170 / 0.16);
+    /* Raw triplet for the fill measured above (#27b892) — see :root's
+     --brand-accent-rgb note. */
+    --brand-accent-rgb: 39 184 146;
     --positive: oklch(0.72 0.13 162);
     --warning: oklch(0.78 0.12 86);
     --negative: oklch(0.66 0.18 25);
     /* Dark's weak tints are alpha over the dark canvas rather than pale
-     pastels, which would glare. Same reason as light: these must be real
-     tokens because v3 can't put an opacity modifier on a bare var(). */
+     pastels, which would glare. Kept as explicit tokens for parity with
+     light's set (see light block's note — the v3 opacity-modifier
+     limitation this used to cite doesn't apply on v4). */
     --positive-subtle: oklch(0.72 0.13 162 / 0.16);
     --warning-subtle: oklch(0.78 0.12 86 / 0.16);
     --negative-subtle: oklch(0.66 0.18 25 / 0.16);
@@ -555,12 +654,24 @@ layer(base);
     --fg-primary: oklch(0.2053 0.0081 274.5);
     --fg-secondary: oklch(0.4754 0.0115 273.2);
     --fg-tertiary: oklch(0.6446 0.0135 276);
+    --fg-disabled: oklch(0.7894 0.0101 273.3);
     --brand-accent: oklch(0.5912 0.1145 170);
     --brand-accent-fill: oklch(0.5171 0.0988 170.6);
+    --brand-accent-hover: oklch(0.4671 0.0895 170.6);
+    --brand-accent-press: oklch(0.4171 0.08 170.6);
     --brand-accent-fg: oklch(1 0 0);
+    --brand-accent-subtle: oklch(0.9591 0.0152 171.1);
+    --brand-accent-rgb: 14 147 115;
     --positive: oklch(0.5912 0.1145 170);
     --warning: oklch(0.7224 0.1378 64.6);
     --negative: oklch(0.5954 0.1829 27.3);
+    --positive-subtle: oklch(0.9591 0.0152 171.1);
+    --warning-subtle: oklch(0.9685 0.0203 74.7);
+    --negative-subtle: oklch(0.9563 0.0186 21.6);
+    --elevation-raised: 0 1px 2px oklch(0.2019 0.0163 273.9 / 0.04);
+    --elevation-overlay:
+      0 1px 2px oklch(0.2019 0.0163 273.9 / 0.06),
+      0 14px 36px -28px oklch(0.2019 0.0163 273.9 / 0.28);
   }
   body {
     background: #fff;

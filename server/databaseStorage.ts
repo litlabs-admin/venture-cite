@@ -60,8 +60,6 @@ import {
   type InsertBrandMention,
   type TrackedContentUrl,
   type InsertTrackedContentUrl,
-  type PromptPortfolio,
-  type InsertPromptPortfolio,
   type CitationQuality,
   type InsertCitationQuality,
   type BrandHallucination,
@@ -79,8 +77,6 @@ import {
   type InsertAlertSettings,
   type AlertHistory,
   type InsertAlertHistory,
-  type PromptTestRun,
-  type InsertPromptTestRun,
   type AgentTask,
   type InsertAgentTask,
   type KeywordResearch,
@@ -2330,396 +2326,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async createPromptPortfolio(insertPrompt: InsertPromptPortfolio): Promise<PromptPortfolio> {
-    const result = await db.insert(schema.promptPortfolio).values(insertPrompt).returning();
-    return result[0];
-  }
-
-  async getPromptPortfolio(
-    brandId?: string,
-    filters?: { category?: string; funnelStage?: string; aiPlatform?: string },
-  ): Promise<PromptPortfolio[]> {
-    const conditions = [];
-    if (brandId) conditions.push(eq(schema.promptPortfolio.brandId, brandId));
-    if (filters?.category) conditions.push(eq(schema.promptPortfolio.category, filters.category));
-    if (filters?.funnelStage)
-      conditions.push(eq(schema.promptPortfolio.funnelStage, filters.funnelStage));
-    if (filters?.aiPlatform)
-      conditions.push(eq(schema.promptPortfolio.aiPlatform, filters.aiPlatform));
-    const rows =
-      conditions.length > 0
-        ? await db
-            .select()
-            .from(schema.promptPortfolio)
-            .where(and(...conditions))
-            .orderBy(desc(schema.promptPortfolio.lastChecked))
-        : await db
-            .select()
-            .from(schema.promptPortfolio)
-            .orderBy(desc(schema.promptPortfolio.lastChecked));
-
-    // Wave C.5 — Phase-1 fallback. prompt_portfolio is a deprecated table
-    // that the active citation pipeline doesn't populate, so for real
-    // brands this always returns []. Synthesize PromptPortfolio-shaped
-    // rows from brand_prompts + their most recent geo_ranking so the
-    // "Tracked Prompts" table on the Share-of-Answer tab shows real data.
-    // Only kicks in when filtered to a specific brand — aggregate queries
-    // still return the (real) Phase-2 rows.
-    if (rows.length === 0 && brandId) {
-      const bps = await this.getBrandPromptsByBrandId(brandId);
-      if (bps.length === 0) return rows;
-      const rankings = await this.getGeoRankingsByBrandPromptIds(bps.map((b) => b.id));
-      // Index most-recent ranking per (prompt, platform) for the
-      // isBrandCited / citationPosition / lastChecked fields.
-      const latestByPromptPlatform = new Map<string, GeoRanking>();
-      for (const r of rankings) {
-        if (!r.brandPromptId) continue;
-        const key = `${r.brandPromptId}::${r.aiPlatform}`;
-        const prev = latestByPromptPlatform.get(key);
-        if (!prev || new Date(r.checkedAt).getTime() > new Date(prev.checkedAt).getTime()) {
-          latestByPromptPlatform.set(key, r);
-        }
-      }
-      // Share-of-answer per prompt = cited / total across all runs.
-      const citeStats = new Map<string, { cited: number; total: number }>();
-      for (const r of rankings) {
-        if (!r.brandPromptId) continue;
-        const s = citeStats.get(r.brandPromptId) ?? { cited: 0, total: 0 };
-        s.total += 1;
-        if (r.isCited === 1) s.cited += 1;
-        citeStats.set(r.brandPromptId, s);
-      }
-
-      const synthesized: PromptPortfolio[] = [];
-      for (const bp of bps) {
-        const cat = (bp.category?.trim() || "uncategorised").toLowerCase();
-        const funnel =
-          (bp.funnelStage?.trim() || "").toLowerCase() ||
-          (cat === "informational"
-            ? "awareness"
-            : cat === "transactional"
-              ? "decision"
-              : cat === "comparison" || cat === "navigational"
-                ? "consideration"
-                : "uncategorised");
-        if (filters?.category && filters.category !== cat) continue;
-        if (filters?.funnelStage && filters.funnelStage !== funnel) continue;
-        // Pick a representative platform row. Prefer one where cited.
-        const rowsForPrompt = Array.from(latestByPromptPlatform.values()).filter(
-          (r) => r.brandPromptId === bp.id,
-        );
-        const representative =
-          rowsForPrompt.find((r) => r.isCited === 1) ?? rowsForPrompt[0] ?? null;
-        if (filters?.aiPlatform && representative?.aiPlatform !== filters.aiPlatform) continue;
-        const stats = citeStats.get(bp.id) ?? { cited: 0, total: 0 };
-        const shareOfAnswer =
-          stats.total > 0 ? ((stats.cited / stats.total) * 100).toFixed(2) : "0";
-        synthesized.push({
-          id: `phase1:${bp.id}`,
-          brandId,
-          prompt: bp.prompt,
-          category: cat,
-          funnelStage: funnel,
-          competitorSet: null,
-          region: bp.region || "global",
-          aiPlatform: representative?.aiPlatform || "all",
-          isBrandCited: representative?.isCited ?? 0,
-          citationPosition: representative?.rank ?? null,
-          shareOfAnswer,
-          sentiment: representative?.sentiment || "neutral",
-          answerVolatility: 0,
-          consensusScore: 0,
-          lastChecked: representative?.checkedAt || bp.createdAt,
-          checkedHistory: null,
-          createdAt: bp.createdAt,
-          metadata: { phase: 1 } as any,
-        } as PromptPortfolio);
-      }
-      return synthesized;
-    }
-    return rows;
-  }
-
-  async getPromptPortfolioById(id: string): Promise<PromptPortfolio | undefined> {
-    const result = await db
-      .select()
-      .from(schema.promptPortfolio)
-      .where(eq(schema.promptPortfolio.id, id));
-    return result[0];
-  }
-
-  async updatePromptPortfolio(
-    id: string,
-    update: Partial<InsertPromptPortfolio>,
-  ): Promise<PromptPortfolio | undefined> {
-    const result = await db
-      .update(schema.promptPortfolio)
-      .set({ ...update, lastChecked: new Date() })
-      .where(eq(schema.promptPortfolio.id, id))
-      .returning();
-    return result[0];
-  }
-
-  async deletePromptPortfolio(id: string): Promise<boolean> {
-    const result = await db
-      .delete(schema.promptPortfolio)
-      .where(eq(schema.promptPortfolio.id, id))
-      .returning();
-    return result.length > 0;
-  }
-
-  async getShareOfAnswerStats(brandId: string): Promise<{
-    totalPrompts: number;
-    citedPrompts: number;
-    shareOfAnswer: number;
-    byCategory: Record<string, { total: number; cited: number }>;
-    byFunnel: Record<string, { total: number; cited: number }>;
-    byCompetitor: Record<string, { total: number; cited: number; shareAgainst: number }>;
-    avgVolatility: number;
-    avgConsensus: number;
-    volatilityDistribution: { stable: number; moderate: number; volatile: number };
-  }> {
-    // IMPORTANT: query the real prompt_portfolio table DIRECTLY — do NOT
-    // go through getPromptPortfolio, which now synthesizes Phase-1 rows
-    // when the table is empty. That fallback was masking the Phase-1
-    // branch below, making Competitor Comparison + Answer Stability
-    // always-empty (synthesized rows have competitorSet=null and
-    // answerVolatility=0, so the Phase-2 code path produced zeros).
-    const realPhase2 = await db
-      .select()
-      .from(schema.promptPortfolio)
-      .where(eq(schema.promptPortfolio.brandId, brandId));
-    const prompts = realPhase2;
-
-    // Phase-1 fallback: when real prompt_portfolio is empty (the common
-    // case — nothing in the active pipeline writes there), derive
-    // share-of-answer from brand_prompts joined against geo_rankings, and
-    // pull byCompetitor from competitor_geo_rankings.
-    if (prompts.length === 0) {
-      const brandPrompts = await this.getBrandPromptsByBrandId(brandId);
-      const promptIds = brandPrompts.map((p) => p.id);
-      const rankings =
-        promptIds.length > 0 ? await this.getGeoRankingsByBrandPromptIds(promptIds) : [];
-      // Semantic fix — previously these were raw ranking-row counts
-      // (every prompt × platform × run contributed 1), so "Cited Prompts"
-      // was actually "Cited Checks" and inflated by platform × run count.
-      // Now:
-      //   totalPrompts = distinct prompts tracked (brand_prompts)
-      //   citedPrompts = distinct prompts cited in AT LEAST ONE check
-      //   shareOfAnswer = citedChecks / totalChecks (still a per-check rate)
-      const totalPrompts = brandPrompts.length;
-      const citedPromptIds = new Set(
-        rankings
-          .filter((r) => r.isCited === 1 && r.brandPromptId)
-          .map((r) => r.brandPromptId as string),
-      );
-      const citedPrompts = citedPromptIds.size;
-      const totalChecks = rankings.length;
-      const citedChecks = rankings.filter((r) => r.isCited === 1).length;
-      const shareOfAnswer = totalChecks > 0 ? (citedChecks / totalChecks) * 100 : 0;
-
-      // Build prompt_id → {category, funnelStage} lookup with fallbacks.
-      // funnelStage derived from category when missing:
-      //   informational → awareness; comparison → consideration;
-      //   transactional → decision; navigational → consideration.
-      const deriveFunnel = (category: string | null): string => {
-        switch ((category || "").toLowerCase()) {
-          case "informational":
-            return "awareness";
-          case "comparison":
-          case "navigational":
-            return "consideration";
-          case "transactional":
-            return "decision";
-          default:
-            return "uncategorised";
-        }
-      };
-      const promptMeta = new Map<string, { category: string; funnelStage: string }>();
-      for (const bp of brandPrompts) {
-        const cat = bp.category?.trim() || "uncategorised";
-        const funnel = bp.funnelStage?.trim() || deriveFunnel(bp.category);
-        promptMeta.set(bp.id, { category: cat, funnelStage: funnel });
-      }
-
-      const byCategory: Record<string, { total: number; cited: number }> = {};
-      const byFunnel: Record<string, { total: number; cited: number }> = {};
-      for (const r of rankings) {
-        const meta = r.brandPromptId
-          ? (promptMeta.get(r.brandPromptId) ?? {
-              category: "uncategorised",
-              funnelStage: "uncategorised",
-            })
-          : { category: "uncategorised", funnelStage: "uncategorised" };
-        if (!byCategory[meta.category]) byCategory[meta.category] = { total: 0, cited: 0 };
-        byCategory[meta.category].total += 1;
-        if (r.isCited === 1) byCategory[meta.category].cited += 1;
-        if (!byFunnel[meta.funnelStage]) byFunnel[meta.funnelStage] = { total: 0, cited: 0 };
-        byFunnel[meta.funnelStage].total += 1;
-        if (r.isCited === 1) byFunnel[meta.funnelStage].cited += 1;
-      }
-
-      // Competitor comparison from competitor_geo_rankings.
-      //
-      // IMPORTANT denominator: competitor_geo_rankings only stores rows
-      // when a competitor was cited (citationChecker keeps the table
-      // narrow). Counting rows both for total and cited would force
-      // shareAgainst = 100% for every competitor — which is the bug you
-      // saw on the tab. The correct denominator is the brand's total
-      // checks: "of N brand checks in this window, on how many was
-      // competitor X cited?". That's cited / brandTotalChecks.
-      const byCompetitor: Record<string, { total: number; cited: number; shareAgainst: number }> =
-        {};
-      if (promptIds.length > 0) {
-        const competitors = await this.getCompetitors(brandId);
-        if (competitors.length > 0) {
-          const compIds = competitors.map((c) => c.id);
-          const cgr = await db
-            .select()
-            .from(schema.competitorGeoRankings)
-            .where(
-              and(
-                inArray(schema.competitorGeoRankings.competitorId, compIds),
-                inArray(schema.competitorGeoRankings.brandPromptId, promptIds),
-                eq(schema.competitorGeoRankings.isCited, 1),
-              ),
-            );
-          const compIdToName = new Map(competitors.map((c) => [c.id, c.name]));
-          const denom = totalChecks; // brand's total rankings in the window
-          for (const row of cgr) {
-            const name = compIdToName.get(row.competitorId);
-            if (!name) continue;
-            if (!byCompetitor[name])
-              byCompetitor[name] = { total: denom, cited: 0, shareAgainst: 0 };
-            byCompetitor[name].cited += 1;
-          }
-          Object.keys(byCompetitor).forEach((k) => {
-            const d = byCompetitor[k];
-            d.shareAgainst = d.total > 0 ? Math.round((d.cited / d.total) * 100) : 0;
-          });
-        }
-      }
-
-      // Answer stability — flip rate per (prompt × platform) across runs.
-      // The previous version grouped by brand_prompt_id only, so a prompt
-      // checked on 5 platforms × 3 runs = 15 rows got sorted by checkedAt
-      // and consecutive rows could be different platforms — inflating the
-      // apparent flip count with cross-platform noise. Grouping by
-      // (prompt, platform) pair compares apples to apples: one series per
-      // pair, ordered by run, measuring "did this prompt's answer on this
-      // platform flip cited/not-cited between runs."
-      //
-      // Volatility = 100 * flips / (runs - 1)
-      // Buckets:  stable ≤30 | moderate 31-60 | volatile >60
-      // Pairs with fewer than 2 runs are skipped (not enough history to
-      // measure flips; don't let them dilute the stable count with bogus
-      // zeros).
-      let totalVolatility = 0;
-      const volatilityDistribution = { stable: 0, moderate: 0, volatile: 0 };
-      const pairHistory = new Map<string, GeoRanking[]>();
-      for (const r of rankings) {
-        if (!r.brandPromptId || !r.aiPlatform) continue;
-        const key = `${r.brandPromptId}::${r.aiPlatform}`;
-        const arr = pairHistory.get(key) ?? [];
-        arr.push(r);
-        pairHistory.set(key, arr);
-      }
-      let pairsScored = 0;
-      pairHistory.forEach((runs) => {
-        if (runs.length < 2) return; // need ≥2 runs to measure flips
-        const sorted = runs
-          .slice()
-          .sort((a, b) => new Date(a.checkedAt).getTime() - new Date(b.checkedAt).getTime());
-        let flips = 0;
-        for (let i = 1; i < sorted.length; i++) {
-          if (sorted[i].isCited !== sorted[i - 1].isCited) flips += 1;
-        }
-        const vol = Math.round((flips / (sorted.length - 1)) * 100);
-        totalVolatility += vol;
-        pairsScored += 1;
-        if (vol <= 30) volatilityDistribution.stable += 1;
-        else if (vol <= 60) volatilityDistribution.moderate += 1;
-        else volatilityDistribution.volatile += 1;
-      });
-      const avgVolatility = pairsScored > 0 ? totalVolatility / pairsScored : 0;
-      // Consensus = inverse of volatility — no Phase-1 source of
-      // cross-platform agreement, so we approximate: a prompt stable
-      // across runs is a high-consensus prompt.
-      const avgConsensus = Math.max(0, 100 - avgVolatility);
-
-      return {
-        totalPrompts,
-        citedPrompts,
-        shareOfAnswer,
-        byCategory,
-        byFunnel,
-        byCompetitor,
-        avgVolatility,
-        avgConsensus,
-        volatilityDistribution,
-      };
-    }
-
-    const totalPrompts = prompts.length;
-    const citedPrompts = prompts.filter((p) => p.isBrandCited === 1).length;
-    const shareOfAnswer = totalPrompts > 0 ? (citedPrompts / totalPrompts) * 100 : 0;
-
-    const byCategory: Record<string, { total: number; cited: number }> = {};
-    const byFunnel: Record<string, { total: number; cited: number }> = {};
-    const byCompetitor: Record<string, { total: number; cited: number; shareAgainst: number }> = {};
-
-    let totalVolatility = 0;
-    let totalConsensus = 0;
-    const volatilityDistribution = { stable: 0, moderate: 0, volatile: 0 };
-
-    prompts.forEach((p) => {
-      if (!byCategory[p.category]) byCategory[p.category] = { total: 0, cited: 0 };
-      byCategory[p.category].total++;
-      if (p.isBrandCited === 1) byCategory[p.category].cited++;
-
-      if (!byFunnel[p.funnelStage]) byFunnel[p.funnelStage] = { total: 0, cited: 0 };
-      byFunnel[p.funnelStage].total++;
-      if (p.isBrandCited === 1) byFunnel[p.funnelStage].cited++;
-
-      if (p.competitorSet && p.competitorSet.length > 0) {
-        p.competitorSet.forEach((competitor) => {
-          if (!byCompetitor[competitor])
-            byCompetitor[competitor] = { total: 0, cited: 0, shareAgainst: 0 };
-          byCompetitor[competitor].total++;
-          if (p.isBrandCited === 1) byCompetitor[competitor].cited++;
-        });
-      }
-
-      totalVolatility += p.answerVolatility || 0;
-      totalConsensus += p.consensusScore || 0;
-
-      const vol = p.answerVolatility || 0;
-      if (vol <= 30) volatilityDistribution.stable++;
-      else if (vol <= 60) volatilityDistribution.moderate++;
-      else volatilityDistribution.volatile++;
-    });
-
-    Object.keys(byCompetitor).forEach((comp) => {
-      const data = byCompetitor[comp];
-      data.shareAgainst = data.total > 0 ? (data.cited / data.total) * 100 : 0;
-    });
-
-    const avgVolatility = totalPrompts > 0 ? totalVolatility / totalPrompts : 0;
-    const avgConsensus = totalPrompts > 0 ? totalConsensus / totalPrompts : 0;
-
-    return {
-      totalPrompts,
-      citedPrompts,
-      shareOfAnswer,
-      byCategory,
-      byFunnel,
-      byCompetitor,
-      avgVolatility,
-      avgConsensus,
-      volatilityDistribution,
-    };
-  }
-
   async createCitationQuality(insertQuality: InsertCitationQuality): Promise<CitationQuality> {
     const result = await db.insert(schema.citationQuality).values(insertQuality).returning();
     return result[0];
@@ -3669,55 +3275,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async recordCurrentMetrics(brandId: string): Promise<void> {
-    // The "Record Snapshot" button on the Trends tab calls this. It used to
-    // only read from the deprecated prompt_portfolio table (always empty in
-    // the active pipeline) — so the button silently wrote nothing and the
-    // chart stayed flat. Fall back to Phase-1 (brand_prompts + geo_rankings)
-    // so a manual snapshot actually produces data.
-
-    // Try Phase-2 prompt_portfolio first (richer metrics when present).
-    const phase2Prompts = await db
-      .select()
-      .from(schema.promptPortfolio)
-      .where(eq(schema.promptPortfolio.brandId, brandId));
-
-    if (phase2Prompts.length > 0) {
-      const citedPrompts = phase2Prompts.filter((p) => p.isBrandCited === 1);
-      const soaValue = (citedPrompts.length / phase2Prompts.length) * 100;
-      const avgVolatility =
-        phase2Prompts.reduce((sum, p) => sum + (p.answerVolatility || 0), 0) / phase2Prompts.length;
-      const avgConsensus =
-        phase2Prompts.reduce((sum, p) => sum + (p.consensusScore || 0), 0) / phase2Prompts.length;
+    // The "Record Snapshot" button on the Trends tab calls this. Compute
+    // share-of-answer from brand_prompts × geo_rankings — the tables the
+    // active citation pipeline actually writes to. (The prompt_portfolio
+    // table this used to prefer was dead — the active pipeline never wrote
+    // to it — and was dropped; see migration 0082.)
+    const brandPrompts = await this.getBrandPromptsByBrandId(brandId);
+    if (brandPrompts.length > 0) {
+      const rankings = await this.getGeoRankingsByBrandPromptIds(brandPrompts.map((p) => p.id));
+      const totalChecks = rankings.length;
+      const citedChecks = rankings.filter((r) => r.isCited === 1).length;
+      const soaValue = totalChecks > 0 ? (citedChecks / totalChecks) * 100 : 0;
       await this.createMetricsSnapshot({
         brandId,
         metricType: "share_of_answer",
         metricValue: soaValue.toFixed(2),
         metricDetails: {
-          promptCount: phase2Prompts.length,
-          citedCount: citedPrompts.length,
-          avgVolatility,
-          avgConsensus,
+          promptCount: brandPrompts.length,
+          totalChecks,
+          citedChecks,
         },
       } as any);
-    } else {
-      // Phase-1 fallback: compute share-of-answer from brand_prompts × geo_rankings.
-      const brandPrompts = await this.getBrandPromptsByBrandId(brandId);
-      if (brandPrompts.length > 0) {
-        const rankings = await this.getGeoRankingsByBrandPromptIds(brandPrompts.map((p) => p.id));
-        const totalChecks = rankings.length;
-        const citedChecks = rankings.filter((r) => r.isCited === 1).length;
-        const soaValue = totalChecks > 0 ? (citedChecks / totalChecks) * 100 : 0;
-        await this.createMetricsSnapshot({
-          brandId,
-          metricType: "share_of_answer",
-          metricValue: soaValue.toFixed(2),
-          metricDetails: {
-            promptCount: brandPrompts.length,
-            totalChecks,
-            citedChecks,
-          },
-        } as any);
-      }
     }
 
     // citation_quality — average totalQualityScore across citations.
@@ -3801,53 +3379,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.alertHistory.brandId, brandId))
       .orderBy(desc(schema.alertHistory.sentAt))
       .limit(limit);
-  }
-
-  async createPromptTestRun(insertRun: InsertPromptTestRun): Promise<PromptTestRun> {
-    const result = await db.insert(schema.promptTestRuns).values(insertRun).returning();
-    return result[0];
-  }
-
-  async getPromptTestRuns(
-    brandId?: string,
-    filters?: { status?: string; promptPortfolioId?: string },
-  ): Promise<PromptTestRun[]> {
-    const conditions = [];
-    if (brandId) conditions.push(eq(schema.promptTestRuns.brandId, brandId));
-    if (filters?.status) conditions.push(eq(schema.promptTestRuns.runStatus, filters.status));
-    if (filters?.promptPortfolioId)
-      conditions.push(eq(schema.promptTestRuns.promptPortfolioId, filters.promptPortfolioId));
-    if (conditions.length > 0) {
-      return await db
-        .select()
-        .from(schema.promptTestRuns)
-        .where(and(...conditions))
-        .orderBy(desc(schema.promptTestRuns.createdAt));
-    }
-    return await db
-      .select()
-      .from(schema.promptTestRuns)
-      .orderBy(desc(schema.promptTestRuns.createdAt));
-  }
-
-  async getPromptTestRunById(id: string): Promise<PromptTestRun | undefined> {
-    const result = await db
-      .select()
-      .from(schema.promptTestRuns)
-      .where(eq(schema.promptTestRuns.id, id));
-    return result[0];
-  }
-
-  async updatePromptTestRun(
-    id: string,
-    update: Partial<InsertPromptTestRun>,
-  ): Promise<PromptTestRun | undefined> {
-    const result = await db
-      .update(schema.promptTestRuns)
-      .set(update)
-      .where(eq(schema.promptTestRuns.id, id))
-      .returning();
-    return result[0];
   }
 
   async createAgentTask(insertTask: InsertAgentTask): Promise<AgentTask> {

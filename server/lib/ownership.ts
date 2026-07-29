@@ -115,25 +115,11 @@ export async function requireBrandMention(
   return loadEntityThroughBrand(schema.brandMentions, id, userId, "Brand mention not found");
 }
 
-export async function requirePromptTest(
-  id: string,
-  userId: string,
-): Promise<typeof schema.promptTestRuns.$inferSelect> {
-  return loadEntityThroughBrand(schema.promptTestRuns, id, userId, "Prompt test not found");
-}
-
 export async function requireCommunityPost(
   id: string,
   userId: string,
 ): Promise<typeof schema.communityPosts.$inferSelect> {
   return loadEntityThroughBrand(schema.communityPosts, id, userId, "Community post not found");
-}
-
-export async function requirePromptPortfolio(
-  id: string,
-  userId: string,
-): Promise<typeof schema.promptPortfolio.$inferSelect> {
-  return loadEntityThroughBrand(schema.promptPortfolio, id, userId, "Prompt not found");
 }
 
 export async function requireCitationQuality(

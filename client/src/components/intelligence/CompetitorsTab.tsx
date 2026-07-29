@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -254,8 +255,20 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
           </CardHeader>
           <CardContent>
             {competitorsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="space-y-3" aria-hidden="true">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+                  >
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-40" />
+                      <Skeleton className="h-4 w-16" />
+                    </div>
+                    <Skeleton className="h-8 w-8 rounded-md shrink-0" />
+                  </div>
+                ))}
               </div>
             ) : competitorsList.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -317,8 +330,23 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
           </CardHeader>
           <CardContent>
             {leaderboardLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="space-y-2" aria-hidden="true">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30"
+                  >
+                    <Skeleton className="h-6 w-8 shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                    <div className="text-right space-y-2">
+                      <Skeleton className="h-5 w-10 ml-auto" />
+                      <Skeleton className="h-3 w-14 ml-auto" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : leaderboard.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">

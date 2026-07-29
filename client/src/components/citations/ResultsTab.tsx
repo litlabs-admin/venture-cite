@@ -1,9 +1,19 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
+import { usePromptResults } from "@/hooks/usePrompts";
+import { useInspector } from "@/components/AppShell";
+import PromptDetail from "./PromptDetail";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import {
   Accordion,
   AccordionContent,
@@ -78,23 +88,12 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
   // bleed into the new run for one polling tick.
   const { hasActive, runs: activeRuns } = useActiveCitationRuns(selectedBrandId);
   const activeRunStartedAt = hasActive ? (activeRuns[0]?.startedAt ?? null) : null;
-  const { data: resultsData, isLoading: resultsLoading } = useQuery<{
-    success: boolean;
-    data: ResultsData;
-  }>({
-    // The `{ since }` segment is an object — the default queryFn turns
-    // object segments into URL query params, so we get e.g.
-    // `/api/.../results?since=2026-04-29T08:24:00.000Z` automatically.
-    // Empty string is filtered out, so when no run is active this
-    // resolves to the bare URL (full-history view).
-    queryKey: [
-      `/api/brand-prompts/${selectedBrandId}/results`,
-      { since: activeRunStartedAt ?? "" },
-    ],
-    enabled: !!selectedBrandId,
+  const { data: resultsData, isLoading: resultsLoading } = usePromptResults(selectedBrandId, {
+    since: activeRunStartedAt ?? undefined,
     refetchInterval: hasActive ? 6_000 : false,
   });
-  const results = resultsData?.data;
+  const results = resultsData?.data as ResultsData | undefined;
+  const inspector = useInspector();
 
   // Phase 3: derive highlight terms from the selected brand so the
   // PlatformResultCard can highlight brand mentions inside AI responses
@@ -200,7 +199,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       {/* Wave 9.2: header strip — last-run timestamp only. CSV export
           was removed in this wave; users asked for it to go away. */}
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           {lastRunAt
             ? `Last run ${formatDistanceToNow(lastRunAt, { addSuffix: true })}`
             : "No completed runs yet"}
@@ -217,7 +216,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
               <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium text-foreground">All platforms missed your brand</p>
-                <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc pl-5">
+                <ul className="text-ui text-muted-foreground mt-2 space-y-1 list-disc pl-5">
                   <li>
                     Add common surface forms to your brand&apos;s name variations (legal name, short
                     name, product line).
@@ -243,13 +242,13 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Overall Citation Rate</p>
+              <p className="text-ui text-muted-foreground">Overall Citation Rate</p>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="text-3xl font-bold text-foreground" data-testid="stat-citation-rate">
+            <p className="text-stat font-semibold text-foreground" data-testid="stat-citation-rate">
               {results.citationRate}%
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-caption text-muted-foreground mt-1">
               {results.totalCited} of {results.totalChecks} checks cited your brand
             </p>
           </CardContent>
@@ -257,15 +256,15 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Best Platform</p>
+              <p className="text-ui text-muted-foreground">Best Platform</p>
               <CheckCircle2 className="h-4 w-4 text-positive" />
             </div>
             {/* Wave 9: when no platform has hit the min-sample threshold,
                 surface "Need more data" rather than a misleading winner. */}
-            <p className="text-3xl font-bold text-foreground" data-testid="stat-best-platform">
+            <p className="text-stat font-semibold text-foreground" data-testid="stat-best-platform">
               {bestPlatform?.platform || "Need more data"}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-caption text-muted-foreground mt-1">
               {bestPlatform
                 ? `${bestPlatform.citationRate}% citation rate`
                 : `Each platform needs ≥${BEST_PLATFORM_MIN_CHECKS} checks before competing.`}
@@ -275,16 +274,16 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-muted-foreground">Top Prompt</p>
+              <p className="text-ui text-muted-foreground">Top Prompt</p>
               <Sparkles className="h-4 w-4 text-muted-foreground" />
             </div>
             <p
-              className="text-base font-semibold text-foreground line-clamp-2"
+              className="text-section font-semibold text-foreground line-clamp-2"
               data-testid="stat-top-prompt"
             >
               {bestPrompt ? `"${bestPrompt.prompt}"` : "—"}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-caption text-muted-foreground mt-1">
               {bestPrompt ? `Cited on ${bestPrompt.citedCount} platforms` : "No data yet"}
             </p>
           </CardContent>
@@ -301,16 +300,16 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       {/* Performance by Platform */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Performance by Platform</CardTitle>
+          <CardTitle className="text-section">Performance by Platform</CardTitle>
         </CardHeader>
         <CardContent>
           {/* Wave 9: sortable column headers. Click to toggle asc/desc;
               clicking a different column resets to a sensible default
               direction (asc for platform name, desc for everything else). */}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
+            <Table className="text-body">
+              <TableHeader>
+                <TableRow>
                   <SortableTh
                     active={platformSort.key === "platform"}
                     dir={platformSort.dir}
@@ -351,32 +350,32 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
                   >
                     Last Run
                   </SortableTh>
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {sortedPlatforms.map((p) => (
-                  <tr
+                  <TableRow
                     key={p.platform}
-                    className="border-b border-border"
                     data-testid={`platform-row-${p.platform}`}
+                    className="border-b-0 hover:bg-muted/40"
                   >
-                    <td className="py-3 font-medium">{p.platform}</td>
-                    <td className="text-right py-3">{p.cited}</td>
-                    <td className="text-right py-3">{p.checks}</td>
-                    <td className="text-right py-3">
+                    <TableCell className="py-2 font-medium">{p.platform}</TableCell>
+                    <TableCell className="text-right py-2">{p.cited}</TableCell>
+                    <TableCell className="text-right py-2">{p.checks}</TableCell>
+                    <TableCell className="text-right py-2">
                       <Badge variant={p.citationRate >= 50 ? "default" : "outline"}>
                         {p.citationRate}%
                       </Badge>
-                    </td>
-                    <td className="text-right py-3 text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="text-right py-2 text-caption text-muted-foreground">
                       {p.lastRun
                         ? formatDistanceToNow(new Date(p.lastRun), { addSuffix: true })
                         : "—"}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
@@ -386,7 +385,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-base">Results by Prompt</CardTitle>
+              <CardTitle className="text-section">Results by Prompt</CardTitle>
               <CardDescription>
                 Click a prompt to see each AI&apos;s full answer and whether your brand was cited.
               </CardDescription>
@@ -395,7 +394,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
                 "Least cited" surfaces problem prompts first (where work
                 pays off). */}
             <Select value={promptSort} onValueChange={(v) => setPromptSort(v as PromptSortKey)}>
-              <SelectTrigger className="w-[170px] h-9 text-xs">
+              <SelectTrigger className="w-[170px] h-9 text-caption">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -428,11 +427,34 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    {row.rationale && (
-                      <p className="text-xs text-muted-foreground italic mb-3 px-1">
-                        Why this prompt: {row.rationale}
-                      </p>
-                    )}
+                    <div className="flex items-center justify-between gap-2 mb-2 px-1">
+                      {row.rationale ? (
+                        <p className="text-caption text-muted-foreground italic">
+                          Why this prompt: {row.rationale}
+                        </p>
+                      ) : (
+                        <span />
+                      )}
+                      <button
+                        type="button"
+                        className="text-caption text-primary hover:underline shrink-0"
+                        onClick={() =>
+                          inspector.open({
+                            title: row.prompt,
+                            body: (
+                              <PromptDetail
+                                promptId={row.promptId}
+                                promptText={row.prompt}
+                                brandId={selectedBrandId}
+                              />
+                            ),
+                          })
+                        }
+                        data-testid={`button-open-prompt-history-${i}`}
+                      >
+                        View full history
+                      </button>
+                    </div>
                     {row.platforms.length === 0 ? (
                       // Wave 9.1: distinguish "never checked" from
                       // "pending in this run". With the since-filter
@@ -440,12 +462,12 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
                       // means this prompt hasn't been re-checked yet —
                       // not that there's no history at all.
                       hasActive ? (
-                        <p className="text-sm text-muted-foreground italic flex items-center gap-2">
+                        <p className="text-ui text-muted-foreground italic flex items-center gap-2">
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           Pending re-check… platform results will appear as each one finishes.
                         </p>
                       ) : (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-ui text-muted-foreground">
                           No results yet — run a citation check.
                         </p>
                       )
@@ -478,7 +500,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       <CardContent className="py-12 text-center">
         <Loader2 className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3 animate-spin" />
         <p className="text-muted-foreground mb-2">Citation run in progress…</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           Results will appear here as each platform finishes — usually within a few seconds per
           check.
         </p>

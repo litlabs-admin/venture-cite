@@ -183,35 +183,35 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
       <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <CardTitle className="text-label font-medium uppercase tracking-wider text-muted-foreground">
               Total Detected
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
-              className="tnum text-3xl font-semibold leading-none text-foreground"
+              className="tnum text-stat font-semibold leading-none text-foreground"
               data-testid="stat-total-hallucinations"
             >
               {halStats.total}
             </div>
-            <p className="mt-1.5 text-xs text-muted-foreground">inaccuracies found</p>
+            <p className="mt-1.5 text-caption text-muted-foreground">inaccuracies found</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <CardTitle className="text-label font-medium uppercase tracking-wider text-muted-foreground">
               Resolved
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
-              className="tnum text-3xl font-semibold leading-none text-(--positive)"
+              className="tnum text-stat font-semibold leading-none text-(--positive)"
               data-testid="stat-resolved"
             >
               {halStats.resolved}
             </div>
-            <p className="mt-1.5 text-xs text-muted-foreground">
+            <p className="mt-1.5 text-caption text-muted-foreground">
               {halStats.total > 0
                 ? `${((halStats.resolved / halStats.total) * 100).toFixed(0)}% resolution rate`
                 : "no issues yet"}
@@ -221,35 +221,35 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <CardTitle className="text-label font-medium uppercase tracking-wider text-muted-foreground">
               Critical Issues
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
-              className="tnum text-3xl font-semibold leading-none text-(--negative)"
+              className="tnum text-stat font-semibold leading-none text-(--negative)"
               data-testid="stat-critical"
             >
               {halStats.bySeverity?.critical || 0}
             </div>
-            <p className="mt-1.5 text-xs text-muted-foreground">need immediate attention</p>
+            <p className="mt-1.5 text-caption text-muted-foreground">need immediate attention</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <CardTitle className="text-label font-medium uppercase tracking-wider text-muted-foreground">
               Brand Facts
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
-              className="tnum text-3xl font-semibold leading-none text-foreground"
+              className="tnum text-stat font-semibold leading-none text-foreground"
               data-testid="stat-facts"
             >
               {facts.length}
             </div>
-            <p className="mt-1.5 text-xs text-muted-foreground">verified facts stored</p>
+            <p className="mt-1.5 text-caption text-muted-foreground">verified facts stored</p>
           </CardContent>
         </Card>
       </div>
@@ -285,7 +285,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
           <CardContent>
             {factSheetTooSmall && (
               <div
-                className="mb-4 flex items-start gap-2 rounded-md border border-(--warning)/20 bg-(--warning)/10 p-3 text-sm text-(--warning)"
+                className="mb-4 flex items-start gap-2 rounded-md border border-(--warning)/20 bg-(--warning)/10 p-3 text-ui text-(--warning)"
                 data-testid="warning-facts-too-small"
               >
                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -302,13 +302,13 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
             {hallucinations.length === 0 ? (
               <div className="py-8 text-center">
                 <Shield className="mx-auto mb-4 h-12 w-12 text-(--positive)" />
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-ui font-medium text-foreground">
                   {severityFilter === "all"
                     ? "No hallucinations detected"
                     : `No ${severityFilter}-severity hallucinations`}
                 </p>
                 {severityFilter === "all" && (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-caption text-muted-foreground">
                     Your brand information appears accurate across AI platforms.
                   </p>
                 )}
@@ -320,10 +320,10 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                     className="rounded-md border border-border bg-(--bg-surface-1) p-3"
                     data-testid="remediation-guidance-panel"
                   >
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
                       How to fix flagged hallucinations
                     </p>
-                    <ul className="mt-1.5 space-y-1 text-sm text-muted-foreground">
+                    <ul className="mt-1.5 space-y-1 text-ui text-muted-foreground">
                       {GENERIC_REMEDIATION_STEPS.map((step, i) => (
                         <li key={i} className="flex gap-2">
                           <span aria-hidden>·</span>
@@ -331,7 +331,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                         </li>
                       ))}
                     </ul>
-                    <p className="mt-1.5 text-xs text-muted-foreground">
+                    <p className="mt-1.5 text-caption text-muted-foreground">
                       The specific correction to publish is quoted as "Actual fact" on each card
                       below.
                     </p>
@@ -373,13 +373,14 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                             </Badge>
                           )}
                           {seenCount && seenCount > 1 && (
-                            <span className="tnum text-[11px] text-muted-foreground">
+                            <span className="tnum text-data text-muted-foreground">
                               · seen {seenCount}×
                             </span>
                           )}
                         </div>
                         {hal.isResolved === 1 ? (
                           <Badge className="bg-(--positive)/10 text-(--positive) border border-(--positive)/20 font-medium shrink-0">
+                            <CheckCircle className="mr-1 h-3 w-3 checkmark-draw" />
                             Resolved
                           </Badge>
                         ) : actionable ? (
@@ -415,19 +416,19 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                           the work; the text reads cleanly on a neutral card. */}
                       <div className="min-w-0 space-y-3">
                         <div className="min-w-0 border-l-2 border-(--negative) pl-3">
-                          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                          <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
                             AI claimed
                           </p>
-                          <p className="mt-0.5 min-w-0 break-words text-sm leading-snug text-foreground">
+                          <p className="mt-0.5 min-w-0 break-words text-ui leading-snug text-foreground">
                             {hal.claimedStatement}
                           </p>
                         </div>
                         {hal.actualFact && (
                           <div className="min-w-0 border-l-2 border-(--positive) pl-3">
-                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                            <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
                               Actual fact
                             </p>
-                            <p className="mt-0.5 min-w-0 break-words text-sm leading-snug text-foreground">
+                            <p className="mt-0.5 min-w-0 break-words text-ui leading-snug text-foreground">
                               {hal.actualFact}
                             </p>
                           </div>
@@ -449,7 +450,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                                 href={safeExternalHref(citingUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                className="inline-flex items-center gap-1 text-caption text-primary hover:underline"
                                 data-testid={`link-source-${hal.id}`}
                                 title="Where this claim appeared. Correct it by fixing your own authoritative pages, not this link."
                               >
@@ -467,10 +468,10 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                             dropped. */}
                         {actionable && hal.remediationSteps && hal.remediationSteps.length > 0 && (
                           <div className="min-w-0 pt-1">
-                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                            <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
                               How to fix this
                             </p>
-                            <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">
+                            <ul className="mt-1 space-y-0.5 text-ui text-muted-foreground">
                               {hal.remediationSteps.map((step, i) => (
                                 <li key={i} className="flex gap-2">
                                   <span aria-hidden>·</span>
@@ -502,7 +503,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
               <div className="text-center py-8">
                 <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-muted-foreground mb-4">No facts added yet</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-ui text-muted-foreground">
                   Add verified facts about your brand to enable hallucination detection
                 </p>
                 <Button asChild className="mt-4" data-testid="button-add-fact">
@@ -526,9 +527,9 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                       <Badge variant="outline" title={`Field: ${fact.factKey}`}>
                         {fact.subcategory}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">Verified</span>
+                      <span className="text-caption text-muted-foreground">Verified</span>
                     </div>
-                    <p className="mt-2 min-w-0 break-words text-sm text-foreground">
+                    <p className="mt-2 min-w-0 break-words text-ui text-foreground">
                       {fact.factValue}
                     </p>
                   </div>

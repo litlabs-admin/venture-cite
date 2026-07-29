@@ -1,19 +1,12 @@
 import { useState } from "react";
-import {
-  CheckCircle2,
-  XCircle,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  ExternalLink,
-  AlertCircle,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, ExternalLink, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import SafeMarkdown from "@/components/SafeMarkdown";
 import { createHighlightPlugin } from "@/lib/highlightTermsRehype";
 import { useToast } from "@/hooks/use-toast";
 import { PLATFORM_COLORS } from "@/lib/platformColors";
 import { safeExternalHref } from "@/lib/urlSafety";
+import { StatusDot } from "@/components/foundations";
 
 export type PlatformResult = {
   platform: string;
@@ -141,24 +134,24 @@ export function PlatformResultCard({
         </div>
         {result.isCited ? (
           <>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-positive-subtle text-positive border border-positive">
-              <CheckCircle2 className="h-3 w-3" />
+            <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <StatusDot tone="success" aria-label="Cited" />
               Cited
-            </div>
+            </span>
             {result.reDetectedAt ? (
-              <div
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground border border-border"
+              <span
+                className="text-xs text-muted-foreground"
                 title="Revealed by a stored-data re-check using an updated name variation. Rank isn't available because the original run didn't see this brand."
               >
                 Re-detected
-              </div>
+              </span>
             ) : null}
           </>
         ) : (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
-            <XCircle className="h-3 w-3" />
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <StatusDot tone="neutral" aria-label="Not cited" />
             Not cited
-          </div>
+          </span>
         )}
         <span className="ml-auto text-xs text-muted-foreground">
           {formatDistanceToNow(new Date(result.checkedAt), { addSuffix: true })}

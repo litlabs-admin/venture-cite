@@ -954,18 +954,21 @@ export default function AIVisibility() {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap gap-4 mb-8 items-center justify-between">
-        <Card className="bg-card border border-border">
+        <Card>
           <CardContent className="py-4 px-6">
             <div className="flex items-center gap-4">
               <div className="text-center">
-                <p className="text-3xl font-bold text-foreground" data-testid="total-progress">
+                <p
+                  className="text-stat font-semibold text-foreground tabular-nums"
+                  data-testid="total-progress"
+                >
                   {totalProgress.completed}/{totalProgress.total}
                 </p>
-                <p className="text-sm text-muted-foreground">Steps Completed</p>
+                <p className="text-caption text-muted-foreground">Steps Completed</p>
               </div>
               <div className="flex-1 min-w-[150px]">
                 <Progress value={totalProgress.percentage} className="h-3" />
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-caption text-muted-foreground mt-1">
                   {totalProgress.percentage}% complete
                 </p>
               </div>
@@ -974,16 +977,17 @@ export default function AIVisibility() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
         {aiEngines.map((engine) => {
           const progress = getEngineProgress(engine);
           const isSelected = engine.id === selectedEngineId;
           return (
             <Card
               key={engine.id}
+              interactive
               onClick={() => setSelectedEngineId(engine.id)}
               aria-pressed={isSelected}
-              className={`border cursor-pointer transition-all hover:border-foreground/40 ${isSelected ? "bg-secondary border-border" : `${engine.bgColor} ${progress.percentage === 100 ? "border-foreground" : "border-border"}`}`}
+              className={`cursor-pointer ${isSelected ? "bg-secondary border-foreground/40" : `${engine.bgColor} ${progress.percentage === 100 ? "border-foreground" : ""}`}`}
               data-testid={`engine-card-${engine.id}`}
             >
               <CardContent className="pt-4">
@@ -993,12 +997,17 @@ export default function AIVisibility() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Progress value={progress.percentage} className="h-2 flex-1" />
-                  <span className="text-sm font-medium" data-testid={`progress-${engine.id}`}>
+                  <span
+                    className="text-data font-medium tabular-nums"
+                    data-testid={`progress-${engine.id}`}
+                  >
                     {progress.completed}/{progress.total}
                   </span>
                 </div>
                 {progress.percentage === 100 && (
-                  <Badge className="mt-2 bg-foreground text-background">Complete</Badge>
+                  <Badge variant="positive" className="mt-2">
+                    Complete
+                  </Badge>
                 )}
               </CardContent>
             </Card>
@@ -1017,8 +1026,10 @@ export default function AIVisibility() {
                   {engine.name} Visibility Checklist
                 </CardTitle>
                 <CardDescription className="mt-2">{engine.description}</CardDescription>
-                <div className="flex flex-wrap gap-2 mt-4">
-                  <span className="text-sm font-medium text-muted-foreground">Key factors:</span>
+                <div className="flex flex-wrap gap-2 mt-4 items-center">
+                  <span className="text-label uppercase tracking-wider text-muted-foreground">
+                    Key factors:
+                  </span>
                   {engine.keyFactors.map((factor, i) => (
                     <Badge key={i} variant="outline">
                       {factor}
@@ -1027,18 +1038,14 @@ export default function AIVisibility() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Accordion
-                  type="multiple"
-                  className="space-y-3"
-                  data-tour-id="aiVisibility.engineList"
-                >
+                <Accordion type="multiple" data-tour-id="aiVisibility.engineList">
                   {engine.steps.map((step, index) => {
                     const isCompleted = (completedSteps[engine.id] || []).includes(step.id);
                     return (
                       <AccordionItem
                         key={step.id}
                         value={step.id}
-                        className={`border rounded-lg px-4 ${isCompleted ? "bg-muted border-border" : "bg-card"}`}
+                        className={`px-4 ${isCompleted ? "bg-muted" : ""}`}
                         data-testid={`step-${step.id}`}
                       >
                         <AccordionTrigger className="hover:no-underline py-4">
@@ -1056,7 +1063,7 @@ export default function AIVisibility() {
                                 </span>
                                 {getPriorityBadge(step.priority)}
                               </div>
-                              <p className="text-sm text-muted-foreground mt-1">
+                              <p className="text-ui text-muted-foreground mt-1">
                                 {step.description}
                               </p>
                             </div>
@@ -1074,10 +1081,10 @@ export default function AIVisibility() {
                                 <Lightbulb className="w-4 h-4 text-muted-foreground" />
                                 How to do this:
                               </h4>
-                              <p className="text-sm text-foreground">{step.howTo}</p>
+                              <p className="text-ui text-foreground">{step.howTo}</p>
                             </div>
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-sm">
+                              <div className="flex items-center gap-2 text-ui">
                                 <Target className="w-4 h-4 text-muted-foreground" />
                                 <span className="font-medium">Expected Impact:</span>
                                 <span className="text-muted-foreground">

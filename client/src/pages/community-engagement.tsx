@@ -30,7 +30,8 @@ import { safeExternalHref } from "@/lib/urlSafety";
 import type { CommunityPost } from "@shared/schema";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { ErrorState } from "@/components/ui/error-state";
-import { EmptyState, KPITile } from "@/components/foundations";
+import { KPITile } from "@/components/foundations";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Search,
   Plus,
@@ -77,21 +78,12 @@ const platformIcons: Record<string, ReactElement> = {
   hackernews: <Globe className="w-4 h-4 text-muted-foreground" />,
 };
 
-const platformColors: Record<string, string> = {
-  reddit: "bg-muted text-foreground",
-  hackernews: "bg-muted text-foreground",
-};
-
-// The badge renders the status word itself, so colour was a second encoding
-// of information already on screen — and it was spending three chart tokens
-// (plus the green accent) on a lifecycle that has no good/bad axis. Neutral
-// throughout; the label carries the meaning.
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  ready: "bg-muted text-foreground",
-  posted: "bg-secondary text-secondary-foreground",
-  archived: "bg-muted text-muted-foreground",
-};
+// Platform and lifecycle-status chips both route through Badge's own
+// "neutral" variant (transparent bg, muted-foreground text) instead of
+// hand-rolled bg-muted/bg-secondary classNames — same visual result, but
+// now the token lives in one place (badge.tsx) instead of being redeclared
+// per page. Status has no good/bad axis, so it stays neutral throughout;
+// the label carries the meaning, not the colour.
 
 export default function CommunityEngagement() {
   const { toast } = useToast();
@@ -343,7 +335,7 @@ export default function CommunityEngagement() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">Platform</label>
+                  <label className="text-ui font-medium">Platform</label>
                   <Select
                     value={generateForm.platform}
                     onValueChange={(v) => setGenerateForm((f) => ({ ...f, platform: v }))}
@@ -358,7 +350,7 @@ export default function CommunityEngagement() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Post Type</label>
+                  <label className="text-ui font-medium">Post Type</label>
                   <Select
                     value={generateForm.postType}
                     onValueChange={(v) => setGenerateForm((f) => ({ ...f, postType: v }))}
@@ -375,7 +367,7 @@ export default function CommunityEngagement() {
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium">Community/Group Name</label>
+                <label className="text-ui font-medium">Community/Group Name</label>
                 <Input
                   placeholder="e.g., r/marketing, Hacker News"
                   value={generateForm.groupName}
@@ -384,7 +376,7 @@ export default function CommunityEngagement() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Topic / Question to Address</label>
+                <label className="text-ui font-medium">Topic / Question to Address</label>
                 <Input
                   placeholder="e.g., Best practices for AI-optimized content"
                   value={generateForm.topic}
@@ -393,7 +385,7 @@ export default function CommunityEngagement() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Tone</label>
+                <label className="text-ui font-medium">Tone</label>
                 <Select
                   value={generateForm.tone}
                   onValueChange={(v) => setGenerateForm((f) => ({ ...f, tone: v }))}
@@ -438,22 +430,26 @@ export default function CommunityEngagement() {
                 >
                   {generatedContent.title && (
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">Title</label>
+                      <label className="text-caption font-medium text-muted-foreground">
+                        Title
+                      </label>
                       <p className="font-medium">{generatedContent.title}</p>
                     </div>
                   )}
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">Content</label>
-                    <div className="mt-1 p-3 bg-card rounded border border-border text-sm whitespace-pre-wrap">
+                    <label className="text-caption font-medium text-muted-foreground">
+                      Content
+                    </label>
+                    <div className="mt-1 p-3 bg-card rounded border border-border text-ui whitespace-pre-wrap">
                       {generatedContent.content}
                     </div>
                   </div>
                   {generatedContent.tips?.length > 0 && (
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">
+                      <label className="text-caption font-medium text-muted-foreground">
                         Posting Tips
                       </label>
-                      <ul className="mt-1 text-sm space-y-1">
+                      <ul className="mt-1 text-ui space-y-1">
                         {generatedContent.tips.map((tip, i) => (
                           <li key={i} className="flex items-start gap-2">
                             <CheckCircle2 className="w-3 h-3 mt-1 text-muted-foreground shrink-0" />
@@ -464,7 +460,7 @@ export default function CommunityEngagement() {
                     </div>
                   )}
                   {generatedContent.bestTimeToPost && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <p className="text-caption text-muted-foreground flex items-center gap-1">
                       <Clock className="w-3 h-3" /> Best time: {generatedContent.bestTimeToPost}
                     </p>
                   )}
@@ -493,15 +489,13 @@ export default function CommunityEngagement() {
       </div>
 
       {!selectedBrandId && (
-        <Card className="mb-6" data-testid="empty-state-no-brand">
-          <CardContent className="py-12 text-center">
-            <Target className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-            <p className="font-medium text-muted-foreground">Select a brand to get started</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Choose a brand above to discover relevant communities and generate engagement content
-            </p>
-          </CardContent>
-        </Card>
+        <div className="mb-6" data-testid="empty-state-no-brand">
+          <EmptyState
+            icon={Target}
+            title="Select a brand to get started"
+            description="Choose a brand above to discover relevant communities and generate engagement content"
+          />
+        </div>
       )}
 
       {selectedBrandId && (
@@ -549,13 +543,17 @@ export default function CommunityEngagement() {
                 <EmptyState
                   icon={Search}
                   title="No communities discovered yet"
-                  body='Click "Discover Communities" to find relevant Reddit and Hacker News groups for your brand'
-                  cta={
-                    <Button onClick={handleDiscover} size="sm" data-testid="button-discover-empty">
-                      <Compass className="w-4 h-4 mr-2" />
-                      Discover Communities
-                    </Button>
-                  }
+                  description='Click "Discover Communities" to find relevant Reddit and Hacker News groups for your brand'
+                  action={{
+                    label: (
+                      <>
+                        <Compass className="w-4 h-4 mr-2" />
+                        Discover Communities
+                      </>
+                    ),
+                    onClick: handleDiscover,
+                    "data-testid": "button-discover-empty",
+                  }}
                 />
               </div>
             )}
@@ -563,43 +561,37 @@ export default function CommunityEngagement() {
             {discoveredGroups.length > 0 && (
               <div className="space-y-3">
                 {discoveredGroups.map((group, idx) => (
-                  <Card key={idx} className="transition-colors" data-testid={`card-group-${idx}`}>
+                  <Card key={idx} data-testid={`card-group-${idx}`}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             {platformIcons[group.platform] || <Globe className="w-4 h-4" />}
-                            <Badge
-                              className={
-                                platformColors[group.platform] || "bg-muted text-foreground"
-                              }
-                            >
-                              {group.platform}
-                            </Badge>
+                            <Badge variant="neutral">{group.platform}</Badge>
                             <span className="font-semibold">{group.name}</span>
                             {group.members && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span className="text-caption text-muted-foreground flex items-center gap-1">
                                 <Users className="w-3 h-3" /> {group.members}
                               </span>
                             )}
                             <Badge
-                              variant={group.relevance === "high" ? "default" : "secondary"}
-                              className="text-xs"
+                              variant={group.relevance === "high" ? "positive" : "neutral"}
+                              className="text-caption"
                             >
                               {group.relevance} relevance
                             </Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground mb-2">{group.description}</p>
-                          <div className="text-sm">
-                            <span className="font-medium text-xs">Approach: </span>
-                            <span className="text-xs text-muted-foreground">
+                          <p className="text-ui text-muted-foreground mb-2">{group.description}</p>
+                          <div className="text-ui">
+                            <span className="font-medium text-caption">Approach: </span>
+                            <span className="text-caption text-muted-foreground">
                               {group.suggestedApproach}
                             </span>
                           </div>
                           {group.topicIdeas?.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
                               {group.topicIdeas.map((topic, ti) => (
-                                <Badge key={ti} variant="outline" className="text-xs">
+                                <Badge key={ti} variant="outline" className="text-caption">
                                   {topic}
                                 </Badge>
                               ))}
@@ -673,15 +665,13 @@ export default function CommunityEngagement() {
             )}
 
             {draftPosts.length === 0 && !postsLoading && (
-              <Card data-testid="empty-state-drafts">
-                <CardContent className="py-12 text-center">
-                  <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="font-medium text-muted-foreground">No draft posts yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Discover communities and generate posts to get started
-                  </p>
-                </CardContent>
-              </Card>
+              <div data-testid="empty-state-drafts">
+                <EmptyState
+                  icon={FileText}
+                  title="No draft posts yet"
+                  description="Discover communities and generate posts to get started"
+                />
+              </div>
             )}
 
             {draftPosts.map((post) => (
@@ -691,21 +681,17 @@ export default function CommunityEngagement() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
-                        <Badge
-                          className={platformColors[post.platform] || "bg-muted text-foreground"}
-                        >
-                          {post.platform}
-                        </Badge>
-                        <span className="font-medium text-sm">{post.groupName}</span>
-                        <Badge className={statusColors[post.status]}>{post.status}</Badge>
+                        <Badge variant="neutral">{post.platform}</Badge>
+                        <span className="font-medium text-ui">{post.groupName}</span>
+                        <Badge variant="neutral">{post.status}</Badge>
                         {post.generatedByAi ? (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-caption">
                             <Sparkles className="w-3 h-3 mr-1" /> AI
                           </Badge>
                         ) : null}
                       </div>
-                      {post.title && <p className="font-medium text-sm mt-1">{post.title}</p>}
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {post.title && <p className="font-medium text-ui mt-1">{post.title}</p>}
+                      <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
                         {post.content}
                       </p>
                     </div>
@@ -759,15 +745,13 @@ export default function CommunityEngagement() {
 
           <TabsContent value="posted" className="space-y-3">
             {postedPosts.length === 0 && (
-              <Card data-testid="empty-state-posted">
-                <CardContent className="py-12 text-center">
-                  <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="font-medium text-muted-foreground">No posted content yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Mark draft posts as posted after sharing them on the platforms
-                  </p>
-                </CardContent>
-              </Card>
+              <div data-testid="empty-state-posted">
+                <EmptyState
+                  icon={CheckCircle2}
+                  title="No posted content yet"
+                  description="Mark draft posts as posted after sharing them on the platforms"
+                />
+              </div>
             )}
 
             {postedPosts.map((post) => (
@@ -777,19 +761,15 @@ export default function CommunityEngagement() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
-                        <Badge
-                          className={platformColors[post.platform] || "bg-muted text-foreground"}
-                        >
-                          {post.platform}
-                        </Badge>
-                        <span className="font-medium text-sm">{post.groupName}</span>
-                        <Badge className="bg-secondary text-secondary-foreground gap-1">
+                        <Badge variant="neutral">{post.platform}</Badge>
+                        <span className="font-medium text-ui">{post.groupName}</span>
+                        <Badge variant="neutral" className="gap-1">
                           <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
                           Posted
                         </Badge>
                       </div>
-                      {post.title && <p className="font-medium text-sm mt-1">{post.title}</p>}
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {post.title && <p className="font-medium text-ui mt-1">{post.title}</p>}
+                      <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
                         {post.content}
                       </p>
                       {post.postUrl && (
@@ -797,13 +777,13 @@ export default function CommunityEngagement() {
                           href={safeExternalHref(post.postUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-chart-1 hover:underline flex items-center gap-1 mt-1"
+                          className="text-caption text-chart-1 hover:underline flex items-center gap-1 mt-1"
                         >
                           <ExternalLink className="w-3 h-3" /> View post
                         </a>
                       )}
                       {post.postedAt && (
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-caption text-muted-foreground mt-1">
                           Posted: {new Date(post.postedAt).toLocaleDateString()}
                         </p>
                       )}
@@ -844,7 +824,7 @@ export default function CommunityEngagement() {
               <Textarea
                 id="draft-content"
                 rows={16}
-                className="font-mono text-sm"
+                className="font-mono text-ui"
                 value={draftEditForm.content}
                 onChange={(e) => setDraftEditForm({ ...draftEditForm, content: e.target.value })}
                 data-testid="textarea-draft-content"
@@ -884,18 +864,18 @@ export default function CommunityEngagement() {
 
       <Card className="mt-6" data-testid="card-best-practices">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="text-section flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-chart-3" />
             Community Engagement Best Practices
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-ui">
             <div className="space-y-2">
               <h4 className="font-medium flex items-center gap-2">
                 <SiReddit className="w-4 h-4 text-muted-foreground" /> Reddit
               </h4>
-              <ul className="space-y-1 text-muted-foreground text-xs">
+              <ul className="space-y-1 text-muted-foreground text-caption">
                 <li>Read the subreddit rules before posting</li>
                 <li>Build karma by commenting helpfully first</li>
                 <li>Never be overtly promotional</li>
@@ -907,7 +887,7 @@ export default function CommunityEngagement() {
               <h4 className="font-medium flex items-center gap-2">
                 <Globe className="w-4 h-4 text-muted-foreground" /> Hacker News
               </h4>
-              <ul className="space-y-1 text-muted-foreground text-xs">
+              <ul className="space-y-1 text-muted-foreground text-caption">
                 <li>Focus on technical depth and original insights</li>
                 <li>Avoid any marketing language</li>
                 <li>Share data and research, not opinions</li>

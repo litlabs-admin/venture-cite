@@ -30,6 +30,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { safeExternalHref } from "@/lib/urlSafety";
 
@@ -365,41 +373,43 @@ export default function AdminScrapeInspector() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider">
-                <th className="pb-2">Source</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2 tnum">Facts</th>
-                <th className="pb-2 tnum">Latency</th>
-                <th className="pb-2">Error</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="text-sm">
+            <TableHeader>
+              <TableRow className="text-left text-xs text-muted-foreground uppercase tracking-wider hover:bg-transparent">
+                <TableHead className="h-auto px-0 pb-2">Source</TableHead>
+                <TableHead className="h-auto px-0 pb-2">Status</TableHead>
+                <TableHead className="h-auto px-0 pb-2 tnum">Facts</TableHead>
+                <TableHead className="h-auto px-0 pb-2 tnum">Latency</TableHead>
+                <TableHead className="h-auto px-0 pb-2">Error</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {logs.map((log) => (
-                <tr key={log.id} className="border-t border-border">
-                  <td className="py-2 font-mono text-xs">{log.source}</td>
-                  <td className="py-2">
+                <TableRow key={log.id} className="border-t border-border hover:bg-transparent">
+                  <TableCell className="py-2 px-0 font-mono text-xs">{log.source}</TableCell>
+                  <TableCell className="py-2 px-0">
                     <Badge variant={log.status === "done" ? "default" : "secondary"}>
                       {log.status}
                     </Badge>
-                  </td>
-                  <td className="py-2 tnum">{log.factCount ?? "—"}</td>
-                  <td className="py-2 tnum text-xs text-muted-foreground">
+                  </TableCell>
+                  <TableCell className="py-2 px-0 tnum">{log.factCount ?? "—"}</TableCell>
+                  <TableCell className="py-2 px-0 tnum text-xs text-muted-foreground">
                     {fmtDuration(log.latencyMs)}
-                  </td>
-                  <td className="py-2 text-xs text-destructive">{log.errorKind ?? ""}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="py-2 px-0 text-xs text-destructive">
+                    {log.errorKind ?? ""}
+                  </TableCell>
+                </TableRow>
               ))}
               {logs.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-2 text-sm text-muted-foreground">
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={5} className="py-2 px-0 text-sm text-muted-foreground">
                     No logs.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -412,19 +422,22 @@ export default function AdminScrapeInspector() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider">
-                <th className="pb-2">URL</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2 tnum">Facts</th>
-                <th className="pb-2">Error</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="text-sm">
+            <TableHeader>
+              <TableRow className="text-left text-xs text-muted-foreground uppercase tracking-wider hover:bg-transparent">
+                <TableHead className="h-auto px-0 pb-2">URL</TableHead>
+                <TableHead className="h-auto px-0 pb-2">Status</TableHead>
+                <TableHead className="h-auto px-0 pb-2 tnum">Facts</TableHead>
+                <TableHead className="h-auto px-0 pb-2">Error</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {pages.map((p) => (
-                <tr key={p.id} className="border-t border-border align-top">
-                  <td className="py-2">
+                <TableRow
+                  key={p.id}
+                  className="border-t border-border align-top hover:bg-transparent"
+                >
+                  <TableCell className="py-2 px-0">
                     <a
                       href={safeExternalHref(p.url)}
                       target="_blank"
@@ -433,8 +446,8 @@ export default function AdminScrapeInspector() {
                     >
                       {p.url}
                     </a>
-                  </td>
-                  <td className="py-2 whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="py-2 px-0 whitespace-nowrap">
                     <Badge
                       variant={
                         p.status === "done"
@@ -451,13 +464,15 @@ export default function AdminScrapeInspector() {
                         {p.statusCode}
                       </span>
                     )}
-                  </td>
-                  <td className="py-2 tnum">{p.factCount ?? "—"}</td>
-                  <td className="py-2 text-xs text-destructive">{p.errorKind ?? ""}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="py-2 px-0 tnum">{p.factCount ?? "—"}</TableCell>
+                  <TableCell className="py-2 px-0 text-xs text-destructive">
+                    {p.errorKind ?? ""}
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
