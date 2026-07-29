@@ -462,10 +462,10 @@ export default function Welcome() {
         <Reveal>
           <Card className="w-full max-w-[480px]">
             <CardContent className="p-8">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              <h1 className="text-page font-semibold tracking-tight text-foreground">
                 Let's establish your brand
               </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-caption text-muted-foreground">
                 Enter your website. We read it and the public record to build the fact sheet
                 everything else is measured against.
               </p>
@@ -483,7 +483,7 @@ export default function Welcome() {
                   aria-invalid={!!inlineError}
                 />
                 {inlineError ? (
-                  <p className="text-sm text-destructive" role="alert">
+                  <p className="text-caption text-destructive" role="alert">
                     {inlineError}
                   </p>
                 ) : null}
@@ -499,7 +499,7 @@ export default function Welcome() {
                   Find my brand
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
-                <p className="mt-3 text-xs text-muted-foreground text-center">
+                <p className="mt-3 text-caption text-muted-foreground text-center">
                   Detection takes about 30 seconds. You'll review everything before it goes live.
                 </p>
               </div>
@@ -513,14 +513,14 @@ export default function Welcome() {
           <Card className="w-full max-w-[560px]">
             <CardContent className="p-8">
               <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-2 rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
+                <div className="inline-flex items-center gap-2 rounded-full border bg-muted/50 px-3 py-1 text-caption font-medium text-muted-foreground">
                   <Lock className="h-3 w-3" />
                   {validateDomain(domain).valid
                     ? (validateDomain(domain) as { normalized: string }).normalized
                     : domain}
                 </div>
                 {scrapeError ? null : (
-                  <span className="text-xs text-muted-foreground">Reading…</span>
+                  <span className="text-caption text-muted-foreground">Reading…</span>
                 )}
               </div>
 
@@ -542,9 +542,9 @@ export default function Welcome() {
                       </div>
                       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground">{log.message}</p>
+                        <p className="text-caption text-foreground">{log.message}</p>
                       </div>
-                      <span className="text-[10px] tabular-nums font-mono text-muted-foreground">
+                      <span className="text-label tabular-nums font-mono text-muted-foreground">
                         {new Date(log.ts).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -555,12 +555,12 @@ export default function Welcome() {
                   );
                 })}
                 {!logs.length && !scrapeError ? (
-                  <p className="text-sm text-muted-foreground">Connecting…</p>
+                  <p className="text-caption text-muted-foreground">Connecting…</p>
                 ) : null}
               </div>
 
               {scrapeError ? (
-                <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-caption text-destructive">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="flex-1">
@@ -591,10 +591,10 @@ export default function Welcome() {
         <Reveal>
           <Card className="w-full max-w-[720px] my-8">
             <CardContent className="p-8">
-              <h2 className="text-2xl font-semibold tracking-tight">Confirm what we found</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h2 className="text-page font-semibold tracking-tight">Confirm what we found</h2>
+              <p className="mt-1 text-caption text-muted-foreground">
                 Fields tagged{" "}
-                <Badge variant="secondary" className="text-[10px] font-normal align-middle">
+                <Badge variant="secondary" className="text-label font-normal align-middle">
                   auto-detected
                 </Badge>{" "}
                 came from your site. Correct anything that's off — accuracy here sets the baseline.
@@ -610,7 +610,7 @@ export default function Welcome() {
                     onError={() => setLogoBroken(true)}
                   />
                 ) : (
-                  <div className="h-16 w-16 rounded-full border bg-muted flex items-center justify-center text-lg font-semibold text-muted-foreground">
+                  <div className="h-16 w-16 rounded-full border bg-muted flex items-center justify-center text-ui font-semibold text-muted-foreground">
                     {initialsOf(editName || scrapedData.brandName || "?") || "?"}
                   </div>
                 )}
@@ -707,7 +707,7 @@ export default function Welcome() {
 
               {/* Competitors */}
               <div className="mt-6">
-                <h3 className="text-sm font-medium">Competitors</h3>
+                <h3 className="text-caption font-medium">Competitors</h3>
                 <div className="mt-3 space-y-2">
                   {editCompetitors.map((c, idx) => (
                     <div key={idx} className="flex items-start gap-3 rounded-md border p-3">
@@ -861,7 +861,7 @@ function ActivationPanel({
           ) : (
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
           )}
-          <h2 className="text-xl font-semibold tracking-tight">
+          <h2 className="text-page font-semibold tracking-tight">
             {done ? "You're set" : failed ? "Setup interrupted" : "Establishing your baseline"}
           </h2>
         </div>
@@ -869,7 +869,7 @@ function ActivationPanel({
         {/* The single editorial verdict sentence — advisor voice, stated
             before the detail. Serif is the one warmth tell. */}
         <p
-          className="mt-3 text-lg leading-snug text-foreground"
+          className="mt-3 text-ui leading-snug text-foreground"
           style={{ fontFamily: "var(--font-serif)" }}
         >
           {verdict}
@@ -901,7 +901,7 @@ function ActivationPanel({
                   <div className="flex items-baseline justify-between gap-3">
                     <p
                       className={cn(
-                        "text-sm font-medium",
+                        "text-caption font-medium",
                         state === "queued" ? "text-muted-foreground" : "text-foreground",
                       )}
                     >
@@ -909,7 +909,7 @@ function ActivationPanel({
                     </p>
                     <span
                       className={cn(
-                        "text-[11px] font-medium uppercase tracking-wide",
+                        "text-data font-medium uppercase tracking-wide",
                         state === "done"
                           ? "text-primary"
                           : state === "working"
@@ -920,11 +920,11 @@ function ActivationPanel({
                       {state === "done" ? "Done" : state === "working" ? "Working" : "Queued"}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
                     {phase.desc}
                   </p>
                   {isCitations && state === "working" && citTotal > 0 ? (
-                    <p className="mt-1.5 font-mono text-xs tabular-nums text-muted-foreground">
+                    <p className="mt-1.5 font-mono text-caption tabular-nums text-muted-foreground">
                       {citRun}/{citTotal} prompts checked
                     </p>
                   ) : null}
@@ -935,15 +935,15 @@ function ActivationPanel({
         </ol>
 
         {failed && autopilot?.error ? (
-          <div className="mt-5 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+          <div className="mt-5 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-caption text-destructive">
             {autopilot.error}
           </div>
         ) : null}
 
         <div className="mt-7 flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             {done
-              ? "Taking you to your command center…"
+              ? "Taking you to your dashboard…"
               : "Safe to leave — this finishes in the background."}
           </p>
           <div className="flex gap-2">
@@ -959,7 +959,7 @@ function ActivationPanel({
               onClick={onGoToDashboard}
               data-testid="button-skip-to-dashboard"
             >
-              {done ? "Go to command center" : "Go to dashboard"}
+              {done ? "Go to dashboard" : "Go to dashboard"}
               <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
             </Button>
           </div>
@@ -972,9 +972,9 @@ function ActivationPanel({
 function FieldLabel({ label, touched }: { label: string; touched: boolean }) {
   return (
     <div className="mb-1.5 flex items-center gap-2">
-      <label className="text-sm font-medium text-foreground">{label}</label>
+      <label className="text-caption font-medium text-foreground">{label}</label>
       {!touched ? (
-        <Badge variant="secondary" className="text-[10px] font-normal">
+        <Badge variant="secondary" className="text-label font-normal">
           auto-detected
         </Badge>
       ) : null}
@@ -1008,7 +1008,7 @@ function TagField({
         {values.map((v, i) => (
           <span
             key={`${v}-${i}`}
-            className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs"
+            className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-caption"
           >
             {v}
             <button
@@ -1034,7 +1034,7 @@ function TagField({
           }}
           onBlur={commitDraft}
           placeholder={values.length ? "" : "Type and press Enter"}
-          className="flex-1 min-w-[120px] bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
+          className="flex-1 min-w-[120px] bg-transparent text-caption outline-hidden placeholder:text-muted-foreground"
         />
       </div>
     </div>

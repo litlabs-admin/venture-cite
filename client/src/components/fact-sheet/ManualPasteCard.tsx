@@ -29,10 +29,10 @@ export function ManualPasteCard({ runId: _runId, onSubmit, onManualFill, busy }:
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Paste your About / homepage / company description here..."
-          className="font-mono text-sm"
+          className="font-mono text-caption"
           maxLength={50_000}
         />
-        <div className="text-xs text-muted-foreground">
+        <div className="text-caption text-muted-foreground">
           {text.length.toLocaleString()} / 50,000 characters
         </div>
         <div className="flex gap-2">

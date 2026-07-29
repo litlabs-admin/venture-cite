@@ -31,12 +31,12 @@ export function KPITile({
 
   return (
     <div className={cn("rounded-md border border-border bg-card p-4", className)}>
-      <div className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+      <div className="text-caption uppercase tracking-wide text-muted-foreground font-medium">
         {label}
       </div>
-      <div className="mt-2 font-mono tabular-nums text-3xl text-foreground">{formattedValue}</div>
+      <div className="mt-2 font-mono tabular-nums text-stat text-foreground">{formattedValue}</div>
       {(delta || sublabel) && (
-        <div className="mt-2 flex items-center gap-2 text-xs">
+        <div className="mt-2 flex items-center gap-2 text-caption">
           {delta && (
             <span className={cn("inline-flex items-center gap-1 font-medium", deltaColor)}>
               {deltaTone === "up" && <ArrowUp className="h-3 w-3" />}

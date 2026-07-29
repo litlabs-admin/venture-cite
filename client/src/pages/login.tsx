@@ -77,7 +77,7 @@ export default function Login() {
       <Card className="w-full max-w-md relative">
         <a
           href="/"
-          className="absolute top-3 left-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="absolute top-3 left-3 text-caption text-muted-foreground hover:text-foreground transition-colors"
           data-testid="link-back-home"
         >
           ← Back to home
@@ -86,7 +86,7 @@ export default function Login() {
           <div className="flex justify-center mb-4">
             <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">Welcome back</CardTitle>
+          <CardTitle className="text-page font-semibold text-foreground">Welcome back</CardTitle>
           <CardDescription>Sign in to your VentureCite account</CardDescription>
         </CardHeader>
         <CardContent>
@@ -135,7 +135,7 @@ export default function Login() {
             <div className="flex justify-end">
               <a
                 href="/forgot-password"
-                className="text-sm text-primary hover:text-primary/90"
+                className="text-caption text-primary hover:text-primary/90"
                 data-testid="link-forgot-password"
               >
                 Forgot password?
@@ -159,7 +159,7 @@ export default function Login() {
           </form>
         </CardContent>
         <CardFooter className="justify-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Don't have an account?{" "}
             <a
               href="/register"

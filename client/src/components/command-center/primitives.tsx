@@ -70,7 +70,7 @@ export function CCLink({
 /** Uppercase panel eyebrow. Every panel header starts with one. */
 export function PanelLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-vc-label whitespace-nowrap">
+    <span className="text-label font-semibold uppercase tracking-wider text-vc-label whitespace-nowrap">
       {children}
     </span>
   );
@@ -89,7 +89,7 @@ export function PanelLink({
   return (
     <CCLink
       dest={dest}
-      className="group flex flex-shrink-0 items-center gap-0.5 whitespace-nowrap text-[10px] text-vc-label transition-colors hover:text-vc-accent"
+      className="group flex flex-shrink-0 items-center gap-0.5 whitespace-nowrap text-label text-vc-label transition-colors hover:text-vc-accent"
     >
       {children}
       {withChevron && <ChevronRight className="h-2.5 w-2.5" aria-hidden />}
@@ -137,7 +137,7 @@ export function Delta({
   return (
     <span
       className={`tabular-nums ${className} ${
-        flat ? "text-vc-tertiary" : up ? "text-positive" : "text-rose-400"
+        flat ? "text-vc-tertiary" : up ? "text-positive" : "text-destructive"
       }`}
     >
       {up ? "+" : ""}
@@ -176,12 +176,12 @@ export function PanelEmptyState({
           {icon}
         </div>
       )}
-      <p className="mb-1 text-[13px] text-vc-tertiary">{title}</p>
-      {hint && <p className="mb-4 text-[11px] text-vc-tertiary/80">{hint}</p>}
+      <p className="mb-1 text-body text-vc-tertiary">{title}</p>
+      {hint && <p className="mb-4 text-data text-vc-tertiary/80">{hint}</p>}
       {cta && (
         <CCLink
           dest={cta.dest}
-          className="inline-flex items-center gap-1 rounded bg-vc-accent-subtle px-3 py-1.5 text-[11px] font-medium text-vc-accent transition-all hover:bg-vc-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-vc-accent/20"
+          className="inline-flex items-center gap-1 rounded bg-vc-accent-subtle px-3 py-1.5 text-data font-medium text-vc-accent transition-all hover:bg-vc-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-vc-accent/20"
         >
           {cta.label}
           <ChevronRight className="h-3 w-3" aria-hidden />
@@ -209,7 +209,7 @@ export function InfoDot({ children }: { children: React.ReactNode }) {
         <TooltipContent
           side="bottom"
           align="start"
-          className="w-56 rounded border border-vc-default bg-white px-3 py-2.5 text-[11px] leading-relaxed text-vc-secondary shadow-vc-overlay"
+          className="w-56 rounded border border-vc-default bg-white px-3 py-2.5 text-data leading-relaxed text-vc-secondary shadow-vc-overlay"
         >
           {children}
         </TooltipContent>

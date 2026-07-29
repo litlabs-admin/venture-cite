@@ -113,7 +113,7 @@ function ProfileSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-section font-semibold">Profile</CardTitle>
+        <CardTitle className="text-ui font-semibold">Profile</CardTitle>
         <CardDescription>
           Signed in as{" "}
           <span className="font-medium text-foreground">{user?.email ?? "(no email)"}</span>
@@ -122,7 +122,7 @@ function ProfileSection() {
       <CardContent className="space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="firstName" className="text-[12px] font-medium text-muted-foreground">
+            <Label htmlFor="firstName" className="text-caption font-medium text-muted-foreground">
               First name
             </Label>
             <Input
@@ -134,7 +134,7 @@ function ProfileSection() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="lastName" className="text-[12px] font-medium text-muted-foreground">
+            <Label htmlFor="lastName" className="text-caption font-medium text-muted-foreground">
               Last name
             </Label>
             <Input
@@ -147,7 +147,7 @@ function ProfileSection() {
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="timezone" className="text-[12px] font-medium text-muted-foreground">
+          <Label htmlFor="timezone" className="text-caption font-medium text-muted-foreground">
             Timezone
           </Label>
           <Select value={timezone} onValueChange={setTimezone}>
@@ -191,7 +191,7 @@ function AppearanceSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-section font-semibold">Appearance</CardTitle>
+        <CardTitle className="text-ui font-semibold">Appearance</CardTitle>
         <CardDescription>
           Choose how VentureCite looks to you. System follows your operating system; Light and Dark
           stay put across reloads and devices on this browser.
@@ -240,14 +240,14 @@ function PasswordSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-section font-semibold">Change password</CardTitle>
+        <CardTitle className="text-ui font-semibold">Change password</CardTitle>
         <CardDescription>Minimum 8 characters.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
           <Label
             htmlFor="currentPassword"
-            className="text-[12px] font-medium text-muted-foreground"
+            className="text-caption font-medium text-muted-foreground"
           >
             Current password
           </Label>
@@ -261,7 +261,7 @@ function PasswordSection() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="newPassword" className="text-[12px] font-medium text-muted-foreground">
+          <Label htmlFor="newPassword" className="text-caption font-medium text-muted-foreground">
             New password
           </Label>
           <Input
@@ -276,7 +276,7 @@ function PasswordSection() {
         <div className="space-y-1.5">
           <Label
             htmlFor="confirmPassword"
-            className="text-[12px] font-medium text-muted-foreground"
+            className="text-caption font-medium text-muted-foreground"
           >
             Confirm new password
           </Label>
@@ -336,13 +336,13 @@ function BillingSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-section font-semibold">Billing</CardTitle>
+        <CardTitle className="text-ui font-semibold">Billing</CardTitle>
         <CardDescription>
           Manage subscription, payment method, and invoices through Stripe.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-ui text-muted-foreground" data-testid="text-billing-plan">
+        <p className="text-caption text-muted-foreground" data-testid="text-billing-plan">
           Current plan: <span className="font-medium text-foreground">{plan}</span>
         </p>
         <Button
@@ -387,13 +387,13 @@ function IntegrationsSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-section font-semibold">Integrations</CardTitle>
+        <CardTitle className="text-ui font-semibold">Integrations</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between rounded-md border border-border p-3">
           <div>
             <p className="font-medium text-foreground">Buffer</p>
-            <p className="text-ui text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               {connected ? "Connected" : "Not connected"}
             </p>
           </div>
@@ -553,8 +553,8 @@ export default function Settings() {
 
       <section className="rounded-lg border border-border p-6 space-y-4">
         <div>
-          <h2 className="text-section font-semibold">Notifications</h2>
-          <p className="text-ui text-muted-foreground mt-1">
+          <h2 className="text-ui font-semibold">Notifications</h2>
+          <p className="text-caption text-muted-foreground mt-1">
             Choose which emails you want to receive. Account and billing notices cannot be turned
             off.
           </p>
@@ -579,7 +579,7 @@ export default function Settings() {
             isRetrying={prefsIsRefetching}
           />
         ) : preferences.length === 0 ? (
-          <p className="text-ui text-muted-foreground">No notification types configured.</p>
+          <p className="text-caption text-muted-foreground">No notification types configured.</p>
         ) : (
           <ul className="space-y-4">
             {preferences.map((pref) => (
@@ -591,7 +591,7 @@ export default function Settings() {
                 <div className="flex-1">
                   <Label
                     htmlFor={`pref-${pref.type}`}
-                    className="text-[12px] font-medium text-muted-foreground"
+                    className="text-caption font-medium text-muted-foreground"
                   >
                     {pref.label}
                   </Label>
@@ -614,13 +614,16 @@ export default function Settings() {
       </section>
 
       <section className="rounded-lg border border-border p-4">
-        <h2 className="text-section font-semibold">Onboarding tours</h2>
-        <p className="text-ui text-muted-foreground mt-1">
+        <h2 className="text-ui font-semibold">Onboarding tours</h2>
+        <p className="text-caption text-muted-foreground mt-1">
           Auto-firing tours appear on first visit to new pages. Manual replay via the "?" icon stays
           available regardless of this setting.
         </p>
         <div className="flex items-center justify-between mt-4">
-          <label htmlFor="suppress-tours" className="text-[12px] font-medium text-muted-foreground">
+          <label
+            htmlFor="suppress-tours"
+            className="text-caption font-medium text-muted-foreground"
+          >
             Don't auto-show tours
           </label>
           <Switch
@@ -633,8 +636,8 @@ export default function Settings() {
 
       <section className="rounded-lg border border-border p-6 space-y-4">
         <div>
-          <h2 className="text-section font-semibold">Delete account</h2>
-          <p className="text-ui text-muted-foreground mt-1">
+          <h2 className="text-ui font-semibold">Delete account</h2>
+          <p className="text-caption text-muted-foreground mt-1">
             Schedules permanent deletion of your account and every brand, article, and citation tied
             to it. You have 30 days to contact support and cancel; after that the data is
             unrecoverable.
@@ -644,7 +647,7 @@ export default function Settings() {
         <div className="space-y-1.5">
           <Label
             htmlFor="delete-password"
-            className="text-[12px] font-medium text-muted-foreground"
+            className="text-caption font-medium text-muted-foreground"
           >
             Confirm password
           </Label>
@@ -659,8 +662,11 @@ export default function Settings() {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="delete-confirm" className="text-[12px] font-medium text-muted-foreground">
-            Type <span className="font-mono font-bold">DELETE</span> to confirm
+          <Label
+            htmlFor="delete-confirm"
+            className="text-caption font-medium text-muted-foreground"
+          >
+            Type <span className="font-mono font-semibold">DELETE</span> to confirm
           </Label>
           <Input
             id="delete-confirm"
@@ -677,8 +683,8 @@ export default function Settings() {
       </section>
 
       <section className="rounded-lg border border-border p-6 space-y-3">
-        <h2 className="text-section font-semibold">Export your data</h2>
-        <p className="text-ui text-muted-foreground">
+        <h2 className="text-ui font-semibold">Export your data</h2>
+        <p className="text-caption text-muted-foreground">
           Download every brand, article, and citation tied to your account as a JSON file.
           Rate-limited to one export per day per account.
         </p>

@@ -165,7 +165,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <CardTitle className="text-section flex items-center gap-2">
+                <CardTitle className="text-ui flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
                   Citation Rate Over Time
                 </CardTitle>
@@ -258,10 +258,10 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
                       return (
-                        <div className="bg-popover border border-border rounded-lg shadow-md p-3 text-ui">
+                        <div className="bg-popover border border-border rounded-lg shadow-md p-3 text-caption">
                           <p className="font-medium">{d.fullDate}</p>
                           <p className="text-foreground mt-1">
-                            Citation Rate: <span className="font-bold">{d.citationRate}%</span>
+                            Citation Rate: <span className="font-semibold">{d.citationRate}%</span>
                           </p>
                           <p className="text-muted-foreground">
                             {d.totalCited} / {d.totalChecks} cited
@@ -297,7 +297,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
       {/* Run history as expandable rows */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-section flex items-center gap-2">
+          <CardTitle className="text-ui flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Run History
           </CardTitle>
@@ -328,7 +328,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium text-ui">
+                        <span className="font-medium text-caption">
                           {format(new Date(run.startedAt), "MMM d, yyyy")}
                         </span>
                         <span className="text-caption text-muted-foreground ml-2">
@@ -336,7 +336,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                         </span>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-ui font-medium tabular-nums">
+                        <span className="text-caption font-medium tabular-nums">
                           {run.citationRate}%
                         </span>
                         {delta !== 0 && (
@@ -408,7 +408,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                             return (
                               <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                <span className="ml-2 text-ui text-muted-foreground">
+                                <span className="ml-2 text-caption text-muted-foreground">
                                   Loading run details...
                                 </span>
                               </div>
@@ -416,7 +416,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                           }
                           if (!detail?.byPrompt) {
                             return (
-                              <p className="text-ui text-muted-foreground text-center py-4">
+                              <p className="text-caption text-muted-foreground text-center py-4">
                                 No detail data available for this run.
                               </p>
                             );
@@ -432,7 +432,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                                         <Badge variant="outline" className="shrink-0">
                                           {j + 1}
                                         </Badge>
-                                        <span className="flex-1 truncate text-ui">
+                                        <span className="flex-1 truncate text-caption">
                                           {row.prompt}
                                         </span>
                                         <Badge
@@ -492,7 +492,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
               <button
                 type="button"
                 onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
-                className="text-ui text-primary hover:underline"
+                className="text-caption text-primary hover:underline"
                 data-testid="button-load-more-runs"
               >
                 Load {Math.min(PAGE_SIZE, filteredHistory.length - visibleCount)} more

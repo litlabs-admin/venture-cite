@@ -242,7 +242,7 @@ export default function FaqManager() {
     // High score: neutral text, not green/chart-4. The check icon rendered
     // alongside the value is what signals "good", not colour.
     if (score >= 80) return "text-foreground";
-    if (score >= 60) return "text-chart-3";
+    if (score >= 60) return "text-warning";
     return "text-destructive";
   };
 
@@ -268,7 +268,7 @@ export default function FaqManager() {
           <CardContent className="py-12 text-center">
             <Target className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
             <p className="font-medium text-muted-foreground">Select a brand to get started</p>
-            <p className="text-ui text-muted-foreground mt-1">
+            <p className="text-caption text-muted-foreground mt-1">
               Choose a brand above to create and manage AI-optimized FAQs
             </p>
           </CardContent>
@@ -312,7 +312,7 @@ export default function FaqManager() {
                       {avgScore >= 80 && <CheckCircle className="h-4 w-4" aria-hidden="true" />}
                     </p>
                   </div>
-                  <Target className="h-8 w-8 text-chart-5 opacity-50" />
+                  <Target className="h-8 w-8 text-primary opacity-50" />
                 </div>
               </CardContent>
             </Card>
@@ -348,7 +348,7 @@ export default function FaqManager() {
                       {categories.length}
                     </p>
                   </div>
-                  <BookOpen className="h-8 w-8 text-chart-3 opacity-50" />
+                  <BookOpen className="h-8 w-8 text-warning opacity-50" />
                 </div>
               </CardContent>
             </Card>
@@ -404,7 +404,7 @@ export default function FaqManager() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <label className="text-ui font-medium mb-1 block">Question</label>
+                      <label className="text-caption font-medium mb-1 block">Question</label>
                       <Textarea
                         placeholder="What is your product/service?"
                         value={newQuestion}
@@ -414,7 +414,7 @@ export default function FaqManager() {
                       />
                     </div>
                     <div>
-                      <label className="text-ui font-medium mb-1 block">Answer</label>
+                      <label className="text-caption font-medium mb-1 block">Answer</label>
                       <Textarea
                         placeholder="Provide a comprehensive answer..."
                         value={newAnswer}
@@ -424,7 +424,7 @@ export default function FaqManager() {
                       />
                     </div>
                     <div>
-                      <label className="text-ui font-medium mb-1 block">Category</label>
+                      <label className="text-caption font-medium mb-1 block">Category</label>
                       <Select value={newCategory} onValueChange={setNewCategory}>
                         <SelectTrigger data-testid="select-new-category">
                           <SelectValue />
@@ -623,7 +623,7 @@ export default function FaqManager() {
                                         </div>
                                       </div>
                                       <p
-                                        className="text-ui text-muted-foreground mb-3"
+                                        className="text-caption text-muted-foreground mb-3"
                                         data-testid={`text-faq-answer-${faq.id}`}
                                       >
                                         {faq.answer}
@@ -641,11 +641,11 @@ export default function FaqManager() {
                                         )}
                                       </div>
                                       {faq.optimizationTips && faq.optimizationTips.length > 0 && (
-                                        <div className="mt-3 p-2 bg-chart-3/10 rounded text-caption">
-                                          <p className="font-medium text-chart-3 mb-1">
+                                        <div className="mt-3 p-2 bg-warning/10 rounded text-caption">
+                                          <p className="font-medium text-warning mb-1">
                                             Optimization Tips:
                                           </p>
-                                          <ul className="list-disc list-inside text-chart-3">
+                                          <ul className="list-disc list-inside text-warning">
                                             {faq.optimizationTips.map((tip, i) => (
                                               <li key={i}>{tip}</li>
                                             ))}
@@ -676,7 +676,7 @@ export default function FaqManager() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-chart-5" />
+                    <Sparkles className="h-5 w-5 text-primary" />
                     AI FAQ Generator
                   </CardTitle>
                   <CardDescription>
@@ -687,7 +687,7 @@ export default function FaqManager() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div>
-                        <label className="text-ui font-medium mb-2 block">
+                        <label className="text-caption font-medium mb-2 block">
                           Topic Focus (Optional)
                         </label>
                         <Input
@@ -701,7 +701,7 @@ export default function FaqManager() {
                         </p>
                       </div>
                       <div>
-                        <label className="text-ui font-medium mb-2 block">
+                        <label className="text-caption font-medium mb-2 block">
                           Number of FAQs to generate
                         </label>
                         <Select value={generateCount} onValueChange={setGenerateCount}>
@@ -751,7 +751,7 @@ export default function FaqManager() {
                         <Target className="h-4 w-4" />
                         AI Optimization Features
                       </h4>
-                      <ul className="space-y-2 text-ui">
+                      <ul className="space-y-2 text-caption">
                         <li className="flex items-start gap-2">
                           <CheckCircle className="h-4 w-4 text-foreground mt-0.5" />
                           <span>Questions formatted for AI extraction (clear, specific)</span>
@@ -816,7 +816,7 @@ export default function FaqManager() {
 
                       <div className="bg-chart-1/10 rounded-lg p-4">
                         <h4 className="font-medium text-chart-1 mb-2">How to Use This Schema</h4>
-                        <ol className="list-decimal list-inside text-ui text-chart-1 space-y-1">
+                        <ol className="list-decimal list-inside text-caption text-chart-1 space-y-1">
                           <li>Copy the JSON-LD schema above</li>
                           <li>
                             Add it to your webpage inside a &lt;script
@@ -842,7 +842,7 @@ export default function FaqManager() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-chart-3" />
+                    <Zap className="h-5 w-5 text-warning" />
                     Bulk Optimization
                   </CardTitle>
                   <CardDescription>
@@ -866,13 +866,13 @@ export default function FaqManager() {
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="bg-chart-3/10 border-chart-3/30">
+                      <Card className="bg-warning/10 border-warning/30">
                         <CardContent className="pt-4">
                           <div className="text-center">
-                            <p className="text-label uppercase tracking-wider text-chart-3">
+                            <p className="text-label uppercase tracking-wider text-warning">
                               Medium Score (60-79)
                             </p>
-                            <p className="text-stat font-semibold tabular-nums text-chart-3">
+                            <p className="text-stat font-semibold tabular-nums text-warning">
                               {
                                 faqs.filter(
                                   (f) =>
@@ -900,7 +900,7 @@ export default function FaqManager() {
                     {/* Low Score FAQs */}
                     <div>
                       <h4 className="font-medium mb-3 flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-chart-3" />
+                        <AlertTriangle className="h-4 w-4 text-warning" />
                         FAQs Needing Optimization
                       </h4>
                       {faqs.filter((f) => (f.aiSurfaceScore || 0) < 80).length > 0 ? (
@@ -914,7 +914,7 @@ export default function FaqManager() {
                                 className="flex items-center justify-between py-3 px-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors"
                               >
                                 <div className="flex-1">
-                                  <p className="font-medium text-ui">{faq.question}</p>
+                                  <p className="font-medium text-caption">{faq.question}</p>
                                   <Badge
                                     variant={getScoreBadge(faq.aiSurfaceScore || 0)}
                                     className="mt-1"

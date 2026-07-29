@@ -71,7 +71,7 @@ type NavEntry = {
 const NAV: NavEntry[] = [
   {
     section: "",
-    label: "Command Center",
+    label: "Dashboard",
     to: "/",
     icon: Home,
     brandScoped: false,
@@ -318,7 +318,7 @@ export default function CommandPalette({
                     <I className="text-muted-foreground" />
                     <span>{entry.label}</span>
                     {section && (
-                      <span className="ml-auto text-xs text-muted-foreground">{section}</span>
+                      <span className="ml-auto text-caption text-muted-foreground">{section}</span>
                     )}
                   </CommandItem>
                 );

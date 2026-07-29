@@ -67,7 +67,7 @@ function NavItem({
     <Link to={href} onClick={onNavigate}>
       <div
         className={[
-          "group flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2 py-2 text-[12px] transition-colors duration-150",
+          "group flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2 py-2 text-caption transition-colors duration-150",
           "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-vc-accent/40",
           active
             ? "bg-vc-accent-subtle font-medium text-vc-accent"
@@ -109,13 +109,18 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Brand row — 56px, matching the context bar's height exactly so the
           two hairlines meet in one unbroken line across the viewport. */}
       <div className="relative flex h-[56px] shrink-0 items-center border-b border-vc-default px-2.5">
+        {/* Mark only — the wordmark is dropped. With no text child the link
+            has no accessible name, so it carries one explicitly. */}
         <Link
           to="/"
           onClick={onNavigate}
-          className="group flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors duration-200 hover:bg-vc-muted/50"
+          aria-label="VentureCite home"
+          className="flex items-center rounded-md px-1.5 py-1.5"
         >
-          <img src={logoPath} alt="" className="h-5 w-5 shrink-0 rounded" />
-          <span className="truncate text-[13px] font-semibold text-vc-primary">VentureCite</span>
+          {/* The asset is a 779×258 wordmark (~3:1). Fixing both axes squashed
+              it to a third of its width; height + `w-auto` lets it keep its
+              proportions. */}
+          <img src={logoPath} alt="" className="h-7 w-auto shrink-0 object-contain" />
         </Link>
       </div>
 
@@ -126,7 +131,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-3">
         <NavItem
           href="/"
-          label="Command Center"
+          label="Dashboard"
           icon={Home}
           active={isActive("/")}
           onNavigate={onNavigate}
@@ -190,12 +195,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <button className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-2 py-1.5 transition-colors duration-150 hover:bg-vc-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-vc-accent/40">
                 <Avatar className="h-6 w-6 shrink-0">
                   <AvatarImage src={user?.profileImageUrl || undefined} />
-                  <AvatarFallback className="bg-vc-accent-subtle text-[10px] font-medium text-vc-accent-hover">
+                  <AvatarFallback className="bg-vc-accent-subtle text-label font-medium text-vc-accent-hover">
                     {getInitials()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1 text-left">
-                  <p className="truncate text-[12px] text-vc-secondary">
+                  <p className="truncate text-caption text-vc-secondary">
                     {user?.firstName
                       ? `${user.firstName} ${user.lastName ?? ""}`.trim()
                       : "Account"}

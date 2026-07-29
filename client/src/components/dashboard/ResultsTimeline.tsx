@@ -79,7 +79,7 @@ export default function ResultsTimeline({ compact = false }: { compact?: boolean
 
   if (compact) {
     return (
-      <p className="text-xs text-muted-foreground px-1">
+      <p className="text-caption text-muted-foreground px-1">
         {current.label} — {current.description} First AI citations typically appear 1–2 weeks after
         publish.
       </p>
@@ -89,7 +89,7 @@ export default function ResultsTimeline({ compact = false }: { compact?: boolean
   return (
     <Card>
       <CardContent className="p-6">
-        <h2 className="text-lg font-semibold mb-4">What to expect</h2>
+        <h2 className="text-ui font-semibold mb-4">What to expect</h2>
 
         <ol className="grid grid-cols-1 md:grid-cols-4 gap-3">
           {MILESTONES.map((m, i) => {
@@ -118,17 +118,19 @@ export default function ResultsTimeline({ compact = false }: { compact?: boolean
                       aria-hidden="true"
                     />
                   )}
-                  <span className={"text-sm font-medium " + (current ? "text-foreground" : "")}>
+                  <span
+                    className={"text-caption font-medium " + (current ? "text-foreground" : "")}
+                  >
                     {m.label}
                   </span>
                 </div>
-                <p className="text-xs leading-snug">{m.description}</p>
+                <p className="text-caption leading-snug">{m.description}</p>
               </li>
             );
           })}
         </ol>
 
-        <p className="text-xs text-muted-foreground mt-4">
+        <p className="text-caption text-muted-foreground mt-4">
           AI engines re-index new content on their own schedule &mdash; first citations typically
           appear 1&ndash;2 weeks after a publish.
         </p>

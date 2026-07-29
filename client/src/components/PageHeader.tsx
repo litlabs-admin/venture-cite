@@ -42,7 +42,7 @@ export default function PageHeader({
         {leading && <div className="shrink-0 mt-0.5">{leading}</div>}
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight truncate">
+            <h1 className="text-page font-semibold text-foreground tracking-tight truncate">
               {title}
             </h1>
             {explainer && (
@@ -56,7 +56,7 @@ export default function PageHeader({
                     <Info className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 text-sm" align="start">
+                <PopoverContent className="w-80 text-caption" align="start">
                   <p className="text-foreground">{explainer.summary}</p>
                   {explainer.prerequisites && (
                     <p className="mt-2 text-muted-foreground">
@@ -72,8 +72,8 @@ export default function PageHeader({
                   )}
                   {explainer.relatedConcept && (
                     <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Related:</span>
-                      <Badge variant="secondary" className="text-xs">
+                      <span className="text-caption text-muted-foreground">Related:</span>
+                      <Badge variant="secondary" className="text-caption">
                         <a
                           href={`/glossary#${explainer.relatedConcept.toLowerCase()}`}
                           className="hover:underline"
@@ -87,7 +87,7 @@ export default function PageHeader({
               </Popover>
             )}
           </div>
-          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+          {description && <p className="mt-1 text-body text-muted-foreground">{description}</p>}
         </div>
       </div>
       {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}

@@ -15,15 +15,15 @@ function PromptLine({ row, index }: { row: PromptRow; index: number }) {
       dest={DEST.prompts}
       className="group flex items-center gap-3 px-2 py-2 transition-colors duration-150 hover:bg-vc-muted/50"
     >
-      <span className="w-3 flex-shrink-0 font-mono text-[10px] tabular-nums text-vc-hover">
+      <span className="w-3 flex-shrink-0 font-mono text-label tabular-nums text-vc-hover">
         {index}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[12px] text-vc-secondary transition-colors group-hover:text-vc-primary">
+      <span className="min-w-0 flex-1 truncate text-caption text-vc-secondary transition-colors group-hover:text-vc-primary">
         {row.prompt}
       </span>
       {/* Search volume has no source: brand_prompts carries no volume column. */}
-      <NoValue className="flex-shrink-0 font-mono text-[11px]" />
-      <span className="w-7 flex-shrink-0 text-right text-[13px] font-semibold tabular-nums text-vc-primary">
+      <NoValue className="flex-shrink-0 font-mono text-data" />
+      <span className="w-7 flex-shrink-0 text-right text-body font-semibold tabular-nums text-vc-primary">
         {cited}
       </span>
       <div className="flex h-3 w-7 flex-shrink-0 items-end gap-px" aria-hidden>
@@ -34,7 +34,7 @@ function PromptLine({ row, index }: { row: PromptRow; index: number }) {
           />
         ))}
       </div>
-      <NoValue className="w-4 flex-shrink-0 text-right font-mono text-[11px]" />
+      <NoValue className="w-4 flex-shrink-0 text-right font-mono text-data" />
     </CCLink>
   );
 }
@@ -64,7 +64,7 @@ export function PromptsRow({ prompts, loading }: { prompts: PromptRow[]; loading
                 ))}
               </div>
             ) : top.length === 0 ? (
-              <p className="px-2 pt-2 text-[11px] text-vc-tertiary">
+              <p className="px-2 pt-2 text-data text-vc-tertiary">
                 No prompt results yet. Run a citation check to populate this list.
               </p>
             ) : (
@@ -92,10 +92,10 @@ export function PromptsRow({ prompts, loading }: { prompts: PromptRow[]; loading
                 </div>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="mb-1 text-[11px] text-vc-tertiary">Site crawling not set up</p>
+                <p className="mb-1 text-data text-vc-tertiary">Site crawling not set up</p>
                 <CCLink
                   dest={DEST.crawler}
-                  className="flex items-center gap-0.5 text-[10px] text-vc-accent hover:underline"
+                  className="flex items-center gap-0.5 text-label text-vc-accent hover:underline"
                 >
                   Check crawler access
                   <ChevronRight className="h-2.5 w-2.5" aria-hidden />
@@ -118,7 +118,7 @@ export function PromptsRow({ prompts, loading }: { prompts: PromptRow[]; loading
                 <NoValue className="text-[24px] font-semibold leading-none" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col justify-center">
-                <p className="text-[11px] text-vc-tertiary">
+                <p className="text-data text-vc-tertiary">
                   Dimension scoring not available yet — only overall sentiment is measured today.
                 </p>
               </div>

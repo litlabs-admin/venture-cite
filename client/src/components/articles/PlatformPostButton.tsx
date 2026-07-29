@@ -116,7 +116,7 @@ export default function PlatformPostButton({
   const renderError = () =>
     error ? (
       <p
-        className="text-sm text-destructive mt-1"
+        className="text-caption text-destructive mt-1"
         data-testid={`text-buffer-post-error-${platform.toLowerCase()}`}
       >
         {error}
@@ -178,7 +178,9 @@ export default function PlatformPostButton({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64 p-1">
-          <p className="px-2 py-1.5 text-xs text-muted-foreground">Choose a {platform} account</p>
+          <p className="px-2 py-1.5 text-caption text-muted-foreground">
+            Choose a {platform} account
+          </p>
           {matches.map((ch) => (
             <Button
               key={ch.id}

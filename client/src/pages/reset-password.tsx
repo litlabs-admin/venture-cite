@@ -94,7 +94,9 @@ export default function ResetPassword() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-foreground">Invalid Reset Link</CardTitle>
+            <CardTitle className="text-page font-semibold text-foreground">
+              Invalid Reset Link
+            </CardTitle>
             <CardDescription>
               This password reset link is invalid or has expired. Please request a new one.
             </CardDescription>
@@ -119,7 +121,9 @@ export default function ResetPassword() {
                 <CheckCircle className="h-8 w-8 text-foreground" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold text-foreground">Password Reset!</CardTitle>
+            <CardTitle className="text-page font-semibold text-foreground">
+              Password Reset!
+            </CardTitle>
             <CardDescription className="mt-2">
               Your password has been successfully reset. You can now sign in with your new password.
             </CardDescription>
@@ -150,7 +154,9 @@ export default function ResetPassword() {
           <div className="flex justify-center mb-4">
             <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">Set new password</CardTitle>
+          <CardTitle className="text-page font-semibold text-foreground">
+            Set new password
+          </CardTitle>
           <CardDescription>Create a strong password for your account</CardDescription>
         </CardHeader>
         <CardContent>
@@ -178,7 +184,7 @@ export default function ResetPassword() {
                 </Button>
               </div>
               {password && (
-                <ul className="text-xs space-y-1 mt-2">
+                <ul className="text-caption space-y-1 mt-2">
                   {passwordRequirements.map((req, i) => (
                     <li
                       key={i}
@@ -203,7 +209,7 @@ export default function ResetPassword() {
                 data-testid="input-confirm-password"
               />
               {confirmPassword && !passwordsMatch && (
-                <p className="text-xs text-destructive flex items-center gap-1">
+                <p className="text-caption text-destructive flex items-center gap-1">
                   <X className="h-3 w-3" /> Passwords do not match
                 </p>
               )}
@@ -231,7 +237,7 @@ export default function ResetPassword() {
           </form>
         </CardContent>
         <CardFooter className="justify-center">
-          <a href="/login" className="text-sm text-muted-foreground hover:text-foreground">
+          <a href="/login" className="text-caption text-muted-foreground hover:text-foreground">
             Remember your password? Sign in
           </a>
         </CardFooter>

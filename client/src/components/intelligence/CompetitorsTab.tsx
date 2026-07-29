@@ -114,8 +114,8 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Competitor Tracking</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-ui font-semibold">Competitor Tracking</h3>
+          <p className="text-caption text-muted-foreground">
             Add competitors by name and domain to compare AI citation performance
           </p>
         </div>
@@ -153,7 +153,7 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
                   onChange={(e) => setNewCompetitor({ ...newCompetitor, domain: e.target.value })}
                   data-testid="input-competitor-domain"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Used to identify citations across AI platforms
                 </p>
               </div>
@@ -201,16 +201,16 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
       <div className="grid gap-6 md:grid-cols-3 mb-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-caption font-medium text-muted-foreground">
               Competitors Tracked
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold" data-testid="stat-competitor-count">
+            <div className="text-stat font-semibold" data-testid="stat-competitor-count">
               {leaderboardMeta?.totalTracked ?? competitorsList.length}
             </div>
             {leaderboardMeta && (
-              <div className="text-xs text-muted-foreground mt-1">
+              <div className="text-caption text-muted-foreground mt-1">
                 {leaderboardMeta.withActivity} with activity in last 30d
               </div>
             )}
@@ -218,24 +218,24 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-caption font-medium text-muted-foreground">
               Leaderboard Entries
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold" data-testid="stat-leaderboard-count">
+            <div className="text-stat font-semibold" data-testid="stat-leaderboard-count">
               {leaderboard.length}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-caption font-medium text-muted-foreground">
               Your Ranking
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-primary" data-testid="stat-your-rank">
+            <div className="text-stat font-semibold text-primary" data-testid="stat-your-rank">
               {leaderboard.findIndex((e) => e.isOwn) >= 0
                 ? `#${leaderboard.findIndex((e) => e.isOwn) + 1}`
                 : "—"}
@@ -274,7 +274,7 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
               <div className="text-center py-8 text-muted-foreground">
                 <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p className="font-medium mb-1">No competitors added yet</p>
-                <p className="text-sm">
+                <p className="text-caption">
                   Add competitors to start comparing your AI visibility against theirs
                 </p>
               </div>
@@ -293,12 +293,12 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
                       >
                         {comp.name}
                       </div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-1">
+                      <div className="text-caption text-muted-foreground flex items-center gap-1">
                         <Eye className="w-3 h-3" />
                         <span className="truncate">{comp.domain}</span>
                       </div>
                       {comp.industry && (
-                        <Badge variant="outline" className="text-xs mt-1">
+                        <Badge variant="outline" className="text-caption mt-1">
                           {comp.industry}
                         </Badge>
                       )}
@@ -352,7 +352,7 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
               <div className="text-center py-8 text-muted-foreground">
                 <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p className="font-medium mb-1">No leaderboard data</p>
-                <p className="text-sm">Add competitors and record citations to see rankings</p>
+                <p className="text-caption">Add competitors and record citations to see rankings</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -364,19 +364,19 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
                     }`}
                     data-testid={`leaderboard-entry-${index}`}
                   >
-                    <span className="text-lg font-bold w-8 text-center text-muted-foreground">
+                    <span className="text-ui font-semibold w-8 text-center text-muted-foreground">
                       {index + 1}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium truncate">{entry.name}</span>
-                        {entry.isOwn && <Badge className="text-xs">You</Badge>}
+                        {entry.isOwn && <Badge className="text-caption">You</Badge>}
                       </div>
-                      <span className="text-xs text-muted-foreground">{entry.domain}</span>
+                      <span className="text-caption text-muted-foreground">{entry.domain}</span>
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold">{entry.totalCitations}</div>
-                      <div className="text-xs text-muted-foreground">citations</div>
+                      <div className="text-page font-semibold">{entry.totalCitations}</div>
+                      <div className="text-caption text-muted-foreground">citations</div>
                     </div>
                   </div>
                 ))}

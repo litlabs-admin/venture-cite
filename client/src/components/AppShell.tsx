@@ -77,7 +77,7 @@ function useIsXlUp() {
 // twins (/content, /articles, /keyword-research, /brands). null means "this
 // route keeps its own in-page header" (e.g. /settings).
 function shellTitleFor(location: string, tab: string | null): string | null {
-  if (location === "/" || location === "/dashboard") return "Command Center";
+  if (location === "/" || location === "/dashboard") return "Dashboard";
   if (location === "/report") return "Report";
   return spineTitleFor(location, tab);
 }
@@ -154,7 +154,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <InspectorContext.Provider value={inspectorApi}>
-      <div className="flex min-h-screen bg-white">
+      {/* `vc-app` sets the authenticated app's DEFAULT type to the product
+          scale (12px/1.5) — see index.css. Without it, any element that
+          forgets a text-* class inherits the browser's 16px and sticks out of
+          a UI where 90% of text is 10–13px. Scoped to the shell so the
+          marketing pages keep their own larger register. */}
+      <div className="vc-app flex min-h-screen bg-white">
         {/* Skip link — keyboard / screen-reader (carried from AppLayout). */}
         <a
           href="#main-content"
@@ -199,18 +204,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
               blur, no shadow — this chrome is a hairline, not a layer. */}
           {ownsContextBar && (
             <div className="sticky top-0 z-20 hidden h-[56px] items-center border-b border-vc-default bg-white px-8 lg:flex print:hidden">
+              {/* No brand mark or page title here: the sidebar already shows
+                  both — the logo at its head, and the active stage highlighted
+                  in the nav. Repeating them put the logo on screen twice and
+                  named the page the nav had already named. The brand selector
+                  takes the vacated left slot — it scopes everything below it,
+                  so it reads first. */}
               <div className="flex w-full items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <img src={logoPath} alt="" className="h-5 w-5 rounded" />
-                  <span className="text-[14px] font-semibold text-vc-primary">{title}</span>
-                </div>
+                <BrandSelector className="w-48" />
                 <div className="flex flex-shrink-0 items-center gap-2">
                   {lastScanLabel && (
-                    <span className="mr-2 select-none text-[11px] tabular-nums text-vc-hover">
+                    <span className="mr-2 select-none text-data tabular-nums text-vc-hover">
                       {lastScanLabel}
                     </span>
                   )}
-                  <BrandSelector className="w-48" />
                   {fullBleed && selectedBrandId && (
                     <HeaderActions brandId={selectedBrandId} brandName={selectedBrandName} />
                   )}
@@ -258,7 +265,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
               >
                 <div className="sticky top-[73px] flex max-h-[calc(100vh-73px)] flex-col">
                   <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-4">
-                    <h2 className="text-sm font-semibold text-foreground">{inspector.title}</h2>
+                    <h2 className="text-caption font-semibold text-foreground">
+                      {inspector.title}
+                    </h2>
                     <button
                       type="button"
                       aria-label="Close inspector"
@@ -291,7 +300,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
               {inspector && (
                 <div className="flex h-full flex-col">
                   <div className="border-b border-border px-5 py-4">
-                    <h2 className="text-sm font-semibold text-foreground">{inspector.title}</h2>
+                    <h2 className="text-caption font-semibold text-foreground">
+                      {inspector.title}
+                    </h2>
                   </div>
                   <div className="overflow-y-auto px-5 py-4">{inspector.body}</div>
                 </div>

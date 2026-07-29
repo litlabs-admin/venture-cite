@@ -97,7 +97,7 @@ function renderCell(state: CellState) {
 export default function CompetitorGapMatrix({ categories, rows }: Props) {
   if (categories.length === 0 || rows.length === 0) {
     return (
-      <p className="text-ui text-muted-foreground">
+      <p className="text-caption text-muted-foreground">
         Gap analysis appears after your first citation run finishes.
       </p>
     );
@@ -151,7 +151,7 @@ export default function CompetitorGapMatrix({ categories, rows }: Props) {
                   <div className="flex items-center gap-2">
                     {isBrand && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
                     <div className="min-w-0">
-                      <div className="text-ui text-foreground truncate">
+                      <div className="text-caption text-foreground truncate">
                         {row.name} {isBrand && <span className="text-muted-foreground">(you)</span>}
                       </div>
                       <div className="text-data text-muted-foreground">
@@ -165,7 +165,7 @@ export default function CompetitorGapMatrix({ categories, rows }: Props) {
                     {renderCell(row.cells[cat] ?? "unknown")}
                   </TableCell>
                 ))}
-                <TableCell className="py-2.5 pl-2 text-center text-ui">
+                <TableCell className="py-2.5 pl-2 text-center text-caption">
                   {isBrand ? (
                     <span className="text-primary">You</span>
                   ) : row.gapCount > 0 ? (

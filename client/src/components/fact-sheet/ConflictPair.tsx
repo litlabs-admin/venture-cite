@@ -55,7 +55,7 @@ export function ConflictPair({
       data-testid={`conflict-pair-${pair.userFact.id}`}
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-caption text-muted-foreground">
           <Badge variant="secondary" className="uppercase tracking-wide">
             {domain}
           </Badge>
@@ -129,10 +129,10 @@ function renderSide(
     // the comparison this is), not a stand-in for "success" — the same kind
     // of legitimate categorical use as the platform colour ramp.
     <Card
-      className={cn("p-3 text-sm", !isUser && "border-chart-4/40")}
+      className={cn("p-3 text-caption", !isUser && "border-chart-4/40")}
       data-testid={`pair-side-${side}-${fact.id}`}
     >
-      <div className="mb-2 flex items-center justify-between text-xs">
+      <div className="mb-2 flex items-center justify-between text-caption">
         <span className="font-medium text-foreground">{heading}</span>
         <span className="text-muted-foreground">{sourceLabel}</span>
       </div>
@@ -144,7 +144,7 @@ function renderSide(
           <span className="font-mono text-foreground">
             {fact.valuePayload?.n ?? fact.factValue}
           </span>
-          <span className="text-xs text-muted-foreground">{fact.factValue}</span>
+          <span className="text-caption text-muted-foreground">{fact.factValue}</span>
         </div>
       )}
 
@@ -161,7 +161,7 @@ function renderSide(
           href={safeExternalHref(fact.sourceUrl)}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          className="mt-2 inline-flex items-center gap-1 text-caption text-primary hover:underline"
         >
           <ExternalLink className="h-3 w-3" />
           {fact.sourceUrl}
@@ -169,13 +169,13 @@ function renderSide(
       ) : null}
 
       {!isUser && fact.sourceExcerpt ? (
-        <p className="mt-2 line-clamp-3 text-xs italic text-muted-foreground">
+        <p className="mt-2 line-clamp-3 text-caption italic text-muted-foreground">
           “{fact.sourceExcerpt}”
         </p>
       ) : null}
 
       {!isUser && fact.confidence !== null && fact.confidence !== undefined ? (
-        <div className="mt-2 text-xs text-muted-foreground">
+        <div className="mt-2 text-caption text-muted-foreground">
           Confidence{" "}
           <span className="font-mono text-foreground">{Number(fact.confidence).toFixed(2)}</span>
         </div>
@@ -209,13 +209,13 @@ function ArrayMergePanel({
 
   return (
     <div className="border-t border-border bg-muted/40 px-3 py-2">
-      <div className="mb-1 text-xs font-medium text-foreground">Merge items (preview)</div>
+      <div className="mb-1 text-caption font-medium text-foreground">Merge items (preview)</div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
-          <div className="mb-1 text-xs text-muted-foreground">From AI — add to merged</div>
+          <div className="mb-1 text-caption text-muted-foreground">From AI — add to merged</div>
           <ul className="space-y-1">
             {aiItems.map((item, i) => (
-              <li key={i} className="flex items-center justify-between gap-2 text-xs">
+              <li key={i} className="flex items-center justify-between gap-2 text-caption">
                 <span className="text-foreground">{item}</span>
                 <Button
                   variant="ghost"
@@ -233,10 +233,10 @@ function ArrayMergePanel({
           </ul>
         </div>
         <div>
-          <div className="mb-1 text-xs text-muted-foreground">Merged result</div>
+          <div className="mb-1 text-caption text-muted-foreground">Merged result</div>
           <ul className="space-y-1">
             {merged.map((item, i) => (
-              <li key={i} className="flex items-center justify-between gap-2 text-xs">
+              <li key={i} className="flex items-center justify-between gap-2 text-caption">
                 <span className="text-foreground">{item}</span>
                 <Button
                   variant="ghost"

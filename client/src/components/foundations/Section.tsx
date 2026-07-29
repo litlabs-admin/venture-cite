@@ -24,9 +24,9 @@ export function Section({
       {hasHeader && (
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            {title && <h2 className="text-lg font-semibold text-foreground">{title}</h2>}
+            {title && <h2 className="text-ui font-semibold text-foreground">{title}</h2>}
             {description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{description}</p>
+              <p className="text-caption text-muted-foreground line-clamp-2 mt-1">{description}</p>
             )}
             {metaRow && <div className="mt-2 flex items-center gap-2 flex-wrap">{metaRow}</div>}
           </div>

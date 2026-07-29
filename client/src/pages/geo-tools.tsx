@@ -603,7 +603,7 @@ export default function GeoTools() {
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle className="flex items-center gap-2">
-                            <List className="h-5 w-5 text-chart-5" />
+                            <List className="h-5 w-5 text-primary" />
                             Listicle Tracker
                           </CardTitle>
                           <CardDescription>
@@ -637,7 +637,7 @@ export default function GeoTools() {
                     </CardHeader>
                     <CardContent>
                       <div className="bg-chart-1/10 p-4 rounded-lg mb-6">
-                        <p className="text-ui text-chart-1">
+                        <p className="text-caption text-chart-1">
                           <strong>Why Listicles Matter:</strong> Getting included in "Best of"
                           articles is how brands rank #1 on ChatGPT. AI systems heavily cite these
                           curated lists.
@@ -832,8 +832,8 @@ export default function GeoTools() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="bg-chart-3/10 p-4 rounded-lg mb-6">
-                        <p className="text-ui text-chart-3">
+                      <div className="bg-warning/10 p-4 rounded-lg mb-6">
+                        <p className="text-caption text-warning">
                           <strong>Wikipedia = 40% of AI Citations:</strong> It's the #2 most cited
                           source by AI systems after Reddit. Even a mention on a relevant Wikipedia
                           page can significantly boost your AI visibility.
@@ -852,14 +852,14 @@ export default function GeoTools() {
                         <div className="space-y-6">
                           <Card>
                             <CardHeader>
-                              <CardTitle className="text-section flex items-center gap-2">
+                              <CardTitle className="text-ui flex items-center gap-2">
                                 <CheckCircle className="h-4 w-4 text-foreground" />
                                 You&apos;re already mentioned ({wikiExistingRows.length})
                               </CardTitle>
                             </CardHeader>
                             <CardContent>
                               {wikiExistingRows.length === 0 ? (
-                                <p className="text-ui text-muted-foreground">
+                                <p className="text-caption text-muted-foreground">
                                   No existing mentions found on Wikipedia yet.
                                 </p>
                               ) : (
@@ -882,7 +882,7 @@ export default function GeoTools() {
                                           <ExternalLink className="h-3 w-3" />
                                         </a>
                                         {m.mentionContext && (
-                                          <p className="text-ui text-muted-foreground mt-1 line-clamp-2">
+                                          <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
                                             {m.mentionContext}
                                           </p>
                                         )}
@@ -901,14 +901,14 @@ export default function GeoTools() {
 
                           <Card>
                             <CardHeader>
-                              <CardTitle className="text-section flex items-center gap-2">
+                              <CardTitle className="text-ui flex items-center gap-2">
                                 <Target className="h-4 w-4 text-chart-1" />
                                 Pages you could target ({wikiOpportunityRows.length})
                               </CardTitle>
                             </CardHeader>
                             <CardContent>
                               {wikiOpportunityRows.length === 0 ? (
-                                <p className="text-ui text-muted-foreground">
+                                <p className="text-caption text-muted-foreground">
                                   No opportunity pages surfaced. Try re-scanning after adding
                                   competitors or products to the brand profile.
                                 </p>
@@ -963,7 +963,7 @@ export default function GeoTools() {
                                           </Button>
                                         </div>
                                         {m.mentionContext && (
-                                          <p className="text-ui text-muted-foreground mt-1 line-clamp-2">
+                                          <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
                                             {m.mentionContext}
                                           </p>
                                         )}
@@ -1002,7 +1002,7 @@ export default function GeoTools() {
                     </CardHeader>
                     <CardContent>
                       <div className="bg-muted p-4 rounded-lg mb-6">
-                        <p className="text-ui text-foreground">
+                        <p className="text-caption text-foreground">
                           <strong>80% BOFU Strategy:</strong> Comparison articles ("X vs Y") and
                           alternatives guides convert 80% better and get cited heavily by AI systems
                           for purchase decisions.
@@ -1011,7 +1011,9 @@ export default function GeoTools() {
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div>
-                          <label className="text-ui font-medium mb-2 block">Content Type</label>
+                          <label className="text-caption font-medium mb-2 block">
+                            Content Type
+                          </label>
                           <Select value={bofuType} onValueChange={setBofuType}>
                             <SelectTrigger data-testid="select-bofu-type">
                               <SelectValue />
@@ -1025,7 +1027,7 @@ export default function GeoTools() {
                         </div>
                         {(bofuType === "comparison" || bofuType === "alternatives") && (
                           <div>
-                            <label className="text-ui font-medium mb-2 block">
+                            <label className="text-caption font-medium mb-2 block">
                               {bofuType === "comparison" ? "Compare With" : "Alternatives To"}
                             </label>
                             <CompetitorCombobox
@@ -1038,7 +1040,9 @@ export default function GeoTools() {
                         )}
                         {bofuType === "guide" && (
                           <div>
-                            <label className="text-ui font-medium mb-2 block">Target Keyword</label>
+                            <label className="text-caption font-medium mb-2 block">
+                              Target Keyword
+                            </label>
                             <Input
                               placeholder="e.g., PR agency guide"
                               value={bofuKeyword}
@@ -1165,7 +1169,7 @@ export default function GeoTools() {
           <Card>
             <CardContent className="py-12 text-center">
               <Target className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-xl font-semibold mb-2">Select a Brand to Get Started</h3>
+              <h3 className="text-page font-semibold mb-2">Select a Brand to Get Started</h3>
               <p className="text-muted-foreground mb-4">
                 Choose a brand above or create one to access GEO tools
               </p>
@@ -1224,7 +1228,7 @@ export default function GeoTools() {
           </DialogHeader>
           {wikiDraft && (
             <div className="space-y-3">
-              <div className="border rounded-md p-3 bg-muted/30 whitespace-pre-wrap text-ui">
+              <div className="border rounded-md p-3 bg-muted/30 whitespace-pre-wrap text-caption">
                 {wikiDraft.text}
               </div>
               <ul className="text-caption text-muted-foreground space-y-1">

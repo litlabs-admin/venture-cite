@@ -243,9 +243,9 @@ export default function ViewEditDialog({
           {tab === "edit" && (
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium mb-1 block">Title</label>
+                <label className="text-caption font-medium mb-1 block">Title</label>
                 <input
-                  className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                  className="w-full border border-border rounded-md px-3 py-2 text-caption bg-background"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
@@ -254,7 +254,7 @@ export default function ViewEditDialog({
 
               {improvePreviousContent !== null && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-semibold">Auto-Improve diff</h4>
+                  <h4 className="text-caption font-semibold">Auto-Improve diff</h4>
                   <RevisionDiff before={improvePreviousContent} after={content} context={2} />
                   <div className="flex gap-2 justify-end">
                     <Button
@@ -311,11 +311,13 @@ export default function ViewEditDialog({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-1 border rounded-md max-h-[60vh] overflow-y-auto">
                 {revisionsQuery.isLoading ? (
-                  <div className="p-4 text-sm text-muted-foreground flex items-center gap-2">
+                  <div className="p-4 text-caption text-muted-foreground flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> Loading…
                   </div>
                 ) : revisions.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground italic">No revisions yet.</div>
+                  <div className="p-4 text-caption text-muted-foreground italic">
+                    No revisions yet.
+                  </div>
                 ) : (
                   <ul className="divide-y">
                     {revisions.map((r) => (
@@ -328,10 +330,10 @@ export default function ViewEditDialog({
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <Badge variant="secondary" className="text-[10px] uppercase">
+                            <Badge variant="secondary" className="text-label uppercase">
                               {r.source.replace(/_/g, " ")}
                             </Badge>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-label text-muted-foreground">
                               {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}
                             </span>
                           </div>
@@ -345,7 +347,7 @@ export default function ViewEditDialog({
                 {selectedRevision ? (
                   <>
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-caption text-muted-foreground">
                         Comparing this revision against the current article.
                       </p>
                       <Button
@@ -364,7 +366,7 @@ export default function ViewEditDialog({
                     <RevisionDiff before={selectedRevision.content} after={content} context={2} />
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">
+                  <p className="text-caption text-muted-foreground italic">
                     Pick a revision on the left to view its diff.
                   </p>
                 )}

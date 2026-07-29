@@ -18,18 +18,20 @@ export default function VerbatimResponseCard({
   return (
     <div className="rounded-md border border-border bg-muted/30 p-4">
       {heading && (
-        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">{heading}</div>
+        <div className="text-caption uppercase tracking-wide text-muted-foreground mb-2">
+          {heading}
+        </div>
       )}
       <div className="flex items-start gap-3">
-        <div className="shrink-0 w-7 h-7 rounded-full bg-primary/10 text-primary grid place-items-center text-xs font-semibold">
+        <div className="shrink-0 w-7 h-7 rounded-full bg-primary/10 text-primary grid place-items-center text-caption font-semibold">
           AI
         </div>
         <div className="min-w-0 flex-1">
-          <div className="prose prose-sm dark:prose-invert max-w-none wrap-break-word text-sm text-foreground prose-p:my-1.5 prose-p:leading-relaxed">
+          <div className="prose prose-sm dark:prose-invert max-w-none wrap-break-word text-caption text-foreground prose-p:my-1.5 prose-p:leading-relaxed">
             <SafeMarkdown>{stripTrackingParams(response)}</SafeMarkdown>
           </div>
           {(platform || prompt) && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-data text-muted-foreground">
               {platform && (
                 <Badge variant="outline" className="px-1.5 py-0.5 font-medium normal-case">
                   {platform}

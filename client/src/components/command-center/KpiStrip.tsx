@@ -15,7 +15,7 @@ import { NoValue, Bar, InfoDot, CCLink, DEST, type Dest } from "./primitives";
 function TileLabel({ children, tip }: { children: React.ReactNode; tip: React.ReactNode }) {
   return (
     <div className="mb-2 flex h-6 items-center gap-1.5">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-vc-text-muted">
+      <span className="text-label font-semibold uppercase tracking-wider text-vc-text-muted">
         {children}
       </span>
       <InfoDot>{tip}</InfoDot>
@@ -101,8 +101,8 @@ export function KpiStrip({
               <span className={VALUE}>{visibility}</span>
               {visibilityDelta !== null && visibilityDelta !== 0 && (
                 <span
-                  className={`font-mono text-[11px] tabular-nums ${
-                    visibilityDelta > 0 ? "text-positive" : "text-rose-400"
+                  className={`font-mono text-data tabular-nums ${
+                    visibilityDelta > 0 ? "text-positive" : "text-destructive"
                   }`}
                 >
                   {visibilityDelta > 0 ? "+" : ""}

@@ -5,9 +5,13 @@ import type { LeaderRow } from "./useCommandCenterData";
 
 // ─── Rankings ────────────────────────────────────────────────────────────────
 // Right third of the first content row. Scrolling list of tracked brands
-// ordered by share of voice. Measured row spec: 34px tall, px-6 py-2,
-// #rank (w-8, 11px) · status dot (8px) · favicon (16px) · name (12px, truncate)
+// ordered by share of voice. Row spec: 34px tall, px-6 py-2,
+// #rank (w-8, 11px) · favicon (16px) · name (12px, truncate)
 // · figure (12px tabular) · delta (10px, w-7, right).
+//
+// The reference carries an activity dot between the rank and the favicon. It
+// is dropped here: it encoded "has any citations", which the figure beside it
+// already says, so it read as decoration in a column of eight identical dots.
 //
 // DELTA IS NULL BY DESIGN: no competitor history table exists, so there is
 // nothing to diff against. Every row shows `–` until competitor snapshots are
@@ -38,18 +42,12 @@ function Row({
           className="flex flex-1 items-center gap-2 px-6 py-2 text-left transition-colors hover:bg-vc-muted/50"
         >
           <span
-            className={`w-8 flex-shrink-0 text-[11px] tabular-nums ${
+            className={`w-8 flex-shrink-0 text-data tabular-nums ${
               row.isOwn ? "font-medium text-vc-primary" : "text-vc-text-muted"
             }`}
           >
             #{rank}
           </span>
-          <span
-            className={`h-2 w-2 flex-shrink-0 rounded-full transition-all ${
-              row.totalCitations > 0 ? "bg-vc-accent" : "bg-vc-default"
-            }`}
-            aria-hidden
-          />
           {row.domain ? (
             <img
               src={favicon(row.domain)}
@@ -64,18 +62,18 @@ function Row({
             </span>
           )}
           <span
-            className={`flex-1 truncate text-[12px] ${
+            className={`flex-1 truncate text-caption ${
               row.isOwn ? "font-medium text-vc-primary" : "text-vc-secondary"
             }`}
           >
             {row.name}
           </span>
           <span
-            className={`text-[12px] tabular-nums text-vc-primary ${row.isOwn ? "font-semibold" : ""}`}
+            className={`text-caption tabular-nums text-vc-primary ${row.isOwn ? "font-semibold" : ""}`}
           >
             {score}
           </span>
-          <NoValue className="w-7 flex-shrink-0 text-right text-[10px]" />
+          <NoValue className="w-7 flex-shrink-0 text-right text-label" />
         </CCLink>
         <CCLink
           dest={DEST.competitors}
@@ -109,7 +107,7 @@ export function RankingsPanel({ rows, loading }: { rows: LeaderRow[]; loading: b
         <PanelLabel>Rankings</PanelLabel>
         <CCLink
           dest={DEST.competitors}
-          className="text-[10px] text-vc-label transition-colors hover:text-vc-accent"
+          className="text-label text-vc-label transition-colors hover:text-vc-accent"
         >
           Manage
         </CCLink>
@@ -123,7 +121,7 @@ export function RankingsPanel({ rows, loading }: { rows: LeaderRow[]; loading: b
             ))}
           </div>
         ) : sorted.length === 0 ? (
-          <p className="px-6 text-[11px] text-vc-tertiary">
+          <p className="px-6 text-data text-vc-tertiary">
             No competitors tracked yet. Add them in Setup to see where you stand.
           </p>
         ) : (
@@ -141,7 +139,7 @@ export function RankingsPanel({ rows, loading }: { rows: LeaderRow[]; loading: b
       </div>
 
       {ownIndex >= 0 && (
-        <p className="mt-3 flex-shrink-0 text-[11px] text-vc-tertiary">
+        <p className="mt-3 flex-shrink-0 text-data text-vc-tertiary">
           You: #{ownIndex + 1} of {sorted.length} tracked
         </p>
       )}

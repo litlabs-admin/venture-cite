@@ -72,29 +72,34 @@ function PageRow({
 }) {
   const tone = STATUS_TO_TONE[page.status];
   return (
-    <TableRow className="text-sm hover:bg-transparent" data-testid={`scrape-page-row-${page.id}`}>
+    <TableRow
+      className="text-caption hover:bg-transparent"
+      data-testid={`scrape-page-row-${page.id}`}
+    >
       <TableCell className="py-2 pr-3 px-0">
         <div className="flex items-center gap-2">
           <StatusDot tone={tone} aria-label={`Status: ${STATUS_LABEL[page.status]}`} />
-          <span className="text-xs text-muted-foreground">{STATUS_LABEL[page.status]}</span>
+          <span className="text-caption text-muted-foreground">{STATUS_LABEL[page.status]}</span>
         </div>
       </TableCell>
       <TableCell className="py-2 pr-3 px-0 max-w-xs">
-        <span className="line-clamp-1 font-mono text-xs" title={page.url}>
+        <span className="line-clamp-1 font-mono text-caption" title={page.url}>
           {truncate(page.url, 60)}
         </span>
       </TableCell>
-      <TableCell className="py-2 pr-3 px-0 text-xs tabular-nums text-muted-foreground">
+      <TableCell className="py-2 pr-3 px-0 text-caption tabular-nums text-muted-foreground">
         {formatBytes(page.bytes)}
       </TableCell>
-      <TableCell className="py-2 pr-3 px-0 text-xs tabular-nums">{page.factCount ?? 0}</TableCell>
-      <TableCell className="py-2 pr-3 px-0 text-xs text-muted-foreground">
+      <TableCell className="py-2 pr-3 px-0 text-caption tabular-nums">
+        {page.factCount ?? 0}
+      </TableCell>
+      <TableCell className="py-2 pr-3 px-0 text-caption text-muted-foreground">
         {page.lang ?? "—"}
       </TableCell>
-      <TableCell className="py-2 pr-3 px-0 text-xs text-muted-foreground">
+      <TableCell className="py-2 pr-3 px-0 text-caption text-muted-foreground">
         {page.errorKind ? truncate(page.errorKind, 20) : "—"}
       </TableCell>
-      <TableCell className="py-2 px-0 text-xs tabular-nums text-muted-foreground">
+      <TableCell className="py-2 px-0 text-caption tabular-nums text-muted-foreground">
         {formatDuration(page.fetchedAt, runStartedAt)}
       </TableCell>
     </TableRow>
@@ -109,7 +114,7 @@ function SkeletonRows({ count = 3 }: { count?: number }) {
           <TableCell className="py-2 pr-3 px-0">
             <div className="flex items-center gap-2">
               <StatusDot tone="pending" />
-              <span className="text-xs text-muted-foreground">Queued</span>
+              <span className="text-caption text-muted-foreground">Queued</span>
             </div>
           </TableCell>
           <TableCell className="py-2 pr-3 px-0">
@@ -149,25 +154,25 @@ function PagesTable({
     <Table>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+          <TableHead className="h-auto py-2 pr-3 px-0 text-caption uppercase tracking-wide text-muted-foreground font-medium">
             Status
           </TableHead>
-          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+          <TableHead className="h-auto py-2 pr-3 px-0 text-caption uppercase tracking-wide text-muted-foreground font-medium">
             URL
           </TableHead>
-          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+          <TableHead className="h-auto py-2 pr-3 px-0 text-caption uppercase tracking-wide text-muted-foreground font-medium">
             Bytes
           </TableHead>
-          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+          <TableHead className="h-auto py-2 pr-3 px-0 text-caption uppercase tracking-wide text-muted-foreground font-medium">
             Facts
           </TableHead>
-          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+          <TableHead className="h-auto py-2 pr-3 px-0 text-caption uppercase tracking-wide text-muted-foreground font-medium">
             Lang
           </TableHead>
-          <TableHead className="h-auto py-2 pr-3 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+          <TableHead className="h-auto py-2 pr-3 px-0 text-caption uppercase tracking-wide text-muted-foreground font-medium">
             Issue
           </TableHead>
-          <TableHead className="h-auto py-2 px-0 text-xs uppercase tracking-wide text-muted-foreground font-medium">
+          <TableHead className="h-auto py-2 px-0 text-caption uppercase tracking-wide text-muted-foreground font-medium">
             Time
           </TableHead>
         </TableRow>
@@ -204,9 +209,9 @@ export function ScrapePagesPanel({
     return (
       <Card data-tour-id="fact-sheet.pages-panel" data-testid="scrape-pages-panel-live">
         <CardHeader>
-          <CardTitle className="text-base">
+          <CardTitle className="text-ui">
             Reading pages{" "}
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
+            <span className="ml-2 text-caption font-normal text-muted-foreground">
               {summary.done} done · {summary.inFlight} in flight · {summary.failed} skipped
             </span>
           </CardTitle>
@@ -225,20 +230,20 @@ export function ScrapePagesPanel({
         <details className="group">
           <summary
             className={cn(
-              "flex cursor-pointer items-center justify-between p-4 text-sm font-medium",
+              "flex cursor-pointer items-center justify-between p-4 text-caption font-medium",
               "select-none hover:bg-accent/30 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
             )}
             data-testid="scrape-pages-panel-summary"
           >
             <span>
               View per-page details
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
+              <span className="ml-2 text-caption font-normal text-muted-foreground">
                 ({summary.total} pages · {summary.done} done · {summary.failed} skipped)
               </span>
             </span>
             <span
               aria-hidden
-              className="text-xs text-muted-foreground transition-transform group-open:rotate-90"
+              className="text-caption text-muted-foreground transition-transform group-open:rotate-90"
             >
               ▶
             </span>

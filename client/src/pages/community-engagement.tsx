@@ -335,7 +335,7 @@ export default function CommunityEngagement() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-ui font-medium">Platform</label>
+                  <label className="text-caption font-medium">Platform</label>
                   <Select
                     value={generateForm.platform}
                     onValueChange={(v) => setGenerateForm((f) => ({ ...f, platform: v }))}
@@ -350,7 +350,7 @@ export default function CommunityEngagement() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-ui font-medium">Post Type</label>
+                  <label className="text-caption font-medium">Post Type</label>
                   <Select
                     value={generateForm.postType}
                     onValueChange={(v) => setGenerateForm((f) => ({ ...f, postType: v }))}
@@ -367,7 +367,7 @@ export default function CommunityEngagement() {
                 </div>
               </div>
               <div>
-                <label className="text-ui font-medium">Community/Group Name</label>
+                <label className="text-caption font-medium">Community/Group Name</label>
                 <Input
                   placeholder="e.g., r/marketing, Hacker News"
                   value={generateForm.groupName}
@@ -376,7 +376,7 @@ export default function CommunityEngagement() {
                 />
               </div>
               <div>
-                <label className="text-ui font-medium">Topic / Question to Address</label>
+                <label className="text-caption font-medium">Topic / Question to Address</label>
                 <Input
                   placeholder="e.g., Best practices for AI-optimized content"
                   value={generateForm.topic}
@@ -385,7 +385,7 @@ export default function CommunityEngagement() {
                 />
               </div>
               <div>
-                <label className="text-ui font-medium">Tone</label>
+                <label className="text-caption font-medium">Tone</label>
                 <Select
                   value={generateForm.tone}
                   onValueChange={(v) => setGenerateForm((f) => ({ ...f, tone: v }))}
@@ -440,7 +440,7 @@ export default function CommunityEngagement() {
                     <label className="text-caption font-medium text-muted-foreground">
                       Content
                     </label>
-                    <div className="mt-1 p-3 bg-card rounded border border-border text-ui whitespace-pre-wrap">
+                    <div className="mt-1 p-3 bg-card rounded border border-border text-caption whitespace-pre-wrap">
                       {generatedContent.content}
                     </div>
                   </div>
@@ -449,7 +449,7 @@ export default function CommunityEngagement() {
                       <label className="text-caption font-medium text-muted-foreground">
                         Posting Tips
                       </label>
-                      <ul className="mt-1 text-ui space-y-1">
+                      <ul className="mt-1 text-caption space-y-1">
                         {generatedContent.tips.map((tip, i) => (
                           <li key={i} className="flex items-start gap-2">
                             <CheckCircle2 className="w-3 h-3 mt-1 text-muted-foreground shrink-0" />
@@ -581,8 +581,10 @@ export default function CommunityEngagement() {
                               {group.relevance} relevance
                             </Badge>
                           </div>
-                          <p className="text-ui text-muted-foreground mb-2">{group.description}</p>
-                          <div className="text-ui">
+                          <p className="text-caption text-muted-foreground mb-2">
+                            {group.description}
+                          </p>
+                          <div className="text-caption">
                             <span className="font-medium text-caption">Approach: </span>
                             <span className="text-caption text-muted-foreground">
                               {group.suggestedApproach}
@@ -682,7 +684,7 @@ export default function CommunityEngagement() {
                       <div className="flex items-center gap-2 mb-1">
                         {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
                         <Badge variant="neutral">{post.platform}</Badge>
-                        <span className="font-medium text-ui">{post.groupName}</span>
+                        <span className="font-medium text-caption">{post.groupName}</span>
                         <Badge variant="neutral">{post.status}</Badge>
                         {post.generatedByAi ? (
                           <Badge variant="outline" className="text-caption">
@@ -690,7 +692,7 @@ export default function CommunityEngagement() {
                           </Badge>
                         ) : null}
                       </div>
-                      {post.title && <p className="font-medium text-ui mt-1">{post.title}</p>}
+                      {post.title && <p className="font-medium text-caption mt-1">{post.title}</p>}
                       <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
                         {post.content}
                       </p>
@@ -762,13 +764,13 @@ export default function CommunityEngagement() {
                       <div className="flex items-center gap-2 mb-1">
                         {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
                         <Badge variant="neutral">{post.platform}</Badge>
-                        <span className="font-medium text-ui">{post.groupName}</span>
+                        <span className="font-medium text-caption">{post.groupName}</span>
                         <Badge variant="neutral" className="gap-1">
                           <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
                           Posted
                         </Badge>
                       </div>
-                      {post.title && <p className="font-medium text-ui mt-1">{post.title}</p>}
+                      {post.title && <p className="font-medium text-caption mt-1">{post.title}</p>}
                       <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
                         {post.content}
                       </p>
@@ -824,7 +826,7 @@ export default function CommunityEngagement() {
               <Textarea
                 id="draft-content"
                 rows={16}
-                className="font-mono text-ui"
+                className="font-mono text-caption"
                 value={draftEditForm.content}
                 onChange={(e) => setDraftEditForm({ ...draftEditForm, content: e.target.value })}
                 data-testid="textarea-draft-content"
@@ -864,13 +866,13 @@ export default function CommunityEngagement() {
 
       <Card className="mt-6" data-testid="card-best-practices">
         <CardHeader>
-          <CardTitle className="text-section flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-chart-3" />
+          <CardTitle className="text-ui flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-warning" />
             Community Engagement Best Practices
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-ui">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-caption">
             <div className="space-y-2">
               <h4 className="font-medium flex items-center gap-2">
                 <SiReddit className="w-4 h-4 text-muted-foreground" /> Reddit

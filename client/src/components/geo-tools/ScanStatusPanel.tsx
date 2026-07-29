@@ -98,7 +98,7 @@ function ActiveSourceChip({
 
   if (!s || s === "pending") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
         <StatusDot tone="neutral" aria-label={`${label}: pending`} />
         {label}
       </span>
@@ -106,7 +106,7 @@ function ActiveSourceChip({
   }
   if (s === "running") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+      <span className="inline-flex items-center gap-1.5 text-caption text-foreground">
         <StatusDot tone="pending" aria-label={`${label}: running`} />
         {label}
       </span>
@@ -115,7 +115,7 @@ function ActiveSourceChip({
   if (s === "done") {
     const count = progress?.count ?? 0;
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+      <span className="inline-flex items-center gap-1.5 text-caption text-foreground">
         <StatusDot tone="success" aria-label={`${label}: done, ${count} found`} />
         {label} · {count}
       </span>
@@ -123,7 +123,7 @@ function ActiveSourceChip({
   }
   if (s === "rate_limited") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-warning">
+      <span className="inline-flex items-center gap-1.5 text-caption text-warning">
         <StatusDot tone="warn" aria-label={`${label}: rate-limited`} />
         {label} rate-limited
       </span>
@@ -131,7 +131,7 @@ function ActiveSourceChip({
   }
   // error fallback
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-destructive">
+    <span className="inline-flex items-center gap-1.5 text-caption text-destructive">
       <StatusDot tone="fail" aria-label={`${label}: error`} />
       {label} error
     </span>
@@ -218,12 +218,12 @@ export function ScanStatusPanel({
   return (
     <Card className="w-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Scan Status</CardTitle>
+        <CardTitle className="text-ui font-semibold">Scan Status</CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {/* ── "Searching for" line (flow A) ──────────────────────────── */}
-        <div className="flex flex-wrap items-center gap-1 text-sm">
+        <div className="flex flex-wrap items-center gap-1 text-caption">
           <span className="text-muted-foreground">Searching for:</span>
           {variations.length === 0 ? (
             <span className="italic text-muted-foreground">no variations set</span>
@@ -231,14 +231,14 @@ export function ScanStatusPanel({
             variations.map((v, i) => (
               <span key={v} className="inline-flex items-center gap-1">
                 {i > 0 && <span className="text-muted-foreground">OR</span>}
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{v}</code>
+                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-caption">{v}</code>
               </span>
             ))
           )}
           <span className="mx-1 text-muted-foreground">·</span>
           <button
             onClick={onAddVariation}
-            className="inline-flex items-center gap-0.5 text-xs text-primary underline-offset-2 hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex items-center gap-0.5 text-caption text-primary underline-offset-2 hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Add search variation"
           >
             <Plus className="h-3 w-3" />
@@ -252,7 +252,7 @@ export function ScanStatusPanel({
         <div className="space-y-2">
           {/* First-scan banner (flow F) */}
           {isFirstScan && (
-            <div className="rounded-md bg-muted px-3 py-2 text-sm text-foreground">
+            <div className="rounded-md bg-muted px-3 py-2 text-caption text-foreground">
               First scan — pulling up to 1 year of history; this may take longer than usual.
             </div>
           )}
@@ -282,7 +282,7 @@ export function ScanStatusPanel({
         {!isActivelyScanning && lastCompletedScan && (
           <>
             <hr />
-            <div className="space-y-1 text-sm">
+            <div className="space-y-1 text-caption">
               <p className="text-muted-foreground">
                 Last scan:{" "}
                 <span className="text-foreground font-medium">
@@ -308,7 +308,7 @@ export function ScanStatusPanel({
                   })()}
                 </span>
               </p>
-              <div aria-live="polite" className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              <div aria-live="polite" className="flex flex-wrap gap-x-3 gap-y-1 text-caption">
                 {SOURCES.map((src, i) => (
                   <span key={src} className="inline-flex items-center gap-1">
                     {i > 0 && <span className="text-muted-foreground">·</span>}
@@ -325,7 +325,7 @@ export function ScanStatusPanel({
         {/* ── Daily auto-scan toggle + next auto-scan (flows I/B) ──────── */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <label htmlFor="scan-monitor-toggle" className="text-sm font-medium leading-none">
+            <label htmlFor="scan-monitor-toggle" className="text-caption font-medium leading-none">
               Daily auto-scan
             </label>
             <Switch
@@ -337,7 +337,7 @@ export function ScanStatusPanel({
           </div>
 
           {!brandMonitorMentions && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Mention monitoring is paused for this brand.{" "}
               <button
                 onClick={() => onToggleMonitor(true)}
@@ -349,7 +349,7 @@ export function ScanStatusPanel({
           )}
 
           {brandMonitorMentions && (
-            <p className="text-xs text-muted-foreground">Daily auto-scan enabled</p>
+            <p className="text-caption text-muted-foreground">Daily auto-scan enabled</p>
           )}
         </div>
       </CardContent>

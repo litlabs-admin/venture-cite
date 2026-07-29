@@ -50,7 +50,7 @@ export default function RevisionDiff({ before, after, context }: RevisionDiffPro
 
   if (stats.added === 0 && stats.removed === 0) {
     return (
-      <div className="text-sm text-muted-foreground italic p-4 border rounded-md">
+      <div className="text-caption text-muted-foreground italic p-4 border rounded-md">
         No changes between these versions.
       </div>
     );
@@ -58,11 +58,11 @@ export default function RevisionDiff({ before, after, context }: RevisionDiffPro
 
   return (
     <div className="space-y-2">
-      <div className="text-xs text-muted-foreground">
+      <div className="text-caption text-muted-foreground">
         <span className="text-positive font-medium">+{stats.added}</span>{" "}
         <span className="text-destructive font-medium">−{stats.removed}</span>
       </div>
-      <pre className="text-xs font-mono leading-relaxed border rounded-md bg-muted p-3 overflow-x-auto max-h-[60vh]">
+      <pre className="text-caption font-mono leading-relaxed border rounded-md bg-muted p-3 overflow-x-auto max-h-[60vh]">
         {rendered.map((l, idx) => {
           if ((l as { op: "skip" }).op === "skip") {
             const skipped = (l as { count: number }).count;

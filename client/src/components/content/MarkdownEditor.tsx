@@ -48,7 +48,7 @@ export default function MarkdownEditor({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex items-center justify-between text-caption text-muted-foreground">
         <span>
           {wordCount.toLocaleString()} words · {charCount.toLocaleString()} characters
         </span>
@@ -60,7 +60,7 @@ export default function MarkdownEditor({
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
           placeholder={placeholder ?? "# Title\n\nWrite your article in markdown..."}
-          className="font-mono text-sm leading-relaxed resize-y"
+          className="font-mono text-caption leading-relaxed resize-y"
           style={{ minHeight }}
           readOnly={!editable}
           data-testid="markdown-editor-textarea"

@@ -16,11 +16,11 @@ import { useCommandCenterData } from "./useCommandCenterData";
 // border, 12px/500 label, 14px icons, 150ms colour transition.
 
 const BTN =
-  "flex h-8 items-center gap-1.5 rounded border border-vc-default px-2.5 text-[12px] font-medium text-vc-secondary transition-colors duration-150 hover:bg-vc-muted/50";
+  "flex h-8 items-center gap-1.5 rounded border border-vc-default px-2.5 text-caption font-medium text-vc-secondary transition-colors duration-150 hover:bg-vc-muted/50";
 const MENU =
   "absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded border border-vc-default bg-white py-1 shadow-vc-overlay";
 const ITEM =
-  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-vc-secondary transition-colors hover:bg-vc-muted/60 hover:text-vc-primary";
+  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-caption text-vc-secondary transition-colors hover:bg-vc-muted/60 hover:text-vc-primary";
 
 function csvEscape(v: string | number | null | undefined) {
   const s = v === null || v === undefined ? "" : String(v);
@@ -68,7 +68,7 @@ export function HeaderActions({ brandId, brandName }: { brandId: string; brandNa
 
   function exportCsv() {
     const rows: (string | number | null)[][] = [
-      ["VentureCite — Command Center export"],
+      ["VentureCite — Dashboard export"],
       ["Brand", brandName],
       ["Generated", new Date().toISOString()],
       [],
@@ -114,7 +114,7 @@ export function HeaderActions({ brandId, brandName }: { brandId: string; brandNa
     const body = rows.map((r) => r.map(csvEscape).join(",")).join("\r\n");
     const stamp = new Date().toISOString().slice(0, 10);
     download(
-      `venturecite-command-center-${brandName.replace(/\W+/g, "-").toLowerCase()}-${stamp}.csv`,
+      `venturecite-dashboard-${brandName.replace(/\W+/g, "-").toLowerCase()}-${stamp}.csv`,
       body,
       "text/csv;charset=utf-8",
     );

@@ -91,7 +91,7 @@ export function FactRow({
     days === null
       ? ""
       : days > 180
-        ? "text-chart-3"
+        ? "text-warning"
         : days > 90
           ? "text-muted-foreground"
           : "text-muted-foreground";
@@ -117,13 +117,13 @@ export function FactRow({
                 keep it available on hover instead. */}
             <Badge
               variant="secondary"
-              className="text-[10px] uppercase tracking-wide"
+              className="text-label uppercase tracking-wide"
               title={`Field: ${fact.factKey}`}
             >
               {fact.subcategory}
             </Badge>
             <span
-              className="text-[10px] text-muted-foreground"
+              className="text-label text-muted-foreground"
               title={`Source: ${badge.label}`}
               data-testid={`source-badge-${fact.id}`}
             >
@@ -131,7 +131,7 @@ export function FactRow({
             </span>
             {sources.length > 1 && (
               <span
-                className="text-[10px] text-muted-foreground tnum"
+                className="text-label text-muted-foreground tnum"
                 title={`Verified across ${sources.length} pages`}
                 data-testid={`sources-count-${fact.id}`}
               >
@@ -141,7 +141,7 @@ export function FactRow({
             {alternatives.length > 0 && (
               <Badge
                 variant="outline"
-                className="text-[10px] font-normal border-(--warning)/30 text-(--warning)"
+                className="text-label font-normal border-(--warning)/30 text-(--warning)"
                 data-testid={`alternatives-count-${fact.id}`}
               >
                 {alternatives.length} variant{alternatives.length === 1 ? "" : "s"}
@@ -150,15 +150,15 @@ export function FactRow({
           </div>
 
           {fact.valueType === "string" && (
-            <p className="text-sm text-foreground">{fact.factValue}</p>
+            <p className="text-caption text-foreground">{fact.factValue}</p>
           )}
           {fact.valueType === "number" && (
-            <p className="font-mono text-sm text-foreground">
+            <p className="font-mono text-caption text-foreground">
               {fact.valuePayload?.n ?? fact.factValue}
             </p>
           )}
           {fact.valueType === "array" && (
-            <ul className="ml-4 list-disc text-sm text-foreground">
+            <ul className="ml-4 list-disc text-caption text-foreground">
               {(fact.valuePayload?.items ?? []).map((item, i) => (
                 <li key={i}>{item}</li>
               ))}
@@ -166,7 +166,10 @@ export function FactRow({
           )}
 
           {showStale && fact.lastVerified ? (
-            <p className={cn("mt-1 text-xs", staleClass)} data-testid={`last-verified-${fact.id}`}>
+            <p
+              className={cn("mt-1 text-caption", staleClass)}
+              data-testid={`last-verified-${fact.id}`}
+            >
               Last verified {formatRelativeTime(fact.lastVerified)}
             </p>
           ) : null}
@@ -176,7 +179,7 @@ export function FactRow({
               <button
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
-                className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
+                className="mt-2 inline-flex items-center gap-1 text-data text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
                 aria-expanded={expanded}
                 aria-controls={`provenance-${fact.id}`}
                 data-testid={`btn-provenance-${fact.id}`}
@@ -194,14 +197,14 @@ export function FactRow({
                 >
                   {sources.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                      <p className="text-label font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
                         Sources ({sources.length})
                       </p>
                       <ul className="space-y-1.5">
                         {sources.map((s, i) => (
                           <li
                             key={`s-${i}`}
-                            className="flex items-start gap-2 text-xs text-foreground"
+                            className="flex items-start gap-2 text-caption text-foreground"
                           >
                             <a
                               href={safeExternalHref(s.url)}
@@ -214,7 +217,7 @@ export function FactRow({
                               {hostnameOf(s.url)}
                               {shortPath(s.url) !== "/" ? shortPath(s.url) : ""}
                             </a>
-                            <span className="text-muted-foreground tnum text-[10px]">
+                            <span className="text-muted-foreground tnum text-label">
                               {Math.round(s.confidence * 100)}%
                             </span>
                             {s.excerpt && (
@@ -229,12 +232,12 @@ export function FactRow({
                   )}
                   {alternatives.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-(--warning) mb-1.5">
+                      <p className="text-label font-medium uppercase tracking-wider text-(--warning) mb-1.5">
                         Other values found
                       </p>
                       <ul className="space-y-2">
                         {alternatives.map((alt, i) => (
-                          <li key={`a-${i}`} className="text-xs">
+                          <li key={`a-${i}`} className="text-caption">
                             <p className="text-foreground">{alt.value}</p>
                             <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
                               {alt.sources.map((s, j) => (
@@ -243,7 +246,7 @@ export function FactRow({
                                   href={safeExternalHref(s.url)}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                                  className="inline-flex items-center gap-1 text-label text-primary hover:underline"
                                   title={s.url}
                                 >
                                   <ExternalLink className="h-2.5 w-2.5" aria-hidden />

@@ -96,14 +96,14 @@ function PlatformChips({ platforms, max = 4 }: { platforms: string[]; max?: numb
   return (
     <div className="flex items-center gap-1">
       {shown.map((p) => (
-        <Badge key={p} variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+        <Badge key={p} variant="outline" className="px-1.5 py-0 text-label font-normal">
           {p}
         </Badge>
       ))}
       {extra > 0 && (
         <Badge
           variant="outline"
-          className="px-1.5 py-0 text-[10px] font-normal text-muted-foreground"
+          className="px-1.5 py-0 text-label font-normal text-muted-foreground"
           title={platforms.join(", ")}
         >
           +{extra}
@@ -250,7 +250,7 @@ export default function CitedUrlsCard({
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 text-ui">
               <Link2 className="h-4 w-4 text-muted-foreground" />
               Cited pages
               {groups.length > 0 && (
@@ -259,7 +259,7 @@ export default function CitedUrlsCard({
                 </Badge>
               )}
             </CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-caption text-muted-foreground">
               {view === "page"
                 ? "The pages AI engines cited about your brand, ranked by how often."
                 : "What each prompt surfaced when AI engines answered about your brand."}
@@ -278,7 +278,7 @@ export default function CitedUrlsCard({
                 type="button"
                 onClick={() => setViewSafe(val)}
                 className={cn(
-                  "rounded px-2.5 py-1 text-xs font-medium transition-colors",
+                  "rounded px-2.5 py-1 text-caption font-medium transition-colors",
                   view === val
                     ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:text-foreground",
@@ -299,7 +299,7 @@ export default function CitedUrlsCard({
             ))}
           </div>
         ) : groups.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
+          <p className="py-6 text-center text-caption text-muted-foreground">
             No cited pages yet. Once an AI engine cites a page about your brand, it will appear
             here.
           </p>
@@ -323,7 +323,7 @@ export default function CitedUrlsCard({
                           className={cn("h-4 w-4 transition-transform", isOpen && "rotate-90")}
                         />
                       </button>
-                      <div className="min-w-0 flex-1 text-sm font-medium">
+                      <div className="min-w-0 flex-1 text-caption font-medium">
                         {view === "page" ? (
                           <UrlLink url={(g as PageGroup).url} />
                         ) : (
@@ -344,7 +344,7 @@ export default function CitedUrlsCard({
                         <Badge variant="secondary" className="font-normal" title="Total citations">
                           {g.count} cite{g.count === 1 ? "" : "s"}
                         </Badge>
-                        <span className="hidden whitespace-nowrap text-xs text-muted-foreground sm:inline">
+                        <span className="hidden whitespace-nowrap text-caption text-muted-foreground sm:inline">
                           {formatRelativeTime(g.lastCitedAt)}
                         </span>
                       </div>
@@ -356,7 +356,7 @@ export default function CitedUrlsCard({
                           ? (g as PageGroup).details.map((d, i) => (
                               <div
                                 key={`${d.platform}-${i}`}
-                                className="flex items-start justify-between gap-3 text-xs"
+                                className="flex items-start justify-between gap-3 text-caption"
                               >
                                 <span className="min-w-0 text-muted-foreground" title={d.prompt}>
                                   <span className="line-clamp-2">{d.prompt}</span>
@@ -364,7 +364,7 @@ export default function CitedUrlsCard({
                                 <span className="flex shrink-0 items-center gap-2">
                                   <Badge
                                     variant="outline"
-                                    className="px-1.5 py-0 text-[10px] font-normal"
+                                    className="px-1.5 py-0 text-label font-normal"
                                   >
                                     {d.platform}
                                   </Badge>
@@ -377,7 +377,7 @@ export default function CitedUrlsCard({
                           : (g as PromptGroup).details.map((d, i) => (
                               <div
                                 key={`${d.url}-${i}`}
-                                className="flex items-center justify-between gap-3 text-xs"
+                                className="flex items-center justify-between gap-3 text-caption"
                               >
                                 <span className="min-w-0">
                                   <UrlLink url={d.url} />
@@ -385,7 +385,7 @@ export default function CitedUrlsCard({
                                 <span className="flex shrink-0 items-center gap-2">
                                   <Badge
                                     variant="outline"
-                                    className="px-1.5 py-0 text-[10px] font-normal"
+                                    className="px-1.5 py-0 text-label font-normal"
                                   >
                                     {d.platform}
                                   </Badge>

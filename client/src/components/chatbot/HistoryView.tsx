@@ -82,8 +82,8 @@ export function HistoryView({
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="text-sm font-semibold">Conversations</div>
-        <div className="ml-auto text-[11px] text-muted-foreground">
+        <div className="text-caption font-semibold">Conversations</div>
+        <div className="ml-auto text-data text-muted-foreground">
           {threads.length} {threads.length === 1 ? "chat" : "chats"}
         </div>
       </div>
@@ -98,8 +98,8 @@ export function HistoryView({
         ) : threads.length === 0 ? (
           <div className="flex flex-col items-center text-center px-6 pt-8 text-muted-foreground">
             <MessageSquare className="h-8 w-8 mb-2 opacity-50" aria-hidden />
-            <p className="text-sm">No conversations yet</p>
-            <p className="text-xs mt-1">Start one from the welcome screen.</p>
+            <p className="text-caption">No conversations yet</p>
+            <p className="text-caption mt-1">Start one from the welcome screen.</p>
           </div>
         ) : (
           threads.map((t) => {
@@ -128,9 +128,9 @@ export function HistoryView({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     {isActive && <Check className="h-3 w-3 text-primary shrink-0" aria-hidden />}
-                    <div className="text-sm font-medium truncate">{t.title}</div>
+                    <div className="text-caption font-medium truncate">{t.title}</div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                  <div className="text-data text-muted-foreground mt-0.5">
                     {relativeTime(t.updatedAt)} · {t.messageCount}{" "}
                     {t.messageCount === 1 ? "msg" : "msgs"}
                   </div>

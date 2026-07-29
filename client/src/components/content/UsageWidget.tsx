@@ -29,13 +29,13 @@ export default function UsageWidget({ data }: UsageWidgetProps) {
                     : "bg-positive"
               }`}
             />
-            <span className="text-sm text-muted-foreground">
+            <span className="text-caption text-muted-foreground">
               <span className="font-medium text-foreground">{data.articlesUsed}</span>
               {" / "}
               <span>{data.articlesLimit === -1 ? "Unlimited" : data.articlesLimit}</span>
               {" articles this month"}
             </span>
-            <span className="text-xs text-muted-foreground capitalize px-2 py-0.5 bg-muted rounded">
+            <span className="text-caption text-muted-foreground capitalize px-2 py-0.5 bg-muted rounded">
               {data.tier} Plan
             </span>
           </div>
@@ -46,12 +46,14 @@ export default function UsageWidget({ data }: UsageWidgetProps) {
               </div>
             )}
             {data.articlesRemaining === 0 && (
-              <span className="text-xs text-destructive font-medium">Monthly limit reached</span>
+              <span className="text-caption text-destructive font-medium">
+                Monthly limit reached
+              </span>
             )}
             {data.articlesRemaining > 0 &&
               data.articlesRemaining <= 5 &&
               data.articlesLimit !== -1 && (
-                <span className="text-xs text-warning font-medium">
+                <span className="text-caption text-warning font-medium">
                   {data.articlesRemaining} remaining
                 </span>
               )}

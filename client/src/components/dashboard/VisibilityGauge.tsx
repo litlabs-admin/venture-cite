@@ -55,8 +55,8 @@ export default function VisibilityGauge({
       </svg>
       {!hideLabel && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="tnum text-4xl font-semibold text-foreground leading-none">{clamped}</div>
-          <div className="text-xs text-muted-foreground mt-1">/ 100</div>
+          <div className="tnum text-stat font-semibold text-foreground leading-none">{clamped}</div>
+          <div className="text-caption text-muted-foreground mt-1">/ 100</div>
         </div>
       )}
     </div>

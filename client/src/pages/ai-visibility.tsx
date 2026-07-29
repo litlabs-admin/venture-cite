@@ -1063,7 +1063,7 @@ export default function AIVisibility() {
                                 </span>
                                 {getPriorityBadge(step.priority)}
                               </div>
-                              <p className="text-ui text-muted-foreground mt-1">
+                              <p className="text-caption text-muted-foreground mt-1">
                                 {step.description}
                               </p>
                             </div>
@@ -1081,10 +1081,10 @@ export default function AIVisibility() {
                                 <Lightbulb className="w-4 h-4 text-muted-foreground" />
                                 How to do this:
                               </h4>
-                              <p className="text-ui text-foreground">{step.howTo}</p>
+                              <p className="text-caption text-foreground">{step.howTo}</p>
                             </div>
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-ui">
+                              <div className="flex items-center gap-2 text-caption">
                                 <Target className="w-4 h-4 text-muted-foreground" />
                                 <span className="font-medium">Expected Impact:</span>
                                 <span className="text-muted-foreground">

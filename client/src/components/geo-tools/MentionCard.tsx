@@ -156,7 +156,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center rounded-full px-2 py-0.5 text-caption font-medium",
         display.className,
       )}
     >
@@ -261,7 +261,7 @@ export default function MentionCard({
         </span>
 
         {/* Title */}
-        <span className="min-w-0 flex-1 truncate text-sm font-medium" title={title}>
+        <span className="min-w-0 flex-1 truncate text-caption font-medium" title={title}>
           {title}
         </span>
 
@@ -276,7 +276,7 @@ export default function MentionCard({
           {/* Dead-link indicator */}
           {isDeadLink && (
             <span
-              className="inline-flex items-center gap-1 text-xs text-destructive"
+              className="inline-flex items-center gap-1 text-caption text-destructive"
               title="Link unavailable"
             >
               <XCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -288,7 +288,9 @@ export default function MentionCard({
           <StatusBadge status={mention.status} />
 
           {/* Date */}
-          <span className="whitespace-nowrap text-xs text-muted-foreground">{relativeDate}</span>
+          <span className="whitespace-nowrap text-caption text-muted-foreground">
+            {relativeDate}
+          </span>
 
           {/* Actions menu — stopPropagation so click doesn't open the sheet */}
           <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
@@ -312,7 +314,7 @@ export default function MentionCard({
           <span className="shrink-0" aria-label={platformLabel(mention.platform)}>
             <PlatformIcon platform={mention.platform} />
           </span>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium" title={title}>
+          <span className="min-w-0 flex-1 truncate text-caption font-medium" title={title}>
             {title}
           </span>
         </div>
@@ -322,14 +324,14 @@ export default function MentionCard({
           {isNew && <Badge variant="secondary">New</Badge>}
           {isManual && <Badge variant="outline">Manual</Badge>}
           {isDeadLink && (
-            <span className="inline-flex items-center gap-1 text-xs text-destructive">
+            <span className="inline-flex items-center gap-1 text-caption text-destructive">
               <XCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               Link unavailable
             </span>
           )}
           <SentimentBadge sentiment={mention.sentiment} />
           <StatusBadge status={mention.status} />
-          <span className="text-xs text-muted-foreground">{relativeDate}</span>
+          <span className="text-caption text-muted-foreground">{relativeDate}</span>
         </div>
 
         {/* Row 3: actions */}
@@ -351,9 +353,9 @@ export default function MentionCard({
       {/* ------------------------------------------------------------------ */}
       {mention.matchedVariation && mention.matchedField && (
         <div className="border-t px-3 pb-2 pt-1.5 sm:px-4">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Found{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-data">
               {mention.matchedVariation}
             </code>{" "}
             in <span className="font-medium">{mention.matchedField}</span>
@@ -405,7 +407,9 @@ function ActionsMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Actions</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-caption text-muted-foreground">
+          Actions
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
         {/* Change status submenu — only rendered when transitions exist */}

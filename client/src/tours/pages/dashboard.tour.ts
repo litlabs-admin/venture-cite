@@ -17,7 +17,7 @@ export const dashboardTour: TourConfig = {
   steps: [
     {
       id: "intro",
-      title: "Command Center",
+      title: "Dashboard",
       content:
         "Your daily home in VentureCite. One sentence + one number tells you where you stand on AI visibility; the Worklist below tells you what to do next.",
     },

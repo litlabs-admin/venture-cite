@@ -11,8 +11,13 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
     <div
       ref={ref}
       className={cn(
-        "rounded-lg bg-card text-card-foreground",
-        interactive && "border shadow-sm transition-shadow hover:shadow-md",
+        // Panel spec shared with the dashboard: white surface, 1px hairline,
+        // 10px radius, no resting shadow. The border used to be opt-in via
+        // `interactive`, so most cards rendered as invisible white-on-white
+        // boxes while the dashboard's panels were hairline-ruled. This system
+        // is border-first — depth comes from 1px rules, not shadows.
+        "rounded-vc-panel border border-vc-default bg-card text-card-foreground",
+        interactive && "transition-shadow hover:shadow-sm",
         className,
       )}
       {...props}
@@ -32,7 +37,10 @@ const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivE
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn("text-2xl font-semibold leading-none tracking-tight", className)}
+      // 14px `ui` — the reference's section-heading role. Was 24px, which is
+      // the scale's METRIC role (hero figures); using it for panel titles made
+      // every card shout.
+      className={cn("text-ui font-semibold leading-none tracking-tight", className)}
       {...props}
     />
   ),
@@ -41,7 +49,7 @@ CardTitle.displayName = "CardTitle";
 
 const CardDescription = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+    <div ref={ref} className={cn("text-caption text-muted-foreground", className)} {...props} />
   ),
 );
 CardDescription.displayName = "CardDescription";

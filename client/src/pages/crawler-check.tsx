@@ -123,7 +123,7 @@ export default function CrawlerCheck() {
       case "blocked":
         return <XCircle className="h-5 w-5 text-destructive" />;
       default:
-        return <AlertTriangle className="h-5 w-5 text-chart-3" />;
+        return <AlertTriangle className="h-5 w-5 text-warning" />;
     }
   };
 
@@ -143,7 +143,7 @@ export default function CrawlerCheck() {
         );
       default:
         return (
-          <Badge variant="outline" className="border-chart-3/30 text-chart-3">
+          <Badge variant="outline" className="border-warning/30 text-warning">
             Unknown
           </Badge>
         );
@@ -186,7 +186,7 @@ export default function CrawlerCheck() {
 
           {brands.length > 0 && (
             <div className="mt-4">
-              <p className="text-ui text-muted-foreground mb-2">Quick check your brands:</p>
+              <p className="text-caption text-muted-foreground mb-2">Quick check your brands:</p>
               <div className="flex flex-wrap gap-2">
                 {brands
                   .filter((b) => b.website)
@@ -234,7 +234,7 @@ export default function CrawlerCheck() {
                   href={safeExternalHref(checkResult.robotsTxtUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-ui text-chart-1 hover:underline flex items-center gap-1"
+                  className="text-caption text-chart-1 hover:underline flex items-center gap-1"
                 >
                   View robots.txt <ExternalLink className="h-3 w-3" />
                 </a>
@@ -250,7 +250,7 @@ export default function CrawlerCheck() {
                     >
                       {checkResult.summary.geoScore}%
                     </div>
-                    <p className="text-ui text-muted-foreground">GEO Access Score</p>
+                    <p className="text-caption text-muted-foreground">GEO Access Score</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -262,7 +262,7 @@ export default function CrawlerCheck() {
                       <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
                       {checkResult.summary.allowed}
                     </div>
-                    <p className="text-ui text-muted-foreground">Allowed</p>
+                    <p className="text-caption text-muted-foreground">Allowed</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -273,18 +273,18 @@ export default function CrawlerCheck() {
                     >
                       {checkResult.summary.blocked}
                     </div>
-                    <p className="text-ui text-muted-foreground">Blocked</p>
+                    <p className="text-caption text-muted-foreground">Blocked</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-4 text-center">
                     <div
-                      className="text-stat font-semibold tabular-nums text-chart-3"
+                      className="text-stat font-semibold tabular-nums text-warning"
                       data-testid="unknown-count"
                     >
                       {checkResult.summary.unknown}
                     </div>
-                    <p className="text-ui text-muted-foreground">Unknown</p>
+                    <p className="text-caption text-muted-foreground">Unknown</p>
                   </CardContent>
                 </Card>
               </div>
@@ -315,9 +315,9 @@ export default function CrawlerCheck() {
           </Card>
 
           {checkResult.recommendations.length > 0 && (
-            <Card className="border-chart-3/30">
+            <Card className="border-warning/30">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-chart-3">
+                <CardTitle className="flex items-center gap-2 text-warning">
                   <AlertTriangle className="h-5 w-5" />
                   Recommendations
                 </CardTitle>
@@ -334,16 +334,16 @@ export default function CrawlerCheck() {
                       <div
                         key={index}
                         className={cn(
-                          "p-4 bg-chart-3/10 rounded-lg",
-                          isTopPriority && "border-l-[3px] border-chart-3 pl-3.5",
+                          "p-4 bg-warning/10 rounded-lg",
+                          isTopPriority && "border-l-[3px] border-warning pl-3.5",
                         )}
                       >
                         {isTopPriority && (
-                          <p className="text-label uppercase tracking-wider text-chart-3 font-semibold mb-1.5">
+                          <p className="text-label uppercase tracking-wider text-warning font-semibold mb-1.5">
                             Top priority
                           </p>
                         )}
-                        <pre className="whitespace-pre-wrap text-ui font-mono">{rec}</pre>
+                        <pre className="whitespace-pre-wrap text-caption font-mono">{rec}</pre>
                         {rec.includes("User-agent:") && (
                           <Button
                             variant="outline"
@@ -408,7 +408,7 @@ export default function CrawlerCheck() {
                       return (
                         <div key={category}>
                           <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-ui font-semibold">
+                            <h3 className="text-caption font-semibold">
                               {category}{" "}
                               <span className="text-muted-foreground font-normal">
                                 ({crawlers.length} bot{crawlers.length === 1 ? "" : "s"})
@@ -433,7 +433,7 @@ export default function CrawlerCheck() {
                                   <div className="flex items-center gap-3 w-full">
                                     {getStatusIcon(crawler.status)}
                                     <span className="font-medium">{crawler.platform}</span>
-                                    <span className="text-muted-foreground text-ui">
+                                    <span className="text-muted-foreground text-caption">
                                       ({crawler.agent})
                                     </span>
                                     <div className="ml-auto mr-4">
@@ -443,18 +443,20 @@ export default function CrawlerCheck() {
                                 </AccordionTrigger>
                                 <AccordionContent>
                                   <div className="pl-8 space-y-3">
-                                    <p className="text-ui text-muted-foreground">
+                                    <p className="text-caption text-muted-foreground">
                                       {crawler.description}
                                     </p>
                                     <div className="p-3 bg-muted rounded-lg">
-                                      <p className="text-ui">
+                                      <p className="text-caption">
                                         <strong>Status:</strong> {crawler.reason}
                                       </p>
                                     </div>
                                     {crawler.recommendation && (
                                       <div className="p-3 bg-warning-subtle rounded-lg">
-                                        <p className="text-ui font-medium mb-2">Recommendation:</p>
-                                        <pre className="text-ui font-mono whitespace-pre-wrap">
+                                        <p className="text-caption font-medium mb-2">
+                                          Recommendation:
+                                        </p>
+                                        <pre className="text-caption font-mono whitespace-pre-wrap">
                                           {crawler.recommendation}
                                         </pre>
                                         <Button
@@ -492,7 +494,7 @@ export default function CrawlerCheck() {
               </CardHeader>
               <CardContent>
                 <div className="relative">
-                  <pre className="p-4 bg-muted rounded-lg text-ui font-mono overflow-x-auto max-h-96 overflow-y-auto">
+                  <pre className="p-4 bg-muted rounded-lg text-caption font-mono overflow-x-auto max-h-96 overflow-y-auto">
                     {checkResult.rawRobotsTxt}
                   </pre>
                   <Button

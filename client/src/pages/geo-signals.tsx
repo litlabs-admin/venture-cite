@@ -255,14 +255,14 @@ function ArticleSelect({
 }) {
   if (!selectedBrandId) {
     return (
-      <div className="flex h-10 items-center text-ui text-muted-foreground">
+      <div className="flex h-10 items-center text-caption text-muted-foreground">
         Select a brand first.
       </div>
     );
   }
   if (articles.length === 0) {
     return (
-      <div className="flex h-10 items-center gap-2 text-ui text-muted-foreground">
+      <div className="flex h-10 items-center gap-2 text-caption text-muted-foreground">
         <span>No articles yet for {brandName}.</span>
         <Link to="/articles">
           <Button variant="outline" size="sm" data-testid="button-create-article">
@@ -667,7 +667,7 @@ export default function GeoSignals() {
     // by getStatusIcon alongside it is what signals "excellent", not colour.
     if (ratio >= 0.8) return "text-foreground";
     if (ratio >= 0.6) return "text-chart-1";
-    if (ratio >= 0.4) return "text-chart-3";
+    if (ratio >= 0.4) return "text-warning";
     return "text-destructive";
   };
 
@@ -678,13 +678,13 @@ export default function GeoSignals() {
       case "good":
         return <CheckCircle className="w-4 h-4 text-chart-1" />;
       case "needs_improvement":
-        return <AlertTriangle className="w-4 h-4 text-chart-3" />;
+        return <AlertTriangle className="w-4 h-4 text-warning" />;
       case "poor":
         return <XCircle className="w-4 h-4 text-destructive" />;
       case "pass":
         return <CheckCircle className="w-4 h-4 text-foreground" />;
       case "warning":
-        return <AlertTriangle className="w-4 h-4 text-chart-3" />;
+        return <AlertTriangle className="w-4 h-4 text-warning" />;
       case "fail":
         return <XCircle className="w-4 h-4 text-destructive" />;
       default:
@@ -735,7 +735,7 @@ export default function GeoSignals() {
         <div className="sticky top-14 z-10 -mx-2 border-b bg-background/95 px-2 py-3 backdrop-blur">
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
-              <Label className="whitespace-nowrap text-ui font-medium text-foreground">
+              <Label className="whitespace-nowrap text-caption font-medium text-foreground">
                 Article to analyze
               </Label>
               <ArticleSelect
@@ -926,7 +926,7 @@ export default function GeoSignals() {
                           data-testid="stat-overall"
                         >
                           {overallScore}
-                          <span className="text-ui text-muted-foreground">%</span>
+                          <span className="text-caption text-muted-foreground">%</span>
                         </p>
                       </div>
                       <Progress value={overallScore} className="w-1/2 h-2" />
@@ -951,7 +951,7 @@ export default function GeoSignals() {
                                     <HelpCircle className="w-3.5 h-3.5" />
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="text-ui" align="start">
+                                <PopoverContent className="text-caption" align="start">
                                   <p className="font-medium text-foreground mb-1">
                                     How this signal is measured
                                   </p>
@@ -973,7 +973,7 @@ export default function GeoSignals() {
                           className="h-2 mb-2"
                         />
                         {signal.recommendations.length > 0 && (
-                          <ul className="text-ui text-muted-foreground space-y-1">
+                          <ul className="text-caption text-muted-foreground space-y-1">
                             {signal.recommendations.map((rec, rIdx) => (
                               <li key={rIdx} className="flex items-start gap-2">
                                 <ChevronRight className="w-3 h-3 mt-1 text-primary" />
@@ -992,7 +992,7 @@ export default function GeoSignals() {
                     .map((signal, idx) => (
                       <div
                         key={`na-${idx}`}
-                        className="p-3 bg-muted/20 rounded-lg border border-dashed text-ui text-muted-foreground flex items-center gap-2"
+                        className="p-3 bg-muted/20 rounded-lg border border-dashed text-caption text-muted-foreground flex items-center gap-2"
                       >
                         <AlertTriangle className="w-4 h-4" />
                         <span>
@@ -1034,7 +1034,7 @@ export default function GeoSignals() {
             <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3 text-left hover:bg-muted/50">
               <div className="flex items-center gap-2">
                 <Workflow className="w-4 h-4 text-muted-foreground" />
-                <span className="text-ui font-medium text-foreground">Pipeline breakdown</span>
+                <span className="text-caption font-medium text-foreground">Pipeline breakdown</span>
                 <span className="text-caption text-muted-foreground">
                   Prepare → Retrieve → Signal → Serve
                 </span>
@@ -1094,7 +1094,7 @@ export default function GeoSignals() {
                               stage.status === "pass"
                                 ? "bg-secondary"
                                 : stage.status === "warning"
-                                  ? "bg-chart-3"
+                                  ? "bg-warning"
                                   : "bg-destructive"
                             }`}
                           >
@@ -1126,7 +1126,7 @@ export default function GeoSignals() {
                               );
                             })()}
                           </div>
-                          <p className="text-ui font-medium text-foreground">{stage.stage}</p>
+                          <p className="text-caption font-medium text-foreground">{stage.stage}</p>
                           <p className="text-data font-mono tabular-nums text-muted-foreground">
                             {stage.score}/100
                           </p>
@@ -1160,7 +1160,7 @@ export default function GeoSignals() {
                         <p className="text-caption text-muted-foreground mb-2">
                           {STAGE_BLURBS[stage.stage]}
                         </p>
-                        <ul className="text-ui text-muted-foreground space-y-1">
+                        <ul className="text-caption text-muted-foreground space-y-1">
                           {stage.details.map((detail, dIdx) => (
                             <li key={dIdx} className="flex items-start gap-2">
                               <ChevronRight className="w-3 h-3 mt-1 text-primary" />
@@ -1192,7 +1192,7 @@ export default function GeoSignals() {
                       <HelpCircle className="w-4 h-4" />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent className="max-w-md text-ui" align="start">
+                  <PopoverContent className="max-w-md text-caption" align="start">
                     <p className="mb-1 font-medium text-foreground">
                       What is &quot;chunking&quot;?
                     </p>
@@ -1314,9 +1314,11 @@ export default function GeoSignals() {
                             )}
                           </div>
                         </div>
-                        <p className="text-ui text-foreground line-clamp-3 mb-2">{chunk.content}</p>
+                        <p className="text-caption text-foreground line-clamp-3 mb-2">
+                          {chunk.content}
+                        </p>
                         {chunk.issues.length > 0 && (
-                          <div className="text-ui text-warning">
+                          <div className="text-caption text-warning">
                             {chunk.issues.map((issue, iIdx) => (
                               <p key={iIdx}>⚠️ {issue}</p>
                             ))}
@@ -1361,7 +1363,7 @@ export default function GeoSignals() {
                   <Textarea
                     value={optimizedContent}
                     readOnly
-                    className=" text-foreground min-h-[300px] font-mono text-ui"
+                    className=" text-foreground min-h-[300px] font-mono text-caption"
                   />
                   <p className="text-caption text-muted-foreground mt-2">
                     "Apply to Article" overwrites the selected article's content with this optimised
@@ -1388,7 +1390,7 @@ export default function GeoSignals() {
                       <HelpCircle className="w-4 h-4" />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent className="max-w-md text-ui" align="start">
+                  <PopoverContent className="max-w-md text-caption" align="start">
                     <p className="mb-1 font-medium text-foreground">What is &quot;schema&quot;?</p>
                     <p className="mb-3 text-muted-foreground">
                       Schema (structured data) is hidden labels in your page&apos;s code that spell
@@ -1487,7 +1489,7 @@ export default function GeoSignals() {
                           <p className="font-medium text-foreground">
                             Audit couldn't fetch this page
                           </p>
-                          <p className="text-ui text-muted-foreground">
+                          <p className="text-caption text-muted-foreground">
                             {schemaFetchError ?? "Unknown fetch error."}
                           </p>
                           {auditedUrl && (
@@ -1729,7 +1731,7 @@ export default function GeoSignals() {
 
                   {additionalTypes.length > 0 && (
                     <div className="p-4 bg-muted/20 rounded-lg border">
-                      <p className="text-ui font-medium text-foreground mb-2">
+                      <p className="text-caption font-medium text-foreground mb-2">
                         Other schema types found on this page:
                       </p>
                       <div className="flex flex-wrap gap-2">
@@ -1762,7 +1764,7 @@ export default function GeoSignals() {
               Review the diff. Overwriting replaces the article's current content.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-auto border rounded-md bg-muted/20 font-mono text-xs p-3">
+          <div className="flex-1 overflow-auto border rounded-md bg-muted/20 font-mono text-caption p-3">
             {selectedArticle
               ? lineDiff(selectedArticle.content || "", pendingOptimized).map((row, i) => (
                   <div

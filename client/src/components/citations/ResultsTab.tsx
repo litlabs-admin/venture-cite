@@ -216,7 +216,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
               <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium text-foreground">All platforms missed your brand</p>
-                <ul className="text-ui text-muted-foreground mt-2 space-y-1 list-disc pl-5">
+                <ul className="text-caption text-muted-foreground mt-2 space-y-1 list-disc pl-5">
                   <li>
                     Add common surface forms to your brand&apos;s name variations (legal name, short
                     name, product line).
@@ -242,7 +242,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-ui text-muted-foreground">Overall Citation Rate</p>
+              <p className="text-caption text-muted-foreground">Overall Citation Rate</p>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="text-stat font-semibold text-foreground" data-testid="stat-citation-rate">
@@ -256,7 +256,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-ui text-muted-foreground">Best Platform</p>
+              <p className="text-caption text-muted-foreground">Best Platform</p>
               <CheckCircle2 className="h-4 w-4 text-positive" />
             </div>
             {/* Wave 9: when no platform has hit the min-sample threshold,
@@ -274,11 +274,11 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-ui text-muted-foreground">Top Prompt</p>
+              <p className="text-caption text-muted-foreground">Top Prompt</p>
               <Sparkles className="h-4 w-4 text-muted-foreground" />
             </div>
             <p
-              className="text-section font-semibold text-foreground line-clamp-2"
+              className="text-ui font-semibold text-foreground line-clamp-2"
               data-testid="stat-top-prompt"
             >
               {bestPrompt ? `"${bestPrompt.prompt}"` : "—"}
@@ -300,7 +300,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       {/* Performance by Platform */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-section">Performance by Platform</CardTitle>
+          <CardTitle className="text-ui">Performance by Platform</CardTitle>
         </CardHeader>
         <CardContent>
           {/* Wave 9: sortable column headers. Click to toggle asc/desc;
@@ -385,7 +385,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-section">Results by Prompt</CardTitle>
+              <CardTitle className="text-ui">Results by Prompt</CardTitle>
               <CardDescription>
                 Click a prompt to see each AI&apos;s full answer and whether your brand was cited.
               </CardDescription>
@@ -462,12 +462,12 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
                       // means this prompt hasn't been re-checked yet —
                       // not that there's no history at all.
                       hasActive ? (
-                        <p className="text-ui text-muted-foreground italic flex items-center gap-2">
+                        <p className="text-caption text-muted-foreground italic flex items-center gap-2">
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           Pending re-check… platform results will appear as each one finishes.
                         </p>
                       ) : (
-                        <p className="text-ui text-muted-foreground">
+                        <p className="text-caption text-muted-foreground">
                           No results yet — run a citation check.
                         </p>
                       )

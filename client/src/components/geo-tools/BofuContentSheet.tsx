@@ -221,7 +221,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
             </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="metadata" className="space-y-3 text-sm">
+          <TabsContent value="metadata" className="space-y-3 text-caption">
             <Row label="Type">{content.contentType}</Row>
             <Row label="Primary keyword">{content.primaryKeyword || "—"}</Row>
             <Row label="Compared with">
@@ -246,7 +246,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
                 onChange={(e) => setPublishedUrl(e.target.value)}
                 data-testid="input-bofu-published-url"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 Once set, the citation checker tracks AI engines citing this URL and stamps "Cited
                 recently" when matches are detected.
               </p>
@@ -254,7 +254,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
             <div className="flex items-center justify-between p-3 border rounded-lg">
               <div>
                 <Label>Mark as published</Label>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Sets the publishedAt timestamp to now.
                 </p>
               </div>
@@ -278,7 +278,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
                 href={safeExternalHref(publishedUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                className="text-caption text-primary hover:underline inline-flex items-center gap-1"
               >
                 <ExternalLink className="h-3 w-3" />
                 Open published URL
@@ -287,7 +287,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
           </TabsContent>
 
           <TabsContent value="schema" className="space-y-3">
-            <div className="text-sm text-muted-foreground">
+            <div className="text-caption text-muted-foreground">
               Drop this JSON-LD into the <code>&lt;head&gt;</code> of the page so AI engines can
               extract structured data.
             </div>
@@ -308,7 +308,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
               </Button>
             </div>
             <ScrollArea className="h-[40vh] border rounded-md p-3">
-              <pre className="text-xs whitespace-pre-wrap wrap-break-word">{jsonLd}</pre>
+              <pre className="text-caption whitespace-pre-wrap wrap-break-word">{jsonLd}</pre>
             </ScrollArea>
           </TabsContent>
         </Tabs>
@@ -335,7 +335,7 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
         </SheetFooter>
 
         {content.publishedAt && (
-          <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
+          <div className="mt-3 text-caption text-muted-foreground flex items-center gap-1">
             <CheckCircle2 className="h-3 w-3 text-positive" />
             Published {new Date(content.publishedAt as any).toLocaleDateString()}
           </div>

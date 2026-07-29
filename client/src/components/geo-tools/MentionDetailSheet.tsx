@@ -221,18 +221,21 @@ export default function MentionDetailSheet({
                 {platformCfg.icon}
               </span>
               <div className="min-w-0 flex-1">
-                <SheetTitle className="text-base leading-snug truncate">
+                <SheetTitle className="text-ui leading-snug truncate">
                   {mention.sourceTitle ?? platformCfg.label}
                 </SheetTitle>
                 <SheetDescription className="sr-only">
                   Mention detail for {mention.sourceTitle ?? mention.platform}
                 </SheetDescription>
                 <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                  <Badge variant={sentimentCfg.variant} className="flex items-center gap-1 text-xs">
+                  <Badge
+                    variant={sentimentCfg.variant}
+                    className="flex items-center gap-1 text-caption"
+                  >
                     {sentimentCfg.icon}
                     {sentimentCfg.label}
                   </Badge>
-                  <Badge variant="outline" className="text-xs capitalize">
+                  <Badge variant="outline" className="text-caption capitalize">
                     {mention.status ?? "new"}
                   </Badge>
                 </div>
@@ -284,13 +287,13 @@ export default function MentionDetailSheet({
               {/* Why matched */}
               {(mention.matchedVariation || mention.matchedField) && (
                 <section aria-label="Why matched">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                  <h3 className="text-caption font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
                     Why matched
                   </h3>
-                  <p className="text-sm text-foreground">
+                  <p className="text-caption text-foreground">
                     Found{" "}
                     {mention.matchedVariation ? (
-                      <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                      <code className="bg-muted px-1 py-0.5 rounded text-caption">
                         {mention.matchedVariation}
                       </code>
                     ) : (
@@ -299,7 +302,7 @@ export default function MentionDetailSheet({
                     {mention.matchedField ? (
                       <>
                         in{" "}
-                        <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                        <code className="bg-muted px-1 py-0.5 rounded text-caption">
                           {mention.matchedField}
                         </code>
                       </>
@@ -311,15 +314,15 @@ export default function MentionDetailSheet({
 
               {/* Mention context */}
               <section aria-label="Mention content">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                <h3 className="text-caption font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Content
                 </h3>
                 {mention.mentionContext ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none text-sm border rounded-md p-3 bg-muted/30">
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-caption border rounded-md p-3 bg-muted/30">
                     <SafeMarkdown>{mention.mentionContext}</SafeMarkdown>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">
+                  <p className="text-caption text-muted-foreground italic">
                     No content captured by scanner.
                   </p>
                 )}
@@ -327,7 +330,7 @@ export default function MentionDetailSheet({
 
               {/* Status */}
               <section aria-label="Status">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                <h3 className="text-caption font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Status
                 </h3>
                 {isTerminal ? (
@@ -344,7 +347,7 @@ export default function MentionDetailSheet({
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-caption text-muted-foreground">
                       Status is final — no further transitions allowed.
                     </p>
                   </div>
@@ -366,13 +369,13 @@ export default function MentionDetailSheet({
 
               {/* Author / Date metadata */}
               <section aria-label="Mention metadata">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                <h3 className="text-caption font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Details
                 </h3>
-                <dl className="space-y-1.5 text-sm">
+                <dl className="space-y-1.5 text-caption">
                   {mention.authorUsername && (
                     <MetaRow label="Author">
-                      <span className="font-mono text-xs">{mention.authorUsername}</span>
+                      <span className="font-mono text-caption">{mention.authorUsername}</span>
                     </MetaRow>
                   )}
                   <MetaRow label="Mentioned">
@@ -385,7 +388,7 @@ export default function MentionDetailSheet({
 
               {/* Actions */}
               <section aria-label="Actions" className="space-y-2 pt-1 border-t">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 pt-4">
+                <h3 className="text-caption font-semibold text-muted-foreground uppercase tracking-wide mb-2 pt-4">
                   Actions
                 </h3>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -412,7 +415,7 @@ export default function MentionDetailSheet({
                   </Button>
                 </div>
                 {isTerminal && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-caption text-muted-foreground">
                     Mark false positive is unavailable — status is final.
                   </p>
                 )}

@@ -173,8 +173,8 @@ export default function KeywordResearchPage() {
     // High score: neutral text, not green/chart-4. The check icon rendered
     // alongside the value is what signals "good", not colour.
     if (score >= 80) return "text-foreground";
-    if (score >= 60) return "text-chart-3";
-    if (score >= 40) return "text-chart-3";
+    if (score >= 60) return "text-warning";
+    if (score >= 40) return "text-warning";
     return "text-destructive";
   };
 
@@ -186,7 +186,7 @@ export default function KeywordResearchPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+            <CardTitle className="text-caption text-muted-foreground flex items-center gap-2">
               <Filter className="h-4 w-4" />
               Filter Status
             </CardTitle>
@@ -216,7 +216,7 @@ export default function KeywordResearchPage() {
 
         <Card className="lg:col-span-2">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+            <CardTitle className="text-caption text-muted-foreground flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
               AI Discovery
             </CardTitle>
@@ -240,7 +240,7 @@ export default function KeywordResearchPage() {
                 </>
               )}
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-caption text-muted-foreground mt-2">
               AI analyzes your brand, industry, and competitors to find high-opportunity keywords
             </p>
           </CardContent>
@@ -329,7 +329,7 @@ export default function KeywordResearchPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3
-                        className="text-lg font-semibold text-foreground"
+                        className="text-ui font-semibold text-foreground"
                         data-testid={`text-keyword-${keyword.id}`}
                       >
                         {keyword.keyword}
@@ -350,12 +350,14 @@ export default function KeywordResearchPage() {
                     <TooltipProvider delayDuration={200}>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Opportunity Score</p>
+                          <p className="text-caption text-muted-foreground mb-1">
+                            Opportunity Score
+                          </p>
                           <div className="flex items-center gap-2">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span
-                                  className={`text-lg font-bold inline-flex items-center gap-1 ${getScoreColor(keyword.opportunityScore)}`}
+                                  className={`text-ui font-semibold inline-flex items-center gap-1 ${getScoreColor(keyword.opportunityScore)}`}
                                   data-testid={`score-opportunity-${keyword.id}`}
                                 >
                                   {keyword.opportunityScore}
@@ -372,14 +374,14 @@ export default function KeywordResearchPage() {
                         </div>
 
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">
+                          <p className="text-caption text-muted-foreground mb-1">
                             AI Citation Potential
                           </p>
                           <div className="flex items-center gap-2">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span
-                                  className={`text-lg font-bold inline-flex items-center gap-1 ${getScoreColor(keyword.aiCitationPotential)}`}
+                                  className={`text-ui font-semibold inline-flex items-center gap-1 ${getScoreColor(keyword.aiCitationPotential)}`}
                                   data-testid={`score-citation-${keyword.id}`}
                                 >
                                   {keyword.aiCitationPotential}
@@ -396,10 +398,10 @@ export default function KeywordResearchPage() {
                         </div>
 
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Search Volume</p>
+                          <p className="text-caption text-muted-foreground mb-1">Search Volume</p>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="text-lg font-bold text-foreground inline-flex items-center gap-1">
+                              <span className="text-ui font-semibold text-foreground inline-flex items-center gap-1">
                                 {keyword.searchVolume ? keyword.searchVolume.toLocaleString() : "—"}
                                 <Sparkles className="h-3 w-3 text-muted-foreground" />
                               </span>
@@ -409,10 +411,10 @@ export default function KeywordResearchPage() {
                         </div>
 
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Difficulty</p>
+                          <p className="text-caption text-muted-foreground mb-1">Difficulty</p>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="text-lg font-bold text-foreground inline-flex items-center gap-1">
+                              <span className="text-ui font-semibold text-foreground inline-flex items-center gap-1">
                                 {keyword.difficulty || "—"}
                                 <Sparkles className="h-3 w-3 text-muted-foreground" />
                               </span>
@@ -425,10 +427,10 @@ export default function KeywordResearchPage() {
 
                     {keyword.relatedKeywords && keyword.relatedKeywords.length > 0 && (
                       <div className="mt-4">
-                        <p className="text-xs text-muted-foreground mb-2">Related Keywords</p>
+                        <p className="text-caption text-muted-foreground mb-2">Related Keywords</p>
                         <div className="flex flex-wrap gap-2">
                           {keyword.relatedKeywords.map((related, i) => (
-                            <Badge key={i} variant="secondary" className="text-xs">
+                            <Badge key={i} variant="secondary" className="text-caption">
                               {related}
                             </Badge>
                           ))}
@@ -448,7 +450,7 @@ export default function KeywordResearchPage() {
                       Generate Content
                     </Button>
 
-                    <Badge variant="outline" className="justify-center text-xs">
+                    <Badge variant="outline" className="justify-center text-caption">
                       {contentTypeLabels[keyword.suggestedContentType || "article"] ||
                         keyword.suggestedContentType}
                     </Badge>

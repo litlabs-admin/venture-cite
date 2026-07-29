@@ -78,7 +78,7 @@ function StatusBadge({ status }: { status: string }) {
   if (status === "ready") return null;
   const cls =
     status === "generating"
-      ? "bg-muted text-chart-3"
+      ? "bg-muted text-warning"
       : status === "failed"
         ? "bg-muted text-destructive"
         : "bg-muted text-muted-foreground";
@@ -363,7 +363,7 @@ export default function Articles() {
             {/* Bulk action toolbar — shown when anything is selected. */}
             {selected.size > 0 && (
               <div className="flex items-center justify-between p-2 px-3 border rounded-md bg-muted/50">
-                <span className="text-ui">
+                <span className="text-caption">
                   {selected.size} selected
                   <button
                     onClick={() => setSelected(new Set())}
@@ -476,13 +476,15 @@ export default function Articles() {
                             </div>
                           </div>
                           {excerpt && (
-                            <p className="text-ui text-muted-foreground line-clamp-2">{excerpt}</p>
+                            <p className="text-caption text-muted-foreground line-clamp-2">
+                              {excerpt}
+                            </p>
                           )}
                         </div>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex flex-wrap items-center gap-3 text-ui text-muted-foreground mb-3">
+                      <div className="flex flex-wrap items-center gap-3 text-caption text-muted-foreground mb-3">
                         {brand && (
                           <Badge variant="outline" className="font-normal">
                             {brand.name}
@@ -613,7 +615,7 @@ export default function Articles() {
                 <button
                   type="button"
                   onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
-                  className="text-ui text-primary hover:underline"
+                  className="text-caption text-primary hover:underline"
                   data-testid="button-load-more-articles"
                 >
                   Load {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more

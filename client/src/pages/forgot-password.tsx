@@ -63,7 +63,9 @@ export default function ForgotPassword() {
                 <CheckCircle className="h-8 w-8 text-foreground" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold text-foreground">Check your email</CardTitle>
+            <CardTitle className="text-page font-semibold text-foreground">
+              Check your email
+            </CardTitle>
             <CardDescription className="mt-2">
               If an account exists for <span className="font-medium">{email}</span>, you'll receive
               a password reset link shortly.
@@ -72,7 +74,7 @@ export default function ForgotPassword() {
           <CardContent className="text-center">
             <div className="bg-muted rounded-lg p-4 mb-4">
               <Mail className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 Don't see the email? Check your spam folder or try again.
               </p>
             </div>
@@ -91,7 +93,7 @@ export default function ForgotPassword() {
           <CardFooter className="justify-center">
             <a
               href="/login"
-              className="text-sm text-primary hover:text-primary/90 flex items-center gap-1"
+              className="text-caption text-primary hover:text-primary/90 flex items-center gap-1"
             >
               <ArrowLeft className="h-4 w-4" /> Back to sign in
             </a>
@@ -110,7 +112,9 @@ export default function ForgotPassword() {
           <div className="flex justify-center mb-4">
             <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">Reset your password</CardTitle>
+          <CardTitle className="text-page font-semibold text-foreground">
+            Reset your password
+          </CardTitle>
           <CardDescription>Enter your email and we'll send you a reset link</CardDescription>
         </CardHeader>
         <CardContent>
@@ -153,7 +157,7 @@ export default function ForgotPassword() {
         <CardFooter className="justify-center">
           <a
             href="/login"
-            className="text-sm text-primary hover:text-primary/90 flex items-center gap-1"
+            className="text-caption text-primary hover:text-primary/90 flex items-center gap-1"
           >
             <ArrowLeft className="h-4 w-4" /> Back to sign in
           </a>

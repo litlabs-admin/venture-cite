@@ -86,7 +86,7 @@ function FilterControls({ filters, onChange, stacked = false }: FilterControlsPr
   }
 
   const wrapCls = stacked ? "flex flex-col gap-3" : "flex flex-wrap items-center gap-2";
-  const labelCls = "text-xs text-muted-foreground font-medium mb-0.5";
+  const labelCls = "text-caption text-muted-foreground font-medium mb-0.5";
   const fieldWrapCls = stacked ? "flex flex-col" : "";
 
   return (
@@ -99,7 +99,7 @@ function FilterControls({ filters, onChange, stacked = false }: FilterControlsPr
           onValueChange={(v) => onChange("status", v === "all" ? undefined : v)}
         >
           <SelectTrigger
-            className={cn("h-8 text-xs", stacked ? "w-full" : "w-[150px]")}
+            className={cn("h-8 text-caption", stacked ? "w-full" : "w-[150px]")}
             aria-label="Filter by status"
           >
             <SelectValue placeholder="Status" />
@@ -123,7 +123,7 @@ function FilterControls({ filters, onChange, stacked = false }: FilterControlsPr
           onValueChange={(v) => onChange("platform", v === "all" ? undefined : v)}
         >
           <SelectTrigger
-            className={cn("h-8 text-xs", stacked ? "w-full" : "w-[140px]")}
+            className={cn("h-8 text-caption", stacked ? "w-full" : "w-[140px]")}
             aria-label="Filter by platform"
           >
             <SelectValue placeholder="Platform" />
@@ -144,7 +144,7 @@ function FilterControls({ filters, onChange, stacked = false }: FilterControlsPr
           onValueChange={(v) => onChange("sentiment", v === "all" ? undefined : v)}
         >
           <SelectTrigger
-            className={cn("h-8 text-xs", stacked ? "w-full" : "w-[130px]")}
+            className={cn("h-8 text-caption", stacked ? "w-full" : "w-[130px]")}
             aria-label="Filter by sentiment"
           >
             <SelectValue placeholder="Sentiment" />
@@ -164,15 +164,15 @@ function FilterControls({ filters, onChange, stacked = false }: FilterControlsPr
         <div className={cn("flex items-center gap-1", stacked ? "" : "")}>
           <Input
             type="date"
-            className="h-8 text-xs w-[130px]"
+            className="h-8 text-caption w-[130px]"
             value={filters.from ?? ""}
             onChange={(e) => onChange("from", e.target.value || undefined)}
             aria-label="From date"
           />
-          <span className="text-xs text-muted-foreground">–</span>
+          <span className="text-caption text-muted-foreground">–</span>
           <Input
             type="date"
-            className="h-8 text-xs w-[130px]"
+            className="h-8 text-caption w-[130px]"
             value={filters.to ?? ""}
             onChange={(e) => onChange("to", e.target.value || undefined)}
             aria-label="To date"
@@ -188,7 +188,7 @@ function FilterControls({ filters, onChange, stacked = false }: FilterControlsPr
           <Input
             type="search"
             placeholder="Search mentions…"
-            className={cn("h-8 text-xs pl-7", stacked ? "w-full" : "w-[180px]")}
+            className={cn("h-8 text-caption pl-7", stacked ? "w-full" : "w-[180px]")}
             value={searchDraft}
             onChange={(e) => handleSearchChange(e.target.value)}
             aria-label="Search mentions"
@@ -204,7 +204,7 @@ function FilterControls({ filters, onChange, stacked = false }: FilterControlsPr
           onValueChange={(v) => onChange("sort", v === "newest" ? undefined : v)}
         >
           <SelectTrigger
-            className={cn("h-8 text-xs", stacked ? "w-full" : "w-[130px]")}
+            className={cn("h-8 text-caption", stacked ? "w-full" : "w-[130px]")}
             aria-label="Sort mentions"
           >
             <SelectValue placeholder="Sort" />
@@ -239,7 +239,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
           type="button"
           onClick={() => onChange("newSinceLastScan", !filters.newSinceLastScan)}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-caption font-medium transition-colors",
             filters.newSinceLastScan
               ? "border-primary bg-primary text-primary-foreground"
               : "border-input bg-background text-foreground hover:bg-accent",
@@ -255,14 +255,14 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs gap-1.5"
+            className="h-8 text-caption gap-1.5"
             onClick={() => setSheetOpen(true)}
             aria-label={`Open filters, ${activeCount} active`}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Filters
             {activeCount > 0 && (
-              <Badge className="ml-0.5 h-4 min-w-4 rounded-full px-1 text-[10px] leading-none">
+              <Badge className="ml-0.5 h-4 min-w-4 rounded-full px-1 text-label leading-none">
                 {activeCount}
               </Badge>
             )}
@@ -274,7 +274,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
           <FilterControls filters={filters} onChange={onChange} />
           {/* Active-filter count badge (desktop) */}
           {activeCount > 0 && (
-            <Badge variant="secondary" className="h-6 rounded-full text-xs">
+            <Badge variant="secondary" className="h-6 rounded-full text-caption">
               <Filter className="mr-1 h-3 w-3" />
               {activeCount} active
             </Badge>
@@ -286,7 +286,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+            className="h-8 text-caption text-muted-foreground hover:text-foreground"
             onClick={onClear}
             aria-label="Clear all filters"
           >
@@ -306,7 +306,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
               <SlidersHorizontal className="h-4 w-4" />
               Filters
               {activeCount > 0 && (
-                <Badge className="ml-1 h-5 rounded-full px-1.5 text-xs">{activeCount}</Badge>
+                <Badge className="ml-1 h-5 rounded-full px-1.5 text-caption">{activeCount}</Badge>
               )}
             </SheetTitle>
           </SheetHeader>
@@ -316,7 +316,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full text-xs"
+                className="w-full text-caption"
                 onClick={() => {
                   onClear();
                   setSheetOpen(false);

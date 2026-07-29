@@ -137,7 +137,7 @@ export default function BufferConnectDialog({
             href="https://publish.buffer.com/settings/api"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline"
+            className="text-caption text-primary hover:underline"
           >
             Where do I get this?
           </a>
@@ -152,7 +152,7 @@ export default function BufferConnectDialog({
             data-testid="input-buffer-token"
           />
           {error && (
-            <p className="text-sm text-destructive" data-testid="text-buffer-connect-error">
+            <p className="text-caption text-destructive" data-testid="text-buffer-connect-error">
               {error}
             </p>
           )}

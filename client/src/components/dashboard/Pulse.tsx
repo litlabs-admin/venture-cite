@@ -277,7 +277,7 @@ export default function Pulse() {
 
   if (recsQ.isError) {
     return shell(
-      <div className="flex items-center justify-between gap-3 pt-2 text-sm text-muted-foreground">
+      <div className="flex items-center justify-between gap-3 pt-2 text-caption text-muted-foreground">
         <span>Couldn&apos;t load your worklist.</span>
         <button
           type="button"
@@ -293,8 +293,8 @@ export default function Pulse() {
   if (visible.length === 0) {
     return shell(
       <div className="pt-2">
-        <p className="text-sm font-medium text-foreground">Nothing needs you right now.</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="text-caption font-medium text-foreground">Nothing needs you right now.</p>
+        <p className="mt-0.5 text-caption text-muted-foreground">
           The next action surfaces here after your weekly scan, or when something changes.
         </p>
       </div>,
@@ -324,8 +324,8 @@ export default function Pulse() {
             <span className="text-label font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {it.kind}
             </span>
-            <p className="mt-0.5 text-sm font-medium text-foreground">{it.title}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{it.why}</p>
+            <p className="mt-0.5 text-caption font-medium text-foreground">{it.title}</p>
+            <p className="mt-0.5 text-caption text-muted-foreground">{it.why}</p>
             {(() => {
               const target = it.target;
               return it.emphasised ? (
@@ -338,7 +338,7 @@ export default function Pulse() {
                 <Link
                   to={target.to}
                   search={target.search}
-                  className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
+                  className="mt-2 inline-block text-caption font-medium text-primary hover:underline"
                 >
                   {it.cta} →
                 </Link>

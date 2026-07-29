@@ -12,7 +12,7 @@ import type { PageExplainer } from "@/components/PageHeader";
  */
 export const pageExplainers = {
   dashboard: {
-    summary: "Your GEO command center — see citation trends, rankings, and what to do next.",
+    summary: "Your GEO dashboard — see citation trends, rankings, and what to do next.",
     expectedOutcome: "New data appears within minutes after each citation check completes.",
   },
   brands: {

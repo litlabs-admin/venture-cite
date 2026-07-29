@@ -102,7 +102,7 @@ export function AddMentionDialog({
               onChange={(e) => setSourceUrl(e.target.value)}
               placeholder="https://reddit.com/r/saas/comments/..."
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               We&apos;ll fetch the page and check that your brand is mentioned.
             </p>
           </div>

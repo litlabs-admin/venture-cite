@@ -31,14 +31,14 @@ export function ActionsStrip({
         <div className="mb-2 flex items-center gap-3">
           <PanelLabel>Actions</PanelLabel>
           <span className="h-3 w-px flex-shrink-0 bg-vc-subtle" aria-hidden />
-          <span className="flex-shrink-0 font-mono text-[11px] tabular-nums text-vc-secondary">
+          <span className="flex-shrink-0 font-mono text-data tabular-nums text-vc-secondary">
             {loading ? "–" : recommendations.length}
           </span>
-          <span className="flex-shrink-0 text-[10px] text-vc-text-muted">open</span>
+          <span className="flex-shrink-0 text-label text-vc-text-muted">open</span>
           <div className="flex-1" />
           <CCLink
             dest={DEST.actions}
-            className="group flex flex-shrink-0 items-center gap-0.5 text-[10px] text-vc-text-muted transition-colors hover:text-vc-accent"
+            className="group flex flex-shrink-0 items-center gap-0.5 text-label text-vc-text-muted transition-colors hover:text-vc-accent"
           >
             View all
             <ChevronRight className="h-2.5 w-2.5" aria-hidden />
@@ -49,7 +49,7 @@ export function ActionsStrip({
           {loading ? (
             <div className="h-4 w-64 rounded-sm bg-vc-muted" aria-hidden />
           ) : !top ? (
-            <p className="text-[12px] text-vc-tertiary">
+            <p className="text-caption text-vc-tertiary">
               Nothing outstanding. New actions appear after each citation run.
             </p>
           ) : (
@@ -60,12 +60,12 @@ export function ActionsStrip({
               <div className="group/title flex min-w-0 items-center gap-2.5">
                 <ChevronRight className="h-2.5 w-2.5 flex-shrink-0 text-vc-hover" aria-hidden />
                 <FileText className="h-3 w-3 flex-shrink-0 text-vc-hover" aria-hidden />
-                <span className="truncate text-[12px] font-medium text-vc-tertiary transition-colors duration-200 group-hover/title:text-vc-accent">
+                <span className="truncate text-caption font-medium text-vc-tertiary transition-colors duration-200 group-hover/title:text-vc-accent">
                   {top.title}
                 </span>
               </div>
               <div className="ml-auto flex flex-shrink-0 items-center gap-2.5">
-                <span className="flex-shrink-0 rounded bg-vc-accent-subtle px-1.5 py-px text-[10px] font-medium text-vc-accent">
+                <span className="flex-shrink-0 rounded bg-vc-accent-subtle px-1.5 py-px text-label font-medium text-vc-accent">
                   {IMPACT[top.priority]}
                 </span>
               </div>

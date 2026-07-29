@@ -94,7 +94,9 @@ export default function VerifyEmail() {
               <CheckCircle className="h-8 w-8 text-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">Check your email</CardTitle>
+          <CardTitle className="text-page font-semibold text-foreground">
+            Check your email
+          </CardTitle>
           <CardDescription className="mt-2">
             {storedEmail ? (
               <>
@@ -112,13 +114,13 @@ export default function VerifyEmail() {
         <CardContent className="text-center">
           <div className="bg-muted rounded-lg p-4 mb-4">
             <Mail className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Don't see the email? Check your spam folder, or resend the link below.
             </p>
           </div>
           {!storedEmail && (
             <div className="space-y-2 text-left mb-4">
-              <Label htmlFor="resend-email" className="text-sm">
+              <Label htmlFor="resend-email" className="text-caption">
                 Enter your email to resend the verification link
               </Label>
               <Input
@@ -148,7 +150,7 @@ export default function VerifyEmail() {
               "Resend verification email"
             )}
           </Button>
-          <p className="text-sm text-muted-foreground mt-4">
+          <p className="text-caption text-muted-foreground mt-4">
             Already verified?{" "}
             <a
               href="/login"
@@ -162,7 +164,7 @@ export default function VerifyEmail() {
         <CardFooter className="justify-center">
           <a
             href="/login"
-            className="text-sm text-primary hover:text-primary/90 flex items-center gap-1"
+            className="text-caption text-primary hover:text-primary/90 flex items-center gap-1"
           >
             <ArrowLeft className="h-4 w-4" /> Back to sign in
           </a>

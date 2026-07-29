@@ -44,7 +44,7 @@ const LOGOS: Record<string, string> = {
   Gemini: "/venturecite/images/ai-logos/gemini.svg",
 };
 
-const SECTION_LABEL = "text-[10px] font-semibold uppercase tracking-wider text-vc-label";
+const SECTION_LABEL = "text-label font-semibold uppercase tracking-wider text-vc-label";
 
 function Dash() {
   return <span className="tabular-nums text-vc-hover">–</span>;
@@ -56,8 +56,8 @@ function ScoreChart({ series }: { series: { at: string; score: number }[] }) {
   if (series.length < 2) {
     return (
       <div className="flex h-[200px] flex-col items-center justify-center text-center">
-        <p className="mb-1 text-[13px] text-vc-tertiary">Not enough history yet</p>
-        <p className="text-[11px] text-vc-tertiary/80">
+        <p className="mb-1 text-body text-vc-tertiary">Not enough history yet</p>
+        <p className="text-data text-vc-tertiary/80">
           {series.length === 0
             ? "This prompt has not been checked yet."
             : "One run recorded. A second one draws the trend."}
@@ -138,8 +138,8 @@ function ScoreChart({ series }: { series: { at: string; score: number }[] }) {
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2">
-      <span className="shrink-0 text-[11px] text-vc-text-muted">{label}</span>
-      <span className="min-w-0 text-right text-[11px] text-vc-secondary">{value}</span>
+      <span className="shrink-0 text-data text-vc-text-muted">{label}</span>
+      <span className="min-w-0 text-right text-data text-vc-secondary">{value}</span>
     </div>
   );
 }
@@ -208,14 +208,14 @@ export default function PromptDetailPage() {
           <Link
             to="/monitor"
             search={{ tab: "citations", ptab: "prompts" } as never}
-            className="inline-flex min-w-0 items-center gap-1.5 text-[12px] text-vc-secondary transition-colors hover:text-vc-primary"
+            className="inline-flex min-w-0 items-center gap-1.5 text-caption text-vc-secondary transition-colors hover:text-vc-primary"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
             Prompts
           </Link>
           <div className="flex items-center gap-1">
             {index >= 0 && (
-              <span className="mr-1 text-[10px] tabular-nums text-vc-text-muted">
+              <span className="mr-1 text-label tabular-nums text-vc-text-muted">
                 {index + 1} of {prompts.length}
               </span>
             )}
@@ -241,7 +241,7 @@ export default function PromptDetailPage() {
             <Link
               to="/diagnose"
               search={{ tab: "signals" } as never}
-              className="flex h-8 items-center gap-1.5 rounded border border-vc-default px-2.5 text-[12px] font-medium text-vc-secondary transition-colors hover:bg-vc-muted/50"
+              className="flex h-8 items-center gap-1.5 rounded border border-vc-default px-2.5 text-caption font-medium text-vc-secondary transition-colors hover:bg-vc-muted/50"
             >
               <Stethoscope className="h-3.5 w-3.5" aria-hidden />
               Diagnose
@@ -253,7 +253,7 @@ export default function PromptDetailPage() {
       {/* Title block */}
       <div className="border-b border-vc-default px-8 pb-5 pt-5">
         <nav className="mb-3 overflow-hidden">
-          <ol className="flex min-w-0 items-center gap-1.5 text-[12px] text-vc-text-muted">
+          <ol className="flex min-w-0 items-center gap-1.5 text-caption text-vc-text-muted">
             <li>
               <Link
                 to="/monitor"
@@ -290,7 +290,7 @@ export default function PromptDetailPage() {
               }`}
               aria-hidden
             />
-            <span className="text-[10px] font-medium text-vc-secondary">
+            <span className="text-label font-medium text-vc-secondary">
               {prompt.status === "tracked" ? "Tracking" : "Paused"}
             </span>
           </span>
@@ -309,7 +309,7 @@ export default function PromptDetailPage() {
                     key={r.key}
                     type="button"
                     onClick={() => setRange(r.key)}
-                    className={`h-full rounded-[3px] px-2 text-[12px] font-medium transition-colors ${
+                    className={`h-full rounded-[3px] px-2 text-caption font-medium transition-colors ${
                       range === r.key
                         ? "bg-vc-accent-subtle text-vc-accent"
                         : "text-vc-secondary hover:bg-vc-muted/40 hover:text-vc-primary"
@@ -333,11 +333,11 @@ export default function PromptDetailPage() {
                 </div>
                 {history?.delta !== null && history?.delta !== undefined && (
                   <span
-                    className={`inline-flex items-center gap-0.5 text-[12px] font-medium tabular-nums ${
+                    className={`inline-flex items-center gap-0.5 text-caption font-medium tabular-nums ${
                       history.delta > 0
                         ? "text-positive"
                         : history.delta < 0
-                          ? "text-rose-500"
+                          ? "text-destructive"
                           : "text-vc-tertiary"
                     }`}
                   >
@@ -348,35 +348,35 @@ export default function PromptDetailPage() {
               </div>
 
               <div className="flex flex-col gap-1.5 border-l border-vc-subtle pl-6 pr-6">
-                <span className="text-[10px] text-vc-text-muted">Rank</span>
+                <span className="text-label text-vc-text-muted">Rank</span>
                 <div className="flex items-baseline gap-1">
                   <span className="text-[24px] font-semibold leading-none tracking-tight tabular-nums text-vc-primary">
                     {history?.rank !== null && history?.rank !== undefined
                       ? `#${history.rank}`
                       : "–"}
                   </span>
-                  <span className="text-[10px] text-vc-text-muted">avg</span>
+                  <span className="text-label text-vc-text-muted">avg</span>
                 </div>
               </div>
 
               {/* No search-volume source exists — a dash, never a number. */}
               <div className="flex flex-col gap-1.5 border-l border-vc-subtle pl-6 pr-6">
-                <span className="text-[10px] text-vc-text-muted">Volume</span>
+                <span className="text-label text-vc-text-muted">Volume</span>
                 <div className="flex items-baseline gap-1">
                   <span className="text-[24px] font-semibold leading-none tracking-tight text-vc-hover">
                     –
                   </span>
-                  <span className="text-[10px] text-vc-text-muted">/mo</span>
+                  <span className="text-label text-vc-text-muted">/mo</span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5 border-l border-vc-subtle pl-6">
-                <span className="text-[10px] text-vc-text-muted">Models</span>
+                <span className="text-label text-vc-text-muted">Models</span>
                 <div className="flex items-baseline gap-1">
                   <span className="text-[24px] font-semibold leading-none tracking-tight tabular-nums text-vc-primary">
                     {platforms.length ? `${mentioning}/${platforms.length}` : "–"}
                   </span>
-                  <span className="text-[10px] text-vc-text-muted">mention you</span>
+                  <span className="text-label text-vc-text-muted">mention you</span>
                 </div>
               </div>
             </div>
@@ -385,7 +385,7 @@ export default function PromptDetailPage() {
               <ScoreChart series={series} />
             </div>
 
-            <div className="mt-3 flex items-center justify-between text-[11px] text-vc-text-muted">
+            <div className="mt-3 flex items-center justify-between text-data text-vc-text-muted">
               <span>
                 {history?.runs ?? 0} report{(history?.runs ?? 0) === 1 ? "" : "s"}
                 {history?.lastRunAt
@@ -410,7 +410,7 @@ export default function PromptDetailPage() {
             <div className="flex items-center justify-between px-8 pb-3 pt-6">
               <h3 className={SECTION_LABEL}>By model</h3>
               {platforms[0]?.checkedAt && (
-                <span className="text-[10px] tabular-nums text-vc-text-muted">
+                <span className="text-label tabular-nums text-vc-text-muted">
                   Latest run ·{" "}
                   {new Date(platforms[0].checkedAt).toLocaleDateString(undefined, {
                     month: "short",
@@ -427,7 +427,7 @@ export default function PromptDetailPage() {
                 <span className={SECTION_LABEL}>What it said</span>
               </div>
               {platforms.length === 0 ? (
-                <p className="px-8 py-6 text-[12px] text-vc-tertiary">
+                <p className="px-8 py-6 text-caption text-vc-tertiary">
                   No results yet. Run a citation check to see how each model answers.
                 </p>
               ) : (
@@ -450,18 +450,18 @@ export default function PromptDetailPage() {
                             {pl.platform.charAt(0)}
                           </span>
                         )}
-                        <span className="truncate text-[13px] font-medium text-vc-primary">
+                        <span className="truncate text-body font-medium text-vc-primary">
                           {pl.platform}
                         </span>
                       </div>
                       <div>
                         {pl.rank ? (
-                          <span className="inline-flex h-5 min-w-[30px] items-center justify-center rounded border border-vc-default bg-white px-1.5 text-[11px] font-semibold tabular-nums text-vc-secondary">
+                          <span className="inline-flex h-5 min-w-[30px] items-center justify-center rounded border border-vc-default bg-white px-1.5 text-data font-semibold tabular-nums text-vc-secondary">
                             #{pl.rank}
                           </span>
                         ) : pl.isCited ? (
                           <span
-                            className="text-[11px] font-medium text-vc-accent"
+                            className="text-data font-medium text-vc-accent"
                             title="Cited, but this run recorded no placement"
                           >
                             cited
@@ -472,16 +472,16 @@ export default function PromptDetailPage() {
                       </div>
                       <div>
                         {rb?.isNew ? (
-                          <span className="text-[10px] font-semibold uppercase tracking-wider text-vc-accent">
+                          <span className="text-label font-semibold uppercase tracking-wider text-vc-accent">
                             new
                           </span>
                         ) : rb?.rankDelta !== null && rb?.rankDelta !== undefined ? (
                           <span
-                            className={`text-[11px] font-medium tabular-nums ${
+                            className={`text-data font-medium tabular-nums ${
                               rb.rankDelta < 0
                                 ? "text-positive"
                                 : rb.rankDelta > 0
-                                  ? "text-rose-500"
+                                  ? "text-destructive"
                                   : "text-vc-tertiary"
                             }`}
                           >
@@ -494,11 +494,11 @@ export default function PromptDetailPage() {
                       </div>
                       <div className="min-w-0 overflow-hidden">
                         {pl.snippet ? (
-                          <p className="truncate text-[11px] text-vc-secondary" title={pl.snippet}>
+                          <p className="truncate text-data text-vc-secondary" title={pl.snippet}>
                             {pl.snippet}
                           </p>
                         ) : (
-                          <span className="text-[11px] text-vc-hover">
+                          <span className="text-data text-vc-hover">
                             {pl.isCited ? "No excerpt stored" : "Not mentioned"}
                           </span>
                         )}
@@ -548,10 +548,10 @@ export default function PromptDetailPage() {
                 .slice(0, 6)
                 .map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-2 py-0.5">
-                    <span className="truncate text-[11px] text-vc-secondary">
+                    <span className="truncate text-data text-vc-secondary">
                       Scored in run · {r.citationRate}% cited
                     </span>
-                    <span className="shrink-0 text-[10px] tabular-nums text-vc-text-muted">
+                    <span className="shrink-0 text-label tabular-nums text-vc-text-muted">
                       {new Date(r.startedAt).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",
@@ -560,8 +560,8 @@ export default function PromptDetailPage() {
                   </div>
                 ))}
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-[11px] text-vc-secondary">Prompt added</span>
-                <span className="shrink-0 text-[10px] tabular-nums text-vc-text-muted">
+                <span className="text-data text-vc-secondary">Prompt added</span>
+                <span className="shrink-0 text-label tabular-nums text-vc-text-muted">
                   {prompt.createdAt
                     ? new Date(prompt.createdAt).toLocaleDateString(undefined, {
                         month: "short",

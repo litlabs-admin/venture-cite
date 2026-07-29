@@ -91,8 +91,8 @@ export default function GlossaryPage() {
       />
 
       <header className="mb-10">
-        <h1 className="text-4xl font-bold tracking-tight">GEO vs AEO vs SEO</h1>
-        <p className="mt-3 text-lg text-muted-foreground">
+        <h1 className="text-stat font-semibold tracking-tight">GEO vs AEO vs SEO</h1>
+        <p className="mt-3 text-ui text-muted-foreground">
           Three optimization disciplines for the AI-first web. They layer — they don't compete.
         </p>
       </header>
@@ -106,23 +106,23 @@ export default function GlossaryPage() {
           className="mb-12 scroll-mt-16"
         >
           <div className="flex items-baseline gap-3 mb-4">
-            <h2 className="text-2xl font-semibold">{term.code}</h2>
-            <span className="text-lg text-muted-foreground">{term.name}</span>
+            <h2 className="text-page font-semibold">{term.code}</h2>
+            <span className="text-ui text-muted-foreground">{term.name}</span>
           </div>
 
           <p className="text-foreground mb-3">{term.definition}</p>
 
-          <h3 className="text-sm font-semibold mt-6 mb-2">Why it matters</h3>
-          <p className="text-sm text-muted-foreground">{term.whyItMatters}</p>
+          <h3 className="text-caption font-semibold mt-6 mb-2">Why it matters</h3>
+          <p className="text-caption text-muted-foreground">{term.whyItMatters}</p>
 
-          <h3 className="text-sm font-semibold mt-6 mb-2">How VentureCite covers it</h3>
-          <ul className="space-y-1.5 text-sm text-muted-foreground list-disc list-inside">
+          <h3 className="text-caption font-semibold mt-6 mb-2">How VentureCite covers it</h3>
+          <ul className="space-y-1.5 text-caption text-muted-foreground list-disc list-inside">
             {term.howVentureCiteCovers.map((item, i) => (
               <li key={i}>{item}</li>
             ))}
           </ul>
 
-          <h3 className="text-sm font-semibold mt-6 mb-2">Related pages</h3>
+          <h3 className="text-caption font-semibold mt-6 mb-2">Related pages</h3>
           <ul className="space-y-1">
             {term.relatedPages.map((p) => (
               <li key={p.href}>
@@ -137,7 +137,7 @@ export default function GlossaryPage() {
                     full navigation is correct regardless. */}
                 <a
                   href={p.href}
-                  className="inline-flex items-center text-sm text-primary hover:underline"
+                  className="inline-flex items-center text-caption text-primary hover:underline"
                 >
                   {p.label} <ArrowRight className="h-3 w-3 ml-1" />
                 </a>
@@ -149,8 +149,8 @@ export default function GlossaryPage() {
 
       <Card>
         <CardContent className="p-6">
-          <h2 className="text-lg font-semibold mb-3">How they layer</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-ui font-semibold mb-3">How they layer</h2>
+          <p className="text-caption text-muted-foreground">
             Think of SEO as the foundation that determines whether your content can be found at all,
             AEO as the discipline of being chosen as the canonical answer in answer-engine surfaces,
             and GEO as the layer that determines whether AI assistants cite you when they're

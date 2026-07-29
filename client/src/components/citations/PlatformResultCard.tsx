@@ -47,14 +47,14 @@ function hashHue(s: string): number {
 const CHART_TEXT_CLASSES = [
   "text-chart-1",
   "text-chart-2",
-  "text-chart-3",
+  "text-warning",
   "text-chart-4",
   "text-chart-5",
 ];
 const CHART_BORDER_CLASSES = [
   "border-chart-1",
   "border-chart-2",
-  "border-chart-3",
+  "border-warning",
   "border-chart-4",
   "border-chart-5",
 ];
@@ -128,19 +128,19 @@ export function PlatformResultCard({
     >
       <div className="flex items-center gap-3 p-3 bg-muted/30">
         <div
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${colorClass}`}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-caption font-medium border ${colorClass}`}
         >
           <span>{result.platform}</span>
         </div>
         {result.isCited ? (
           <>
-            <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+            <span className="flex items-center gap-1.5 text-caption font-medium text-foreground">
               <StatusDot tone="success" aria-label="Cited" />
               Cited
             </span>
             {result.reDetectedAt ? (
               <span
-                className="text-xs text-muted-foreground"
+                className="text-caption text-muted-foreground"
                 title="Revealed by a stored-data re-check using an updated name variation. Rank isn't available because the original run didn't see this brand."
               >
                 Re-detected
@@ -148,12 +148,12 @@ export function PlatformResultCard({
             ) : null}
           </>
         ) : (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5 text-caption text-muted-foreground">
             <StatusDot tone="neutral" aria-label="Not cited" />
             Not cited
           </span>
         )}
-        <span className="ml-auto text-xs text-muted-foreground">
+        <span className="ml-auto text-caption text-muted-foreground">
           {formatDistanceToNow(new Date(result.checkedAt), { addSuffix: true })}
         </span>
       </div>
@@ -164,7 +164,7 @@ export function PlatformResultCard({
           through. Show it inline + tinted red so it's unmissable. */}
       {isError && (
         <div className="px-3 py-2 border-t bg-destructive-subtle border-destructive">
-          <div className="flex items-start gap-2 text-xs text-destructive">
+          <div className="flex items-start gap-2 text-caption text-destructive">
             <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>{result.snippet}</span>
           </div>
@@ -177,7 +177,7 @@ export function PlatformResultCard({
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-2 text-xs font-medium text-muted-foreground flex-1 text-left"
+              className="flex items-center gap-2 text-caption font-medium text-muted-foreground flex-1 text-left"
               data-testid={`toggle-response-${result.platform.toLowerCase()}`}
             >
               {expanded ? (
@@ -198,7 +198,7 @@ export function PlatformResultCard({
                     e.stopPropagation();
                     handleCopy();
                   }}
-                  className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted"
+                  className="text-caption text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted"
                   title="Copy response to clipboard"
                   data-testid={`button-copy-${result.platform.toLowerCase()}`}
                 >
@@ -212,7 +212,7 @@ export function PlatformResultCard({
                       e.stopPropagation();
                       handleOpenInChat();
                     }}
-                    className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted"
+                    className="text-caption text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted"
                     title={
                       deepLink
                         ? `Open this prompt in ${result.platform}`
@@ -229,13 +229,15 @@ export function PlatformResultCard({
           </div>
           {expanded && (
             <div className="px-4 py-3 bg-muted/20 border-t max-h-[480px] overflow-y-auto">
-              <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-pre:text-xs">
+              <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-pre:text-caption">
                 <SafeMarkdown rehypePlugins={[createHighlightPlugin(highlightTerms)]}>
                   {result.fullResponse}
                 </SafeMarkdown>
                 {result.citedUrls && result.citedUrls.length > 0 && (
                   <div className="mt-4 border-t pt-3">
-                    <p className="text-xs text-muted-foreground mb-2">Sources cited in response</p>
+                    <p className="text-caption text-muted-foreground mb-2">
+                      Sources cited in response
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {result.citedUrls.map((url) => {
                         let hostname = url;
@@ -250,7 +252,7 @@ export function PlatformResultCard({
                             href={safeExternalHref(url)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs px-2 py-1 rounded bg-secondary hover:bg-accent transition-colors"
+                            className="text-caption px-2 py-1 rounded bg-secondary hover:bg-accent transition-colors"
                             title={url}
                           >
                             {hostname}
@@ -267,11 +269,11 @@ export function PlatformResultCard({
       ) : !isError && result.snippet ? (
         // Wave 9: snippet without fullResponse and not an error → unusual
         // legacy state. Show inline so the user sees what was captured.
-        <div className="px-3 py-2 border-t text-xs text-muted-foreground italic">
+        <div className="px-3 py-2 border-t text-caption text-muted-foreground italic">
           {result.snippet}
         </div>
       ) : !isError ? (
-        <div className="px-3 py-2 border-t text-xs text-muted-foreground italic">
+        <div className="px-3 py-2 border-t text-caption text-muted-foreground italic">
           No response captured. Re-run the check to populate.
         </div>
       ) : null}

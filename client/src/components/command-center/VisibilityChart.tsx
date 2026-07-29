@@ -46,10 +46,10 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded border border-vc-default bg-white px-3 py-2 shadow-vc-overlay">
-      <p className="mb-0.5 text-[10px] text-vc-tertiary">{label ? fmtDay(label) : ""}</p>
-      <p className="font-mono text-[13px] font-semibold tabular-nums text-vc-primary">
+      <p className="mb-0.5 text-label text-vc-tertiary">{label ? fmtDay(label) : ""}</p>
+      <p className="font-mono text-body font-semibold tabular-nums text-vc-primary">
         {payload[0].value}
-        <span className="ml-1 text-[10px] font-normal text-vc-tertiary">visibility</span>
+        <span className="ml-1 text-label font-normal text-vc-tertiary">visibility</span>
       </p>
     </div>
   );
@@ -81,7 +81,7 @@ export function VisibilityChart({
           {RANGES.map((r) => (
             <label
               key={r.key}
-              className={`relative inline-flex h-full cursor-pointer items-center justify-center gap-1.5 rounded-[3px] px-2 text-[12px] font-medium transition-colors has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-vc-accent/40 ${
+              className={`relative inline-flex h-full cursor-pointer items-center justify-center gap-1.5 rounded-[3px] px-2 text-caption font-medium transition-colors has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-vc-accent/40 ${
                 range === r.key
                   ? "bg-vc-accent-subtle text-vc-accent"
                   : "text-vc-secondary hover:bg-vc-muted/40 hover:text-vc-primary"
@@ -105,8 +105,8 @@ export function VisibilityChart({
           <div className="h-full w-full rounded bg-vc-muted/40" aria-hidden />
         ) : data.length < 2 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <p className="mb-1 text-[13px] text-vc-tertiary">Not enough history yet</p>
-            <p className="text-[11px] text-vc-tertiary/80">
+            <p className="mb-1 text-body text-vc-tertiary">Not enough history yet</p>
+            <p className="text-data text-vc-tertiary/80">
               {series.length === 0
                 ? "Visibility is recorded on each citation run. Run one to start the series."
                 : `One snapshot recorded. A second one draws the trend.`}

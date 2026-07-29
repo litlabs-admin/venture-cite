@@ -707,7 +707,7 @@ export default function Content() {
           <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-6">
             <div className="flex items-center gap-3">
               <StatusDot tone="pending" aria-label="Generating" />
-              <p className="text-ui font-medium text-muted-foreground">
+              <p className="text-caption font-medium text-muted-foreground">
                 Generating ({elapsedSeconds}s)
               </p>
               <Button
@@ -925,7 +925,7 @@ function DraftForm(props: DraftFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           {errorBanner && (
-            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-ui text-destructive">
+            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-caption text-destructive">
               {errorBanner}
             </div>
           )}
@@ -938,7 +938,7 @@ function DraftForm(props: DraftFormProps) {
                   <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-ui">
+                  <p className="text-caption">
                     The brand this article belongs to. Required so AI-citation tracking can
                     attribute the result correctly.
                   </p>
@@ -956,7 +956,7 @@ function DraftForm(props: DraftFormProps) {
                   <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-ui">
+                  <p className="text-caption">
                     The industry this <em>article</em> targets — can differ from your brand's home
                     industry. Useful when you want to write for an adjacent vertical.
                   </p>
@@ -980,7 +980,7 @@ function DraftForm(props: DraftFormProps) {
                   <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-ui">
+                  <p className="text-caption">
                     Press Enter or comma to add a chip. Backspace on an empty input removes the last
                     chip.
                   </p>
@@ -1079,7 +1079,7 @@ function DraftForm(props: DraftFormProps) {
                   <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-ui">
+                  <p className="text-caption">
                     B2C is conversational and benefit-first. B2B is professional and data-driven.
                     The brand profile (tone, audience) is layered on top of this choice.
                   </p>
@@ -1096,7 +1096,7 @@ function DraftForm(props: DraftFormProps) {
                     : "border-muted hover:border-muted-foreground/30"
                 }`}
               >
-                <span className="text-ui font-semibold">B2C — Consumer</span>
+                <span className="text-caption font-semibold">B2C — Consumer</span>
                 <span className="text-caption text-muted-foreground text-center">
                   Conversational, lifestyle-focused, relatable
                 </span>
@@ -1110,7 +1110,7 @@ function DraftForm(props: DraftFormProps) {
                     : "border-muted hover:border-muted-foreground/30"
                 }`}
               >
-                <span className="text-ui font-semibold">B2B — Business</span>
+                <span className="text-caption font-semibold">B2B — Business</span>
                 <span className="text-caption text-muted-foreground text-center">
                   Professional, data-driven, industry authority
                 </span>
@@ -1223,11 +1223,11 @@ function DraftForm(props: DraftFormProps) {
           </CardHeader>
           <CardContent>
             {popularTopicsLoading ? (
-              <div className="flex items-center gap-2 text-ui text-muted-foreground">
+              <div className="flex items-center gap-2 text-caption text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading…
               </div>
             ) : popularTopics.length === 0 ? (
-              <p className="text-ui text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 No popular topics for this industry yet.
               </p>
             ) : (
@@ -1245,7 +1245,7 @@ function DraftForm(props: DraftFormProps) {
                   >
                     <Plus className="w-4 h-4 text-muted-foreground mt-0.5" />
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-ui">{topic.topic}</h4>
+                      <h4 className="font-medium text-caption">{topic.topic}</h4>
                       {topic.description && (
                         <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
                           {topic.description}

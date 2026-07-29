@@ -459,7 +459,7 @@ export default function BrandFactSheet() {
     lastScrapedDays === null
       ? "text-muted-foreground"
       : lastScrapedDays > 90
-        ? "text-chart-3"
+        ? "text-warning"
         : lastScrapedDays > 7
           ? "text-muted-foreground"
           : "text-foreground";
@@ -545,7 +545,7 @@ export default function BrandFactSheet() {
           {/* HEADER SECTION — Task 8 */}
           <Card data-tour-id="fact-sheet.header">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2 text-ui">
                 <RefreshCw className="h-5 w-5 text-primary" />
                 Scrape status
               </CardTitle>
@@ -555,8 +555,8 @@ export default function BrandFactSheet() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 text-sm">
-                  <div className="text-xs text-muted-foreground">Last scraped</div>
+                <div className="min-w-0 text-caption">
+                  <div className="text-caption text-muted-foreground">Last scraped</div>
                   <div className={lastScrapedColor} data-testid="text-last-scraped">
                     {lastScrapedAt
                       ? formatRelativeTime(lastScrapedAt)
@@ -664,7 +664,7 @@ export default function BrandFactSheet() {
           {/* DIFF SECTION — Task 9 */}
           <Card data-tour-id="fact-sheet.diff">
             <CardHeader>
-              <CardTitle className="text-lg">Conflicts to resolve</CardTitle>
+              <CardTitle className="text-ui">Conflicts to resolve</CardTitle>
               <CardDescription>
                 Pairs where what you entered and what we found differ. Pick one, keep both, or
                 merge.
@@ -760,7 +760,7 @@ export default function BrandFactSheet() {
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-lg">Resolved facts</CardTitle>
+                  <CardTitle className="text-ui">Resolved facts</CardTitle>
                   <CardDescription>Verified facts about {selectedBrand.name}.</CardDescription>
                 </div>
                 <Button

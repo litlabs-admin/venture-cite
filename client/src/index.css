@@ -65,14 +65,23 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* Neutral ramp — WARM STONE, and deliberately so. Measured off the live
+     reference PRODUCT (computed styles on its /dashboard): ink rgb(28,25,23),
+     secondary rgb(87,83,78), tertiary rgb(120,113,108), label rgb(168,162,158),
+     hairline rgb(231,229,228) — i.e. Tailwind stone 900/600/500/400/200.
+
+     Do not "correct" these to the cool #16171b/#5a5c63/#8b8d96 TDS values:
+     those come from the reference's MARKETING stylesheet, which is a
+     different surface with a different ramp. The product is warm. The
+     shadcn semantic layer in :root is pointed at these same values so the
+     whole app resolves ONE ramp. */
   --color-vc-surface: #fff;
   --color-vc-page: #fff;
   --color-vc-primary: #1c1917;
   --color-vc-secondary: #57534e;
   --color-vc-tertiary: #78716c;
-  /* Warm gray-400. The reference uses this one step lighter than `tertiary`
-     for panel eyebrows and de-emphasized meta text; without it those labels
-     render a full step too dark. */
+  /* One step lighter than `tertiary` — panel eyebrows and de-emphasized meta
+     text. Without it those labels render a full step too dark. */
   --color-vc-label: #a8a29e;
   --color-vc-text-muted: #78716c;
   --color-vc-placeholder: #78716c;
@@ -91,7 +100,7 @@
      marketing palette. Outside the landing these keep the product neutrals. */
   --color-vc-hairline: #e7e5e4;
   --color-vc-hairline-strong: #d6d3d1;
-  --color-vc-row-hover: rgba(244, 244, 240, 0.62);
+  --color-vc-row-hover: rgba(245, 245, 244, 0.62);
   --color-vc-accent-bright: #5b7bff;
   --color-vc-accent-deep: #2743c9;
   --color-vc-success-ink: #0e7490;
@@ -125,17 +134,46 @@
      (verified via document.styleSheets against the live site) rather than
      invented — each name is a UI role, not a t-shirt size. Tailwind
      auto-generates a text-* utility per key. */
+  /* ROLE MAP — measured off the live reference product across 7 pages
+     (~1,200 text nodes). 91% of its text is 10–13px; it has nothing at
+     15/16/18px and never goes bolder than 600.
+
+       label   10  600, uppercase, .5px tracking — eyebrows
+       data    11  400 — dense meta, ranks, deltas, table numerics
+       caption 12  400/500 — DEFAULT body + every control (buttons, inputs,
+                             menu items, tabs, table cells)
+       body    13  400, 600 for inline figures — prose / primary content
+       ui      14  500/600 — section headings ONLY, not body
+       page    20  600 — the one page title
+       metric/stat 24/28 600 — hero figures
+
+     Line-height is a flat 1.5 at every size on the reference — measured,
+     not chosen. Declared explicitly because Tailwind gives a bare @theme
+     font-size key NO line-height, so these would otherwise fall back to
+     `normal` (~1.2) and read cramped next to the stock text-sm/xs they
+     replace (which carry 1.43/1.33). */
   --text-hero: 56px;
+  --text-hero--line-height: 1.5;
   --text-stat: 28px;
+  --text-stat--line-height: 1.5;
   --text-metric: 24px;
+  --text-metric--line-height: 1.5;
   --text-page: 20px;
+  --text-page--line-height: 1.5;
   --text-section: 16px;
+  --text-section--line-height: 1.5;
   --text-dialog: 15px;
+  --text-dialog--line-height: 1.5;
   --text-ui: 14px;
+  --text-ui--line-height: 1.5;
   --text-body: 13px;
+  --text-body--line-height: 1.5;
   --text-caption: 12px;
+  --text-caption--line-height: 1.5;
   --text-data: 11px;
+  --text-data--line-height: 1.5;
   --text-label: 10px;
+  --text-label--line-height: 1.5;
 
   --transition-duration-250: 250ms;
   --transition-duration-450: 450ms;
@@ -265,6 +303,16 @@
   ::backdrop,
   ::file-selector-button {
     border-color: var(--color-gray-200, currentcolor);
+  }
+
+  /* Default type for the authenticated app (applied by AppShell's root).
+     The product scale is 10–13px; the browser default of 16px is off the
+     scale entirely, so any element missing a text-* class used to render a
+     full four steps too large. In `base` so any explicit text-* utility
+     still wins. Marketing pages are outside this scope by design. */
+  .vc-app {
+    font-size: var(--text-caption);
+    line-height: 1.5;
   }
 }
 
@@ -441,17 +489,26 @@
     /* Primitives — LIGHT (Trakkr TDS). White canvas AND white cards; the
      recessed step (--tds-inset) is what muted/sidebar use, so separation
      comes from borders rather than from stacking tones. */
-    --bg-base: oklch(1 0 0); /* --tds-bg #ffffff — page background */
-    --bg-surface-1: oklch(0.9635 0.0045 258.3); /* --tds-inset #f1f3f6 — muted / sidebar */
-    --bg-surface-2: oklch(1 0 0); /* --tds-surface #ffffff — cards */
-    --bg-surface-3: oklch(1 0 0); /* --tds-surface #ffffff — popovers / elevated */
-    --border-subtle: oklch(0.9582 0.0041 271.4); /* --tds-divider #f0f1f4 */
-    --border-default: oklch(0.9374 0.0055 275); /* --tds-border #e9eaee */
-    --border-strong: oklch(0.9008 0.0084 271.3); /* --tds-border-strong #dcdee4 */
-    --fg-primary: oklch(0.2053 0.0081 274.5); /* --tds-ink #16171b */
-    --fg-secondary: oklch(0.4754 0.0115 273.2); /* --tds-ink-2 #5a5c63 */
-    --fg-tertiary: oklch(0.6446 0.0135 276); /* --tds-ink-3 #8b8d96 */
-    --fg-disabled: oklch(0.7894 0.0101 273.3); /* --tds-ink-4 #b8bac1 */
+    /* WARM STONE, measured off the live reference PRODUCT (computed styles
+       across its dashboard/prompts/citations/competitors/reports/settings/
+       diagnose pages): ink rgb(28,25,23), 2 rgb(87,83,78), 3 rgb(120,113,108),
+       4 rgb(168,162,158); hairline rgb(231,229,228) on white surfaces.
+
+       These were previously the cool TDS values (#16171b / #5a5c63 / #e9eaee)
+       transcribed from the reference's MARKETING stylesheet — a different
+       surface with a different ramp. That left the app cool and the dashboard
+       (vc-*) warm, two grays side by side. Both now resolve stone. */
+    --bg-base: oklch(1 0 0); /* #ffffff — page background */
+    --bg-surface-1: #f5f5f4; /* stone-100 — muted / sidebar inset */
+    --bg-surface-2: oklch(1 0 0); /* #ffffff — cards */
+    --bg-surface-3: oklch(1 0 0); /* #ffffff — popovers / elevated */
+    --border-subtle: #f5f5f4; /* stone-100 — divider */
+    --border-default: #e7e5e4; /* stone-200 — the product's hairline */
+    --border-strong: #d6d3d1; /* stone-300 */
+    --fg-primary: #1c1917; /* stone-900 — ink */
+    --fg-secondary: #57534e; /* stone-600 */
+    --fg-tertiary: #78716c; /* stone-500 */
+    --fg-disabled: #a8a29e; /* stone-400 */
     /* Primary accent — brand blue #3b5bf6.
      Same two-value split as before: the flat accent carries borders,
      text-on-white, focus rings and the chart lead; anything with a white
@@ -478,7 +535,19 @@
     /* Functional status. TDS ships pos + neg only; --warning is derived from
      --tds-s3, its one warm hue. */
     --positive: #0e7490; /* cyan-700 — positive, but never mistakable for the blue accent */
-    --warning: oklch(0.7224 0.1378 64.6); /* derived from --tds-s3 #e0913a */
+    /* NOT amber. The reference product ships no amber/orange in its UI at
+       all — its whole status vocabulary is neutral + accent + positive +
+       negative — and this app's brand accent is blue, so a warm amber tier
+       was the single loudest off-palette colour on screen (65 badge
+       instances on /diagnose alone).
+
+       Re-pointed at the brand accent rather than deleted, so the ~33 call
+       sites keep their semantic name and can be re-diverged later by
+       changing this one line. TRADE-OFF: "caution" and "in progress" now
+       look identical to any other accent-tinted state; the distinguishing
+       information is carried by the badge's own text. Charts keep a real
+       amber (--chart-3) because categorical series must stay separable. */
+    --warning: var(--brand-accent);
     --negative: oklch(0.5954 0.1829 27.3); /* --tds-neg #d6453d */
     /* Weak status tints, for badge/callout backgrounds. This project is on
      Tailwind v4, where an opacity modifier on a bare var() colour (e.g.
@@ -490,7 +559,7 @@
      exactly, not because v4 requires it. */
     --positive-subtle: #ecfeff; /* cyan-50, paired with --positive #0e7490 */
     --negative-subtle: oklch(0.9563 0.0186 21.6); /* --tds-neg-weak #fdeceb */
-    --warning-subtle: oklch(0.9685 0.0203 74.7); /* derived to match the pair above */
+    --warning-subtle: var(--brand-accent-subtle);
     /* Stable cool near-white for text on saturated status fills
      (destructive/positive/negative). Theme-agnostic — NOT redefined. */
     --color-on-strong: oklch(0.99 0.003 285);
@@ -536,7 +605,12 @@
     --destructive: var(--negative);
     --destructive-foreground: var(--color-on-strong);
     --border: var(--border-default);
-    --input: var(--border-strong);
+    /* Controls carry the SAME hairline as panels. Was --border-strong
+       (#d6d3d1), which drew every input/select a step darker than every
+       other edge on the page — 67 of them on /diagnose alone. Measured on
+       the reference: its inputs and buttons are #e7e5e4, identical to its
+       panel borders. One hairline, everywhere. */
+    --input: var(--border-default);
     /* Focus ring uses the TINT, not the flat accent — matches Trakkr's own
        .input:focus (box-shadow ring in --color-accent-subtle) and .btn's
        focus-visible ring, both confirmed from their compiled CSS. A
@@ -628,14 +702,14 @@
      --brand-accent-rgb note. */
     --brand-accent-rgb: 127 155 255;
     --positive: #22d3ee;
-    --warning: oklch(0.78 0.12 86);
+    --warning: var(--brand-accent);
     --negative: oklch(0.66 0.18 25);
     /* Dark's weak tints are alpha over the dark canvas rather than pale
      pastels, which would glare. Kept as explicit tokens for parity with
      light's set (see light block's note — the v3 opacity-modifier
      limitation this used to cite doesn't apply on v4). */
     --positive-subtle: oklch(0.79 0.13 210 / 0.16);
-    --warning-subtle: oklch(0.78 0.12 86 / 0.16);
+    --warning-subtle: var(--brand-accent-subtle);
     --negative-subtle: oklch(0.66 0.18 25 / 0.16);
 
     /* Dark elevation = surface-lightening + a lit top edge; shadows recede. */
@@ -680,10 +754,10 @@
     --brand-accent-subtle: #eef2fe;
     --brand-accent-rgb: 59 91 246;
     --positive: #0e7490;
-    --warning: oklch(0.7224 0.1378 64.6);
+    --warning: var(--brand-accent);
     --negative: oklch(0.5954 0.1829 27.3);
     --positive-subtle: #ecfeff;
-    --warning-subtle: oklch(0.9685 0.0203 74.7);
+    --warning-subtle: var(--brand-accent-subtle);
     --negative-subtle: oklch(0.9563 0.0186 21.6);
     --elevation-raised: 0 1px 2px oklch(0.2019 0.0163 273.9 / 0.04);
     --elevation-overlay:

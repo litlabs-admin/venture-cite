@@ -303,11 +303,11 @@ export default function CompetitorsPage() {
   };
 
   const getRankIcon = (index: number) => {
-    if (index === 0) return <Crown className="w-5 h-5 text-chart-3" />;
+    if (index === 0) return <Crown className="w-5 h-5 text-warning" />;
     if (index === 1) return <Award className="w-5 h-5 text-muted-foreground" />;
-    if (index === 2) return <Medal className="w-5 h-5 text-chart-3" />;
+    if (index === 2) return <Medal className="w-5 h-5 text-warning" />;
     return (
-      <span className="w-5 h-5 flex items-center justify-center text-ui font-medium text-muted-foreground">
+      <span className="w-5 h-5 flex items-center justify-center text-caption font-medium text-muted-foreground">
         #{index + 1}
       </span>
     );
@@ -326,7 +326,7 @@ export default function CompetitorsPage() {
             {brandsLoading ? (
               <Skeleton className="h-10 w-full" />
             ) : (
-              <p className="text-muted-foreground text-ui">
+              <p className="text-muted-foreground text-caption">
                 Create a brand first to start tracking competitors.
               </p>
             )}
@@ -411,7 +411,7 @@ export default function CompetitorsPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1.5">
                     <CardTitle className="flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-chart-3" />
+                      <Trophy className="w-5 h-5 text-warning" />
                       GEO Leaderboard
                     </CardTitle>
                     <CardDescription>
@@ -460,7 +460,7 @@ export default function CompetitorsPage() {
                   <div className="text-center py-12 text-muted-foreground">
                     <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p className="font-medium">No competitors yet</p>
-                    <p className="text-ui">
+                    <p className="text-caption">
                       Add a competitor to start benchmarking your AI citations.
                     </p>
                     <Button
@@ -487,7 +487,7 @@ export default function CompetitorsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span
-                              className="text-ui font-semibold truncate"
+                              className="text-caption font-semibold truncate"
                               data-testid={`text-competitor-name-${index}`}
                             >
                               {entry.name}
@@ -505,7 +505,7 @@ export default function CompetitorsPage() {
                         </div>
                         <div className="text-right">
                           <div
-                            className="text-metric font-bold font-mono tabular-nums"
+                            className="text-metric font-semibold font-mono tabular-nums"
                             data-testid={`text-citation-count-${index}`}
                           >
                             {entry.totalCitations}
@@ -544,7 +544,7 @@ export default function CompetitorsPage() {
               <CardContent>
                 {leaderboard.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-ui">Add data to see platform breakdown</p>
+                    <p className="text-caption">Add data to see platform breakdown</p>
                   </div>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2">
@@ -565,7 +565,7 @@ export default function CompetitorsPage() {
                         <div key={platform} className="p-3 rounded-lg border bg-muted/30">
                           <div className="flex items-center gap-2 mb-2">
                             <Icon className="w-4 h-4" />
-                            <span className="font-medium text-ui">{platform}</span>
+                            <span className="font-medium text-caption">{platform}</span>
                           </div>
                           <div className="space-y-1">
                             {platformData.map((entry, idx) => (
@@ -620,7 +620,7 @@ export default function CompetitorsPage() {
                   </div>
                 ) : competitors.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-ui">No competitors added yet</p>
+                    <p className="text-caption">No competitors added yet</p>
                     <Button
                       variant="outline"
                       size="sm"
@@ -655,7 +655,7 @@ export default function CompetitorsPage() {
                         the discovered pool.
                       </p>
                       {coreCompetitors.length === 0 ? (
-                        <p className="py-6 text-center text-ui text-muted-foreground">
+                        <p className="py-6 text-center text-caption text-muted-foreground">
                           No core competitors yet. Add one above, or promote a discovered
                           competitor.
                         </p>
@@ -680,7 +680,7 @@ export default function CompetitorsPage() {
                         that matter, ignore the false positives.
                       </p>
                       {discoveredCompetitors.length === 0 ? (
-                        <p className="py-6 text-center text-ui text-muted-foreground">
+                        <p className="py-6 text-center text-caption text-muted-foreground">
                           Nothing in the discovered pool. Run Re-discover to surface more.
                         </p>
                       ) : (

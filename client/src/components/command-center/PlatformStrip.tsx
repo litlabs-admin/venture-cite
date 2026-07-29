@@ -72,7 +72,7 @@ function Cell({
             <>
               <div className="mb-1 flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-vc-accent" aria-hidden />
-                <span className="text-[10px] font-medium uppercase tracking-wider text-vc-text-muted">
+                <span className="text-label font-medium uppercase tracking-wider text-vc-text-muted">
                   {name}
                 </span>
               </div>
@@ -80,21 +80,21 @@ function Cell({
                 <span className="text-[22px] font-semibold tabular-nums tracking-tight text-vc-primary">
                   {platform.visibilityScore}
                 </span>
-                <span className="text-[11px] font-medium text-vc-text-muted">/100</span>
+                <span className="text-data font-medium text-vc-text-muted">/100</span>
               </div>
-              <p className="mb-2 text-[11px] leading-relaxed text-vc-secondary">
+              <p className="mb-2 text-data leading-relaxed text-vc-secondary">
                 {platform.citedCount} of {platform.totalCount} checks cited. {BLURB[name] ?? name}
               </p>
             </>
           ) : (
             <>
-              <p className="mb-1.5 text-[12px] text-vc-tertiary">Not queried yet</p>
-              <p className="mb-2 text-[11px] leading-relaxed text-vc-secondary">
+              <p className="mb-1.5 text-caption text-vc-tertiary">Not queried yet</p>
+              <p className="mb-2 text-data leading-relaxed text-vc-secondary">
                 {BLURB[name] ?? name}
               </p>
             </>
           )}
-          <p className="flex items-center gap-1 text-[10px] font-medium text-vc-accent">
+          <p className="flex items-center gap-1 text-label font-medium text-vc-accent">
             View prompts by model
             <ChevronRight className="h-2.5 w-2.5" aria-hidden />
           </p>
@@ -120,7 +120,7 @@ function Cell({
             </span>
           )}
           <span
-            className={`font-mono text-[11px] tabular-nums ${
+            className={`font-mono text-data tabular-nums ${
               dim ? "text-vc-hover" : "text-vc-primary"
             }`}
           >
@@ -164,7 +164,7 @@ export function PlatformStrip({ platforms }: { platforms: PlatformRank[] }) {
         </div>
         <CCLink
           dest={DEST.promptResults}
-          className="flex flex-shrink-0 items-center gap-0.5 whitespace-nowrap border-l border-vc-default px-4 text-[10px] text-vc-label transition-colors hover:text-vc-accent"
+          className="flex flex-shrink-0 items-center gap-0.5 whitespace-nowrap border-l border-vc-default px-4 text-label text-vc-label transition-colors hover:text-vc-accent"
         >
           Explore
           <ChevronRight className="h-2.5 w-2.5" aria-hidden />

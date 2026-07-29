@@ -31,9 +31,9 @@ export default function BrandEntityStrength({ data }: { data: EntityStrengthData
   return (
     <div className="space-y-3">
       <div className="flex items-end gap-2">
-        <span className="text-4xl font-bold text-foreground leading-none">{data.score}</span>
-        <span className="text-xs text-muted-foreground mb-1">/ 100</span>
-        <span className={`ml-auto text-sm font-medium ${tone} mb-1`}>{data.label}</span>
+        <span className="text-stat font-semibold text-foreground leading-none">{data.score}</span>
+        <span className="text-caption text-muted-foreground mb-1">/ 100</span>
+        <span className={`ml-auto text-caption font-medium ${tone} mb-1`}>{data.label}</span>
       </div>
       <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
         <div
@@ -41,24 +41,24 @@ export default function BrandEntityStrength({ data }: { data: EntityStrengthData
           style={{ width: `${Math.max(4, data.score)}%`, transition: "width 600ms ease" }}
         />
       </div>
-      <div className="flex justify-between text-[11px] text-muted-foreground">
+      <div className="flex justify-between text-data text-muted-foreground">
         <span>Weak</span>
         <span>Strong</span>
       </div>
 
       <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
         <div>
-          <div className="text-xs text-muted-foreground">Citation rate</div>
-          <div className="text-xl font-semibold text-foreground">{data.citeRatePct}%</div>
+          <div className="text-caption text-muted-foreground">Citation rate</div>
+          <div className="text-page font-semibold text-foreground">{data.citeRatePct}%</div>
         </div>
         <div>
-          <div className="text-xs text-muted-foreground">Avg rank</div>
-          <div className="text-xl font-semibold text-foreground">
+          <div className="text-caption text-muted-foreground">Avg rank</div>
+          <div className="text-page font-semibold text-foreground">
             {data.avgRank !== null ? `#${data.avgRank}` : "—"}
           </div>
         </div>
       </div>
-      <p className="text-[11px] text-muted-foreground">{explainer}</p>
+      <p className="text-data text-muted-foreground">{explainer}</p>
     </div>
   );
 }

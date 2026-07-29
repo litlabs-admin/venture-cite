@@ -69,15 +69,15 @@ function CitationsPanel({
             )}
           </div>
           <div className="mt-1 flex items-center justify-between">
-            <span className="text-[10px] text-vc-label">cited URLs (30d)</span>
+            <span className="text-label text-vc-label">cited URLs (30d)</span>
           </div>
         </div>
 
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-vc-label">
+          <span className="text-label font-medium uppercase tracking-wider text-vc-label">
             Top sources
           </span>
-          <span className="text-[10px] text-vc-hover">last 30 days</span>
+          <span className="text-label text-vc-hover">last 30 days</span>
         </div>
 
         <div className="-mx-2 min-h-0 flex-1 overflow-hidden">
@@ -88,9 +88,7 @@ function CitationsPanel({
               ))}
             </div>
           ) : sources.length === 0 ? (
-            <p className="px-2 pt-2 text-[11px] text-vc-label">
-              No cited URLs in the last 30 days.
-            </p>
+            <p className="px-2 pt-2 text-data text-vc-label">No cited URLs in the last 30 days.</p>
           ) : (
             sources.slice(0, 4).map((s) => (
               <a
@@ -101,10 +99,10 @@ function CitationsPanel({
                 className="group flex items-center gap-3 px-2 py-2 transition-colors hover:bg-vc-muted/50"
               >
                 <img src={favicon(s.domain)} alt="" className="h-4 w-4 flex-shrink-0 rounded" />
-                <span className="flex-1 truncate text-[12px] text-vc-secondary transition-colors group-hover:text-vc-primary">
+                <span className="flex-1 truncate text-caption text-vc-secondary transition-colors group-hover:text-vc-primary">
                   {s.domain}
                 </span>
-                <span className="font-mono text-[11px] tabular-nums text-vc-label">{s.count}</span>
+                <span className="font-mono text-data tabular-nums text-vc-label">{s.count}</span>
               </a>
             ))
           )}
@@ -163,10 +161,10 @@ export function BottomRow({
               <img src="/venturecite/images/ai-logos/perplexity.svg" alt="" className="h-5 w-5" />
               <img src="/venturecite/images/ai-logos/claude.svg" alt="" className="h-5 w-5" />
             </div>
-            <p className="text-[11px] text-vc-label">No conversation tracking yet</p>
+            <p className="text-data text-vc-label">No conversation tracking yet</p>
             <CCLink
               dest={DEST.crawler}
-              className="mt-1 flex items-center gap-0.5 text-[10px] text-vc-accent hover:underline"
+              className="mt-1 flex items-center gap-0.5 text-label text-vc-accent hover:underline"
             >
               Check crawler access
             </CCLink>

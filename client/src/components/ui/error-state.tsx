@@ -26,8 +26,8 @@ export function ErrorState({
         <div className="rounded-full bg-destructive/10 p-4 mb-4">
           <AlertTriangle className="h-8 w-8 text-destructive" aria-hidden="true" />
         </div>
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <div className="text-sm text-muted-foreground mt-2 max-w-md">{description}</div>
+        <h2 className="text-ui font-semibold">{title}</h2>
+        <div className="text-caption text-muted-foreground mt-2 max-w-md">{description}</div>
         <Button
           size="sm"
           variant="outline"

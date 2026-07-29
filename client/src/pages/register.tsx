@@ -113,7 +113,7 @@ export default function Register() {
       <Card className="w-full max-w-md relative">
         <a
           href="/"
-          className="absolute top-3 left-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="absolute top-3 left-3 text-caption text-muted-foreground hover:text-foreground transition-colors"
           data-testid="link-back-home"
         >
           ← Back to home
@@ -122,7 +122,9 @@ export default function Register() {
           <div className="flex justify-center mb-4">
             <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">Create your account</CardTitle>
+          <CardTitle className="text-page font-semibold text-foreground">
+            Create your account
+          </CardTitle>
           <CardDescription>Start optimizing for AI search engines today</CardDescription>
         </CardHeader>
         <CardContent>
@@ -186,7 +188,7 @@ export default function Register() {
                 </Button>
               </div>
               {password && (
-                <ul className="text-xs space-y-1 mt-2">
+                <ul className="text-caption space-y-1 mt-2">
                   {passwordRequirements.map((req, i) => (
                     <li
                       key={i}
@@ -211,7 +213,7 @@ export default function Register() {
                 data-testid="input-confirm-password"
               />
               {confirmPassword && !passwordsMatch && (
-                <p className="text-xs text-destructive flex items-center gap-1">
+                <p className="text-caption text-destructive flex items-center gap-1">
                   <X className="h-3 w-3" /> Passwords do not match
                 </p>
               )}
@@ -231,13 +233,13 @@ export default function Register() {
                 "Create account"
               )}
             </Button>
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-caption text-muted-foreground text-center">
               By signing up, you agree to our Terms of Service and Privacy Policy.
             </p>
           </form>
         </CardContent>
         <CardFooter className="justify-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Already have an account?{" "}
             <a
               href="/login"

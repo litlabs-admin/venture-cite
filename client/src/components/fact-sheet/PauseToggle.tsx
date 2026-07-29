@@ -67,7 +67,7 @@ export function PauseToggle({ brandId, enabled, onChange }: PauseToggleProps) {
         data-testid="fact-sheet-pause-toggle"
         aria-label={localEnabled ? "Auto-scraping enabled" : "Auto-scraping paused"}
       />
-      <Label htmlFor={`pause-toggle-${brandId}`} className="text-xs text-muted-foreground">
+      <Label htmlFor={`pause-toggle-${brandId}`} className="text-caption text-muted-foreground">
         {localEnabled ? "Auto-scraping enabled" : "Auto-scraping paused"}
       </Label>
     </div>

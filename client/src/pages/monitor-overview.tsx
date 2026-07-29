@@ -116,11 +116,11 @@ function Section({
   return (
     <Card className="relative border-border/60">
       {pendingDot && (
-        <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
+        <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-warning animate-pulse" />
       )}
       <CardHeader className="flex-row items-start justify-between space-y-0 gap-4 pb-4">
         <div className="min-w-0">
-          <CardTitle className="text-section font-semibold">{title}</CardTitle>
+          <CardTitle className="text-ui font-semibold">{title}</CardTitle>
           {description && (
             <p className="text-caption text-muted-foreground mt-0.5 line-clamp-2">{description}</p>
           )}
@@ -547,7 +547,7 @@ export default function MonitorOverview() {
           } ${autopilot?.status === "completed" ? "opacity-0" : "opacity-100"}`}
           data-testid="autopilot-banner"
         >
-          <div className="flex items-center gap-3 text-ui">
+          <div className="flex items-center gap-3 text-caption">
             {isAutopilotFailed ? (
               <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
             ) : (
@@ -629,7 +629,7 @@ export default function MonitorOverview() {
               {/* AI Visibility Score */}
               <Card data-testid="card-visibility-score" className="relative border-border/60">
                 {isAutopilotDataPending && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-warning animate-pulse" />
                 )}
                 <CardContent className="p-5 flex flex-col h-full">
                   <p className="text-label uppercase tracking-wider text-muted-foreground text-center">
@@ -683,7 +683,7 @@ export default function MonitorOverview() {
               {/* Share of AI Voice */}
               <Card data-testid="card-share-of-voice" className="relative border-border/60">
                 {isAutopilotDataPending && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-warning animate-pulse" />
                 )}
                 <CardContent className="p-5 flex flex-col h-full">
                   <p className="text-label uppercase tracking-wider text-muted-foreground text-center">
@@ -737,7 +737,7 @@ export default function MonitorOverview() {
               {/* Cited / Total */}
               <Card data-testid="card-cited-total" className="relative border-border/60">
                 {isAutopilotDataPending && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-chart-3 animate-pulse" />
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-warning animate-pulse" />
                 )}
                 <CardContent className="p-5 flex flex-col h-full">
                   <p className="text-label uppercase tracking-wider text-muted-foreground text-center">
@@ -816,7 +816,7 @@ export default function MonitorOverview() {
                     strokeLinecap="round"
                   />
                 </svg>
-                <div className="relative h-full flex items-center justify-center text-ui text-muted-foreground">
+                <div className="relative h-full flex items-center justify-center text-caption text-muted-foreground">
                   Run a citation check to start tracking your trend.
                 </div>
               </div>
@@ -974,7 +974,7 @@ export default function MonitorOverview() {
             ) : leaderboard.isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : sovDonutData.length === 0 ? (
-              <p className="text-ui text-muted-foreground">No share-of-voice data yet.</p>
+              <p className="text-caption text-muted-foreground">No share-of-voice data yet.</p>
             ) : (
               <div className="grid md:grid-cols-2 gap-6 md:items-center">
                 {/*
@@ -1024,7 +1024,7 @@ export default function MonitorOverview() {
                     // pushing the number off the row.
                     <li
                       key={slice.name}
-                      className="flex items-start justify-between gap-3 text-ui py-1"
+                      className="flex items-start justify-between gap-3 text-caption py-1"
                     >
                       <span className="flex min-w-0 items-start gap-2">
                         <span
@@ -1102,7 +1102,7 @@ export default function MonitorOverview() {
               ) : entityData ? (
                 <BrandEntityStrength data={entityData} />
               ) : (
-                <p className="text-ui text-muted-foreground">No data yet.</p>
+                <p className="text-caption text-muted-foreground">No data yet.</p>
               )}
             </Section>
           </div>
@@ -1130,7 +1130,7 @@ export default function MonitorOverview() {
                 </>
               ) : (
                 <div className="md:col-span-3 rounded-md border border-border bg-muted/30 px-4 py-6 text-center">
-                  <p className="text-ui text-muted-foreground">
+                  <p className="text-caption text-muted-foreground">
                     {autopilot?.status === "running_citations" ||
                     autopilot?.status === "generating_prompts" ||
                     autopilot?.status === "pending"
@@ -1145,7 +1145,7 @@ export default function MonitorOverview() {
                 <div className="text-label uppercase tracking-wide text-primary mb-2">
                   How AI describes {selectedBrand?.name ?? "your brand"}
                 </div>
-                <div className="prose prose-sm dark:prose-invert max-w-none text-ui italic text-foreground prose-p:my-0 prose-p:inline">
+                <div className="prose prose-sm dark:prose-invert max-w-none text-caption italic text-foreground prose-p:my-0 prose-p:inline">
                   <span aria-hidden="true">&ldquo;</span>
                   <SafeMarkdown>
                     {stripTrackingParams(firstPlatformSnippet.latestSnippet)}
@@ -1161,7 +1161,10 @@ export default function MonitorOverview() {
                 </div>
                 <ul className="space-y-1">
                   {gapsAiIdentifies.map((gap) => (
-                    <li key={gap} className="text-ui text-muted-foreground flex items-center gap-2">
+                    <li
+                      key={gap}
+                      className="text-caption text-muted-foreground flex items-center gap-2"
+                    >
                       <AlertTriangle className="w-3.5 h-3.5 text-destructive" /> {gap}
                     </li>
                   ))}
@@ -1169,7 +1172,7 @@ export default function MonitorOverview() {
               </div>
             )}
             {!hasMeasured && (
-              <p className="text-ui text-muted-foreground mt-2">
+              <p className="text-caption text-muted-foreground mt-2">
                 We'll surface gaps once your first citation scan completes.
               </p>
             )}
@@ -1199,7 +1202,7 @@ export default function MonitorOverview() {
             }
           >
             {verbatimBlocks.length === 0 ? (
-              <p className="text-ui text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 No verbatim responses yet — run a citation check to populate.
               </p>
             ) : !showVerbatim ? (
@@ -1207,7 +1210,7 @@ export default function MonitorOverview() {
                 <div className="rounded-md border border-destructive bg-destructive-subtle p-4 flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-ui">
+                    <p className="text-caption">
                       <span className="font-semibold text-destructive">
                         {selectedBrand?.name ?? "Your brand"}{" "}
                         {(heroData?.citationRate ?? 0) < 50
@@ -1224,7 +1227,7 @@ export default function MonitorOverview() {
               ) : (
                 <div className="rounded-md border border-border bg-muted/30 p-4 flex items-start gap-3">
                   <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                  <p className="text-ui text-muted-foreground">
+                  <p className="text-caption text-muted-foreground">
                     We'll surface verbatim AI responses once your first citation scan completes.
                   </p>
                 </div>
@@ -1302,7 +1305,7 @@ function PromptCoverageMap({
 }) {
   const brandRow = rows.find((r) => r.entityType === "brand");
   if (!brandRow || categories.length === 0) {
-    return <p className="text-ui text-muted-foreground">No prompt coverage data yet.</p>;
+    return <p className="text-caption text-muted-foreground">No prompt coverage data yet.</p>;
   }
   const appearing = categories.filter(
     (c) => brandRow.cells[c] === "yes" || brandRow.cells[c] === "partial",
@@ -1400,8 +1403,8 @@ function RedditVisibility({
         (hasMeasured ? (
           <div className="rounded-md border border-destructive bg-destructive-subtle p-6 text-center">
             <MessageSquare className="w-8 h-8 text-destructive mx-auto mb-2" />
-            <p className="text-ui font-semibold">No Reddit presence found</p>
-            <p className="text-ui text-muted-foreground mt-1">
+            <p className="text-caption font-semibold">No Reddit presence found</p>
+            <p className="text-caption text-muted-foreground mt-1">
               Your brand has zero visibility on Reddit — a major source AI platforms use for
               recommendations.
             </p>
@@ -1409,8 +1412,8 @@ function RedditVisibility({
         ) : (
           <div className="rounded-md border border-border bg-muted/30 p-6 text-center">
             <MessageSquare className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-ui font-semibold text-foreground">Reddit scan runs weekly</p>
-            <p className="text-ui text-muted-foreground mt-1">
+            <p className="text-caption font-semibold text-foreground">Reddit scan runs weekly</p>
+            <p className="text-caption text-muted-foreground mt-1">
               We'll surface Reddit visibility once your first citation scan completes.
             </p>
           </div>

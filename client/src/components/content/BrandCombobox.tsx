@@ -71,7 +71,7 @@ export default function BrandCombobox({
                     className={cn("mr-2 h-4 w-4", value === b.id ? "opacity-100" : "opacity-0")}
                   />
                   <span className="font-medium">{b.name}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{b.companyName}</span>
+                  <span className="ml-2 text-caption text-muted-foreground">{b.companyName}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

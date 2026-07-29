@@ -390,7 +390,7 @@ export default function Citations() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
                 </span>
-                <span className="text-ui font-medium truncate">
+                <span className="text-caption font-medium truncate">
                   Citation run in progress — {headlineProgress.progressPct}%
                 </span>
               </div>
@@ -422,7 +422,7 @@ export default function Citations() {
       {brandsLoading ? (
         <Skeleton className="h-10 w-full" />
       ) : brands.length === 0 ? (
-        <p className="text-muted-foreground text-ui">
+        <p className="text-muted-foreground text-caption">
           Create a brand first to start tracking citations.
         </p>
       ) : !selectedBrandId ? (
@@ -454,7 +454,7 @@ export default function Citations() {
                     aria-selected={isActive}
                     onClick={() => setActiveTab(tab.id)}
                     data-tour-id={tab.tourId}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-ui font-medium transition-colors border-b-2 -mb-px ${
+                    className={`flex items-center gap-2 px-4 py-2.5 text-caption font-medium transition-colors border-b-2 -mb-px ${
                       isActive
                         ? "border-primary text-foreground"
                         : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
@@ -576,7 +576,7 @@ export default function Citations() {
           {activeTab === "schedule" && (
             <Card>
               <CardContent className="pt-6">
-                <p className="text-ui text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Citation scans run weekly for every brand.
                 </p>
               </CardContent>

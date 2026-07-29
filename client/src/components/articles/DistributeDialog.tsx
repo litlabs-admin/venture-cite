@@ -222,15 +222,13 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
     }
     if (latestByPlatform.size === 0) return;
     setGeneratedContent(
-      Array.from(latestByPlatform.values()).map(
-        (d): GeneratedRow => ({
-          platform: d.platform,
-          status: "success",
-          content: d.metadata.content,
-          distributionId: d.id,
-          platformPostId: d.platformPostId ?? null,
-        }),
-      ),
+      Array.from(latestByPlatform.values()).map((d): GeneratedRow => ({
+        platform: d.platform,
+        status: "success",
+        content: d.metadata.content,
+        distributionId: d.id,
+        platformPostId: d.platformPostId ?? null,
+      })),
     );
     setView("results");
   }, [open, historyData, generatedContent.length]);
@@ -275,7 +273,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
         <div className="flex items-center gap-2">
           <Badge>{platform}</Badge>
           {timestamp && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-caption text-muted-foreground">
               {formatDistanceToNow(new Date(timestamp), { addSuffix: true })}
             </span>
           )}
@@ -328,7 +326,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
           <Textarea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
-            className="min-h-[160px] text-sm font-mono"
+            className="min-h-[160px] text-caption font-mono"
           />
           <div className="flex gap-2 justify-end">
             <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
@@ -344,7 +342,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
           </div>
         </div>
       ) : (
-        <pre className="text-sm whitespace-pre-wrap bg-muted p-3 rounded-md max-h-60 overflow-y-auto font-sans">
+        <pre className="text-caption whitespace-pre-wrap bg-muted p-3 rounded-md max-h-60 overflow-y-auto font-sans">
           {content}
         </pre>
       )}
@@ -401,7 +399,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
 
         {!bufferConnected ? (
           <div className="bg-muted border border-border rounded-lg p-3 mb-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-caption">
               <Link2 className="w-4 h-4 text-muted-foreground" />
               <span className="text-foreground">Connect Buffer to post directly</span>
             </div>
@@ -416,7 +414,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
             className="bg-positive-subtle border border-positive rounded-lg p-3 mb-3 flex items-center justify-between gap-3"
             data-testid="banner-buffer-connected"
           >
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-caption">
               <Link2 className="w-4 h-4 text-positive" />
               <span className="text-foreground">
                 Buffer connected ·{" "}
@@ -437,11 +435,11 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
             >
               <div className="flex items-start gap-2">
                 <Share2 className="w-4 h-4 text-muted-foreground mt-0.5" />
-                <div className="text-sm">
+                <div className="text-caption">
                   <p className="font-medium text-foreground" data-testid="text-distribution-info">
                     Smart Distribution
                   </p>
-                  <p className="text-muted-foreground text-xs mt-1">
+                  <p className="text-muted-foreground text-caption mt-1">
                     AI reformats your article for each platform with optimized hooks, hashtags, and
                     formatting.
                   </p>
@@ -459,7 +457,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
                   }}
                   data-testid={`checkbox-platform-${platform.toLowerCase()}`}
                 />
-                <label htmlFor={`platform-${platform}`} className="text-sm font-medium">
+                <label htmlFor={`platform-${platform}`} className="text-caption font-medium">
                   {platform}
                 </label>
               </div>
@@ -496,7 +494,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
               ) : (
                 <div key={item.platform} className="border rounded-lg p-4">
                   <Badge variant="destructive">{item.platform}</Badge>
-                  <p className="text-sm text-destructive mt-2">
+                  <p className="text-caption text-destructive mt-2">
                     Failed to generate content for this platform.
                   </p>
                 </div>
@@ -520,7 +518,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
         {view === "history" && (
           <div className="space-y-4">
             {history.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground text-sm">
+              <div className="py-8 text-center text-muted-foreground text-caption">
                 <Clock className="w-8 h-8 mx-auto mb-2 opacity-40" />
                 No past distributions yet. Generate content and it will appear here.
               </div>

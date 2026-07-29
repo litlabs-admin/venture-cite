@@ -116,7 +116,7 @@ export function ScrapeFailureState({
               Looks like a CDN (Cloudflare / Akamai) is filtering our crawler. To allow it, add this
               line to your <code className="rounded bg-muted px-1 py-0.5">robots.txt</code>:
             </p>
-            <pre className="overflow-x-auto rounded bg-muted px-3 py-2 text-xs">
+            <pre className="overflow-x-auto rounded bg-muted px-3 py-2 text-caption">
               User-agent: VentureCiteBot/1.0{"\n"}Allow: /
             </pre>
             <div className="flex flex-wrap gap-2">
@@ -166,7 +166,7 @@ export function ScrapeFailureState({
               action needed on your end.
             </p>
             {errorMessage ? (
-              <p className="mt-2 text-xs text-muted-foreground">Details: {errorMessage}</p>
+              <p className="mt-2 text-caption text-muted-foreground">Details: {errorMessage}</p>
             ) : null}
           </AlertDescription>
         </Alert>
@@ -234,7 +234,7 @@ export function ScrapeFailureState({
               </Button>
             </div>
             {errorMessage ? (
-              <p className="text-xs text-muted-foreground">Details: {errorMessage}</p>
+              <p className="text-caption text-muted-foreground">Details: {errorMessage}</p>
             ) : null}
           </AlertDescription>
         </Alert>
@@ -256,7 +256,7 @@ export function ScrapeFailureState({
               <code className="rounded bg-muted px-1 py-0.5">{runId}</code>.
             </p>
             {errorMessage ? (
-              <p className="mt-2 text-xs text-muted-foreground">Details: {errorMessage}</p>
+              <p className="mt-2 text-caption text-muted-foreground">Details: {errorMessage}</p>
             ) : null}
           </AlertDescription>
         </Alert>

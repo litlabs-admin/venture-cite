@@ -62,8 +62,8 @@ export default function AdminScrapeRuns() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Recent fact-sheet scrapes</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-page font-semibold text-foreground">Recent fact-sheet scrapes</h1>
+          <p className="text-caption text-muted-foreground mt-1">
             Last 50 runs across all brands. Auto-refreshes every 15 seconds.
           </p>
         </div>
@@ -71,7 +71,7 @@ export default function AdminScrapeRuns() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Runs</CardTitle>
+          <CardTitle className="text-ui">Runs</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -81,11 +81,11 @@ export default function AdminScrapeRuns() {
               ))}
             </div>
           ) : isError ? (
-            <p className="text-sm text-destructive">Could not load runs.</p>
+            <p className="text-caption text-destructive">Could not load runs.</p>
           ) : (
             <div className="space-y-1">
               {(data?.data ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">No runs yet.</p>
+                <p className="text-caption text-muted-foreground">No runs yet.</p>
               ) : null}
               {(data?.data ?? []).map((run) => {
                 const tone = statusToVariant(run.status);
@@ -106,12 +106,12 @@ export default function AdminScrapeRuns() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-muted-foreground">
+                          <span className="font-mono text-caption text-muted-foreground">
                             {run.id.slice(0, 8)}
                           </span>
                           <Badge
                             className={cn(
-                              "text-[10px] uppercase tracking-wider",
+                              "text-label uppercase tracking-wider",
                               tone === "ok"
                                 ? "bg-secondary text-secondary-foreground"
                                 : tone === "fail"
@@ -122,15 +122,15 @@ export default function AdminScrapeRuns() {
                             {run.status}
                           </Badge>
                           {run.errorKind && (
-                            <span className="text-[10px] text-destructive truncate">
+                            <span className="text-label text-destructive truncate">
                               {run.errorKind}
                             </span>
                           )}
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-label text-muted-foreground">
                             {run.triggeredBy ?? "—"}
                           </span>
                         </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0 text-xs text-muted-foreground tnum">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0 text-caption text-muted-foreground tnum">
                           <span>{fmtAgo(run.startedAt)}</span>
                           <span>duration {fmtDur(run.startedAt, run.completedAt)}</span>
                           <span>{run.pagesFetched ?? 0} pages</span>

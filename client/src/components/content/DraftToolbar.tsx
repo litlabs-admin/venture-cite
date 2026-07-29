@@ -78,11 +78,11 @@ export default function DraftToolbar({
                       }}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{draftLabel(draft)}</p>
+                        <p className="text-caption font-medium truncate">{draftLabel(draft)}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <Badge
                             variant="secondary"
-                            className={`text-[10px] px-1.5 py-0 h-4 ${
+                            className={`text-label px-1.5 py-0 h-4 ${
                               status === "generating"
                                 ? "bg-warning-subtle text-warning"
                                 : status === "failed"
@@ -103,7 +103,7 @@ export default function DraftToolbar({
                                   ? "Done"
                                   : "Draft"}
                           </Badge>
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-label text-muted-foreground">
                             {relativeTime(draft.updatedAt)}
                           </span>
                         </div>
@@ -128,7 +128,7 @@ export default function DraftToolbar({
       )}
 
       {activeDraftId && drafts.find((d) => d.id === activeDraftId) && (
-        <span className="text-xs text-muted-foreground hidden sm:inline">
+        <span className="text-caption text-muted-foreground hidden sm:inline">
           Editing:{" "}
           <span className="font-medium text-foreground">
             {draftLabel(drafts.find((d) => d.id === activeDraftId)!)}

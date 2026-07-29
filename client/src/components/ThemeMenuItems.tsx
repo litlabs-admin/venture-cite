@@ -54,7 +54,7 @@ export function ThemeMenuItems() {
   return (
     <>
       <DropdownMenuSeparator />
-      <DropdownMenuLabel className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <DropdownMenuLabel className="text-data font-medium uppercase tracking-wider text-muted-foreground">
         Appearance
       </DropdownMenuLabel>
       <DropdownMenuRadioGroup

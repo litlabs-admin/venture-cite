@@ -27,7 +27,7 @@ export function MessageBubble({
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3.5 py-2 text-sm whitespace-pre-wrap wrap-break-word">
+        <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-3.5 py-2 text-caption whitespace-pre-wrap wrap-break-word">
           {msg.content}
         </div>
       </div>
@@ -42,15 +42,15 @@ export function MessageBubble({
         </div>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-medium text-muted-foreground mb-0.5">AI Tutor</div>
+        <div className="text-data font-medium text-muted-foreground mb-0.5">AI Tutor</div>
         <div
           className={cn(
             "rounded-2xl rounded-tl-md bg-muted px-3.5 py-2.5",
             "prose prose-sm dark:prose-invert max-w-none",
             "prose-p:my-1.5 prose-p:leading-relaxed",
-            "prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-2 prose-headings:mb-1",
+            "prose-headings:text-caption prose-headings:font-semibold prose-headings:mt-2 prose-headings:mb-1",
             "prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5",
-            "prose-code:text-xs prose-code:bg-background/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded",
+            "prose-code:text-caption prose-code:bg-background/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded",
             "prose-code:before:content-none prose-code:after:content-none",
             "prose-blockquote:border-l-primary/40 prose-blockquote:text-foreground/80 prose-blockquote:not-italic",
             "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
@@ -60,7 +60,7 @@ export function MessageBubble({
           {msg.content ? (
             <SafeMarkdown>{msg.content}</SafeMarkdown>
           ) : (
-            <span className="text-muted-foreground text-sm">Thinking…</span>
+            <span className="text-muted-foreground text-caption">Thinking…</span>
           )}
           {isStreaming && msg.content && (
             <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom" />
@@ -70,7 +70,7 @@ export function MessageBubble({
           <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={handleCopy}
-              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-accent"
+              className="text-data text-muted-foreground hover:text-foreground flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-accent"
               aria-label="Copy message"
             >
               {copied ? (
@@ -85,7 +85,7 @@ export function MessageBubble({
             </button>
             <button
               onClick={onRegenerate}
-              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-accent"
+              className="text-data text-muted-foreground hover:text-foreground flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-accent"
               aria-label="Regenerate response"
             >
               <RefreshCw className="h-3 w-3" /> Regenerate

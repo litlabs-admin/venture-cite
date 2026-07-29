@@ -56,7 +56,7 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
         <Button
           variant="ghost"
           onClick={() => setOpen(true)}
-          className="w-full justify-start gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
+          className="w-full justify-start gap-2 px-3 py-2 text-caption text-muted-foreground hover:text-foreground"
           aria-label="View completed onboarding"
           data-testid="sidebar-onboarding-complete-button"
         >
@@ -79,10 +79,10 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground leading-tight tracking-tight">
+              <p className="text-caption font-semibold text-foreground leading-tight tracking-tight">
                 {isComplete ? "You're all set" : "Getting started"}
               </p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-data text-muted-foreground">
                 {isComplete ? `${total} of ${total} complete` : `${completed} of ${total} complete`}
               </p>
             </div>
@@ -104,10 +104,10 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <DialogTitle className="text-xl font-semibold tracking-tight">
+                  <DialogTitle className="text-page font-semibold tracking-tight">
                     {isComplete ? "You're all set" : "Getting started with VentureCite"}
                   </DialogTitle>
-                  <DialogDescription className="text-sm text-muted-foreground mt-1">
+                  <DialogDescription className="text-caption text-muted-foreground mt-1">
                     {isComplete
                       ? "You've completed every onboarding step. Revisit any time to refresh the essentials."
                       : "Four steps to start getting cited by AI search engines."}
@@ -115,7 +115,7 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
                 </div>
               </div>
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center justify-between text-caption">
                   <span className="text-muted-foreground">
                     {completed} of {total} complete
                   </span>
@@ -153,26 +153,26 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-medium text-muted-foreground tracking-wide">
+                      <span className="text-caption font-medium text-muted-foreground tracking-wide">
                         STEP {idx + 1}
                       </span>
                       {isNext && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground border border-border bg-muted px-1.5 py-0.5 rounded">
+                        <span className="text-label font-semibold uppercase tracking-wider text-foreground border border-border bg-muted px-1.5 py-0.5 rounded">
                           Next
                         </span>
                       )}
                       {done && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <span className="text-label font-semibold uppercase tracking-wider text-muted-foreground">
                           Done
                         </span>
                       )}
                     </div>
                     <p
-                      className={`text-sm font-semibold mt-0.5 ${done ? "text-muted-foreground line-through" : "text-foreground"}`}
+                      className={`text-caption font-semibold mt-0.5 ${done ? "text-muted-foreground line-through" : "text-foreground"}`}
                     >
                       {step.title}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    <p className="text-caption text-muted-foreground mt-1 leading-relaxed">
                       {step.description}
                     </p>
                     {!done && (
@@ -217,7 +217,9 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
           </div>
 
           <div className="px-6 py-3 border-t border-border bg-muted/30 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">Reopen this anytime from the sidebar.</p>
+            <p className="text-caption text-muted-foreground">
+              Reopen this anytime from the sidebar.
+            </p>
             <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
               Close
             </Button>

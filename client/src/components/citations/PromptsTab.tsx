@@ -248,7 +248,7 @@ export default function PromptsTab({
       <div className="flex flex-col items-center justify-center px-8 py-16 text-center">
         <Sparkles className="mb-3 h-6 w-6 text-vc-hover" aria-hidden />
         <p className="mb-1 text-[15px] font-medium text-vc-primary">No prompts yet</p>
-        <p className="mb-4 max-w-md text-[12px] text-vc-tertiary">
+        <p className="mb-4 max-w-md text-caption text-vc-tertiary">
           Generate {TRACKED_CAP} citation prompts tailored to {selectedBrand?.name ?? "your brand"},
           then refine them. The same set is re-checked on every run so trends stay comparable.
         </p>
@@ -278,7 +278,7 @@ export default function PromptsTab({
   return (
     <div className="flex min-h-0 flex-col">
       <div className="flex items-center gap-2.5 border-b border-vc-accent/10 bg-vc-accent-subtle/30 px-4 py-2 sm:px-8">
-        <p className="flex-1 text-[12px] leading-snug text-vc-secondary">
+        <p className="flex-1 text-caption leading-snug text-vc-secondary">
           Prompts are the questions people ask AI. The same set is re-checked on every run, so
           scores stay comparable week to week
           {promptsAgeLabel ? ` — seeded ${promptsAgeLabel}` : ""}.
@@ -287,7 +287,7 @@ export default function PromptsTab({
           type="button"
           onClick={() => setResetOpen(true)}
           data-testid="button-reset-prompts"
-          className="flex flex-shrink-0 items-center gap-1 text-[11px] font-medium text-vc-accent transition-colors hover:text-vc-accent-hover"
+          className="flex flex-shrink-0 items-center gap-1 text-data font-medium text-vc-accent transition-colors hover:text-vc-accent-hover"
         >
           <RefreshCw className="h-3 w-3" aria-hidden />
           Reset all
@@ -365,7 +365,7 @@ export default function PromptsTab({
             rows={4}
             onChange={(e) => setDuplicateText(e.target.value)}
           />
-          <p className="text-right text-xs text-muted-foreground">
+          <p className="text-right text-caption text-muted-foreground">
             {duplicateText.length}/{PROMPT_MAX_LEN}
           </p>
           <DialogFooter>
@@ -430,7 +430,7 @@ export default function PromptsTab({
               restart.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <label className="mt-2 flex cursor-pointer items-start gap-2 text-sm">
+          <label className="mt-2 flex cursor-pointer items-start gap-2 text-caption">
             <input
               type="checkbox"
               checked={resetConfirmed}
@@ -466,7 +466,7 @@ export default function PromptsTab({
           </DialogHeader>
           <div className="max-h-[50vh] space-y-1 overflow-y-auto">
             {suggestions.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
+              <p className="py-6 text-center text-caption text-muted-foreground">
                 No suggestions right now. Refresh to generate a new batch.
               </p>
             ) : (
@@ -476,9 +476,9 @@ export default function PromptsTab({
                   className="flex items-start gap-3 rounded border border-vc-default px-3 py-2"
                 >
                   <div className="flex-1">
-                    <p className="text-[13px] text-vc-primary">{s.prompt}</p>
+                    <p className="text-body text-vc-primary">{s.prompt}</p>
                     {s.rationale && (
-                      <p className="mt-0.5 text-[11px] italic text-vc-tertiary">{s.rationale}</p>
+                      <p className="mt-0.5 text-data italic text-vc-tertiary">{s.rationale}</p>
                     )}
                   </div>
                   <Button
@@ -549,10 +549,10 @@ export default function PromptsTab({
 
           {accepting && (
             <div className="rounded border border-vc-accent/30 bg-vc-accent-subtle/40 p-3">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-vc-accent">
+              <p className="mb-1 text-label font-semibold uppercase tracking-wider text-vc-accent">
                 {prompts.length < TRACKED_CAP ? "Will be added" : "New (will be tracked)"}
               </p>
-              <p className="text-[13px] text-vc-primary">{accepting.prompt}</p>
+              <p className="text-body text-vc-primary">{accepting.prompt}</p>
             </div>
           )}
 
@@ -561,8 +561,10 @@ export default function PromptsTab({
               {prompts.map((p, i) => (
                 <label
                   key={p.id}
-                  className={`flex cursor-pointer items-start gap-2 rounded border p-2 text-[13px] transition-colors hover:bg-muted/40 ${
-                    acceptReplaceId === p.id ? "border-rose-400 bg-rose-50" : "border-vc-default"
+                  className={`flex cursor-pointer items-start gap-2 rounded border p-2 text-body transition-colors hover:bg-muted/40 ${
+                    acceptReplaceId === p.id
+                      ? "border-destructive bg-destructive/10"
+                      : "border-vc-default"
                   }`}
                 >
                   <input

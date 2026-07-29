@@ -67,7 +67,7 @@ export default function PromptDetail({ promptId, promptText, brandId }: PromptDe
 
   if (runs.length === 0) {
     return (
-      <p className="text-ui text-muted-foreground text-center py-8">
+      <p className="text-caption text-muted-foreground text-center py-8">
         No completed runs yet. Run a citation check to start building history for this prompt.
       </p>
     );
@@ -109,7 +109,7 @@ export default function PromptDetail({ promptId, promptText, brandId }: PromptDe
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : !promptRowForRun || promptRowForRun.platforms.length === 0 ? (
-          <p className="text-ui text-muted-foreground text-center py-4">
+          <p className="text-caption text-muted-foreground text-center py-4">
             No platform results captured for this prompt in the selected run.
           </p>
         ) : (

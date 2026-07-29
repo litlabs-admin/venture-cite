@@ -76,7 +76,7 @@ export default function DeleteBrandDialog({ brandId, brandName, isPending, onCon
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-caption">
           <div className="font-medium mb-1 text-destructive">Deleting will remove:</div>
           {previewLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -106,7 +106,7 @@ export default function DeleteBrandDialog({ brandId, brandName, isPending, onCon
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor={`confirm-delete-${brandId}`} className="text-sm">
+          <Label htmlFor={`confirm-delete-${brandId}`} className="text-caption">
             Type <span className="font-mono font-semibold">{brandName}</span> to confirm
           </Label>
           <Input

@@ -201,20 +201,20 @@ export default function Report() {
 
       {/* 1. Conclusion + the one number. */}
       <section>
-        <p className="max-w-[60ch] text-lg leading-snug text-foreground">{conclusion}</p>
+        <p className="max-w-[60ch] text-ui leading-snug text-foreground">{conclusion}</p>
         {scanned && (
           <div className="mt-5 flex items-end gap-4">
             <span className="tnum text-hero font-semibold leading-none text-foreground">
               {score}
             </span>
-            <span className="pb-1 text-sm text-muted-foreground">/ 100</span>
+            <span className="pb-1 text-caption text-muted-foreground">/ 100</span>
             {delta !== null && enoughTrend ? (
               <span className="pb-1.5">{<DeltaChip delta={delta} />}</span>
             ) : null}
           </div>
         )}
         {h?.lastScanAt && (
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className="mt-3 text-caption text-muted-foreground">
             Last scan {formatRelativeTime(h.lastScanAt)}.
             {scanned ? ` ${h.citedChecks}/${h.totalChecks} checks cited (${h.citationRate}%).` : ""}
           </p>
@@ -232,19 +232,19 @@ export default function Report() {
             <div className="grid grid-cols-2 gap-x-8 gap-y-1 sm:grid-cols-4">
               {weeks.slice(-8).map((w) => (
                 <div key={w.weekStart} className="flex items-baseline justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-caption text-muted-foreground">
                     {new Date(w.weekStart).toLocaleDateString(undefined, {
                       month: "short",
                       day: "numeric",
                     })}
                   </span>
-                  <span className="tnum text-sm text-foreground">{w.citationRate}%</span>
+                  <span className="tnum text-caption text-foreground">{w.citationRate}%</span>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Not enough scan history yet. The trend appears once there are at least two weekly scans
             with checks.
           </p>
@@ -269,7 +269,7 @@ export default function Report() {
               return (
                 <div
                   key={name}
-                  className="grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-x-6 border-b border-border/60 py-2 text-sm last:border-0"
+                  className="grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-x-6 border-b border-border/60 py-2 text-caption last:border-0"
                 >
                   <span className="text-foreground">{name}</span>
                   <span className="tnum text-right text-foreground">
@@ -282,7 +282,7 @@ export default function Report() {
             })}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             No per-engine data yet. It appears after the first completed citation check.
           </p>
         )}
@@ -291,7 +291,7 @@ export default function Report() {
       {/* 4. Which pages got cited. The card carries its own heading. */}
       <CitedUrlsCard brandId={selectedBrandId} />
 
-      <p className="border-t border-border pt-4 text-xs text-muted-foreground">
+      <p className="border-t border-border pt-4 text-caption text-muted-foreground">
         VentureCite, generated{" "}
         {new Date().toLocaleDateString(undefined, {
           year: "numeric",

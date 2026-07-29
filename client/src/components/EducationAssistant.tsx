@@ -57,7 +57,7 @@ function ChatTrigger({ onClick }: { onClick: () => void }) {
       )}
     >
       <Sparkles className="h-5 w-5" />
-      <span className="text-sm font-medium">AI Tutor</span>
+      <span className="text-caption font-medium">AI Tutor</span>
     </button>
   );
 }
@@ -191,8 +191,8 @@ export default function EducationAssistant() {
                   <Sparkles className="h-4 w-4 text-primary-foreground" />
                 </div>
                 <div className="min-w-0">
-                  <SheetTitle className="text-sm leading-tight">AI Tutor</SheetTitle>
-                  <p className="text-[11px] text-muted-foreground leading-tight">
+                  <SheetTitle className="text-caption leading-tight">AI Tutor</SheetTitle>
+                  <p className="text-data text-muted-foreground leading-tight">
                     Your GEO/AEO strategist
                   </p>
                 </div>
@@ -221,7 +221,7 @@ export default function EducationAssistant() {
                     <History className="h-4 w-4 mr-2" />
                     Conversation history
                     {chatbot.threads.length > 0 && (
-                      <span className="ml-auto text-xs text-muted-foreground">
+                      <span className="ml-auto text-caption text-muted-foreground">
                         {chatbot.threads.length}
                       </span>
                     )}
@@ -248,7 +248,7 @@ export default function EducationAssistant() {
                 {activeThread && (
                   <button
                     onClick={() => setView("history")}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-accent text-[11px] text-muted-foreground"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-accent text-data text-muted-foreground"
                     aria-label="Switch conversation"
                   >
                     <span className="font-medium text-foreground truncate max-w-[200px]">
@@ -258,7 +258,7 @@ export default function EducationAssistant() {
                   </button>
                 )}
                 {selectedBrand && (
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/60 text-[11px] text-muted-foreground">
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/60 text-data text-muted-foreground">
                     <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                     {selectedBrand.name}
                   </div>
@@ -325,7 +325,7 @@ export default function EducationAssistant() {
                           <div className="h-7 w-7 rounded-full bg-linear-to-br from-primary/20 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center">
                             <Bot className="h-3.5 w-3.5 text-primary" />
                           </div>
-                          <div className="rounded-2xl rounded-tl-md bg-muted px-3.5 py-2.5 flex items-center gap-2 text-sm text-muted-foreground">
+                          <div className="rounded-2xl rounded-tl-md bg-muted px-3.5 py-2.5 flex items-center gap-2 text-caption text-muted-foreground">
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             Thinking…
                           </div>
@@ -337,11 +337,11 @@ export default function EducationAssistant() {
                 {chatbot.brandSwitchNotice && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-2.5">
                     <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                    <div className="flex-1 text-sm text-foreground">
+                    <div className="flex-1 text-caption text-foreground">
                       {chatbot.brandSwitchNotice}
                       <button
                         onClick={chatbot.dismissBrandSwitchNotice}
-                        className="ml-2 text-xs text-muted-foreground hover:text-foreground underline"
+                        className="ml-2 text-caption text-muted-foreground hover:text-foreground underline"
                       >
                         Dismiss
                       </button>
@@ -353,11 +353,11 @@ export default function EducationAssistant() {
                   <div className="rounded-lg border border-warning bg-warning-subtle p-3.5">
                     <div className="flex items-start gap-2.5">
                       <AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
-                      <div className="text-sm">
+                      <div className="text-caption">
                         <div className="font-medium text-foreground">
                           Daily AI Tutor limit reached
                         </div>
-                        <p className="text-muted-foreground text-xs mt-1">
+                        <p className="text-muted-foreground text-caption mt-1">
                           You've used today's free AI Tutor messages. Resets at midnight UTC.
                         </p>
                       </div>
@@ -368,11 +368,11 @@ export default function EducationAssistant() {
                 {chatbot.error && (
                   <div className="rounded-lg border border-destructive bg-destructive-subtle p-3 flex items-start gap-2.5">
                     <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                    <div className="flex-1 text-sm">
+                    <div className="flex-1 text-caption">
                       <div className="text-foreground">{chatbot.error}</div>
                       <button
                         onClick={chatbot.regenerate}
-                        className="text-xs text-primary hover:underline mt-1"
+                        className="text-caption text-primary hover:underline mt-1"
                       >
                         Try again
                       </button>
@@ -395,7 +395,7 @@ export default function EducationAssistant() {
                       }
                     }}
                     placeholder="Ask anything about GEO, AEO, SEO, or VentureCite…"
-                    className="min-h-[44px] max-h-[160px] resize-none text-sm py-2.5"
+                    className="min-h-[44px] max-h-[160px] resize-none text-caption py-2.5"
                     maxLength={2000}
                     disabled={chatbot.budgetExceeded}
                     aria-label="Message"
@@ -432,7 +432,7 @@ export default function EducationAssistant() {
                     </Tooltip>
                   )}
                 </div>
-                <div className="flex items-center justify-between mt-1.5 text-[10px] text-muted-foreground px-1">
+                <div className="flex items-center justify-between mt-1.5 text-label text-muted-foreground px-1">
                   <span>Enter to send · Shift+Enter for newline</span>
                   {showCharCount && (
                     <span className={cn(charCount > 1900 && "text-warning")}>

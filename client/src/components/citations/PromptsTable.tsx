@@ -82,15 +82,14 @@ const COLUMNS = [
 type ColumnKey = (typeof COLUMNS)[number]["key"];
 
 const BTN =
-  "h-8 px-2.5 flex items-center gap-1.5 rounded border border-vc-default text-[12px] text-vc-secondary transition-colors hover:bg-vc-muted/50";
+  "h-8 px-2.5 flex items-center gap-1.5 rounded border border-vc-default text-caption text-vc-secondary transition-colors hover:bg-vc-muted/50";
 const MENU =
   "absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded border border-vc-default bg-white py-1 shadow-vc-overlay";
-const MENU_LABEL =
-  "px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-vc-label";
+const MENU_LABEL = "px-3 pb-1 pt-2 text-label font-semibold uppercase tracking-wider text-vc-label";
 const MENU_ITEM =
-  "flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[12px] text-vc-secondary transition-colors hover:bg-vc-muted/60 hover:text-vc-primary";
+  "flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-caption text-vc-secondary transition-colors hover:bg-vc-muted/60 hover:text-vc-primary";
 const TH =
-  "flex h-10 items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-vc-text-muted transition-colors duration-200 hover:text-vc-secondary";
+  "flex h-10 items-center gap-1 text-label font-medium uppercase tracking-wider text-vc-text-muted transition-colors duration-200 hover:text-vc-secondary";
 
 /** Close a popover on outside click / Escape. */
 function useDismiss<T extends HTMLElement>(open: boolean, close: () => void) {
@@ -139,7 +138,7 @@ function Sparkline({ series }: { series: PromptScoreHistory["series"] }) {
       <path
         d={d}
         fill="none"
-        stroke={rising ? "#3b5bf6" : "#f43f5e"}
+        stroke={rising ? "var(--brand-accent)" : "var(--negative)"}
         strokeWidth="1.25"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -384,7 +383,7 @@ export function PromptsTable({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search prompts..."
               aria-label="Search prompts"
-              className="h-8 w-full rounded border border-vc-default pl-8 pr-8 text-[12px] text-vc-primary outline-none transition-all placeholder:text-vc-text-muted focus:border-vc-accent focus:ring-2 focus:ring-vc-accent/20"
+              className="h-8 w-full rounded border border-vc-default pl-8 pr-8 text-caption text-vc-primary outline-none transition-all placeholder:text-vc-text-muted focus:border-vc-accent focus:ring-2 focus:ring-vc-accent/20"
             />
             {query && (
               <button
@@ -401,7 +400,7 @@ export function PromptsTable({
 
         <div className="ml-auto flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
           {/* Run summary — same figures as the reference's header chip. */}
-          <span className="mr-1 hidden items-center gap-2.5 text-[11px] lg:flex">
+          <span className="mr-1 hidden items-center gap-2.5 text-data lg:flex">
             {summary.lastRun && (
               <span className="flex items-center gap-1.5 text-vc-text-muted">
                 <span className="h-1 w-1 shrink-0 rounded-full bg-vc-accent/50" aria-hidden />
@@ -420,7 +419,7 @@ export function PromptsTable({
               className="flex items-center gap-1 text-vc-secondary"
               title="Prompts that lost ground"
             >
-              <ArrowDown className="h-2.5 w-2.5 text-rose-500" aria-hidden />
+              <ArrowDown className="h-2.5 w-2.5 text-destructive" aria-hidden />
               <span className="tabular-nums">{summary.down}</span>
             </span>
             <button
@@ -447,7 +446,7 @@ export function PromptsTable({
               {/* Counts only a filter the user actually chose — "active" is
                   the default and must not read as an applied filter. */}
               {status !== "active" && (
-                <span className="rounded bg-vc-accent-subtle px-1 font-mono text-[10px] text-vc-accent">
+                <span className="rounded bg-vc-accent-subtle px-1 font-mono text-label text-vc-accent">
                   1
                 </span>
               )}
@@ -498,7 +497,7 @@ export function PromptsTable({
                   >
                     <span>
                       {v.label}
-                      <span className="block text-[10px] text-vc-text-muted">{v.hint}</span>
+                      <span className="block text-label text-vc-text-muted">{v.hint}</span>
                     </span>
                     {view === v.key && <span className="text-vc-accent">✓</span>}
                   </button>
@@ -542,7 +541,7 @@ export function PromptsTable({
           <div className="relative" ref={addRef}>
             <button
               type="button"
-              className="flex h-8 items-center gap-1.5 rounded bg-vc-accent-subtle pl-2.5 pr-2 text-[12px] font-medium text-vc-accent transition-colors hover:bg-vc-accent hover:text-white"
+              className="flex h-8 items-center gap-1.5 rounded bg-vc-accent-subtle pl-2.5 pr-2 text-caption font-medium text-vc-accent transition-colors hover:bg-vc-accent hover:text-white"
               aria-expanded={openMenu === "add"}
               onClick={() => setOpenMenu(openMenu === "add" ? null : "add")}
             >
@@ -562,7 +561,7 @@ export function PromptsTable({
                 >
                   <span>
                     Add manually
-                    <span className="block text-[10px] text-vc-text-muted">Write your own</span>
+                    <span className="block text-label text-vc-text-muted">Write your own</span>
                   </span>
                 </button>
                 <button
@@ -575,7 +574,7 @@ export function PromptsTable({
                 >
                   <span>
                     Suggest prompts
-                    <span className="block text-[10px] text-vc-text-muted">
+                    <span className="block text-label text-vc-text-muted">
                       Let AI find your gaps
                     </span>
                   </span>
@@ -590,7 +589,7 @@ export function PromptsTable({
                 >
                   <span>
                     Paste a list
-                    <span className="block text-[10px] text-vc-text-muted">Add many at once</span>
+                    <span className="block text-label text-vc-text-muted">Add many at once</span>
                   </span>
                 </button>
               </div>
@@ -602,19 +601,19 @@ export function PromptsTable({
       {/* Bulk bar */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 border-b border-vc-accent/10 bg-vc-accent-subtle/30 px-4 py-2">
-          <span className="font-mono text-[11px] tabular-nums text-vc-accent">{selected.size}</span>
-          <span className="text-[12px] text-vc-secondary">selected</span>
+          <span className="font-mono text-data tabular-nums text-vc-accent">{selected.size}</span>
+          <span className="text-caption text-vc-secondary">selected</span>
           <div className="flex-1" />
           <button
             type="button"
-            className="text-[11px] font-medium text-vc-secondary hover:text-vc-primary"
+            className="text-data font-medium text-vc-secondary hover:text-vc-primary"
             onClick={() => setSelected(new Set())}
           >
             Clear
           </button>
           <button
             type="button"
-            className="flex items-center gap-1 text-[11px] font-medium text-rose-500 hover:text-rose-600"
+            className="flex items-center gap-1 text-data font-medium text-destructive hover:text-destructive"
             onClick={() => {
               rows.filter((r) => selected.has(r.prompt.id)).forEach((r) => onArchive(r.prompt));
               setSelected(new Set());
@@ -729,12 +728,12 @@ export function PromptsTable({
                       if (text && text !== p.prompt) onEdit(p, text);
                       setEditingId(null);
                     }}
-                    className="w-full rounded border border-vc-accent bg-white px-2 py-1 text-[13px] text-vc-primary outline-none ring-2 ring-vc-accent/20"
+                    className="w-full rounded border border-vc-accent bg-white px-2 py-1 text-body text-vc-primary outline-none ring-2 ring-vc-accent/20"
                   />
                 ) : (
                   <div className="group/prompt flex min-w-0 items-center gap-2">
                     <p
-                      className={`line-clamp-1 min-w-0 text-[13px] ${
+                      className={`line-clamp-1 min-w-0 text-body ${
                         active ? "text-vc-primary" : "text-vc-text-muted"
                       }`}
                     >
@@ -768,10 +767,10 @@ export function PromptsTable({
                     {h?.rankDelta !== null && h?.rankDelta !== undefined && h.rankDelta > 0 && (
                       <span
                         title={`Your rank slipped on this prompt (now ${h.rank})`}
-                        className="inline-flex h-4 shrink-0 items-center gap-0.5 rounded px-1 text-rose-500/80"
+                        className="inline-flex h-4 shrink-0 items-center gap-0.5 rounded px-1 text-destructive/80"
                       >
                         <ArrowDown className="h-2.5 w-2.5" aria-hidden />
-                        <span className="text-[10px] font-semibold leading-none tabular-nums">
+                        <span className="text-label font-semibold leading-none tabular-nums">
                           {h.rankDelta}
                         </span>
                       </span>
@@ -779,7 +778,7 @@ export function PromptsTable({
                     {r.blindSpot && (
                       <span
                         title="No AI engine cited you on this prompt in the last run"
-                        className="inline-flex h-4 shrink-0 items-center gap-0.5 rounded px-1 text-rose-500/80"
+                        className="inline-flex h-4 shrink-0 items-center gap-0.5 rounded px-1 text-destructive/80"
                       >
                         <Flag className="h-2.5 w-2.5" aria-hidden />
                       </span>
@@ -791,7 +790,7 @@ export function PromptsTable({
               {shown("vol") && (
                 <div className="w-16 shrink-0 text-right">
                   {/* No search-volume source exists; a dash, never a number. */}
-                  <span className="font-mono text-[11px] tabular-nums text-vc-hover">–</span>
+                  <span className="font-mono text-data tabular-nums text-vc-hover">–</span>
                 </div>
               )}
 
@@ -808,7 +807,7 @@ export function PromptsTable({
               {shown("score") && (
                 <div className="w-10 shrink-0 text-right">
                   <span
-                    className={`font-mono text-[11px] font-medium tabular-nums ${
+                    className={`font-mono text-data font-medium tabular-nums ${
                       h?.score === null || h?.score === undefined
                         ? "text-vc-hover"
                         : "text-vc-primary"
@@ -822,13 +821,13 @@ export function PromptsTable({
               {shown("delta") && (
                 <div className="w-10 shrink-0 text-right">
                   <span
-                    className={`font-mono text-[11px] font-medium tabular-nums ${
+                    className={`font-mono text-data font-medium tabular-nums ${
                       h?.delta === null || h?.delta === undefined
                         ? "text-vc-hover"
                         : h.delta > 0
                           ? "text-positive"
                           : h.delta < 0
-                            ? "text-rose-500"
+                            ? "text-destructive"
                             : "text-vc-tertiary"
                     }`}
                   >
@@ -862,7 +861,7 @@ export function PromptsTable({
 
               {shown("added") && (
                 <div className="w-24 shrink-0">
-                  <span className="font-mono text-[11px] tabular-nums text-vc-secondary">
+                  <span className="font-mono text-data tabular-nums text-vc-secondary">
                     {p.createdAt
                       ? new Date(p.createdAt).toLocaleDateString(undefined, {
                           month: "short",
@@ -1003,7 +1002,7 @@ export function PromptsTable({
                       </button>
                       <button
                         type="button"
-                        className={`${MENU_ITEM} text-rose-500 hover:text-rose-600`}
+                        className={`${MENU_ITEM} text-destructive hover:text-destructive`}
                         onClick={() => {
                           setRowMenu(null);
                           onArchive(p);
@@ -1023,7 +1022,7 @@ export function PromptsTable({
         })}
 
         {visible.length === 0 && (
-          <p className="px-4 py-6 text-[12px] text-vc-tertiary">
+          <p className="px-4 py-6 text-caption text-vc-tertiary">
             {rows.length === 0
               ? "No prompts yet."
               : "No prompts match this view. Clear the search or switch views."}
@@ -1045,7 +1044,7 @@ export function PromptsTable({
             placeholder={
               atCap ? `At the ${cap}-prompt limit — switch one off first` : "Add a prompt..."
             }
-            className="min-w-0 flex-1 bg-transparent text-[13px] text-vc-primary outline-none placeholder:text-vc-text-muted disabled:cursor-not-allowed"
+            className="min-w-0 flex-1 bg-transparent text-body text-vc-primary outline-none placeholder:text-vc-text-muted disabled:cursor-not-allowed"
           />
         </div>
 
@@ -1058,7 +1057,7 @@ export function PromptsTable({
               className="group flex w-full items-center justify-center gap-2 rounded border border-dashed border-vc-default py-2.5 transition-all duration-200 hover:border-vc-accent/40 hover:bg-vc-accent-subtle/20"
             >
               <Plus className="h-3 w-3 text-vc-text-muted" aria-hidden />
-              <span className="text-[12px] text-vc-text-muted transition-colors group-hover:text-vc-secondary">
+              <span className="text-caption text-vc-text-muted transition-colors group-hover:text-vc-secondary">
                 Explore{" "}
                 <span className="font-mono font-medium tabular-nums text-vc-accent">
                   {suggestionCount}
@@ -1071,7 +1070,7 @@ export function PromptsTable({
       </div>
 
       {/* Footer */}
-      <div className="flex h-7 items-center justify-between border-t border-vc-subtle px-4 text-[10px] text-vc-text-muted">
+      <div className="flex h-7 items-center justify-between border-t border-vc-subtle px-4 text-label text-vc-text-muted">
         <span>
           Showing <span className="font-mono tabular-nums text-vc-secondary">{visible.length}</span>{" "}
           of <span className="font-mono tabular-nums">{rows.length}</span> prompts
@@ -1087,7 +1086,7 @@ export function PromptsTable({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
           <div className="w-full max-w-lg rounded-lg border border-vc-default bg-white p-5 shadow-vc-overlay">
             <h2 className="mb-1 text-[15px] font-semibold text-vc-primary">Paste a list</h2>
-            <p className="mb-3 text-[12px] text-vc-tertiary">
+            <p className="mb-3 text-caption text-vc-tertiary">
               One prompt per line. {cap - trackedCount} slot
               {cap - trackedCount === 1 ? "" : "s"} left.
             </p>
@@ -1095,7 +1094,7 @@ export function PromptsTable({
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
               rows={8}
-              className="w-full rounded border border-vc-default p-2 text-[13px] text-vc-primary outline-none focus:border-vc-accent focus:ring-2 focus:ring-vc-accent/20"
+              className="w-full rounded border border-vc-default p-2 text-body text-vc-primary outline-none focus:border-vc-accent focus:ring-2 focus:ring-vc-accent/20"
               placeholder={"best crm for small teams\nalternatives to salesforce"}
             />
             <div className="mt-3 flex justify-end gap-2">
@@ -1111,7 +1110,7 @@ export function PromptsTable({
               </button>
               <button
                 type="button"
-                className="flex h-8 items-center rounded bg-vc-accent px-3 text-[12px] font-medium text-white hover:bg-vc-accent-hover"
+                className="flex h-8 items-center rounded bg-vc-accent px-3 text-caption font-medium text-white hover:bg-vc-accent-hover"
                 onClick={() => {
                   const lines = pasteText
                     .split("\n")

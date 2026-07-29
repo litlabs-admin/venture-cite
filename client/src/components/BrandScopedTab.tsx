@@ -14,8 +14,8 @@ export function brandScoped(Child: ComponentType<{ selectedBrandId: string }>): 
       return (
         <Card className="p-12 text-center">
           <Brain className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
-          <h2 className="mb-1 text-lg font-semibold">Select a brand to get started</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="mb-1 text-ui font-semibold">Select a brand to get started</h2>
+          <p className="text-caption text-muted-foreground">
             Choose a brand from the selector above to view this data.
           </p>
         </Card>

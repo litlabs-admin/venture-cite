@@ -32,8 +32,8 @@ export default function CitedMentionsStrip({ mentions, highlightTerms }: CitedMe
     <Card className="mb-4">
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold">Where you were cited</h3>
-          <span className="text-xs text-muted-foreground">
+          <h3 className="text-caption font-semibold">Where you were cited</h3>
+          <span className="text-caption text-muted-foreground">
             {mentions.length} mention{mentions.length === 1 ? "" : "s"}
           </span>
         </div>
@@ -63,15 +63,17 @@ export default function CitedMentionsStrip({ mentions, highlightTerms }: CitedMe
                 <div className="flex items-center gap-2 mb-2">
                   <span
                     className={[
-                      "inline-flex items-center px-2 py-0.5 text-xs font-medium rounded border",
+                      "inline-flex items-center px-2 py-0.5 text-caption font-medium rounded border",
                       platformClass,
                     ].join(" ")}
                   >
                     {m.platform}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground line-clamp-1 mb-1.5">{m.prompt}</p>
-                <p className="text-xs leading-relaxed line-clamp-3">{snippet || "(no snippet)"}</p>
+                <p className="text-caption text-muted-foreground line-clamp-1 mb-1.5">{m.prompt}</p>
+                <p className="text-caption leading-relaxed line-clamp-3">
+                  {snippet || "(no snippet)"}
+                </p>
               </button>
             );
           })}

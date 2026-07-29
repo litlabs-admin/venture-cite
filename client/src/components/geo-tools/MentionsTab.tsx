@@ -76,14 +76,14 @@ function StatCard({
     <div className="flex flex-1 flex-col items-center rounded-lg border bg-card px-3 py-2 text-center">
       <span
         className={cn(
-          "inline-flex items-center gap-1 text-xl font-bold tabular-nums",
+          "inline-flex items-center gap-1 text-page font-semibold tabular-nums",
           showAccent && tone === "negative" ? "text-destructive" : "text-foreground",
         )}
       >
         {showAccent && Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
         {value}
       </span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-caption text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -316,7 +316,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
   if (showNoBrand) {
     return (
       <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center">
-        <p className="text-sm text-muted-foreground">Select a brand to view mentions.</p>
+        <p className="text-caption text-muted-foreground">Select a brand to view mentions.</p>
       </div>
     );
   }
@@ -373,7 +373,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
         <Button
           size="sm"
           variant="outline"
-          className="h-8 gap-1.5 text-xs"
+          className="h-8 gap-1.5 text-caption"
           onClick={() => setAddOpen(true)}
         >
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -384,7 +384,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
         <Button
           size="sm"
           variant={bulkMode ? "secondary" : "outline"}
-          className="h-8 gap-1.5 text-xs"
+          className="h-8 gap-1.5 text-caption"
           onClick={() => {
             setBulkMode((v) => !v);
             setSelectedIds(new Set());
@@ -404,7 +404,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
           <Button
             size="sm"
             variant="destructive"
-            className="h-8 gap-1.5 text-xs"
+            className="h-8 gap-1.5 text-caption"
             onClick={() => setBulkDeleteOpen(true)}
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -419,7 +419,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 gap-1.5 text-xs text-destructive hover:bg-destructive-subtle hover:text-destructive"
+          className="h-8 gap-1.5 text-caption text-destructive hover:bg-destructive-subtle hover:text-destructive"
           onClick={() => setDeleteAllOpen(true)}
         >
           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -442,15 +442,17 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
           {/* Empty states */}
           {showNoScans && (
             <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center">
-              <p className="text-sm font-medium">No scans yet.</p>
-              <p className="text-xs text-muted-foreground">Run your first scan to find mentions.</p>
+              <p className="text-caption font-medium">No scans yet.</p>
+              <p className="text-caption text-muted-foreground">
+                Run your first scan to find mentions.
+              </p>
             </div>
           )}
 
           {showNoMentionsAfterScan && (
             <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center">
-              <p className="text-sm font-medium">No mentions found yet.</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption font-medium">No mentions found yet.</p>
+              <p className="text-caption text-muted-foreground">
                 {"We'll keep checking daily. Add variations to widen the search."}
               </p>
             </div>
@@ -458,7 +460,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
 
           {showFilteredEmpty && (
             <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
-              <p className="text-sm text-muted-foreground">No mentions match these filters.</p>
+              <p className="text-caption text-muted-foreground">No mentions match these filters.</p>
               <Button size="sm" variant="outline" onClick={clearFilters}>
                 Clear filters
               </Button>
@@ -514,7 +516,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
           {/* Load more */}
           {hasMore && (
             <div className="flex justify-center pt-2">
-              <Button variant="outline" size="sm" onClick={loadMore} className="text-xs">
+              <Button variant="outline" size="sm" onClick={loadMore} className="text-caption">
                 Load more
               </Button>
             </div>

@@ -378,7 +378,7 @@ export default function Brands() {
             </div>
             <div className="flex-1 space-y-4">
               <div>
-                <h2 className="text-xl font-semibold mb-1" data-testid="text-add-brand-heading">
+                <h2 className="text-page font-semibold mb-1" data-testid="text-add-brand-heading">
                   Add Your Brand
                 </h2>
                 <p className="text-muted-foreground">
@@ -397,7 +397,7 @@ export default function Brands() {
                       handleCreateFromWebsite();
                     }
                   }}
-                  className="bg-card text-base h-11"
+                  className="bg-card text-ui h-11"
                   disabled={createFromWebsiteMutation.isPending}
                   data-testid="input-website-url"
                 />
@@ -423,7 +423,7 @@ export default function Brands() {
               </div>
               {createFromWebsiteMutation.isPending && (
                 <div
-                  className="flex items-center gap-3 text-sm text-muted-foreground"
+                  className="flex items-center gap-3 text-caption text-muted-foreground"
                   data-testid="status-analyzing"
                 >
                   <div className="flex gap-1">
@@ -443,7 +443,7 @@ export default function Brands() {
                   Visiting your website, reading your content, and building your brand profile...
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted-foreground">
                 <button
                   type="button"
                   onClick={() => navigate({ to: "/welcome" })}
@@ -498,7 +498,7 @@ export default function Brands() {
         />
       ) : brands && brands.length > 0 ? (
         <>
-          <h2 className="text-lg font-semibold mb-4" data-testid="text-brands-heading">
+          <h2 className="text-ui font-semibold mb-4" data-testid="text-brands-heading">
             Your Brands ({brands.length})
           </h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -538,12 +538,12 @@ export default function Brands() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 text-caption text-muted-foreground">
                     <Briefcase className="h-4 w-4" />
                     <span>{brand.industry}</span>
                   </div>
                   {brand.website && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 text-caption text-muted-foreground">
                       <Globe className="h-4 w-4" />
                       <a
                         href={safeExternalHref(brand.website)}
@@ -556,36 +556,36 @@ export default function Brands() {
                     </div>
                   )}
                   {brand.targetAudience && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 text-caption text-muted-foreground">
                       <Target className="h-4 w-4" />
                       <span className="line-clamp-2">{brand.targetAudience}</span>
                     </div>
                   )}
                   {brand.tone && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 text-caption text-muted-foreground">
                       <Megaphone className="h-4 w-4" />
                       <span className="capitalize">{brand.tone} tone</span>
                     </div>
                   )}
                   {brand.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 pt-2 border-t">
+                    <p className="text-caption text-muted-foreground line-clamp-2 pt-2 border-t">
                       {brand.description}
                     </p>
                   )}
                   {brand.products && brand.products.length > 0 && (
                     <div className="pt-2 border-t">
-                      <p className="text-xs font-semibold mb-1">Products/Services:</p>
+                      <p className="text-caption font-semibold mb-1">Products/Services:</p>
                       <div className="flex flex-wrap gap-1">
                         {brand.products.slice(0, 3).map((product, idx) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs"
+                            className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-caption"
                           >
                             {product}
                           </span>
                         ))}
                         {brand.products.length > 3 && (
-                          <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs">
+                          <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-caption">
                             +{brand.products.length - 3} more
                           </span>
                         )}
@@ -607,7 +607,7 @@ export default function Brands() {
                   <h3 className="font-semibold mb-1">
                     Next Step: Get Your Brand Cited by AI Engines
                   </h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-caption text-muted-foreground">
                     Now that your brand is set up, follow the step-by-step checklists to ensure
                     ChatGPT, Claude, Perplexity, Gemini, Grok, and Manus AI can find and cite your
                     brand.

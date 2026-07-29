@@ -82,7 +82,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             onKeyDown={(e) => handleKeyDown(e, index)}
             data-testid={`theme-toggle-${value}`}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium",
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-caption font-medium",
               "transition-colors",
               "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
               selected

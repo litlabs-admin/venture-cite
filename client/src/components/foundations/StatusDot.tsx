@@ -8,7 +8,7 @@ export type StatusDotTone = "success" | "warn" | "fail" | "neutral" | "pending";
 // chart-4 violet that used to stand in for it) is reserved for actions,
 // never for signalling a status outcome.
 const toneClass: Record<Exclude<StatusDotTone, "success">, string> = {
-  warn: "bg-chart-3",
+  warn: "bg-warning",
   fail: "bg-destructive",
   neutral: "bg-muted-foreground",
   pending: "bg-muted-foreground/40 animate-pulse",

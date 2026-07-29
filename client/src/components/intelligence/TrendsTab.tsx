@@ -127,8 +127,8 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Historical Performance Trends</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-ui font-semibold">Historical Performance Trends</h3>
+          <p className="text-caption text-muted-foreground">
             Track your AI intelligence metrics over time
           </p>
         </div>
@@ -197,8 +197,8 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={getTrendChartData()}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-xs" />
-                    <YAxis className="text-xs" />
+                    <XAxis dataKey="date" className="text-caption" />
+                    <YAxis className="text-caption" />
                     <Tooltip contentStyle={chartTheme.tooltipContentStyle} />
                     <Line
                       type="monotone"

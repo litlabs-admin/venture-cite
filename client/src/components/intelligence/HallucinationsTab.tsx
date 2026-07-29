@@ -285,7 +285,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
           <CardContent>
             {factSheetTooSmall && (
               <div
-                className="mb-4 flex items-start gap-2 rounded-md border border-(--warning)/20 bg-(--warning)/10 p-3 text-ui text-(--warning)"
+                className="mb-4 flex items-start gap-2 rounded-md border border-(--warning)/20 bg-(--warning)/10 p-3 text-caption text-(--warning)"
                 data-testid="warning-facts-too-small"
               >
                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -302,7 +302,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
             {hallucinations.length === 0 ? (
               <div className="py-8 text-center">
                 <Shield className="mx-auto mb-4 h-12 w-12 text-(--positive)" />
-                <p className="text-ui font-medium text-foreground">
+                <p className="text-caption font-medium text-foreground">
                   {severityFilter === "all"
                     ? "No hallucinations detected"
                     : `No ${severityFilter}-severity hallucinations`}
@@ -323,7 +323,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                     <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
                       How to fix flagged hallucinations
                     </p>
-                    <ul className="mt-1.5 space-y-1 text-ui text-muted-foreground">
+                    <ul className="mt-1.5 space-y-1 text-caption text-muted-foreground">
                       {GENERIC_REMEDIATION_STEPS.map((step, i) => (
                         <li key={i} className="flex gap-2">
                           <span aria-hidden>·</span>
@@ -419,7 +419,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                           <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
                             AI claimed
                           </p>
-                          <p className="mt-0.5 min-w-0 break-words text-ui leading-snug text-foreground">
+                          <p className="mt-0.5 min-w-0 break-words text-caption leading-snug text-foreground">
                             {hal.claimedStatement}
                           </p>
                         </div>
@@ -428,7 +428,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                             <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
                               Actual fact
                             </p>
-                            <p className="mt-0.5 min-w-0 break-words text-ui leading-snug text-foreground">
+                            <p className="mt-0.5 min-w-0 break-words text-caption leading-snug text-foreground">
                               {hal.actualFact}
                             </p>
                           </div>
@@ -471,7 +471,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                             <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
                               How to fix this
                             </p>
-                            <ul className="mt-1 space-y-0.5 text-ui text-muted-foreground">
+                            <ul className="mt-1 space-y-0.5 text-caption text-muted-foreground">
                               {hal.remediationSteps.map((step, i) => (
                                 <li key={i} className="flex gap-2">
                                   <span aria-hidden>·</span>
@@ -503,7 +503,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
               <div className="text-center py-8">
                 <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-muted-foreground mb-4">No facts added yet</p>
-                <p className="text-ui text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Add verified facts about your brand to enable hallucination detection
                 </p>
                 <Button asChild className="mt-4" data-testid="button-add-fact">
@@ -529,7 +529,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                       </Badge>
                       <span className="text-caption text-muted-foreground">Verified</span>
                     </div>
-                    <p className="mt-2 min-w-0 break-words text-ui text-foreground">
+                    <p className="mt-2 min-w-0 break-words text-caption text-foreground">
                       {fact.factValue}
                     </p>
                   </div>
