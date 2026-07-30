@@ -11,7 +11,7 @@ import { toLinkTarget, withBrand, type LinkTarget } from "@/lib/linkTarget";
 import { cn } from "@/lib/utils";
 
 // ─── Pulse ───────────────────────────────────────────────────────────────────
-// The Command Center's action-first worklist. One ranked list answering "what
+// The Dashboard's action-first worklist. One ranked list answering "what
 // do I do next", merging three REAL measured sources — no estimates, no
 // fabricated revenue/traffic (PRODUCT.md: honest by construction):
 //

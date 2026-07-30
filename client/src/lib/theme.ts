@@ -54,7 +54,7 @@ function isTheme(value: unknown): value is Theme {
 
 /** Read the stored preference. Defaults to "light" when nothing is stored.
  *
- *  The app chrome (sidebar, context bar, Command Center) is a light-only
+ *  The app chrome (sidebar, context bar, Dashboard) is a light-only
  *  surface built against the reference design system, so following the OS
  *  into dark used to put a light dashboard inside dark chrome. Users who
  *  explicitly pick dark or system still get it — this is only the default

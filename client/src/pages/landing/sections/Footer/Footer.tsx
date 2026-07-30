@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import logoPath from "@assets/logo.png";
 import { FooterColumn } from "./FooterColumn";
 import { ArrowRightIcon, LinkedInIcon } from "./icons";
 import {
@@ -9,6 +8,7 @@ import {
   mobileLearnLinks,
   desktopLearnLinks,
 } from "./data";
+import { BrandLogo } from "@/components/BrandLogo";
 
 // index.html:3627-3769. Every reveal block in the source is already
 // captured in its settled state (opacity-100, translate-y-0) — per the
@@ -52,7 +52,7 @@ export function Footer() {
               className={`flex items-start gap-3 mb-5 pb-5 border-b border-vc-default ${revealY(isVisible)}`}
             >
               <Link to="/" className="shrink-0">
-                <img src={logoPath} alt="VentureCite" className="h-6 w-auto" />
+                <BrandLogo imgClassName="h-6 w-auto" textClassName="text-caption" />
               </Link>
               <p className="text-[11px] text-vc-secondary leading-relaxed">
                 Get cited by AI search engines. Track every mention. Optimize every prompt.
@@ -104,7 +104,7 @@ export function Footer() {
               )}`}
             >
               <Link to="/" className="flex items-center mb-4">
-                <img src={logoPath} alt="VentureCite" className="h-6 w-auto" />
+                <BrandLogo imgClassName="h-6 w-auto" textClassName="text-caption" />
               </Link>
               <p className="text-[12px] text-vc-secondary leading-relaxed mb-4 max-w-[180px]">
                 Get cited by AI search engines. Track every mention. Optimize every prompt.

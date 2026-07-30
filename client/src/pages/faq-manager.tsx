@@ -728,7 +728,7 @@ export default function FaqManager() {
                           })
                         }
                         disabled={generateFaqsMutation.isPending}
-                        className="w-full bg-primary"
+                        className="w-full"
                         size="lg"
                         data-testid="button-generate-faqs"
                       >

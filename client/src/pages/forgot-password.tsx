@@ -14,7 +14,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Mail, CheckCircle, AlertCircle } from "lucide-react";
-import ventureCiteLogo from "@assets/logo.png";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export default function ForgotPassword() {
   const { toast } = useToast();
@@ -110,7 +110,7 @@ export default function ForgotPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
+            <BrandLogo imgClassName="h-12" textClassName="text-page" />
           </div>
           <CardTitle className="text-page font-semibold text-foreground">
             Reset your password

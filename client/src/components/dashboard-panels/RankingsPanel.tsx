@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ChevronRight } from "lucide-react";
 import { PanelLabel, NoValue, CCLink, DEST } from "./primitives";
-import type { LeaderRow } from "./useCommandCenterData";
+import type { LeaderRow } from "./useDashboardData";
 
 // ─── Rankings ────────────────────────────────────────────────────────────────
 // Right third of the first content row. Scrolling list of tracked brands

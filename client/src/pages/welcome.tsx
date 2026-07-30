@@ -432,7 +432,7 @@ export default function Welcome() {
     }
   };
 
-  // Auto-advance into the Command Center the moment the baseline is ready.
+  // Auto-advance into the Dashboard the moment the baseline is ready.
   // The spine's global-welcome tour auto-fires at `/dashboard`, so the
   // guided tour runs alongside whatever finishes in the background.
   // Failures do NOT auto-redirect — the user chooses retry or proceed.
@@ -442,7 +442,7 @@ export default function Welcome() {
   // (src/routes/index.tsx) — for an authenticated visitor it hard-redirects
   // to "/dashboard" via `window.location.href`, which drops the query
   // string entirely. Targeting "/dashboard" directly (where FirstRunGate
-  // now mounts the Home/Command Center component) is what actually
+  // now mounts the Home/Dashboard component) is what actually
   // preserves the old behavior: landing on the dashboard with the
   // just-created brand selected.
   useEffect(() => {

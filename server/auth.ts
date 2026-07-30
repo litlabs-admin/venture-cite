@@ -194,6 +194,18 @@ const PUBLIC_API_ROUTES = new Set<string>([
   "GET /api/logo-proxy",
   // Daily cron orchestrator — self-auths via CRON_SECRET (Vercel migration).
   "POST /api/cron/daily-orchestrator",
+  // Public pricing catalogue. /pricing is a marketing page served to logged-
+  // OUT visitors, so gating these two made it fall back to the hardcoded
+  // defaultPlans — which carry no priceId, so the subscribe button dead-ended
+  // in a "Products not configured yet" toast for every prospect.
+  //
+  // Neither leaks anything: /products returns product names, descriptions and
+  // prices already printed on the page, and the publishable key is designed to
+  // ship to browsers (it is in VITE_STRIPE_PUBLISHABLE_KEY, i.e. compiled into
+  // the client bundle regardless). POST /api/stripe/checkout stays gated — you
+  // still need an account before you can be charged.
+  "GET /api/stripe/products",
+  "GET /api/stripe/publishable-key",
 ]);
 
 export const requireAuthForApi: RequestHandler = (req, res, next) => {

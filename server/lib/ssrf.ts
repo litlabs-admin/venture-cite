@@ -249,7 +249,13 @@ export async function safeFetchText(
 
 export async function safeFetchTextWithLockedIp(
   raw: string,
-  opts: { maxBytes?: number; timeoutMs?: number; headers?: Record<string, string> } = {},
+  opts: {
+    maxBytes?: number;
+    timeoutMs?: number;
+    headers?: Record<string, string>;
+    /** Return the first maxBytes instead of throwing when the body is bigger. */
+    truncateOnLimit?: boolean;
+  } = {},
 ): Promise<{ status: number; text: string; contentType: string; headers: Record<string, string> }> {
   const maxBytes = opts.maxBytes ?? 2 * 1024 * 1024;
   const timeoutMs = opts.timeoutMs ?? 10_000;
@@ -314,7 +320,7 @@ export async function safeFetchTextWithLockedIp(
         const loc = res.headers.get("location");
         if (!loc) {
           // 3xx without a Location — treat as terminal.
-          return await readBody(res, maxBytes);
+          return await readBody(res, maxBytes, opts.truncateOnLimit ?? false);
         }
         // Resolve relative URLs against the current request URL.
         currentUrl = new URL(loc, validated).toString();
@@ -331,7 +337,7 @@ export async function safeFetchTextWithLockedIp(
         continue;
       }
 
-      return await readBody(res, maxBytes);
+      return await readBody(res, maxBytes, opts.truncateOnLimit ?? false);
     }
     throw new Error(`Exceeded ${MAX_REDIRECTS} redirects`);
   } finally {
@@ -342,6 +348,17 @@ export async function safeFetchTextWithLockedIp(
 async function readBody(
   res: Response,
   maxBytes: number,
+  // Opt-in, default OFF so every existing caller keeps the strict
+  // throw-on-oversize behaviour they were written against.
+  //
+  // Some callers only need the FIRST bytes of a document and must not fail
+  // just because the whole page is enormous — platform detection reads
+  // <head> markers that sit in the first few KB, but real homepages run to
+  // megabytes (wix.com is 3.1 MB, framer.com 2.3 MB), so throwing meant
+  // "large site" was indistinguishable from "undetectable site". With this
+  // set, the reader stops at the cap and returns what it already has;
+  // memory stays bounded by maxBytes exactly as before.
+  truncateOnLimit = false,
 ): Promise<{ status: number; text: string; contentType: string; headers: Record<string, string> }> {
   const contentType = res.headers.get("content-type") ?? "";
   const headers: Record<string, string> = {};
@@ -358,6 +375,11 @@ async function readBody(
     if (value) {
       total += value.byteLength;
       if (total > maxBytes) {
+        if (truncateOnLimit) {
+          chunks.push(value);
+          await reader.cancel();
+          break;
+        }
         await reader.cancel();
         throw new Error("Response exceeded maximum size");
       }

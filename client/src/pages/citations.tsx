@@ -474,7 +474,7 @@ export default function Citations() {
                     runMutation.mutate();
                   }}
                   disabled={runMutation.isPending || showBanner || !selectedBrandId}
-                  className="bg-primary hover:bg-primary/90 shrink-0"
+                  className="shrink-0"
                   data-testid="button-run-check"
                   data-tour-id="prompts.runButton"
                 >

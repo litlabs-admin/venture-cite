@@ -75,7 +75,7 @@ export const STANDALONE_TITLES: Record<string, string> = {
 /**
  * Resolve the AppShell context-bar title for a pathname + `?tab` value.
  * Returns null for routes the shell does not own (those keep their own
- * in-page header). Command Center and Report are handled directly in
+ * in-page header). Dashboard and Report are handled directly in
  * AppShell; this covers the four spine stages and their standalone twins.
  */
 export function spineTitleFor(pathname: string, tab: string | null): string | null {

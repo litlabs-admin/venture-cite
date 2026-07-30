@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronDown, Download, FileText } from "lucide-react";
-import { useCommandCenterData } from "./useCommandCenterData";
+import { useDashboardData } from "./useDashboardData";
 
 // ─── Context-bar actions ─────────────────────────────────────────────────────
 // The reference's header carries Share ▾, Export ▾ and Reports ▾.
@@ -64,7 +64,7 @@ export function HeaderActions({ brandId, brandName }: { brandId: string; brandNa
   const [open, setOpen] = useState(false);
   const ref = useDismiss(open, () => setOpen(false));
   // Same query keys the dashboard already mounted, so this is a cache read.
-  const d = useCommandCenterData(brandId);
+  const d = useDashboardData(brandId);
 
   function exportCsv() {
     const rows: (string | number | null)[][] = [

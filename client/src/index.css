@@ -105,6 +105,14 @@
   --color-vc-accent-deep: #2743c9;
   --color-vc-success-ink: #0e7490;
   --color-vc-danger-ink: #c81f37;
+  /* Marketing's dark button tier. `.vc-home` declares --ink/--ink-fill and a
+     `--color-ink-fill` alias, but a --color-* declared inside a SCOPED
+     selector does not make Tailwind emit the utility — theme keys have to be
+     here, in @theme. Registering them lets the nav CTA use `bg-ink-fill` /
+     `hover:bg-ink` instead of arbitrary `bg-[var(--ink-fill)]`, and .vc-home
+     still rebinds the values. */
+  --color-ink: #16162e;
+  --color-ink-fill: #1b1b3a;
   --radius-vc-panel: 10px;
 
   --shadow-vc-card: 0 1px 3px 0 #0000000a;

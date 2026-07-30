@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, Check, X } from "lucide-react";
-import ventureCiteLogo from "@assets/logo.png";
 import { setSession } from "@/lib/authStore";
 import { PASSWORD_RULES } from "@shared/passwordPolicy";
+import { BrandLogo } from "@/components/BrandLogo";
 
 // Sessionstorage key that hands the verify-email page the address the
 // user just registered with — avoids a query-string param that could
@@ -120,7 +120,7 @@ export default function Register() {
         </a>
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
+            <BrandLogo imgClassName="h-12" textClassName="text-page" />
           </div>
           <CardTitle className="text-page font-semibold text-foreground">
             Create your account

@@ -2,9 +2,9 @@ import { Link } from "@tanstack/react-router";
 import { ChevronRight, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// ─── Command Center primitives ───────────────────────────────────────────────
+// ─── Dashboard primitives ───────────────────────────────────────────────
 // The dashboard's visual system, ported 1:1 from the reference dashboard
-// (captured DOM + computed styles, see docs/command-center-reference.md).
+// (captured DOM + computed styles, see docs/dashboard-reference.md).
 //
 // Every value here is measured, not invented:
 //   panel label   10px / 600 / uppercase / tracking-wider / --color-vc-label
@@ -38,13 +38,14 @@ export const DEST = {
   overview: { to: "/monitor", search: { tab: "overview" } },
   signals: { to: "/diagnose", search: { tab: "signals" } },
   crawler: { to: "/diagnose", search: { tab: "crawler" } },
+  siteHealth: { to: "/site-health" },
   actions: { to: "/act" },
   settings: { to: "/settings" },
 } as const;
 
 export type Dest = { to: string; search?: Record<string, string> };
 
-/** The one place a Command Center destination becomes a router link. */
+/** The one place a Dashboard destination becomes a router link. */
 export function CCLink({
   dest,
   className,

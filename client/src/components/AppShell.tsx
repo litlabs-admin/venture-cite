@@ -3,7 +3,7 @@ import { Link, useRouterState, useSearch } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Menu, X } from "lucide-react";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
-import { HeaderActions } from "@/components/command-center/HeaderActions";
+import { HeaderActions } from "@/components/dashboard-panels/HeaderActions";
 import Sidebar, { SidebarContent } from "./Sidebar";
 import EducationAssistant from "./EducationAssistant";
 import CommandPalette from "./CommandPalette";
@@ -11,8 +11,8 @@ import BrandSelector from "./BrandSelector";
 import { PageHeaderHelp } from "./PageHeaderHelp";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import logoPath from "@assets/logo.png";
 import { spineTitleFor, pageTourFor } from "@/lib/spineStages";
+import { BrandLogo } from "@/components/BrandLogo";
 
 // ─── AppShell ────────────────────────────────────────────────────────────────
 // The one persistent three-zone shell (nav rail / context bar + canvas /
@@ -21,7 +21,7 @@ import { spineTitleFor, pageTourFor } from "@/lib/spineStages";
 // per-stage tab host that monitor/diagnose/act/setup depend on; that gets
 // decomposed in a later increment.)
 //
-// This first increment fully owns the Command Center: a route-derived
+// This first increment fully owns the Dashboard: a route-derived
 // title + the global BrandSelector + help in the context bar, plus a real
 // inspector. Legacy routes render their existing body in the canvas
 // unchanged (no context bar, no double header, no 18-page edits) until
@@ -53,7 +53,7 @@ export function useInspector(): InspectorApi {
 // xl+ and an overlay Sheet below xl. They MUST be gated in JS, not just CSS.
 // A Radix Sheet left `open` at xl+ keeps its full-screen overlay + body
 // scroll-lock active even when its content is `display:none` (xl:hidden) —
-// which froze the entire Command Center on desktop the moment a tile was
+// which froze the entire Dashboard on desktop the moment a tile was
 // clicked. Tailwind's xl breakpoint is 1280px; this hook mirrors use-mobile.
 const XL_BREAKPOINT = 1280;
 
@@ -82,7 +82,7 @@ function shellTitleFor(location: string, tab: string | null): string | null {
   return spineTitleFor(location, tab);
 }
 
-/** The Command Center draws its own full-bleed hairline grid and owns its
+/** The Dashboard draws its own full-bleed hairline grid and owns its
  *  horizontal padding. Wrapping it in the shell's padded, max-width canvas
  *  would inset every row border away from the viewport edge. */
 function isFullBleed(location: string) {
@@ -95,7 +95,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [inspector, setInspector] = useState<InspectorPayload | null>(null);
   const location = useRouterState({ select: (s) => s.location.pathname });
-  // AppShell mounts above every authenticated route (Command Center, Report,
+  // AppShell mounts above every authenticated route (Dashboard, Report,
   // and all four spine stages), so — like SpineShell — it reads search
   // loosely rather than against one route's typed search; see
   // native-api-contract.md rule 3. `tab` is declared (as an optional string)
@@ -119,7 +119,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   const isXlUp = useIsXlUp();
 
-  // "Data through <date>" in the context bar. Shares the Command Center's
+  // "Data through <date>" in the context bar. Shares the Dashboard's
   // hero queryKey, so on the dashboard this is a cache read, not a request.
   const { selectedBrandId, brands } = useBrandSelection();
   const selectedBrandName = brands.find((b) => b.id === selectedBrandId)?.name ?? "brand";
@@ -187,7 +187,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               </SheetContent>
             </Sheet>
             <Link to="/dashboard">
-              <img src={logoPath} alt="VentureCite" className="h-8 w-auto cursor-pointer" />
+              <BrandLogo imgClassName="h-8 w-auto" className="cursor-pointer" />
             </Link>
             {/* Mobile help: the desktop context bar is lg:-only, so without
                 this the "?" (tour replay / AI tutor) is unreachable on phones
@@ -243,7 +243,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   into the pill's corner (it sits in the gutter instead), so
                   the extra padding reverts to the original py-6 value there. */}
               {fullBleed ? (
-                // The Command Center's own grid reaches the viewport edge; the
+                // The Dashboard's own grid reaches the viewport edge; the
                 // shell contributes nothing but the max-width column.
                 <div className="mx-auto w-full max-w-[1800px]">{children}</div>
               ) : (
@@ -255,7 +255,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
             {/* Zone 3 — inspector (desktop xl+). Live on every route that owns
                 a context bar (ownsContextBar = shellTitleFor(...) !== null:
-                Command Center, Report, and every Monitor/Diagnose/Act/Setup
+                Dashboard, Report, and every Monitor/Diagnose/Act/Setup
                 stage + its standalone twins), not Command-Center-only. Quiet
                 surface-3; only mounts when something is selected. */}
             {showInlineInspector && (

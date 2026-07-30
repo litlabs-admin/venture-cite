@@ -11,8 +11,6 @@
 //   POST /api/billing/portal-session  — open Stripe customer portal (auth-gated)
 
 import type { Express } from "express";
-import { sql } from "drizzle-orm";
-import { db } from "../db";
 import { storage } from "../storage";
 import { asyncHandler } from "../lib/routesShared";
 import { isAuthenticated } from "../auth";
@@ -153,11 +151,41 @@ export function setupBillingRoutes(app: Express): void {
         const { getUncachableStripeClient } = await import("../stripeClient");
         const stripe = await getUncachableStripeClient();
 
-        // Verify price exists in our synced Stripe products schema.
-        const priceCheck = await db.execute(
-          sql`SELECT id FROM stripe.prices WHERE id = ${priceId} AND active = true`,
-        );
-        if (priceCheck.rows.length === 0) {
+        // Verify the price against Stripe itself — the same source of truth
+        // GET /api/stripe/products renders the pricing page from.
+        //
+        // This used to read `stripe.prices`, a table belonging to Supabase's
+        // Stripe Sync Engine that is NOT installed on this database (verified:
+        // the whole `stripe` schema is absent). The query therefore threw
+        // "relation does not exist" on every attempt, was swallowed by the
+        // catch below, and returned a generic 500 — i.e. checkout could never
+        // succeed for anyone. Validating against a sync table also risked the
+        // opposite bug: a price the pricing page happily displays being
+        // rejected here because the sync had lagged.
+        //
+        // The allow-list intent is preserved and unchanged: a caller may only
+        // check out an ACTIVE price attached to an ACTIVE product carrying a
+        // `tier` metadata key. That is exactly the filter the products
+        // endpoint applies, so anything purchasable is something we published,
+        // and an arbitrary price ID lifted from another integration is
+        // refused.
+        let price: import("stripe").Stripe.Price;
+        try {
+          price = await stripe.prices.retrieve(priceId, { expand: ["product"] });
+        } catch {
+          return res.status(400).json({ success: false, error: "Invalid or inactive price" });
+        }
+
+        const priceProduct = price.product as import("stripe").Stripe.Product;
+        const isPurchasable =
+          price.active &&
+          price.recurring !== null &&
+          typeof priceProduct === "object" &&
+          !("deleted" in priceProduct && priceProduct.deleted) &&
+          priceProduct.active &&
+          Boolean(priceProduct.metadata?.tier);
+
+        if (!isPurchasable) {
           return res.status(400).json({ success: false, error: "Invalid or inactive price" });
         }
 
@@ -189,9 +217,9 @@ export function setupBillingRoutes(app: Express): void {
 
         res.json({ success: true, url: session.url });
       } catch (error: any) {
-        // Catch-all around a raw SQL lookup (db.execute) + Stripe API
-        // calls — this is the confirmed leak site: error.message could
-        // contain the SQL statement text. Never echo it to the client.
+        // Catch-all around the Stripe API calls. Never echo error.message to
+        // the client — Stripe errors can carry request IDs and parameter
+        // detail we don't want to surface publicly.
         logger.error({ err: error }, "stripe.checkout failed");
         captureAndFlush(error, { tags: { source: "billing.ts:137" } });
         res.status(500).json({ success: false, error: "Failed to create checkout session" });

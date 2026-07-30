@@ -368,28 +368,7 @@ export function countContentWords(text: string): number {
   return m ? m.length : 0;
 }
 
-export function detectHeadings(content: string): {
-  count: number;
-  hasHierarchy: boolean;
-  headings: Array<{ level: number; text: string }>;
-} {
-  if (!content) return { count: 0, hasHierarchy: false, headings: [] };
-  const headings: Array<{ level: number; text: string }> = [];
-
-  const mdRe = /^(#{1,6})\s+(.+?)\s*$/gm;
-  let m: RegExpExecArray | null;
-  while ((m = mdRe.exec(content)) !== null) {
-    headings.push({ level: m[1].length, text: m[2].trim() });
-  }
-
-  const htmlRe = /<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi;
-  while ((m = htmlRe.exec(content)) !== null) {
-    const level = parseInt(m[1], 10);
-    const text = m[2].replace(/<[^>]+>/g, "").trim();
-    headings.push({ level, text });
-  }
-
-  const levels = new Set(headings.map((h) => h.level));
-  const hasHierarchy = levels.has(2) && levels.has(3);
-  return { count: headings.length, hasHierarchy, headings };
-}
+// Moved to server/lib/headingDetect.ts (no `openai`/DB import chain) so
+// server/lib/pageContentAnalysis.ts can reuse it as a pure function.
+// Re-exported here so existing importers of detectHeadings keep working.
+export { detectHeadings } from "./headingDetect";

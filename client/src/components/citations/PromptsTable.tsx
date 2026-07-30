@@ -38,11 +38,11 @@ import type { PromptScoreHistory } from "@/hooks/usePrompts";
 // TWO REFERENCE FEATURES ARE DELIBERATELY NOT REPRODUCED, on different
 // grounds:
 //   * AI VOL renders as a dash. It is a per-row VALUE with no source yet —
-//     the same treatment the Command Center gives its unbacked metrics.
+//     the same treatment the Dashboard gives its unbacked metrics.
 //   * Tags and Audiences (the column, the two sibling tabs, the filters) are
 //     omitted entirely. Those are whole features with interactive controls,
 //     and a control that cannot do anything is worse than an absent one.
-// See docs/command-center-reference.md for the same distinction applied to
+// See docs/dashboard-reference.md for the same distinction applied to
 // the dashboard's Share menu.
 
 export type PromptRowModel = {

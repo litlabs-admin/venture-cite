@@ -14,10 +14,10 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, Check, X, CheckCircle } from "lucide-react";
-import ventureCiteLogo from "@assets/logo.png";
 import { supabase } from "@/lib/supabase";
 import { Sentry } from "@/lib/sentry";
 import { PASSWORD_RULES } from "@shared/passwordPolicy";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -152,7 +152,7 @@ export default function ResetPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <img src={ventureCiteLogo} alt="VentureCite" className="h-12" />
+            <BrandLogo imgClassName="h-12" textClassName="text-page" />
           </div>
           <CardTitle className="text-page font-semibold text-foreground">
             Set new password

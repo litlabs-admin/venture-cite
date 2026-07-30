@@ -54,6 +54,10 @@ vi.mock("../../server/lib/routesShared", async () => {
     sendError: (res: express.Response, _err: unknown, msg: string) => {
       res.status(500).json({ success: false, error: msg });
     },
+    // dashboard.ts gates POST /perception/:brandId/run on this. Pass-through
+    // here: the tests in this file exercise recommendation inputs, not rate
+    // limiting, and without the export the whole module fails to import.
+    aiLimitMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
   };
 });
 

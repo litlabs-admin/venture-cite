@@ -39,11 +39,13 @@ import { Route as AppKeywordResearchRouteImport } from './routes/_app/keyword-re
 import { Route as AppLoginRouteImport } from './routes/_app/login'
 import { Route as AppMonitorRouteImport } from './routes/_app/monitor'
 import { Route as AppOpportunitiesRouteImport } from './routes/_app/opportunities'
+import { Route as AppPerceptionRouteImport } from './routes/_app/perception'
 import { Route as AppRegisterRouteImport } from './routes/_app/register'
 import { Route as AppReportRouteImport } from './routes/_app/report'
 import { Route as AppResetPasswordRouteImport } from './routes/_app/reset-password'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSetupRouteImport } from './routes/_app/setup'
+import { Route as AppSiteHealthRouteImport } from './routes/_app/site-health'
 import { Route as AppVerifyEmailRouteImport } from './routes/_app/verify-email'
 import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
@@ -202,6 +204,11 @@ const AppOpportunitiesRoute = AppOpportunitiesRouteImport.update({
   path: '/opportunities',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPerceptionRoute = AppPerceptionRouteImport.update({
+  id: '/perception',
+  path: '/perception',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppRegisterRoute = AppRegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -225,6 +232,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
 const AppSetupRoute = AppSetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSiteHealthRoute = AppSiteHealthRouteImport.update({
+  id: '/site-health',
+  path: '/site-health',
   getParentRoute: () => AppRoute,
 } as any)
 const AppVerifyEmailRoute = AppVerifyEmailRouteImport.update({
@@ -298,11 +310,13 @@ export interface FileRoutesByFullPath {
   '/login': typeof AppLoginRoute
   '/monitor': typeof AppMonitorRoute
   '/opportunities': typeof AppOpportunitiesRoute
+  '/perception': typeof AppPerceptionRoute
   '/register': typeof AppRegisterRoute
   '/report': typeof AppReportRoute
   '/reset-password': typeof AppResetPasswordRoute
   '/settings': typeof AppSettingsRoute
   '/setup': typeof AppSetupRoute
+  '/site-health': typeof AppSiteHealthRoute
   '/verify-email': typeof AppVerifyEmailRoute
   '/welcome': typeof AppWelcomeRoute
   '/api/$': typeof ApiSplatRoute
@@ -342,11 +356,13 @@ export interface FileRoutesByTo {
   '/login': typeof AppLoginRoute
   '/monitor': typeof AppMonitorRoute
   '/opportunities': typeof AppOpportunitiesRoute
+  '/perception': typeof AppPerceptionRoute
   '/register': typeof AppRegisterRoute
   '/report': typeof AppReportRoute
   '/reset-password': typeof AppResetPasswordRoute
   '/settings': typeof AppSettingsRoute
   '/setup': typeof AppSetupRoute
+  '/site-health': typeof AppSiteHealthRoute
   '/verify-email': typeof AppVerifyEmailRoute
   '/welcome': typeof AppWelcomeRoute
   '/api/$': typeof ApiSplatRoute
@@ -388,11 +404,13 @@ export interface FileRoutesById {
   '/_app/login': typeof AppLoginRoute
   '/_app/monitor': typeof AppMonitorRoute
   '/_app/opportunities': typeof AppOpportunitiesRoute
+  '/_app/perception': typeof AppPerceptionRoute
   '/_app/register': typeof AppRegisterRoute
   '/_app/report': typeof AppReportRoute
   '/_app/reset-password': typeof AppResetPasswordRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/setup': typeof AppSetupRoute
+  '/_app/site-health': typeof AppSiteHealthRoute
   '/_app/verify-email': typeof AppVerifyEmailRoute
   '/_app/welcome': typeof AppWelcomeRoute
   '/api/$': typeof ApiSplatRoute
@@ -434,11 +452,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/monitor'
     | '/opportunities'
+    | '/perception'
     | '/register'
     | '/report'
     | '/reset-password'
     | '/settings'
     | '/setup'
+    | '/site-health'
     | '/verify-email'
     | '/welcome'
     | '/api/$'
@@ -478,11 +498,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/monitor'
     | '/opportunities'
+    | '/perception'
     | '/register'
     | '/report'
     | '/reset-password'
     | '/settings'
     | '/setup'
+    | '/site-health'
     | '/verify-email'
     | '/welcome'
     | '/api/$'
@@ -523,11 +545,13 @@ export interface FileRouteTypes {
     | '/_app/login'
     | '/_app/monitor'
     | '/_app/opportunities'
+    | '/_app/perception'
     | '/_app/register'
     | '/_app/report'
     | '/_app/reset-password'
     | '/_app/settings'
     | '/_app/setup'
+    | '/_app/site-health'
     | '/_app/verify-email'
     | '/_app/welcome'
     | '/api/$'
@@ -761,6 +785,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOpportunitiesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/perception': {
+      id: '/_app/perception'
+      path: '/perception'
+      fullPath: '/perception'
+      preLoaderRoute: typeof AppPerceptionRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/register': {
       id: '/_app/register'
       path: '/register'
@@ -794,6 +825,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof AppSetupRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/site-health': {
+      id: '/_app/site-health'
+      path: '/site-health'
+      fullPath: '/site-health'
+      preLoaderRoute: typeof AppSiteHealthRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/verify-email': {
@@ -904,11 +942,13 @@ interface AppRouteChildren {
   AppLoginRoute: typeof AppLoginRoute
   AppMonitorRoute: typeof AppMonitorRoute
   AppOpportunitiesRoute: typeof AppOpportunitiesRoute
+  AppPerceptionRoute: typeof AppPerceptionRoute
   AppRegisterRoute: typeof AppRegisterRoute
   AppReportRoute: typeof AppReportRoute
   AppResetPasswordRoute: typeof AppResetPasswordRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSetupRoute: typeof AppSetupRoute
+  AppSiteHealthRoute: typeof AppSiteHealthRoute
   AppVerifyEmailRoute: typeof AppVerifyEmailRoute
   AppWelcomeRoute: typeof AppWelcomeRoute
   AppAdminScrapeRoute: typeof AppAdminScrapeRouteWithChildren
@@ -940,11 +980,13 @@ const AppRouteChildren: AppRouteChildren = {
   AppLoginRoute: AppLoginRoute,
   AppMonitorRoute: AppMonitorRoute,
   AppOpportunitiesRoute: AppOpportunitiesRoute,
+  AppPerceptionRoute: AppPerceptionRoute,
   AppRegisterRoute: AppRegisterRoute,
   AppReportRoute: AppReportRoute,
   AppResetPasswordRoute: AppResetPasswordRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSetupRoute: AppSetupRoute,
+  AppSiteHealthRoute: AppSiteHealthRoute,
   AppVerifyEmailRoute: AppVerifyEmailRoute,
   AppWelcomeRoute: AppWelcomeRoute,
   AppAdminScrapeRoute: AppAdminScrapeRouteWithChildren,

@@ -17,6 +17,25 @@ import { AI_PLATFORMS_CORE, VISIBILITY_CHECKLIST_TOTAL } from "@shared/constants
 import type { BrandPrompt, GeoRanking, Competitor } from "@shared/schema";
 import { getRecommendations, type RecommendationState } from "../lib/recommendationsEngine";
 import { citationRatePct, computeVisibilityScore } from "../lib/visibilityMetrics";
+import {
+  parseRobotsTxt,
+  evaluateCrawlers,
+  fetchRobots,
+  fetchDiscovery,
+  AI_CRAWLERS,
+} from "../lib/crawlerAccess";
+import { logger } from "../lib/logger";
+import { db } from "../db";
+import { sql, and, desc, isNotNull, eq } from "drizzle-orm";
+import { brandFactScrapePages, geoRankings, brandPerceptionRuns } from "@shared/schema";
+import { aiLimitMiddleware } from "../lib/routesShared";
+import { gatherEvidence, scoreBrandPerception } from "../lib/perceptionScorer";
+import { detectPlatform } from "../lib/platformDetect";
+import { discoverSitemapUrls } from "../lib/factAgent/v2/sitemapDiscovery";
+import { safeFetchText } from "../lib/ssrf";
+import { withOriginLimit } from "../lib/originConcurrency";
+import { scanPagesForFindings } from "../lib/siteHealthContentScan";
+import type { SiteHealthFinding } from "@shared/siteHealthFindings";
 
 // Platforms we surface on the dashboard. Only platforms in this list
 // are rendered as rows — matches the set we actually query via
@@ -99,6 +118,415 @@ function lastScanAt(rankings: GeoRanking[]): Date | null {
     if (r.checkedAt > latest) latest = r.checkedAt;
   }
   return latest;
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/dashboard/site-health/:brandId — in-module robots.txt cache.
+//
+// The crawler-access evaluation hits the network (robots.txt fetch), which
+// is too slow/expensive to redo on every dashboard load. Cache per brandId
+// with a 6-hour TTL; no new DB table needed since this is a cheap
+// point-in-time snapshot, not something we need to persist or query.
+// ---------------------------------------------------------------------------
+type SiteHealthCacheEntry = {
+  checkedAt: string;
+  website: string | null;
+  discovery: {
+    robotsTxt: boolean | null;
+    sitemapXml: boolean | null;
+    llmsTxt: boolean | null;
+    mcpJson: boolean | null;
+    securityTxt: boolean | null;
+  };
+  total: number;
+  allowed: number;
+  blocked: number;
+  unknown: number;
+  blockedCrawlers: string[];
+  platform: string | null;
+  // Sitemap URL count — the SITE's size (crawled pages the sitemap
+  // advertises), distinct from `pagesFetched` on a scrape run (the
+  // cost-bounded fact-extraction SAMPLE, ~10 URLs). null = sitemap
+  // unavailable/unfetchable; the UI falls back to pagesCrawled.
+  sitemapUrlCount: number | null;
+  // PENDING, not measured. Set only on the deadline-timeout placeholder
+  // returned by getSiteHealthCached when the real compute hasn't finished —
+  // never set on anything that reaches cacheSiteHealth. A pending entry
+  // carries all-false/null discovery and zero crawler counts, which look
+  // exactly like a genuinely terrible site if a caller forgets to check this
+  // flag, so scoreSiteHealth and the UI both gate on it explicitly.
+  pending?: boolean;
+};
+const SITE_HEALTH_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+// BOUNDED. A plain unbounded Map here was a slow memory leak: entries are only
+// ever overwritten per brand, never removed, so a long-lived process serving
+// many brands grows forever. Map preserves insertion order, so deleting the
+// first key evicts the oldest — enough for a cache this small, without pulling
+// in an LRU dependency.
+const SITE_HEALTH_CACHE_MAX = 500;
+// Bounded wait for a cold-cache compute before answering with a placeholder.
+//
+// Was 4s. Live probing against apple.com measured: robots 477ms, sitemap
+// 135ms, llms.txt 7777ms (a 404 that serves a 110KB custom error page),
+// mcp.json 1531ms, security.txt 132ms — i.e. a real, honest compute that
+// legitimately exceeds 4s on a slow 404 page. 4s guaranteed a timeout on any
+// site with one slow discovery file, and the timeout placeholder used to be
+// scored and rendered as if it were real data (all-false discovery, zero
+// crawler counts) — a timeout is not a measurement. 9s gives probes (each
+// individually capped at 10s) room to actually finish while still protecting
+// the dashboard from a truly hung site.
+const SITE_HEALTH_DEADLINE_MS = 9_000;
+// Minimum gap between perception scoring runs for one brand. Evidence only
+// changes when a new citation check lands, so re-scoring sooner spends an LLM
+// call to recompute the same answer.
+export const PERCEPTION_COOLDOWN_MS = 60 * 60 * 1000;
+const siteHealthCache = new Map<string, SiteHealthCacheEntry>();
+
+// Coalesces concurrent computes for the SAME brand. Without this, N dashboard
+// loads landing together on a cold cache each fired their own ~5 outbound
+// requests (robots + 3 discovery probes + homepage) at the customer's site — a
+// thundering herd we point at someone else's server. Now the first caller does
+// the work and the rest await its promise.
+const siteHealthInFlight = new Map<string, Promise<SiteHealthCacheEntry>>();
+
+function cacheSiteHealth(brandId: string, entry: SiteHealthCacheEntry): void {
+  siteHealthCache.set(brandId, entry);
+  while (siteHealthCache.size > SITE_HEALTH_CACHE_MAX) {
+    const oldest = siteHealthCache.keys().next();
+    if (oldest.done) break;
+    siteHealthCache.delete(oldest.value);
+  }
+}
+
+async function getSiteHealthCached(
+  brandId: string,
+  website: string | null,
+): Promise<SiteHealthCacheEntry> {
+  const cached = siteHealthCache.get(brandId);
+  if (cached && Date.now() - new Date(cached.checkedAt).getTime() < SITE_HEALTH_CACHE_TTL_MS) {
+    return cached;
+  }
+  const existing = siteHealthInFlight.get(brandId);
+  if (existing) return existing;
+
+  const work = (async () => {
+    try {
+      const fresh = await computeSiteHealth(website);
+      cacheSiteHealth(brandId, fresh);
+      return fresh;
+    } catch (err) {
+      // computeSiteHealth already degrades internally, but if it ever throws,
+      // serve the STALE entry rather than failing the panel. Expired-but-real
+      // beats nothing; only a brand we have never measured falls through.
+      logger.error({ err, brandId }, "site health compute failed");
+      if (cached) return cached;
+      throw err;
+    } finally {
+      siteHealthInFlight.delete(brandId);
+    }
+  })();
+
+  siteHealthInFlight.set(brandId, work);
+
+  // DEADLINE. The underlying probes each allow 10s, so a slow customer site
+  // could hold this HTTP response open for ~10s — one unresponsive domain
+  // stalling someone's dashboard. Wait a bounded time, then answer with what
+  // we have.
+  //
+  // The abandoned `work` promise is deliberately NOT cancelled: it keeps
+  // running and populates the cache when it finishes, so the next request
+  // gets the real answer. The placeholder returned here is never cached, so
+  // a timeout can't pin a brand to "unmeasured".
+  const deadline = new Promise<SiteHealthCacheEntry | null>((resolve) =>
+    setTimeout(() => resolve(null), SITE_HEALTH_DEADLINE_MS).unref?.(),
+  );
+  const raced = await Promise.race([work.catch(() => null), deadline]);
+  if (raced) return raced;
+  if (cached) return cached;
+  // PENDING placeholder — NEVER cached (see cacheSiteHealth callers; this
+  // object is returned directly, never passed to cacheSiteHealth). Discovery
+  // is UNKNOWN (null), not "absent" (false): a slow site's files may well
+  // exist, we just haven't found out yet within the deadline. `pending: true`
+  // is the only thing scoreSiteHealth and the UI need to check to refuse to
+  // render this as a real score.
+  return {
+    checkedAt: new Date().toISOString(),
+    website,
+    discovery: { ...EMPTY_DISCOVERY },
+    platform: null,
+    total: 0,
+    allowed: 0,
+    blocked: 0,
+    unknown: 0,
+    blockedCrawlers: [],
+    sitemapUrlCount: null,
+    pending: true,
+  };
+}
+
+// UNKNOWN, not "absent". Used for the pending-timeout placeholder and as the
+// degrade-on-throw default in computeSiteHealth — both cases mean "we could
+// not measure this", never "confirmed missing".
+const EMPTY_DISCOVERY = {
+  robotsTxt: null,
+  sitemapXml: null,
+  llmsTxt: null,
+  mcpJson: null,
+  securityTxt: null,
+} as const;
+
+// Bounded fetcher adapter for discoverSitemapUrls — reuses the same
+// SSRF-safe fetch as robots/discovery, capped byte size, never throws.
+const sitemapFetcher = async (url: string, opts?: { maxBytes?: number }) => {
+  const { status, text } = await safeFetchText(url, {
+    maxBytes: opts?.maxBytes ?? 500_000,
+    timeoutMs: 10_000,
+    headers: { "User-Agent": "GEO-Platform-Checker/1.0" },
+  });
+  return { status, text };
+};
+
+// Site size (sitemap URL count), capped at a few hundred entries by
+// discoverSitemapUrls itself (MAX_ENTRIES = 200). Degrades to null on any
+// failure — never blocks or throws, runs inside the same 6h cache/4s
+// deadline as the rest of computeSiteHealth.
+async function getSitemapUrlCount(website: string): Promise<number | null> {
+  // COUNT, don't COLLECT. `discoverSitemapUrls` exists to hand the fact-scraper
+  // a workable list of URLs, so it stops at MAX_ENTRIES (200). Using its length
+  // as the site's page count reported "200 pages" for apple.com, whose sitemap
+  // actually holds 848 — a truncation artifact rendered as though it were a
+  // measurement, which is worse than showing nothing.
+  //
+  // We only need the tally, so count <loc> elements directly. Nested
+  // sitemapindex files are followed one level, which covers the common
+  // "index -> child sitemaps" layout without turning this into a crawler.
+  const origin = (() => {
+    try {
+      return new URL(website.startsWith("http") ? website : `https://${website}`).origin;
+    } catch {
+      return null;
+    }
+  })();
+  if (!origin) return null;
+
+  const countLocs = async (url: string): Promise<{ locs: number; children: string[] }> => {
+    const fetchOrigin = (() => {
+      try {
+        return new URL(url).origin;
+      } catch {
+        return origin;
+      }
+    })();
+    const { status, text } = await withOriginLimit(fetchOrigin, () =>
+      safeFetchText(url, {
+        maxBytes: 5 * 1024 * 1024,
+        timeoutMs: 8_000,
+        headers: { "User-Agent": "GEO-Platform-Checker/1.0" },
+      }),
+    );
+    if (status < 200 || status >= 300) return { locs: 0, children: [] };
+    const isIndex = /<sitemapindex/i.test(text);
+    const locs = (text.match(/<loc>/gi) ?? []).length;
+    if (!isIndex) return { locs, children: [] };
+    // A sitemapindex's <loc>s are child sitemaps, not pages.
+    const children = [...text.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)]
+      .map((m) => m[1])
+      .slice(0, 25); // bounded: never fan out unboundedly on someone's site
+    return { locs: 0, children };
+  };
+
+  try {
+    const root = await countLocs(`${origin}/sitemap.xml`);
+    if (root.children.length === 0) return root.locs > 0 ? root.locs : null;
+    const childCounts = await Promise.all(
+      root.children.map((c) =>
+        countLocs(c)
+          .then((r) => r.locs)
+          .catch(() => 0),
+      ),
+    );
+    const total = childCounts.reduce((a, b) => a + b, 0);
+    return total > 0 ? total : null;
+  } catch {
+    return null;
+  }
+}
+
+async function computeSiteHealth(website: string | null): Promise<SiteHealthCacheEntry> {
+  const checkedAt = new Date().toISOString();
+  if (!website) {
+    return {
+      checkedAt,
+      website: null,
+      discovery: { ...EMPTY_DISCOVERY },
+      total: 0,
+      allowed: 0,
+      blocked: 0,
+      unknown: 0,
+      blockedCrawlers: [],
+      platform: null,
+      sitemapUrlCount: null,
+    };
+  }
+
+  try {
+    const [{ robotsTxtExists, content, fetchError }, discovery, platform, sitemapUrlCount] =
+      await Promise.all([
+        fetchRobots(website),
+        fetchDiscovery(website).catch(() => ({ ...EMPTY_DISCOVERY })),
+        // Runs concurrently with the robots/discovery fetches, inside the
+        // same 6h cache — never a per-render network round-trip. Best-effort:
+        // detectPlatform never throws, degrades to null on any failure.
+        detectPlatform(website).catch(() => null),
+        // Same treatment: concurrent, best-effort, null on failure. This is
+        // the SITE's page count (sitemap size), not the fact-extraction
+        // sample (`pagesFetched` on a scrape run).
+        getSitemapUrlCount(website),
+      ]);
+    const blocks = robotsTxtExists ? parseRobotsTxt(content) : [];
+    const crawlerResults = evaluateCrawlers({ blocks, robotsTxtExists, fetchError });
+
+    const total = AI_CRAWLERS.length;
+    const allowed = crawlerResults.filter((c) => c.status === "allowed").length;
+    const blocked = crawlerResults.filter((c) => c.status === "blocked").length;
+    const unknown = crawlerResults.filter((c) => c.status === "unknown").length;
+    const blockedCrawlers = crawlerResults
+      .filter((c) => c.status === "blocked")
+      .map((c) => c.platform);
+
+    return {
+      checkedAt,
+      website,
+      discovery,
+      total,
+      allowed,
+      blocked,
+      unknown,
+      blockedCrawlers,
+      platform,
+      sitemapUrlCount,
+    };
+  } catch (err) {
+    // Network/parse failure — degrade gracefully, never 500 the dashboard.
+    logger.error({ err }, "Site health robots.txt check failed");
+    return {
+      checkedAt,
+      website,
+      discovery: { ...EMPTY_DISCOVERY },
+      total: 0,
+      allowed: 0,
+      blocked: 0,
+      unknown: 0,
+      blockedCrawlers: [],
+      platform: null,
+      sitemapUrlCount: null,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Citation-readiness scoring — pure function, unit-tested in
+// tests/unit/siteHealth.test.ts. Weights below are the full spec; keep them
+// in sync with that file's expectations.
+//
+//   discovery (35 pts):      robots.txt = 10, sitemap.xml = 15, llms.txt = 10
+//   crawler access (35 pts): round(allowed / total * 35)
+//   crawl success (30 pts):  round(pagesFetched / (pagesFetched + pagesFailed) * 30)
+//                            EXCLUDED entirely when no crawl run exists — a
+//                            brand that's never been crawled is UNMEASURED,
+//                            not penalised, so the score rescales over the
+//                            70 points that were actually measurable.
+//
+//   Final score = round(earned / attainable * 100).
+//   null when: website is null AND there's no crawl run (nothing at all to
+//   measure), OR `pending` is true (the compute hasn't finished within the
+//   deadline — a timeout is not a measurement and must never be scored).
+//
+//   Each discovery flag is `boolean | null`: null means UNKNOWN (the probe
+//   timed out, hit a 429, or errored — see fetchDiscovery in
+//   server/lib/crawlerAccess.ts), NOT "confirmed absent". An unmeasured file
+//   is EXCLUDED from both earned and attainable — same rescale pattern as
+//   the never-crawled case above — so a site with 2 confirmed-present files
+//   and 3 unknown ones scores identically to a site with only those same 2
+//   files ever probed, not as "3 missing".
+// ---------------------------------------------------------------------------
+const DISCOVERY_WEIGHTS = { robotsTxt: 10, sitemapXml: 15, llmsTxt: 10 } as const;
+
+export function scoreSiteHealth(params: {
+  website: string | null;
+  discovery: {
+    robotsTxt: boolean | null;
+    sitemapXml: boolean | null;
+    llmsTxt: boolean | null;
+  };
+  crawlers: { total: number; allowed: number };
+  crawl: { pagesFetched: number; pagesFailed: number } | null; // null = no crawl run
+  pending?: boolean; // true = compute hasn't finished — never scored
+}): number | null {
+  const { website, discovery, crawlers, crawl, pending } = params;
+
+  if (pending) return null;
+  if (!website && !crawl) return null;
+
+  let earned = 0;
+  let attainable = 0;
+
+  for (const key of Object.keys(DISCOVERY_WEIGHTS) as (keyof typeof DISCOVERY_WEIGHTS)[]) {
+    const value = discovery[key];
+    if (value === null || value === undefined) continue; // unknown — excluded, not zeroed
+    attainable += DISCOVERY_WEIGHTS[key];
+    if (value) earned += DISCOVERY_WEIGHTS[key];
+  }
+
+  attainable += 35;
+  earned += crawlers.total > 0 ? Math.round((crawlers.allowed / crawlers.total) * 35) : 0;
+
+  if (crawl) {
+    attainable += 30;
+    const denom = crawl.pagesFetched + crawl.pagesFailed;
+    if (denom > 0) {
+      earned += Math.round((crawl.pagesFetched / denom) * 30);
+    }
+  }
+
+  if (attainable === 0) return null;
+  return Math.round((earned / attainable) * 100);
+}
+
+// ---------------------------------------------------------------------------
+// Per-page severity for the Site Health detail page — SAME rules as the
+// issue aggregate in the SQL above (GET /api/dashboard/site-health/:brandId),
+// just evaluated in JS over individual rows instead of a grouped count.
+// Keep these two in sync; a page landing in "high" here must land in the
+// same bucket the aggregate counted it in.
+// ---------------------------------------------------------------------------
+export function pageSeverity(page: {
+  statusCode: number | null;
+  status: string;
+  errorKind: string | null;
+  contentType: string | null;
+  factCount: number;
+}): "critical" | "high" | "medium" | "low" | "ok" {
+  const sc = page.statusCode;
+  if (
+    (sc !== null && sc >= 500) ||
+    (sc === null && (page.status === "failed" || page.errorKind !== null))
+  ) {
+    return "critical";
+  }
+  if (sc !== null && sc >= 400 && sc < 500) return "high";
+  const isHtml = page.contentType === null || /html/i.test(page.contentType);
+  if (sc !== null && sc >= 200 && sc < 300 && page.factCount === 0 && isHtml) return "medium";
+  if (
+    sc !== null &&
+    sc >= 200 &&
+    sc < 300 &&
+    page.contentType !== null &&
+    !/html/i.test(page.contentType)
+  ) {
+    return "low";
+  }
+  return "ok";
 }
 
 export function setupDashboardRoutes(app: Express): void {
@@ -688,6 +1116,433 @@ export function setupDashboardRoutes(app: Express): void {
         res.json({ success: true, data: alerts });
       } catch (error) {
         sendError(res, error, "Failed to load alerts");
+      }
+    }),
+  );
+
+  // ==========================================================================
+  // GET /api/dashboard/site-health/:brandId
+  // Robots.txt-based AI crawler access score + latest fact-scrape run stats.
+  // Robots.txt evaluation is cached in-module per brandId (6h TTL) so this
+  // never hits the network on every dashboard load. Deliberately NOT behind
+  // aiLimitMiddleware — it doesn't call any LLM and shouldn't consume quota.
+  // ==========================================================================
+  app.get(
+    "/api/dashboard/site-health/:brandId",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const website = brand.website?.trim() || null;
+
+        const health = await getSiteHealthCached(brand.id, website);
+
+        const latestRun = await storage.getLatestCompletedScrapeRun(brand.id).catch(() => null);
+
+        // Issue counts — single grouped aggregate over the latest run's
+        // pages, never a full row fetch. Degrades to all-zero on any
+        // failure (missing table, bad run id, etc.) — never 500s.
+        let issues = { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+        if (latestRun) {
+          try {
+            const [row] = await db
+              .select({
+                critical: sql<number>`count(*) filter (where ${brandFactScrapePages.statusCode} >= 500 or (${brandFactScrapePages.statusCode} is null and (${brandFactScrapePages.status} = 'failed' or ${brandFactScrapePages.errorKind} is not null)))::int`,
+                high: sql<number>`count(*) filter (where ${brandFactScrapePages.statusCode} >= 400 and ${brandFactScrapePages.statusCode} < 500)::int`,
+                // `and (content_type is null or ilike '%html%')` keeps medium
+                // and low DISJOINT. Without it a 2xx PDF that yielded no facts
+                // matched both filters and `total` counted that one page twice,
+                // so the severity counts would not have summed to a page count.
+                // A non-HTML page yielding nothing is a `low`, not a `medium` —
+                // extracting little from a PDF is expected, not a defect.
+                medium: sql<number>`count(*) filter (where ${brandFactScrapePages.statusCode} >= 200 and ${brandFactScrapePages.statusCode} < 300 and ${brandFactScrapePages.factCount} = 0 and (${brandFactScrapePages.contentType} is null or ${brandFactScrapePages.contentType} ilike '%html%'))::int`,
+                low: sql<number>`count(*) filter (where ${brandFactScrapePages.statusCode} >= 200 and ${brandFactScrapePages.statusCode} < 300 and ${brandFactScrapePages.contentType} is not null and ${brandFactScrapePages.contentType} not ilike '%html%')::int`,
+              })
+              .from(brandFactScrapePages)
+              .where(sql`${brandFactScrapePages.runId} = ${latestRun.id}`);
+            if (row) {
+              const critical = row.critical ?? 0;
+              const high = row.high ?? 0;
+              const medium = row.medium ?? 0;
+              const low = row.low ?? 0;
+              issues = { critical, high, medium, low, total: critical + high + medium + low };
+            }
+          } catch (err) {
+            logger.error({ err, brandId: brand.id }, "Site health issue aggregate failed");
+          }
+        }
+
+        const crawl = latestRun
+          ? { pagesFetched: latestRun.pagesFetched, pagesFailed: latestRun.pagesFailed }
+          : null;
+
+        const score = scoreSiteHealth({
+          website: health.website,
+          discovery: health.discovery,
+          crawlers: { total: health.total, allowed: health.allowed },
+          crawl,
+          pending: health.pending,
+        });
+
+        res.json({
+          success: true,
+          data: {
+            website: health.website,
+            checkedAt: health.checkedAt,
+            score,
+            // The compute hasn't finished within the deadline yet — the
+            // discovery/crawler fields above are all-unknown/zero and MUST
+            // NOT be read as a measurement. The background compute is still
+            // running and will populate the cache; the next load gets the
+            // real answer.
+            pending: !!health.pending,
+            platform: health.platform,
+            discovery: health.discovery,
+            crawlers: {
+              total: health.total,
+              allowed: health.allowed,
+              blocked: health.blocked,
+              unknown: health.unknown,
+              blockedCrawlers: health.blockedCrawlers,
+            },
+            crawl: {
+              // "Pages we audited" — the cost-bounded fact-extraction sample.
+              pagesCrawled: latestRun?.pagesFetched ?? null,
+              pagesFailed: latestRun?.pagesFailed ?? null,
+              // The SITE's size — sitemap URL count. This is what the "N
+              // pages" chip should show; pagesCrawled is a fallback when the
+              // sitemap is unavailable.
+              sitemapUrlCount: health.sitemapUrlCount,
+              lastCrawlAt: latestRun
+                ? (latestRun.completedAt ?? latestRun.startedAt).toISOString()
+                : null,
+            },
+            issues,
+          },
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to load site health");
+      }
+    }),
+  );
+
+  // ==========================================================================
+  // GET /api/dashboard/site-health/:brandId/pages
+  // Per-page rows of the LATEST completed scrape run, for the Site Health
+  // detail page's issue lists. Read-only, no LLM, capped at 200 rows.
+  // Empty array (never 404/500) when the brand has no crawl run yet.
+  // ==========================================================================
+  app.get(
+    "/api/dashboard/site-health/:brandId/pages",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const latestRun = await storage.getLatestCompletedScrapeRun(brand.id).catch(() => null);
+        if (!latestRun) {
+          return res.json({ success: true, data: { runId: null, pages: [] } });
+        }
+
+        const MAX_ROWS = 200;
+        const rows = await db
+          .select({
+            url: brandFactScrapePages.url,
+            statusCode: brandFactScrapePages.statusCode,
+            status: brandFactScrapePages.status,
+            errorKind: brandFactScrapePages.errorKind,
+            contentType: brandFactScrapePages.contentType,
+            factCount: brandFactScrapePages.factCount,
+          })
+          .from(brandFactScrapePages)
+          .where(sql`${brandFactScrapePages.runId} = ${latestRun.id}`)
+          .limit(MAX_ROWS);
+
+        const pages = rows.map((r) => ({
+          url: r.url,
+          statusCode: r.statusCode,
+          status: r.status,
+          errorKind: r.errorKind,
+          contentType: r.contentType,
+          factCount: r.factCount,
+          severity: pageSeverity(r),
+        }));
+
+        res.json({ success: true, data: { runId: latestRun.id, pages } });
+      } catch (error) {
+        sendError(res, error, "Failed to load site health pages");
+      }
+    }),
+  );
+
+  // ==========================================================================
+  // GET /api/dashboard/site-health/:brandId/content-findings
+  // Per-page CONTENT findings (meta tags, OG tags, heading structure,
+  // readability, structured answer formats, FAQ content, content density).
+  // These require re-fetching each page's HTML (excerpt is never persisted —
+  // brand_fact_scrape_pages.excerpt is a dead column), so this is a SIBLING
+  // endpoint, never inlined into the hot /site-health path or its 4s
+  // deadline. Cached per brand with a 6h TTL + in-flight coalescing, same
+  // shape as getSiteHealthCached above, so concurrent dashboard loads don't
+  // each re-fetch the brand's whole page set.
+  // ==========================================================================
+  const CONTENT_FINDINGS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+  const CONTENT_FINDINGS_DEADLINE_MS = 8_000;
+  const CONTENT_FINDINGS_CACHE_MAX = 500;
+  type ContentFindingsCacheEntry = { checkedAt: number; findings: SiteHealthFinding[] };
+  const contentFindingsCache = new Map<string, ContentFindingsCacheEntry>();
+  const contentFindingsInFlight = new Map<string, Promise<ContentFindingsCacheEntry>>();
+
+  function cacheContentFindings(brandId: string, entry: ContentFindingsCacheEntry): void {
+    contentFindingsCache.set(brandId, entry);
+    while (contentFindingsCache.size > CONTENT_FINDINGS_CACHE_MAX) {
+      const oldest = contentFindingsCache.keys().next();
+      if (oldest.done) break;
+      contentFindingsCache.delete(oldest.value);
+    }
+  }
+
+  async function getContentFindingsCached(
+    brandId: string,
+    urls: string[],
+  ): Promise<ContentFindingsCacheEntry> {
+    const cached = contentFindingsCache.get(brandId);
+    if (cached && Date.now() - cached.checkedAt < CONTENT_FINDINGS_CACHE_TTL_MS) return cached;
+
+    const existing = contentFindingsInFlight.get(brandId);
+    if (existing) return existing;
+
+    const work = (async () => {
+      try {
+        const findings = await scanPagesForFindings(urls);
+        const fresh = { checkedAt: Date.now(), findings };
+        cacheContentFindings(brandId, fresh);
+        return fresh;
+      } catch (err) {
+        logger.error({ err, brandId }, "content findings scan failed");
+        if (cached) return cached;
+        return { checkedAt: Date.now(), findings: [] };
+      } finally {
+        contentFindingsInFlight.delete(brandId);
+      }
+    })();
+    contentFindingsInFlight.set(brandId, work);
+
+    // Bounded wait — the underlying page fetches can take longer than a
+    // request should stay open. If the deadline passes, the abandoned `work`
+    // promise keeps running and populates the cache for the NEXT request; we
+    // answer with stale cache (if any) or an empty result now, never a hung
+    // response and never a cached-as-final empty placeholder.
+    const deadline = new Promise<ContentFindingsCacheEntry | null>((resolve) =>
+      setTimeout(() => resolve(null), CONTENT_FINDINGS_DEADLINE_MS).unref?.(),
+    );
+    const raced = await Promise.race([work.catch(() => null), deadline]);
+    if (raced) return raced;
+    if (cached) return cached;
+    return { checkedAt: Date.now(), findings: [] };
+  }
+
+  app.get(
+    "/api/dashboard/site-health/:brandId/content-findings",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const latestRun = await storage.getLatestCompletedScrapeRun(brand.id).catch(() => null);
+        if (!latestRun) {
+          return res.json({ success: true, data: { findings: [] } });
+        }
+
+        const MAX_ROWS = 50;
+        const rows = await db
+          .select({ url: brandFactScrapePages.url })
+          .from(brandFactScrapePages)
+          .where(sql`${brandFactScrapePages.runId} = ${latestRun.id}`)
+          .limit(MAX_ROWS);
+        const urls = rows.map((r) => r.url).filter((u): u is string => !!u);
+
+        const { findings } = await getContentFindingsCached(brand.id, urls);
+        res.json({ success: true, data: { findings } });
+      } catch (error) {
+        sendError(res, error, "Failed to load site health content findings");
+      }
+    }),
+  );
+
+  // ==========================================================================
+  // Brand perception scoring — five axes (trust/quality/value/market/
+  // innovation) judged from what AI models actually said about the brand
+  // (server/lib/perceptionScorer.ts). Runs are persisted so the dashboard
+  // reads the newest one instead of paying an LLM call on every render.
+  // ==========================================================================
+
+  // Drizzle returns `numeric` columns as strings, so trust/quality/value/
+  // market/innovation/overall arrive as e.g. "66.6" — convert to number
+  // before serialising so the JSON contract stays numeric. Null stays
+  // null (never NaN, never 0).
+  function numericOrNull(v: string | number | null): number | null {
+    if (v === null) return null;
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function serializePerceptionRun(row: typeof brandPerceptionRuns.$inferSelect) {
+    return {
+      trust: numericOrNull(row.trust),
+      quality: numericOrNull(row.quality),
+      value: numericOrNull(row.value),
+      market: numericOrNull(row.market),
+      innovation: numericOrNull(row.innovation),
+      overall: numericOrNull(row.overall),
+      praised: row.praised,
+      questioned: row.questioned,
+      evidenceCount: row.evidenceCount,
+      model: row.model,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  // GET /api/dashboard/perception/:brandId — read only, no LLM, cheap.
+  app.get(
+    "/api/dashboard/perception/:brandId",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        // Single query: last up-to-7 runs, newest first. Feeds both the
+        // "latest" card (row 0) and the sparkline "history" (reversed to
+        // oldest-first below) — no second round-trip / N+1.
+        const recentRuns = await db
+          .select({
+            overall: brandPerceptionRuns.overall,
+            createdAt: brandPerceptionRuns.createdAt,
+          })
+          .from(brandPerceptionRuns)
+          .where(eq(brandPerceptionRuns.brandId, brand.id))
+          .orderBy(desc(brandPerceptionRuns.createdAt))
+          .limit(7);
+
+        const [latest] = await db
+          .select()
+          .from(brandPerceptionRuns)
+          .where(eq(brandPerceptionRuns.brandId, brand.id))
+          .orderBy(desc(brandPerceptionRuns.createdAt))
+          .limit(1);
+
+        // Oldest first; nulls excluded; newest run's own overall is last.
+        const history = recentRuns
+          .map((r) => numericOrNull(r.overall))
+          .filter((v): v is number => v !== null)
+          .reverse();
+
+        res.json({
+          success: true,
+          data: latest ? { ...serializePerceptionRun(latest), history } : null,
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to load brand perception");
+      }
+    }),
+  );
+
+  // POST /api/dashboard/perception/:brandId/run — computes and persists one
+  // run. Behind aiLimitMiddleware because it calls an LLM (unlike the
+  // read-only GET above and unlike site-health).
+  app.post(
+    "/api/dashboard/perception/:brandId/run",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        // COST SAFEGUARD. Every run spends an LLM call over up to 40 excerpts,
+        // and nothing about the underlying evidence changes minute to minute —
+        // it only moves when a new citation check lands. `aiLimitMiddleware`
+        // caps a USER's overall AI usage, but says nothing about one brand
+        // being re-scored in a loop, so this adds a per-brand cooldown.
+        //
+        // Enforced from brand_perception_runs.created_at rather than an
+        // in-memory counter: that survives a restart and is correct across
+        // multiple instances, where a per-process Map would let N instances
+        // each allow a run.
+        const [recent] = await db
+          .select({ createdAt: brandPerceptionRuns.createdAt })
+          .from(brandPerceptionRuns)
+          .where(eq(brandPerceptionRuns.brandId, brand.id))
+          .orderBy(desc(brandPerceptionRuns.createdAt))
+          .limit(1);
+
+        if (recent?.createdAt) {
+          const ageMs = Date.now() - new Date(recent.createdAt).getTime();
+          if (ageMs < PERCEPTION_COOLDOWN_MS) {
+            const retryAfterSec = Math.ceil((PERCEPTION_COOLDOWN_MS - ageMs) / 1000);
+            res.setHeader("Retry-After", String(retryAfterSec));
+            return res.status(429).json({
+              success: false,
+              error: "Perception was scored recently. Try again later.",
+              retryAfterSeconds: retryAfterSec,
+            });
+          }
+        }
+
+        const rows = await db
+          .select({
+            citationContext: geoRankings.citationContext,
+            aiPlatform: geoRankings.aiPlatform,
+          })
+          .from(geoRankings)
+          .where(and(eq(geoRankings.brandId, brand.id), isNotNull(geoRankings.citationContext)))
+          .orderBy(desc(geoRankings.checkedAt))
+          .limit(400);
+
+        // Pass the brand identity so only snippets that actually DISCUSS this
+        // brand are scored. The bare registrable domain is included as an
+        // alias, so an answer that cites the site without naming the company
+        // still counts as evidence.
+        const domainAlias = (brand.website ?? "")
+          .replace(/^https?:\/\//i, "")
+          .replace(/^www\./i, "")
+          .split("/")[0]
+          .split(".")[0];
+        const evidence = gatherEvidence(rows, {
+          brandName: brand.name,
+          aliases: domainAlias ? [domainAlias] : [],
+        });
+        if (evidence.length === 0) {
+          return res.json({ success: true, data: null });
+        }
+
+        const result = await scoreBrandPerception({ brandName: brand.name, evidence });
+
+        // Drizzle's `numeric` columns accept strings on write (and return
+        // strings on read — see numericOrNull above). Convert the
+        // number|null axis values accordingly; null stays null.
+        const toNumericInput = (v: number | null): string | null => (v === null ? null : String(v));
+
+        const [inserted] = await db
+          .insert(brandPerceptionRuns)
+          .values({
+            brandId: brand.id,
+            trust: toNumericInput(result.trust),
+            quality: toNumericInput(result.quality),
+            value: toNumericInput(result.value),
+            market: toNumericInput(result.market),
+            innovation: toNumericInput(result.innovation),
+            overall: toNumericInput(result.overall),
+            praised: result.praised,
+            questioned: result.questioned,
+            evidenceCount: result.evidenceCount,
+            model: result.model,
+          })
+          .returning();
+
+        res.json({ success: true, data: serializePerceptionRun(inserted) });
+      } catch (error) {
+        sendError(res, error, "Failed to run brand perception scoring");
       }
     }),
   );

@@ -1,6 +1,6 @@
 // client/src/tours/global-welcome.tour.ts
 //
-// One-time orientation for new users, auto-fired on the Command Center
+// One-time orientation for new users, auto-fired on the Dashboard
 // (/, /dashboard). Walks the workflow spine in narrative order — Setup
 // → Monitor → Diagnose → Act → Report — independent of the sidebar's
 // alphabetical render order. Each spine-stage step targets its literal

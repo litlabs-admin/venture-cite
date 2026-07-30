@@ -258,7 +258,7 @@ const DONUT_COLORS = chartTheme.palette;
 
 // Monitor › Overview — the full AI-visibility analytics view. This is the
 // verified dashboard implementation relocated verbatim from the old `/`
-// landing page; the new lean Command Center (home.tsx) links here. Its score
+// landing page; the new lean Dashboard (home.tsx) links here. Its score
 // is the canonical /api/dashboard/* aggregate (CITATION_SCORING via
 // dashboard.ts), so the old /api/geo-analytics formula is fully retired.
 export default function MonitorOverview() {

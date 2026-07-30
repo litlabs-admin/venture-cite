@@ -244,18 +244,38 @@ export default function Pricing() {
               </CardContent>
               <CardFooter>
                 <Button
-                  className={`w-full ${plan.popular ? "bg-primary" : ""}`}
+                  // No bg override. The `default` variant rests as an accent
+                  // TINT with accent-coloured label and only goes solid on
+                  // hover; forcing `bg-primary` here repainted the background
+                  // solid while leaving the label accent-blue, i.e. blue text
+                  // on a blue fill — invisible. The popular plan is already
+                  // distinguished by its ring, scale and "Most Popular" badge.
+                  className="w-full"
                   variant={plan.popular ? "default" : "outline"}
+                  // Behaviour is driven by TIER first, then by price
+                  // availability. It used to check `plan.priceId` first, which
+                  // was harmless only while Stripe returned no products: the
+                  // moment real products load (i.e. the moment billing goes
+                  // live) every tier that has a price went straight to
+                  // checkout — including Free, which would open a $0/month
+                  // subscription instead of signing the visitor up, and
+                  // Enterprise, whose button says "Contact Sales" but would
+                  // have immediately charged $249/month.
                   onClick={() => {
+                    if (plan.tier === "free") {
+                      // Free is an account, not a purchase. Never route it
+                      // through Checkout even though it has a $0 price object.
+                      window.location.href = "/register";
+                      return;
+                    }
                     if ("priceId" in plan && plan.priceId) {
                       checkoutMutation.mutate(plan.priceId);
-                    } else if (plan.tier === "free") {
-                      window.location.href = "/";
-                    } else {
-                      toast({
-                        title: "Products not configured yet. Please set up Stripe products.",
-                      });
+                      return;
                     }
+                    toast({
+                      title: "This plan isn't available for self-serve checkout yet.",
+                      description: "Please contact us and we'll get you set up.",
+                    });
                   }}
                   disabled={checkoutMutation.isPending}
                   data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
@@ -263,11 +283,18 @@ export default function Pricing() {
                   {checkoutMutation.isPending ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : null}
+                  {/* The label must describe what the button actually does.
+                      Enterprise previously read "Contact Sales" while wired
+                      to Checkout — a $249/month charge behind a button that
+                      promises a conversation. It has a real, active price in
+                      Stripe, so self-serve is honest; if you'd rather this be
+                      sales-led, the fix is to give it its own branch above
+                      (contact link) rather than to change this label back. */}
                   {plan.tier === "free"
                     ? "Get Started"
-                    : plan.tier === "enterprise"
-                      ? "Contact Sales"
-                      : "Start Free Trial"}
+                    : "priceId" in plan && plan.priceId
+                      ? "Subscribe"
+                      : "Contact Sales"}
                 </Button>
               </CardFooter>
             </Card>

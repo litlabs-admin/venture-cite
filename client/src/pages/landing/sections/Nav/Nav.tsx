@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import logoPath from "@assets/logo.png";
 import { ProductMegaMenu } from "./ProductMegaMenu";
 import { ResourcesMegaMenu } from "./ResourcesMegaMenu";
 import { MobileMenu } from "./MobileMenu";
 import { demoLink, containerMaxWidth } from "./data";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export function Nav() {
   return (
@@ -15,7 +15,7 @@ export function Nav() {
         <Link to="/" className="shrink-0" aria-label="VentureCite home">
           {/* Wordmark is 779x258 (~3:1), not the square mark this replaced —
               height-constrained with w-auto so it can't squash. */}
-          <img src={logoPath} alt="VentureCite" className="h-[26px] w-auto" />
+          <BrandLogo imgClassName="h-[26px] w-auto" textClassName="text-body" />
         </Link>
 
         <div className="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
@@ -47,14 +47,11 @@ export function Nav() {
               Sign in
             </Link>
             {/* Two-tier button system: this persistent nav CTA is the DARK
-                tier (--ink-fill). The accent fill is reserved for the
-                in-page conversion CTA in the hero. Never both accent.
-                Arbitrary values because --ink-fill/--ink are declared on
-                .vc-home in landing/styles.css but not registered as Tailwind
-                theme keys in index.css. */}
+                tier (ink-fill). The accent fill is reserved for the in-page
+                conversion CTA in the hero. Never both accent. */}
             <Link
               to="/register"
-              className="h-9 px-4 bg-[var(--ink-fill)] text-white text-[13px] font-medium rounded hover:bg-[var(--ink)] transition-colors duration-150 inline-flex items-center"
+              className="h-9 px-4 bg-ink-fill text-white text-[13px] font-medium rounded hover:bg-ink transition-colors duration-150 inline-flex items-center"
             >
               Get started
             </Link>

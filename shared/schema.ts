@@ -1997,4 +1997,44 @@ export const systemState = pgTable("system_state", {
   valueJson: jsonb("value_json").notNull(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// ── Brand perception scoring (migration 0088) ──────────────────────────
+// Mirrors migrations/0088_brand_perception_runs.sql exactly. Every axis
+// column is nullable — a judge that can't assess an axis from the
+// available evidence records NULL, never a middling default.
+export const brandPerceptionRuns = pgTable(
+  "brand_perception_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    // numeric(4,1): the reference reports one decimal of precision
+    // (e.g. 66.6); INTEGER silently rounded that away. Drizzle returns
+    // numeric columns as strings — callers MUST convert to number before
+    // serialising (see serializePerceptionRun in server/routes/dashboard.ts).
+    trust: numeric("trust", { precision: 4, scale: 1 }),
+    quality: numeric("quality", { precision: 4, scale: 1 }),
+    value: numeric("value", { precision: 4, scale: 1 }),
+    market: numeric("market", { precision: 4, scale: 1 }),
+    innovation: numeric("innovation", { precision: 4, scale: 1 }),
+    overall: numeric("overall", { precision: 4, scale: 1 }),
+    praised: text("praised")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    questioned: text("questioned")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    evidenceCount: integer("evidence_count").notNull().default(0),
+    model: text("model"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("brand_perception_runs_brand_created_idx").on(table.brandId, table.createdAt.desc()),
+  ],
+);
+export type BrandPerceptionRun = typeof brandPerceptionRuns.$inferSelect;
+export type InsertBrandPerceptionRun = typeof brandPerceptionRuns.$inferInsert;
 export type SystemState = typeof systemState.$inferSelect;

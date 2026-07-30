@@ -21,6 +21,13 @@ const buttonVariants = cva(
         // rest, color:surface/bg:accent on hover), confirmed from its
         // compiled CSS. A saturated filled button should only ever appear
         // transiently under the cursor, never at rest.
+        //
+        // DO NOT pass `bg-primary` (or any other bg-*) via className to make a
+        // button "look primary". The background and the LABEL colour are a
+        // matched pair: overriding only the background repaints the fill solid
+        // and leaves the label accent-blue, giving blue-on-blue text that is
+        // completely unreadable. Five call sites had done exactly this. This
+        // variant is already the primary treatment — just use it.
         default:
           "bg-(--brand-accent-subtle) text-(--brand-accent) hover:bg-primary hover:text-primary-foreground",
         // Mirrors .btn-danger: never goes fully solid, even on hover — rest

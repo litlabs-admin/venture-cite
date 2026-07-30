@@ -17,8 +17,14 @@ import { storage } from "../storage";
 import { AI_PLATFORMS as SHARED_AI_PLATFORMS } from "@shared/constants";
 import { computeVisibilityScore } from "../lib/visibilityMetrics";
 import { MODELS } from "../lib/modelConfig";
-import { safeFetchText } from "../lib/ssrf";
 import { requireUser } from "../lib/ownership";
+import {
+  AI_CRAWLERS,
+  parseRobotsTxt,
+  evaluateCrawlers,
+  fetchRobots,
+  DisallowedUrlError,
+} from "../lib/crawlerAccess";
 import {
   openai,
   aiLimitMiddleware,
@@ -32,313 +38,6 @@ import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
 export function setupAnalyticsRoutes(app: Express): void {
   // ========== AI CRAWLER PERMISSION CHECKER ==========
-
-  // Known AI crawler user agents. Each entry carries a `category` so the
-  // UI can group by vendor ("OpenAI (3 bots)") instead of rendering 15 flat
-  // rows. Keep this list current — deprecated names (Claude-Web,
-  // anthropic-ai, old Applebot labels) mislead users into thinking a bot
-  // is blocked when the real bot is allowed under its new name.
-  //
-  // Note: `facebookexternalhit` is link-preview scraping, NOT AI training
-  // — deliberately excluded. Meta's AI crawler is `meta-externalagent`.
-  // purpose tag orthogonal to vendor category:
-  //   training → crawled to build the next model weights
-  //   search   → crawled to index for the vendor's AI search product
-  //   realtime → fired at fetch-time when a user asks the assistant to open a URL
-  // Site owners typically want to allow "search" everywhere, may opt out of
-  // "training" selectively, and almost always allow "realtime".
-  const AI_CRAWLERS: Array<{
-    name: string;
-    agent: string;
-    platform: string;
-    category: string;
-    purpose: "training" | "search" | "realtime";
-    description: string;
-  }> = [
-    // ── OpenAI ──
-    {
-      name: "GPTBot",
-      agent: "GPTBot",
-      platform: "OpenAI (training)",
-      category: "OpenAI",
-      purpose: "training",
-      description:
-        "OpenAI's main training crawler — gathers content for ChatGPT and future models.",
-    },
-    {
-      name: "ChatGPT-User",
-      agent: "ChatGPT-User",
-      platform: "ChatGPT (browsing)",
-      category: "OpenAI",
-      purpose: "realtime",
-      description: "User-triggered browsing agent when ChatGPT fetches a page on a user's behalf.",
-    },
-    {
-      name: "OAI-SearchBot",
-      agent: "OAI-SearchBot",
-      platform: "ChatGPT Search",
-      category: "OpenAI",
-      purpose: "search",
-      description: "OpenAI's search-indexing crawler powering ChatGPT Search.",
-    },
-
-    // ── Anthropic / Claude ──
-    {
-      name: "ClaudeBot",
-      agent: "ClaudeBot",
-      platform: "Claude (training)",
-      category: "Anthropic",
-      purpose: "training",
-      description:
-        "Anthropic's primary training crawler. Distinct from Claude-Web (legacy) and Claude-SearchBot (search).",
-    },
-    {
-      name: "Claude-Web",
-      agent: "Claude-Web",
-      platform: "Claude (legacy)",
-      category: "Anthropic",
-      purpose: "training",
-      description:
-        "Older Anthropic crawler still observed in the wild; some sites treat it distinctly from ClaudeBot.",
-    },
-    {
-      name: "Claude-User",
-      agent: "Claude-User",
-      platform: "Claude (browsing)",
-      category: "Anthropic",
-      purpose: "realtime",
-      description: "User-triggered browsing agent when Claude fetches a page on a user's behalf.",
-    },
-    {
-      name: "Claude-SearchBot",
-      agent: "Claude-SearchBot",
-      platform: "Claude Search",
-      category: "Anthropic",
-      purpose: "search",
-      description: "Anthropic's search-indexing crawler for Claude's search features.",
-    },
-
-    // ── Perplexity ──
-    {
-      name: "PerplexityBot",
-      agent: "PerplexityBot",
-      platform: "Perplexity (indexing)",
-      category: "Perplexity",
-      purpose: "search",
-      description:
-        "Perplexity's indexing crawler — the retrieval side that builds Perplexity's answer index.",
-    },
-    {
-      name: "Perplexity-User",
-      agent: "Perplexity-User",
-      platform: "Perplexity (browsing)",
-      category: "Perplexity",
-      purpose: "realtime",
-      description:
-        "User-triggered browsing agent when Perplexity fetches a page to answer a specific query.",
-    },
-
-    // ── Google ──
-    {
-      name: "Googlebot",
-      agent: "Googlebot",
-      platform: "Google Search",
-      category: "Google",
-      purpose: "search",
-      description:
-        "Google's primary search crawler. Blocking this removes you from Google Search entirely.",
-    },
-    {
-      name: "Google-Extended",
-      agent: "Google-Extended",
-      platform: "Google AI (Gemini / AI Overviews)",
-      category: "Google",
-      purpose: "training",
-      description:
-        "Google's AI training toggle — independent from search crawling. Block this alone to keep content out of Gemini training while staying in Google Search.",
-    },
-
-    // ── Microsoft ──
-    {
-      name: "Bingbot",
-      agent: "Bingbot",
-      platform: "Bing / Copilot",
-      category: "Microsoft",
-      purpose: "search",
-      description: "Microsoft's crawler for Bing Search and Copilot answers.",
-    },
-
-    // ── Meta ──
-    {
-      name: "meta-externalagent",
-      agent: "meta-externalagent",
-      platform: "Meta AI",
-      category: "Meta",
-      purpose: "training",
-      description:
-        "Meta's AI training crawler. (facebookexternalhit is link-preview scraping, not AI training — deliberately not checked.)",
-    },
-    {
-      name: "FacebookBot",
-      agent: "FacebookBot",
-      platform: "Meta (training)",
-      category: "Meta",
-      purpose: "training",
-      description: "Meta's training crawler for AI assistants.",
-    },
-
-    // ── ByteDance / TikTok ──
-    {
-      name: "Bytespider",
-      agent: "Bytespider",
-      platform: "ByteDance / TikTok",
-      category: "ByteDance",
-      purpose: "training",
-      description: "ByteDance's crawler, widely used for LLM training sets.",
-    },
-
-    // ── Apple ──
-    {
-      name: "Applebot",
-      agent: "Applebot",
-      platform: "Apple (Siri / Spotlight)",
-      category: "Apple",
-      purpose: "search",
-      description: "Apple's main crawler for Siri suggestions, Spotlight, and Safari snippets.",
-    },
-    {
-      name: "Applebot-Extended",
-      agent: "Applebot-Extended",
-      platform: "Apple Intelligence (training)",
-      category: "Apple",
-      purpose: "training",
-      description:
-        "Apple's AI training toggle — block this alone to keep content out of Apple Intelligence training while staying in Siri/Spotlight.",
-    },
-
-    // ── Common Crawl ──
-    {
-      name: "CCBot",
-      agent: "CCBot",
-      platform: "Common Crawl",
-      category: "Common Crawl",
-      purpose: "training",
-      description:
-        "Common Crawl open dataset — feeds many LLMs' pretraining data (GPT-3, LLaMA, and more).",
-    },
-  ];
-
-  // Parse robots.txt content
-  function parseRobotsTxt(
-    content: string,
-  ): { userAgent: string; rules: { type: "allow" | "disallow"; path: string }[] }[] {
-    const blocks: { userAgent: string; rules: { type: "allow" | "disallow"; path: string }[] }[] =
-      [];
-    let currentBlock: {
-      userAgent: string;
-      rules: { type: "allow" | "disallow"; path: string }[];
-    } | null = null;
-
-    const lines = content
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith("#"));
-
-    // robots.txt semantics (per RFC 9309 / Google spec):
-    //   Disallow: /       → block the entire site
-    //   Disallow:         → empty value means NOTHING disallowed — allow all
-    //   Disallow: /admin  → block only /admin
-    //   Allow: /          → explicit allow-all
-    // The previous parser defaulted empty Disallow to "/", which flipped
-    // the semantics and showed sites with `Disallow:` (an allow-all signal)
-    // as blocking every crawler. Keep empty paths empty below.
-    for (const line of lines) {
-      const lowerLine = line.toLowerCase();
-
-      if (lowerLine.startsWith("user-agent:")) {
-        const agent = line.substring(11).trim();
-        currentBlock = { userAgent: agent, rules: [] };
-        blocks.push(currentBlock);
-      } else if (currentBlock) {
-        if (lowerLine.startsWith("disallow:")) {
-          const path = line.substring(9).trim();
-          currentBlock.rules.push({ type: "disallow", path });
-        } else if (lowerLine.startsWith("allow:")) {
-          const path = line.substring(6).trim();
-          if (path) currentBlock.rules.push({ type: "allow", path });
-        }
-      }
-    }
-
-    return blocks;
-  }
-
-  // Check if a crawler is blocked by the parsed robots.txt rules.
-  //
-  // Decision order:
-  //   1. Block specific to this crawler with Disallow: /  → BLOCKED (unless
-  //      that same block also has Allow: / which un-blocks).
-  //   2. Block specific to this crawler with only Disallow: (empty) or
-  //      narrower paths → ALLOWED (site doesn't block the whole crawler).
-  //   3. No specific block → fall back to wildcard (User-agent: *).
-  //   4. Wildcard with Disallow: /  → BLOCKED.
-  //   5. Nothing matches → ALLOWED by default.
-  function isCrawlerBlocked(
-    blocks: ReturnType<typeof parseRobotsTxt>,
-    crawlerAgent: string,
-  ): { blocked: boolean; reason: string } {
-    const specificBlock = blocks.find(
-      (b) => b.userAgent.toLowerCase() === crawlerAgent.toLowerCase(),
-    );
-    const wildcardBlock = blocks.find((b) => b.userAgent === "*");
-
-    if (specificBlock) {
-      // `Disallow: /` alone = full block. An empty `Disallow:` is the
-      // opposite signal (allow all) and must NOT count here.
-      const hasDisallowAll = specificBlock.rules.some(
-        (r) => r.type === "disallow" && r.path === "/",
-      );
-      const hasAllowAll = specificBlock.rules.some((r) => r.type === "allow" && r.path === "/");
-      const hasEmptyDisallow = specificBlock.rules.some(
-        (r) => r.type === "disallow" && r.path === "",
-      );
-
-      if (hasDisallowAll && !hasAllowAll) {
-        return {
-          blocked: true,
-          reason: `Explicitly blocked via "User-agent: ${crawlerAgent}" with "Disallow: /"`,
-        };
-      }
-      if (hasAllowAll || hasEmptyDisallow) {
-        return {
-          blocked: false,
-          reason: `Explicitly allowed via "User-agent: ${crawlerAgent}"`,
-        };
-      }
-      // Specific block exists but only disallows narrower paths — the
-      // crawler can still access the root. Treat as allowed.
-      return {
-        blocked: false,
-        reason: `"User-agent: ${crawlerAgent}" exists but does not block the whole site`,
-      };
-    }
-
-    // No specific block — fall back to wildcard.
-    if (wildcardBlock) {
-      const hasDisallowAll = wildcardBlock.rules.some(
-        (r) => r.type === "disallow" && r.path === "/",
-      );
-      const hasAllowAll = wildcardBlock.rules.some((r) => r.type === "allow" && r.path === "/");
-      if (hasDisallowAll && !hasAllowAll) {
-        return {
-          blocked: true,
-          reason: 'Blocked by wildcard rule "User-agent: *" with "Disallow: /"',
-        };
-      }
-    }
-
-    return { blocked: false, reason: "No blocking rules found — crawler allowed by default" };
-  }
 
   // Check AI crawler permissions for a URL — SSRF-guarded + rate-limited.
   app.post(
@@ -369,64 +68,21 @@ export function setupAnalyticsRoutes(app: Express): void {
         let fetchError = "";
 
         try {
-          const robotsUrl = `${domain}/robots.txt`;
-          const { status, text } = await safeFetchText(robotsUrl, {
-            maxBytes: 1 * 1024 * 1024,
-            timeoutMs: 10_000,
-            headers: { "User-Agent": "GEO-Platform-Checker/1.0" },
-          });
-          if (status >= 200 && status < 300) {
-            robotsTxtContent = text;
-            robotsTxtExists = true;
-          } else if (status === 404) {
-            robotsTxtExists = false;
-          } else {
-            fetchError = `HTTP ${status}`;
-          }
-        } catch (err: any) {
-          const msg = err instanceof Error ? err.message : "Failed to fetch robots.txt";
-          if (/private|not allowed|resolve|Invalid URL|http/i.test(msg)) {
+          const fetched = await fetchRobots(url);
+          robotsTxtContent = fetched.content;
+          robotsTxtExists = fetched.robotsTxtExists;
+          fetchError = fetched.fetchError;
+        } catch (err) {
+          if (err instanceof DisallowedUrlError) {
             return res.status(400).json({ success: false, error: "This URL is not allowed" });
           }
-          fetchError = msg;
+          throw err;
         }
 
         // Parse and check each AI crawler
         const blocks = robotsTxtExists ? parseRobotsTxt(robotsTxtContent) : [];
 
-        const crawlerResults = AI_CRAWLERS.map((crawler) => {
-          if (!robotsTxtExists && !fetchError) {
-            return {
-              ...crawler,
-              status: "allowed" as const,
-              reason: "No robots.txt found - all crawlers allowed by default",
-              recommendation: null,
-            };
-          }
-
-          if (fetchError) {
-            return {
-              ...crawler,
-              status: "unknown" as const,
-              reason: `Could not check: ${fetchError}`,
-              recommendation: "Ensure your robots.txt is accessible",
-            };
-          }
-
-          const result = isCrawlerBlocked(blocks, crawler.agent);
-
-          let recommendation = null;
-          if (result.blocked) {
-            recommendation = `To allow ${crawler.platform} to crawl your site, add these lines to robots.txt:\n\nUser-agent: ${crawler.agent}\nAllow: /`;
-          }
-
-          return {
-            ...crawler,
-            status: result.blocked ? ("blocked" as const) : ("allowed" as const),
-            reason: result.reason,
-            recommendation,
-          };
-        });
+        const crawlerResults = evaluateCrawlers({ blocks, robotsTxtExists, fetchError });
 
         // Generate summary
         const blockedCount = crawlerResults.filter((c) => c.status === "blocked").length;

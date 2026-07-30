@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { AI_PLATFORMS_ACTIVE } from "@shared/constants";
 import { CCLink, DEST, HoverCard } from "./primitives";
-import type { PlatformRank } from "./useCommandCenterData";
+import type { PlatformRank } from "./useDashboardData";
 
 // ─── Platform strip ──────────────────────────────────────────────────────────
 // Eight hairline-separated cells, 49px tall: logo + citation count + a 2px

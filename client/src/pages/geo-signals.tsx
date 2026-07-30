@@ -879,7 +879,6 @@ export default function GeoSignals() {
                   <Button
                     onClick={handleAnalyzeArticle}
                     disabled={!selectedArticle || analyzeSignalsMutation.isPending}
-                    className="bg-primary hover:bg-primary/90"
                     data-testid="button-analyze-signals"
                   >
                     {analyzeSignalsMutation.isPending ? (
@@ -1245,7 +1244,6 @@ export default function GeoSignals() {
                   disabled={
                     !selectedArticle || !selectedArticle.content || optimizeChunksMutation.isPending
                   }
-                  className="bg-primary hover:bg-primary/90"
                   data-testid="button-optimize-chunks"
                 >
                   {optimizeChunksMutation.isPending ? (
@@ -1437,7 +1435,6 @@ export default function GeoSignals() {
                   <Button
                     onClick={() => auditSchemaMutation.mutate({ url })}
                     disabled={!url || auditSchemaMutation.isPending}
-                    className="bg-primary hover:bg-primary/90"
                     data-testid="button-audit-schema"
                   >
                     {auditSchemaMutation.isPending ? (

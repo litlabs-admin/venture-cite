@@ -9,7 +9,7 @@ import HallucinationsTab from "@/components/intelligence/HallucinationsTab";
 // because the citation_quality table is dead — the server synthesized the
 // authority/relevance/recency scores, so the surface could not be
 // defended); Signals and Crawler are the technical readiness checks. The
-// Issues tab was retired — recommendations live on the Command Center
+// Issues tab was retired — recommendations live on the Dashboard
 // (Pulse) as the single canonical worklist surface.
 const GeoSignals = lazy(() => import("@/pages/geo-signals"));
 const CrawlerCheck = lazy(() => import("@/pages/crawler-check"));

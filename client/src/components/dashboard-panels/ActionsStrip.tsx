@@ -1,6 +1,6 @@
 import { ChevronRight, FileText } from "lucide-react";
 import { PanelLabel, CCLink, DEST } from "./primitives";
-import type { Recommendation } from "./useCommandCenterData";
+import type { Recommendation } from "./useDashboardData";
 
 // ─── Actions strip ───────────────────────────────────────────────────────────
 // One full-width band between the chart row and the prompts row. Measured:

@@ -2,21 +2,21 @@ import { Brain } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
-import { useCommandCenterData } from "@/components/command-center/useCommandCenterData";
-import { KpiStrip } from "@/components/command-center/KpiStrip";
-import { VisibilityChart } from "@/components/command-center/VisibilityChart";
-import { RankingsPanel } from "@/components/command-center/RankingsPanel";
-import { ActionsStrip } from "@/components/command-center/ActionsStrip";
-import { PromptsRow } from "@/components/command-center/PromptsRow";
-import { PlatformStrip } from "@/components/command-center/PlatformStrip";
-import { BottomRow } from "@/components/command-center/BottomRow";
+import { useDashboardData } from "@/components/dashboard-panels/useDashboardData";
+import { KpiStrip } from "@/components/dashboard-panels/KpiStrip";
+import { VisibilityChart } from "@/components/dashboard-panels/VisibilityChart";
+import { RankingsPanel } from "@/components/dashboard-panels/RankingsPanel";
+import { ActionsStrip } from "@/components/dashboard-panels/ActionsStrip";
+import { PromptsRow } from "@/components/dashboard-panels/PromptsRow";
+import { PlatformStrip } from "@/components/dashboard-panels/PlatformStrip";
+import { BottomRow } from "@/components/dashboard-panels/BottomRow";
 
-// ─── Command Center ──────────────────────────────────────────────────────────
+// ─── Dashboard ──────────────────────────────────────────────────────────
 // Full-bleed instrument panel, rebuilt against a captured reference DOM
-// (see docs/command-center-reference.md for the measured spec).
+// (see docs/dashboard-reference.md for the measured spec).
 //
 // LAYOUT CONTRACT: this page draws its own hairlines and owns its horizontal
-// padding, edge to edge. AppShell gives the Command Center an unpadded canvas
+// padding, edge to edge. AppShell gives the Dashboard an unpadded canvas
 // (see AppShell's `fullBleed` branch) — do not wrap it in a padded container
 // or every row's border stops short of the viewport edge.
 //
@@ -28,14 +28,14 @@ import { BottomRow } from "@/components/command-center/BottomRow";
 //   5. Platform strip     8 cells
 //   6. Citations / AI Traffic / Conversations
 //
-// DATA HONESTY: every figure traces to an endpoint in useCommandCenterData.
+// DATA HONESTY: every figure traces to an endpoint in useDashboardData.
 // Panels with no backing source (Rank, Site Health, Perception, AI Traffic,
 // Conversations) render `–` plus a line naming what is missing. Nothing on
 // this page is generated, estimated, or carried over from a demo fixture.
 
 export default function Home() {
   const { brands, selectedBrandId, isLoading: brandsLoading } = useBrandSelection();
-  const d = useCommandCenterData(selectedBrandId);
+  const d = useDashboardData(selectedBrandId);
 
   if (brandsLoading) {
     return (
@@ -95,7 +95,16 @@ export default function Home() {
         <ActionsStrip recommendations={d.recommendations} loading={d.recommendationsLoading} />
       </div>
 
-      <PromptsRow prompts={d.prompts} loading={d.promptsLoading} />
+      <PromptsRow
+        prompts={d.prompts}
+        loading={d.promptsLoading}
+        siteHealth={d.siteHealth}
+        siteHealthLoading={d.siteHealthLoading}
+        tone={d.tone}
+        toneLoading={d.toneLoading}
+        perception={d.perception}
+        perceptionLoading={d.perceptionLoading}
+      />
 
       <PlatformStrip platforms={d.platforms} />
 

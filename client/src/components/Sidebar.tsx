@@ -19,17 +19,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import logoPath from "@assets/logo.png";
 import SidebarOnboarding from "@/components/SidebarOnboarding";
 import { ThemeMenuItems, QuickThemeToggle } from "@/components/ThemeMenuItems";
+import { BrandLogo } from "@/components/BrandLogo";
 
 // ─── Workflow spine ──────────────────────────────────────────────────────────
 // One flat list, no section labels. The product is a single operating system,
 // rendered in the order a real user moves through it:
 //
-//   Command Center → Setup → Monitor → Diagnose → Act → Report
+//   Dashboard → Setup → Monitor → Diagnose → Act → Report
 //
-// Command Center is the daily landing spot. Setup configures the brand and
+// Dashboard is the daily landing spot. Setup configures the brand and
 // fact sheet (first task for any new user, ongoing maintenance for existing
 // ones). Monitor measures, Diagnose explains, Act fixes, Report proves.
 // The global welcome tour narrates the same flow.
@@ -97,7 +97,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     return "U";
   };
 
-  // `/` and `/dashboard` both render the Command Center. Every other spine
+  // `/` and `/dashboard` both render the Dashboard. Every other spine
   // stage owns a path prefix (e.g. `/monitor?tab=citations`).
   const isActive = (href: string) =>
     href === "/"
@@ -109,18 +109,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Brand row — 56px, matching the context bar's height exactly so the
           two hairlines meet in one unbroken line across the viewport. */}
       <div className="relative flex h-[56px] shrink-0 items-center border-b border-vc-default px-2.5">
-        {/* Mark only — the wordmark is dropped. With no text child the link
-            has no accessible name, so it carries one explicitly. */}
+        {/* Mark + wordmark. The image carries no accessible name of its own
+            (alt=""), so the adjacent text supplies it — no aria-label needed. */}
         <Link
           to="/"
           onClick={onNavigate}
-          aria-label="VentureCite home"
-          className="flex items-center rounded-md px-1.5 py-1.5"
+          className="flex items-center gap-2 rounded-md px-1.5 py-1.5"
         >
-          {/* The asset is a 779×258 wordmark (~3:1). Fixing both axes squashed
-              it to a third of its width; height + `w-auto` lets it keep its
-              proportions. */}
-          <img src={logoPath} alt="" className="h-7 w-auto shrink-0 object-contain" />
+          {/* Height + `w-auto`: fixing both axes squashed the mark, which is
+              wider than it is tall. */}
+          <BrandLogo />
         </Link>
       </div>
 

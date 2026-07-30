@@ -17,6 +17,7 @@ import { openai, aiLimitMiddleware, MAX_CONTENT_LENGTH, asyncHandler } from "../
 import { db } from "../db";
 import { schemaAudits } from "@shared/schema";
 import { logger } from "../lib/logger";
+import { parseJsonLdFromHtml } from "../lib/jsonLdExtract";
 import {
   embedBatch,
   cosineSimilarity,
@@ -119,52 +120,11 @@ function statusFromScore(score: number, max: number): SignalResult["status"] {
   return bucketize(max > 0 ? score / max : 0);
 }
 
-function collectSchemaNodes(node: unknown, out: Map<string, object[]>): void {
-  if (!node || typeof node !== "object") return;
-  if (Array.isArray(node)) {
-    for (const child of node) collectSchemaNodes(child, out);
-    return;
-  }
-  const obj = node as Record<string, unknown>;
-  const t = obj["@type"];
-  const types: string[] = [];
-  if (typeof t === "string") types.push(t);
-  else if (Array.isArray(t)) for (const x of t) if (typeof x === "string") types.push(x);
-  for (const ty of types) {
-    const arr = out.get(ty) ?? [];
-    arr.push(obj);
-    out.set(ty, arr);
-  }
-  for (const key of Object.keys(obj)) {
-    if (key === "@type") continue;
-    collectSchemaNodes(obj[key], out);
-  }
-}
-
-function parseJsonLdFromHtml(html: string): Map<string, object[]> {
-  const out = new Map<string, object[]>();
-  const scan = (source: string) => {
-    const re =
-      /<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(source)) !== null) {
-      const raw = m[1]?.trim();
-      if (!raw) continue;
-      try {
-        collectSchemaNodes(JSON.parse(raw), out);
-      } catch {
-        /* skip malformed block */
-      }
-    }
-  };
-  scan(html);
-  const nsRe = /<noscript\b[^>]*>([\s\S]*?)<\/noscript>/gi;
-  let n: RegExpExecArray | null;
-  while ((n = nsRe.exec(html)) !== null) {
-    if (n[1]) scan(n[1]);
-  }
-  return out;
-}
+// JSON-LD @type extraction now lives in server/lib/jsonLdExtract.ts so
+// server/lib/pageContentAnalysis.ts (a pure, DB-free module) can reuse it
+// without importing this route file's Express/DB dependency chain.
+// Re-exported here so any existing importer of these names keeps working.
+export { collectSchemaNodes } from "../lib/jsonLdExtract";
 
 function isFieldPopulated(node: Record<string, unknown>, field: string): boolean {
   const v = node[field];

@@ -1,9 +1,9 @@
 // client/src/tours/pages/dashboard.tour.ts
 //
-// Replayable tour for the Command Center (/, /dashboard). The page used
+// Replayable tour for the Dashboard (/, /dashboard). The page used
 // to be called "Dashboard" — both /dashboard and / route to the same
 // surface, but the heading in the AppShell context bar is now
-// "Command Center" and the copy below has been refreshed to match.
+// "Dashboard" and the copy below has been refreshed to match.
 //
 // Manual trigger — only fires via the page-help "?" button or replay.
 // The auto-firing onboarding tour is `global-welcome` (routes "/", "/dashboard").

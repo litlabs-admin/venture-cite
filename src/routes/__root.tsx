@@ -102,6 +102,7 @@ export const Route = createRootRoute({
       { name: "twitter:image", content: "https://venturecite.com/favicon.png" },
     ],
     links: [
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "apple-touch-icon", href: "/favicon.png" },
       { rel: "canonical", href: "https://venturecite.com/" },

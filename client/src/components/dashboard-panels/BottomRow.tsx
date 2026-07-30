@@ -1,6 +1,6 @@
 import { BarChart3 } from "lucide-react";
 import { PanelLabel, PanelLink, PanelEmptyState, CCLink, DEST } from "./primitives";
-import type { TrendWeek } from "./useCommandCenterData";
+import type { TrendWeek } from "./useDashboardData";
 
 // ─── Citations / AI Traffic / Conversations ──────────────────────────────────
 // Final content row, three equal columns, min-h-[340px], px-8 py-6.
