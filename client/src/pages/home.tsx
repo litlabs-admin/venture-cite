@@ -9,6 +9,7 @@ import { RankingsPanel } from "@/components/dashboard-panels/RankingsPanel";
 import { ActionsStrip } from "@/components/dashboard-panels/ActionsStrip";
 import { PromptsRow } from "@/components/dashboard-panels/PromptsRow";
 import { PlatformStrip } from "@/components/dashboard-panels/PlatformStrip";
+import { GapsRow } from "@/components/dashboard-panels/GapsRow";
 import { BottomRow } from "@/components/dashboard-panels/BottomRow";
 
 // ─── Dashboard ──────────────────────────────────────────────────────────
@@ -26,12 +27,22 @@ import { BottomRow } from "@/components/dashboard-panels/BottomRow";
 //   3. Actions            single-line band
 //   4. Prompts + Health   2/3 + (Site Health / Perception) stacked
 //   5. Platform strip     8 cells
-//   6. Citations / AI Traffic / Conversations
+//   6. Competitor gaps   full width
+//   7. Citations / Hallucinations / Listicles
 //
 // DATA HONESTY: every figure traces to an endpoint in useDashboardData.
-// Panels with no backing source (Rank, Site Health, Perception, AI Traffic,
-// Conversations) render `–` plus a line naming what is missing. Nothing on
-// this page is generated, estimated, or carried over from a demo fixture.
+// Panels with no backing source render `–` plus a line naming what is
+// missing. Nothing here is generated, estimated, or carried over from a demo
+// fixture.
+//
+// "AI Traffic" and "Conversations" used to occupy row 7 and two KPI tiles.
+// Both were permanent empty states — they need a Google Analytics connection
+// and AI-crawler tracking on the customer's domain respectively, neither of
+// which this product has — so a third of the dashboard asked you to connect
+// something that cannot be connected. They were replaced with hallucination
+// severity and "best of" listicle presence: both already measured for every brand,
+// both previously surfaced nowhere on this page. `Rank` is the one remaining
+// deliberate `–`: it needs a cross-account brand index that does not exist.
 
 export default function Home() {
   const { brands, selectedBrandId, isLoading: brandsLoading } = useBrandSelection();
@@ -81,8 +92,17 @@ export default function Home() {
           visibilityDelta={d.hero?.visibilityDelta ?? null}
           mentions7d={d.mentions7d}
           mentionsTruncated={d.mentionsTruncated}
+          mentionsScanned={d.mentionsScanned}
+          mentionsScanLoading={d.mentionsScanLoading}
           citationsThisWeek={d.citationsThisWeek}
           loading={d.heroLoading}
+          ownRank={d.ownRank}
+          trackedBrands={d.trackedBrands}
+          leaderboardLoading={d.leaderboardLoading}
+          hallucinations={d.hallucinations}
+          hallucinationsLoading={d.hallucinationsLoading}
+          listicles={d.listicles}
+          listiclesLoading={d.listiclesLoading}
         />
       </div>
 
@@ -108,12 +128,18 @@ export default function Home() {
 
       <PlatformStrip platforms={d.platforms} />
 
+      <GapsRow categories={d.gapCategories} rows={d.gapRows} gapLoading={d.gapLoading} />
+
       <BottomRow
         weeks={d.weeks}
         totalCitedUrls={d.totalCitedUrls}
         citedUrlsTruncated={d.citedUrlsTruncated}
         topSources={d.topSources}
         loading={d.citationsLoading}
+        hallucinations={d.hallucinations}
+        hallucinationsLoading={d.hallucinationsLoading}
+        listicles={d.listicles}
+        listiclesLoading={d.listiclesLoading}
       />
     </div>
   );

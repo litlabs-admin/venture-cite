@@ -1,11 +1,19 @@
 import { useEffect, useRef } from "react";
 import { ChevronRight } from "lucide-react";
 import { PanelLabel, NoValue, CCLink, DEST } from "./primitives";
-import type { LeaderRow } from "./useDashboardData";
+import { rankLeaderboard, type LeaderRow } from "./useDashboardData";
 
 // ─── Rankings ────────────────────────────────────────────────────────────────
 // Right third of the first content row. Scrolling list of tracked brands
-// ordered by share of voice. Row spec: 34px tall, px-6 py-2,
+// ordered by share of voice.
+//
+// The figure IS share of voice, so it carries a `%`. Monitor's Overview tab
+// rendered the identical numbers a second time as a donut ("Share of AI
+// Voice", same /api/competitors/leaderboard response); that panel was
+// retired rather than ported — the unit here is what made the two read as
+// different metrics.
+//
+// Row spec: 34px tall, px-6 py-2,
 // #rank (w-8, 11px) · favicon (16px) · name (12px, truncate)
 // · figure (12px tabular) · delta (10px, w-7, right).
 //
@@ -72,6 +80,7 @@ function Row({
             className={`text-caption tabular-nums text-vc-primary ${row.isOwn ? "font-semibold" : ""}`}
           >
             {score}
+            <span className="text-vc-tertiary">%</span>
           </span>
           <NoValue className="w-7 flex-shrink-0 text-right text-label" />
         </CCLink>
@@ -88,8 +97,9 @@ function Row({
 }
 
 export function RankingsPanel({ rows, loading }: { rows: LeaderRow[]; loading: boolean }) {
-  const sorted = [...rows].sort((a, b) => b.shareOfVoice - a.shareOfVoice);
-  const ownIndex = sorted.findIndex((r) => r.isOwn);
+  // Same helper the KPI strip's Rank tile uses, so the two can never disagree.
+  const { sorted, ownRank, tracked } = rankLeaderboard(rows);
+  const ownIndex = ownRank === null ? -1 : ownRank - 1;
   const ownRef = useRef<HTMLDivElement>(null);
 
   // The reference scrolls your own row into view on load — with a long
@@ -138,9 +148,9 @@ export function RankingsPanel({ rows, loading }: { rows: LeaderRow[]; loading: b
         )}
       </div>
 
-      {ownIndex >= 0 && (
+      {ownRank !== null && (
         <p className="mt-3 flex-shrink-0 text-data text-vc-tertiary">
-          You: #{ownIndex + 1} of {sorted.length} tracked
+          You: #{ownRank} of {tracked} tracked
         </p>
       )}
     </div>

@@ -19,9 +19,9 @@ import { SEL } from "./support/selectors";
 // so 12 is what's tested here.)
 const REDIRECTS: Array<{ from: string; toPath: string; tab: string; activeTab?: string }> = [
   { from: "/citations", toPath: "/monitor", tab: "citations" },
-  { from: "/geo-analytics", toPath: "/monitor", tab: "overview" },
+  { from: "/geo-analytics", toPath: "/monitor", tab: "citations" },
   { from: "/competitors", toPath: "/monitor", tab: "competitors" },
-  // client/src/pages/monitor.tsx's SpineShell tabs are overview, citations,
+  // client/src/pages/monitor.tsx's SpineShell tabs are citations,
   // competitors, trends, mentions — "share-of-answer" is NOT one of them
   // (monitor.tsx's own comment explains its Share-of-Answer tab was dropped
   // because the backing prompt_portfolio table is dead). SpineRedirect still
@@ -29,10 +29,10 @@ const REDIRECTS: Array<{ from: string; toPath: string; tab: string; activeTab?: 
   // knowledge of the destination's valid tab values — but SpineShell's
   // `tabs.some((t) => t.value === requested) ? requested : defaultTab`
   // fallback (SpineShell.tsx:31) means the tab that actually activates is
-  // Monitor's defaultTab, "overview". `activeTab` records that real outcome;
+  // Monitor's defaultTab, "citations". `activeTab` records that real outcome;
   // the URL is still asserted against the literal `tab` value SpineRedirect
   // writes.
-  { from: "/ai-intelligence", toPath: "/monitor", tab: "share-of-answer", activeTab: "overview" },
+  { from: "/ai-intelligence", toPath: "/monitor", tab: "share-of-answer", activeTab: "citations" },
   { from: "/geo-signals", toPath: "/diagnose", tab: "signals" },
   { from: "/crawler-check", toPath: "/diagnose", tab: "crawler" },
   { from: "/opportunities", toPath: "/diagnose", tab: "hallucinations" },

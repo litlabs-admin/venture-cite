@@ -4,7 +4,7 @@
 // Decides which tour to fire and delegates to shepherdAdapter. Tracks an
 // activeTourRef to prevent StrictMode double-fires.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../hooks/use-auth";
@@ -77,17 +77,27 @@ function useCounts(brandId: string | null): CountsResp {
   const promptCount = Array.isArray(prompts)
     ? prompts.length
     : ((prompts as { data?: unknown[] } | undefined)?.data?.length ?? 0);
-  return {
-    brands: brands?.data?.length ?? 0,
-    mentions: mentions?.rows?.length ?? 0,
-    // No cheap client-side citations-count source exists; the spine's
-    // activation pipeline runs citations server-side. Honest 0 means
-    // "not measured here", not "zero citations" — and no tour auto-fires
-    // on this value (the always-true empty-citations nudge was removed).
-    citations: 0,
-    articles: articles?.data?.length ?? 0,
-    prompts: promptCount,
-  };
+  const brandCount = brands?.data?.length ?? 0;
+  const mentionCount = mentions?.rows?.length ?? 0;
+  const articleCount = articles?.data?.length ?? 0;
+  // Memoised on the scalar counts. A fresh object literal every render made
+  // `counts` a new identity every render, which re-ran all three effects
+  // below on every render — including the preview effect, which rebuilt the
+  // admin's previewed tour from scratch each time.
+  return useMemo(
+    () => ({
+      brands: brandCount,
+      mentions: mentionCount,
+      // No cheap client-side citations-count source exists; the spine's
+      // activation pipeline runs citations server-side. Honest 0 means
+      // "not measured here", not "zero citations" — and no tour auto-fires
+      // on this value (the always-true empty-citations nudge was removed).
+      citations: 0,
+      articles: articleCount,
+      prompts: promptCount,
+    }),
+    [brandCount, mentionCount, articleCount, promptCount],
+  );
 }
 
 export function TourOrchestrator() {
@@ -95,7 +105,7 @@ export function TourOrchestrator() {
   const { user } = useAuth();
   const { selectedBrandId, selectedBrand } = useBrandSelection();
   const brandId = selectedBrandId || null;
-  const { state } = useTourState();
+  const { state, isReady: stateReady } = useTourState();
   const { mutate: patchState } = useTourStatePatch();
   const location = useRouterState({ select: (s) => s.location.pathname });
   const counts = useCounts(brandId);
@@ -156,7 +166,7 @@ export function TourOrchestrator() {
       ctx,
       mode: "preview",
       buffer: bufferRef.current,
-      onNoShow: () => {
+      onEnd: () => {
         activeRef.current = null;
       },
     });
@@ -166,6 +176,19 @@ export function TourOrchestrator() {
   useEffect(() => {
     if (!enabled || !user || !bufferRef.current) return;
     if (activeRef.current) return; // StrictMode guard
+    // Wait for the persisted state to land. useTourState yields `{}` while
+    // /api/tours/state is in flight, and an empty state looks exactly like
+    // "never seen this tour" — so every page load re-fired tours the user
+    // had already completed, skipped or suppressed. The intro step has no
+    // DOM target, so it painted instantly, well before the real state
+    // arrived to say it shouldn't have. Completion was being written
+    // correctly the whole time; it was simply never read in time.
+    //
+    // Measured on admin@venturecite.com (2026-07-30): state held
+    // `global: { v: 2, skippedAt: 2026-07-29T19:18 }` and the tour still
+    // auto-fired 7 times the next day — 133 fires against 6 completions
+    // and 21 skips lifetime.
+    if (!stateReady) return;
 
     const ctx: TourContext = {
       userId: user.id,
@@ -176,14 +199,23 @@ export function TourOrchestrator() {
     };
 
     for (const tour of Object.values(TOURS)) {
-      if (firedThisSessionRef.current.has(tour.id)) continue;
+      // Keyed by brand as well as id: a perBrand tour is a different tour
+      // for each brand, and keying on id alone meant seeing it for one
+      // brand suppressed it for every other brand in the same session.
+      const guardKey = tour.scope === "perBrand" ? `${tour.id}::${ctx.brandId ?? "none"}` : tour.id;
+      if (firedThisSessionRef.current.has(guardKey)) continue;
       if (shouldAutoFire(tour, state, ctx, location)) {
-        firedThisSessionRef.current.add(tour.id);
+        firedThisSessionRef.current.add(guardKey);
         activeRef.current = runTour({
           config: tour,
           ctx,
           mode: "auto",
           buffer: bufferRef.current,
+          // onEnd clears activeRef for every ending, so none of the
+          // persistence callbacks below have to remember to.
+          onEnd: () => {
+            activeRef.current = null;
+          },
           onComplete: () => {
             patchState({
               op: "markCompleted",
@@ -191,7 +223,6 @@ export function TourOrchestrator() {
               version: tour.version,
               brandId: tour.scope === "perBrand" ? ctx.brandId : null,
             });
-            activeRef.current = null;
           },
           onSkip: () => {
             patchState({
@@ -200,11 +231,9 @@ export function TourOrchestrator() {
               version: tour.version,
               brandId: tour.scope === "perBrand" ? ctx.brandId : null,
             });
-            activeRef.current = null;
           },
           onSkipForever: () => {
             patchState({ op: "suppress", tourId: tour.id });
-            activeRef.current = null;
           },
           onNoShow: () => {
             // Anchor wasn't on this page, so nothing showed. Persist
@@ -212,14 +241,23 @@ export function TourOrchestrator() {
             // re-evaluated on the next route/state change — it fires
             // properly once the user reaches the page that has the
             // anchor, instead of being silently consumed here.
-            firedThisSessionRef.current.delete(tour.id);
-            activeRef.current = null;
+            firedThisSessionRef.current.delete(guardKey);
           },
         });
         break;
       }
     }
-  }, [enabled, user, brandId, selectedBrand?.name, state, location, counts, patchState]);
+  }, [
+    enabled,
+    user,
+    brandId,
+    selectedBrand?.name,
+    state,
+    stateReady,
+    location,
+    counts,
+    patchState,
+  ]);
 
   // Expose replay imperatively via window for PageHeaderHelp / chatbot fallback.
   useEffect(() => {
@@ -241,10 +279,11 @@ export function TourOrchestrator() {
         ctx,
         mode: "manual",
         buffer: bufferRef.current,
-        onComplete: () => {
-          activeRef.current = null;
-        },
-        onNoShow: () => {
+        // Manual replay persists nothing (runTour enforces that too); it
+        // only has to release the slot, however the user ends it. Before
+        // onEnd existed, dismissing a replay with X left activeRef set and
+        // blocked every later tour for the rest of the session.
+        onEnd: () => {
           activeRef.current = null;
         },
       });

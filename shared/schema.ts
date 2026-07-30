@@ -196,7 +196,10 @@ export const brands = pgTable(
     deletedAt: timestamp("deleted_at"),
     deletionScheduledFor: timestamp("deletion_scheduled_for"),
     // Mentions rebuild (0050): per-brand opt-in for daily auto-scan.
-    monitorMentions: boolean("monitor_mentions").notNull().default(false),
+    // Default ON: the weekly mention-scan cron reads this flag, and every
+    // other dashboard measurement fires on its own schedule. See
+    // migrations/0090_monitor_mentions_default_on.sql.
+    monitorMentions: boolean("monitor_mentions").notNull().default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

@@ -12,18 +12,17 @@ import type { PlatformRank } from "./useDashboardData";
 // platform's visibility score over /100, one line describing the engine, and
 // an accent call-to-action. Cells with no data get the "No data yet" variant.
 //
-// Only AI_PLATFORMS_ACTIVE produce data. The planned platforms still occupy
-// their cells (the strip is a fixed 8-wide grid in the reference) but render
-// grayscale with `–`, which is what "we don't query this yet" looks like.
+// ONLY platforms we actually query get a cell. Grok, Meta AI and Google AI
+// used to occupy three greyed-out cells rendering `–` "not queried yet" —
+// a fifth of the strip spent advertising engines that produce no data and
+// that the user cannot enable. The reference's 8-wide grid is not a reason
+// to ship three dead columns.
 
 const LOGOS: Record<string, string> = {
   ChatGPT: "/venturecite/images/ai-logos/chatgpt.svg",
   Claude: "/venturecite/images/ai-logos/claude.svg",
   Perplexity: "/venturecite/images/ai-logos/perplexity.svg",
   Gemini: "/venturecite/images/ai-logos/gemini.svg",
-  Grok: "/venturecite/images/ai-logos/grok.svg",
-  "Meta AI": "/venturecite/images/ai-logos/meta-ai.svg",
-  "Google AI": "/venturecite/images/ai-logos/google.svg",
 };
 
 // One line per engine, shown in the hover card. Same register as the
@@ -34,15 +33,11 @@ const BLURB: Record<string, string> = {
   Perplexity: "Perplexity AI — answer engine with citations",
   Gemini: "Google's Gemini — search-grounded assistant",
   DeepSeek: "DeepSeek — open-weight reasoning models",
-  Grok: "xAI's Grok — not queried yet",
-  "Meta AI": "Meta AI — not queried yet",
-  "Google AI": "Google's AI-generated search summaries — not queried yet",
 };
 
 // DeepSeek ships no logo asset, so it falls back to a monogram rather than a
 // broken image.
-const PLANNED_SHOWN = ["Grok", "Meta AI", "Google AI"] as const;
-const CELLS = [...AI_PLATFORMS_ACTIVE, ...PLANNED_SHOWN];
+const CELLS = AI_PLATFORMS_ACTIVE;
 
 function Cell({
   name,
@@ -145,7 +140,7 @@ export function PlatformStrip({ platforms }: { platforms: PlatformRank[] }) {
   return (
     <div className="border-b border-vc-default">
       <div className="flex">
-        <div className="grid flex-1 grid-cols-4 sm:grid-cols-8">
+        <div className="grid flex-1 grid-cols-3 sm:grid-cols-5">
           {CELLS.map((name, i) => {
             const p = byName.get(name);
             return (

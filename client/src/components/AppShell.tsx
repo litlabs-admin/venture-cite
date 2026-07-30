@@ -178,7 +178,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-vc-default bg-white px-4 lg:hidden print:hidden">
             <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Open menu">
+                {/* nav.mobileToggle is the welcome tour's stand-in for the
+                    five nav.* steps. Below lg the desktop <aside> is
+                    display:none, so those targets can never resolve and the
+                    tour silently collapsed to its one anchorless step. The
+                    two paths are mutually exclusive by breakpoint — this
+                    button is lg:hidden, the sidebar is hidden lg:flex — so
+                    exactly one of them renders and the other drops out. */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Open menu"
+                  data-tour-id="nav.mobileToggle"
+                >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>

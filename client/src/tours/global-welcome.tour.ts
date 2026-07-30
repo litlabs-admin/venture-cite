@@ -22,6 +22,21 @@ export const globalWelcomeTour: TourConfig = {
       content:
         "VentureCite measures and improves how AI engines (ChatGPT, Claude, Perplexity, Gemini) cite your brand. A quick 60-second tour of the five-stage workflow?",
     },
+    // Narrow viewports only. The five nav.* steps below target the desktop
+    // sidebar, which is `hidden lg:flex` — under 1024px they resolve to
+    // nothing and drop out, which left this tour as a single anchorless
+    // paragraph. This step is the mutually-exclusive counterpart: its anchor
+    // is `lg:hidden`, so exactly one of the two paths ever renders, and the
+    // engine's missing-target handling picks between them with no viewport
+    // check anywhere in the config.
+    {
+      id: "mobile-nav",
+      target: "nav.mobileToggle",
+      attachTo: "bottom-start",
+      title: "The five-stage workflow",
+      content:
+        "Everything lives behind this menu, in order: Set up your brand and fact sheet, Monitor how AI engines cite you, Diagnose what's wrong, Act to close the gaps, and Report the impact.",
+    },
     {
       id: "sidebar-setup",
       target: "nav.setup",

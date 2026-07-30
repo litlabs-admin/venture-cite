@@ -727,16 +727,14 @@ export async function runBrandPrompts(
           brand.companyName,
         ].filter((s): s is string => typeof s === "string" && s.trim().length > 0),
       },
-      ...competitors.map(
-        (c): TrackedEntity => ({
-          kind: "competitor",
-          id: c.id,
-          name: c.name,
-          website: c.domain || null,
-          industry: (c as any).industry || null,
-          description: (c as any).description || null,
-        }),
-      ),
+      ...competitors.map((c): TrackedEntity => ({
+        kind: "competitor",
+        id: c.id,
+        name: c.name,
+        website: c.domain || null,
+        industry: (c as any).industry || null,
+        description: (c as any).description || null,
+      })),
     ];
 
     let analysis: Awaited<ReturnType<typeof analyzeResponse>> = {
@@ -988,6 +986,28 @@ export async function runBrandPrompts(
         for (const cand of candidates) {
           const name = cand.name?.trim();
           if (!name || name.length < 2 || name.length > 120) continue;
+          // Never record the tracked brand as its own competitor. The
+          // analyzer reports every entity it saw and marks anything that
+          // isn't an exact tracked-name hit as "untracked", so the brand's
+          // own aliases came straight back through here: the Apple brand
+          // accumulated two `Apple` competitor rows and they ranked against
+          // the brand's own row on the dashboard. matchEntity is the same
+          // check used for presence detection, so it honours the brand's
+          // recorded name variations too.
+          if (
+            matchEntity(name, {
+              id: brand.id,
+              name: brand.name,
+              nameVariations: brand.nameVariations ?? [],
+              website: brand.website ?? null,
+            }).matched
+          ) {
+            logger.info(
+              { brandId, platform, candidate: name },
+              "citation.auto_discovery.dropped_own_brand",
+            );
+            continue;
+          }
           const firstUrl = cand.citedUrls?.[0] ?? "";
           let derivedDomain = "";
           if (firstUrl) {

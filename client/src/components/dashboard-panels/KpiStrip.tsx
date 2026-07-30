@@ -1,4 +1,5 @@
 import { NoValue, Bar, InfoDot, CCLink, DEST, type Dest } from "./primitives";
+import type { HallucinationStats, Listicle } from "./useDashboardData";
 
 // ─── KPI strip ───────────────────────────────────────────────────────────────
 // Six equal columns, hairline-separated, 113px tall. Measured spec:
@@ -74,15 +75,33 @@ export function KpiStrip({
   visibilityDelta,
   mentions7d,
   mentionsTruncated,
+  mentionsScanned,
+  mentionsScanLoading,
   citationsThisWeek,
   loading,
+  ownRank,
+  trackedBrands,
+  leaderboardLoading,
+  hallucinations,
+  hallucinationsLoading,
+  listicles,
+  listiclesLoading,
 }: {
   visibility: number | null;
   visibilityDelta: number | null;
   mentions7d: number | null;
   mentionsTruncated: boolean;
+  mentionsScanned: boolean;
+  mentionsScanLoading: boolean;
   citationsThisWeek: number | null;
   loading: boolean;
+  ownRank: number | null;
+  trackedBrands: number;
+  leaderboardLoading: boolean;
+  hallucinations: HallucinationStats | null;
+  hallucinationsLoading: boolean;
+  listicles: Listicle[] | null;
+  listiclesLoading: boolean;
 }) {
   return (
     <div className="border-b border-vc-default">
@@ -113,12 +132,19 @@ export function KpiStrip({
           )}
         </Tile>
 
+        {/* `–` until a scan has actually completed. The mention scan is
+            opt-in (brands.monitor_mentions gates the weekly cron) and
+            otherwise runs on demand from Monitor › Mentions, so an unscanned
+            brand is the normal starting state — and it used to render a
+            confident "0 · last 7 days", which claims a measurement nobody
+            took. The caption names the missing step instead. */}
         <Tile
           dest={DEST.mentions}
           label="Mentions"
-          tip="Brand mentions found on Reddit and Hacker News in the last 7 days."
-          caption="last 7 days"
-          loading={loading}
+          tip="Brand mentions found on Reddit and Hacker News in the last 7 days. Run a scan from Monitor › Mentions to populate this."
+          caption={mentionsScanned ? "last 7 days" : "run a scan"}
+          captionMuted={!mentionsScanned}
+          loading={loading || mentionsScanLoading}
         >
           {mentions7d === null ? (
             <NoValue className={VALUE} />
@@ -130,16 +156,25 @@ export function KpiStrip({
           )}
         </Tile>
 
-        {/* No global brand universe exists, so there is no "#n of N" to show.
-            The tile keeps its column and says why rather than inventing one. */}
+        {/* Your position in the competitive set, from the same
+            rankLeaderboard() the Rankings panel uses — the tile and the panel
+            are one claim shown twice and must not sort independently.
+            Previously specced as a cross-account GLOBAL rank, which needs an
+            index that does not exist, so it rendered a permanent `–` directly
+            above a panel reading "You: #1 of 14 tracked". */}
         <Tile
           dest={DEST.competitors}
           label="Rank"
-          tip="Position across all tracked brands. Requires a cross-account brand index, which is not built yet."
-          caption="not tracked yet"
-          loading={false}
+          tip="Your position by share of voice among the brands you track."
+          caption={ownRank === null ? "no competitors tracked" : `of ${trackedBrands} tracked`}
+          captionMuted={ownRank === null}
+          loading={leaderboardLoading}
         >
-          <NoValue className={VALUE} />
+          {ownRank === null ? (
+            <NoValue className={VALUE} />
+          ) : (
+            <span className={VALUE}>#{ownRank}</span>
+          )}
         </Tile>
 
         <Tile
@@ -156,27 +191,45 @@ export function KpiStrip({
           )}
         </Tile>
 
+        {/* Replaced "AI Traffic" (needed a Google Analytics connection that
+            does not exist). Unresolved contradicted claims — measured on every
+            citation run, and the highest-stakes number on this strip. */}
         <Tile
-          dest={DEST.settings}
-          label="AI Traffic"
-          tip="Visitors arriving from AI citations. Needs a Google Analytics connection."
-          caption="Connect GA"
-          captionMuted
-          loading={false}
+          dest={DEST.hallucinations}
+          label="Hallucinations"
+          tip="Claims an AI engine stated about you that contradict your fact sheet, still unresolved."
+          caption={
+            hallucinations === null
+              ? "not checked yet"
+              : `${(hallucinations.bySeverity.critical ?? 0) + (hallucinations.bySeverity.high ?? 0)} critical or high`
+          }
+          captionMuted={hallucinations === null}
+          loading={hallucinationsLoading}
         >
-          <NoValue className={VALUE} />
+          {hallucinations === null ? (
+            <NoValue className={VALUE} />
+          ) : (
+            <span className={VALUE}>{hallucinations.total - hallucinations.resolved}</span>
+          )}
         </Tile>
 
+        {/* Replaced "Conversations" (needed AI-crawler tracking on the
+            customer's domain). "Best of" roundups are a source AI engines lean
+            on heavily, and presence in them was already scanned and stored. */}
         <Tile
-          dest={DEST.crawler}
-          label="Conversations"
-          tip="AI assistants reading your site. Needs AI crawler tracking on your domain."
-          caption="Connect AI Crawlers"
-          captionMuted
-          loading={false}
+          dest={DEST.listicles}
+          label="Listicles"
+          tip={'"Best of" roundups in your category that list your brand, out of those we track.'}
+          caption={listicles === null ? "not scanned yet" : `of ${listicles.length} tracked`}
+          captionMuted={listicles === null}
+          loading={listiclesLoading}
           last
         >
-          <NoValue className={VALUE} />
+          {listicles === null ? (
+            <NoValue className={VALUE} />
+          ) : (
+            <span className={VALUE}>{listicles.filter((l) => l.isIncluded === 1).length}</span>
+          )}
         </Tile>
       </div>
     </div>

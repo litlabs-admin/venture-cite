@@ -18,9 +18,8 @@ export type SpineStage = {
 export const SPINE_STAGES: SpineStage[] = [
   {
     path: "/monitor",
-    defaultTab: "overview",
+    defaultTab: "citations",
     labels: {
-      overview: "Overview",
       citations: "Citations",
       competitors: "Competitors",
       trends: "Trends",

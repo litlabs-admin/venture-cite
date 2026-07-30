@@ -16,6 +16,7 @@ import type { InsertTourEvent } from "@shared/schema";
 import type { KnownTourId, TourStateOp } from "./lib/tourRegistry";
 import { db } from "./db";
 import * as schema from "@shared/schema";
+import { buildCoreCompetitorRows, mergeLeaderboardByDomain } from "./lib/leaderboardMerge";
 import { IStorage } from "./storage";
 import {
   type User,
@@ -1462,12 +1463,20 @@ export class DatabaseStorage implements IStorage {
 
   async getCompetitors(
     brandId?: string,
-    opts?: { includeDeleted?: boolean },
+    opts?: { includeDeleted?: boolean; tier?: "core" | "discovered" },
   ): Promise<Competitor[]> {
     const includeDeleted = opts?.includeDeleted === true;
     const conditions = [] as any[];
     if (brandId) conditions.push(eq(schema.competitors.brandId, brandId));
     if (!includeDeleted) conditions.push(isNull(schema.competitors.deletedAt));
+    // `core` is the curated competitive set: manual adds and AI-inferred
+    // direct competitors. `discovered` is the citation-mined pool — every
+    // entity a model happened to name in an answer, which includes product
+    // lines ("iPhone", "S Pen"), publishers ("CNET"), operating systems
+    // ("macOS") and the tracked brand itself. That pool is useful as MENTION
+    // data; it is not a competitor list, and anything presenting a
+    // competitive set must ask for core.
+    if (opts?.tier) conditions.push(eq(schema.competitors.tier, opts.tier));
     const where = conditions.length === 1 ? conditions[0] : and(...conditions);
     const q = db.select().from(schema.competitors);
     return await (where ? q.where(where) : q);
@@ -1792,9 +1801,25 @@ export class DatabaseStorage implements IStorage {
     // table so the leaderboard reflects actual LLM-judged citations, not
     // a coarse aggregate. One row per (competitor × platform × prompt ×
     // run); count cited rows within the window, bucket by platform.
-    const competitors = brandId ? await this.getCompetitors(brandId) : await this.getCompetitors();
-    if (competitors.length > 0) {
-      const compIds = competitors.map((c) => c.id);
+    // Read EVERY competitor row, then present only the core ones.
+    //
+    // Presentation must be core-only: this is a competitive set, so it holds
+    // competitor BRANDS and nothing else. Ranking the citation-mined
+    // `discovered` pool alongside them put "iPhone", "iPad", "AirPods",
+    // "Apple Watch", "MacBook Air", "S Pen" and "Samsung Galaxy Tab" on the
+    // board as rival companies, plus publishers (CNET, PCMag) and the
+    // tracked brand itself, twice. 82 of the Apple brand's 96 rows.
+    //
+    // But the COUNTS still have to come from every row. competitor_geo_
+    // rankings are keyed by competitor row id, and the same company often
+    // exists as both a core row and a discovered one — measured live, core
+    // `Spotify / spotify.com` had 0 citations while discovered `Spotify / ""`
+    // had 11. Filtering before counting would silently discard those.
+    const allCompetitors = brandId
+      ? await this.getCompetitors(brandId)
+      : await this.getCompetitors();
+    if (allCompetitors.length > 0) {
+      const compIds = allCompetitors.map((c) => c.id);
       const cgr = await db
         .select()
         .from(schema.competitorGeoRankings)
@@ -1814,24 +1839,15 @@ export class DatabaseStorage implements IStorage {
         bucket.set(r.aiPlatform, (bucket.get(r.aiPlatform) || 0) + 1);
       }
 
-      for (const competitor of competitors) {
-        const bucket = perCompetitor.get(competitor.id) ?? new Map<string, number>();
-        const breakdown: Record<string, number> = {};
-        let total = 0;
-        bucket.forEach((count, platform) => {
-          breakdown[platform] = count;
-          total += count;
-        });
-        leaderboard.push({
-          name: competitor.name,
-          domain: competitor.domain,
-          isOwn: false,
-          totalCitations: total,
-          platformBreakdown: breakdown,
-          shareOfVoice: 0,
-        });
-      }
+      // One row per core competitor, carrying the citations of every row for
+      // the same company (see server/lib/leaderboardMerge).
+      leaderboard.push(...buildCoreCompetitorRows(allCompetitors, perCompetitor));
     }
+
+    // Fold rows that are the same company (see server/lib/leaderboardMerge).
+    const merged = mergeLeaderboardByDomain(leaderboard);
+    leaderboard.length = 0;
+    leaderboard.push(...merged);
 
     // Compute share-of-voice so each row answers the "are they cited more
     // than me, and by how much?" question directly.

@@ -279,7 +279,10 @@ export interface IStorage {
 
   // Competitor methods
   createCompetitor(competitor: InsertCompetitor): Promise<Competitor>;
-  getCompetitors(brandId?: string, opts?: { includeDeleted?: boolean }): Promise<Competitor[]>;
+  getCompetitors(
+    brandId?: string,
+    opts?: { includeDeleted?: boolean; tier?: "core" | "discovered" },
+  ): Promise<Competitor[]>;
   getCompetitorById(id: string): Promise<Competitor | undefined>;
   updateCompetitor(id: string, patch: Partial<InsertCompetitor>): Promise<Competitor | undefined>;
   // Append a surface form to the entity's nameVariations if absent

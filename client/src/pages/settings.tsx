@@ -411,7 +411,7 @@ export default function Settings() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
 
-  const { state: tourState } = useTourState();
+  const { state: tourState, isReady: tourStateReady } = useTourState();
   const { mutate: patchTour } = useTourStatePatch();
   const wildcardSuppressed = (tourState.perUserSuppressed ?? []).includes("*");
 
@@ -626,9 +626,14 @@ export default function Settings() {
           >
             Don't auto-show tours
           </label>
+          {/* Disabled until the state actually arrives: an unloaded
+              TourState is `{}`, which renders as "off" even for a user who
+              has suppressed tours — and a click in that window writes the
+              wrong value. Same root cause as the tour re-firing bug. */}
           <Switch
             id="suppress-tours"
             checked={wildcardSuppressed}
+            disabled={!tourStateReady}
             onCheckedChange={toggleWildcard}
           />
         </div>

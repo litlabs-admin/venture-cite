@@ -36,6 +36,32 @@ export interface LeaderRow {
   totalCitations: number;
   shareOfVoice: number;
 }
+/**
+ * The single ordering of the competitive set.
+ *
+ * The KPI strip's "Rank" tile and the Rankings panel are the same claim shown
+ * twice, so they must not each sort for themselves — the tile used to show a
+ * permanent `–` (it was specced as a cross-account global rank that no index
+ * exists for) while the panel said "You: #1 of 14 tracked" directly beneath
+ * it. Both now read from here.
+ *
+ * `ownRank` is null when the brand has no leaderboard row at all, which is
+ * "not measured" — the tile renders `–`, never a fabricated position.
+ */
+export function rankLeaderboard(rows: LeaderRow[]): {
+  sorted: LeaderRow[];
+  ownRank: number | null;
+  tracked: number;
+} {
+  const sorted = [...rows].sort((a, b) => b.shareOfVoice - a.shareOfVoice);
+  const ownIndex = sorted.findIndex((r) => r.isOwn);
+  return {
+    sorted,
+    ownRank: ownIndex < 0 ? null : ownIndex + 1,
+    tracked: sorted.length,
+  };
+}
+
 export interface Recommendation {
   id: string;
   title: string;
@@ -57,6 +83,37 @@ export interface PromptRow {
   promptId: string;
   prompt: string;
   platforms: { platform: string; isCited: boolean }[];
+}
+// Competitor gap matrix — moved here when the Monitor "Overview" tab was
+// retired. /api/dashboard/gap-matrix has no other consumer, so the panel is
+// the only reason it exists.
+export type GapCell = "yes" | "no" | "partial" | "unknown";
+export interface GapMatrixRow {
+  entityType: "brand" | "competitor";
+  entityId: string;
+  name: string;
+  totalMentions: number;
+  cells: Record<string, GapCell>;
+  gapCount: number;
+}
+// Replaced the AI Traffic / Conversations placeholders, which needed external
+// integrations (GA, crawler tracking) that don't exist. These two are already
+// measured for every brand and were surfaced nowhere on this page.
+export interface HallucinationStats {
+  total: number;
+  resolved: number;
+  bySeverity: Record<string, number>;
+  byType: Record<string, number>;
+}
+export interface Listicle {
+  id: string;
+  title: string;
+  url: string;
+  sourcePublication: string | null;
+  listPosition: number | null;
+  totalListItems: number | null;
+  isIncluded: number; // 0 | 1 — integer column, not a boolean
+  lastChecked: string;
 }
 export interface CitedUrl {
   platform: string;
@@ -220,6 +277,18 @@ export function useDashboardData(brandId: string) {
     queryKey: [`/api/dashboard/rankings/${brandId}`],
     enabled,
   });
+  const gapMatrix = useQuery<Envelope<{ categories: string[]; rows: GapMatrixRow[] }>>({
+    queryKey: [`/api/dashboard/gap-matrix/${brandId}`],
+    enabled,
+  });
+  const hallucinations = useQuery<Envelope<HallucinationStats>>({
+    queryKey: [`/api/hallucinations/stats/${brandId}`],
+    enabled,
+  });
+  const listicles = useQuery<Envelope<Listicle[]>>({
+    queryKey: [`/api/listicles?brandId=${brandId}`],
+    enabled,
+  });
   const prompts = useQuery<
     Envelope<{ byPrompt: PromptRow[]; totalChecks: number; totalCited: number }>
   >({
@@ -249,6 +318,21 @@ export function useDashboardData(brandId: string) {
     };
   }>({
     queryKey: [`/api/brand-mentions/${brandId}?from=${mentionsFrom}&limit=200`],
+    enabled,
+  });
+  // Has a mention scan EVER completed for this brand?
+  //
+  // Without this, a brand nobody has scanned is indistinguishable from one
+  // scanned with nothing found: the list query returns `rows: []` either way
+  // and the KPI tile rendered a confident `0 · last 7 days`. That is the
+  // "a dash is never a zero" rule inverted — the tile claimed a measurement
+  // that had never been taken.
+  //
+  // The mention scan is opt-in (brands.monitor_mentions gates the weekly cron)
+  // and otherwise runs on demand from Monitor › Mentions, so "never scanned"
+  // is the normal state for a new brand, not an edge case.
+  const lastMentionScan = useQuery<{ data: { completedAt?: string } | null }>({
+    queryKey: [`/api/brand-mentions/scans/last/${brandId}`],
     enabled,
   });
 
@@ -310,11 +394,16 @@ export function useDashboardData(brandId: string) {
       .sort((a, b) => b.count - a.count);
   }, [citedUrls.data]);
 
+  const leaderboardRows = useMemo(() => leaderboard.data?.data ?? [], [leaderboard.data]);
+  const leaderboardRank = useMemo(() => rankLeaderboard(leaderboardRows), [leaderboardRows]);
+
   const weeks = trend.data?.data?.weeks ?? [];
   const thisWeek = weeks.length ? weeks[weeks.length - 1] : null;
 
   const mentionRows = mentions.data?.rows?.length ?? 0;
   const mentionsTruncated = !!mentions.data?.nextCursor;
+  // A completed scan is what makes 0 a measurement rather than an absence.
+  const mentionsScanned = !!lastMentionScan.data?.data?.completedAt;
 
   return {
     isLoading: hero.isLoading || trend.isLoading || leaderboard.isLoading || platforms.isLoading,
@@ -329,17 +418,37 @@ export function useDashboardData(brandId: string) {
     thisWeek,
     citationsThisWeek: thisWeek?.cited ?? null,
 
-    mentions7d: mentions.isLoading ? null : mentionRows,
+    // null = never scanned (tile shows `–`), a number = scanned and counted.
+    mentions7d:
+      mentions.isLoading || lastMentionScan.isLoading || !mentionsScanned ? null : mentionRows,
     mentionsTruncated,
+    mentionsScanned,
+    mentionsScanLoading: lastMentionScan.isLoading,
 
-    leaderboard: leaderboard.data?.data ?? [],
+    leaderboard: leaderboardRows,
     leaderboardLoading: leaderboard.isLoading,
+    // Shared with the Rankings panel via rankLeaderboard, so the KPI tile and
+    // the panel can never disagree about where you stand.
+    ownRank: leaderboardRank.ownRank,
+    trackedBrands: leaderboardRank.tracked,
 
     recommendations: recommendations.data?.data ?? [],
     recommendationsLoading: recommendations.isLoading,
 
     platforms: platforms.data?.data?.platforms ?? [],
     platformsLoading: platforms.isLoading,
+
+    gapCategories: gapMatrix.data?.data?.categories ?? [],
+    gapRows: gapMatrix.data?.data?.rows ?? [],
+    gapLoading: gapMatrix.isLoading,
+
+    hallucinations: hallucinations.data?.data ?? null,
+    hallucinationsLoading: hallucinations.isLoading,
+
+    // `null` (not []) until the request settles, so the panels can tell
+    // "never scanned" apart from "scanned, found nothing".
+    listicles: listicles.data?.data ?? null,
+    listiclesLoading: listicles.isLoading,
 
     prompts: prompts.data?.data?.byPrompt ?? [],
     promptsLoading: prompts.isLoading,

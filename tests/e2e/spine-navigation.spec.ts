@@ -17,7 +17,7 @@ const SPINE_PAGES = ["/monitor", "/diagnose", "/act", "/setup", "/report"] as co
 
 // Tab values, verified directly against each spine page's SpineShell config
 // (the code is the source of truth, not the original task brief):
-//   client/src/pages/monitor.tsx   -> tabs: overview, citations, competitors, trends, mentions
+//   client/src/pages/monitor.tsx   -> tabs: citations, competitors, trends, mentions
 //   client/src/pages/diagnose.tsx  -> tabs: hallucinations, signals, crawler
 //   client/src/pages/act.tsx       -> tabs: create, library, keywords, geo-assets, faq, community
 //   client/src/pages/setup.tsx     -> tabs: brands, fact-sheet, visibility

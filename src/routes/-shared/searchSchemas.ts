@@ -79,7 +79,7 @@ export const actSearchSchema = z
   })
   .passthrough();
 
-/** `/monitor` — `tab` is the active SpineShell tab (overview/citations/
+/** `/monitor` — `tab` is the active SpineShell tab (citations/
  *  competitors/trends/mentions). `mention` opens MentionDetailSheet for a
  *  specific brand mention on the embedded Mentions tab
  *  (client/src/components/geo-tools/MentionsTab.tsx, out of this task's

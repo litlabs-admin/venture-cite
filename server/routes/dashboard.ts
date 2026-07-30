@@ -7,7 +7,6 @@
 //   GET /api/dashboard/hero/:brandId            — hero row numbers
 //   GET /api/dashboard/rankings/:brandId        — per-platform rollup + snippets
 //   GET /api/dashboard/gap-matrix/:brandId      — competitor × query-type cells
-//   GET /api/dashboard/entity-strength/:brandId — composite + 4 sub-scores
 
 import type { Express } from "express";
 import { storage } from "../storage";
@@ -727,12 +726,21 @@ export function setupDashboardRoutes(app: Express): void {
           { platform: string; prompt: string; url: string; citedAt: Date }
         >();
         for (const r of toCitedArr(rankings)) {
-          const urls =
-            Array.isArray(r.citedUrls) && r.citedUrls.length > 0
-              ? r.citedUrls
-              : r.citingOutletUrl
-                ? [r.citingOutletUrl]
-                : [];
+          // `citingOutletUrl` ONLY — the matcher-derived source that actually
+          // referenced the brand.
+          //
+          // This used to prefer `citedUrls`, which the schema defines as
+          // "list of all URLs the LLM cited in its response" — every link in
+          // the answer, most of which have nothing to do with the brand. On
+          // the Apple brand that turned 117 attributed sources into 962 raw
+          // URLs (226 after dedupe), so "cited URLs" counted the whole
+          // bibliography of every answer we appeared in and "Top sources"
+          // ranked outlets that never mentioned the brand at all.
+          //
+          // A cited ranking with no citingOutletUrl contributes nothing: the
+          // response cited us but we could not attribute it to a source, and
+          // listing its unrelated links would be a guess.
+          const urls = r.citingOutletUrl ? [r.citingOutletUrl] : [];
           for (const rawUrl of urls) {
             const url = (rawUrl ?? "").trim();
             if (!url) continue;
@@ -818,8 +826,13 @@ export function setupDashboardRoutes(app: Express): void {
                   : "partial";
         }
 
-        // Competitor rows from competitor_geo_rankings.
-        const competitors = (await storage.getCompetitors(brand.id)) as Competitor[];
+        // Competitor rows from competitor_geo_rankings. Core only — the gap
+        // matrix compares the brand against rival COMPANIES, and an
+        // unfiltered read takes the first 6 rows of the citation-mined pool,
+        // which is mostly product names and publishers.
+        const competitors = (await storage.getCompetitors(brand.id, {
+          tier: "core",
+        })) as Competitor[];
         const topCompetitors = competitors.slice(0, 6);
 
         const competitorRows = await Promise.all(
@@ -893,68 +906,6 @@ export function setupDashboardRoutes(app: Express): void {
         res.json({ success: true, data: { categories, rows } });
       } catch (error) {
         sendError(res, error, "Failed to load gap matrix");
-      }
-    }),
-  );
-
-  // ==========================================================================
-  // GET /api/dashboard/entity-strength/:brandId
-  // ==========================================================================
-  // Replaces the old entity-strength endpoint. One transparent formula
-  // instead of four arbitrary subscores. Kept at the same URL so existing
-  // clients don't 404 while the UI migrates; data shape is different.
-  //
-  //   citation_health = round(100 × cite_rate × rank_factor)
-  //   cite_rate   = cited / total (0..1)
-  //   rank_factor = avg_rank ? max(0, 1 - (avg_rank - 1) / 10) : 1
-  //
-  // So a brand cited 60% of the time at average rank 2 scores
-  // round(100 × 0.6 × 0.9) = 54.
-  app.get(
-    "/api/dashboard/entity-strength/:brandId",
-    asyncHandler(async (req, res) => {
-      try {
-        const brand = await requireOwnedBrand(req);
-        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
-
-        const { rankings } = await loadRankingsContext(brand.id, { since: parseSinceQuery(req) });
-        const totalChecks = rankings.length;
-        const cited = toCitedArr(rankings);
-        const citedCount = cited.length;
-
-        const ranks = cited.map((r) => r.rank).filter((r): r is number => typeof r === "number");
-        // Nullable for the response (UI shows "—" for no rank data); the
-        // score treats null as neutral via `?? 0` (canonical factor 1).
-        const avgRank: number | null =
-          ranks.length > 0 ? ranks.reduce((a, b) => a + b, 0) / ranks.length : null;
-        const authScores = cited
-          .map((r) => r.authorityScore)
-          .filter((s): s is number => typeof s === "number");
-        // null (not 0) when authority is UNMEASURED, so the scorer drops its
-        // weight instead of capping at 70 — consistent with the hero and
-        // /api/geo-analytics (one number, one meaning across screens).
-        const avgAuthority =
-          authScores.length > 0 ? authScores.reduce((a, b) => a + b, 0) / authScores.length : null;
-
-        // Canonical visibility score — the same definition as the
-        // dashboard hero and /api/geo-analytics.
-        const score = computeVisibilityScore(citedCount, totalChecks, avgRank ?? 0, avgAuthority);
-        const label: "Weak" | "Moderate" | "Strong" =
-          score >= 60 ? "Strong" : score >= 30 ? "Moderate" : "Weak";
-
-        res.json({
-          success: true,
-          data: {
-            score,
-            label,
-            citeRatePct: citationRatePct(citedCount, totalChecks),
-            avgRank: avgRank === null ? null : Math.round(avgRank * 10) / 10,
-            totalChecks,
-            citedCount,
-          },
-        });
-      } catch (error) {
-        sendError(res, error, "Failed to load citation health");
       }
     }),
   );

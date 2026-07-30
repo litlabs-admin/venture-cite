@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { BarChart3, Link2, Swords, History, Radar } from "lucide-react";
+import { Link2, Swords, History, Radar } from "lucide-react";
 import SpineShell from "@/components/SpineShell";
 import { brandScoped } from "@/components/BrandScopedTab";
 import TrendsTab from "@/components/intelligence/TrendsTab";
@@ -7,9 +7,9 @@ import MentionsTab from "@/components/geo-tools/MentionsTab";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 
 // "Where do I stand?" — the canonical analytics + citation-run home.
-// Overview is the full AI-visibility report relocated from the old `/`
-// dashboard (monitor-overview.tsx), powered by the single /api/dashboard
-// aggregate — the duplicate /api/geo-analytics-backed page is retired.
+// The Overview tab was retired: every panel on it either duplicated the
+// Command Center dashboard (home.tsx) or moved there. Citations is now the
+// default tab.
 // Trends is the analytical half of the dissolved ai-intelligence page (its
 // Competitors tab is dropped — competitors.tsx is the single canonical
 // competitor view, embedded here as the Competitors tab; its Share-of-Answer
@@ -17,7 +17,6 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 // synthesized the numbers, so the surface could not be defended).
 // Mentions is the detected brand-mention scanner (Reddit / Hacker News /
 // manual adds) — distinct from /act › Community (authored outreach).
-const MonitorOverview = lazy(() => import("@/pages/monitor-overview"));
 const Citations = lazy(() => import("@/pages/citations"));
 const Competitors = lazy(() => import("@/pages/competitors"));
 
@@ -35,16 +34,8 @@ function MentionsScanner() {
 export default function Monitor() {
   return (
     <SpineShell
-      defaultTab="overview"
+      defaultTab="citations"
       tabs={[
-        {
-          value: "overview",
-          label: "Overview",
-          icon: BarChart3,
-          Component: MonitorOverview,
-          description:
-            "Where you stand across AI engines at a glance: your visibility score, generative rankings, and citation trend.",
-        },
         {
           value: "citations",
           label: "Citations",

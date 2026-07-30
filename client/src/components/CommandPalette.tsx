@@ -3,7 +3,6 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   Home,
   FileText,
-  BarChart3,
   Link2,
   Swords,
   History,
@@ -86,15 +85,6 @@ const NAV: NavEntry[] = [
     keywords: "proof export pdf share results",
   },
 
-  {
-    section: "Monitor",
-    label: "Overview",
-    to: "/monitor",
-    tab: "overview",
-    icon: BarChart3,
-    brandScoped: true,
-    keywords: "analytics visibility report",
-  },
   {
     section: "Monitor",
     label: "Citations",
