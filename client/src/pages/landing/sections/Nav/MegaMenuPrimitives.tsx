@@ -50,9 +50,12 @@ export function MegaMenuPanel({
     <div
       id={id}
       aria-hidden={!isOpen}
-      // React 18's JSX types predate the `inert` attribute; it still reaches
-      // the DOM as-is. Drop the cast once the app is on React 19 types.
-      {...({ inert: isOpen ? undefined : "" } as Record<string, unknown>)}
+      // Native boolean, as the cast this replaces said to do once the app was
+      // on React 19 types (it is: react 19.2.8, @types/react 19.2.17). The old
+      // `inert: ""` spread made React 19 warn on every page load — it reads an
+      // empty string for a boolean attribute as FALSE, so the closed menu was
+      // never actually inert and its links stayed keyboard-reachable.
+      inert={!isOpen}
       className={`
         absolute top-full left-0 mt-2 ${width}
         bg-vc-surface rounded border border-vc-default shadow-[0_8px_28px_-12px_rgba(15,23,42,0.12)]

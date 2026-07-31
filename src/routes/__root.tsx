@@ -215,7 +215,17 @@ const SOFTWARE_APPLICATION_JSON_LD = {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning because THEME_FOUC_SCRIPT below deliberately
+    // mutates this exact element before React hydrates — it adds `class="dark"`
+    // and sets `style.color-scheme`. The server cannot render those: the theme
+    // lives in localStorage, which SSR cannot read. React saw attributes it had
+    // not emitted and logged a hydration mismatch on every single page load.
+    //
+    // Suppression is scoped to this element's own attributes only — it does not
+    // extend to descendants — so a genuine mismatch anywhere inside the app is
+    // still reported. Removing the script instead is not an option: it exists to
+    // stop a flash of the wrong theme, and it has to run before first paint.
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Every <title>/<meta>/<link>/<script> tag for the document comes
             from route `head()` config (this route's default above, plus any
