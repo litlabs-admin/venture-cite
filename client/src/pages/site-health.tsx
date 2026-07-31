@@ -51,8 +51,8 @@ export interface SiteHealthPage {
 const SEVERITY_SWATCH: Record<string, string> = {
   critical: "var(--negative)",
   high: "var(--brand-accent)",
-  medium: "#a8a29e",
-  low: "#d6d3d1",
+  medium: "var(--fg-disabled)",
+  low: "var(--border-strong)",
 };
 
 const SEVERITY_LABEL: Record<string, string> = {
@@ -146,7 +146,7 @@ function DiscoveryRow({ label, status }: { label: string; status: boolean | null
     <div className="flex items-center gap-1.5 text-data text-vc-secondary">
       <span
         className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-        style={{ backgroundColor: status ? "var(--brand-accent)" : "#d6d3d1" }}
+        style={{ backgroundColor: status ? "var(--brand-accent)" : "var(--border-strong)" }}
         aria-hidden
       />
       {label}
@@ -411,7 +411,7 @@ export default function SiteHealthDetailPage() {
   );
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-vc-page">
       {/* Header: brand name · website ↗ · ● Audited <relative time> */}
       <div className="flex items-center justify-between border-b border-vc-default px-8 py-6">
         <div>
@@ -435,7 +435,9 @@ export default function SiteHealthDetailPage() {
             )}
             <span
               className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-              style={{ backgroundColor: health?.checkedAt ? "var(--brand-accent)" : "#d6d3d1" }}
+              style={{
+                backgroundColor: health?.checkedAt ? "var(--brand-accent)" : "var(--border-strong)",
+              }}
               aria-hidden
             />
             {health?.checkedAt ? `Audited ${relTime(health.checkedAt)}` : "Not audited yet"}

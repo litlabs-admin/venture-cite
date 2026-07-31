@@ -4,7 +4,6 @@
 // were removed here to end the duplication.
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,6 +62,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 // Wave 9.4: pretty-print scan reports as multi-line toast descriptions.
 // Hides zero-valued lines so a clean run shows just the meaningful ones.
@@ -102,20 +102,23 @@ function SummaryCard({
   primary,
   secondary,
   testId,
+  span,
+  border,
 }: {
   label: string;
   primary: string;
   secondary: string;
   testId?: string;
+  span?: 2 | 3;
+  border?: "row" | "last";
 }) {
   return (
-    <Card data-testid={testId}>
-      <CardContent className="pt-4 pb-4">
-        <div className="text-label uppercase tracking-wider text-muted-foreground">{label}</div>
-        <div className="text-metric font-semibold mt-1">{primary}</div>
+    <Panel label={label} span={span} border={border}>
+      <div data-testid={testId}>
+        <div className="text-metric font-semibold mt-1 tabular-nums">{primary}</div>
         <div className="text-caption text-muted-foreground mt-1">{secondary}</div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -539,14 +542,14 @@ export default function GeoTools() {
     // (Fragment kept: BofuContentSheet/dialogs below are siblings of the
     // main <div>, not children of it.)
     <>
-      <div className="space-y-8">
+      <PanelPage>
         {selectedBrandId ? (
           <>
             {/* Wave 9.4: header roll-up. Single endpoint, refreshes
                 with the live cadence so newly published content +
                 self-citation counts surface within the run. */}
             {summary && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <PanelRow cols={3}>
                 <SummaryCard
                   label="Listicles"
                   primary={`${summary.listicles.included}/${summary.listicles.total}`}
@@ -564,10 +567,14 @@ export default function GeoTools() {
                   primary={`${summary.bofu.published}`}
                   secondary={`${summary.bofu.cited30d} cited (30d) · ${summary.bofu.drafts} draft`}
                   testId="summary-bofu"
+                  border="last"
                 />
-              </div>
+              </PanelRow>
             )}
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            {/* Tab strip: a widget the panel grammar has no equivalent for
+                (see task note on tab strips/dialogs/accordions). Left as-is,
+                just padded to line up with the panel edges above/below. */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="px-8 pt-6">
               <TabsList className="grid w-full grid-cols-3 mb-6" data-tour-id="geoTools.tabs">
                 <TabsTrigger
                   value="listicles"
@@ -597,577 +604,570 @@ export default function GeoTools() {
 
               {/* LISTICLES TAB */}
               <TabsContent value="listicles">
-                <div className="grid gap-6">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <List className="h-5 w-5 text-primary" />
-                            Listicle Tracker
-                          </CardTitle>
-                          <CardDescription>
-                            Find "best of" articles across consumer, professional, and investor
-                            audiences where your brand should be listed
-                          </CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => setAddListicleOpen(true)}
-                            data-testid="button-add-listicle"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add manually
-                          </Button>
-                          <Button
-                            onClick={() => discoverListiclesMutation.mutate()}
-                            disabled={discoverListiclesMutation.isPending}
-                            data-testid="button-discover-listicles"
-                          >
-                            {discoverListiclesMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-4 w-4 mr-2" />
-                            )}
-                            Discover Opportunities
-                          </Button>
-                        </div>
+                <PanelRow cols={1} last>
+                  <Panel
+                    label={
+                      <span className="flex items-center gap-2">
+                        <List className="h-3.5 w-3.5" />
+                        Listicle Tracker
+                      </span>
+                    }
+                    action={
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAddListicleOpen(true)}
+                          data-testid="button-add-listicle"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add manually
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => discoverListiclesMutation.mutate()}
+                          disabled={discoverListiclesMutation.isPending}
+                          data-testid="button-discover-listicles"
+                        >
+                          {discoverListiclesMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-4 w-4 mr-2" />
+                          )}
+                          Discover Opportunities
+                        </Button>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="bg-chart-1/10 p-4 rounded-lg mb-6">
-                        <p className="text-caption text-chart-1">
-                          <strong>Why Listicles Matter:</strong> Getting included in "Best of"
-                          articles is how brands rank #1 on ChatGPT. AI systems heavily cite these
-                          curated lists.
-                        </p>
-                      </div>
+                    }
+                    width="wide"
+                    border="last"
+                  >
+                    <p className="mb-4 text-data text-vc-tertiary">
+                      Find "best of" articles across consumer, professional, and investor audiences
+                      where your brand should be listed
+                    </p>
+                    <div className="bg-chart-1/10 p-4 rounded-lg mb-6">
+                      <p className="text-caption text-chart-1">
+                        <strong>Why Listicles Matter:</strong> Getting included in "Best of"
+                        articles is how brands rank #1 on ChatGPT. AI systems heavily cite these
+                        curated lists.
+                      </p>
+                    </div>
 
-                      {listiclesLoading ? (
-                        <div className="space-y-4">
-                          <Skeleton className="h-24 w-full rounded-lg" />
-                          <Skeleton className="h-24 w-full rounded-lg" />
-                          <Skeleton className="h-24 w-full rounded-lg" />
-                        </div>
-                      ) : listiclesIsError ? (
-                        <ErrorState
-                          title="Couldn't load listicles"
-                          onRetry={() => refetchListicles()}
-                          isRetrying={listiclesIsRefetching}
-                        />
-                      ) : listicles.length > 0 ? (
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold">
-                              Tracked Listicles ({listicles.length})
-                            </h3>
-                            <div className="flex items-center gap-2">
-                              <span className="text-caption text-muted-foreground">
-                                Filter by outreach
-                              </span>
-                              <Select
-                                value={listicleStatusFilter}
-                                onValueChange={setListicleStatusFilter}
+                    {listiclesLoading ? (
+                      <div className="space-y-4">
+                        <Skeleton className="h-24 w-full rounded-lg" />
+                        <Skeleton className="h-24 w-full rounded-lg" />
+                        <Skeleton className="h-24 w-full rounded-lg" />
+                      </div>
+                    ) : listiclesIsError ? (
+                      <ErrorState
+                        title="Couldn't load listicles"
+                        onRetry={() => refetchListicles()}
+                        isRetrying={listiclesIsRefetching}
+                      />
+                    ) : listicles.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold">Tracked Listicles ({listicles.length})</h3>
+                          <div className="flex items-center gap-2">
+                            <span className="text-caption text-muted-foreground">
+                              Filter by outreach
+                            </span>
+                            <Select
+                              value={listicleStatusFilter}
+                              onValueChange={setListicleStatusFilter}
+                            >
+                              <SelectTrigger
+                                className="w-[160px] h-8 text-caption"
+                                data-testid="select-listicle-status-filter"
                               >
-                                <SelectTrigger
-                                  className="w-[160px] h-8 text-caption"
-                                  data-testid="select-listicle-status-filter"
-                                >
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="all">All</SelectItem>
-                                  <SelectItem value="new">New</SelectItem>
-                                  <SelectItem value="contacted">Contacted</SelectItem>
-                                  <SelectItem value="won">Won</SelectItem>
-                                  <SelectItem value="dropped">Dropped</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All</SelectItem>
+                                <SelectItem value="new">New</SelectItem>
+                                <SelectItem value="contacted">Contacted</SelectItem>
+                                <SelectItem value="won">Won</SelectItem>
+                                <SelectItem value="dropped">Dropped</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
-                          {listicles
-                            .filter((l) => {
-                              if (listicleStatusFilter === "all") return true;
-                              const s = (l as any).outreachStatus ?? "new";
-                              return s === listicleStatusFilter;
-                            })
-                            .map((l, listicleIndex) => {
-                              const competitors = Array.isArray(l.competitorsMentioned)
-                                ? l.competitorsMentioned
-                                : [];
-                              const extra = competitors.length > 3 ? competitors.length - 3 : 0;
-                              const status = ((l as any).outreachStatus ?? "new") as string;
-                              const statusMeta =
-                                LISTICLE_STATUS_DISPLAY[status] ?? LISTICLE_STATUS_DISPLAY.new;
-                              return (
-                                <Card key={l.id}>
-                                  <CardContent className="pt-4">
-                                    <div className="flex items-start justify-between gap-4">
-                                      <StatusDot tone="neutral" className="mt-2" />
-                                      <div className="flex-1 min-w-0">
-                                        <a
-                                          href={safeExternalHref(l.url)}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="font-medium text-chart-1 hover:underline flex items-center gap-1"
-                                        >
-                                          <span className="line-clamp-1">{l.title}</span>
-                                          <ExternalLink className="h-3 w-3 shrink-0" />
-                                        </a>
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                          <Badge
-                                            variant={statusMeta.variant}
-                                            data-testid={`badge-listicle-status-${l.id}`}
-                                          >
-                                            {statusMeta.icon && (
-                                              <Check className="h-3 w-3 mr-1" aria-hidden="true" />
-                                            )}
-                                            {statusMeta.label}
-                                          </Badge>
-                                          {l.sourcePublication && (
-                                            <Badge variant="outline">{l.sourcePublication}</Badge>
-                                          )}
-                                          {l.isIncluded === 1 ? (
-                                            <Badge variant="positive">
-                                              <CheckCircle className="h-3 w-3 mr-1" />
-                                              Included at #{l.listPosition ?? "?"} /{" "}
-                                              {l.totalListItems ?? "?"}
-                                            </Badge>
-                                          ) : (
-                                            <Badge variant="neutral">
-                                              <XCircle className="h-3 w-3 mr-1" />
-                                              Not in list
-                                            </Badge>
-                                          )}
-                                          {l.keyword && (
-                                            <Badge variant="secondary">
-                                              <Search className="h-3 w-3 mr-1" />
-                                              {l.keyword}
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        {competitors.length > 0 && (
-                                          <p className="text-caption text-muted-foreground mt-2">
-                                            Competitors: {competitors.slice(0, 3).join(", ")}
-                                            {extra > 0 ? ` + ${extra} more` : ""}
-                                          </p>
-                                        )}
-                                      </div>
-                                      <div className="shrink-0">
-                                        <Select
-                                          value={(l as any).outreachStatus ?? "new"}
-                                          onValueChange={(v) =>
-                                            updateListicleStatusMutation.mutate({
-                                              id: l.id,
-                                              outreachStatus: v,
-                                            })
-                                          }
-                                        >
-                                          <SelectTrigger
-                                            className="w-[150px] h-8 text-caption"
-                                            data-testid={`select-listicle-status-${l.id}`}
-                                          >
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="new">New</SelectItem>
-                                            <SelectItem value="contacted">Contacted</SelectItem>
-                                            <SelectItem value="won">Won</SelectItem>
-                                            <SelectItem value="dropped">Dropped</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              );
-                            })}
                         </div>
-                      ) : (
-                        <EmptyState icon={List} title="No listicles yet. Click Discover to scan." />
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                        {listicles
+                          .filter((l) => {
+                            if (listicleStatusFilter === "all") return true;
+                            const s = (l as any).outreachStatus ?? "new";
+                            return s === listicleStatusFilter;
+                          })
+                          .map((l, listicleIndex) => {
+                            const competitors = Array.isArray(l.competitorsMentioned)
+                              ? l.competitorsMentioned
+                              : [];
+                            const extra = competitors.length > 3 ? competitors.length - 3 : 0;
+                            const status = ((l as any).outreachStatus ?? "new") as string;
+                            const statusMeta =
+                              LISTICLE_STATUS_DISPLAY[status] ?? LISTICLE_STATUS_DISPLAY.new;
+                            return (
+                              <div
+                                key={l.id}
+                                className="rounded-lg border border-border bg-card pt-4 px-4 pb-4"
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <StatusDot tone="neutral" className="mt-2" />
+                                  <div className="flex-1 min-w-0">
+                                    <a
+                                      href={safeExternalHref(l.url)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-medium text-chart-1 hover:underline flex items-center gap-1"
+                                    >
+                                      <span className="line-clamp-1">{l.title}</span>
+                                      <ExternalLink className="h-3 w-3 shrink-0" />
+                                    </a>
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                      <Badge
+                                        variant={statusMeta.variant}
+                                        data-testid={`badge-listicle-status-${l.id}`}
+                                      >
+                                        {statusMeta.icon && (
+                                          <Check className="h-3 w-3 mr-1" aria-hidden="true" />
+                                        )}
+                                        {statusMeta.label}
+                                      </Badge>
+                                      {l.sourcePublication && (
+                                        <Badge variant="outline">{l.sourcePublication}</Badge>
+                                      )}
+                                      {l.isIncluded === 1 ? (
+                                        <Badge variant="positive">
+                                          <CheckCircle className="h-3 w-3 mr-1" />
+                                          Included at #{l.listPosition ?? "?"} /{" "}
+                                          {l.totalListItems ?? "?"}
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="neutral">
+                                          <XCircle className="h-3 w-3 mr-1" />
+                                          Not in list
+                                        </Badge>
+                                      )}
+                                      {l.keyword && (
+                                        <Badge variant="secondary">
+                                          <Search className="h-3 w-3 mr-1" />
+                                          {l.keyword}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {competitors.length > 0 && (
+                                      <p className="text-caption text-muted-foreground mt-2">
+                                        Competitors: {competitors.slice(0, 3).join(", ")}
+                                        {extra > 0 ? ` + ${extra} more` : ""}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="shrink-0">
+                                    <Select
+                                      value={(l as any).outreachStatus ?? "new"}
+                                      onValueChange={(v) =>
+                                        updateListicleStatusMutation.mutate({
+                                          id: l.id,
+                                          outreachStatus: v,
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger
+                                        className="w-[150px] h-8 text-caption"
+                                        data-testid={`select-listicle-status-${l.id}`}
+                                      >
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="new">New</SelectItem>
+                                        <SelectItem value="contacted">Contacted</SelectItem>
+                                        <SelectItem value="won">Won</SelectItem>
+                                        <SelectItem value="dropped">Dropped</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    ) : (
+                      <EmptyState icon={List} title="No listicles yet. Click Discover to scan." />
+                    )}
+                  </Panel>
+                </PanelRow>
               </TabsContent>
 
               {/* WIKIPEDIA TAB */}
               <TabsContent value="wikipedia">
-                <div className="grid gap-6">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <BookOpen className="h-5 w-5 text-chart-1" />
-                            Wikipedia Monitor
-                          </CardTitle>
-                          <CardDescription>
-                            Track & improve your Wikipedia presence (40% of AI citations)
-                          </CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => setAddWikipediaOpen(true)}
-                            data-testid="button-add-wikipedia"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add manually
-                          </Button>
-                          <Button
-                            onClick={() => scanWikipediaMutation.mutate()}
-                            disabled={scanWikipediaMutation.isPending}
-                            data-testid="button-scan-wikipedia"
-                          >
-                            {scanWikipediaMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Search className="h-4 w-4 mr-2" />
-                            )}
-                            Scan Opportunities
-                          </Button>
-                        </div>
+                <PanelRow cols={1} last>
+                  <Panel
+                    label={
+                      <span className="flex items-center gap-2">
+                        <BookOpen className="h-3.5 w-3.5" />
+                        Wikipedia Monitor
+                      </span>
+                    }
+                    action={
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAddWikipediaOpen(true)}
+                          data-testid="button-add-wikipedia"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add manually
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => scanWikipediaMutation.mutate()}
+                          disabled={scanWikipediaMutation.isPending}
+                          data-testid="button-scan-wikipedia"
+                        >
+                          {scanWikipediaMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Search className="h-4 w-4 mr-2" />
+                          )}
+                          Scan Opportunities
+                        </Button>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="bg-warning/10 p-4 rounded-lg mb-6">
-                        <p className="text-caption text-warning">
-                          <strong>Wikipedia = 40% of AI Citations:</strong> It's the #2 most cited
-                          source by AI systems after Reddit. Even a mention on a relevant Wikipedia
-                          page can significantly boost your AI visibility.
+                    }
+                    width="wide"
+                    border="last"
+                  >
+                    <p className="mb-4 text-data text-vc-tertiary">
+                      Track & improve your Wikipedia presence (40% of AI citations)
+                    </p>
+                    <div className="bg-warning/10 p-4 rounded-lg mb-6">
+                      <p className="text-caption text-warning">
+                        <strong>Wikipedia = 40% of AI Citations:</strong> It's the #2 most cited
+                        source by AI systems after Reddit. Even a mention on a relevant Wikipedia
+                        page can significantly boost your AI visibility.
+                      </p>
+                    </div>
+
+                    {wikipediaMentions.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>
+                          Click "Scan Opportunities" to analyze Wikipedia presence for{" "}
+                          {selectedBrand?.name}
                         </p>
                       </div>
-
-                      {wikipediaMentions.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>
-                            Click "Scan Opportunities" to analyze Wikipedia presence for{" "}
-                            {selectedBrand?.name}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-6">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle className="text-ui flex items-center gap-2">
-                                <CheckCircle className="h-4 w-4 text-foreground" />
-                                You&apos;re already mentioned ({wikiExistingRows.length})
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              {wikiExistingRows.length === 0 ? (
-                                <p className="text-caption text-muted-foreground">
-                                  No existing mentions found on Wikipedia yet.
-                                </p>
-                              ) : (
-                                <div className="space-y-3">
-                                  {wikiExistingRows.map((m) => {
-                                    const reason =
-                                      (m.metadata as { reason?: string } | null)?.reason ?? "";
-                                    return (
-                                      <div
-                                        key={m.id}
-                                        className="border rounded-md p-3 hover:bg-muted/40"
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="rounded-lg border border-border bg-card p-4">
+                          <h4 className="text-ui font-semibold flex items-center gap-2 mb-3">
+                            <CheckCircle className="h-4 w-4 text-foreground" />
+                            You&apos;re already mentioned ({wikiExistingRows.length})
+                          </h4>
+                          <div>
+                            {wikiExistingRows.length === 0 ? (
+                              <p className="text-caption text-muted-foreground">
+                                No existing mentions found on Wikipedia yet.
+                              </p>
+                            ) : (
+                              <div className="space-y-3">
+                                {wikiExistingRows.map((m) => {
+                                  const reason =
+                                    (m.metadata as { reason?: string } | null)?.reason ?? "";
+                                  return (
+                                    <div
+                                      key={m.id}
+                                      className="border rounded-md p-3 hover:bg-muted/40"
+                                    >
+                                      <a
+                                        href={safeExternalHref(m.pageUrl)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="font-medium text-chart-1 hover:underline flex items-center gap-1"
                                       >
+                                        {m.pageTitle}
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                      {m.mentionContext && (
+                                        <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
+                                          {m.mentionContext}
+                                        </p>
+                                      )}
+                                      {reason && (
+                                        <p className="text-caption text-muted-foreground mt-2 italic">
+                                          {reason}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-border bg-card p-4">
+                          <h4 className="text-ui font-semibold flex items-center gap-2 mb-3">
+                            <Target className="h-4 w-4 text-chart-1" />
+                            Pages you could target ({wikiOpportunityRows.length})
+                          </h4>
+                          <div>
+                            {wikiOpportunityRows.length === 0 ? (
+                              <p className="text-caption text-muted-foreground">
+                                No opportunity pages surfaced. Try re-scanning after adding
+                                competitors or products to the brand profile.
+                              </p>
+                            ) : (
+                              <div className="space-y-3">
+                                {wikiOpportunityRows.map((m) => {
+                                  const reason =
+                                    (m.metadata as { reason?: string } | null)?.reason ?? "";
+                                  return (
+                                    <div
+                                      key={m.id}
+                                      className="border rounded-md p-3 hover:bg-muted/40"
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
                                         <a
                                           href={safeExternalHref(m.pageUrl)}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="font-medium text-chart-1 hover:underline flex items-center gap-1"
+                                          className="font-medium text-chart-1 hover:underline flex items-center gap-1 min-w-0"
                                         >
-                                          {m.pageTitle}
-                                          <ExternalLink className="h-3 w-3" />
+                                          <span className="line-clamp-2">{m.pageTitle}</span>
+                                          <ExternalLink className="h-3 w-3 shrink-0" />
                                         </a>
-                                        {m.mentionContext && (
-                                          <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
-                                            {m.mentionContext}
-                                          </p>
-                                        )}
-                                        {reason && (
-                                          <p className="text-caption text-muted-foreground mt-2 italic">
-                                            {reason}
-                                          </p>
-                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="shrink-0"
+                                          onClick={async () => {
+                                            const data = await draftWikipediaMutation
+                                              .mutateAsync(m.id)
+                                              .catch(() => null);
+                                            if (data?.data) {
+                                              setWikiDraft({
+                                                mentionId: m.id,
+                                                pageTitle: m.pageTitle,
+                                                text: data.data.draft || "",
+                                                notes: Array.isArray(data.data.notes)
+                                                  ? data.data.notes
+                                                  : [],
+                                              });
+                                            }
+                                          }}
+                                          disabled={draftWikipediaMutation.isPending}
+                                          data-testid={`button-wikipedia-draft-${m.id}`}
+                                        >
+                                          {draftWikipediaMutation.isPending ? (
+                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                          ) : (
+                                            <Sparkles className="h-3 w-3 mr-1" />
+                                          )}
+                                          Draft mention
+                                        </Button>
                                       </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
-
-                          <Card>
-                            <CardHeader>
-                              <CardTitle className="text-ui flex items-center gap-2">
-                                <Target className="h-4 w-4 text-chart-1" />
-                                Pages you could target ({wikiOpportunityRows.length})
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              {wikiOpportunityRows.length === 0 ? (
-                                <p className="text-caption text-muted-foreground">
-                                  No opportunity pages surfaced. Try re-scanning after adding
-                                  competitors or products to the brand profile.
-                                </p>
-                              ) : (
-                                <div className="space-y-3">
-                                  {wikiOpportunityRows.map((m) => {
-                                    const reason =
-                                      (m.metadata as { reason?: string } | null)?.reason ?? "";
-                                    return (
-                                      <div
-                                        key={m.id}
-                                        className="border rounded-md p-3 hover:bg-muted/40"
-                                      >
-                                        <div className="flex items-start justify-between gap-2">
-                                          <a
-                                            href={safeExternalHref(m.pageUrl)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="font-medium text-chart-1 hover:underline flex items-center gap-1 min-w-0"
-                                          >
-                                            <span className="line-clamp-2">{m.pageTitle}</span>
-                                            <ExternalLink className="h-3 w-3 shrink-0" />
-                                          </a>
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="shrink-0"
-                                            onClick={async () => {
-                                              const data = await draftWikipediaMutation
-                                                .mutateAsync(m.id)
-                                                .catch(() => null);
-                                              if (data?.data) {
-                                                setWikiDraft({
-                                                  mentionId: m.id,
-                                                  pageTitle: m.pageTitle,
-                                                  text: data.data.draft || "",
-                                                  notes: Array.isArray(data.data.notes)
-                                                    ? data.data.notes
-                                                    : [],
-                                                });
-                                              }
-                                            }}
-                                            disabled={draftWikipediaMutation.isPending}
-                                            data-testid={`button-wikipedia-draft-${m.id}`}
-                                          >
-                                            {draftWikipediaMutation.isPending ? (
-                                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                            ) : (
-                                              <Sparkles className="h-3 w-3 mr-1" />
-                                            )}
-                                            Draft mention
-                                          </Button>
-                                        </div>
-                                        {m.mentionContext && (
-                                          <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
-                                            {m.mentionContext}
-                                          </p>
-                                        )}
-                                        {reason && (
-                                          <p className="text-caption text-muted-foreground mt-2 italic">
-                                            {reason}
-                                          </p>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
+                                      {m.mentionContext && (
+                                        <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
+                                          {m.mentionContext}
+                                        </p>
+                                      )}
+                                      {reason && (
+                                        <p className="text-caption text-muted-foreground mt-2 italic">
+                                          {reason}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                      </div>
+                    )}
+                  </Panel>
+                </PanelRow>
               </TabsContent>
 
               {/* BOFU CONTENT TAB */}
               <TabsContent value="bofu">
-                <div className="grid gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-foreground" />
+                <PanelRow cols={1} last>
+                  <Panel
+                    label={
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-3.5 w-3.5" />
                         BOFU Content Generator
-                      </CardTitle>
-                      <CardDescription>
-                        Generate bottom-of-funnel content: comparisons, alternatives, and
-                        transactional guides
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="bg-muted p-4 rounded-lg mb-6">
-                        <p className="text-caption text-foreground">
-                          <strong>80% BOFU Strategy:</strong> Comparison articles ("X vs Y") and
-                          alternatives guides convert 80% better and get cited heavily by AI systems
-                          for purchase decisions.
-                        </p>
-                      </div>
+                      </span>
+                    }
+                    width="wide"
+                    border="last"
+                  >
+                    <p className="mb-4 text-data text-vc-tertiary">
+                      Generate bottom-of-funnel content: comparisons, alternatives, and
+                      transactional guides
+                    </p>
+                    <div className="bg-muted p-4 rounded-lg mb-6">
+                      <p className="text-caption text-foreground">
+                        <strong>80% BOFU Strategy:</strong> Comparison articles ("X vs Y") and
+                        alternatives guides convert 80% better and get cited heavily by AI systems
+                        for purchase decisions.
+                      </p>
+                    </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div>
+                        <label className="text-caption font-medium mb-2 block">Content Type</label>
+                        <Select value={bofuType} onValueChange={setBofuType}>
+                          <SelectTrigger data-testid="select-bofu-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="comparison">X vs Y Comparison</SelectItem>
+                            <SelectItem value="alternatives">Alternatives To</SelectItem>
+                            <SelectItem value="guide">Buying Guide</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {(bofuType === "comparison" || bofuType === "alternatives") && (
                         <div>
                           <label className="text-caption font-medium mb-2 block">
-                            Content Type
+                            {bofuType === "comparison" ? "Compare With" : "Alternatives To"}
                           </label>
-                          <Select value={bofuType} onValueChange={setBofuType}>
-                            <SelectTrigger data-testid="select-bofu-type">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="comparison">X vs Y Comparison</SelectItem>
-                              <SelectItem value="alternatives">Alternatives To</SelectItem>
-                              <SelectItem value="guide">Buying Guide</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {(bofuType === "comparison" || bofuType === "alternatives") && (
-                          <div>
-                            <label className="text-caption font-medium mb-2 block">
-                              {bofuType === "comparison" ? "Compare With" : "Alternatives To"}
-                            </label>
-                            <CompetitorCombobox
-                              options={trackedCompetitors.map((c) => c.name)}
-                              value={bofuCompetitors}
-                              onChange={setBofuCompetitors}
-                              placeholder="Pick competitors..."
-                            />
-                          </div>
-                        )}
-                        {bofuType === "guide" && (
-                          <div>
-                            <label className="text-caption font-medium mb-2 block">
-                              Target Keyword
-                            </label>
-                            <Input
-                              placeholder="e.g., PR agency guide"
-                              value={bofuKeyword}
-                              onChange={(e) => setBofuKeyword(e.target.value)}
-                              data-testid="input-bofu-keyword"
-                            />
-                          </div>
-                        )}
-                        <div className="flex items-end">
-                          <Button
-                            onClick={() =>
-                              generateBofuMutation.mutate({
-                                contentType: bofuType,
-                                comparedWith:
-                                  bofuCompetitors.length > 0 ? bofuCompetitors : undefined,
-                                keyword: bofuKeyword || undefined,
-                              })
-                            }
-                            disabled={generateBofuMutation.isPending}
-                            className="w-full"
-                            data-testid="button-generate-bofu"
-                          >
-                            {generateBofuMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-4 w-4 mr-2" />
-                            )}
-                            Generate
-                          </Button>
-                        </div>
-                      </div>
-
-                      <Separator className="my-6" />
-
-                      {bofuLoading ? (
-                        <div className="space-y-3">
-                          <Skeleton className="h-20 w-full rounded-lg" />
-                          <Skeleton className="h-20 w-full rounded-lg" />
-                        </div>
-                      ) : (bofuData as any)?.data?.length > 0 ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold">Generated Content</h3>
-                            <span className="text-caption text-muted-foreground">
-                              Click any piece to view, copy, or mark as published.
-                            </span>
-                          </div>
-                          {(bofuData as any).data.map((content: BofuContent) => {
-                            const lastCited = content.lastCitedAt
-                              ? new Date(content.lastCitedAt as any)
-                              : null;
-                            const recentlyCited =
-                              !!lastCited &&
-                              Date.now() - lastCited.getTime() < 30 * 24 * 60 * 60 * 1000;
-                            return (
-                              <Card
-                                key={content.id}
-                                interactive
-                                className="cursor-pointer"
-                                onClick={() => {
-                                  setActiveBofu(content);
-                                  setBofuSheetOpen(true);
-                                }}
-                                data-testid={`bofu-card-${content.id}`}
-                              >
-                                <CardContent className="pt-4">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                                        <Badge variant="outline">{content.contentType}</Badge>
-                                        <Badge variant="neutral">{content.status ?? "draft"}</Badge>
-                                        {content.publishedAt && (
-                                          <Badge variant="positive">
-                                            <Check className="h-3 w-3 mr-1" aria-hidden="true" />
-                                            Published
-                                          </Badge>
-                                        )}
-                                        {recentlyCited && (
-                                          <Badge variant="positive">Cited recently</Badge>
-                                        )}
-                                      </div>
-                                      <h4 className="font-medium line-clamp-2">{content.title}</h4>
-                                      <p className="text-caption text-muted-foreground mt-1">
-                                        {content.publishedUrl ? (
-                                          <span className="line-clamp-2 inline-block max-w-full">
-                                            {content.publishedUrl}
-                                          </span>
-                                        ) : (
-                                          <span>Draft — not yet published</span>
-                                        )}
-                                      </p>
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveBofu(content);
-                                        setBofuSheetOpen(true);
-                                      }}
-                                      data-testid={`button-open-bofu-${content.id}`}
-                                    >
-                                      Open
-                                    </Button>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>No BOFU content yet. Generate your first piece above!</p>
+                          <CompetitorCombobox
+                            options={trackedCompetitors.map((c) => c.name)}
+                            value={bofuCompetitors}
+                            onChange={setBofuCompetitors}
+                            placeholder="Pick competitors..."
+                          />
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
-                </div>
+                      {bofuType === "guide" && (
+                        <div>
+                          <label className="text-caption font-medium mb-2 block">
+                            Target Keyword
+                          </label>
+                          <Input
+                            placeholder="e.g., PR agency guide"
+                            value={bofuKeyword}
+                            onChange={(e) => setBofuKeyword(e.target.value)}
+                            data-testid="input-bofu-keyword"
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-end">
+                        <Button
+                          onClick={() =>
+                            generateBofuMutation.mutate({
+                              contentType: bofuType,
+                              comparedWith:
+                                bofuCompetitors.length > 0 ? bofuCompetitors : undefined,
+                              keyword: bofuKeyword || undefined,
+                            })
+                          }
+                          disabled={generateBofuMutation.isPending}
+                          className="w-full"
+                          data-testid="button-generate-bofu"
+                        >
+                          {generateBofuMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-4 w-4 mr-2" />
+                          )}
+                          Generate
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Separator className="my-6" />
+
+                    {bofuLoading ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-20 w-full rounded-lg" />
+                        <Skeleton className="h-20 w-full rounded-lg" />
+                      </div>
+                    ) : (bofuData as any)?.data?.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold">Generated Content</h3>
+                          <span className="text-caption text-muted-foreground">
+                            Click any piece to view, copy, or mark as published.
+                          </span>
+                        </div>
+                        {(bofuData as any).data.map((content: BofuContent) => {
+                          const lastCited = content.lastCitedAt
+                            ? new Date(content.lastCitedAt as any)
+                            : null;
+                          const recentlyCited =
+                            !!lastCited &&
+                            Date.now() - lastCited.getTime() < 30 * 24 * 60 * 60 * 1000;
+                          return (
+                            <div
+                              key={content.id}
+                              className="border border-vc-default p-4 cursor-pointer transition-colors hover:bg-vc-muted/50"
+                              onClick={() => {
+                                setActiveBofu(content);
+                                setBofuSheetOpen(true);
+                              }}
+                              data-testid={`bofu-card-${content.id}`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <Badge variant="outline">{content.contentType}</Badge>
+                                    <Badge variant="neutral">{content.status ?? "draft"}</Badge>
+                                    {content.publishedAt && (
+                                      <Badge variant="positive">
+                                        <Check className="h-3 w-3 mr-1" aria-hidden="true" />
+                                        Published
+                                      </Badge>
+                                    )}
+                                    {recentlyCited && (
+                                      <Badge variant="positive">Cited recently</Badge>
+                                    )}
+                                  </div>
+                                  <h4 className="font-medium line-clamp-2">{content.title}</h4>
+                                  <p className="text-caption text-muted-foreground mt-1">
+                                    {content.publishedUrl ? (
+                                      <span className="line-clamp-2 inline-block max-w-full">
+                                        {content.publishedUrl}
+                                      </span>
+                                    ) : (
+                                      <span>Draft — not yet published</span>
+                                    )}
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveBofu(content);
+                                    setBofuSheetOpen(true);
+                                  }}
+                                  data-testid={`button-open-bofu-${content.id}`}
+                                >
+                                  Open
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No BOFU content yet. Generate your first piece above!</p>
+                      </div>
+                    )}
+                  </Panel>
+                </PanelRow>
               </TabsContent>
             </Tabs>
           </>
         ) : (
-          <Card>
-            <CardContent className="py-12 text-center">
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last" className="py-12 text-center">
               <Target className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-page font-semibold mb-2">Select a Brand to Get Started</h3>
               <p className="text-muted-foreground mb-4">
@@ -1179,10 +1179,10 @@ export default function GeoTools() {
                   Create Your First Brand
                 </Button>
               </Link>
-            </CardContent>
-          </Card>
+            </Panel>
+          </PanelRow>
         )}
-      </div>
+      </PanelPage>
 
       <BofuContentSheet
         content={activeBofu}

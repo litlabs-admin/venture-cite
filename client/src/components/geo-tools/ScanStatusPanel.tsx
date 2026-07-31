@@ -8,10 +8,10 @@
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Loader2, Plus } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { StatusDot } from "@/components/foundations/StatusDot";
+import { PanelLabel } from "@/components/dashboard-panels/primitives";
 import type { ScanJob } from "@shared/schema";
 
 // ---------------------------------------------------------------------------
@@ -216,12 +216,12 @@ export function ScanStatusPanel({
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-ui font-semibold">Scan Status</CardTitle>
-      </CardHeader>
+    <div className="w-full">
+      <div className="mb-3">
+        <PanelLabel>Scan Status</PanelLabel>
+      </div>
 
-      <CardContent className="space-y-4">
+      <div className="space-y-4">
         {/* ── "Searching for" line (flow A) ──────────────────────────── */}
         <div className="flex flex-wrap items-center gap-1 text-caption">
           <span className="text-muted-foreground">Searching for:</span>
@@ -352,8 +352,8 @@ export function ScanStatusPanel({
             <p className="text-caption text-muted-foreground">Daily auto-scan enabled</p>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

@@ -75,25 +75,43 @@
      different surface with a different ramp. The product is warm. The
      shadcn semantic layer in :root is pointed at these same values so the
      whole app resolves ONE ramp. */
-  --color-vc-surface: #fff;
-  --color-vc-page: #fff;
-  --color-vc-primary: #1c1917;
-  --color-vc-secondary: #57534e;
-  --color-vc-tertiary: #78716c;
+  /* THEME-DERIVED, NOT LITERAL.
+     These were hard-coded hex, which meant 972 `vc-*` utility uses across 62
+     files rendered light-mode colours under `.dark` — a dark page inside a
+     white chrome frame (app root, sidebar, context bar). The values below are
+     the SAME ones in light: every pair was verified identical before the
+     swap (primary #1c1917 = --fg-primary, default #e7e5e4 = --border-default,
+     label #a8a29e = --fg-disabled, and so on), so light is byte-for-byte
+     unchanged and dark now follows the .dark block.
+
+     Do not re-inline hex here. A literal in this block is invisible in light
+     and silently breaks the whole dark theme. */
+  --color-vc-surface: var(--bg-surface-2);
+  --color-vc-page: var(--bg-base);
+  --color-vc-primary: var(--fg-primary);
+  --color-vc-secondary: var(--fg-secondary);
+  --color-vc-tertiary: var(--fg-tertiary);
   /* One step lighter than `tertiary` — panel eyebrows and de-emphasized meta
-     text. Without it those labels render a full step too dark. */
-  --color-vc-label: #a8a29e;
-  --color-vc-text-muted: #78716c;
-  --color-vc-placeholder: #78716c;
-  --color-vc-muted: #f5f5f4;
-  --color-vc-subtle: #f5f5f4;
-  --color-vc-default: #e7e5e4;
-  --color-vc-hover: #d6d3d1;
-  --color-vc-faint: #d6d3d1;
-  --color-vc-accent: #3b5bf6;
-  --color-vc-accent-subtle: #eef2fe;
-  --color-vc-accent-hover: #2e49d4;
-  --color-vc-success: #0891b2;
+     text. Without it those labels render a full step too dark. Light
+     #a8a29e is exactly --fg-disabled, and dark's own disabled step
+     (oklch 0.42) is the equivalent dimming against a dark canvas. */
+  --color-vc-label: var(--fg-disabled);
+  --color-vc-text-muted: var(--fg-tertiary);
+  --color-vc-placeholder: var(--fg-tertiary);
+  --color-vc-muted: var(--bg-surface-1);
+  --color-vc-subtle: var(--bg-surface-1);
+  --color-vc-default: var(--border-default);
+  --color-vc-hover: var(--border-strong);
+  --color-vc-faint: var(--border-strong);
+  --color-vc-accent: var(--brand-accent);
+  --color-vc-accent-subtle: var(--brand-accent-subtle);
+  /* Light's vc-accent-hover was #2e49d4 — the FILL, not --brand-accent-hover
+     (#2743c9). Mapped to the value it actually had. */
+  --color-vc-accent-hover: var(--brand-accent-fill);
+  /* NOT --positive: that is #0e7490 (cyan-700) and this was #0891b2
+     (cyan-600). Mapping it there would have shifted light mode, so it gets
+     its own primitive declared in both theme blocks. */
+  --color-vc-success: var(--success-accent);
 
   /* Marketing surface-polish layer. Declared here so Tailwind emits the
      utilities; `.vc-home` (landing/styles.css) rebinds the values for the
@@ -543,6 +561,9 @@
     /* Functional status. TDS ships pos + neg only; --warning is derived from
      --tds-s3, its one warm hue. */
     --positive: #0e7490; /* cyan-700 — positive, but never mistakable for the blue accent */
+    /* One step brighter than --positive. Backs `vc-success`, which the
+       dashboard uses for success TEXT rather than fills. */
+    --success-accent: #0891b2; /* cyan-600 */
     /* NOT amber. The reference product ships no amber/orange in its UI at
        all — its whole status vocabulary is neutral + accent + positive +
        negative — and this app's brand accent is blue, so a warm amber tier
@@ -678,38 +699,49 @@
     --fg-secondary: oklch(0.72 0.005 285);
     --fg-tertiary: oklch(0.55 0.006 285);
     --fg-disabled: oklch(0.42 0.005 285);
-    /* Dark used to flip the accent to indigo (hue 278) while light stayed
-     green (hue 170), so the brand changed colour with the theme. Dark is now
-     the same green family as light — one accent, product-wide.
+    /* ACCENT — same hue as light, one step lighter, chroma held as high as
+     sRGB allows. Measured in OKLCH, not eyeballed:
 
-     Values are MEASURED, not eyeballed. Light's own green cannot be reused
-     here: the light-mode --brand-accent-fill #2e49d4 is far too dark on this canvas.
-     Green at hue 170 also cannot carry white text at any usable lightness —
-     the best case is 3.35:1, below the 4.5:1 AA floor — so dark inverts the
-     label to near-black. That is why --brand-accent-fg differs from light's
-     white.
+       light #3b5bf6   L 0.548  C 0.233  H 268.3
+       dark  #5c81fe   L 0.640  C 0.190  H 268.3
 
-     Measured against --bg-base oklch(0.165 0.003 285):
-       fill  #27b892  7.66:1 vs its own label, 7.66:1 vs canvas  (AA pass)
-       hover #3fc8a1  9.18:1
-       press #24a684  6.32:1   (chroma trimmed to 0.12 — 0.13 clips sRGB)
+     The previous dark accent was #7f9bff (L 0.712, C 0.149) — the same hue
+     but with 36% of the chroma discarded, which read as a different, washed
+     out blue. It was also over-delivering contrast at 7.38:1 against the
+     canvas when the AA floor is 4.5, so the desaturation bought nothing.
 
-     Worth recording: the indigo this replaces scored 3.20:1 against its
-     near-white label, i.e. the previous comment here claiming "indigo needs
-     no AA adjustment" was wrong and dark's primary button was failing AA.
+     Chroma cannot match light exactly: blue at this hue clips out of sRGB
+     above C ~0.19 once L > 0.6. 0.19 is the honest ceiling at a lightness
+     the dark canvas needs.
+
+     Contrast, computed against --bg-base oklch(0.165 0.003 285) / canvas
+     #0e0e10 and --bg-surface-2 #1b1b1e:
+       accent #5c81fe  5.53 vs canvas, 4.93 vs surface-2   (AA pass)
+       hover  #6f91fa  6.53 / 5.81
+       press  #4a6cef  4.30 / 3.83   (press is a transient state, not text)
+
+     LABEL STAYS INVERTED. On #5c81fe a near-black label scores 5.53 and
+     white only 3.48, so --brand-accent-fg is near-black here where light
+     uses white. That is deliberate, not a leftover.
+
+     (The note this replaces described a green palette at hue 170 that exists
+     in neither theme — it documented a ramp that had already been removed.)
 
      Must be redeclared: --primary points at --brand-accent-fill, so without
-     these lines dark would inherit :root's light-tuned green. */
-    --brand-accent: #7f9bff;
-    --brand-accent-fill: #7f9bff;
-    --brand-accent-hover: #9db1ff;
-    --brand-accent-press: #5b7bff;
+     these lines dark would inherit :root's light-tuned blue. */
+    --brand-accent: #5c81fe;
+    --brand-accent-fill: #5c81fe;
+    --brand-accent-hover: #6f91fa;
+    --brand-accent-press: #4a6cef;
     --brand-accent-fg: oklch(0.165 0.003 285);
-    --brand-accent-subtle: oklch(0.68 0.16 268 / 0.16);
-    /* Raw triplet for the fill above (#7f9bff) — see :root's
-     --brand-accent-rgb note. */
-    --brand-accent-rgb: 127 155 255;
+    --brand-accent-subtle: oklch(0.64 0.19 268.3 / 0.16);
+    /* Raw triplet for the fill above (#5c81fe) — see :root's
+     --brand-accent-rgb note. The gap-matrix heatmap reads this directly. */
+    --brand-accent-rgb: 92 129 254;
     --positive: #22d3ee;
+    /* Dark's canvas is oklch(0.165); cyan-600 reads muddy on it, so success
+       text steps up to cyan-400 for the same separation light gets. */
+    --success-accent: #22d3ee;
     --warning: var(--brand-accent);
     --negative: oklch(0.66 0.18 25);
     /* Dark's weak tints are alpha over the dark canvas rather than pale

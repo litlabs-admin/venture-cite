@@ -127,8 +127,8 @@ function CitationsPanel({
 const SEVERITY: { key: string; label: string; color: string }[] = [
   { key: "critical", label: "crit", color: "var(--negative)" },
   { key: "high", label: "high", color: "var(--brand-accent)" },
-  { key: "medium", label: "med", color: "#a8a29e" },
-  { key: "low", label: "low", color: "#d6d3d1" },
+  { key: "medium", label: "med", color: "var(--fg-disabled)" },
+  { key: "low", label: "low", color: "var(--border-strong)" },
 ];
 
 function HallucinationsPanel({

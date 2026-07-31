@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -31,6 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTourState, useTourStatePatch } from "@/hooks/useTourState";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 type NotificationPreference = {
   type: string;
@@ -111,18 +111,15 @@ function ProfileSection() {
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-ui font-semibold">Profile</CardTitle>
-        <CardDescription>
-          Signed in as{" "}
-          <span className="font-medium text-foreground">{user?.email ?? "(no email)"}</span>
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel label="Profile">
+      <p className="mb-4 text-data text-vc-tertiary">
+        Signed in as{" "}
+        <span className="font-medium text-vc-primary">{user?.email ?? "(no email)"}</span>
+      </p>
+      <div className="space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="firstName" className="text-caption font-medium text-muted-foreground">
+            <Label htmlFor="firstName" className="text-caption text-vc-secondary">
               First name
             </Label>
             <Input
@@ -134,7 +131,7 @@ function ProfileSection() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="lastName" className="text-caption font-medium text-muted-foreground">
+            <Label htmlFor="lastName" className="text-caption text-vc-secondary">
               Last name
             </Label>
             <Input
@@ -147,7 +144,7 @@ function ProfileSection() {
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="timezone" className="text-caption font-medium text-muted-foreground">
+          <Label htmlFor="timezone" className="text-caption text-vc-secondary">
             Timezone
           </Label>
           <Select value={timezone} onValueChange={setTimezone}>
@@ -174,8 +171,8 @@ function ProfileSection() {
         >
           {updateProfile.isPending ? "Saving…" : "Save profile"}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -189,19 +186,16 @@ function AppearanceSection() {
   const hint =
     theme === "system" ? `Following your system. Currently ${resolvedTheme}.` : `Always ${theme}.`;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-ui font-semibold">Appearance</CardTitle>
-        <CardDescription>
-          Choose how VentureCite looks to you. System follows your operating system; Light and Dark
-          stay put across reloads and devices on this browser.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <Panel label="Appearance">
+      <p className="mb-4 text-data text-vc-tertiary">
+        Choose how VentureCite looks to you. System follows your operating system; Light and Dark
+        stay put across reloads and devices on this browser.
+      </p>
+      <div className="space-y-3">
         <ThemeToggle />
-        <p className="text-caption text-muted-foreground tnum">{hint}</p>
-      </CardContent>
-    </Card>
+        <p className="text-caption text-vc-tertiary tabular-nums">{hint}</p>
+      </div>
+    </Panel>
   );
 }
 
@@ -238,17 +232,11 @@ function PasswordSection() {
     !changePassword.isPending;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-ui font-semibold">Change password</CardTitle>
-        <CardDescription>Minimum 8 characters.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel label="Change password">
+      <p className="mb-4 text-data text-vc-tertiary">Minimum 8 characters.</p>
+      <div className="space-y-4">
         <div className="space-y-1.5">
-          <Label
-            htmlFor="currentPassword"
-            className="text-caption font-medium text-muted-foreground"
-          >
+          <Label htmlFor="currentPassword" className="text-caption text-vc-secondary">
             Current password
           </Label>
           <Input
@@ -261,7 +249,7 @@ function PasswordSection() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="newPassword" className="text-caption font-medium text-muted-foreground">
+          <Label htmlFor="newPassword" className="text-caption text-vc-secondary">
             New password
           </Label>
           <Input
@@ -274,10 +262,7 @@ function PasswordSection() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label
-            htmlFor="confirmPassword"
-            className="text-caption font-medium text-muted-foreground"
-          >
+          <Label htmlFor="confirmPassword" className="text-caption text-vc-secondary">
             Confirm new password
           </Label>
           <Input
@@ -299,8 +284,8 @@ function PasswordSection() {
         >
           {changePassword.isPending ? "Changing…" : "Change password"}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -334,16 +319,13 @@ function BillingSection() {
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-ui font-semibold">Billing</CardTitle>
-        <CardDescription>
-          Manage subscription, payment method, and invoices through Stripe.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-caption text-muted-foreground" data-testid="text-billing-plan">
-          Current plan: <span className="font-medium text-foreground">{plan}</span>
+    <Panel label="Billing">
+      <p className="mb-4 text-data text-vc-tertiary">
+        Manage subscription, payment method, and invoices through Stripe.
+      </p>
+      <div className="space-y-3">
+        <p className="text-caption text-vc-tertiary" data-testid="text-billing-plan">
+          Current plan: <span className="font-medium text-vc-primary">{plan}</span>
         </p>
         <Button
           onClick={() => openPortal.mutate()}
@@ -352,8 +334,8 @@ function BillingSection() {
         >
           {openPortal.isPending ? "Opening…" : "Manage billing"}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -385,22 +367,17 @@ function IntegrationsSection() {
   const connected = !!buffer?.connected;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-ui font-semibold">Integrations</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center justify-between rounded-md border border-border p-3">
-          <div>
-            <p className="font-medium text-foreground">Buffer</p>
-            <p className="text-caption text-muted-foreground">
-              {connected ? "Connected" : "Not connected"}
-            </p>
-          </div>
-          <BufferConnectDialog connected={connected} />
+    <Panel label="Integrations">
+      <div className="flex items-center justify-between border border-vc-default p-3">
+        <div>
+          <p className="font-medium text-vc-primary">Buffer</p>
+          <p className="text-caption text-vc-tertiary">
+            {connected ? "Connected" : "Not connected"}
+          </p>
         </div>
-      </CardContent>
-    </Card>
+        <BufferConnectDialog connected={connected} />
+      </div>
+    </Panel>
   );
 }
 
@@ -538,169 +515,185 @@ export default function Settings() {
   const canSubmit = password.length > 0 && confirm === "DELETE" && !deleteMutation.isPending;
 
   return (
-    <div className="container max-w-3xl py-8 space-y-8">
-      <PageHeader
-        title="Account settings"
-        description="Manage your account and your data."
-        explainer={pageExplainers.settings}
-      />
+    <PanelPage>
+      <div className="px-8 py-6">
+        <PageHeader
+          title="Account settings"
+          description="Manage your account and your data."
+          explainer={pageExplainers.settings}
+        />
+      </div>
 
-      <ProfileSection />
-      <AppearanceSection />
-      <PasswordSection />
-      <BillingSection />
-      <IntegrationsSection />
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <ProfileSection />
+        </Panel>
+      </PanelRow>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <AppearanceSection />
+        </Panel>
+      </PanelRow>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <PasswordSection />
+        </Panel>
+      </PanelRow>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <BillingSection />
+        </Panel>
+      </PanelRow>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <IntegrationsSection />
+        </Panel>
+      </PanelRow>
 
-      <section className="rounded-lg border border-border p-6 space-y-4">
-        <div>
-          <h2 className="text-ui font-semibold">Notifications</h2>
-          <p className="text-caption text-muted-foreground mt-1">
+      <PanelRow cols={1}>
+        <Panel label="Notifications" width="wide" border="last">
+          <p className="mb-4 text-data text-vc-tertiary">
             Choose which emails you want to receive. Account and billing notices cannot be turned
             off.
           </p>
-        </div>
 
-        {prefsLoading ? (
-          <div className="space-y-4">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-start justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-3 w-64" />
+          {prefsLoading ? (
+            <div className="space-y-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-64" />
+                  </div>
+                  <Skeleton className="h-5 w-9 rounded-full" />
                 </div>
-                <Skeleton className="h-5 w-9 rounded-full" />
-              </div>
-            ))}
+              ))}
+            </div>
+          ) : prefsIsError ? (
+            <ErrorState
+              title="Couldn't load notification preferences"
+              onRetry={() => refetchPrefs()}
+              isRetrying={prefsIsRefetching}
+            />
+          ) : preferences.length === 0 ? (
+            <p className="text-caption text-vc-tertiary">No notification types configured.</p>
+          ) : (
+            <ul className="space-y-4">
+              {preferences.map((pref) => (
+                <li
+                  key={pref.type}
+                  className="flex items-start justify-between gap-4"
+                  data-testid={`notification-pref-${pref.type}`}
+                >
+                  <div className="flex-1">
+                    <Label htmlFor={`pref-${pref.type}`} className="text-caption text-vc-secondary">
+                      {pref.label}
+                    </Label>
+                    <p className="text-caption text-vc-tertiary mt-0.5">{pref.description}</p>
+                  </div>
+                  <Switch
+                    id={`pref-${pref.type}`}
+                    checked={pref.emailEnabled}
+                    disabled={prefMutation.isPending}
+                    onCheckedChange={(checked) =>
+                      prefMutation.mutate({ type: pref.type, emailEnabled: checked })
+                    }
+                    aria-label={`Toggle ${pref.label}`}
+                    data-testid={`switch-${pref.type}`}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </PanelRow>
+
+      <PanelRow cols={1}>
+        <Panel label="Onboarding tours" width="wide" border="last">
+          <p className="mb-4 text-data text-vc-tertiary">
+            Auto-firing tours appear on first visit to new pages. Manual replay via the "?" icon
+            stays available regardless of this setting.
+          </p>
+          <div className="flex items-center justify-between">
+            <label htmlFor="suppress-tours" className="text-caption text-vc-secondary">
+              Don't auto-show tours
+            </label>
+            {/* Disabled until the state actually arrives: an unloaded
+                TourState is `{}`, which renders as "off" even for a user who
+                has suppressed tours — and a click in that window writes the
+                wrong value. Same root cause as the tour re-firing bug. */}
+            <Switch
+              id="suppress-tours"
+              checked={wildcardSuppressed}
+              disabled={!tourStateReady}
+              onCheckedChange={toggleWildcard}
+            />
           </div>
-        ) : prefsIsError ? (
-          <ErrorState
-            title="Couldn't load notification preferences"
-            onRetry={() => refetchPrefs()}
-            isRetrying={prefsIsRefetching}
-          />
-        ) : preferences.length === 0 ? (
-          <p className="text-caption text-muted-foreground">No notification types configured.</p>
-        ) : (
-          <ul className="space-y-4">
-            {preferences.map((pref) => (
-              <li
-                key={pref.type}
-                className="flex items-start justify-between gap-4"
-                data-testid={`notification-pref-${pref.type}`}
-              >
-                <div className="flex-1">
-                  <Label
-                    htmlFor={`pref-${pref.type}`}
-                    className="text-caption font-medium text-muted-foreground"
-                  >
-                    {pref.label}
-                  </Label>
-                  <p className="text-caption text-muted-foreground mt-0.5">{pref.description}</p>
-                </div>
-                <Switch
-                  id={`pref-${pref.type}`}
-                  checked={pref.emailEnabled}
-                  disabled={prefMutation.isPending}
-                  onCheckedChange={(checked) =>
-                    prefMutation.mutate({ type: pref.type, emailEnabled: checked })
-                  }
-                  aria-label={`Toggle ${pref.label}`}
-                  data-testid={`switch-${pref.type}`}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        </Panel>
+      </PanelRow>
 
-      <section className="rounded-lg border border-border p-4">
-        <h2 className="text-ui font-semibold">Onboarding tours</h2>
-        <p className="text-caption text-muted-foreground mt-1">
-          Auto-firing tours appear on first visit to new pages. Manual replay via the "?" icon stays
-          available regardless of this setting.
-        </p>
-        <div className="flex items-center justify-between mt-4">
-          <label
-            htmlFor="suppress-tours"
-            className="text-caption font-medium text-muted-foreground"
-          >
-            Don't auto-show tours
-          </label>
-          {/* Disabled until the state actually arrives: an unloaded
-              TourState is `{}`, which renders as "off" even for a user who
-              has suppressed tours — and a click in that window writes the
-              wrong value. Same root cause as the tour re-firing bug. */}
-          <Switch
-            id="suppress-tours"
-            checked={wildcardSuppressed}
-            disabled={!tourStateReady}
-            onCheckedChange={toggleWildcard}
-          />
-        </div>
-      </section>
-
-      <section className="rounded-lg border border-border p-6 space-y-4">
-        <div>
-          <h2 className="text-ui font-semibold">Delete account</h2>
-          <p className="text-caption text-muted-foreground mt-1">
+      <PanelRow cols={1}>
+        <Panel label="Delete account" width="wide" border="last">
+          <p className="mb-4 text-data text-vc-tertiary">
             Schedules permanent deletion of your account and every brand, article, and citation tied
             to it. You have 30 days to contact support and cancel; after that the data is
             unrecoverable.
           </p>
-        </div>
 
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="delete-password"
-            className="text-caption font-medium text-muted-foreground"
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="delete-password" className="text-caption text-vc-secondary">
+                Confirm password
+              </Label>
+              <Input
+                id="delete-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Your account password"
+                autoComplete="current-password"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="delete-confirm" className="text-caption text-vc-secondary">
+                Type <span className="font-mono font-semibold">DELETE</span> to confirm
+              </Label>
+              <Input
+                id="delete-confirm"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="DELETE"
+                autoComplete="off"
+              />
+            </div>
+
+            <Button
+              variant="destructive"
+              disabled={!canSubmit}
+              onClick={() => deleteMutation.mutate()}
+            >
+              {deleteMutation.isPending ? "Scheduling…" : "Schedule account deletion"}
+            </Button>
+          </div>
+        </Panel>
+      </PanelRow>
+
+      <PanelRow cols={1} last>
+        <Panel label="Export your data" width="wide" border="last">
+          <p className="mb-4 text-data text-vc-tertiary">
+            Download every brand, article, and citation tied to your account as a JSON file.
+            Rate-limited to one export per day per account.
+          </p>
+          <Button
+            variant="outline"
+            disabled={exportMutation.isPending}
+            onClick={() => exportMutation.mutate()}
           >
-            Confirm password
-          </Label>
-          <Input
-            id="delete-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Your account password"
-            autoComplete="current-password"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="delete-confirm"
-            className="text-caption font-medium text-muted-foreground"
-          >
-            Type <span className="font-mono font-semibold">DELETE</span> to confirm
-          </Label>
-          <Input
-            id="delete-confirm"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            placeholder="DELETE"
-            autoComplete="off"
-          />
-        </div>
-
-        <Button variant="destructive" disabled={!canSubmit} onClick={() => deleteMutation.mutate()}>
-          {deleteMutation.isPending ? "Scheduling…" : "Schedule account deletion"}
-        </Button>
-      </section>
-
-      <section className="rounded-lg border border-border p-6 space-y-3">
-        <h2 className="text-ui font-semibold">Export your data</h2>
-        <p className="text-caption text-muted-foreground">
-          Download every brand, article, and citation tied to your account as a JSON file.
-          Rate-limited to one export per day per account.
-        </p>
-        <Button
-          variant="outline"
-          disabled={exportMutation.isPending}
-          onClick={() => exportMutation.mutate()}
-        >
-          {exportMutation.isPending ? "Preparing…" : "Download my data (JSON)"}
-        </Button>
-      </section>
-    </div>
+            {exportMutation.isPending ? "Preparing…" : "Download my data (JSON)"}
+          </Button>
+        </Panel>
+      </PanelRow>
+    </PanelPage>
   );
 }

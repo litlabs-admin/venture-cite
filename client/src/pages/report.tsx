@@ -8,6 +8,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
 import CitedUrlsCard from "@/components/dashboard/CitedUrlsCard";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 // ─── Report ──────────────────────────────────────────────────────────────────
 // The "prove the impact" surface. Opens with one plain-language conclusion
@@ -84,8 +85,7 @@ function DeltaChip({ delta }: { delta: number }) {
   // see the note there. A decline keeps destructive, because that is the one
   // case where the direction alone under-states it. Rendered as plain
   // colored text — no pill background, no border, no padding.
-  const cls =
-    delta > 0 ? "text-foreground" : delta < 0 ? "text-(--negative)" : "text-muted-foreground";
+  const cls = delta > 0 ? "text-vc-primary" : delta < 0 ? "text-destructive" : "text-vc-tertiary";
   return (
     <span className={`inline-flex items-center gap-1 text-data font-mono font-medium ${cls}`}>
       <Icon className="h-3 w-3" />
@@ -95,14 +95,6 @@ function DeltaChip({ delta }: { delta: number }) {
       </span>{" "}
       pts
     </span>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-3 text-label font-semibold uppercase tracking-wider text-muted-foreground">
-      {children}
-    </p>
   );
 }
 
@@ -140,7 +132,7 @@ export default function Report() {
 
   if (brandsLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-px px-8 py-6">
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-24 w-48" />
         <Skeleton className="h-40 w-full" />
@@ -150,11 +142,17 @@ export default function Report() {
 
   if (brands.length === 0) {
     return (
-      <EmptyState
-        title="No brand to report on yet"
-        description="Create a brand and run a citation check, then this report shows your measured AI-visibility proof."
-        action={{ label: "Create your first brand", href: "/setup?tab=brands", onClick: () => {} }}
-      />
+      <div className="px-8 py-10">
+        <EmptyState
+          title="No brand to report on yet"
+          description="Create a brand and run a citation check, then this report shows your measured AI-visibility proof."
+          action={{
+            label: "Create your first brand",
+            href: "/setup?tab=brands",
+            onClick: () => {},
+          }}
+        />
+      </div>
     );
   }
 
@@ -163,15 +161,17 @@ export default function Report() {
 
   if (anyError) {
     return (
-      <ErrorState
-        title="Couldn't load the report"
-        onRetry={() => {
-          heroQ.refetch();
-          trendQ.refetch();
-          geoQ.refetch();
-        }}
-        isRetrying={heroQ.isRefetching || trendQ.isRefetching || geoQ.isRefetching}
-      />
+      <div className="px-8 py-10">
+        <ErrorState
+          title="Couldn't load the report"
+          onRetry={() => {
+            heroQ.refetch();
+            trendQ.refetch();
+            geoQ.refetch();
+          }}
+          isRetrying={heroQ.isRefetching || trendQ.isRefetching || geoQ.isRefetching}
+        />
+      </div>
     );
   }
 
@@ -190,9 +190,9 @@ export default function Report() {
           } ${Math.abs(delta)} point${Math.abs(delta) === 1 ? "" : "s"} since the last scan.`;
 
   return (
-    <div className="reveal in-view mx-auto max-w-3xl space-y-10 py-2">
+    <PanelPage className="reveal in-view">
       {/* Print action — not part of the printed page. */}
-      <div className="flex justify-end print:hidden">
+      <div className="flex justify-end border-b border-vc-default px-8 py-4 print:hidden">
         <Button variant="outline" size="sm" onClick={() => window.print()}>
           <Printer className="mr-2 h-4 w-4" />
           Print / Save PDF
@@ -200,98 +200,119 @@ export default function Report() {
       </div>
 
       {/* 1. Conclusion + the one number. */}
-      <section>
-        <p className="max-w-[60ch] text-ui leading-snug text-foreground">{conclusion}</p>
-        {scanned && (
-          <div className="mt-5 flex items-end gap-4">
-            <span className="tnum text-hero font-semibold leading-none text-foreground">
-              {score}
-            </span>
-            <span className="pb-1 text-caption text-muted-foreground">/ 100</span>
-            {delta !== null && enoughTrend ? (
-              <span className="pb-1.5">{<DeltaChip delta={delta} />}</span>
-            ) : null}
-          </div>
-        )}
-        {h?.lastScanAt && (
-          <p className="mt-3 text-caption text-muted-foreground">
-            Last scan {formatRelativeTime(h.lastScanAt)}.
-            {scanned ? ` ${h.citedChecks}/${h.totalChecks} checks cited (${h.citationRate}%).` : ""}
-          </p>
-        )}
-      </section>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last" className="print:break-inside-avoid">
+          <p className="max-w-[60ch] text-ui leading-snug text-vc-primary">{conclusion}</p>
+          {scanned && (
+            <div className="mt-5 flex items-end gap-4">
+              <span className="font-mono text-stat font-semibold leading-none tracking-tight tabular-nums text-vc-primary">
+                {score}
+              </span>
+              <span className="pb-1 text-caption text-vc-tertiary">/ 100</span>
+              {delta !== null && enoughTrend ? (
+                <span className="pb-1.5">{<DeltaChip delta={delta} />}</span>
+              ) : null}
+            </div>
+          )}
+          {h?.lastScanAt && (
+            <p className="mt-3 text-caption text-vc-tertiary">
+              Last scan {formatRelativeTime(h.lastScanAt)}.
+              {scanned
+                ? ` ${h.citedChecks}/${h.totalChecks} checks cited (${h.citationRate}%).`
+                : ""}
+            </p>
+          )}
+        </Panel>
+      </PanelRow>
 
       {/* 2. Citation-rate trend. */}
-      <section>
-        <SectionLabel>Citation-rate trend</SectionLabel>
-        {anyLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : enoughTrend ? (
-          <div className="space-y-3">
-            <Sparkline values={weeks.map((w) => w.citationRate)} />
-            <div className="grid grid-cols-2 gap-x-8 gap-y-1 sm:grid-cols-4">
-              {weeks.slice(-8).map((w) => (
-                <div key={w.weekStart} className="flex items-baseline justify-between gap-2">
-                  <span className="text-caption text-muted-foreground">
-                    {new Date(w.weekStart).toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                  <span className="tnum text-caption text-foreground">{w.citationRate}%</span>
-                </div>
-              ))}
+      <PanelRow cols={1}>
+        <Panel
+          width="wide"
+          label="Citation-rate trend"
+          border="last"
+          className="print:break-inside-avoid"
+        >
+          {anyLoading ? (
+            <Skeleton className="h-16 w-full" />
+          ) : enoughTrend ? (
+            <div className="space-y-3">
+              <Sparkline values={weeks.map((w) => w.citationRate)} />
+              <div className="grid grid-cols-2 gap-x-8 gap-y-1 sm:grid-cols-4">
+                {weeks.slice(-8).map((w) => (
+                  <div key={w.weekStart} className="flex items-baseline justify-between gap-2">
+                    <span className="text-caption text-vc-tertiary">
+                      {new Date(w.weekStart).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                    <span className="font-mono text-caption tabular-nums text-vc-primary">
+                      {w.citationRate}%
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <p className="text-caption text-muted-foreground">
-            Not enough scan history yet. The trend appears once there are at least two weekly scans
-            with checks.
-          </p>
-        )}
-      </section>
+          ) : (
+            <p className="text-caption text-vc-tertiary">
+              Not enough scan history yet. The trend appears once there are at least two weekly
+              scans with checks.
+            </p>
+          )}
+        </Panel>
+      </PanelRow>
 
       {/* 3. By engine. */}
-      <section>
-        <SectionLabel>By engine</SectionLabel>
-        {anyLoading ? (
-          <Skeleton className="h-32 w-full" />
-        ) : engines.length > 0 ? (
-          <div>
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 border-b border-border pb-2 text-label font-semibold uppercase tracking-wider text-muted-foreground">
-              <span>Engine</span>
-              <span className="text-right">Cited</span>
-              <span className="text-right">Rate</span>
-              <span className="text-right">Score</span>
+      <PanelRow cols={1}>
+        <Panel width="wide" label="By engine" border="last" className="print:break-inside-avoid">
+          {anyLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : engines.length > 0 ? (
+            <div>
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 border-b border-vc-default pb-2 text-label font-semibold uppercase tracking-wider text-vc-label">
+                <span>Engine</span>
+                <span className="text-right">Cited</span>
+                <span className="text-right">Rate</span>
+                <span className="text-right">Score</span>
+              </div>
+              {engines.map(([name, p]) => {
+                const rate = p.mentions > 0 ? Math.round((p.citations / p.mentions) * 100) : 0;
+                return (
+                  <div
+                    key={name}
+                    className="grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-x-6 border-b border-vc-default/60 py-2 text-caption last:border-0"
+                  >
+                    <span className="text-vc-primary">{name}</span>
+                    <span className="font-mono text-right tabular-nums text-vc-primary">
+                      {p.citations}/{p.mentions}
+                    </span>
+                    <span className="font-mono text-right tabular-nums text-vc-primary">
+                      {rate}%
+                    </span>
+                    <span className="font-mono text-right tabular-nums text-vc-primary">
+                      {p.visibilityScore}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-            {engines.map(([name, p]) => {
-              const rate = p.mentions > 0 ? Math.round((p.citations / p.mentions) * 100) : 0;
-              return (
-                <div
-                  key={name}
-                  className="grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-x-6 border-b border-border/60 py-2 text-caption last:border-0"
-                >
-                  <span className="text-foreground">{name}</span>
-                  <span className="tnum text-right text-foreground">
-                    {p.citations}/{p.mentions}
-                  </span>
-                  <span className="tnum text-right text-foreground">{rate}%</span>
-                  <span className="tnum text-right text-foreground">{p.visibilityScore}</span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-caption text-muted-foreground">
-            No per-engine data yet. It appears after the first completed citation check.
-          </p>
-        )}
-      </section>
+          ) : (
+            <p className="text-caption text-vc-tertiary">
+              No per-engine data yet. It appears after the first completed citation check.
+            </p>
+          )}
+        </Panel>
+      </PanelRow>
 
       {/* 4. Which pages got cited. The card carries its own heading. */}
-      <CitedUrlsCard brandId={selectedBrandId} />
+      <PanelRow cols={1} last>
+        <Panel width="wide" border="last" className="print:break-inside-avoid">
+          <CitedUrlsCard brandId={selectedBrandId} />
+        </Panel>
+      </PanelRow>
 
-      <p className="border-t border-border pt-4 text-caption text-muted-foreground">
+      <p className="border-t border-vc-default px-8 py-4 text-caption text-vc-tertiary">
         VentureCite, generated{" "}
         {new Date().toLocaleDateString(undefined, {
           year: "numeric",
@@ -300,6 +321,6 @@ export default function Report() {
         })}
         . Every figure here is measured from real AI-engine citation checks; no estimates.
       </p>
-    </div>
+    </PanelPage>
   );
 }

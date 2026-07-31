@@ -3,7 +3,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -952,82 +952,81 @@ export default function AIVisibility() {
   const totalProgress = getTotalProgress();
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap gap-4 mb-8 items-center justify-between">
-        <Card>
-          <CardContent className="py-4 px-6">
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <p
-                  className="text-stat font-semibold text-foreground tabular-nums"
-                  data-testid="total-progress"
-                >
-                  {totalProgress.completed}/{totalProgress.total}
-                </p>
-                <p className="text-caption text-muted-foreground">Steps Completed</p>
-              </div>
-              <div className="flex-1 min-w-[150px]">
-                <Progress value={totalProgress.percentage} className="h-3" />
-                <p className="text-caption text-muted-foreground mt-1">
-                  {totalProgress.percentage}% complete
-                </p>
-              </div>
+    <PanelPage>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <p
+                className="text-stat font-semibold text-vc-primary tabular-nums"
+                data-testid="total-progress"
+              >
+                {totalProgress.completed}/{totalProgress.total}
+              </p>
+              <p className="text-caption text-vc-tertiary">Steps Completed</p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="flex-1 min-w-[150px]">
+              <Progress value={totalProgress.percentage} className="h-3" />
+              <p className="text-caption text-vc-tertiary mt-1 tabular-nums">
+                {totalProgress.percentage}% complete
+              </p>
+            </div>
+          </div>
+        </Panel>
+      </PanelRow>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
-        {aiEngines.map((engine) => {
-          const progress = getEngineProgress(engine);
-          const isSelected = engine.id === selectedEngineId;
-          return (
-            <Card
-              key={engine.id}
-              interactive
-              onClick={() => setSelectedEngineId(engine.id)}
-              aria-pressed={isSelected}
-              className={`cursor-pointer ${isSelected ? "bg-secondary border-foreground/40" : `${engine.bgColor} ${progress.percentage === 100 ? "border-foreground" : ""}`}`}
-              data-testid={`engine-card-${engine.id}`}
-            >
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={engine.color}>{engine.icon}</span>
-                  <span className="font-semibold">{engine.name}</span>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            {aiEngines.map((engine) => {
+              const progress = getEngineProgress(engine);
+              const isSelected = engine.id === selectedEngineId;
+              return (
+                <div
+                  key={engine.id}
+                  onClick={() => setSelectedEngineId(engine.id)}
+                  aria-pressed={isSelected}
+                  className={`cursor-pointer border p-4 pt-4 transition-colors hover:bg-vc-muted/50 ${isSelected ? "bg-vc-muted border-vc-primary/40" : `border-vc-default ${progress.percentage === 100 ? "border-vc-primary" : ""}`}`}
+                  data-testid={`engine-card-${engine.id}`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={engine.color}>{engine.icon}</span>
+                    <span className="font-semibold">{engine.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Progress value={progress.percentage} className="h-2 flex-1" />
+                    <span
+                      className="text-data font-medium tabular-nums"
+                      data-testid={`progress-${engine.id}`}
+                    >
+                      {progress.completed}/{progress.total}
+                    </span>
+                  </div>
+                  {progress.percentage === 100 && (
+                    <Badge variant="positive" className="mt-2">
+                      Complete
+                    </Badge>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Progress value={progress.percentage} className="h-2 flex-1" />
-                  <span
-                    className="text-data font-medium tabular-nums"
-                    data-testid={`progress-${engine.id}`}
-                  >
-                    {progress.completed}/{progress.total}
-                  </span>
-                </div>
-                {progress.percentage === 100 && (
-                  <Badge variant="positive" className="mt-2">
-                    Complete
-                  </Badge>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </Panel>
+      </PanelRow>
 
       {(() => {
         const engine = aiEngines.find((e) => e.id === selectedEngineId) || aiEngines[0];
         return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
+              <div className="mb-4">
+                <h2 className="flex items-center gap-2 text-page font-semibold">
                   <span className={engine.color}>{engine.icon}</span>
                   {engine.name} Visibility Checklist
-                </CardTitle>
-                <CardDescription className="mt-2">{engine.description}</CardDescription>
+                </h2>
+                <p className="mt-2 text-data text-vc-tertiary">{engine.description}</p>
                 <div className="flex flex-wrap gap-2 mt-4 items-center">
-                  <span className="text-label uppercase tracking-wider text-muted-foreground">
+                  <span className="text-label uppercase tracking-wider text-vc-tertiary">
                     Key factors:
                   </span>
                   {engine.keyFactors.map((factor, i) => (
@@ -1036,99 +1035,95 @@ export default function AIVisibility() {
                     </Badge>
                   ))}
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Accordion type="multiple" data-tour-id="aiVisibility.engineList">
-                  {engine.steps.map((step, index) => {
-                    const isCompleted = (completedSteps[engine.id] || []).includes(step.id);
-                    return (
-                      <AccordionItem
-                        key={step.id}
-                        value={step.id}
-                        className={`px-4 ${isCompleted ? "bg-muted" : ""}`}
-                        data-testid={`step-${step.id}`}
-                      >
-                        <AccordionTrigger className="hover:no-underline py-4">
-                          <div className="flex items-center gap-4 text-left w-full">
-                            <Checkbox
-                              checked={isCompleted}
-                              onCheckedChange={() => toggleStep(engine.id, step.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              data-testid={`checkbox-${step.id}`}
-                            />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium">
-                                  Step {index + 1}: {step.title}
-                                </span>
-                                {getPriorityBadge(step.priority)}
-                              </div>
-                              <p className="text-caption text-muted-foreground mt-1">
-                                {step.description}
-                              </p>
+              </div>
+              <Accordion type="multiple" data-tour-id="aiVisibility.engineList">
+                {engine.steps.map((step, index) => {
+                  const isCompleted = (completedSteps[engine.id] || []).includes(step.id);
+                  return (
+                    <AccordionItem
+                      key={step.id}
+                      value={step.id}
+                      className={`px-4 ${isCompleted ? "bg-muted" : ""}`}
+                      data-testid={`step-${step.id}`}
+                    >
+                      <AccordionTrigger className="hover:no-underline py-4">
+                        <div className="flex items-center gap-4 text-left w-full">
+                          <Checkbox
+                            checked={isCompleted}
+                            onCheckedChange={() => toggleStep(engine.id, step.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`checkbox-${step.id}`}
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium">
+                                Step {index + 1}: {step.title}
+                              </span>
+                              {getPriorityBadge(step.priority)}
                             </div>
-                            {isCompleted ? (
-                              <CheckCircle2 className="w-5 h-5 text-foreground shrink-0" />
-                            ) : (
-                              <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />
-                            )}
+                            <p className="text-caption text-muted-foreground mt-1">
+                              {step.description}
+                            </p>
                           </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pb-4">
-                          <div className="ml-10 space-y-4">
-                            <div className="bg-muted p-4 rounded-lg">
-                              <h4 className="font-medium flex items-center gap-2 mb-2">
-                                <Lightbulb className="w-4 h-4 text-muted-foreground" />
-                                How to do this:
-                              </h4>
-                              <p className="text-caption text-foreground">{step.howTo}</p>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-caption">
-                                <Target className="w-4 h-4 text-muted-foreground" />
-                                <span className="font-medium">Expected Impact:</span>
-                                <span className="text-muted-foreground">
-                                  {step.estimatedImpact}
-                                </span>
-                              </div>
-                              {step.quickAction &&
-                                ("to" in step.quickAction ? (
-                                  <Link to={step.quickAction.to}>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="gap-2"
-                                      data-testid={`action-${step.id}`}
-                                    >
-                                      {step.quickAction.label}
-                                      <ArrowRight className="w-4 h-4" />
-                                    </Button>
-                                  </Link>
-                                ) : (
-                                  <a href={step.quickAction.href}>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="gap-2"
-                                      data-testid={`action-${step.id}`}
-                                    >
-                                      {step.quickAction.label}
-                                      <ArrowRight className="w-4 h-4" />
-                                    </Button>
-                                  </a>
-                                ))}
-                            </div>
+                          {isCompleted ? (
+                            <CheckCircle2 className="w-5 h-5 text-foreground shrink-0" />
+                          ) : (
+                            <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-4">
+                        <div className="ml-10 space-y-4">
+                          <div className="bg-muted p-4 rounded-lg">
+                            <h4 className="font-medium flex items-center gap-2 mb-2">
+                              <Lightbulb className="w-4 h-4 text-muted-foreground" />
+                              How to do this:
+                            </h4>
+                            <p className="text-caption text-foreground">{step.howTo}</p>
                           </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    );
-                  })}
-                </Accordion>
-              </CardContent>
-            </Card>
-          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-caption">
+                              <Target className="w-4 h-4 text-muted-foreground" />
+                              <span className="font-medium">Expected Impact:</span>
+                              <span className="text-muted-foreground">{step.estimatedImpact}</span>
+                            </div>
+                            {step.quickAction &&
+                              ("to" in step.quickAction ? (
+                                <Link to={step.quickAction.to}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-2"
+                                    data-testid={`action-${step.id}`}
+                                  >
+                                    {step.quickAction.label}
+                                    <ArrowRight className="w-4 h-4" />
+                                  </Button>
+                                </Link>
+                              ) : (
+                                <a href={step.quickAction.href}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-2"
+                                    data-testid={`action-${step.id}`}
+                                  >
+                                    {step.quickAction.label}
+                                    <ArrowRight className="w-4 h-4" />
+                                  </Button>
+                                </a>
+                              ))}
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            </Panel>
+          </PanelRow>
         );
       })()}
-    </div>
+    </PanelPage>
   );
 }

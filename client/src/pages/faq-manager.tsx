@@ -2,7 +2,6 @@
 // removed in favour of this one to end the duplication.
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +24,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusDot } from "@/components/foundations";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import {
   HelpCircle,
   Sparkles,
@@ -262,99 +262,72 @@ export default function FaqManager() {
     // Only ever rendered client-side, as a lazy tab inside
     // client/src/pages/act.tsx (no route of its own) — title/meta removed
     // per this task's blanket rule; /act falls back to root defaults.
-    <div className="space-y-8">
+    <PanelPage>
       {!selectedBrandId && (
-        <Card data-testid="empty-state-no-brand">
-          <CardContent className="py-12 text-center">
-            <Target className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-            <p className="font-medium text-muted-foreground">Select a brand to get started</p>
-            <p className="text-caption text-muted-foreground mt-1">
-              Choose a brand above to create and manage AI-optimized FAQs
-            </p>
-          </CardContent>
-        </Card>
+        <PanelRow cols={1} last>
+          <Panel width="wide" border="last" className="py-12 text-center">
+            <div data-testid="empty-state-no-brand">
+              <Target className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+              <p className="font-medium text-muted-foreground">Select a brand to get started</p>
+              <p className="text-caption text-muted-foreground mt-1">
+                Choose a brand above to create and manage AI-optimized FAQs
+              </p>
+            </div>
+          </Panel>
+        </PanelRow>
       )}
 
       {selectedBrandId && (
         <>
           {/* Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-label uppercase tracking-wider text-muted-foreground">
-                      Total FAQs
-                    </p>
-                    <p
-                      className="text-stat font-semibold tabular-nums"
-                      data-testid="text-total-faqs"
-                    >
-                      {faqs.length}
-                    </p>
-                  </div>
-                  <HelpCircle className="h-8 w-8 text-chart-1 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-label uppercase tracking-wider text-muted-foreground">
-                      Avg AI Score
-                    </p>
-                    <p
-                      className={`text-stat font-semibold tabular-nums inline-flex items-center gap-1.5 ${getScoreColor(avgScore)}`}
-                      data-testid="text-avg-score"
-                    >
-                      {avgScore}%
-                      {avgScore >= 80 && <CheckCircle className="h-4 w-4" aria-hidden="true" />}
-                    </p>
-                  </div>
-                  <Target className="h-8 w-8 text-primary opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-label uppercase tracking-wider text-muted-foreground">
-                      Optimized
-                    </p>
-                    <p
-                      className="text-stat font-semibold tabular-nums text-foreground"
-                      data-testid="text-optimized-count"
-                    >
-                      {optimizedCount}/{faqs.length}
-                    </p>
-                  </div>
-                  <CheckCircle className="h-8 w-8 text-foreground opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-label uppercase tracking-wider text-muted-foreground">
-                      Categories
-                    </p>
-                    <p
-                      className="text-stat font-semibold tabular-nums"
-                      data-testid="text-categories-count"
-                    >
-                      {categories.length}
-                    </p>
-                  </div>
-                  <BookOpen className="h-8 w-8 text-warning opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <PanelRow cols={2}>
+            <Panel label="Total FAQs">
+              <div className="flex items-center justify-between">
+                <p className="text-stat font-semibold tabular-nums" data-testid="text-total-faqs">
+                  {faqs.length}
+                </p>
+                <HelpCircle className="h-8 w-8 text-chart-1 opacity-50" />
+              </div>
+            </Panel>
+            <Panel label="Avg AI Score" border="last">
+              <div className="flex items-center justify-between">
+                <p
+                  className={`text-stat font-semibold tabular-nums inline-flex items-center gap-1.5 ${getScoreColor(avgScore)}`}
+                  data-testid="text-avg-score"
+                >
+                  {avgScore}%
+                  {avgScore >= 80 && <CheckCircle className="h-4 w-4" aria-hidden="true" />}
+                </p>
+                <Target className="h-8 w-8 text-primary opacity-50" />
+              </div>
+            </Panel>
+          </PanelRow>
+          <PanelRow cols={2}>
+            <Panel label="Optimized">
+              <div className="flex items-center justify-between">
+                <p
+                  className="text-stat font-semibold tabular-nums text-foreground"
+                  data-testid="text-optimized-count"
+                >
+                  {optimizedCount}/{faqs.length}
+                </p>
+                <CheckCircle className="h-8 w-8 text-foreground opacity-50" />
+              </div>
+            </Panel>
+            <Panel label="Categories" border="last">
+              <div className="flex items-center justify-between">
+                <p
+                  className="text-stat font-semibold tabular-nums"
+                  data-testid="text-categories-count"
+                >
+                  {categories.length}
+                </p>
+                <BookOpen className="h-8 w-8 text-warning opacity-50" />
+              </div>
+            </Panel>
+          </PanelRow>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="px-8 pt-6">
             <TabsList className="grid w-full grid-cols-4 mb-6">
               <TabsTrigger
                 value="manage"
@@ -392,17 +365,21 @@ export default function FaqManager() {
 
             {/* MANAGE TAB */}
             <TabsContent value="manage">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <PanelRow cols={3} last>
                 {/* Add New FAQ */}
-                <Card className="lg:col-span-1">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Plus className="h-5 w-5" />
+                <Panel
+                  label={
+                    <span className="flex items-center gap-2">
+                      <Plus className="h-3.5 w-3.5" />
                       Add New FAQ
-                    </CardTitle>
-                    <CardDescription>Manually add a question and answer</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+                    </span>
+                  }
+                  width="narrow"
+                >
+                  <p className="mb-4 text-data text-vc-tertiary">
+                    Manually add a question and answer
+                  </p>
+                  <div className="space-y-4">
                     <div>
                       <label className="text-caption font-medium mb-1 block">Question</label>
                       <Textarea
@@ -459,231 +436,234 @@ export default function FaqManager() {
                       )}
                       Add FAQ
                     </Button>
-                  </CardContent>
-                </Card>
+                  </div>
+                </Panel>
 
                 {/* FAQ List */}
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle>Your FAQs</CardTitle>
-                      <Select value={filterCategory} onValueChange={setFilterCategory}>
-                        <SelectTrigger className="w-40" data-testid="select-filter-category">
-                          <SelectValue placeholder="Filter by category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Categories</SelectItem>
-                          {categories.map((cat) => (
-                            <SelectItem key={cat} value={cat}>
-                              {cat}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                <Panel
+                  label="Your FAQs"
+                  action={
+                    <Select value={filterCategory} onValueChange={setFilterCategory}>
+                      <SelectTrigger className="w-40" data-testid="select-filter-category">
+                        <SelectValue placeholder="Filter by category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  }
+                  width="wide"
+                  span={2}
+                  border="last"
+                >
+                  {faqsIsError ? (
+                    <ErrorState
+                      title="Couldn't load FAQs"
+                      onRetry={() => refetchFaqs()}
+                      isRetrying={faqsIsRefetching}
+                    />
+                  ) : faqsLoading ? (
+                    <div className="divide-y divide-border" aria-hidden="true">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="py-4 first:pt-0">
+                          <div className="flex items-start gap-2">
+                            <Skeleton className="h-2 w-2 rounded-full mt-2" />
+                            <div className="flex-1 min-w-0 space-y-3">
+                              <div className="flex items-start justify-between">
+                                <Skeleton className="h-5 w-2/3" />
+                                <Skeleton className="h-7 w-20" />
+                              </div>
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-5/6" />
+                              <div className="flex gap-2">
+                                <Skeleton className="h-5 w-16" />
+                                <Skeleton className="h-5 w-20" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    {faqsIsError ? (
-                      <ErrorState
-                        title="Couldn't load FAQs"
-                        onRetry={() => refetchFaqs()}
-                        isRetrying={faqsIsRefetching}
-                      />
-                    ) : faqsLoading ? (
-                      <div className="divide-y divide-border" aria-hidden="true">
-                        {[0, 1, 2].map((i) => (
-                          <div key={i} className="py-4 first:pt-0">
+                  ) : filteredFaqs.length > 0 ? (
+                    <ScrollArea className="h-[500px]">
+                      <div className="divide-y divide-border pr-4">
+                        {filteredFaqs.map((faq, faqIndex) => (
+                          <div
+                            key={faq.id}
+                            className="py-4 first:pt-0 -mx-2 px-2 rounded-md hover:bg-muted/50 transition-colors"
+                            data-tour-id={faqIndex === 0 ? "faq.firstResult" : undefined}
+                          >
                             <div className="flex items-start gap-2">
-                              <Skeleton className="h-2 w-2 rounded-full mt-2" />
-                              <div className="flex-1 min-w-0 space-y-3">
-                                <div className="flex items-start justify-between">
-                                  <Skeleton className="h-5 w-2/3" />
-                                  <Skeleton className="h-7 w-20" />
-                                </div>
-                                <Skeleton className="h-4 w-full" />
-                                <Skeleton className="h-4 w-5/6" />
-                                <div className="flex gap-2">
-                                  <Skeleton className="h-5 w-16" />
-                                  <Skeleton className="h-5 w-20" />
-                                </div>
+                              <StatusDot
+                                tone={
+                                  (faq.aiSurfaceScore || 0) >= 80
+                                    ? "success"
+                                    : (faq.aiSurfaceScore || 0) >= 60
+                                      ? "warn"
+                                      : "fail"
+                                }
+                                className="mt-2"
+                              />
+                              <div className="flex-1 min-w-0">
+                                {editingFaq?.id === faq.id ? (
+                                  <div className="space-y-3">
+                                    <Textarea
+                                      value={editQuestion}
+                                      onChange={(e) => setEditQuestion(e.target.value)}
+                                      rows={2}
+                                      data-testid={`input-edit-question-${faq.id}`}
+                                    />
+                                    <Textarea
+                                      value={editAnswer}
+                                      onChange={(e) => setEditAnswer(e.target.value)}
+                                      rows={4}
+                                      data-testid={`input-edit-answer-${faq.id}`}
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() =>
+                                          updateFaqMutation.mutate({
+                                            id: faq.id,
+                                            data: {
+                                              question: editQuestion,
+                                              answer: editAnswer,
+                                            },
+                                          })
+                                        }
+                                        disabled={updateFaqMutation.isPending}
+                                        data-testid={`button-save-faq-${faq.id}`}
+                                      >
+                                        <Save className="h-4 w-4 mr-1" />
+                                        Save
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setEditingFaq(null)}
+                                        data-testid={`button-cancel-edit-${faq.id}`}
+                                      >
+                                        <X className="h-4 w-4 mr-1" />
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex items-start justify-between mb-2">
+                                      <h4
+                                        className="font-medium text-chart-1 flex-1"
+                                        data-testid={`text-faq-question-${faq.id}`}
+                                      >
+                                        {faq.question}
+                                      </h4>
+                                      <div className="flex gap-1 ml-2">
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-7 w-7"
+                                          onClick={() => {
+                                            setEditingFaq(faq);
+                                            setEditQuestion(faq.question);
+                                            setEditAnswer(faq.answer);
+                                          }}
+                                          data-testid={`button-edit-faq-${faq.id}`}
+                                          aria-label={`Edit FAQ: ${faq.question}`}
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-7 w-7"
+                                          onClick={() => optimizeFaqMutation.mutate(faq.id)}
+                                          disabled={optimizeFaqMutation.isPending}
+                                          data-testid={`button-optimize-faq-${faq.id}`}
+                                          aria-label={`Optimize FAQ: ${faq.question}`}
+                                        >
+                                          <Zap className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-7 w-7 text-destructive hover:text-destructive/80"
+                                          onClick={() => deleteFaqMutation.mutate(faq.id)}
+                                          data-testid={`button-delete-faq-${faq.id}`}
+                                          aria-label={`Delete FAQ: ${faq.question}`}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    <p
+                                      className="text-caption text-muted-foreground mb-3"
+                                      data-testid={`text-faq-answer-${faq.id}`}
+                                    >
+                                      {faq.answer}
+                                    </p>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge variant="outline">{faq.category || "general"}</Badge>
+                                      <Badge variant={getScoreBadge(faq.aiSurfaceScore || 0)}>
+                                        AI Score: {faq.aiSurfaceScore || 0}%
+                                      </Badge>
+                                      {faq.isOptimized === 1 && (
+                                        <Badge variant="secondary">
+                                          <CheckCircle className="h-3 w-3 mr-1" />
+                                          Optimized
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {faq.optimizationTips && faq.optimizationTips.length > 0 && (
+                                      <div className="mt-3 p-2 bg-warning/10 rounded text-caption">
+                                        <p className="font-medium text-warning mb-1">
+                                          Optimization Tips:
+                                        </p>
+                                        <ul className="list-disc list-inside text-warning">
+                                          {faq.optimizationTips.map((tip, i) => (
+                                            <li key={i}>{tip}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
                         ))}
                       </div>
-                    ) : filteredFaqs.length > 0 ? (
-                      <ScrollArea className="h-[500px]">
-                        <div className="divide-y divide-border pr-4">
-                          {filteredFaqs.map((faq, faqIndex) => (
-                            <div
-                              key={faq.id}
-                              className="py-4 first:pt-0 -mx-2 px-2 rounded-md hover:bg-muted/50 transition-colors"
-                              data-tour-id={faqIndex === 0 ? "faq.firstResult" : undefined}
-                            >
-                              <div className="flex items-start gap-2">
-                                <StatusDot
-                                  tone={
-                                    (faq.aiSurfaceScore || 0) >= 80
-                                      ? "success"
-                                      : (faq.aiSurfaceScore || 0) >= 60
-                                        ? "warn"
-                                        : "fail"
-                                  }
-                                  className="mt-2"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  {editingFaq?.id === faq.id ? (
-                                    <div className="space-y-3">
-                                      <Textarea
-                                        value={editQuestion}
-                                        onChange={(e) => setEditQuestion(e.target.value)}
-                                        rows={2}
-                                        data-testid={`input-edit-question-${faq.id}`}
-                                      />
-                                      <Textarea
-                                        value={editAnswer}
-                                        onChange={(e) => setEditAnswer(e.target.value)}
-                                        rows={4}
-                                        data-testid={`input-edit-answer-${faq.id}`}
-                                      />
-                                      <div className="flex gap-2">
-                                        <Button
-                                          size="sm"
-                                          onClick={() =>
-                                            updateFaqMutation.mutate({
-                                              id: faq.id,
-                                              data: {
-                                                question: editQuestion,
-                                                answer: editAnswer,
-                                              },
-                                            })
-                                          }
-                                          disabled={updateFaqMutation.isPending}
-                                          data-testid={`button-save-faq-${faq.id}`}
-                                        >
-                                          <Save className="h-4 w-4 mr-1" />
-                                          Save
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => setEditingFaq(null)}
-                                          data-testid={`button-cancel-edit-${faq.id}`}
-                                        >
-                                          <X className="h-4 w-4 mr-1" />
-                                          Cancel
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-start justify-between mb-2">
-                                        <h4
-                                          className="font-medium text-chart-1 flex-1"
-                                          data-testid={`text-faq-question-${faq.id}`}
-                                        >
-                                          {faq.question}
-                                        </h4>
-                                        <div className="flex gap-1 ml-2">
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className="h-7 w-7"
-                                            onClick={() => {
-                                              setEditingFaq(faq);
-                                              setEditQuestion(faq.question);
-                                              setEditAnswer(faq.answer);
-                                            }}
-                                            data-testid={`button-edit-faq-${faq.id}`}
-                                            aria-label={`Edit FAQ: ${faq.question}`}
-                                          >
-                                            <Edit className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className="h-7 w-7"
-                                            onClick={() => optimizeFaqMutation.mutate(faq.id)}
-                                            disabled={optimizeFaqMutation.isPending}
-                                            data-testid={`button-optimize-faq-${faq.id}`}
-                                            aria-label={`Optimize FAQ: ${faq.question}`}
-                                          >
-                                            <Zap className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className="h-7 w-7 text-destructive hover:text-destructive/80"
-                                            onClick={() => deleteFaqMutation.mutate(faq.id)}
-                                            data-testid={`button-delete-faq-${faq.id}`}
-                                            aria-label={`Delete FAQ: ${faq.question}`}
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                      <p
-                                        className="text-caption text-muted-foreground mb-3"
-                                        data-testid={`text-faq-answer-${faq.id}`}
-                                      >
-                                        {faq.answer}
-                                      </p>
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <Badge variant="outline">{faq.category || "general"}</Badge>
-                                        <Badge variant={getScoreBadge(faq.aiSurfaceScore || 0)}>
-                                          AI Score: {faq.aiSurfaceScore || 0}%
-                                        </Badge>
-                                        {faq.isOptimized === 1 && (
-                                          <Badge variant="secondary">
-                                            <CheckCircle className="h-3 w-3 mr-1" />
-                                            Optimized
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      {faq.optimizationTips && faq.optimizationTips.length > 0 && (
-                                        <div className="mt-3 p-2 bg-warning/10 rounded text-caption">
-                                          <p className="font-medium text-warning mb-1">
-                                            Optimization Tips:
-                                          </p>
-                                          <ul className="list-disc list-inside text-warning">
-                                            {faq.optimizationTips.map((tip, i) => (
-                                              <li key={i}>{tip}</li>
-                                            ))}
-                                          </ul>
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    ) : (
-                      <EmptyState
-                        icon={HelpCircle}
-                        title="No FAQs yet. Add one manually or use AI to generate."
-                      />
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+                    </ScrollArea>
+                  ) : (
+                    <EmptyState
+                      icon={HelpCircle}
+                      title="No FAQs yet. Add one manually or use AI to generate."
+                    />
+                  )}
+                </Panel>
+              </PanelRow>
             </TabsContent>
 
             {/* GENERATE TAB */}
             <TabsContent value="generate">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                    AI FAQ Generator
-                  </CardTitle>
-                  <CardDescription>
+              <PanelRow cols={1} last>
+                <Panel
+                  label={
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      AI FAQ Generator
+                    </span>
+                  }
+                  width="wide"
+                  border="last"
+                >
+                  <p className="mb-4 text-data text-vc-tertiary">
                     Generate intelligent, citation-optimized FAQs based on your brand context
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div>
@@ -775,23 +755,26 @@ export default function FaqManager() {
                       </ul>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </Panel>
+              </PanelRow>
             </TabsContent>
 
             {/* SCHEMA TAB */}
             <TabsContent value="schema">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Code className="h-5 w-5" />
-                    FAQPage Schema Markup
-                  </CardTitle>
-                  <CardDescription>
+              <PanelRow cols={1} last>
+                <Panel
+                  label={
+                    <span className="flex items-center gap-2">
+                      <Code className="h-3.5 w-3.5" />
+                      FAQPage Schema Markup
+                    </span>
+                  }
+                  width="wide"
+                  border="last"
+                >
+                  <p className="mb-4 text-data text-vc-tertiary">
                     Copy this structured data to help AI engines understand and cite your FAQs
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+                  </p>
                   {faqs.length > 0 ? (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
@@ -833,68 +816,65 @@ export default function FaqManager() {
                       <p>Add FAQs first to generate schema markup</p>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </Panel>
+              </PanelRow>
             </TabsContent>
 
             {/* BULK OPTIMIZE TAB */}
             <TabsContent value="optimize">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-warning" />
-                    Bulk Optimization
-                  </CardTitle>
-                  <CardDescription>
+              <PanelRow cols={1} last>
+                <Panel
+                  label={
+                    <span className="flex items-center gap-2">
+                      <Zap className="h-3.5 w-3.5" />
+                      Bulk Optimization
+                    </span>
+                  }
+                  width="wide"
+                  border="last"
+                >
+                  <p className="mb-4 text-data text-vc-tertiary">
                     Optimize all FAQs at once for better AI citation rates
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+                  </p>
                   <div className="space-y-6">
                     {/* Optimization Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card className="bg-muted border-border">
-                        <CardContent className="pt-4">
-                          <div className="text-center">
-                            <p className="text-label uppercase tracking-wider text-foreground inline-flex items-center justify-center gap-1">
-                              <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                              High Score (80+)
-                            </p>
-                            <p className="text-stat font-semibold tabular-nums text-foreground">
-                              {faqs.filter((f) => (f.aiSurfaceScore || 0) >= 80).length}
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card className="bg-warning/10 border-warning/30">
-                        <CardContent className="pt-4">
-                          <div className="text-center">
-                            <p className="text-label uppercase tracking-wider text-warning">
-                              Medium Score (60-79)
-                            </p>
-                            <p className="text-stat font-semibold tabular-nums text-warning">
-                              {
-                                faqs.filter(
-                                  (f) =>
-                                    (f.aiSurfaceScore || 0) >= 60 && (f.aiSurfaceScore || 0) < 80,
-                                ).length
-                              }
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card className="bg-destructive/10 border-destructive/30">
-                        <CardContent className="pt-4">
-                          <div className="text-center">
-                            <p className="text-label uppercase tracking-wider text-destructive">
-                              Low Score (&lt;60)
-                            </p>
-                            <p className="text-stat font-semibold tabular-nums text-destructive">
-                              {faqs.filter((f) => (f.aiSurfaceScore || 0) < 60).length}
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <div className="rounded-lg border border-border bg-muted pt-4 pb-4 px-4">
+                        <div className="text-center">
+                          <p className="text-label uppercase tracking-wider text-foreground inline-flex items-center justify-center gap-1">
+                            <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                            High Score (80+)
+                          </p>
+                          <p className="text-stat font-semibold tabular-nums text-foreground">
+                            {faqs.filter((f) => (f.aiSurfaceScore || 0) >= 80).length}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-warning/30 bg-warning/10 pt-4 pb-4 px-4">
+                        <div className="text-center">
+                          <p className="text-label uppercase tracking-wider text-warning">
+                            Medium Score (60-79)
+                          </p>
+                          <p className="text-stat font-semibold tabular-nums text-warning">
+                            {
+                              faqs.filter(
+                                (f) =>
+                                  (f.aiSurfaceScore || 0) >= 60 && (f.aiSurfaceScore || 0) < 80,
+                              ).length
+                            }
+                          </p>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-destructive/30 bg-destructive/10 pt-4 pb-4 px-4">
+                        <div className="text-center">
+                          <p className="text-label uppercase tracking-wider text-destructive">
+                            Low Score (&lt;60)
+                          </p>
+                          <p className="text-stat font-semibold tabular-nums text-destructive">
+                            {faqs.filter((f) => (f.aiSurfaceScore || 0) < 60).length}
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Low Score FAQs */}
@@ -942,12 +922,12 @@ export default function FaqManager() {
                       )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </Panel>
+              </PanelRow>
             </TabsContent>
           </Tabs>
         </>
       )}
-    </div>
+    </PanelPage>
   );
 }

@@ -4,19 +4,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, Check, X } from "lucide-react";
 import { setSession } from "@/lib/authStore";
 import { PASSWORD_RULES } from "@shared/passwordPolicy";
 import { BrandLogo } from "@/components/BrandLogo";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 // Sessionstorage key that hands the verify-email page the address the
 // user just registered with — avoids a query-string param that could
@@ -109,148 +102,150 @@ export default function Register() {
   return (
     // Title/robots moved to src/routes/_app/register.tsx's `head()` —
     // metadata belongs to the route, not this component.
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md relative">
-        <a
-          href="/"
-          className="absolute top-3 left-3 text-caption text-muted-foreground hover:text-foreground transition-colors"
-          data-testid="link-back-home"
-        >
-          ← Back to home
-        </a>
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <BrandLogo imgClassName="h-12" textClassName="text-page" />
-          </div>
-          <CardTitle className="text-page font-semibold text-foreground">
-            Create your account
-          </CardTitle>
-          <CardDescription>Start optimizing for AI search engines today</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First name</Label>
-                <Input
-                  id="firstName"
-                  placeholder="John"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  data-testid="input-first-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
-                <Input
-                  id="lastName"
-                  placeholder="Doe"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  data-testid="input-last-name"
-                />
-              </div>
+    <PanelPage className="flex items-center justify-center p-4">
+      <PanelRow cols={1} last className="w-full max-w-md">
+        <Panel width="wide" border="last" className="relative">
+          <a
+            href="/"
+            className="absolute top-3 left-3 text-caption text-vc-tertiary hover:text-vc-primary transition-colors"
+            data-testid="link-back-home"
+          >
+            ← Back to home
+          </a>
+          <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <BrandLogo imgClassName="h-12" textClassName="text-page" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                data-testid="input-email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Create a strong password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  data-testid="input-password"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-              {password && (
-                <ul className="text-caption space-y-1 mt-2">
-                  {passwordRequirements.map((req, i) => (
-                    <li
-                      key={i}
-                      className={`flex items-center gap-1 ${req.met ? "text-foreground" : "text-muted-foreground"}`}
-                    >
-                      {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                      {req.label}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm password</Label>
-              <Input
-                id="confirmPassword"
-                type={showPassword ? "text" : "password"}
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                data-testid="input-confirm-password"
-              />
-              {confirmPassword && !passwordsMatch && (
-                <p className="text-caption text-destructive flex items-center gap-1">
-                  <X className="h-3 w-3" /> Passwords do not match
-                </p>
-              )}
-            </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={registerMutation.isPending || !allRequirementsMet || !passwordsMatch}
-              data-testid="button-register"
-            >
-              {registerMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating account...
-                </>
-              ) : (
-                "Create account"
-              )}
-            </Button>
-            <p className="text-caption text-muted-foreground text-center">
-              By signing up, you agree to our Terms of Service and Privacy Policy.
+            <h1 className="text-page font-semibold text-vc-primary">Create your account</h1>
+            <p className="mt-1 text-caption text-vc-tertiary">
+              Start optimizing for AI search engines today
             </p>
-          </form>
-        </CardContent>
-        <CardFooter className="justify-center">
-          <p className="text-caption text-muted-foreground">
-            Already have an account?{" "}
-            <a
-              href="/login"
-              className="text-primary hover:text-primary/90 font-medium"
-              data-testid="link-login"
-            >
-              Sign in
-            </a>
-          </p>
-        </CardFooter>
-      </Card>
-    </div>
+          </div>
+          <div className="mt-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First name</Label>
+                  <Input
+                    id="firstName"
+                    placeholder="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    data-testid="input-first-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last name</Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    data-testid="input-last-name"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  data-testid="input-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Create a strong password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    data-testid="input-password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {password && (
+                  <ul className="text-caption space-y-1 mt-2">
+                    {passwordRequirements.map((req, i) => (
+                      <li
+                        key={i}
+                        className={`flex items-center gap-1 ${req.met ? "text-foreground" : "text-muted-foreground"}`}
+                      >
+                        {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        {req.label}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <Input
+                  id="confirmPassword"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  data-testid="input-confirm-password"
+                />
+                {confirmPassword && !passwordsMatch && (
+                  <p className="text-caption text-destructive flex items-center gap-1">
+                    <X className="h-3 w-3" /> Passwords do not match
+                  </p>
+                )}
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={registerMutation.isPending || !allRequirementsMet || !passwordsMatch}
+                data-testid="button-register"
+              >
+                {registerMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  "Create account"
+                )}
+              </Button>
+              <p className="text-caption text-vc-tertiary text-center">
+                By signing up, you agree to our Terms of Service and Privacy Policy.
+              </p>
+            </form>
+          </div>
+          <div className="mt-6 flex justify-center">
+            <p className="text-caption text-vc-tertiary">
+              Already have an account?{" "}
+              <a
+                href="/login"
+                className="text-vc-accent hover:text-vc-accent/90 font-medium"
+                data-testid="link-login"
+              >
+                Sign in
+              </a>
+            </p>
+          </div>
+        </Panel>
+      </PanelRow>
+    </PanelPage>
   );
 }

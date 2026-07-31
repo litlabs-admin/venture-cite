@@ -62,7 +62,17 @@ function Donut({ pct }: { pct: number | null }) {
   const filled = pct === null ? 0 : (Math.max(0, Math.min(100, pct)) / 100) * CIRC;
   return (
     <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90" aria-hidden>
-      <circle cx="28" cy="28" r={DONUT_R} fill="none" stroke="#f3f4f6" strokeWidth="3" />
+      {/* Track matches every other meter on the page (bg-vc-muted). It was
+          #f3f4f6 — Tailwind gray-100, a COOL value in a warm-stone surface,
+          and one step off the #f5f5f4 stone-100 used everywhere else. */}
+      <circle
+        cx="28"
+        cy="28"
+        r={DONUT_R}
+        fill="none"
+        stroke="var(--bg-surface-1)"
+        strokeWidth="3"
+      />
       {pct !== null && (
         <circle
           cx="28"
@@ -90,8 +100,8 @@ function Donut({ pct }: { pct: number | null }) {
 const SEVERITY: Record<string, string> = {
   crit: "var(--negative)",
   high: "var(--brand-accent)",
-  med: "#a8a29e", // stone-400
-  low: "#d6d3d1", // stone-300 — same as the reference's own `low`
+  med: "var(--fg-disabled)", // stone-400
+  low: "var(--border-strong)", // stone-300 — same as the reference's own `low`
 };
 
 // Measured: 8×8 square swatch (no radius), count 12/600 ink, label 11/400.

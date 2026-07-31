@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronRight, ExternalLink, Link2 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
 import { cn } from "@/lib/utils";
+import { PanelLabel } from "@/components/dashboard-panels/primitives";
 
 export interface CitedUrlItem {
   platform: string;
@@ -65,7 +65,7 @@ function UrlLink({ url }: { url: string }) {
   const label = prettyUrl(url);
   if (!href) {
     return (
-      <span className="block truncate text-muted-foreground" title={url}>
+      <span className="block truncate text-vc-tertiary" title={url}>
         {label}
       </span>
     );
@@ -78,7 +78,7 @@ function UrlLink({ url }: { url: string }) {
       // `flex` (not inline-flex) so the anchor fills — and is bound by — the
       // min-w-0 column; otherwise it shrink-wraps to the full URL and overflows
       // onto the platform chips. The inner span then truncates to fit.
-      className="flex min-w-0 items-center gap-1 text-primary hover:underline"
+      className="flex min-w-0 items-center gap-1 text-vc-accent hover:underline"
       title={url}
     >
       <span className="truncate">{label}</span>
@@ -103,7 +103,7 @@ function PlatformChips({ platforms, max = 4 }: { platforms: string[]; max?: numb
       {extra > 0 && (
         <Badge
           variant="outline"
-          className="px-1.5 py-0 text-label font-normal text-muted-foreground"
+          className="px-1.5 py-0 text-label font-normal text-vc-tertiary"
           title={platforms.join(", ")}
         >
           +{extra}
@@ -246,176 +246,173 @@ export default function CitedUrlsCard({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-ui">
-              <Link2 className="h-4 w-4 text-muted-foreground" />
-              Cited pages
-              {groups.length > 0 && (
-                <Badge variant="outline" className="ml-1 font-normal">
-                  {groups.length}
-                </Badge>
-              )}
-            </CardTitle>
-            <p className="mt-1 text-caption text-muted-foreground">
-              {view === "page"
-                ? "The pages AI engines cited about your brand, ranked by how often."
-                : "What each prompt surfaced when AI engines answered about your brand."}
-            </p>
-          </div>
-          {/* Lens toggle */}
-          <div className="inline-flex rounded-md border border-border p-0.5 print:hidden">
-            {(
-              [
-                ["page", "By page"],
-                ["prompt", "By prompt"],
-              ] as [View, string][]
-            ).map(([val, label]) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setViewSafe(val)}
-                className={cn(
-                  "rounded px-2.5 py-1 text-caption font-medium transition-colors",
-                  view === val
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-                data-testid={`cited-urls-view-${val}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-11 w-full" />
-            ))}
-          </div>
-        ) : groups.length === 0 ? (
-          <p className="py-6 text-center text-caption text-muted-foreground">
-            No cited pages yet. Once an AI engine cites a page about your brand, it will appear
-            here.
-          </p>
-        ) : (
-          <>
-            <ul className="divide-y divide-border/60">
-              {visible.map((g) => {
-                const isOpen = openKeys.has(g.key);
-                return (
-                  <li key={g.key} data-testid="cited-url-group">
-                    <div className="flex items-center gap-2 py-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleOpen(g.key)}
-                        className="-ml-1 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-expanded={isOpen}
-                        aria-label={isOpen ? "Collapse details" : "Expand details"}
-                        data-testid="cited-url-group-toggle"
-                      >
-                        <ChevronRight
-                          className={cn("h-4 w-4 transition-transform", isOpen && "rotate-90")}
-                        />
-                      </button>
-                      <div className="min-w-0 flex-1 text-caption font-medium">
-                        {view === "page" ? (
-                          <UrlLink url={(g as PageGroup).url} />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => toggleOpen(g.key)}
-                            className="block w-full truncate text-left"
-                            title={(g as PromptGroup).prompt}
-                          >
-                            {(g as PromptGroup).prompt}
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {view === "page" && (
-                          <PlatformChips platforms={(g as PageGroup).platforms} />
-                        )}
-                        <Badge variant="secondary" className="font-normal" title="Total citations">
-                          {g.count} cite{g.count === 1 ? "" : "s"}
-                        </Badge>
-                        <span className="hidden whitespace-nowrap text-caption text-muted-foreground sm:inline">
-                          {formatRelativeTime(g.lastCitedAt)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {isOpen && (
-                      <div className="space-y-1.5 pb-3 pl-6 pr-1">
-                        {view === "page"
-                          ? (g as PageGroup).details.map((d, i) => (
-                              <div
-                                key={`${d.platform}-${i}`}
-                                className="flex items-start justify-between gap-3 text-caption"
-                              >
-                                <span className="min-w-0 text-muted-foreground" title={d.prompt}>
-                                  <span className="line-clamp-2">{d.prompt}</span>
-                                </span>
-                                <span className="flex shrink-0 items-center gap-2">
-                                  <Badge
-                                    variant="outline"
-                                    className="px-1.5 py-0 text-label font-normal"
-                                  >
-                                    {d.platform}
-                                  </Badge>
-                                  <span className="whitespace-nowrap text-muted-foreground">
-                                    {formatRelativeTime(d.citedAt)}
-                                  </span>
-                                </span>
-                              </div>
-                            ))
-                          : (g as PromptGroup).details.map((d, i) => (
-                              <div
-                                key={`${d.url}-${i}`}
-                                className="flex items-center justify-between gap-3 text-caption"
-                              >
-                                <span className="min-w-0">
-                                  <UrlLink url={d.url} />
-                                </span>
-                                <span className="flex shrink-0 items-center gap-2">
-                                  <Badge
-                                    variant="outline"
-                                    className="px-1.5 py-0 text-label font-normal"
-                                  >
-                                    {d.platform}
-                                  </Badge>
-                                  <span className="whitespace-nowrap text-muted-foreground">
-                                    {formatRelativeTime(d.citedAt)}
-                                  </span>
-                                </span>
-                              </div>
-                            ))}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            {expandable && groups.length > initialLimit && (
-              <div className="mt-3 text-center print:hidden">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAll((v) => !v)}
-                  data-testid="cited-urls-toggle"
-                >
-                  {showAll ? "Show less" : `Show all ${groups.length}`}
-                </Button>
-              </div>
+    <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <PanelLabel>
+              <span className="inline-flex items-center gap-2 normal-case tracking-normal">
+                <Link2 className="h-4 w-4 text-vc-tertiary" />
+                Cited pages
+              </span>
+            </PanelLabel>
+            {groups.length > 0 && (
+              <Badge variant="outline" className="ml-1 font-normal">
+                {groups.length}
+              </Badge>
             )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+          </div>
+          <p className="mt-1 text-caption text-vc-tertiary">
+            {view === "page"
+              ? "The pages AI engines cited about your brand, ranked by how often."
+              : "What each prompt surfaced when AI engines answered about your brand."}
+          </p>
+        </div>
+        {/* Lens toggle */}
+        <div className="inline-flex rounded-md border border-vc-default p-0.5 print:hidden">
+          {(
+            [
+              ["page", "By page"],
+              ["prompt", "By prompt"],
+            ] as [View, string][]
+          ).map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setViewSafe(val)}
+              className={cn(
+                "rounded px-2.5 py-1 text-caption font-medium transition-colors",
+                view === val
+                  ? "bg-vc-muted text-vc-primary"
+                  : "text-vc-tertiary hover:text-vc-primary",
+              )}
+              data-testid={`cited-urls-view-${val}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-11 w-full" />
+          ))}
+        </div>
+      ) : groups.length === 0 ? (
+        <p className="py-6 text-center text-caption text-vc-tertiary">
+          No cited pages yet. Once an AI engine cites a page about your brand, it will appear here.
+        </p>
+      ) : (
+        <>
+          <ul className="divide-y divide-vc-default/60">
+            {visible.map((g) => {
+              const isOpen = openKeys.has(g.key);
+              return (
+                <li key={g.key} data-testid="cited-url-group">
+                  <div className="flex items-center gap-2 py-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleOpen(g.key)}
+                      className="-ml-1 shrink-0 rounded p-1 text-vc-tertiary transition-colors hover:bg-vc-muted hover:text-vc-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-expanded={isOpen}
+                      aria-label={isOpen ? "Collapse details" : "Expand details"}
+                      data-testid="cited-url-group-toggle"
+                    >
+                      <ChevronRight
+                        className={cn("h-4 w-4 transition-transform", isOpen && "rotate-90")}
+                      />
+                    </button>
+                    <div className="min-w-0 flex-1 text-caption font-medium">
+                      {view === "page" ? (
+                        <UrlLink url={(g as PageGroup).url} />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => toggleOpen(g.key)}
+                          className="block w-full truncate text-left"
+                          title={(g as PromptGroup).prompt}
+                        >
+                          {(g as PromptGroup).prompt}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {view === "page" && <PlatformChips platforms={(g as PageGroup).platforms} />}
+                      <Badge variant="secondary" className="font-normal" title="Total citations">
+                        {g.count} cite{g.count === 1 ? "" : "s"}
+                      </Badge>
+                      <span className="hidden whitespace-nowrap text-caption text-vc-tertiary sm:inline">
+                        {formatRelativeTime(g.lastCitedAt)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {isOpen && (
+                    <div className="space-y-1.5 pb-3 pl-6 pr-1">
+                      {view === "page"
+                        ? (g as PageGroup).details.map((d, i) => (
+                            <div
+                              key={`${d.platform}-${i}`}
+                              className="flex items-start justify-between gap-3 text-caption"
+                            >
+                              <span className="min-w-0 text-vc-tertiary" title={d.prompt}>
+                                <span className="line-clamp-2">{d.prompt}</span>
+                              </span>
+                              <span className="flex shrink-0 items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className="px-1.5 py-0 text-label font-normal"
+                                >
+                                  {d.platform}
+                                </Badge>
+                                <span className="whitespace-nowrap text-vc-tertiary">
+                                  {formatRelativeTime(d.citedAt)}
+                                </span>
+                              </span>
+                            </div>
+                          ))
+                        : (g as PromptGroup).details.map((d, i) => (
+                            <div
+                              key={`${d.url}-${i}`}
+                              className="flex items-center justify-between gap-3 text-caption"
+                            >
+                              <span className="min-w-0">
+                                <UrlLink url={d.url} />
+                              </span>
+                              <span className="flex shrink-0 items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className="px-1.5 py-0 text-label font-normal"
+                                >
+                                  {d.platform}
+                                </Badge>
+                                <span className="whitespace-nowrap text-vc-tertiary">
+                                  {formatRelativeTime(d.citedAt)}
+                                </span>
+                              </span>
+                            </div>
+                          ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {expandable && groups.length > initialLimit && (
+            <div className="mt-3 text-center print:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAll((v) => !v)}
+                data-testid="cited-urls-toggle"
+              >
+                {showAll ? "Show less" : `Show all ${groups.length}`}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

@@ -6,10 +6,10 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle, ChevronRight, Loader2, XCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 type RunSummary = {
   id: string;
@@ -56,24 +56,18 @@ export default function AdminScrapeRuns() {
   });
 
   return (
-    <div className="container mx-auto max-w-5xl py-8 space-y-6">
+    <PanelPage>
       {/* Title moved to src/routes/_app/admin.scrape.tsx's `head()` —
           metadata belongs to the route, not this component. */}
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-page font-semibold text-foreground">Recent fact-sheet scrapes</h1>
-          <p className="text-caption text-muted-foreground mt-1">
-            Last 50 runs across all brands. Auto-refreshes every 15 seconds.
-          </p>
-        </div>
+      <div className="px-8 py-6">
+        <h1 className="text-page font-semibold text-vc-primary">Recent fact-sheet scrapes</h1>
+        <p className="text-caption text-vc-tertiary mt-1">
+          Last 50 runs across all brands. Auto-refreshes every 15 seconds.
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-ui">Runs</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <PanelRow cols={1} last>
+        <Panel label="Runs" width="wide" border="last">
           {isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -85,19 +79,19 @@ export default function AdminScrapeRuns() {
           ) : (
             <div className="space-y-1">
               {(data?.data ?? []).length === 0 ? (
-                <p className="text-caption text-muted-foreground">No runs yet.</p>
+                <p className="text-caption text-vc-tertiary">No runs yet.</p>
               ) : null}
               {(data?.data ?? []).map((run) => {
                 const tone = statusToVariant(run.status);
                 return (
                   <Link key={run.id} to="/admin/scrape/$runId" params={{ runId: run.id }}>
                     <div
-                      className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:bg-(--bg-surface-2) focus-within:ring-2 focus-within:ring-ring transition-colors cursor-pointer"
+                      className="flex items-center gap-3 border border-vc-default p-3 hover:bg-vc-muted/50 focus-within:ring-2 focus-within:ring-ring transition-colors cursor-pointer"
                       data-testid={`run-row-${run.id}`}
                     >
                       <div className="shrink-0">
                         {tone === "ok" ? (
-                          <CheckCircle className="h-4 w-4 text-foreground" />
+                          <CheckCircle className="h-4 w-4 text-vc-primary" />
                         ) : tone === "fail" ? (
                           <XCircle className="h-4 w-4 text-destructive" />
                         ) : (
@@ -106,7 +100,7 @@ export default function AdminScrapeRuns() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-caption text-muted-foreground">
+                          <span className="font-mono text-caption text-vc-tertiary">
                             {run.id.slice(0, 8)}
                           </span>
                           <Badge
@@ -126,26 +120,26 @@ export default function AdminScrapeRuns() {
                               {run.errorKind}
                             </span>
                           )}
-                          <span className="text-label text-muted-foreground">
+                          <span className="text-label text-vc-tertiary">
                             {run.triggeredBy ?? "—"}
                           </span>
                         </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0 text-caption text-muted-foreground tnum">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0 text-caption text-vc-tertiary tabular-nums">
                           <span>{fmtAgo(run.startedAt)}</span>
                           <span>duration {fmtDur(run.startedAt, run.completedAt)}</span>
                           <span>{run.pagesFetched ?? 0} pages</span>
                           <span>{run.factsExtracted ?? 0} facts</span>
                         </div>
                       </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <ChevronRight className="h-4 w-4 shrink-0 text-vc-tertiary" />
                     </div>
                   </Link>
                 );
               })}
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </Panel>
+      </PanelRow>
+    </PanelPage>
   );
 }

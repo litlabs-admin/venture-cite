@@ -1,7 +1,6 @@
 // client/src/components/fact-sheet/ConflictPair.tsx
 import { useState } from "react";
 import { ExternalLink, Plus, Minus } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -50,10 +49,7 @@ export function ConflictPair({
   const factKey = userFact.factKey;
 
   return (
-    <div
-      className="rounded-md border border-border bg-card"
-      data-testid={`conflict-pair-${pair.userFact.id}`}
-    >
+    <div className="border border-vc-default" data-testid={`conflict-pair-${pair.userFact.id}`}>
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <div className="flex items-center gap-2 text-caption text-muted-foreground">
           <Badge variant="secondary" className="uppercase tracking-wide">
@@ -128,8 +124,8 @@ function renderSide(
     // AI side keeps --chart-4 because that use is categorical (which side of
     // the comparison this is), not a stand-in for "success" — the same kind
     // of legitimate categorical use as the platform colour ramp.
-    <Card
-      className={cn("p-3 text-caption", !isUser && "border-chart-4/40")}
+    <div
+      className={cn("border border-vc-default p-3 text-caption", !isUser && "border-chart-4/40")}
       data-testid={`pair-side-${side}-${fact.id}`}
     >
       <div className="mb-2 flex items-center justify-between text-caption">
@@ -180,7 +176,7 @@ function renderSide(
           <span className="font-mono text-foreground">{Number(fact.confidence).toFixed(2)}</span>
         </div>
       ) : null}
-    </Card>
+    </div>
   );
 }
 

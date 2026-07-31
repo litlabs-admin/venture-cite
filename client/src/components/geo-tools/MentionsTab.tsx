@@ -42,6 +42,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import type { BrandMention, ScanJob } from "@shared/schema";
 import type { Brand } from "@shared/schema";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -315,214 +316,232 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
   // Early: no brand selected
   if (showNoBrand) {
     return (
-      <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center">
-        <p className="text-caption text-muted-foreground">Select a brand to view mentions.</p>
-      </div>
+      <PanelPage>
+        <PanelRow cols={1} last>
+          <Panel width="wide" border="last">
+            <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 text-center">
+              <p className="text-caption text-vc-tertiary">Select a brand to view mentions.</p>
+            </div>
+          </Panel>
+        </PanelRow>
+      </PanelPage>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <PanelPage>
       {/* ── 1. Scan status panel ─────────────────────────────────────────── */}
-      <ScanStatusPanel
-        brandId={brandId}
-        brandName={brandName}
-        brandMonitorMentions={brand?.monitorMentions ?? false}
-        variations={(() => {
-          // Mirror server-side `collectVariations`: brand name first, then
-          // nameVariations, deduped case-insensitively, drop entries < 2 chars.
-          const all = [brand?.name, ...(brand?.nameVariations ?? [])];
-          const seen = new Set<string>();
-          const out: string[] = [];
-          for (const raw of all) {
-            if (typeof raw !== "string") continue;
-            const v = raw.trim();
-            if (v.length < 2) continue;
-            const key = v.toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            out.push(v);
-          }
-          return out;
-        })()}
-        activeScan={activeScan}
-        lastCompletedScan={lastCompletedScan}
-        scanCooldown={scanCooldown}
-        onStartScan={startScan}
-        onAddVariation={() => {
-          // Variation management lives on the brands page. Navigate there;
-          // the brand row exposes the name-variations editor.
-          navigate({ to: "/brands" });
-        }}
-        onToggleMonitor={handleToggleMonitor}
-      />
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <ScanStatusPanel
+            brandId={brandId}
+            brandName={brandName}
+            brandMonitorMentions={brand?.monitorMentions ?? false}
+            variations={(() => {
+              // Mirror server-side `collectVariations`: brand name first, then
+              // nameVariations, deduped case-insensitively, drop entries < 2 chars.
+              const all = [brand?.name, ...(brand?.nameVariations ?? [])];
+              const seen = new Set<string>();
+              const out: string[] = [];
+              for (const raw of all) {
+                if (typeof raw !== "string") continue;
+                const v = raw.trim();
+                if (v.length < 2) continue;
+                const key = v.toLowerCase();
+                if (seen.has(key)) continue;
+                seen.add(key);
+                out.push(v);
+              }
+              return out;
+            })()}
+            activeScan={activeScan}
+            lastCompletedScan={lastCompletedScan}
+            scanCooldown={scanCooldown}
+            onStartScan={startScan}
+            onAddVariation={() => {
+              // Variation management lives on the brands page. Navigate there;
+              // the brand row exposes the name-variations editor.
+              navigate({ to: "/brands" });
+            }}
+            onToggleMonitor={handleToggleMonitor}
+          />
+        </Panel>
+      </PanelRow>
 
-      {/* ── 2. Stats row ────────────────────────────────────────────────── */}
-      {stats && (
-        <div className="flex gap-2" aria-label="Mention statistics">
-          <StatCard label="Total" value={stats.total} />
-          <StatCard label="Positive" value={stats.bySentiment.positive} tone="positive" />
-          <StatCard label="Neutral" value={stats.bySentiment.neutral} />
-          <StatCard label="Negative" value={stats.bySentiment.negative} tone="negative" />
-        </div>
-      )}
+      <PanelRow cols={1} last>
+        <Panel width="wide" border="last">
+          <div className="flex flex-col gap-4">
+            {/* ── 2. Stats row ────────────────────────────────────────────── */}
+            {stats && (
+              <div className="flex gap-2" aria-label="Mention statistics">
+                <StatCard label="Total" value={stats.total} />
+                <StatCard label="Positive" value={stats.bySentiment.positive} tone="positive" />
+                <StatCard label="Neutral" value={stats.bySentiment.neutral} />
+                <StatCard label="Negative" value={stats.bySentiment.negative} tone="negative" />
+              </div>
+            )}
 
-      {/* ── 3. Toolbar ──────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Add manually */}
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 gap-1.5 text-caption"
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          Add manually
-        </Button>
-
-        {/* Bulk select toggle */}
-        <Button
-          size="sm"
-          variant={bulkMode ? "secondary" : "outline"}
-          className="h-8 gap-1.5 text-caption"
-          onClick={() => {
-            setBulkMode((v) => !v);
-            setSelectedIds(new Set());
-          }}
-          aria-pressed={bulkMode}
-        >
-          {bulkMode ? (
-            <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
-          ) : (
-            <Square className="h-3.5 w-3.5" aria-hidden="true" />
-          )}
-          Bulk select
-        </Button>
-
-        {/* Delete selected — visible when bulk mode active and items selected */}
-        {bulkMode && selectedIds.size > 0 && (
-          <Button
-            size="sm"
-            variant="destructive"
-            className="h-8 gap-1.5 text-caption"
-            onClick={() => setBulkDeleteOpen(true)}
-          >
-            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-            Delete selected ({selectedIds.size})
-          </Button>
-        )}
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Delete all for brand — danger zone */}
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-8 gap-1.5 text-caption text-destructive hover:bg-destructive-subtle hover:text-destructive"
-          onClick={() => setDeleteAllOpen(true)}
-        >
-          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-          Delete all for brand
-        </Button>
-      </div>
-
-      {/* ── 4. Filters ───────────────────────────────────────────────────── */}
-      <MentionsFilters filters={filters} onChange={setFilter} onClear={clearFilters} />
-
-      {/* ── 5. List ─────────────────────────────────────────────────────── */}
-      {isLoading ? (
-        <div className="flex flex-col gap-2" aria-label="Loading mentions" role="status">
-          <MentionCardSkeleton />
-          <MentionCardSkeleton />
-          <MentionCardSkeleton />
-        </div>
-      ) : (
-        <>
-          {/* Empty states */}
-          {showNoScans && (
-            <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center">
-              <p className="text-caption font-medium">No scans yet.</p>
-              <p className="text-caption text-muted-foreground">
-                Run your first scan to find mentions.
-              </p>
-            </div>
-          )}
-
-          {showNoMentionsAfterScan && (
-            <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center">
-              <p className="text-caption font-medium">No mentions found yet.</p>
-              <p className="text-caption text-muted-foreground">
-                {"We'll keep checking daily. Add variations to widen the search."}
-              </p>
-            </div>
-          )}
-
-          {showFilteredEmpty && (
-            <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
-              <p className="text-caption text-muted-foreground">No mentions match these filters.</p>
-              <Button size="sm" variant="outline" onClick={clearFilters}>
-                Clear filters
+            {/* ── 3. Toolbar ──────────────────────────────────────────────── */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Add manually */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 text-caption"
+                onClick={() => setAddOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                Add manually
               </Button>
-            </div>
-          )}
 
-          {/* The list */}
-          {mentions.length > 0 && (
-            <ul className="flex flex-col gap-2" aria-label="Mentions list">
-              {mentions.map((mention, index) => (
-                <li
-                  key={mention.id}
-                  className="flex items-start gap-2"
-                  data-tour-id={index === 0 ? "mentions.firstResult" : undefined}
+              {/* Bulk select toggle */}
+              <Button
+                size="sm"
+                variant={bulkMode ? "secondary" : "outline"}
+                className="h-8 gap-1.5 text-caption"
+                onClick={() => {
+                  setBulkMode((v) => !v);
+                  setSelectedIds(new Set());
+                }}
+                aria-pressed={bulkMode}
+              >
+                {bulkMode ? (
+                  <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                ) : (
+                  <Square className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                Bulk select
+              </Button>
+
+              {/* Delete selected — visible when bulk mode active and items selected */}
+              {bulkMode && selectedIds.size > 0 && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-8 gap-1.5 text-caption"
+                  onClick={() => setBulkDeleteOpen(true)}
                 >
-                  {/* Bulk-select checkbox */}
-                  {bulkMode && (
-                    <button
-                      type="button"
-                      aria-label={
-                        selectedIds.has(mention.id)
-                          ? `Deselect mention ${mention.id}`
-                          : `Select mention ${mention.id}`
-                      }
-                      aria-checked={selectedIds.has(mention.id)}
-                      role="checkbox"
-                      className="mt-3 shrink-0 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
-                      onClick={() => toggleSelect(mention.id)}
-                    >
-                      {selectedIds.has(mention.id) ? (
-                        <CheckSquare className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Square className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </button>
-                  )}
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  Delete selected ({selectedIds.size})
+                </Button>
+              )}
 
-                  <div className="min-w-0 flex-1">
-                    <MentionCard
-                      mention={mention}
-                      onOpen={openDetailSheet}
-                      onChangeStatus={updateStatus}
-                      onDelete={deleteMention}
-                      onMarkFalsePositive={markFalsePositive}
-                      isActive={mention.id === openMentionId}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+              {/* Spacer */}
+              <div className="flex-1" />
 
-          {/* Load more */}
-          {hasMore && (
-            <div className="flex justify-center pt-2">
-              <Button variant="outline" size="sm" onClick={loadMore} className="text-caption">
-                Load more
+              {/* Delete all for brand — danger zone */}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 gap-1.5 text-caption text-destructive hover:bg-destructive-subtle hover:text-destructive"
+                onClick={() => setDeleteAllOpen(true)}
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                Delete all for brand
               </Button>
             </div>
-          )}
-        </>
-      )}
+
+            {/* ── 4. Filters ───────────────────────────────────────────────── */}
+            <MentionsFilters filters={filters} onChange={setFilter} onClear={clearFilters} />
+
+            {/* ── 5. List ─────────────────────────────────────────────────── */}
+            {isLoading ? (
+              <div className="flex flex-col gap-2" aria-label="Loading mentions" role="status">
+                <MentionCardSkeleton />
+                <MentionCardSkeleton />
+                <MentionCardSkeleton />
+              </div>
+            ) : (
+              <>
+                {/* Empty states */}
+                {showNoScans && (
+                  <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-vc-default p-8 text-center">
+                    <p className="text-caption font-medium">No scans yet.</p>
+                    <p className="text-caption text-vc-tertiary">
+                      Run your first scan to find mentions.
+                    </p>
+                  </div>
+                )}
+
+                {showNoMentionsAfterScan && (
+                  <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-vc-default p-8 text-center">
+                    <p className="text-caption font-medium">No mentions found yet.</p>
+                    <p className="text-caption text-vc-tertiary">
+                      {"We'll keep checking daily. Add variations to widen the search."}
+                    </p>
+                  </div>
+                )}
+
+                {showFilteredEmpty && (
+                  <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-vc-default p-8 text-center">
+                    <p className="text-caption text-vc-tertiary">
+                      No mentions match these filters.
+                    </p>
+                    <Button size="sm" variant="outline" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  </div>
+                )}
+
+                {/* The list */}
+                {mentions.length > 0 && (
+                  <ul className="flex flex-col gap-2" aria-label="Mentions list">
+                    {mentions.map((mention, index) => (
+                      <li
+                        key={mention.id}
+                        className="flex items-start gap-2"
+                        data-tour-id={index === 0 ? "mentions.firstResult" : undefined}
+                      >
+                        {/* Bulk-select checkbox */}
+                        {bulkMode && (
+                          <button
+                            type="button"
+                            aria-label={
+                              selectedIds.has(mention.id)
+                                ? `Deselect mention ${mention.id}`
+                                : `Select mention ${mention.id}`
+                            }
+                            aria-checked={selectedIds.has(mention.id)}
+                            role="checkbox"
+                            className="mt-3 shrink-0 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+                            onClick={() => toggleSelect(mention.id)}
+                          >
+                            {selectedIds.has(mention.id) ? (
+                              <CheckSquare className="h-4 w-4 text-primary" />
+                            ) : (
+                              <Square className="h-4 w-4 text-vc-tertiary" />
+                            )}
+                          </button>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <MentionCard
+                            mention={mention}
+                            onOpen={openDetailSheet}
+                            onChangeStatus={updateStatus}
+                            onDelete={deleteMention}
+                            onMarkFalsePositive={markFalsePositive}
+                            isActive={mention.id === openMentionId}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Load more */}
+                {hasMore && (
+                  <div className="flex justify-center pt-2">
+                    <Button variant="outline" size="sm" onClick={loadMore} className="text-caption">
+                      Load more
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </Panel>
+      </PanelRow>
 
       {/* ── Detail sheet ─────────────────────────────────────────────────── */}
       <MentionDetailSheet
@@ -602,6 +621,6 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PanelPage>
   );
 }

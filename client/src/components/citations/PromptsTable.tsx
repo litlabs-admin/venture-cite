@@ -84,7 +84,7 @@ type ColumnKey = (typeof COLUMNS)[number]["key"];
 const BTN =
   "h-8 px-2.5 flex items-center gap-1.5 rounded border border-vc-default text-caption text-vc-secondary transition-colors hover:bg-vc-muted/50";
 const MENU =
-  "absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded border border-vc-default bg-white py-1 shadow-vc-overlay";
+  "absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded border border-vc-default bg-vc-surface py-1 shadow-vc-overlay";
 const MENU_LABEL = "px-3 pb-1 pt-2 text-label font-semibold uppercase tracking-wider text-vc-label";
 const MENU_ITEM =
   "flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-caption text-vc-secondary transition-colors hover:bg-vc-muted/60 hover:text-vc-primary";
@@ -163,7 +163,7 @@ function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => voi
       <span
         className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
           checked
-            ? "border-vc-accent bg-vc-accent text-white"
+            ? "border-vc-accent bg-vc-accent text-primary-foreground"
             : "border-vc-default group-hover/select:border-vc-hover"
         }`}
       >
@@ -541,7 +541,7 @@ export function PromptsTable({
           <div className="relative" ref={addRef}>
             <button
               type="button"
-              className="flex h-8 items-center gap-1.5 rounded bg-vc-accent-subtle pl-2.5 pr-2 text-caption font-medium text-vc-accent transition-colors hover:bg-vc-accent hover:text-white"
+              className="flex h-8 items-center gap-1.5 rounded bg-vc-accent-subtle pl-2.5 pr-2 text-caption font-medium text-vc-accent transition-colors hover:bg-vc-accent hover:text-primary-foreground"
               aria-expanded={openMenu === "add"}
               onClick={() => setOpenMenu(openMenu === "add" ? null : "add")}
             >
@@ -728,7 +728,7 @@ export function PromptsTable({
                       if (text && text !== p.prompt) onEdit(p, text);
                       setEditingId(null);
                     }}
-                    className="w-full rounded border border-vc-accent bg-white px-2 py-1 text-body text-vc-primary outline-none ring-2 ring-vc-accent/20"
+                    className="w-full rounded border border-vc-accent bg-vc-surface px-2 py-1 text-body text-vc-primary outline-none ring-2 ring-vc-accent/20"
                   />
                 ) : (
                   <div className="group/prompt flex min-w-0 items-center gap-2">
@@ -1084,7 +1084,7 @@ export function PromptsTable({
       {/* Paste-a-list dialog */}
       {pasteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
-          <div className="w-full max-w-lg rounded-lg border border-vc-default bg-white p-5 shadow-vc-overlay">
+          <div className="w-full max-w-lg rounded-lg border border-vc-default bg-vc-surface p-5 shadow-vc-overlay">
             <h2 className="mb-1 text-[15px] font-semibold text-vc-primary">Paste a list</h2>
             <p className="mb-3 text-caption text-vc-tertiary">
               One prompt per line. {cap - trackedCount} slot
@@ -1110,7 +1110,7 @@ export function PromptsTable({
               </button>
               <button
                 type="button"
-                className="flex h-8 items-center rounded bg-vc-accent px-3 text-caption font-medium text-white hover:bg-vc-accent-hover"
+                className="flex h-8 items-center rounded bg-vc-accent px-3 text-caption font-medium text-primary-foreground hover:bg-vc-accent-hover"
                 onClick={() => {
                   const lines = pasteText
                     .split("\n")

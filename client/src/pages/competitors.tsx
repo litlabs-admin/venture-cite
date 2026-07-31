@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +43,7 @@ import { SiClaude, SiPerplexity, SiGooglegemini } from "react-icons/si";
 import type { ComponentType, SVGProps } from "react";
 import type { Competitor } from "@shared/schema";
 import { AI_PLATFORMS } from "@shared/constants";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 const platformIcon: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   chatgpt: BsOpenai,
@@ -318,20 +318,20 @@ export default function CompetitorsPage() {
     // client/src/pages/monitor.tsx (no route of its own) — title/meta
     // removed per this task's blanket rule; /monitor falls back to root
     // defaults.
-    <div className="space-y-8">
+    <PanelPage>
       {/* Competitors/leaderboard are scoped to a single brand */}
       {(brandsLoading || brands.length === 0) && (
-        <Card>
-          <CardContent className="pt-6">
+        <PanelRow cols={1}>
+          <Panel width="wide" border="last">
             {brandsLoading ? (
               <Skeleton className="h-10 w-full" />
             ) : (
-              <p className="text-muted-foreground text-caption">
+              <p className="text-vc-tertiary text-caption">
                 Create a brand first to start tracking competitors.
               </p>
             )}
-          </CardContent>
-        </Card>
+          </Panel>
+        </PanelRow>
       )}
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -404,305 +404,312 @@ export default function CompetitorsPage() {
       </Dialog>
 
       {!selectedBrandId ? null : (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1.5">
-                    <CardTitle className="flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-warning" />
-                      GEO Leaderboard
-                    </CardTitle>
-                    <CardDescription>
-                      See how your brand stacks up against competitors in AI citations
-                    </CardDescription>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => rediscoverMutation.mutate()}
-                      disabled={rediscoverMutation.isPending}
-                      title="Re-run AI discovery to find competitors you may be missing"
-                      data-testid="button-rediscover-competitors"
-                    >
-                      <RefreshCw
-                        className={`w-4 h-4 mr-2 ${rediscoverMutation.isPending ? "animate-spin" : ""}`}
-                      />
-                      {rediscoverMutation.isPending ? "Scanning..." : "Re-discover"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => setIsAddDialogOpen(true)}
-                      data-testid="button-add-competitor"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Competitor
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {leaderboardIsError ? (
-                  <ErrorState
-                    title="Couldn't load leaderboard"
-                    onRetry={() => refetchLeaderboard()}
-                    isRetrying={leaderboardIsRefetching}
+        <PanelRow cols={3}>
+          <Panel
+            width="wide"
+            span={2}
+            label={
+              <span className="flex items-center gap-2">
+                <Trophy className="h-3.5 w-3.5 text-warning" />
+                GEO Leaderboard
+              </span>
+            }
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <p className="text-data text-vc-tertiary">
+                See how your brand stacks up against competitors in AI citations
+              </p>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => rediscoverMutation.mutate()}
+                  disabled={rediscoverMutation.isPending}
+                  title="Re-run AI discovery to find competitors you may be missing"
+                  data-testid="button-rediscover-competitors"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 mr-2 ${rediscoverMutation.isPending ? "animate-spin" : ""}`}
                   />
-                ) : isLoadingLeaderboard ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-16 w-full rounded-lg" />
-                    <Skeleton className="h-16 w-full rounded-lg" />
-                    <Skeleton className="h-16 w-full rounded-lg" />
-                  </div>
-                ) : leaderboard.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="font-medium">No competitors yet</p>
-                    <p className="text-caption">
-                      Add a competitor to start benchmarking your AI citations.
-                    </p>
-                    <Button
-                      className="mt-4"
-                      size="sm"
-                      onClick={() => setIsAddDialogOpen(true)}
-                      data-testid="button-leaderboard-empty-add"
+                  {rediscoverMutation.isPending ? "Scanning..." : "Re-discover"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsAddDialogOpen(true)}
+                  data-testid="button-add-competitor"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Competitor
+                </Button>
+              </div>
+            </div>
+            <div>
+              {leaderboardIsError ? (
+                <ErrorState
+                  title="Couldn't load leaderboard"
+                  onRetry={() => refetchLeaderboard()}
+                  isRetrying={leaderboardIsRefetching}
+                />
+              ) : isLoadingLeaderboard ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                </div>
+              ) : leaderboard.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p className="font-medium">No competitors yet</p>
+                  <p className="text-caption">
+                    Add a competitor to start benchmarking your AI citations.
+                  </p>
+                  <Button
+                    className="mt-4"
+                    size="sm"
+                    onClick={() => setIsAddDialogOpen(true)}
+                    data-testid="button-leaderboard-empty-add"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add your first competitor
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {leaderboard.map((entry, index) => (
+                    <div
+                      key={`${entry.domain}-${index}`}
+                      className={`flex items-center gap-4 p-3 rounded-lg border ${
+                        entry.isOwn ? "bg-primary/5 border-primary/20" : "bg-muted/50"
+                      }`}
+                      data-testid={`leaderboard-entry-${index}`}
                     >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add your first competitor
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {leaderboard.map((entry, index) => (
-                      <div
-                        key={`${entry.domain}-${index}`}
-                        className={`flex items-center gap-4 p-3 rounded-lg border ${
-                          entry.isOwn ? "bg-primary/5 border-primary/20" : "bg-muted/50"
-                        }`}
-                        data-testid={`leaderboard-entry-${index}`}
-                      >
-                        <div className="shrink-0">{getRankIcon(index)}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="text-caption font-semibold truncate"
-                              data-testid={`text-competitor-name-${index}`}
-                            >
-                              {entry.name}
-                            </span>
-                            {entry.isOwn && (
-                              <Badge variant="default" className="text-caption">
-                                Your Brand
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 text-body text-muted-foreground">
-                            <ExternalLink className="w-3 h-3" />
-                            <span className="truncate">{entry.domain}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div
-                            className="text-metric font-semibold font-mono tabular-nums"
-                            data-testid={`text-citation-count-${index}`}
+                      <div className="shrink-0">{getRankIcon(index)}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-caption font-semibold truncate"
+                            data-testid={`text-competitor-name-${index}`}
                           >
-                            {entry.totalCitations}
-                          </div>
-                          <div className="text-caption text-muted-foreground">citations</div>
-                        </div>
-                        <div className="hidden md:flex flex-wrap gap-1 max-w-[200px]">
-                          {Object.entries(entry.platformBreakdown)
-                            .slice(0, 3)
-                            .map(([platform, count]) => (
-                              <Badge key={platform} variant="outline" className="text-caption">
-                                {platform}: {count}
-                              </Badge>
-                            ))}
-                          {Object.keys(entry.platformBreakdown).length > 3 && (
-                            <Badge variant="outline" className="text-caption">
-                              +{Object.keys(entry.platformBreakdown).length - 3} more
+                            {entry.name}
+                          </span>
+                          {entry.isOwn && (
+                            <Badge variant="default" className="text-caption">
+                              Your Brand
                             </Badge>
                           )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-muted-foreground" />
-                  Platform Breakdown
-                </CardTitle>
-                <CardDescription>Citations by AI platform for top performers</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {leaderboard.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-caption">Add data to see platform breakdown</p>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {AI_PLATFORMS.map((platform) => {
-                      const platformData = leaderboard
-                        .filter((entry) => entry.platformBreakdown[platform])
-                        .sort(
-                          (a, b) =>
-                            (b.platformBreakdown[platform] || 0) -
-                            (a.platformBreakdown[platform] || 0),
-                        )
-                        .slice(0, 3);
-
-                      if (platformData.length === 0) return null;
-
-                      const Icon = platformIcon[platform.toLowerCase()] ?? Brain;
-                      return (
-                        <div key={platform} className="p-3 rounded-lg border bg-muted/30">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Icon className="w-4 h-4" />
-                            <span className="font-medium text-caption">{platform}</span>
-                          </div>
-                          <div className="space-y-1">
-                            {platformData.map((entry, idx) => (
-                              <div key={entry.domain} className="flex justify-between text-caption">
-                                <span
-                                  className={
-                                    entry.isOwn
-                                      ? "font-medium text-primary"
-                                      : "text-muted-foreground"
-                                  }
-                                >
-                                  {idx + 1}. {entry.name}
-                                </span>
-                                <span className="font-medium">
-                                  {entry.platformBreakdown[platform]}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                        <div className="flex items-center gap-1 text-body text-muted-foreground">
+                          <ExternalLink className="w-3 h-3" />
+                          <span className="truncate">{entry.domain}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                      </div>
+                      <div className="text-right">
+                        <div
+                          className="text-metric font-semibold font-mono tabular-nums"
+                          data-testid={`text-citation-count-${index}`}
+                        >
+                          {entry.totalCitations}
+                        </div>
+                        <div className="text-caption text-muted-foreground">citations</div>
+                      </div>
+                      <div className="hidden md:flex flex-wrap gap-1 max-w-[200px]">
+                        {Object.entries(entry.platformBreakdown)
+                          .slice(0, 3)
+                          .map(([platform, count]) => (
+                            <Badge key={platform} variant="outline" className="text-caption">
+                              {platform}: {count}
+                            </Badge>
+                          ))}
+                        {Object.keys(entry.platformBreakdown).length > 3 && (
+                          <Badge variant="outline" className="text-caption">
+                            +{Object.keys(entry.platformBreakdown).length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Panel>
 
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Tracked Competitors
-                </CardTitle>
-                <CardDescription>
-                  {competitors.length} competitor{competitors.length !== 1 ? "s" : ""} being tracked
-                  — the leaderboard above adds your brand as its own row.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {competitorsIsError ? (
-                  <ErrorState
-                    title="Couldn't load competitors"
-                    onRetry={() => refetchCompetitors()}
-                    isRetrying={competitorsIsRefetching}
-                  />
-                ) : isLoadingCompetitors ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-12 w-full rounded-lg" />
-                    <Skeleton className="h-12 w-full rounded-lg" />
-                  </div>
-                ) : competitors.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-caption">No competitors added yet</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => setIsAddDialogOpen(true)}
-                      data-testid="button-add-first-competitor"
+          <Panel
+            width="narrow"
+            border="last"
+            label={
+              <span className="flex items-center gap-2">
+                <Users className="h-3.5 w-3.5" />
+                Tracked Competitors
+              </span>
+            }
+          >
+            <p className="mb-4 text-data text-vc-tertiary">
+              {competitors.length} competitor{competitors.length !== 1 ? "s" : ""} being tracked —
+              the leaderboard above adds your brand as its own row.
+            </p>
+            {competitorsIsError ? (
+              <ErrorState
+                title="Couldn't load competitors"
+                onRetry={() => refetchCompetitors()}
+                isRetrying={competitorsIsRefetching}
+              />
+            ) : isLoadingCompetitors ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+              </div>
+            ) : competitors.length === 0 ? (
+              <div className="text-center py-8 text-vc-tertiary">
+                <p className="text-caption">No competitors added yet</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setIsAddDialogOpen(true)}
+                  data-testid="button-add-first-competitor"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Your First
+                </Button>
+              </div>
+            ) : (
+              <Tabs
+                defaultValue={
+                  coreCompetitors.length === 0 && discoveredCompetitors.length > 0
+                    ? "discovered"
+                    : "core"
+                }
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="core" data-testid="tab-core-competitors">
+                    Core ({coreCompetitors.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="discovered" data-testid="tab-discovered-competitors">
+                    Discovered ({discoveredCompetitors.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="core" className="space-y-3">
+                  <p className="text-caption text-vc-tertiary">
+                    The competitors you track most closely. Add them by hand or promote one from the
+                    discovered pool.
+                  </p>
+                  {coreCompetitors.length === 0 ? (
+                    <p className="py-6 text-center text-caption text-vc-tertiary">
+                      No core competitors yet. Add one above, or promote a discovered competitor.
+                    </p>
+                  ) : (
+                    coreCompetitors.map((competitor) => (
+                      <CompetitorRow
+                        key={competitor.id}
+                        competitor={competitor}
+                        onEdit={openEdit}
+                        onDelete={(id) => deleteCompetitorMutation.mutate(id)}
+                        onIgnore={(id) => ignoreCompetitorMutation.mutate(id)}
+                        onSetTier={(id, tier) => setTierMutation.mutate({ id, tier })}
+                        tierBusy={setTierMutation.isPending}
+                      />
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="discovered" className="space-y-3">
+                  <p className="text-caption text-vc-tertiary">
+                    Competitors AI discovery surfaced, ranked by relevance. Promote the ones that
+                    matter, ignore the false positives.
+                  </p>
+                  {discoveredCompetitors.length === 0 ? (
+                    <p className="py-6 text-center text-caption text-vc-tertiary">
+                      Nothing in the discovered pool. Run Re-discover to surface more.
+                    </p>
+                  ) : (
+                    discoveredCompetitors.map((competitor) => (
+                      <CompetitorRow
+                        key={competitor.id}
+                        competitor={competitor}
+                        onEdit={openEdit}
+                        onDelete={(id) => deleteCompetitorMutation.mutate(id)}
+                        onIgnore={(id) => ignoreCompetitorMutation.mutate(id)}
+                        onSetTier={(id, tier) => setTierMutation.mutate({ id, tier })}
+                        tierBusy={setTierMutation.isPending}
+                      />
+                    ))
+                  )}
+                </TabsContent>
+              </Tabs>
+            )}
+          </Panel>
+        </PanelRow>
+      )}
+
+      {/* Platform Breakdown moved into its own full-width row beneath the
+          leaderboard/tracked-competitors row — the panel grammar's rows are
+          full-bleed horizontal bands, so the original two-cards-stacked-in-
+          one-column layout is flattened into two rows rather than forced
+          into a single cell. */}
+      {selectedBrandId && (
+        <PanelRow cols={1} last>
+          <Panel
+            width="wide"
+            border="last"
+            label={
+              <span className="flex items-center gap-2">
+                <TrendingUp className="h-3.5 w-3.5 text-vc-tertiary" />
+                Platform Breakdown
+              </span>
+            }
+          >
+            <p className="mb-4 text-data text-vc-tertiary">
+              Citations by AI platform for top performers
+            </p>
+            {leaderboard.length === 0 ? (
+              <div className="text-center py-8 text-vc-tertiary">
+                <p className="text-caption">Add data to see platform breakdown</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {AI_PLATFORMS.map((platform) => {
+                  const platformData = leaderboard
+                    .filter((entry) => entry.platformBreakdown[platform])
+                    .sort(
+                      (a, b) =>
+                        (b.platformBreakdown[platform] || 0) - (a.platformBreakdown[platform] || 0),
+                    )
+                    .slice(0, 3);
+
+                  if (platformData.length === 0) return null;
+
+                  const Icon = platformIcon[platform.toLowerCase()] ?? Brain;
+                  return (
+                    <div
+                      key={platform}
+                      className="p-3 rounded-lg border border-vc-default bg-vc-muted/30"
                     >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Your First
-                    </Button>
-                  </div>
-                ) : (
-                  <Tabs
-                    defaultValue={
-                      coreCompetitors.length === 0 && discoveredCompetitors.length > 0
-                        ? "discovered"
-                        : "core"
-                    }
-                  >
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="core" data-testid="tab-core-competitors">
-                        Core ({coreCompetitors.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="discovered" data-testid="tab-discovered-competitors">
-                        Discovered ({discoveredCompetitors.length})
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="core" className="space-y-3">
-                      <p className="text-caption text-muted-foreground">
-                        The competitors you track most closely. Add them by hand or promote one from
-                        the discovered pool.
-                      </p>
-                      {coreCompetitors.length === 0 ? (
-                        <p className="py-6 text-center text-caption text-muted-foreground">
-                          No core competitors yet. Add one above, or promote a discovered
-                          competitor.
-                        </p>
-                      ) : (
-                        coreCompetitors.map((competitor) => (
-                          <CompetitorRow
-                            key={competitor.id}
-                            competitor={competitor}
-                            onEdit={openEdit}
-                            onDelete={(id) => deleteCompetitorMutation.mutate(id)}
-                            onIgnore={(id) => ignoreCompetitorMutation.mutate(id)}
-                            onSetTier={(id, tier) => setTierMutation.mutate({ id, tier })}
-                            tierBusy={setTierMutation.isPending}
-                          />
-                        ))
-                      )}
-                    </TabsContent>
-
-                    <TabsContent value="discovered" className="space-y-3">
-                      <p className="text-caption text-muted-foreground">
-                        Competitors AI discovery surfaced, ranked by relevance. Promote the ones
-                        that matter, ignore the false positives.
-                      </p>
-                      {discoveredCompetitors.length === 0 ? (
-                        <p className="py-6 text-center text-caption text-muted-foreground">
-                          Nothing in the discovered pool. Run Re-discover to surface more.
-                        </p>
-                      ) : (
-                        discoveredCompetitors.map((competitor) => (
-                          <CompetitorRow
-                            key={competitor.id}
-                            competitor={competitor}
-                            onEdit={openEdit}
-                            onDelete={(id) => deleteCompetitorMutation.mutate(id)}
-                            onIgnore={(id) => ignoreCompetitorMutation.mutate(id)}
-                            onSetTier={(id, tier) => setTierMutation.mutate({ id, tier })}
-                            tierBusy={setTierMutation.isPending}
-                          />
-                        ))
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Icon className="w-4 h-4" />
+                        <span className="font-medium text-caption">{platform}</span>
+                      </div>
+                      <div className="space-y-1">
+                        {platformData.map((entry, idx) => (
+                          <div key={entry.domain} className="flex justify-between text-caption">
+                            <span
+                              className={
+                                entry.isOwn ? "font-medium text-primary" : "text-vc-tertiary"
+                              }
+                            >
+                              {idx + 1}. {entry.name}
+                            </span>
+                            <span className="font-medium">{entry.platformBreakdown[platform]}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+        </PanelRow>
       )}
 
       <Dialog
@@ -803,7 +810,7 @@ export default function CompetitorsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PanelPage>
   );
 }
 

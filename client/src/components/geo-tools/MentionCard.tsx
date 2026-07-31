@@ -244,7 +244,7 @@ export default function MentionCard({
       className={cn(
         // Base card styling
         "group relative w-full cursor-pointer rounded-lg border bg-card text-left transition-colors",
-        "hover:border-primary/40 hover:shadow-sm",
+        "hover:border-vc-accent/40 hover:bg-vc-muted/50",
         // Focus ring
         "focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden",
         // Active state (currently shown in detail sheet)

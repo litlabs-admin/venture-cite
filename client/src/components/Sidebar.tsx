@@ -105,7 +105,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       : location === href || location.startsWith(`${href}/`) || location.startsWith(`${href}?`);
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-vc-surface">
       {/* Brand row — 56px, matching the context bar's height exactly so the
           two hairlines meet in one unbroken line across the viewport. */}
       <div className="relative flex h-[56px] shrink-0 items-center border-b border-vc-default px-2.5">
@@ -238,7 +238,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[200px] flex-col border-r border-vc-default bg-white lg:flex">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[200px] flex-col border-r border-vc-default bg-vc-surface lg:flex">
       <SidebarContent />
     </aside>
   );

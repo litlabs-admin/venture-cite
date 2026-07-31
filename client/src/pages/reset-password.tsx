@@ -4,20 +4,13 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, Check, X, CheckCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Sentry } from "@/lib/sentry";
 import { PASSWORD_RULES } from "@shared/passwordPolicy";
 import { BrandLogo } from "@/components/BrandLogo";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -91,157 +84,160 @@ export default function ResetPassword() {
 
   if (hasSession === false) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-page font-semibold text-foreground">
-              Invalid Reset Link
-            </CardTitle>
-            <CardDescription>
-              This password reset link is invalid or has expired. Please request a new one.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Button onClick={() => navigate({ to: "/forgot-password" })}>
-              Request new reset link
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <PanelPage className="flex items-center justify-center p-4">
+        <PanelRow cols={1} last className="w-full max-w-md">
+          <Panel width="wide" border="last">
+            <div className="text-center">
+              <h1 className="text-page font-semibold text-vc-primary">Invalid Reset Link</h1>
+              <p className="mt-1 text-caption text-vc-tertiary">
+                This password reset link is invalid or has expired. Please request a new one.
+              </p>
+            </div>
+            <div className="mt-6 text-center">
+              <Button onClick={() => navigate({ to: "/forgot-password" })}>
+                Request new reset link
+              </Button>
+            </div>
+          </Panel>
+        </PanelRow>
+      </PanelPage>
     );
   }
 
   if (success) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
-                <CheckCircle className="h-8 w-8 text-foreground" />
+      <PanelPage className="flex items-center justify-center p-4">
+        <PanelRow cols={1} last className="w-full max-w-md">
+          <Panel width="wide" border="last">
+            <div className="text-center">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 bg-vc-muted rounded-full flex items-center justify-center">
+                  <CheckCircle className="h-8 w-8 text-vc-primary" />
+                </div>
               </div>
+              <h1 className="text-page font-semibold text-vc-primary">Password Reset!</h1>
+              <p className="mt-2 text-caption text-vc-tertiary">
+                Your password has been successfully reset. You can now sign in with your new
+                password.
+              </p>
             </div>
-            <CardTitle className="text-page font-semibold text-foreground">
-              Password Reset!
-            </CardTitle>
-            <CardDescription className="mt-2">
-              Your password has been successfully reset. You can now sign in with your new password.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                navigate({ to: "/login" });
-              }}
-              className="w-full"
-              data-testid="button-go-login"
-            >
-              Go to sign in
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="mt-6 text-center">
+              <Button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  navigate({ to: "/login" });
+                }}
+                className="w-full"
+                data-testid="button-go-login"
+              >
+                Go to sign in
+              </Button>
+            </div>
+          </Panel>
+        </PanelRow>
+      </PanelPage>
     );
   }
 
   return (
     // Title/robots moved to src/routes/_app/reset-password.tsx's `head()`
     // — metadata belongs to the route, not this component.
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <BrandLogo imgClassName="h-12" textClassName="text-page" />
+    <PanelPage className="flex items-center justify-center p-4">
+      <PanelRow cols={1} last className="w-full max-w-md">
+        <Panel width="wide" border="last">
+          <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <BrandLogo imgClassName="h-12" textClassName="text-page" />
+            </div>
+            <h1 className="text-page font-semibold text-vc-primary">Set new password</h1>
+            <p className="mt-1 text-caption text-vc-tertiary">
+              Create a strong password for your account
+            </p>
           </div>
-          <CardTitle className="text-page font-semibold text-foreground">
-            Set new password
-          </CardTitle>
-          <CardDescription>Create a strong password for your account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="password">New password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Create a strong password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  data-testid="input-password"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+          <div className="mt-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="password">New password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Create a strong password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    data-testid="input-password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {password && (
+                  <ul className="text-caption space-y-1 mt-2">
+                    {passwordRequirements.map((req, i) => (
+                      <li
+                        key={i}
+                        className={`flex items-center gap-1 ${req.met ? "text-foreground" : "text-muted-foreground"}`}
+                      >
+                        {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        {req.label}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              {password && (
-                <ul className="text-caption space-y-1 mt-2">
-                  {passwordRequirements.map((req, i) => (
-                    <li
-                      key={i}
-                      className={`flex items-center gap-1 ${req.met ? "text-foreground" : "text-muted-foreground"}`}
-                    >
-                      {req.met ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                      {req.label}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm new password</Label>
-              <Input
-                id="confirmPassword"
-                type={showPassword ? "text" : "password"}
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                data-testid="input-confirm-password"
-              />
-              {confirmPassword && !passwordsMatch && (
-                <p className="text-caption text-destructive flex items-center gap-1">
-                  <X className="h-3 w-3" /> Passwords do not match
-                </p>
-              )}
-            </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={
-                resetMutation.isPending ||
-                !allRequirementsMet ||
-                !passwordsMatch ||
-                hasSession !== true
-              }
-              data-testid="button-reset-password"
-            >
-              {resetMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Resetting...
-                </>
-              ) : (
-                "Reset password"
-              )}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="justify-center">
-          <a href="/login" className="text-caption text-muted-foreground hover:text-foreground">
-            Remember your password? Sign in
-          </a>
-        </CardFooter>
-      </Card>
-    </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm new password</Label>
+                <Input
+                  id="confirmPassword"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  data-testid="input-confirm-password"
+                />
+                {confirmPassword && !passwordsMatch && (
+                  <p className="text-caption text-destructive flex items-center gap-1">
+                    <X className="h-3 w-3" /> Passwords do not match
+                  </p>
+                )}
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={
+                  resetMutation.isPending ||
+                  !allRequirementsMet ||
+                  !passwordsMatch ||
+                  hasSession !== true
+                }
+                data-testid="button-reset-password"
+              >
+                {resetMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  "Reset password"
+                )}
+              </Button>
+            </form>
+          </div>
+          <div className="mt-6 flex justify-center">
+            <a href="/login" className="text-caption text-vc-tertiary hover:text-vc-primary">
+              Remember your password? Sign in
+            </a>
+          </div>
+        </Panel>
+      </PanelRow>
+    </PanelPage>
   );
 }

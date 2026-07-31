@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -24,6 +23,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { chartTheme } from "@/lib/chartTheme";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string }) {
   const { toast } = useToast();
@@ -124,11 +124,14 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <PanelPage>
+      {/* Toolbar: title/description + time-range select + record action.
+          Not a panel — it's the tab's controls row, same non-panel
+          treatment as the citations tab bar. */}
+      <div className="flex items-center justify-between px-8 py-6">
         <div>
-          <h3 className="text-ui font-semibold">Historical Performance Trends</h3>
-          <p className="text-caption text-muted-foreground">
+          <h3 className="text-ui font-semibold text-vc-primary">Historical Performance Trends</h3>
+          <p className="text-caption text-vc-tertiary">
             Track your AI intelligence metrics over time
           </p>
         </div>
@@ -159,63 +162,70 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
       </div>
 
       {trendsLoading ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin text-muted-foreground" />
-            <p className="text-muted-foreground">Loading trends data...</p>
-          </CardContent>
-        </Card>
+        <PanelRow cols={1} last>
+          <Panel width="wide" border="last">
+            <div className="py-12 text-center">
+              <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin text-vc-tertiary" />
+              <p className="text-vc-tertiary">Loading trends data...</p>
+            </div>
+          </Panel>
+        </PanelRow>
       ) : getTrendChartData().length === 0 ? (
-        <EmptyState
-          icon={History}
-          title="No Historical Data Yet"
-          description="Start recording snapshots to track your metrics over time"
-          action={{
-            label: (
-              <>
-                <Plus className="w-4 h-4 mr-2" />
-                Record First Snapshot
-              </>
-            ),
-            onClick: () => recordMetricsMutation.mutate(),
-            disabled: recordMetricsMutation.isPending,
-            "data-testid": "button-first-snapshot",
-          }}
-        />
-      ) : (
-        <div className="grid gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5" />
-                Unresolved Hallucinations
-              </CardTitle>
-              <CardDescription>Count of unresolved AI inaccuracies over time</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={getTrendChartData()}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-caption" />
-                    <YAxis className="text-caption" />
-                    <Tooltip contentStyle={chartTheme.tooltipContentStyle} />
-                    <Line
-                      type="monotone"
-                      dataKey="hallucinations"
-                      stroke={chartTheme.series.issues}
-                      strokeWidth={2}
-                      dot={{ fill: chartTheme.series.issues }}
-                      name="Unresolved Issues"
-                      connectNulls
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="px-8 py-6">
+          <EmptyState
+            icon={History}
+            title="No Historical Data Yet"
+            description="Start recording snapshots to track your metrics over time"
+            action={{
+              label: (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Record First Snapshot
+                </>
+              ),
+              onClick: () => recordMetricsMutation.mutate(),
+              disabled: recordMetricsMutation.isPending,
+              "data-testid": "button-first-snapshot",
+            }}
+          />
         </div>
+      ) : (
+        <PanelRow cols={1} last>
+          <Panel
+            width="wide"
+            border="last"
+            label={
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Unresolved Hallucinations
+              </span>
+            }
+          >
+            <p className="mb-4 text-data text-vc-tertiary">
+              Count of unresolved AI inaccuracies over time
+            </p>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={getTrendChartData()}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" className="text-caption" />
+                  <YAxis className="text-caption" />
+                  <Tooltip contentStyle={chartTheme.tooltipContentStyle} />
+                  <Line
+                    type="monotone"
+                    dataKey="hallucinations"
+                    stroke={chartTheme.series.issues}
+                    strokeWidth={2}
+                    dot={{ fill: chartTheme.series.issues }}
+                    name="Unresolved Issues"
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+        </PanelRow>
       )}
-    </div>
+    </PanelPage>
   );
 }

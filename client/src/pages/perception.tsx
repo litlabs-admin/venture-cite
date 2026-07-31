@@ -286,7 +286,7 @@ export default function PerceptionPage() {
           runMutation.mutate();
         }}
         disabled={runMutation.isPending || !selectedBrandId}
-        className="inline-flex items-center gap-1.5 rounded bg-vc-accent-subtle px-3 py-1.5 text-data font-medium text-vc-accent transition-all hover:bg-vc-accent hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex items-center gap-1.5 rounded bg-vc-accent-subtle px-3 py-1.5 text-data font-medium text-vc-accent transition-all hover:bg-vc-accent hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
       >
         {runMutation.isPending ? (
           <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
@@ -301,7 +301,7 @@ export default function PerceptionPage() {
 
   if (brandsLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-white px-8 py-8">
+      <div className="min-h-screen bg-vc-page px-8 py-8">
         <div className="space-y-6">
           <div className="h-4 w-48 animate-pulse rounded-sm bg-vc-muted" />
           <div className="h-20 w-64 animate-pulse rounded-sm bg-vc-muted" />
@@ -312,7 +312,7 @@ export default function PerceptionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white px-8 py-8">
+    <div className="min-h-screen bg-vc-page px-8 py-8">
       {/* Header: brand · last-scored date */}
       <div className="mb-8 flex items-center justify-between border-b border-vc-default pb-4">
         <div className="flex items-center gap-3">

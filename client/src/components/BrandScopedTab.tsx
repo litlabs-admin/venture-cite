@@ -1,6 +1,5 @@
 import type { ComponentType } from "react";
 import { Brain } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 
 // Hosts an intelligence child component (which needs a `selectedBrandId`
@@ -12,13 +11,15 @@ export function brandScoped(Child: ComponentType<{ selectedBrandId: string }>): 
     const { selectedBrandId } = useBrandSelection();
     if (!selectedBrandId) {
       return (
-        <Card className="p-12 text-center">
-          <Brain className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
-          <h2 className="mb-1 text-ui font-semibold">Select a brand to get started</h2>
-          <p className="text-caption text-muted-foreground">
+        <div className="p-12 text-center">
+          <Brain className="mx-auto mb-3 h-12 w-12 text-vc-hover" />
+          <h2 className="mb-1 text-ui font-semibold text-vc-primary">
+            Select a brand to get started
+          </h2>
+          <p className="text-caption text-vc-tertiary">
             Choose a brand from the selector above to view this data.
           </p>
-        </Card>
+        </div>
       );
     }
     return <Child selectedBrandId={selectedBrandId} />;

@@ -3,7 +3,6 @@ import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { usePromptResults } from "@/hooks/usePrompts";
 import { useInspector } from "@/components/AppShell";
 import PromptDetail from "./PromptDetail";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -40,6 +39,7 @@ import { PlatformResultCard, type PlatformResult } from "./PlatformResultCard";
 import EmptyResultsHero from "./EmptyResultsHero";
 import CitedMentionsStrip, { type CitedMention } from "./CitedMentionsStrip";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
+import { PanelLabel } from "@/components/dashboard-panels/primitives";
 
 // Wave 9: minimum sample size before a platform competes for "Best
 // Platform". Without this, a platform with 1/1 cited (100%) beats one
@@ -199,7 +199,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       {/* Wave 9.2: header strip — last-run timestamp only. CSV export
           was removed in this wave; users asked for it to go away. */}
       <div className="flex items-center justify-between gap-3">
-        <p className="text-caption text-muted-foreground">
+        <p className="text-caption text-vc-tertiary">
           {lastRunAt
             ? `Last run ${formatDistanceToNow(lastRunAt, { addSuffix: true })}`
             : "No completed runs yet"}
@@ -208,86 +208,82 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
 
       {/* Wave 9: 0% citation rate gets a dedicated, actionable empty
           state instead of a sad zero. Hidden when ≥1% so the normal
-          summary takes over. */}
+          summary takes over. Left-border stripe, no card chrome — same
+          treatment as crawler-check's "Top priority" recommendation. */}
       {results.citationRate === 0 && (
-        <Card className="border-warning bg-warning-subtle">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
-              <div>
-                <p className="font-medium text-foreground">All platforms missed your brand</p>
-                <ul className="text-caption text-muted-foreground mt-2 space-y-1 list-disc pl-5">
-                  <li>
-                    Add common surface forms to your brand&apos;s name variations (legal name, short
-                    name, product line).
-                  </li>
-                  <li>
-                    Re-check stored responses (overflow menu beside Run Check) so older runs pick up
-                    the new variations.
-                  </li>
-                  <li>
-                    Check that your tracked prompts mention the right category — generic queries
-                    (&quot;best CRM&quot;) often miss niche brands.
-                  </li>
-                  <li>Publish or update articles targeting your tracked prompts.</li>
-                </ul>
-              </div>
+        <div className="border-l-[3px] border-warning bg-warning-subtle py-3 pl-3.5">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium text-vc-primary">All platforms missed your brand</p>
+              <ul className="text-caption text-vc-tertiary mt-2 space-y-1 list-disc pl-5">
+                <li>
+                  Add common surface forms to your brand&apos;s name variations (legal name, short
+                  name, product line).
+                </li>
+                <li>
+                  Re-check stored responses (overflow menu beside Run Check) so older runs pick up
+                  the new variations.
+                </li>
+                <li>
+                  Check that your tracked prompts mention the right category — generic queries
+                  (&quot;best CRM&quot;) often miss niche brands.
+                </li>
+                <li>Publish or update articles targeting your tracked prompts.</li>
+              </ul>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-caption text-muted-foreground">Overall Citation Rate</p>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="text-stat font-semibold text-foreground" data-testid="stat-citation-rate">
-              {results.citationRate}%
-            </p>
-            <p className="text-caption text-muted-foreground mt-1">
-              {results.totalCited} of {results.totalChecks} checks cited your brand
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-caption text-muted-foreground">Best Platform</p>
-              <CheckCircle2 className="h-4 w-4 text-positive" />
-            </div>
-            {/* Wave 9: when no platform has hit the min-sample threshold,
-                surface "Need more data" rather than a misleading winner. */}
-            <p className="text-stat font-semibold text-foreground" data-testid="stat-best-platform">
-              {bestPlatform?.platform || "Need more data"}
-            </p>
-            <p className="text-caption text-muted-foreground mt-1">
-              {bestPlatform
-                ? `${bestPlatform.citationRate}% citation rate`
-                : `Each platform needs ≥${BEST_PLATFORM_MIN_CHECKS} checks before competing.`}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-caption text-muted-foreground">Top Prompt</p>
-              <Sparkles className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p
-              className="text-ui font-semibold text-foreground line-clamp-2"
-              data-testid="stat-top-prompt"
-            >
-              {bestPrompt ? `"${bestPrompt.prompt}"` : "—"}
-            </p>
-            <p className="text-caption text-muted-foreground mt-1">
-              {bestPrompt ? `Cited on ${bestPrompt.citedCount} platforms` : "No data yet"}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Summary stats — three hairline-divided cells, not cards. */}
+      <div className="grid grid-cols-1 divide-y divide-vc-default border-y border-vc-default md:grid-cols-3 md:divide-x md:divide-y-0">
+        <div className="py-4 md:px-6 md:first:pl-0 md:last:pr-0">
+          <div className="flex items-center justify-between mb-2">
+            <PanelLabel>Overall Citation Rate</PanelLabel>
+            <TrendingUp className="h-4 w-4 text-vc-hover" />
+          </div>
+          <p
+            className="text-stat font-semibold tabular-nums text-vc-primary"
+            data-testid="stat-citation-rate"
+          >
+            {results.citationRate}%
+          </p>
+          <p className="text-caption text-vc-tertiary mt-1">
+            {results.totalCited} of {results.totalChecks} checks cited your brand
+          </p>
+        </div>
+        <div className="py-4 md:px-6 md:first:pl-0 md:last:pr-0">
+          <div className="flex items-center justify-between mb-2">
+            <PanelLabel>Best Platform</PanelLabel>
+            <CheckCircle2 className="h-4 w-4 text-positive" />
+          </div>
+          {/* Wave 9: when no platform has hit the min-sample threshold,
+              surface "Need more data" rather than a misleading winner. */}
+          <p className="text-stat font-semibold text-vc-primary" data-testid="stat-best-platform">
+            {bestPlatform?.platform || "Need more data"}
+          </p>
+          <p className="text-caption text-vc-tertiary mt-1">
+            {bestPlatform
+              ? `${bestPlatform.citationRate}% citation rate`
+              : `Each platform needs ≥${BEST_PLATFORM_MIN_CHECKS} checks before competing.`}
+          </p>
+        </div>
+        <div className="py-4 md:px-6 md:first:pl-0 md:last:pr-0">
+          <div className="flex items-center justify-between mb-2">
+            <PanelLabel>Top Prompt</PanelLabel>
+            <Sparkles className="h-4 w-4 text-vc-hover" />
+          </div>
+          <p
+            className="text-ui font-semibold text-vc-primary line-clamp-2"
+            data-testid="stat-top-prompt"
+          >
+            {bestPrompt ? `"${bestPrompt.prompt}"` : "—"}
+          </p>
+          <p className="text-caption text-vc-tertiary mt-1">
+            {bestPrompt ? `Cited on ${bestPrompt.citedCount} platforms` : "No data yet"}
+          </p>
+        </div>
       </div>
 
       {/* Phase 3: Cited mentions strip — surface where the brand was
@@ -298,114 +294,108 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       )}
 
       {/* Performance by Platform */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-ui">Performance by Platform</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Wave 9: sortable column headers. Click to toggle asc/desc;
-              clicking a different column resets to a sensible default
-              direction (asc for platform name, desc for everything else). */}
-          <div className="overflow-x-auto">
-            <Table className="text-body">
-              <TableHeader>
-                <TableRow>
-                  <SortableTh
-                    active={platformSort.key === "platform"}
-                    dir={platformSort.dir}
-                    onClick={() => togglePlatformSort("platform")}
-                    align="left"
-                  >
-                    Platform
-                  </SortableTh>
-                  <SortableTh
-                    active={platformSort.key === "cited"}
-                    dir={platformSort.dir}
-                    onClick={() => togglePlatformSort("cited")}
-                    align="right"
-                  >
-                    Cited
-                  </SortableTh>
-                  <SortableTh
-                    active={platformSort.key === "checks"}
-                    dir={platformSort.dir}
-                    onClick={() => togglePlatformSort("checks")}
-                    align="right"
-                  >
-                    Checks
-                  </SortableTh>
-                  <SortableTh
-                    active={platformSort.key === "citationRate"}
-                    dir={platformSort.dir}
-                    onClick={() => togglePlatformSort("citationRate")}
-                    align="right"
-                  >
-                    Rate
-                  </SortableTh>
-                  <SortableTh
-                    active={platformSort.key === "lastRun"}
-                    dir={platformSort.dir}
-                    onClick={() => togglePlatformSort("lastRun")}
-                    align="right"
-                  >
-                    Last Run
-                  </SortableTh>
+      <div className="border-b border-vc-default pb-2">
+        <PanelLabel>Performance by Platform</PanelLabel>
+        {/* Wave 9: sortable column headers. Click to toggle asc/desc;
+            clicking a different column resets to a sensible default
+            direction (asc for platform name, desc for everything else). */}
+        <div className="mt-3 overflow-x-auto">
+          <Table className="text-body">
+            <TableHeader>
+              <TableRow className="border-vc-default">
+                <SortableTh
+                  active={platformSort.key === "platform"}
+                  dir={platformSort.dir}
+                  onClick={() => togglePlatformSort("platform")}
+                  align="left"
+                >
+                  Platform
+                </SortableTh>
+                <SortableTh
+                  active={platformSort.key === "cited"}
+                  dir={platformSort.dir}
+                  onClick={() => togglePlatformSort("cited")}
+                  align="right"
+                >
+                  Cited
+                </SortableTh>
+                <SortableTh
+                  active={platformSort.key === "checks"}
+                  dir={platformSort.dir}
+                  onClick={() => togglePlatformSort("checks")}
+                  align="right"
+                >
+                  Checks
+                </SortableTh>
+                <SortableTh
+                  active={platformSort.key === "citationRate"}
+                  dir={platformSort.dir}
+                  onClick={() => togglePlatformSort("citationRate")}
+                  align="right"
+                >
+                  Rate
+                </SortableTh>
+                <SortableTh
+                  active={platformSort.key === "lastRun"}
+                  dir={platformSort.dir}
+                  onClick={() => togglePlatformSort("lastRun")}
+                  align="right"
+                >
+                  Last Run
+                </SortableTh>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedPlatforms.map((p) => (
+                <TableRow
+                  key={p.platform}
+                  data-testid={`platform-row-${p.platform}`}
+                  className="border-b border-vc-default last:border-b-0 hover:bg-vc-muted/50"
+                >
+                  <TableCell className="py-2 font-medium tabular-nums">{p.platform}</TableCell>
+                  <TableCell className="text-right py-2 tabular-nums">{p.cited}</TableCell>
+                  <TableCell className="text-right py-2 tabular-nums">{p.checks}</TableCell>
+                  <TableCell className="text-right py-2">
+                    <Badge variant={p.citationRate >= 50 ? "default" : "outline"}>
+                      {p.citationRate}%
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right py-2 text-caption text-vc-tertiary">
+                    {p.lastRun
+                      ? formatDistanceToNow(new Date(p.lastRun), { addSuffix: true })
+                      : "—"}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedPlatforms.map((p) => (
-                  <TableRow
-                    key={p.platform}
-                    data-testid={`platform-row-${p.platform}`}
-                    className="border-b-0 hover:bg-muted/40"
-                  >
-                    <TableCell className="py-2 font-medium">{p.platform}</TableCell>
-                    <TableCell className="text-right py-2">{p.cited}</TableCell>
-                    <TableCell className="text-right py-2">{p.checks}</TableCell>
-                    <TableCell className="text-right py-2">
-                      <Badge variant={p.citationRate >= 50 ? "default" : "outline"}>
-                        {p.citationRate}%
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right py-2 text-caption text-muted-foreground">
-                      {p.lastRun
-                        ? formatDistanceToNow(new Date(p.lastRun), { addSuffix: true })
-                        : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
 
       {/* Results by Prompt */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-ui">Results by Prompt</CardTitle>
-              <CardDescription>
-                Click a prompt to see each AI&apos;s full answer and whether your brand was cited.
-              </CardDescription>
-            </div>
-            {/* Wave 9: actionable sort. Default = original prompt order;
-                "Least cited" surfaces problem prompts first (where work
-                pays off). */}
-            <Select value={promptSort} onValueChange={(v) => setPromptSort(v as PromptSortKey)}>
-              <SelectTrigger className="w-[170px] h-9 text-caption">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Default order</SelectItem>
-                <SelectItem value="least-cited">Least cited first</SelectItem>
-                <SelectItem value="most-cited">Most cited first</SelectItem>
-              </SelectContent>
-            </Select>
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <PanelLabel>Results by Prompt</PanelLabel>
+            <p className="mt-1 text-caption text-vc-tertiary">
+              Click a prompt to see each AI&apos;s full answer and whether your brand was cited.
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
+          {/* Wave 9: actionable sort. Default = original prompt order;
+              "Least cited" surfaces problem prompts first (where work
+              pays off). */}
+          <Select value={promptSort} onValueChange={(v) => setPromptSort(v as PromptSortKey)}>
+            <SelectTrigger className="w-[170px] h-9 text-caption">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default order</SelectItem>
+              <SelectItem value="least-cited">Least cited first</SelectItem>
+              <SelectItem value="most-cited">Most cited first</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="mt-3">
           <Accordion type="single" collapsible className="w-full">
             {sortedPrompts.map((row, i) => {
               const citedCount = row.platforms.filter((p) => p.isCited).length;
@@ -429,7 +419,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
                   <AccordionContent>
                     <div className="flex items-center justify-between gap-2 mb-2 px-1">
                       {row.rationale ? (
-                        <p className="text-caption text-muted-foreground italic">
+                        <p className="text-caption text-vc-tertiary italic">
                           Why this prompt: {row.rationale}
                         </p>
                       ) : (
@@ -462,12 +452,12 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
                       // means this prompt hasn't been re-checked yet —
                       // not that there's no history at all.
                       hasActive ? (
-                        <p className="text-caption text-muted-foreground italic flex items-center gap-2">
+                        <p className="text-caption text-vc-tertiary italic flex items-center gap-2">
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           Pending re-check… platform results will appear as each one finishes.
                         </p>
                       ) : (
-                        <p className="text-caption text-muted-foreground">
+                        <p className="text-caption text-vc-tertiary">
                           No results yet — run a citation check.
                         </p>
                       )
@@ -487,8 +477,8 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
               );
             })}
           </Accordion>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </>
   ) : hasActive ? (
     // Wave 9.1: when a fresh run just started, the since-filter
@@ -496,16 +486,13 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
     // Show in-progress messaging instead of the empty-state hero
     // so users don't think the run failed. The hero returns once
     // the active-runs gate flips back to false.
-    <Card>
-      <CardContent className="py-12 text-center">
-        <Loader2 className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3 animate-spin" />
-        <p className="text-muted-foreground mb-2">Citation run in progress…</p>
-        <p className="text-caption text-muted-foreground">
-          Results will appear here as each platform finishes — usually within a few seconds per
-          check.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="py-12 text-center">
+      <Loader2 className="h-12 w-12 mx-auto text-vc-hover mb-3 animate-spin" />
+      <p className="text-vc-tertiary mb-2">Citation run in progress…</p>
+      <p className="text-caption text-vc-tertiary">
+        Results will appear here as each platform finishes — usually within a few seconds per check.
+      </p>
+    </div>
   ) : (
     // Phase 1: empty-state hero with the LLM re-index lag explainer
     // (1–2 week delay) — same wording as the dashboard timeline so

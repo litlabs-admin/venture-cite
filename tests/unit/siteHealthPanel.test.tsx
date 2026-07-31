@@ -89,10 +89,15 @@ describe("SiteHealthPanel payload resilience", () => {
     expect(screen.getByText("1d ago")).toBeTruthy();
 
     // Critical stays red; the quiet tiers stay neutral, per the blue-safe ramp.
+    //
+    // Asserted as TOKENS, not hex. These were literal #a8a29e / #d6d3d1, which
+    // pinned the swatches to light mode — a literal here renders identically
+    // under `.dark` and the ramp disappears against the dark canvas. Every
+    // colour on this surface now resolves through a theme variable.
     const swatches = [...container.querySelectorAll<HTMLElement>("span.h-2.w-2")];
     expect(swatches[0].style.backgroundColor).toContain("--negative");
-    expect(swatches[2].style.backgroundColor).toBe("#a8a29e");
-    expect(swatches[3].style.backgroundColor).toBe("#d6d3d1");
+    expect(swatches[2].style.backgroundColor).toContain("--fg-disabled");
+    expect(swatches[3].style.backgroundColor).toContain("--border-strong");
   });
 });
 

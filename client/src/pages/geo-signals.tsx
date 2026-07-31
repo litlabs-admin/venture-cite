@@ -1,7 +1,6 @@
 ﻿import { useState, useEffect, useReducer, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,6 +35,7 @@ import {
 } from "@/components/ui/command";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { StatusDot } from "@/components/foundations/StatusDot";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { safeExternalHref } from "@/lib/urlSafety";
@@ -714,7 +714,7 @@ export default function GeoSignals() {
     // client/src/pages/diagnose.tsx (no route of its own) — title/meta
     // removed per this task's blanket rule; /diagnose falls back to root
     // defaults.
-    <div className="space-y-8">
+    <PanelPage>
       {/* The four KPI cards (Overall / Chunks / Schema / Pipeline)
             that used to sit above the tabs were removed — every number
             was already shown one click below inside its respective tab,
@@ -732,7 +732,7 @@ export default function GeoSignals() {
             Signal Scorecard the article picker sits inline next to the query
             (one line, no duplicate picker). */}
       {activeTab !== "signals" && (
-        <div className="sticky top-14 z-10 -mx-2 border-b bg-background/95 px-2 py-3 backdrop-blur">
+        <div className="sticky top-14 z-10 border-b border-vc-default bg-vc-page/95 px-8 py-3 backdrop-blur">
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label className="whitespace-nowrap text-caption font-medium text-foreground">
@@ -762,37 +762,36 @@ export default function GeoSignals() {
               up as signal #7 inside the Scorecard, and the list view
               is fundamentally an article-list pivot that belongs on
               /act?tab=library, not in Diagnose. Tab removed entirely. */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="signals" data-testid="tab-signals">
-            <BarChart3 className="w-4 h-4 mr-2" /> Signal Scorecard
-          </TabsTrigger>
-          <TabsTrigger
-            value="chunks"
-            data-testid="tab-chunks"
-            title="Chunk Engineer: AI engines read your article in ~500-token pieces, not all at once. This shows those pieces and flags which ones aren't answer-ready."
-          >
-            <SplitSquareVertical className="w-4 h-4 mr-2" /> Chunk Engineer
-          </TabsTrigger>
-          <TabsTrigger
-            value="schema"
-            data-testid="tab-schema"
-            title="Schema Lab: checks the structured-data labels (Schema.org markup) in your page's code that tell Google and AI engines what your content is."
-          >
-            <Code className="w-4 h-4 mr-2" /> Schema Lab
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="border-b border-vc-default px-8 pt-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="signals" data-testid="tab-signals">
+              <BarChart3 className="w-4 h-4 mr-2" /> Signal Scorecard
+            </TabsTrigger>
+            <TabsTrigger
+              value="chunks"
+              data-testid="tab-chunks"
+              title="Chunk Engineer: AI engines read your article in ~500-token pieces, not all at once. This shows those pieces and flags which ones aren't answer-ready."
+            >
+              <SplitSquareVertical className="w-4 h-4 mr-2" /> Chunk Engineer
+            </TabsTrigger>
+            <TabsTrigger
+              value="schema"
+              data-testid="tab-schema"
+              title="Schema Lab: checks the structured-data labels (Schema.org markup) in your page's code that tell Google and AI engines what your content is."
+            >
+              <Code className="w-4 h-4 mr-2" /> Schema Lab
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="signals" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-foreground">GEO Signal Scorecard</CardTitle>
-              <CardDescription className="text-muted-foreground">
+        <TabsContent value="signals">
+          <PanelRow cols={1}>
+            <Panel label="GEO Signal Scorecard" width="wide" border="last">
+              <p className="mb-4 text-data text-vc-tertiary">
                 Six honest content signals + freshness. Each signal's label matches its actual
                 formula.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </p>
               {/* Article + Target query on one line, with Analyze. The
                     article picker lives here (not the top bar) on this tab so
                     the two selectors read as a single setup row. */}
@@ -1014,8 +1013,8 @@ export default function GeoSignals() {
                   description="Scores across all 7 signals — six content signals plus freshness. Only what's measurable counts toward the headline %."
                 />
               )}
-            </CardContent>
-          </Card>
+            </Panel>
+          </PanelRow>
 
           {/* 2026-05-28: the 171-line "How signals are scored" inline
                 Collapsible was replaced by per-signal `?` tooltips
@@ -1029,158 +1028,174 @@ export default function GeoSignals() {
                 stages are just derived views of the same content+query.
                 Hidden by default to keep the page calm; only opens
                 when the user wants the 4-stage decomposition. */}
-          <Collapsible className="-mt-2">
-            <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3 text-left hover:bg-muted/50">
-              <div className="flex items-center gap-2">
-                <Workflow className="w-4 h-4 text-muted-foreground" />
-                <span className="text-caption font-medium text-foreground">Pipeline breakdown</span>
-                <span className="text-caption text-muted-foreground">
-                  Prepare → Retrieve → Signal → Serve
-                </span>
-              </div>
-              <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform data-[state=open]:rotate-180" />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-4 pt-4">
-              <div className="flex items-center gap-2 px-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (selectedArticle && selectedArticle.content) {
-                      simulatePipelineMutation.mutate({
-                        content: selectedArticle.content,
-                        query: targetQuery || selectedArticle.title || "",
-                        articleUpdatedAt: selectedArticle.updatedAt
-                          ? new Date(selectedArticle.updatedAt).toISOString()
-                          : undefined,
-                      });
-                    }
-                  }}
-                  disabled={!selectedArticle || simulatePipelineMutation.isPending}
-                  data-testid="button-simulate-pipeline"
-                >
-                  {simulatePipelineMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Workflow className="w-4 h-4 mr-2" />
-                  )}
-                  {pipelineStages.length > 0 ? "Re-run breakdown" : "Run breakdown"}
-                </Button>
-                {simulatePipelineMutation.isPending && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => pipelineAbortRef.current?.abort()}
-                  >
-                    Cancel
-                  </Button>
-                )}
-                {pipelineStages.length === 0 && !simulatePipelineMutation.isPending && (
-                  <span className="text-caption text-muted-foreground">
-                    Maps your content through the 4-stage AI-search pipeline.
-                  </span>
-                )}
-              </div>
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
+              <Collapsible>
+                <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3 text-left hover:bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <Workflow className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-caption font-medium text-foreground">
+                      Pipeline breakdown
+                    </span>
+                    <span className="text-caption text-muted-foreground">
+                      Prepare → Retrieve → Signal → Serve
+                    </span>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (selectedArticle && selectedArticle.content) {
+                          simulatePipelineMutation.mutate({
+                            content: selectedArticle.content,
+                            query: targetQuery || selectedArticle.title || "",
+                            articleUpdatedAt: selectedArticle.updatedAt
+                              ? new Date(selectedArticle.updatedAt).toISOString()
+                              : undefined,
+                          });
+                        }
+                      }}
+                      disabled={!selectedArticle || simulatePipelineMutation.isPending}
+                      data-testid="button-simulate-pipeline"
+                    >
+                      {simulatePipelineMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Workflow className="w-4 h-4 mr-2" />
+                      )}
+                      {pipelineStages.length > 0 ? "Re-run breakdown" : "Run breakdown"}
+                    </Button>
+                    {simulatePipelineMutation.isPending && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => pipelineAbortRef.current?.abort()}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                    {pipelineStages.length === 0 && !simulatePipelineMutation.isPending && (
+                      <span className="text-caption text-muted-foreground">
+                        Maps your content through the 4-stage AI-search pipeline.
+                      </span>
+                    )}
+                  </div>
 
-              {pipelineStages.length > 0 && (
-                <>
-                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                    {pipelineStages.map((stage, idx) => (
-                      <div key={stage.stage} className="flex items-center">
-                        <div className="text-center">
-                          <div
-                            className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
-                              stage.status === "pass"
-                                ? "bg-secondary"
-                                : stage.status === "warning"
-                                  ? "bg-warning"
-                                  : "bg-destructive"
-                            }`}
-                          >
-                            {(() => {
-                              // "pass" is neutral (secondary-foreground on
-                              // secondary), not green/chart-4 — the stage
-                              // status is carried by the check icon + label
-                              // in the detail row below, not this glyph's
-                              // colour alone.
-                              const iconColor =
-                                stage.status === "pass"
-                                  ? "text-secondary-foreground"
-                                  : "text-white";
-                              return (
-                                <>
-                                  {stage.stage === "Prepare" && (
-                                    <Brain className={`w-6 h-6 ${iconColor}`} />
-                                  )}
-                                  {stage.stage === "Retrieve" && (
-                                    <SplitSquareVertical className={`w-6 h-6 ${iconColor}`} />
-                                  )}
-                                  {stage.stage === "Signal" && (
-                                    <Activity className={`w-6 h-6 ${iconColor}`} />
-                                  )}
-                                  {stage.stage === "Serve" && (
-                                    <Sparkles className={`w-6 h-6 ${iconColor}`} />
-                                  )}
-                                </>
-                              );
-                            })()}
+                  {pipelineStages.length > 0 && (
+                    <>
+                      <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                        {pipelineStages.map((stage, idx) => (
+                          <div key={stage.stage} className="flex items-center">
+                            <div className="text-center">
+                              <div
+                                className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
+                                  stage.status === "pass"
+                                    ? "bg-secondary"
+                                    : stage.status === "warning"
+                                      ? "bg-warning"
+                                      : "bg-destructive"
+                                }`}
+                              >
+                                {(() => {
+                                  // "pass" is neutral (secondary-foreground on
+                                  // secondary), not green/chart-4 — the stage
+                                  // status is carried by the check icon + label
+                                  // in the detail row below, not this glyph's
+                                  // colour alone.
+                                  // Not a literal white: `bg-warning` resolves to
+                                  // --brand-accent, which in dark is a light blue
+                                  // — a white glyph on it disappears. Each fill
+                                  // carries its own designed label token instead.
+                                  const iconColor =
+                                    stage.status === "pass"
+                                      ? "text-secondary-foreground"
+                                      : stage.status === "warning"
+                                        ? "text-primary-foreground"
+                                        : "text-destructive-foreground";
+                                  return (
+                                    <>
+                                      {stage.stage === "Prepare" && (
+                                        <Brain className={`w-6 h-6 ${iconColor}`} />
+                                      )}
+                                      {stage.stage === "Retrieve" && (
+                                        <SplitSquareVertical className={`w-6 h-6 ${iconColor}`} />
+                                      )}
+                                      {stage.stage === "Signal" && (
+                                        <Activity className={`w-6 h-6 ${iconColor}`} />
+                                      )}
+                                      {stage.stage === "Serve" && (
+                                        <Sparkles className={`w-6 h-6 ${iconColor}`} />
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                              <p className="text-caption font-medium text-foreground">
+                                {stage.stage}
+                              </p>
+                              <p className="text-data font-mono tabular-nums text-muted-foreground">
+                                {stage.score}/100
+                              </p>
+                            </div>
+                            {idx < pipelineStages.length - 1 && (
+                              <ArrowRight className="w-6 h-6 text-muted-foreground mx-4" />
+                            )}
                           </div>
-                          <p className="text-caption font-medium text-foreground">{stage.stage}</p>
-                          <p className="text-data font-mono tabular-nums text-muted-foreground">
-                            {stage.score}/100
-                          </p>
-                        </div>
-                        {idx < pipelineStages.length - 1 && (
-                          <ArrowRight className="w-6 h-6 text-muted-foreground mx-4" />
-                        )}
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <div className="space-y-3">
-                    {pipelineStages.map((stage) => (
-                      <div key={stage.stage} className="bg-muted/30 rounded-lg border p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <StatusDot
-                              tone={
-                                stage.status === "pass"
-                                  ? "success"
-                                  : stage.status === "warning"
-                                    ? "warn"
-                                    : "fail"
-                              }
-                            />
-                            <span className="font-medium text-foreground">{stage.stage}</span>
+                      <div className="space-y-3">
+                        {pipelineStages.map((stage) => (
+                          <div key={stage.stage} className="bg-muted/30 rounded-lg border p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <StatusDot
+                                  tone={
+                                    stage.status === "pass"
+                                      ? "success"
+                                      : stage.status === "warning"
+                                        ? "warn"
+                                        : "fail"
+                                  }
+                                />
+                                <span className="font-medium text-foreground">{stage.stage}</span>
+                              </div>
+                              <span className="text-data font-mono tabular-nums text-muted-foreground">
+                                {stage.score}/100
+                              </span>
+                            </div>
+                            <p className="text-caption text-muted-foreground mb-2">
+                              {STAGE_BLURBS[stage.stage]}
+                            </p>
+                            <ul className="text-caption text-muted-foreground space-y-1">
+                              {stage.details.map((detail, dIdx) => (
+                                <li key={dIdx} className="flex items-start gap-2">
+                                  <ChevronRight className="w-3 h-3 mt-1 text-primary" />
+                                  {detail}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
-                          <span className="text-data font-mono tabular-nums text-muted-foreground">
-                            {stage.score}/100
-                          </span>
-                        </div>
-                        <p className="text-caption text-muted-foreground mb-2">
-                          {STAGE_BLURBS[stage.stage]}
-                        </p>
-                        <ul className="text-caption text-muted-foreground space-y-1">
-                          {stage.details.map((detail, dIdx) => (
-                            <li key={dIdx} className="flex items-start gap-2">
-                              <ChevronRight className="w-3 h-3 mt-1 text-primary" />
-                              {detail}
-                            </li>
-                          ))}
-                        </ul>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
+                    </>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            </Panel>
+          </PanelRow>
         </TabsContent>
 
-        <TabsContent value="chunks" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-foreground">
-                500-Token Chunk Engineer
+        <TabsContent value="chunks">
+          <PanelRow cols={1} last>
+            <Panel
+              label="500-Token Chunk Engineer"
+              width="wide"
+              border="last"
+              action={
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
@@ -1204,180 +1219,187 @@ export default function GeoSignals() {
                     </p>
                   </PopoverContent>
                 </Popover>
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">
+              }
+            >
+              <p className="mb-4 text-data text-vc-tertiary">
                 Restructure content into AI-extractable ~375 word chunks with question-based
                 headings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-4">
-                <Button
-                  onClick={() => {
-                    if (selectedArticle && selectedArticle.content) {
-                      setContentToAnalyze(selectedArticle.content);
-                      analyzeChunksMutation.mutate({ content: selectedArticle.content });
-                    }
-                  }}
-                  disabled={
-                    !selectedArticle || !selectedArticle.content || analyzeChunksMutation.isPending
-                  }
-                  variant="outline"
-                  data-testid="button-analyze-chunks"
-                >
-                  {analyzeChunksMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <SplitSquareVertical className="w-4 h-4 mr-2" />
-                  )}
-                  Analyze Chunks
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (selectedArticle && selectedArticle.content) {
-                      optimizeChunksMutation.mutate({
-                        content: selectedArticle.content,
-                        brandId: selectedBrandId,
-                      });
-                    }
-                  }}
-                  disabled={
-                    !selectedArticle || !selectedArticle.content || optimizeChunksMutation.isPending
-                  }
-                  data-testid="button-optimize-chunks"
-                >
-                  {optimizeChunksMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-4 h-4 mr-2" />
-                  )}
-                  Auto-Optimize Chunks
-                </Button>
-                {optimizeChunksMutation.isPending && (
+              </p>
+              <div className="space-y-4">
+                <div className="flex gap-4">
                   <Button
+                    onClick={() => {
+                      if (selectedArticle && selectedArticle.content) {
+                        setContentToAnalyze(selectedArticle.content);
+                        analyzeChunksMutation.mutate({ content: selectedArticle.content });
+                      }
+                    }}
+                    disabled={
+                      !selectedArticle ||
+                      !selectedArticle.content ||
+                      analyzeChunksMutation.isPending
+                    }
                     variant="outline"
-                    onClick={() => optimizeAbortRef.current?.abort()}
-                    data-testid="button-optimize-cancel"
+                    data-testid="button-analyze-chunks"
                   >
-                    Cancel
+                    {analyzeChunksMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <SplitSquareVertical className="w-4 h-4 mr-2" />
+                    )}
+                    Analyze Chunks
                   </Button>
-                )}
-              </div>
-
-              {chunks.length > 0 && chunkStats && (
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="p-4 bg-muted/30 rounded-lg text-center">
-                    <p className="text-metric font-semibold text-foreground tabular-nums">
-                      {chunkStats.totalChunks}
-                    </p>
-                    <p className="text-caption text-muted-foreground">Total Chunks</p>
-                  </div>
-                  <div className="p-4 bg-muted/30 rounded-lg text-center">
-                    <p className="text-metric font-semibold text-foreground tabular-nums">
-                      {chunkStats.extractableChunks}
-                    </p>
-                    <p className="text-caption text-muted-foreground">Extractable</p>
-                  </div>
-                  <div className="p-4 bg-muted/30 rounded-lg text-center">
-                    <p className="text-metric font-semibold text-foreground tabular-nums">
-                      {chunkStats.avgTokens}
-                    </p>
-                    <p className="text-caption text-muted-foreground">Avg Tokens</p>
-                  </div>
+                  <Button
+                    onClick={() => {
+                      if (selectedArticle && selectedArticle.content) {
+                        optimizeChunksMutation.mutate({
+                          content: selectedArticle.content,
+                          brandId: selectedBrandId,
+                        });
+                      }
+                    }}
+                    disabled={
+                      !selectedArticle ||
+                      !selectedArticle.content ||
+                      optimizeChunksMutation.isPending
+                    }
+                    data-testid="button-optimize-chunks"
+                  >
+                    {optimizeChunksMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    Auto-Optimize Chunks
+                  </Button>
+                  {optimizeChunksMutation.isPending && (
+                    <Button
+                      variant="outline"
+                      onClick={() => optimizeAbortRef.current?.abort()}
+                      data-testid="button-optimize-cancel"
+                    >
+                      Cancel
+                    </Button>
+                  )}
                 </div>
-              )}
 
-              {chunks.length > 0 && (
-                <ScrollArea className="h-[400px]">
-                  <div className="space-y-4">
-                    {chunks.map((chunk, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-4 rounded-lg border ${chunk.extractable ? "bg-positive-subtle" : "bg-destructive-subtle"}`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Badge variant={chunk.extractable ? "positive" : "destructive"}>
-                              Chunk {chunk.chunkNumber}
-                            </Badge>
-                            <span className="text-caption text-muted-foreground">
-                              {chunk.tokenCount} tokens / {chunk.wordCount} words
-                            </span>
-                          </div>
-                          <div className="flex gap-2">
-                            {chunk.hasHeading && <Badge variant="positive">Has Heading</Badge>}
-                            {chunk.questionBased && <Badge variant="neutral">Question H2</Badge>}
-                            {chunk.hasDirectAnswer && (
-                              <Badge variant="positive">Direct Answer</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-caption text-foreground line-clamp-3 mb-2">
-                          {chunk.content}
-                        </p>
-                        {chunk.issues.length > 0 && (
-                          <div className="text-caption text-warning">
-                            {chunk.issues.map((issue, iIdx) => (
-                              <p key={iIdx}>⚠️ {issue}</p>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-
-              {optimizedContent && (
-                <div className="mt-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-foreground">Optimized Content</Label>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          navigator.clipboard.writeText(optimizedContent);
-                          toast({ title: "Copied to clipboard" });
-                        }}
-                        data-testid="button-copy-optimized"
-                      >
-                        Copy
-                      </Button>
-                      <Button
-                        size="sm"
-                        disabled={!selectedArticle || applyOptimizedMutation.isPending}
-                        onClick={() => {
-                          if (!selectedArticle) return;
-                          setPendingOptimized(optimizedContent);
-                          setDiffDialogOpen(true);
-                        }}
-                        data-testid="button-apply-optimized"
-                      >
-                        Apply to Article
-                      </Button>
+                {chunks.length > 0 && chunkStats && (
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="p-4 bg-muted/30 rounded-lg text-center">
+                      <p className="text-metric font-semibold text-foreground tabular-nums">
+                        {chunkStats.totalChunks}
+                      </p>
+                      <p className="text-caption text-muted-foreground">Total Chunks</p>
+                    </div>
+                    <div className="p-4 bg-muted/30 rounded-lg text-center">
+                      <p className="text-metric font-semibold text-foreground tabular-nums">
+                        {chunkStats.extractableChunks}
+                      </p>
+                      <p className="text-caption text-muted-foreground">Extractable</p>
+                    </div>
+                    <div className="p-4 bg-muted/30 rounded-lg text-center">
+                      <p className="text-metric font-semibold text-foreground tabular-nums">
+                        {chunkStats.avgTokens}
+                      </p>
+                      <p className="text-caption text-muted-foreground">Avg Tokens</p>
                     </div>
                   </div>
-                  <Textarea
-                    value={optimizedContent}
-                    readOnly
-                    className=" text-foreground min-h-[300px] font-mono text-caption"
-                  />
-                  <p className="text-caption text-muted-foreground mt-2">
-                    "Apply to Article" overwrites the selected article's content with this optimised
-                    version. Open it in the Articles page afterwards to review.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+
+                {chunks.length > 0 && (
+                  <ScrollArea className="h-[400px]">
+                    <div className="space-y-4">
+                      {chunks.map((chunk, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-4 rounded-lg border ${chunk.extractable ? "bg-positive-subtle" : "bg-destructive-subtle"}`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={chunk.extractable ? "positive" : "destructive"}>
+                                Chunk {chunk.chunkNumber}
+                              </Badge>
+                              <span className="text-caption text-muted-foreground">
+                                {chunk.tokenCount} tokens / {chunk.wordCount} words
+                              </span>
+                            </div>
+                            <div className="flex gap-2">
+                              {chunk.hasHeading && <Badge variant="positive">Has Heading</Badge>}
+                              {chunk.questionBased && <Badge variant="neutral">Question H2</Badge>}
+                              {chunk.hasDirectAnswer && (
+                                <Badge variant="positive">Direct Answer</Badge>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-caption text-foreground line-clamp-3 mb-2">
+                            {chunk.content}
+                          </p>
+                          {chunk.issues.length > 0 && (
+                            <div className="text-caption text-warning">
+                              {chunk.issues.map((issue, iIdx) => (
+                                <p key={iIdx}>⚠️ {issue}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+
+                {optimizedContent && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-foreground">Optimized Content</Label>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(optimizedContent);
+                            toast({ title: "Copied to clipboard" });
+                          }}
+                          data-testid="button-copy-optimized"
+                        >
+                          Copy
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={!selectedArticle || applyOptimizedMutation.isPending}
+                          onClick={() => {
+                            if (!selectedArticle) return;
+                            setPendingOptimized(optimizedContent);
+                            setDiffDialogOpen(true);
+                          }}
+                          data-testid="button-apply-optimized"
+                        >
+                          Apply to Article
+                        </Button>
+                      </div>
+                    </div>
+                    <Textarea
+                      value={optimizedContent}
+                      readOnly
+                      className=" text-foreground min-h-[300px] font-mono text-caption"
+                    />
+                    <p className="text-caption text-muted-foreground mt-2">
+                      "Apply to Article" overwrites the selected article's content with this
+                      optimised version. Open it in the Articles page afterwards to review.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Panel>
+          </PanelRow>
         </TabsContent>
 
-        <TabsContent value="schema" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-foreground flex items-center gap-2">
-                Schema Impact Lab
+        <TabsContent value="schema">
+          <PanelRow cols={1} last>
+            <Panel
+              label="Schema Impact Lab"
+              width="wide"
+              border="last"
+              action={
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
@@ -1399,190 +1421,190 @@ export default function GeoSignals() {
                     <p className="text-muted-foreground">{SCHEMA_LEGEND_BLURB}</p>
                   </PopoverContent>
                 </Popover>
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">
+              }
+            >
+              <p className="mb-4 text-data text-vc-tertiary">
                 Audit structured data completeness — required and recommended fields per schema
                 type. Feeds the Authority signal automatically when audited URL matches the
                 article's external URL.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <Label className="text-foreground">URL to Audit</Label>
-                  <Input
-                    value={url}
-                    onChange={(e) => {
-                      setUrlTouched(true);
-                      setUrl(e.target.value);
-                    }}
-                    placeholder="https://example.com/page"
-                    className=" text-foreground"
-                    data-testid="input-url"
-                  />
-                  <p className="mt-1 text-caption text-muted-foreground">
-                    {selectedArticle &&
-                    !((selectedArticle as any).externalUrl as string | undefined)?.trim()
-                      ? // Help users connect Schema Lab → Authority signal.
-                        // Without externalUrl on the article, the cache key
-                        // is wrong and the Authority signal can't pick up
-                        // the audit. Tell them how to fix it.
-                        "This article has no published URL set. Add an 'External URL' on the article editor to auto-fill — or paste any URL to audit it."
-                      : "Auto-filled from this article's external URL. Edit if you want to audit a different page."}
-                  </p>
-                </div>
-                <div className="flex items-end gap-2">
-                  <Button
-                    onClick={() => auditSchemaMutation.mutate({ url })}
-                    disabled={!url || auditSchemaMutation.isPending}
-                    data-testid="button-audit-schema"
-                  >
-                    {auditSchemaMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Code className="w-4 h-4 mr-2" />
-                    )}
-                    Audit Schema
-                  </Button>
-                  {auditSchemaMutation.isPending && (
+              </p>
+              <div className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <Label className="text-foreground">URL to Audit</Label>
+                    <Input
+                      value={url}
+                      onChange={(e) => {
+                        setUrlTouched(true);
+                        setUrl(e.target.value);
+                      }}
+                      placeholder="https://example.com/page"
+                      className=" text-foreground"
+                      data-testid="input-url"
+                    />
+                    <p className="mt-1 text-caption text-muted-foreground">
+                      {selectedArticle &&
+                      !((selectedArticle as any).externalUrl as string | undefined)?.trim()
+                        ? // Help users connect Schema Lab → Authority signal.
+                          // Without externalUrl on the article, the cache key
+                          // is wrong and the Authority signal can't pick up
+                          // the audit. Tell them how to fix it.
+                          "This article has no published URL set. Add an 'External URL' on the article editor to auto-fill — or paste any URL to audit it."
+                        : "Auto-filled from this article's external URL. Edit if you want to audit a different page."}
+                    </p>
+                  </div>
+                  <div className="flex items-end gap-2">
                     <Button
-                      variant="outline"
-                      onClick={() => auditAbortRef.current?.abort()}
-                      data-testid="button-audit-cancel"
+                      onClick={() => auditSchemaMutation.mutate({ url })}
+                      disabled={!url || auditSchemaMutation.isPending}
+                      data-testid="button-audit-schema"
                     >
-                      Cancel
+                      {auditSchemaMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Code className="w-4 h-4 mr-2" />
+                      )}
+                      Audit Schema
                     </Button>
-                  )}
+                    {auditSchemaMutation.isPending && (
+                      <Button
+                        variant="outline"
+                        onClick={() => auditAbortRef.current?.abort()}
+                        data-testid="button-audit-cancel"
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* 2026-05-28: the three glossary cards (Completeness /
+                {/* 2026-05-28: the three glossary cards (Completeness /
                     Required / Recommended) used to render here before any
                     audit data — pure docs, ate vertical space. Replaced
                     with one inline help icon on the section header below;
                     SCHEMA_LEGEND_BLURB holds the same explanation. */}
 
-              {schemaAudits.length > 0 ? (
-                <div className="space-y-4">
-                  {/* Diagnostic strip: prove to the user that the audit
+                {schemaAudits.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Diagnostic strip: prove to the user that the audit
                         is REAL by surfacing the URL we fetched + the total
                         number of JSON-LD `@type` blocks we found on the
                         page. The previous UI showed every catalogued type
                         as "Missing" for any page with no JSON-LD, which
                         looked indistinguishable from a stub. */}
-                  {!schemaFetched ? (
-                    // Fetch FAILED — surface this prominently as an
-                    // error banner instead of letting the "all 14 types
-                    // missing" body render as if it were a real audit
-                    // result. Without this, a WAF-blocked fetch is
-                    // visually identical to "page has no schema."
-                    <div
-                      className="rounded-md border border-destructive/30 bg-destructive/5 p-4"
-                      data-testid="schema-fetch-failed"
-                    >
-                      <div className="flex items-start gap-3">
-                        <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                        <div className="flex-1 space-y-1">
-                          <p className="font-medium text-foreground">
-                            Audit couldn't fetch this page
-                          </p>
-                          <p className="text-caption text-muted-foreground">
-                            {schemaFetchError ?? "Unknown fetch error."}
-                          </p>
-                          {auditedUrl && (
-                            <a
-                              href={safeExternalHref(auditedUrl)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block text-caption text-primary hover:underline"
-                              data-testid="schema-audit-url"
-                            >
-                              Open {auditedUrl} ↗
-                            </a>
-                          )}
-                          <p className="text-caption text-muted-foreground pt-1">
-                            Common causes: Cloudflare/WAF bot detection, the URL requires
-                            authentication, or the target site is offline. Try a public-facing
-                            article URL.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          className="text-caption text-muted-foreground underline hover:text-foreground shrink-0"
-                          onClick={() => auditSchemaMutation.mutate({ url })}
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      className="rounded-md border bg-card p-3 text-caption"
-                      data-testid="schema-audit-summary"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="h-3.5 w-3.5 text-foreground" />
-                            <span className="font-medium text-foreground">Fetched live</span>
+                    {!schemaFetched ? (
+                      // Fetch FAILED — surface this prominently as an
+                      // error banner instead of letting the "all 14 types
+                      // missing" body render as if it were a real audit
+                      // result. Without this, a WAF-blocked fetch is
+                      // visually identical to "page has no schema."
+                      <div
+                        className="rounded-md border border-destructive/30 bg-destructive/5 p-4"
+                        data-testid="schema-fetch-failed"
+                      >
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                          <div className="flex-1 space-y-1">
+                            <p className="font-medium text-foreground">
+                              Audit couldn't fetch this page
+                            </p>
+                            <p className="text-caption text-muted-foreground">
+                              {schemaFetchError ?? "Unknown fetch error."}
+                            </p>
                             {auditedUrl && (
                               <a
                                 href={safeExternalHref(auditedUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="truncate text-primary hover:underline max-w-[260px]"
+                                className="inline-block text-caption text-primary hover:underline"
                                 data-testid="schema-audit-url"
                               >
-                                {auditedUrl}
+                                Open {auditedUrl} ↗
                               </a>
                             )}
+                            <p className="text-caption text-muted-foreground pt-1">
+                              Common causes: Cloudflare/WAF bot detection, the URL requires
+                              authentication, or the target site is offline. Try a public-facing
+                              article URL.
+                            </p>
                           </div>
-                          <div className="text-muted-foreground">
-                            Found{" "}
-                            <span
-                              className="tnum font-medium text-foreground"
-                              data-testid="schema-total-found"
-                            >
-                              {totalSchemasFound}
-                            </span>{" "}
-                            JSON-LD schema {totalSchemasFound === 1 ? "block" : "blocks"} on this
-                            page
-                            {totalSchemasFound === 0 && (
-                              <span className="text-muted-foreground">
-                                {" "}
-                                — page is reachable but has no structured data
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {schemaCachedAt && (
                           <button
                             type="button"
-                            className="text-muted-foreground underline hover:text-foreground shrink-0"
-                            onClick={() => auditSchemaMutation.mutate({ url, force: true })}
-                            disabled={auditSchemaMutation.isPending}
+                            className="text-caption text-muted-foreground underline hover:text-foreground shrink-0"
+                            onClick={() => auditSchemaMutation.mutate({ url })}
                           >
-                            <Clock className="w-3 h-3 inline mr-1" />
-                            Re-audit
+                            Retry
                           </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="rounded-md border bg-card p-3 text-caption"
+                        data-testid="schema-audit-summary"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-3.5 w-3.5 text-foreground" />
+                              <span className="font-medium text-foreground">Fetched live</span>
+                              {auditedUrl && (
+                                <a
+                                  href={safeExternalHref(auditedUrl)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="truncate text-primary hover:underline max-w-[260px]"
+                                  data-testid="schema-audit-url"
+                                >
+                                  {auditedUrl}
+                                </a>
+                              )}
+                            </div>
+                            <div className="text-muted-foreground">
+                              Found{" "}
+                              <span
+                                className="tabular-nums font-medium text-foreground"
+                                data-testid="schema-total-found"
+                              >
+                                {totalSchemasFound}
+                              </span>{" "}
+                              JSON-LD schema {totalSchemasFound === 1 ? "block" : "blocks"} on this
+                              page
+                              {totalSchemasFound === 0 && (
+                                <span className="text-muted-foreground">
+                                  {" "}
+                                  — page is reachable but has no structured data
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {schemaCachedAt && (
+                            <button
+                              type="button"
+                              className="text-muted-foreground underline hover:text-foreground shrink-0"
+                              onClick={() => auditSchemaMutation.mutate({ url, force: true })}
+                              disabled={auditSchemaMutation.isPending}
+                            >
+                              <Clock className="w-3 h-3 inline mr-1" />
+                              Re-audit
+                            </button>
+                          )}
+                        </div>
+                        {schemaCachedAt && (
+                          <p className="mt-1 text-caption text-muted-foreground">
+                            Cached{" "}
+                            {Math.max(
+                              0,
+                              Math.floor(
+                                (Date.now() - new Date(schemaCachedAt).getTime()) /
+                                  (1000 * 60 * 60 * 24),
+                              ),
+                            )}{" "}
+                            day(s) ago — Re-audit forces a fresh fetch.
+                          </p>
                         )}
                       </div>
-                      {schemaCachedAt && (
-                        <p className="mt-1 text-caption text-muted-foreground">
-                          Cached{" "}
-                          {Math.max(
-                            0,
-                            Math.floor(
-                              (Date.now() - new Date(schemaCachedAt).getTime()) /
-                                (1000 * 60 * 60 * 24),
-                            ),
-                          )}{" "}
-                          day(s) ago — Re-audit forces a fresh fetch.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {/* Render only the relevant schema cards by default:
+                    )}
+                    {/* Render only the relevant schema cards by default:
                         types that are PRESENT on the audited page, plus a
                         small "core" set most articles care about (Article,
                         BlogPosting, NewsArticle, FAQPage, Organization,
@@ -1593,163 +1615,164 @@ export default function GeoSignals() {
                         filter (.filter(s => s.present || s.required.length > 0))
                         was a no-op because EVERY catalogued type has at
                         least one required field. */}
-                  {schemaFetched && (
-                    <div className="flex items-center justify-end -mb-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowAllSchemaTypes((v) => !v)}
-                        className="text-caption text-muted-foreground underline hover:text-foreground"
-                      >
-                        {showAllSchemaTypes
-                          ? `Hide irrelevant schema types`
-                          : `Show all 14 schema types`}
-                      </button>
-                    </div>
-                  )}
-                  {schemaFetched &&
-                    schemaAudits
-                      .filter(
-                        (schema) =>
-                          showAllSchemaTypes ||
-                          schema.present ||
-                          CORE_SCHEMA_TYPES.has(schema.schemaType),
-                      )
-                      .map((schema, idx) => {
-                        const requiredSet = new Set(schema.required);
-                        const recommendedSet = new Set(schema.recommended);
-                        const missingRequired = schema.missingFields.filter((f) =>
-                          requiredSet.has(f),
-                        );
-                        const missingRecommended = schema.missingFields.filter((f) =>
-                          recommendedSet.has(f),
-                        );
-                        const pct = Math.max(0, Math.min(100, schema.completenessPercent ?? 0));
-                        return (
-                          <div
-                            key={`${schema.schemaType}-${idx}`}
-                            className="p-4 bg-muted/30 rounded-lg border"
-                            data-testid={`schema-card-${schema.schemaType}`}
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                {schema.present ? (
-                                  <CheckCircle className="w-5 h-5 text-foreground" />
-                                ) : (
-                                  <XCircle className="w-5 h-5 text-destructive" />
-                                )}
-                                <span className="font-medium text-foreground">
-                                  {schema.schemaType}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {schema.present && (
-                                  <span
-                                    className="tnum text-data font-medium text-foreground"
-                                    data-testid={`schema-pct-${schema.schemaType}`}
-                                  >
-                                    {pct}%
+                    {schemaFetched && (
+                      <div className="flex items-center justify-end -mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAllSchemaTypes((v) => !v)}
+                          className="text-caption text-muted-foreground underline hover:text-foreground"
+                        >
+                          {showAllSchemaTypes
+                            ? `Hide irrelevant schema types`
+                            : `Show all 14 schema types`}
+                        </button>
+                      </div>
+                    )}
+                    {schemaFetched &&
+                      schemaAudits
+                        .filter(
+                          (schema) =>
+                            showAllSchemaTypes ||
+                            schema.present ||
+                            CORE_SCHEMA_TYPES.has(schema.schemaType),
+                        )
+                        .map((schema, idx) => {
+                          const requiredSet = new Set(schema.required);
+                          const recommendedSet = new Set(schema.recommended);
+                          const missingRequired = schema.missingFields.filter((f) =>
+                            requiredSet.has(f),
+                          );
+                          const missingRecommended = schema.missingFields.filter((f) =>
+                            recommendedSet.has(f),
+                          );
+                          const pct = Math.max(0, Math.min(100, schema.completenessPercent ?? 0));
+                          return (
+                            <div
+                              key={`${schema.schemaType}-${idx}`}
+                              className="p-4 bg-muted/30 rounded-lg border"
+                              data-testid={`schema-card-${schema.schemaType}`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  {schema.present ? (
+                                    <CheckCircle className="w-5 h-5 text-foreground" />
+                                  ) : (
+                                    <XCircle className="w-5 h-5 text-destructive" />
+                                  )}
+                                  <span className="font-medium text-foreground">
+                                    {schema.schemaType}
                                   </span>
-                                )}
-                                {/* "default" here was bg-primary — the action
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {schema.present && (
+                                    <span
+                                      className="tabular-nums text-data font-medium text-foreground"
+                                      data-testid={`schema-pct-${schema.schemaType}`}
+                                    >
+                                      {pct}%
+                                    </span>
+                                  )}
+                                  {/* "default" here was bg-primary — the action
                                     accent — marking an outcome. Present/Missing
                                     is a status, so it reads neutral and the
                                     check glyph carries the meaning. */}
-                                <Badge variant={schema.present ? "secondary" : "outline"}>
-                                  {schema.present && (
-                                    <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />
-                                  )}
-                                  {schema.present ? "Present" : "Missing"}
-                                </Badge>
+                                  <Badge variant={schema.present ? "secondary" : "outline"}>
+                                    {schema.present && (
+                                      <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />
+                                    )}
+                                    {schema.present ? "Present" : "Missing"}
+                                  </Badge>
+                                </div>
                               </div>
+
+                              {schema.present && <Progress value={pct} className="mb-3 h-1.5" />}
+
+                              {schema.populatedFields.length > 0 && (
+                                <div className="mb-3">
+                                  <p className="text-label font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                                    Populated ({schema.populatedFields.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {schema.populatedFields.map((f) => (
+                                      <Badge
+                                        key={f}
+                                        variant="positive"
+                                        className="text-caption font-normal"
+                                      >
+                                        <Check className="w-2.5 h-2.5 mr-1" />
+                                        {f}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {missingRequired.length > 0 && (
+                                <div className="mb-2">
+                                  <p className="text-label font-medium uppercase tracking-wider text-destructive mb-1.5">
+                                    Missing required ({missingRequired.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {missingRequired.map((f) => (
+                                      <Badge
+                                        key={f}
+                                        variant="destructive"
+                                        className="text-caption font-normal"
+                                      >
+                                        {f}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {missingRecommended.length > 0 && (
+                                <div>
+                                  <p className="text-label font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                                    Missing recommended ({missingRecommended.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {missingRecommended.map((f) => (
+                                      <Badge
+                                        key={f}
+                                        variant="warning"
+                                        className="text-caption font-normal"
+                                      >
+                                        {f}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
+                          );
+                        })}
 
-                            {schema.present && <Progress value={pct} className="mb-3 h-1.5" />}
-
-                            {schema.populatedFields.length > 0 && (
-                              <div className="mb-3">
-                                <p className="text-label font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
-                                  Populated ({schema.populatedFields.length})
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {schema.populatedFields.map((f) => (
-                                    <Badge
-                                      key={f}
-                                      variant="positive"
-                                      className="text-caption font-normal"
-                                    >
-                                      <Check className="w-2.5 h-2.5 mr-1" />
-                                      {f}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {missingRequired.length > 0 && (
-                              <div className="mb-2">
-                                <p className="text-label font-medium uppercase tracking-wider text-destructive mb-1.5">
-                                  Missing required ({missingRequired.length})
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {missingRequired.map((f) => (
-                                    <Badge
-                                      key={f}
-                                      variant="destructive"
-                                      className="text-caption font-normal"
-                                    >
-                                      {f}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {missingRecommended.length > 0 && (
-                              <div>
-                                <p className="text-label font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
-                                  Missing recommended ({missingRecommended.length})
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {missingRecommended.map((f) => (
-                                    <Badge
-                                      key={f}
-                                      variant="warning"
-                                      className="text-caption font-normal"
-                                    >
-                                      {f}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-
-                  {additionalTypes.length > 0 && (
-                    <div className="p-4 bg-muted/20 rounded-lg border">
-                      <p className="text-caption font-medium text-foreground mb-2">
-                        Other schema types found on this page:
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {additionalTypes.map((t) => (
-                          <Badge key={t} variant="neutral" className="text-caption">
-                            {t}
-                          </Badge>
-                        ))}
+                    {additionalTypes.length > 0 && (
+                      <div className="p-4 bg-muted/20 rounded-lg border">
+                        <p className="text-caption font-medium text-foreground mb-2">
+                          Other schema types found on this page:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {additionalTypes.map((t) => (
+                            <Badge key={t} variant="neutral" className="text-caption">
+                              {t}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={Code}
-                  title="Enter a URL to audit schema markup"
-                  description="See which required and recommended fields are populated for each schema type."
-                />
-              )}
-            </CardContent>
-          </Card>
+                    )}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={Code}
+                    title="Enter a URL to audit schema markup"
+                    description="See which required and recommended fields are populated for each schema type."
+                  />
+                )}
+              </div>
+            </Panel>
+          </PanelRow>
         </TabsContent>
       </Tabs>
 
@@ -1804,6 +1827,6 @@ export default function GeoSignals() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PanelPage>
   );
 }

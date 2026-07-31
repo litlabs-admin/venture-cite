@@ -18,7 +18,7 @@ import { useDashboardData } from "./useDashboardData";
 const BTN =
   "flex h-8 items-center gap-1.5 rounded border border-vc-default px-2.5 text-caption font-medium text-vc-secondary transition-colors duration-150 hover:bg-vc-muted/50";
 const MENU =
-  "absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded border border-vc-default bg-white py-1 shadow-vc-overlay";
+  "absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded border border-vc-default bg-vc-surface py-1 shadow-vc-overlay";
 const ITEM =
   "flex w-full items-center gap-2 px-3 py-1.5 text-left text-caption text-vc-secondary transition-colors hover:bg-vc-muted/60 hover:text-vc-primary";
 

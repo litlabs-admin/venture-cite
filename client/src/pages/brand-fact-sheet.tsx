@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Loader2, AlertTriangle, Plus } from "lucide-react";
 
 import { apiRequest, ApiError } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -539,230 +539,254 @@ export default function BrandFactSheet() {
     // `head()` to) — see this task's report. Title/meta removed per this
     // task's blanket "metadata belongs to the route" rule; /setup falls
     // back to the root's site-wide defaults.
-    <div className="space-y-8">
+    <PanelPage>
       {selectedBrand && (
         <>
           {/* HEADER SECTION — Task 8 */}
-          <Card data-tour-id="fact-sheet.header">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-ui">
-                <RefreshCw className="h-5 w-5 text-primary" />
-                Scrape status
-              </CardTitle>
-              <CardDescription>
-                We re-scrape monthly. Re-scrape on demand — duplicates are skipped.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 text-caption">
-                  <div className="text-caption text-muted-foreground">Last scraped</div>
-                  <div className={lastScrapedColor} data-testid="text-last-scraped">
-                    {lastScrapedAt
-                      ? formatRelativeTime(lastScrapedAt)
-                      : legacyVerifiedAt
-                        ? `No scrape run on record — facts verified ${formatRelativeTime(legacyVerifiedAt)}`
-                        : "Never"}
+          <div data-tour-id="fact-sheet.header">
+            <PanelRow cols={1}>
+              <Panel
+                width="wide"
+                border="last"
+                label={
+                  <span className="flex items-center gap-2">
+                    <RefreshCw className="h-3 w-3 text-vc-accent" />
+                    Scrape status
+                  </span>
+                }
+              >
+                <p className="mb-3 text-data text-vc-tertiary">
+                  We re-scrape monthly. Re-scrape on demand — duplicates are skipped.
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 text-caption">
+                    <div className="text-caption text-vc-tertiary">Last scraped</div>
+                    <div className={lastScrapedColor} data-testid="text-last-scraped">
+                      {lastScrapedAt
+                        ? formatRelativeTime(lastScrapedAt)
+                        : legacyVerifiedAt
+                          ? `No scrape run on record — facts verified ${formatRelativeTime(legacyVerifiedAt)}`
+                          : "Never"}
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-3">
-                    {selectedBrandId ? (
-                      <PauseToggle
-                        brandId={selectedBrandId}
-                        enabled={brandFactScrapeEnabled}
-                        onChange={setScrapeEnabled}
-                      />
-                    ) : null}
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button
-                            onClick={startRescrape}
-                            disabled={!selectedBrandId || rescrapeInFlight || !scrapeEnabled}
-                            data-testid="btn-rescrape"
-                          >
-                            {rescrapeInFlight ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Scraping…
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Re-scrape
-                              </>
-                            )}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {rescrapeDisabledReason ? (
-                        <TooltipContent>{rescrapeDisabledReason}</TooltipContent>
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="flex items-center gap-3">
+                      {selectedBrandId ? (
+                        <PauseToggle
+                          brandId={selectedBrandId}
+                          enabled={brandFactScrapeEnabled}
+                          onChange={setScrapeEnabled}
+                        />
                       ) : null}
-                    </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              onClick={startRescrape}
+                              disabled={!selectedBrandId || rescrapeInFlight || !scrapeEnabled}
+                              data-testid="btn-rescrape"
+                            >
+                              {rescrapeInFlight ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Scraping…
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  Re-scrape
+                                </>
+                              )}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {rescrapeDisabledReason ? (
+                          <TooltipContent>{rescrapeDisabledReason}</TooltipContent>
+                        ) : null}
+                      </Tooltip>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </Panel>
+            </PanelRow>
+          </div>
 
           {/* MANUAL PASTE FALLBACK — latest completed run found zero facts */}
           {latestCompleted && latestCompleted.factsExtracted === 0 && (
-            <ManualPasteCard
-              runId={latestCompleted.id}
-              onSubmit={async (text) => {
-                try {
-                  await apiRequest(
-                    "POST",
-                    `/api/brand-fact-sheet/runs/${latestCompleted.id}/paste`,
-                    { text },
-                  );
-                  await queryClient.invalidateQueries({
-                    queryKey: ["/api/brand-facts", selectedBrandId],
-                  });
-                } catch {
-                  // Paste failed — error already logged by apiRequest. UI shows the
-                  // unchanged "0 facts" state; user can retry.
-                }
-              }}
-              onManualFill={() => {
-                // For MVP, just close/dismiss — the existing FactRow edit button
-                // and EditFactDialog are already on the page.
-              }}
-            />
+            <PanelRow cols={1}>
+              <Panel width="wide" border="last">
+                <ManualPasteCard
+                  runId={latestCompleted.id}
+                  onSubmit={async (text) => {
+                    try {
+                      await apiRequest(
+                        "POST",
+                        `/api/brand-fact-sheet/runs/${latestCompleted.id}/paste`,
+                        { text },
+                      );
+                      await queryClient.invalidateQueries({
+                        queryKey: ["/api/brand-facts", selectedBrandId],
+                      });
+                    } catch {
+                      // Paste failed — error already logged by apiRequest. UI shows the
+                      // unchanged "0 facts" state; user can retry.
+                    }
+                  }}
+                  onManualFill={() => {
+                    // For MVP, just close/dismiss — the existing FactRow edit button
+                    // and EditFactDialog are already on the page.
+                  }}
+                />
+              </Panel>
+            </PanelRow>
           )}
 
           {/* RE-SCRAPE BLOCKED ALERT — cooldown / cost cap from /full-rescrape */}
           {rescrapeError && (
-            <Alert variant="default" data-testid="rescrape-error-alert">
-              <AlertDescription>{rescrapeError}</AlertDescription>
-            </Alert>
+            <PanelRow cols={1}>
+              <Panel width="wide" border="last">
+                <Alert variant="default" data-testid="rescrape-error-alert">
+                  <AlertDescription>{rescrapeError}</AlertDescription>
+                </Alert>
+              </Panel>
+            </PanelRow>
           )}
 
           {/* PER-PAGE PANEL — Plan 2.5 Task 8 */}
           {(stream.isStreaming || displayPages.length > 0) && activeRunId ? (
-            <ScrapePagesPanel
-              pages={displayPages}
-              runId={activeRunId}
-              isStreaming={stream.isStreaming}
-              runStartedAt={runDetailQuery.data?.run?.startedAt ?? activeRun?.startedAt ?? null}
-            />
+            <PanelRow cols={1}>
+              <Panel width="wide" border="last">
+                <ScrapePagesPanel
+                  pages={displayPages}
+                  runId={activeRunId}
+                  isStreaming={stream.isStreaming}
+                  runStartedAt={runDetailQuery.data?.run?.startedAt ?? activeRun?.startedAt ?? null}
+                />
+              </Panel>
+            </PanelRow>
           ) : null}
 
           {/* TERMINAL FAILURE STATE — Plan 2.5 Task 9 */}
           {isTerminalFailure && latestRun ? (
-            <ScrapeFailureState
-              errorKind={latestRun.errorKind as ScrapeFailureKind | string}
-              errorMessage={failureErrorMessage}
-              runId={latestRun.id}
-              brandId={selectedBrandId}
-              brandWebsite={selectedBrand?.website ?? null}
-            />
+            <PanelRow cols={1}>
+              <Panel width="wide" border="last">
+                <ScrapeFailureState
+                  errorKind={latestRun.errorKind as ScrapeFailureKind | string}
+                  errorMessage={failureErrorMessage}
+                  runId={latestRun.id}
+                  brandId={selectedBrandId}
+                  brandWebsite={selectedBrand?.website ?? null}
+                />
+              </Panel>
+            </PanelRow>
           ) : null}
 
           {/* DIFF SECTION — Task 9 */}
-          <Card data-tour-id="fact-sheet.diff">
-            <CardHeader>
-              <CardTitle className="text-ui">Conflicts to resolve</CardTitle>
-              <CardDescription>
-                Pairs where what you entered and what we found differ. Pick one, keep both, or
-                merge.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {diffQuery.isLoading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              ) : diffQuery.isError ? (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Couldn&apos;t load conflicts</AlertTitle>
-                  <AlertDescription>
-                    <Button
-                      variant="link"
-                      className="px-0"
-                      onClick={() => diffQuery.refetch()}
-                      data-testid="btn-retry-diff"
-                    >
-                      Try again
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              ) : !diffQuery.data || diffHasNoConflicts(diffQuery.data) ? (
-                <EmptyState
-                  title="No conflicts"
-                  body="Everything you've entered matches (or has been resolved against) what AI found."
-                />
-              ) : (
-                <div className="space-y-6">
-                  {DOMAINS.map((domain) => {
-                    const pairs = diffQuery.data!.conflicts[domain] ?? [];
-                    if (pairs.length === 0) return null;
-                    return (
-                      <div key={domain} className="overflow-hidden rounded-md border border-border">
-                        <DomainGroupHeader
-                          domain={domain}
-                          conflictCount={pairs.length}
-                          onAcceptAllAI={() =>
-                            bulkAcceptMutation.mutate({ side: "scraped", domain })
-                          }
-                          onKeepAllMine={() => bulkAcceptMutation.mutate({ side: "user", domain })}
-                          disabled={bulkAcceptMutation.isPending}
-                        />
-                        <div className="space-y-3 p-3">
-                          {pairs.map((pair) => (
-                            <ConflictPair
-                              key={pair.userFact.id}
-                              pair={pair}
-                              onUseMine={handleUseMine}
-                              onUseAI={handleUseAI}
-                              onKeepBoth={handleKeepBoth}
-                              disabled={acceptFactMutation.isPending}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Page-level bulk actions */}
-                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => bulkAcceptMutation.mutate({ side: "user" })}
-                      disabled={bulkAcceptMutation.isPending}
-                      data-testid="btn-keep-all-mine-global"
-                    >
-                      Keep all mine
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => bulkAcceptMutation.mutate({ side: "scraped" })}
-                      disabled={bulkAcceptMutation.isPending}
-                      data-testid="btn-accept-all-ai-global"
-                    >
-                      Accept all AI
-                    </Button>
+          <div data-tour-id="fact-sheet.diff">
+            <PanelRow cols={1}>
+              <Panel width="wide" border="last" label="Conflicts to resolve">
+                <p className="mb-4 text-data text-vc-tertiary">
+                  Pairs where what you entered and what we found differ. Pick one, keep both, or
+                  merge.
+                </p>
+                {diffQuery.isLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                ) : diffQuery.isError ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Couldn&apos;t load conflicts</AlertTitle>
+                    <AlertDescription>
+                      <Button
+                        variant="link"
+                        className="px-0"
+                        onClick={() => diffQuery.refetch()}
+                        data-testid="btn-retry-diff"
+                      >
+                        Try again
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                ) : !diffQuery.data || diffHasNoConflicts(diffQuery.data) ? (
+                  <EmptyState
+                    title="No conflicts"
+                    body="Everything you've entered matches (or has been resolved against) what AI found."
+                  />
+                ) : (
+                  <div className="space-y-6">
+                    {DOMAINS.map((domain) => {
+                      const pairs = diffQuery.data!.conflicts[domain] ?? [];
+                      if (pairs.length === 0) return null;
+                      return (
+                        <div
+                          key={domain}
+                          className="overflow-hidden rounded-md border border-border"
+                        >
+                          <DomainGroupHeader
+                            domain={domain}
+                            conflictCount={pairs.length}
+                            onAcceptAllAI={() =>
+                              bulkAcceptMutation.mutate({ side: "scraped", domain })
+                            }
+                            onKeepAllMine={() =>
+                              bulkAcceptMutation.mutate({ side: "user", domain })
+                            }
+                            disabled={bulkAcceptMutation.isPending}
+                          />
+                          <div className="space-y-3 p-3">
+                            {pairs.map((pair) => (
+                              <ConflictPair
+                                key={pair.userFact.id}
+                                pair={pair}
+                                onUseMine={handleUseMine}
+                                onUseAI={handleUseAI}
+                                onKeepBoth={handleKeepBoth}
+                                disabled={acceptFactMutation.isPending}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Page-level bulk actions */}
+                    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => bulkAcceptMutation.mutate({ side: "user" })}
+                        disabled={bulkAcceptMutation.isPending}
+                        data-testid="btn-keep-all-mine-global"
+                      >
+                        Keep all mine
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => bulkAcceptMutation.mutate({ side: "scraped" })}
+                        disabled={bulkAcceptMutation.isPending}
+                        data-testid="btn-accept-all-ai-global"
+                      >
+                        Accept all AI
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </Panel>
+            </PanelRow>
+          </div>
 
           {/* RESOLVED FACTS — Task 10 */}
           {/* TODO(spec-2 Plan 2.5): delta indicators (new / changed / removed) — needs prior-run comparison query */}
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-ui">Resolved facts</CardTitle>
-                  <CardDescription>Verified facts about {selectedBrand.name}.</CardDescription>
-                </div>
+          <PanelRow cols={1} last>
+            <Panel
+              width="wide"
+              border="last"
+              label="Resolved facts"
+              action={
                 <Button
                   variant="outline"
                   size="sm"
@@ -772,9 +796,11 @@ export default function BrandFactSheet() {
                   <Plus className="mr-2 h-4 w-4" />
                   Add fact
                 </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
+              }
+            >
+              <p className="mb-4 text-data text-vc-tertiary">
+                Verified facts about {selectedBrand.name}.
+              </p>
               {resolvedQuery.isLoading ? (
                 <div className="space-y-2">
                   <Skeleton className="h-16 w-full" />
@@ -825,8 +851,8 @@ export default function BrandFactSheet() {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </Panel>
+          </PanelRow>
         </>
       )}
 
@@ -956,6 +982,6 @@ export default function BrandFactSheet() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PanelPage>
   );
 }

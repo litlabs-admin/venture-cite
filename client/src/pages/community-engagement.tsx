@@ -1,6 +1,5 @@
 import { useState, type ReactElement } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -32,6 +31,7 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { ErrorState } from "@/components/ui/error-state";
 import { KPITile } from "@/components/foundations";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import {
   Search,
   Plus,
@@ -299,503 +299,529 @@ export default function CommunityEngagement() {
     // Only ever rendered client-side, as a lazy tab inside
     // client/src/pages/act.tsx (no route of its own) — title/meta removed
     // per this task's blanket rule; /act falls back to root defaults.
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        <Button
-          onClick={handleDiscover}
-          disabled={!selectedBrandId || discoverMutation.isPending}
-          data-testid="button-discover"
-        >
-          {discoverMutation.isPending ? (
-            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Compass className="w-4 h-4 mr-2" />
-          )}
-          Discover Communities
-        </Button>
-
-        <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
-          <DialogTrigger asChild>
+    <PanelPage>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <div className="flex flex-wrap items-center gap-4">
             <Button
-              variant="outline"
-              disabled={!selectedBrandId}
-              data-testid="button-generate-post"
+              onClick={handleDiscover}
+              disabled={!selectedBrandId || discoverMutation.isPending}
+              data-testid="button-discover"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Generate Post
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Generate Community Post</DialogTitle>
-              <DialogDescription>
-                AI will create a helpful, non-spammy post tailored to the platform and community
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-caption font-medium">Platform</label>
-                  <Select
-                    value={generateForm.platform}
-                    onValueChange={(v) => setGenerateForm((f) => ({ ...f, platform: v }))}
-                  >
-                    <SelectTrigger data-testid="select-gen-platform">
-                      <SelectValue placeholder="Select platform" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="reddit">Reddit</SelectItem>
-                      <SelectItem value="hackernews">Hacker News</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-caption font-medium">Post Type</label>
-                  <Select
-                    value={generateForm.postType}
-                    onValueChange={(v) => setGenerateForm((f) => ({ ...f, postType: v }))}
-                  >
-                    <SelectTrigger data-testid="select-gen-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="post">New Post</SelectItem>
-                      <SelectItem value="answer">Answer/Reply</SelectItem>
-                      <SelectItem value="comment">Comment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <label className="text-caption font-medium">Community/Group Name</label>
-                <Input
-                  placeholder="e.g., r/marketing, Hacker News"
-                  value={generateForm.groupName}
-                  onChange={(e) => setGenerateForm((f) => ({ ...f, groupName: e.target.value }))}
-                  data-testid="input-gen-group"
-                />
-              </div>
-              <div>
-                <label className="text-caption font-medium">Topic / Question to Address</label>
-                <Input
-                  placeholder="e.g., Best practices for AI-optimized content"
-                  value={generateForm.topic}
-                  onChange={(e) => setGenerateForm((f) => ({ ...f, topic: e.target.value }))}
-                  data-testid="input-gen-topic"
-                />
-              </div>
-              <div>
-                <label className="text-caption font-medium">Tone</label>
-                <Select
-                  value={generateForm.tone}
-                  onValueChange={(v) => setGenerateForm((f) => ({ ...f, tone: v }))}
-                >
-                  <SelectTrigger data-testid="select-gen-tone">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="helpful and authentic">Helpful & Authentic</SelectItem>
-                    <SelectItem value="expert and authoritative">Expert & Authoritative</SelectItem>
-                    <SelectItem value="casual and friendly">Casual & Friendly</SelectItem>
-                    <SelectItem value="data-driven and analytical">
-                      Data-Driven & Analytical
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                onClick={handleGenerate}
-                disabled={
-                  !generateForm.platform ||
-                  !generateForm.groupName ||
-                  !generateForm.topic ||
-                  generateMutation.isPending
-                }
-                className="w-full"
-                data-testid="button-run-generate"
-              >
-                {generateMutation.isPending ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4 mr-2" />
-                )}
-                Generate Content
-              </Button>
-
-              {generatedContent && (
-                <div
-                  className="border border-border rounded-lg p-4 space-y-3 bg-muted"
-                  data-testid="generated-content"
-                >
-                  {generatedContent.title && (
-                    <div>
-                      <label className="text-caption font-medium text-muted-foreground">
-                        Title
-                      </label>
-                      <p className="font-medium">{generatedContent.title}</p>
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-caption font-medium text-muted-foreground">
-                      Content
-                    </label>
-                    <div className="mt-1 p-3 bg-card rounded border border-border text-caption whitespace-pre-wrap">
-                      {generatedContent.content}
-                    </div>
-                  </div>
-                  {generatedContent.tips?.length > 0 && (
-                    <div>
-                      <label className="text-caption font-medium text-muted-foreground">
-                        Posting Tips
-                      </label>
-                      <ul className="mt-1 text-caption space-y-1">
-                        {generatedContent.tips.map((tip, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <CheckCircle2 className="w-3 h-3 mt-1 text-muted-foreground shrink-0" />
-                            <span>{tip}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {generatedContent.bestTimeToPost && (
-                    <p className="text-caption text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Best time: {generatedContent.bestTimeToPost}
-                    </p>
-                  )}
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => copyToClipboard(generatedContent.content)}
-                      data-testid="button-copy-content"
-                    >
-                      <Copy className="w-3 h-3 mr-1" /> Copy
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleSaveGenerated}
-                      data-testid="button-save-draft"
-                    >
-                      <FileText className="w-3 h-3 mr-1" /> Save as Draft
-                    </Button>
-                  </div>
-                </div>
+              {discoverMutation.isPending ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Compass className="w-4 h-4 mr-2" />
               )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+              Discover Communities
+            </Button>
+
+            <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={!selectedBrandId}
+                  data-testid="button-generate-post"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate Post
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Generate Community Post</DialogTitle>
+                  <DialogDescription>
+                    AI will create a helpful, non-spammy post tailored to the platform and community
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-caption font-medium">Platform</label>
+                      <Select
+                        value={generateForm.platform}
+                        onValueChange={(v) => setGenerateForm((f) => ({ ...f, platform: v }))}
+                      >
+                        <SelectTrigger data-testid="select-gen-platform">
+                          <SelectValue placeholder="Select platform" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="reddit">Reddit</SelectItem>
+                          <SelectItem value="hackernews">Hacker News</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-caption font-medium">Post Type</label>
+                      <Select
+                        value={generateForm.postType}
+                        onValueChange={(v) => setGenerateForm((f) => ({ ...f, postType: v }))}
+                      >
+                        <SelectTrigger data-testid="select-gen-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="post">New Post</SelectItem>
+                          <SelectItem value="answer">Answer/Reply</SelectItem>
+                          <SelectItem value="comment">Comment</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-caption font-medium">Community/Group Name</label>
+                    <Input
+                      placeholder="e.g., r/marketing, Hacker News"
+                      value={generateForm.groupName}
+                      onChange={(e) =>
+                        setGenerateForm((f) => ({ ...f, groupName: e.target.value }))
+                      }
+                      data-testid="input-gen-group"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-caption font-medium">Topic / Question to Address</label>
+                    <Input
+                      placeholder="e.g., Best practices for AI-optimized content"
+                      value={generateForm.topic}
+                      onChange={(e) => setGenerateForm((f) => ({ ...f, topic: e.target.value }))}
+                      data-testid="input-gen-topic"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-caption font-medium">Tone</label>
+                    <Select
+                      value={generateForm.tone}
+                      onValueChange={(v) => setGenerateForm((f) => ({ ...f, tone: v }))}
+                    >
+                      <SelectTrigger data-testid="select-gen-tone">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="helpful and authentic">Helpful & Authentic</SelectItem>
+                        <SelectItem value="expert and authoritative">
+                          Expert & Authoritative
+                        </SelectItem>
+                        <SelectItem value="casual and friendly">Casual & Friendly</SelectItem>
+                        <SelectItem value="data-driven and analytical">
+                          Data-Driven & Analytical
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={
+                      !generateForm.platform ||
+                      !generateForm.groupName ||
+                      !generateForm.topic ||
+                      generateMutation.isPending
+                    }
+                    className="w-full"
+                    data-testid="button-run-generate"
+                  >
+                    {generateMutation.isPending ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    Generate Content
+                  </Button>
+
+                  {generatedContent && (
+                    <div
+                      className="border border-border rounded-lg p-4 space-y-3 bg-muted"
+                      data-testid="generated-content"
+                    >
+                      {generatedContent.title && (
+                        <div>
+                          <label className="text-caption font-medium text-muted-foreground">
+                            Title
+                          </label>
+                          <p className="font-medium">{generatedContent.title}</p>
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-caption font-medium text-muted-foreground">
+                          Content
+                        </label>
+                        <div className="mt-1 p-3 bg-card rounded border border-border text-caption whitespace-pre-wrap">
+                          {generatedContent.content}
+                        </div>
+                      </div>
+                      {generatedContent.tips?.length > 0 && (
+                        <div>
+                          <label className="text-caption font-medium text-muted-foreground">
+                            Posting Tips
+                          </label>
+                          <ul className="mt-1 text-caption space-y-1">
+                            {generatedContent.tips.map((tip, i) => (
+                              <li key={i} className="flex items-start gap-2">
+                                <CheckCircle2 className="w-3 h-3 mt-1 text-muted-foreground shrink-0" />
+                                <span>{tip}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {generatedContent.bestTimeToPost && (
+                        <p className="text-caption text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Best time: {generatedContent.bestTimeToPost}
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => copyToClipboard(generatedContent.content)}
+                          data-testid="button-copy-content"
+                        >
+                          <Copy className="w-3 h-3 mr-1" /> Copy
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleSaveGenerated}
+                          data-testid="button-save-draft"
+                        >
+                          <FileText className="w-3 h-3 mr-1" /> Save as Draft
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </Panel>
+      </PanelRow>
 
       {!selectedBrandId && (
-        <div className="mb-6" data-testid="empty-state-no-brand">
-          <EmptyState
-            icon={Target}
-            title="Select a brand to get started"
-            description="Choose a brand above to discover relevant communities and generate engagement content"
-          />
-        </div>
+        <PanelRow cols={1}>
+          <Panel width="wide" border="last">
+            <div data-testid="empty-state-no-brand">
+              <EmptyState
+                icon={Target}
+                title="Select a brand to get started"
+                description="Choose a brand above to discover relevant communities and generate engagement content"
+              />
+            </div>
+          </Panel>
+        </PanelRow>
       )}
 
       {selectedBrandId && (
-        <Tabs
-          value={activeTab}
-          onValueChange={(v) => setActiveTab(v as "discover" | "drafts" | "posted")}
-          className="space-y-6"
-        >
-          <TabsList data-testid="tabs-community">
-            <TabsTrigger value="discover" data-testid="tab-discover">
-              <Compass className="w-4 h-4 mr-2" />
-              Discover
-            </TabsTrigger>
-            <TabsTrigger value="drafts" data-testid="tab-drafts">
-              <FileText className="w-4 h-4 mr-2" />
-              Drafts ({draftPosts.length})
-            </TabsTrigger>
-            <TabsTrigger value="posted" data-testid="tab-posted">
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Posted ({postedPosts.length})
-            </TabsTrigger>
-          </TabsList>
+        <PanelRow cols={1}>
+          <Panel width="wide" border="last">
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as "discover" | "drafts" | "posted")}
+              className="space-y-6"
+            >
+              <TabsList data-testid="tabs-community">
+                <TabsTrigger value="discover" data-testid="tab-discover">
+                  <Compass className="w-4 h-4 mr-2" />
+                  Discover
+                </TabsTrigger>
+                <TabsTrigger value="drafts" data-testid="tab-drafts">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Drafts ({draftPosts.length})
+                </TabsTrigger>
+                <TabsTrigger value="posted" data-testid="tab-posted">
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Posted ({postedPosts.length})
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="discover" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <KPITile label="Groups Found" value={discoveredGroups.length} />
-              <KPITile label="Draft Posts" value={draftPosts.length} />
-              <KPITile label="Posted" value={postedPosts.length} />
-              <KPITile
-                label="Platforms Active"
-                value={new Set(posts.map((p) => p.platform)).size}
-              />
-            </div>
+              <TabsContent value="discover" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <KPITile label="Groups Found" value={discoveredGroups.length} />
+                  <KPITile label="Draft Posts" value={draftPosts.length} />
+                  <KPITile label="Posted" value={postedPosts.length} />
+                  <KPITile
+                    label="Platforms Active"
+                    value={new Set(posts.map((p) => p.platform)).size}
+                  />
+                </div>
 
-            {discoverMutation.isPending && (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-32 w-full rounded-lg" />
-                ))}
-              </div>
-            )}
+                {discoverMutation.isPending && (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-32 w-full rounded-lg" />
+                    ))}
+                  </div>
+                )}
 
-            {discoveredGroups.length === 0 && !discoverMutation.isPending && (
-              <div data-testid="empty-state-discover">
-                <EmptyState
-                  icon={Search}
-                  title="No communities discovered yet"
-                  description='Click "Discover Communities" to find relevant Reddit and Hacker News groups for your brand'
-                  action={{
-                    label: (
-                      <>
-                        <Compass className="w-4 h-4 mr-2" />
-                        Discover Communities
-                      </>
-                    ),
-                    onClick: handleDiscover,
-                    "data-testid": "button-discover-empty",
-                  }}
-                />
-              </div>
-            )}
+                {discoveredGroups.length === 0 && !discoverMutation.isPending && (
+                  <div data-testid="empty-state-discover">
+                    <EmptyState
+                      icon={Search}
+                      title="No communities discovered yet"
+                      description='Click "Discover Communities" to find relevant Reddit and Hacker News groups for your brand'
+                      action={{
+                        label: (
+                          <>
+                            <Compass className="w-4 h-4 mr-2" />
+                            Discover Communities
+                          </>
+                        ),
+                        onClick: handleDiscover,
+                        "data-testid": "button-discover-empty",
+                      }}
+                    />
+                  </div>
+                )}
 
-            {discoveredGroups.length > 0 && (
-              <div className="space-y-3">
-                {discoveredGroups.map((group, idx) => (
-                  <Card key={idx} data-testid={`card-group-${idx}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            {platformIcons[group.platform] || <Globe className="w-4 h-4" />}
-                            <Badge variant="neutral">{group.platform}</Badge>
-                            <span className="font-semibold">{group.name}</span>
-                            {group.members && (
-                              <span className="text-caption text-muted-foreground flex items-center gap-1">
-                                <Users className="w-3 h-3" /> {group.members}
-                              </span>
-                            )}
-                            <Badge
-                              variant={group.relevance === "high" ? "positive" : "neutral"}
-                              className="text-caption"
-                            >
-                              {group.relevance} relevance
-                            </Badge>
-                          </div>
-                          <p className="text-caption text-muted-foreground mb-2">
-                            {group.description}
-                          </p>
-                          <div className="text-caption">
-                            <span className="font-medium text-caption">Approach: </span>
-                            <span className="text-caption text-muted-foreground">
-                              {group.suggestedApproach}
-                            </span>
-                          </div>
-                          {group.topicIdeas?.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {group.topicIdeas.map((topic, ti) => (
-                                <Badge key={ti} variant="outline" className="text-caption">
-                                  {topic}
-                                </Badge>
-                              ))}
+                {discoveredGroups.length > 0 && (
+                  <div className="space-y-3">
+                    {discoveredGroups.map((group, idx) => (
+                      <div
+                        key={idx}
+                        data-testid={`card-group-${idx}`}
+                        className="rounded-lg border border-border bg-card p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              {platformIcons[group.platform] || <Globe className="w-4 h-4" />}
+                              <Badge variant="neutral">{group.platform}</Badge>
+                              <span className="font-semibold">{group.name}</span>
+                              {group.members && (
+                                <span className="text-caption text-muted-foreground flex items-center gap-1">
+                                  <Users className="w-3 h-3" /> {group.members}
+                                </span>
+                              )}
+                              <Badge
+                                variant={group.relevance === "high" ? "positive" : "neutral"}
+                                className="text-caption"
+                              >
+                                {group.relevance} relevance
+                              </Badge>
                             </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2 shrink-0">
-                          {group.url && (
+                            <p className="text-caption text-muted-foreground mb-2">
+                              {group.description}
+                            </p>
+                            <div className="text-caption">
+                              <span className="font-medium text-caption">Approach: </span>
+                              <span className="text-caption text-muted-foreground">
+                                {group.suggestedApproach}
+                              </span>
+                            </div>
+                            {group.topicIdeas?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {group.topicIdeas.map((topic, ti) => (
+                                  <Badge key={ti} variant="outline" className="text-caption">
+                                    {topic}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2 shrink-0">
+                            {group.url && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                data-testid={`button-visit-${idx}`}
+                              >
+                                <a
+                                  href={safeExternalHref(group.url)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ExternalLink className="w-3 h-3 mr-1" /> Visit
+                                </a>
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"
-                              asChild
-                              data-testid={`button-visit-${idx}`}
+                              onClick={() => {
+                                setGenerateForm((f) => ({
+                                  ...f,
+                                  platform: group.platform,
+                                  groupName: group.name,
+                                  topic: group.topicIdeas?.[0] || "",
+                                }));
+                                setGenerateDialogOpen(true);
+                              }}
+                              data-testid={`button-write-${idx}`}
                             >
-                              <a
-                                href={safeExternalHref(group.url)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <ExternalLink className="w-3 h-3 mr-1" /> Visit
-                              </a>
+                              <Sparkles className="w-3 h-3 mr-1" /> Write Post
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setGenerateForm((f) => ({
-                                ...f,
-                                platform: group.platform,
-                                groupName: group.name,
-                                topic: group.topicIdeas?.[0] || "",
-                              }));
-                              setGenerateDialogOpen(true);
-                            }}
-                            data-testid={`button-write-${idx}`}
-                          >
-                            <Sparkles className="w-3 h-3 mr-1" /> Write Post
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleSaveDiscoveredGroup(group)}
-                            data-testid={`button-save-group-${idx}`}
-                          >
-                            <Plus className="w-3 h-3 mr-1" /> Save
-                          </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleSaveDiscoveredGroup(group)}
+                              data-testid={`button-save-group-${idx}`}
+                            >
+                              <Plus className="w-3 h-3 mr-1" /> Save
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="drafts" className="space-y-3">
-            {postsIsError && !postsLoading && (
-              <ErrorState
-                title="Couldn't load community posts"
-                onRetry={() => refetchPosts()}
-                isRetrying={postsIsRefetching}
-              />
-            )}
-            {postsLoading && (
-              <div className="space-y-3">
-                {[1, 2].map((i) => (
-                  <Skeleton key={i} className="h-24 w-full rounded-lg" />
-                ))}
-              </div>
-            )}
-
-            {draftPosts.length === 0 && !postsLoading && (
-              <div data-testid="empty-state-drafts">
-                <EmptyState
-                  icon={FileText}
-                  title="No draft posts yet"
-                  description="Discover communities and generate posts to get started"
-                />
-              </div>
-            )}
-
-            {draftPosts.map((post) => (
-              <Card key={post.id} data-testid={`card-draft-${post.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
-                        <Badge variant="neutral">{post.platform}</Badge>
-                        <span className="font-medium text-caption">{post.groupName}</span>
-                        <Badge variant="neutral">{post.status}</Badge>
-                        {post.generatedByAi ? (
-                          <Badge variant="outline" className="text-caption">
-                            <Sparkles className="w-3 h-3 mr-1" /> AI
-                          </Badge>
-                        ) : null}
-                      </div>
-                      {post.title && <p className="font-medium text-caption mt-1">{post.title}</p>}
-                      <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
-                        {post.content}
-                      </p>
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingDraft(post);
-                          setDraftEditForm({
-                            title: post.title || "",
-                            content: post.content || "",
-                          });
-                        }}
-                        title="View / edit draft"
-                        data-testid={`button-edit-draft-${post.id}`}
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => copyToClipboard(post.content)}
-                        data-testid={`button-copy-draft-${post.id}`}
-                      >
-                        <Copy className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => markPostedMutation.mutate(post.id)}
-                        title="Mark as posted"
-                        data-testid={`button-mark-posted-${post.id}`}
-                      >
-                        <CheckCircle2 className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deletePostMutation.mutate(post.id)}
-                        data-testid={`button-delete-draft-${post.id}`}
-                      >
-                        <Trash2 className="w-3 h-3 text-destructive" />
-                      </Button>
-                    </div>
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
+                )}
+              </TabsContent>
 
-          <TabsContent value="posted" className="space-y-3">
-            {postedPosts.length === 0 && (
-              <div data-testid="empty-state-posted">
-                <EmptyState
-                  icon={CheckCircle2}
-                  title="No posted content yet"
-                  description="Mark draft posts as posted after sharing them on the platforms"
-                />
-              </div>
-            )}
+              <TabsContent value="drafts" className="space-y-3">
+                {postsIsError && !postsLoading && (
+                  <ErrorState
+                    title="Couldn't load community posts"
+                    onRetry={() => refetchPosts()}
+                    isRetrying={postsIsRefetching}
+                  />
+                )}
+                {postsLoading && (
+                  <div className="space-y-3">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                    ))}
+                  </div>
+                )}
 
-            {postedPosts.map((post) => (
-              <Card key={post.id} data-testid={`card-posted-${post.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
-                        <Badge variant="neutral">{post.platform}</Badge>
-                        <span className="font-medium text-caption">{post.groupName}</span>
-                        <Badge variant="neutral" className="gap-1">
-                          <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
-                          Posted
-                        </Badge>
-                      </div>
-                      {post.title && <p className="font-medium text-caption mt-1">{post.title}</p>}
-                      <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
-                        {post.content}
-                      </p>
-                      {post.postUrl && (
-                        <a
-                          href={safeExternalHref(post.postUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-caption text-chart-1 hover:underline flex items-center gap-1 mt-1"
-                        >
-                          <ExternalLink className="w-3 h-3" /> View post
-                        </a>
-                      )}
-                      {post.postedAt && (
-                        <p className="text-caption text-muted-foreground mt-1">
-                          Posted: {new Date(post.postedAt).toLocaleDateString()}
+                {draftPosts.length === 0 && !postsLoading && (
+                  <div data-testid="empty-state-drafts">
+                    <EmptyState
+                      icon={FileText}
+                      title="No draft posts yet"
+                      description="Discover communities and generate posts to get started"
+                    />
+                  </div>
+                )}
+
+                {draftPosts.map((post) => (
+                  <div
+                    key={post.id}
+                    data-testid={`card-draft-${post.id}`}
+                    className="rounded-lg border border-border bg-card p-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
+                          <Badge variant="neutral">{post.platform}</Badge>
+                          <span className="font-medium text-caption">{post.groupName}</span>
+                          <Badge variant="neutral">{post.status}</Badge>
+                          {post.generatedByAi ? (
+                            <Badge variant="outline" className="text-caption">
+                              <Sparkles className="w-3 h-3 mr-1" /> AI
+                            </Badge>
+                          ) : null}
+                        </div>
+                        {post.title && (
+                          <p className="font-medium text-caption mt-1">{post.title}</p>
+                        )}
+                        <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
+                          {post.content}
                         </p>
-                      )}
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingDraft(post);
+                            setDraftEditForm({
+                              title: post.title || "",
+                              content: post.content || "",
+                            });
+                          }}
+                          title="View / edit draft"
+                          data-testid={`button-edit-draft-${post.id}`}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => copyToClipboard(post.content)}
+                          data-testid={`button-copy-draft-${post.id}`}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => markPostedMutation.mutate(post.id)}
+                          title="Mark as posted"
+                          data-testid={`button-mark-posted-${post.id}`}
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deletePostMutation.mutate(post.id)}
+                          data-testid={`button-delete-draft-${post.id}`}
+                        >
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-        </Tabs>
+                ))}
+              </TabsContent>
+
+              <TabsContent value="posted" className="space-y-3">
+                {postedPosts.length === 0 && (
+                  <div data-testid="empty-state-posted">
+                    <EmptyState
+                      icon={CheckCircle2}
+                      title="No posted content yet"
+                      description="Mark draft posts as posted after sharing them on the platforms"
+                    />
+                  </div>
+                )}
+
+                {postedPosts.map((post) => (
+                  <div
+                    key={post.id}
+                    data-testid={`card-posted-${post.id}`}
+                    className="rounded-lg border border-border bg-card p-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {platformIcons[post.platform] || <Globe className="w-4 h-4" />}
+                          <Badge variant="neutral">{post.platform}</Badge>
+                          <span className="font-medium text-caption">{post.groupName}</span>
+                          <Badge variant="neutral" className="gap-1">
+                            <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                            Posted
+                          </Badge>
+                        </div>
+                        {post.title && (
+                          <p className="font-medium text-caption mt-1">{post.title}</p>
+                        )}
+                        <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
+                          {post.content}
+                        </p>
+                        {post.postUrl && (
+                          <a
+                            href={safeExternalHref(post.postUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-caption text-chart-1 hover:underline flex items-center gap-1 mt-1"
+                          >
+                            <ExternalLink className="w-3 h-3" /> View post
+                          </a>
+                        )}
+                        {post.postedAt && (
+                          <p className="text-caption text-muted-foreground mt-1">
+                            Posted: {new Date(post.postedAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </TabsContent>
+            </Tabs>
+          </Panel>
+        </PanelRow>
       )}
 
       <Dialog
@@ -864,15 +890,21 @@ export default function CommunityEngagement() {
         </DialogContent>
       </Dialog>
 
-      <Card className="mt-6" data-testid="card-best-practices">
-        <CardHeader>
-          <CardTitle className="text-ui flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-warning" />
-            Community Engagement Best Practices
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-caption">
+      <PanelRow cols={1} last>
+        <Panel
+          label={
+            <span className="flex items-center gap-2">
+              <AlertCircle className="h-3.5 w-3.5 text-warning" />
+              Community Engagement Best Practices
+            </span>
+          }
+          width="wide"
+          border="last"
+        >
+          <div
+            data-testid="card-best-practices"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-caption"
+          >
             <div className="space-y-2">
               <h4 className="font-medium flex items-center gap-2">
                 <SiReddit className="w-4 h-4 text-muted-foreground" /> Reddit
@@ -898,8 +930,8 @@ export default function CommunityEngagement() {
               </ul>
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </Panel>
+      </PanelRow>
+    </PanelPage>
   );
 }

@@ -183,7 +183,7 @@ export function PanelEmptyState({
       {cta && (
         <CCLink
           dest={cta.dest}
-          className="inline-flex items-center gap-1 rounded bg-vc-accent-subtle px-3 py-1.5 text-data font-medium text-vc-accent transition-all hover:bg-vc-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-vc-accent/20"
+          className="inline-flex items-center gap-1 rounded bg-vc-accent-subtle px-3 py-1.5 text-data font-medium text-vc-accent transition-all hover:bg-vc-accent hover:text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-vc-accent/20"
         >
           {cta.label}
           <ChevronRight className="h-3 w-3" aria-hidden />
@@ -211,7 +211,7 @@ export function InfoDot({ children }: { children: React.ReactNode }) {
         <TooltipContent
           side="bottom"
           align="start"
-          className="w-56 rounded border border-vc-default bg-white px-3 py-2.5 text-data leading-relaxed text-vc-secondary shadow-vc-overlay"
+          className="w-56 rounded border border-vc-default bg-vc-surface px-3 py-2.5 text-data leading-relaxed text-vc-secondary shadow-vc-overlay"
         >
           {children}
         </TooltipContent>
@@ -236,7 +236,7 @@ export function HoverCard({
         align === "center" ? "left-1/2 -translate-x-1/2" : "left-0"
       }`}
     >
-      <div className="w-48 rounded border border-vc-default bg-white px-3 py-2.5 shadow-vc-overlay">
+      <div className="w-48 rounded border border-vc-default bg-vc-surface px-3 py-2.5 shadow-vc-overlay">
         {children}
       </div>
     </div>

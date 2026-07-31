@@ -1,18 +1,11 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle, Loader2, Mail } from "lucide-react";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 // Post-register "check your email" screen. Register.tsx drops the
 // pending email in sessionStorage and routes here; the resend button
@@ -86,90 +79,90 @@ export default function VerifyEmail() {
   return (
     // Title/robots moved to src/routes/_app/verify-email.tsx's `head()` —
     // metadata belongs to the route, not this component.
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
-              <CheckCircle className="h-8 w-8 text-foreground" />
+    <PanelPage className="flex items-center justify-center p-4">
+      <PanelRow cols={1} last className="w-full max-w-md">
+        <Panel width="wide" border="last">
+          <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="h-16 w-16 bg-vc-muted rounded-full flex items-center justify-center">
+                <CheckCircle className="h-8 w-8 text-vc-primary" />
+              </div>
             </div>
-          </div>
-          <CardTitle className="text-page font-semibold text-foreground">
-            Check your email
-          </CardTitle>
-          <CardDescription className="mt-2">
-            {storedEmail ? (
-              <>
-                We sent a verification link to <span className="font-medium">{storedEmail}</span>.
-                Click it to finish setting up your account.
-              </>
-            ) : (
-              <>
-                We sent a verification link to the email you registered with. Click it to finish
-                setting up your account.
-              </>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-center">
-          <div className="bg-muted rounded-lg p-4 mb-4">
-            <Mail className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-            <p className="text-caption text-muted-foreground">
-              Don't see the email? Check your spam folder, or resend the link below.
+            <h1 className="text-page font-semibold text-vc-primary">Check your email</h1>
+            <p className="mt-2 text-caption text-vc-tertiary">
+              {storedEmail ? (
+                <>
+                  We sent a verification link to <span className="font-medium">{storedEmail}</span>.
+                  Click it to finish setting up your account.
+                </>
+              ) : (
+                <>
+                  We sent a verification link to the email you registered with. Click it to finish
+                  setting up your account.
+                </>
+              )}
             </p>
           </div>
-          {!storedEmail && (
-            <div className="space-y-2 text-left mb-4">
-              <Label htmlFor="resend-email" className="text-caption">
-                Enter your email to resend the verification link
-              </Label>
-              <Input
-                id="resend-email"
-                type="email"
-                placeholder="you@example.com"
-                value={typedEmail}
-                onChange={(e) => setTypedEmail(e.target.value)}
-                data-testid="input-resend-email"
-              />
+          <div className="mt-6 text-center">
+            <div className="bg-vc-muted rounded-lg p-4 mb-4">
+              <Mail className="h-6 w-6 mx-auto text-vc-tertiary mb-2" />
+              <p className="text-caption text-vc-tertiary">
+                Don't see the email? Check your spam folder, or resend the link below.
+              </p>
             </div>
-          )}
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={!canResend}
-            onClick={() => resendMutation.mutate()}
-            data-testid="button-resend-verification"
-          >
-            {resendMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...
-              </>
-            ) : cooldown > 0 ? (
-              `Resend in ${cooldown}s`
-            ) : (
-              "Resend verification email"
+            {!storedEmail && (
+              <div className="space-y-2 text-left mb-4">
+                <Label htmlFor="resend-email" className="text-caption text-vc-secondary">
+                  Enter your email to resend the verification link
+                </Label>
+                <Input
+                  id="resend-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={typedEmail}
+                  onChange={(e) => setTypedEmail(e.target.value)}
+                  data-testid="input-resend-email"
+                />
+              </div>
             )}
-          </Button>
-          <p className="text-caption text-muted-foreground mt-4">
-            Already verified?{" "}
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={!canResend}
+              onClick={() => resendMutation.mutate()}
+              data-testid="button-resend-verification"
+            >
+              {resendMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...
+                </>
+              ) : cooldown > 0 ? (
+                `Resend in ${cooldown}s`
+              ) : (
+                "Resend verification email"
+              )}
+            </Button>
+            <p className="text-caption text-vc-tertiary mt-4">
+              Already verified?{" "}
+              <a
+                href="/login"
+                className="text-vc-accent hover:text-vc-accent/90 font-medium"
+                data-testid="link-already-verified-signin"
+              >
+                Sign in
+              </a>
+            </p>
+          </div>
+          <div className="mt-6 flex justify-center">
             <a
               href="/login"
-              className="text-primary hover:text-primary/90 font-medium"
-              data-testid="link-already-verified-signin"
+              className="text-caption text-vc-accent hover:text-vc-accent/90 flex items-center gap-1"
             >
-              Sign in
+              <ArrowLeft className="h-4 w-4" /> Back to sign in
             </a>
-          </p>
-        </CardContent>
-        <CardFooter className="justify-center">
-          <a
-            href="/login"
-            className="text-caption text-primary hover:text-primary/90 flex items-center gap-1"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to sign in
-          </a>
-        </CardFooter>
-      </Card>
-    </div>
+          </div>
+        </Panel>
+      </PanelRow>
+    </PanelPage>
   );
 }

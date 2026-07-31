@@ -18,13 +18,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getAccessToken } from "@/lib/authStore";
 import { validateDomain } from "@shared/validateDomain";
 import { cn } from "@/lib/utils";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 type Scene = "input" | "scraping" | "confirm" | "activating";
 
@@ -457,11 +457,11 @@ export default function Welcome() {
   }, [autopilot?.status, scene, newBrandId, navigate]);
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <PanelPage className="flex items-center justify-center p-6">
       {scene === "input" && (
-        <Reveal>
-          <Card className="w-full max-w-[480px]">
-            <CardContent className="p-8">
+        <Reveal className="w-full max-w-[480px]">
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
               <h1 className="text-page font-semibold tracking-tight text-foreground">
                 Let's establish your brand
               </h1>
@@ -503,15 +503,15 @@ export default function Welcome() {
                   Detection takes about 30 seconds. You'll review everything before it goes live.
                 </p>
               </div>
-            </CardContent>
-          </Card>
+            </Panel>
+          </PanelRow>
         </Reveal>
       )}
 
       {scene === "scraping" && (
-        <Reveal>
-          <Card className="w-full max-w-[560px]">
-            <CardContent className="p-8">
+        <Reveal className="w-full max-w-[560px]">
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
               <div className="flex items-center justify-between">
                 <div className="inline-flex items-center gap-2 rounded-full border bg-muted/50 px-3 py-1 text-caption font-medium text-muted-foreground">
                   <Lock className="h-3 w-3" />
@@ -582,15 +582,15 @@ export default function Welcome() {
                   </div>
                 </div>
               ) : null}
-            </CardContent>
-          </Card>
+            </Panel>
+          </PanelRow>
         </Reveal>
       )}
 
       {scene === "confirm" && scrapedData && (
-        <Reveal>
-          <Card className="w-full max-w-[720px] my-8">
-            <CardContent className="p-8">
+        <Reveal className="w-full max-w-[720px] my-8">
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
               <h2 className="text-page font-semibold tracking-tight">Confirm what we found</h2>
               <p className="mt-1 text-caption text-muted-foreground">
                 Fields tagged{" "}
@@ -798,13 +798,13 @@ export default function Welcome() {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </Panel>
+          </PanelRow>
         </Reveal>
       )}
 
       {scene === "activating" && newBrandId && (
-        <Reveal>
+        <Reveal className="w-full max-w-[560px]">
           <ActivationPanel
             brandName={editName || scrapedData?.brandName || "your brand"}
             autopilot={autopilot}
@@ -814,7 +814,7 @@ export default function Welcome() {
           />
         </Reveal>
       )}
-    </div>
+    </PanelPage>
   );
 }
 
@@ -851,8 +851,8 @@ function ActivationPanel({
       : `We're establishing how AI engines represent ${brandName}. This runs on its own.`;
 
   return (
-    <Card className="w-full max-w-[560px]">
-      <CardContent className="p-8">
+    <PanelRow cols={1} last>
+      <Panel width="wide" border="last">
         <div className="flex items-center gap-3">
           {done ? (
             <CheckCircle className="h-5 w-5 text-primary" aria-hidden="true" />
@@ -964,8 +964,8 @@ function ActivationPanel({
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </Panel>
+    </PanelRow>
   );
 }
 

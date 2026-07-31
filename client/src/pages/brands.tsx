@@ -8,7 +8,7 @@ import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import {
   Dialog,
   DialogContent,
@@ -369,10 +369,10 @@ export default function Brands() {
   }
 
   return (
-    <div className="space-y-8">
-      <Card className="mb-8 border border-border bg-card" data-testid="card-add-brand">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
+    <PanelPage>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <div className="flex items-start gap-4" data-testid="card-add-brand">
             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center shrink-0">
               <Sparkles className="w-6 h-6 text-foreground" />
             </div>
@@ -469,170 +469,168 @@ export default function Brands() {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </Panel>
+      </PanelRow>
 
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-5/6" />
+      <PanelRow cols={1} last>
+        <Panel width="wide" border="last">
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="border border-vc-default p-4">
+                  <Skeleton className="h-6 w-3/4 mb-2" />
+                  <Skeleton className="h-4 w-1/2 mb-3" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : isError ? (
-        <ErrorState
-          title="Couldn't load your brands"
-          description="We hit a problem fetching your brand list. The issue has been logged — please try again."
-          onRetry={() => refetch()}
-          isRetrying={isRefetching}
-        />
-      ) : brands && brands.length > 0 ? (
-        <>
-          <h2 className="text-ui font-semibold mb-4" data-testid="text-brands-heading">
-            Your Brands ({brands.length})
-          </h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {brands.map((brand, brandIndex) => (
-              <Card
-                key={brand.id}
-                className="hover:shadow-lg transition-shadow"
-                data-testid={`card-brand-${brand.id}`}
-                data-tour-id={brandIndex === 0 ? "brands.firstRow" : undefined}
-              >
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2">
-                        <Building2 className="h-5 w-5" />
-                        {brand.name}
-                      </CardTitle>
-                      <CardDescription>{brand.companyName}</CardDescription>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(brand)}
-                        data-testid={`button-edit-${brand.id}`}
-                        aria-label={`Edit brand ${brand.name}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <DeleteBrandDialog
-                        brandId={brand.id}
-                        brandName={brand.name}
-                        isPending={deleteMutation.isPending}
-                        onConfirm={handleDelete}
-                      />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2 text-caption text-muted-foreground">
-                    <Briefcase className="h-4 w-4" />
-                    <span>{brand.industry}</span>
-                  </div>
-                  {brand.website && (
-                    <div className="flex items-center gap-2 text-caption text-muted-foreground">
-                      <Globe className="h-4 w-4" />
-                      <a
-                        href={safeExternalHref(brand.website)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline line-clamp-2 break-all"
-                      >
-                        {brand.website}
-                      </a>
-                    </div>
-                  )}
-                  {brand.targetAudience && (
-                    <div className="flex items-center gap-2 text-caption text-muted-foreground">
-                      <Target className="h-4 w-4" />
-                      <span className="line-clamp-2">{brand.targetAudience}</span>
-                    </div>
-                  )}
-                  {brand.tone && (
-                    <div className="flex items-center gap-2 text-caption text-muted-foreground">
-                      <Megaphone className="h-4 w-4" />
-                      <span className="capitalize">{brand.tone} tone</span>
-                    </div>
-                  )}
-                  {brand.description && (
-                    <p className="text-caption text-muted-foreground line-clamp-2 pt-2 border-t">
-                      {brand.description}
-                    </p>
-                  )}
-                  {brand.products && brand.products.length > 0 && (
-                    <div className="pt-2 border-t">
-                      <p className="text-caption font-semibold mb-1">Products/Services:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {brand.products.slice(0, 3).map((product, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-caption"
-                          >
-                            {product}
-                          </span>
-                        ))}
-                        {brand.products.length > 3 && (
-                          <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-caption">
-                            +{brand.products.length - 3} more
-                          </span>
-                        )}
+              ))}
+            </div>
+          ) : isError ? (
+            <ErrorState
+              title="Couldn't load your brands"
+              description="We hit a problem fetching your brand list. The issue has been logged — please try again."
+              onRetry={() => refetch()}
+              isRetrying={isRefetching}
+            />
+          ) : brands && brands.length > 0 ? (
+            <>
+              <h2 className="text-ui font-semibold mb-4" data-testid="text-brands-heading">
+                Your Brands (<span className="tabular-nums">{brands.length}</span>)
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {brands.map((brand, brandIndex) => (
+                  <div
+                    key={brand.id}
+                    className="border border-vc-default p-4"
+                    data-testid={`card-brand-${brand.id}`}
+                    data-tour-id={brandIndex === 0 ? "brands.firstRow" : undefined}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <p className="flex items-center gap-2 text-ui font-semibold text-vc-primary">
+                          <Building2 className="h-5 w-5" />
+                          {brand.name}
+                        </p>
+                        <p className="text-caption text-vc-tertiary">{brand.companyName}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(brand)}
+                          data-testid={`button-edit-${brand.id}`}
+                          aria-label={`Edit brand ${brand.name}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <DeleteBrandDialog
+                          brandId={brand.id}
+                          brandName={brand.name}
+                          isPending={deleteMutation.isPending}
+                          onConfirm={handleDelete}
+                        />
                       </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <Card className="mt-6 border border-border bg-card" data-testid="card-next-step">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                  <Shield className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold mb-1">
-                    Next Step: Get Your Brand Cited by AI Engines
-                  </h3>
-                  <p className="text-caption text-muted-foreground">
-                    Now that your brand is set up, follow the step-by-step checklists to ensure
-                    ChatGPT, Claude, Perplexity, Gemini, Grok, and Manus AI can find and cite your
-                    brand.
-                  </p>
-                </div>
-                <Link to="/ai-visibility">
-                  <Button
-                    className="bg-primary hover:bg-primary/90 text-white gap-2 shrink-0"
-                    data-testid="button-ai-visibility"
-                  >
-                    Open Checklists
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-caption text-vc-tertiary">
+                        <Briefcase className="h-4 w-4" />
+                        <span>{brand.industry}</span>
+                      </div>
+                      {brand.website && (
+                        <div className="flex items-center gap-2 text-caption text-vc-tertiary">
+                          <Globe className="h-4 w-4" />
+                          <a
+                            href={safeExternalHref(brand.website)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline line-clamp-2 break-all"
+                          >
+                            {brand.website}
+                          </a>
+                        </div>
+                      )}
+                      {brand.targetAudience && (
+                        <div className="flex items-center gap-2 text-caption text-vc-tertiary">
+                          <Target className="h-4 w-4" />
+                          <span className="line-clamp-2">{brand.targetAudience}</span>
+                        </div>
+                      )}
+                      {brand.tone && (
+                        <div className="flex items-center gap-2 text-caption text-vc-tertiary">
+                          <Megaphone className="h-4 w-4" />
+                          <span className="capitalize">{brand.tone} tone</span>
+                        </div>
+                      )}
+                      {brand.description && (
+                        <p className="text-caption text-vc-tertiary line-clamp-2 pt-2 border-t border-vc-default">
+                          {brand.description}
+                        </p>
+                      )}
+                      {brand.products && brand.products.length > 0 && (
+                        <div className="pt-2 border-t border-vc-default">
+                          <p className="text-caption font-semibold text-vc-secondary mb-1">
+                            Products/Services:
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {brand.products.slice(0, 3).map((product, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center rounded-md bg-vc-accent-subtle px-2 py-1 text-caption"
+                              >
+                                {product}
+                              </span>
+                            ))}
+                            {brand.products.length > 3 && (
+                              <span className="inline-flex items-center rounded-md bg-vc-muted px-2 py-1 text-caption tabular-nums">
+                                +{brand.products.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        </>
-      ) : (
-        <EmptyState
-          icon={Building2}
-          title="No brands yet"
-          description="Enter your website above and we'll create your brand profile automatically. This powers all the AI optimization features in VentureCite."
-        />
-      )}
+
+              <div className="mt-6 border border-vc-default p-6" data-testid="card-next-step">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-vc-muted flex items-center justify-center shrink-0">
+                    <Shield className="w-5 h-5 text-vc-tertiary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-ui font-semibold text-vc-primary mb-1">
+                      Next Step: Get Your Brand Cited by AI Engines
+                    </h3>
+                    <p className="text-caption text-vc-tertiary">
+                      Now that your brand is set up, follow the step-by-step checklists to ensure
+                      ChatGPT, Claude, Perplexity, Gemini, Grok, and Manus AI can find and cite your
+                      brand.
+                    </p>
+                  </div>
+                  <Link to="/ai-visibility">
+                    <Button
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 shrink-0"
+                      data-testid="button-ai-visibility"
+                    >
+                      Open Checklists
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              icon={Building2}
+              title="No brands yet"
+              description="Enter your website above and we'll create your brand profile automatically. This powers all the AI optimization features in VentureCite."
+            />
+          )}
+        </Panel>
+      </PanelRow>
 
       <Dialog open={showManualForm} onOpenChange={setShowManualForm}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -703,6 +701,6 @@ export default function Brands() {
           </Form>
         </DialogContent>
       </Dialog>
-    </div>
+    </PanelPage>
   );
 }

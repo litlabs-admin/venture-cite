@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { StatusDot, type StatusDotTone } from "@/components/foundations";
 import SafeMarkdown from "@/components/SafeMarkdown";
 import { stripTrackingParams } from "@/lib/stripTrackingParams";
@@ -49,29 +48,32 @@ export default function PlatformRankingCard({
           : "Pending";
 
   return (
-    <Card className="border border-border" data-testid={`platform-card-${platform.aiPlatform}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-1.5 gap-2">
-          <span className="font-medium text-caption text-foreground">{platform.aiPlatform}</span>
-          <span className="inline-flex items-center gap-1.5 text-label uppercase tracking-wider font-semibold text-muted-foreground">
-            <StatusDot tone={statusTone} aria-label={statusText} />
-            {statusText}
-          </span>
-        </div>
+    <div
+      className="border border-vc-default rounded p-4"
+      data-testid={`platform-card-${platform.aiPlatform}`}
+    >
+      <div className="flex items-start justify-between mb-1.5 gap-2">
+        <span className="font-medium text-caption text-vc-primary">{platform.aiPlatform}</span>
+        <span className="inline-flex items-center gap-1.5 text-label uppercase tracking-wider font-semibold text-vc-tertiary">
+          <StatusDot tone={statusTone} aria-label={statusText} />
+          {statusText}
+        </span>
+      </div>
 
-        <div className={`text-page font-semibold leading-tight ${rankTone}`}>{rankText}</div>
-        <div className="text-data text-muted-foreground mb-2.5">
-          {platform.citedCount}/{platform.totalCount} cited
-        </div>
+      <div className={`text-page font-semibold leading-tight tabular-nums ${rankTone}`}>
+        {rankText}
+      </div>
+      <div className="text-data text-vc-tertiary mb-2.5 tabular-nums">
+        {platform.citedCount}/{platform.totalCount} cited
+      </div>
 
-        {hasMeasured && platform.latestSnippet ? (
-          <div className="prose prose-sm dark:prose-invert line-clamp-4 max-w-none text-caption italic leading-snug text-muted-foreground prose-p:my-0 prose-p:inline">
-            <span aria-hidden="true">&ldquo;</span>
-            <SafeMarkdown>{stripTrackingParams(platform.latestSnippet)}</SafeMarkdown>
-            <span aria-hidden="true">&rdquo;</span>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+      {hasMeasured && platform.latestSnippet ? (
+        <div className="prose prose-sm dark:prose-invert line-clamp-4 max-w-none text-caption italic leading-snug text-vc-tertiary prose-p:my-0 prose-p:inline">
+          <span aria-hidden="true">&ldquo;</span>
+          <SafeMarkdown>{stripTrackingParams(platform.latestSnippet)}</SafeMarkdown>
+          <span aria-hidden="true">&rdquo;</span>
+        </div>
+      ) : null}
+    </div>
   );
 }

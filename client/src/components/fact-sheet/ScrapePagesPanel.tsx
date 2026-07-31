@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { StatusDot, type StatusDotTone } from "@/components/foundations/StatusDot";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -207,52 +206,48 @@ export function ScrapePagesPanel({
   // While streaming: always visible. After completion: collapsed in <details>.
   if (isStreaming) {
     return (
-      <Card data-tour-id="fact-sheet.pages-panel" data-testid="scrape-pages-panel-live">
-        <CardHeader>
-          <CardTitle className="text-ui">
-            Reading pages{" "}
-            <span className="ml-2 text-caption font-normal text-muted-foreground">
-              {summary.done} done · {summary.inFlight} in flight · {summary.failed} skipped
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
+      <div data-tour-id="fact-sheet.pages-panel" data-testid="scrape-pages-panel-live">
+        <h3 className="mb-3 text-ui font-semibold">
+          Reading pages{" "}
+          <span className="ml-2 text-caption font-normal text-muted-foreground">
+            {summary.done} done · {summary.inFlight} in flight · {summary.failed} skipped
+          </span>
+        </h3>
+        <div className="overflow-x-auto">
           <PagesTable pages={pages} isStreaming={isStreaming} runStartedAt={runStartedAt} />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
-  // Post-completion: collapsed semantic <details>, summary shows count.
+  // Post-completion: collapsed semantic <details>.
   return (
-    <Card data-tour-id="fact-sheet.pages-panel" data-testid="scrape-pages-panel-collapsed">
-      <CardContent className="p-0">
-        <details className="group">
-          <summary
-            className={cn(
-              "flex cursor-pointer items-center justify-between p-4 text-caption font-medium",
-              "select-none hover:bg-accent/30 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
-            )}
-            data-testid="scrape-pages-panel-summary"
+    <div data-tour-id="fact-sheet.pages-panel" data-testid="scrape-pages-panel-collapsed">
+      <details className="group">
+        <summary
+          className={cn(
+            "flex cursor-pointer items-center justify-between py-2 text-caption font-medium",
+            "select-none hover:bg-vc-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
+          )}
+          data-testid="scrape-pages-panel-summary"
+        >
+          <span>
+            View per-page details
+            <span className="ml-2 text-caption font-normal text-muted-foreground">
+              ({summary.total} pages · {summary.done} done · {summary.failed} skipped)
+            </span>
+          </span>
+          <span
+            aria-hidden
+            className="text-caption text-muted-foreground transition-transform group-open:rotate-90"
           >
-            <span>
-              View per-page details
-              <span className="ml-2 text-caption font-normal text-muted-foreground">
-                ({summary.total} pages · {summary.done} done · {summary.failed} skipped)
-              </span>
-            </span>
-            <span
-              aria-hidden
-              className="text-caption text-muted-foreground transition-transform group-open:rotate-90"
-            >
-              ▶
-            </span>
-          </summary>
-          <div className="overflow-x-auto px-4 pb-4">
-            <PagesTable pages={pages} isStreaming={false} runStartedAt={runStartedAt} />
-          </div>
-        </details>
-      </CardContent>
-    </Card>
+            ▶
+          </span>
+        </summary>
+        <div className="overflow-x-auto pb-2">
+          <PagesTable pages={pages} isStreaming={false} runStartedAt={runStartedAt} />
+        </div>
+      </details>
+    </div>
   );
 }

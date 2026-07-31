@@ -67,7 +67,7 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="group w-full text-left rounded-lg border border-border bg-card hover:border-foreground/20 hover:shadow-sm p-3 transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          className="group w-full text-left rounded-lg border border-vc-default hover:border-vc-hover hover:bg-vc-muted/50 p-3 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="sidebar-onboarding-trigger"
         >
           <div className="flex items-center gap-2 mb-2">

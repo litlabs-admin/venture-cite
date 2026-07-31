@@ -1,5 +1,5 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight } from "lucide-react";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 const TERMS = [
   {
@@ -77,7 +77,7 @@ export default function GlossaryPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-12">
+    <PanelPage>
       {/* Title/description moved to src/routes/glossary.tsx's `head()` —
           metadata belongs to the route, not this component. The JSON-LD
           script below stays here: it's page-specific structured data, not
@@ -90,75 +90,75 @@ export default function GlossaryPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <header className="mb-10">
-        <h1 className="text-stat font-semibold tracking-tight">GEO vs AEO vs SEO</h1>
-        <p className="mt-3 text-ui text-muted-foreground">
-          Three optimization disciplines for the AI-first web. They layer — they don't compete.
-        </p>
-      </header>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <h1 className="text-page font-semibold tracking-tight text-vc-primary">
+            GEO vs AEO vs SEO
+          </h1>
+          <p className="mt-3 text-ui text-vc-tertiary">
+            Three optimization disciplines for the AI-first web. They layer — they don't compete.
+          </p>
+        </Panel>
+      </PanelRow>
 
       {TERMS.map((term) => (
-        <section
-          key={term.id}
-          id={term.id}
-          // scroll-mt-16 ensures anchor jumps don't hide the heading under
-          // any sticky header that might exist later.
-          className="mb-12 scroll-mt-16"
-        >
-          <div className="flex items-baseline gap-3 mb-4">
-            <h2 className="text-page font-semibold">{term.code}</h2>
-            <span className="text-ui text-muted-foreground">{term.name}</span>
-          </div>
+        <PanelRow key={term.id} cols={1}>
+          <Panel width="wide" border="last" label={`${term.code} — ${term.name}`}>
+            {/* Anchor target for in-page jumps from the term header above and
+                any external #hash links. scroll-mt-16 keeps the heading clear
+                of any sticky header that might exist later. */}
+            <div id={term.id} className="scroll-mt-16" />
+            <p className="text-vc-primary mb-3">{term.definition}</p>
 
-          <p className="text-foreground mb-3">{term.definition}</p>
+            <h3 className="text-caption font-semibold mt-6 mb-2 text-vc-primary">Why it matters</h3>
+            <p className="text-caption text-vc-tertiary">{term.whyItMatters}</p>
 
-          <h3 className="text-caption font-semibold mt-6 mb-2">Why it matters</h3>
-          <p className="text-caption text-muted-foreground">{term.whyItMatters}</p>
+            <h3 className="text-caption font-semibold mt-6 mb-2 text-vc-primary">
+              How VentureCite covers it
+            </h3>
+            <ul className="space-y-1.5 text-caption text-vc-tertiary list-disc list-inside">
+              {term.howVentureCiteCovers.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
 
-          <h3 className="text-caption font-semibold mt-6 mb-2">How VentureCite covers it</h3>
-          <ul className="space-y-1.5 text-caption text-muted-foreground list-disc list-inside">
-            {term.howVentureCiteCovers.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-
-          <h3 className="text-caption font-semibold mt-6 mb-2">Related pages</h3>
-          <ul className="space-y-1">
-            {term.relatedPages.map((p) => (
-              <li key={p.href}>
-                {/* Plain <a>, not wouter's <Link>: wouter's Link reads the
-                    default useLocation hook to compute its active state,
-                    which touches the global `location` object during
-                    render — that throws under SSR (no `location` global in
-                    Node) since this page renders outside any wouter
-                    <Router ssrPath=...> that could supply a server
-                    snapshot. These are outbound links to other top-level
-                    routes anyway (not in-page client transitions), so a
-                    full navigation is correct regardless. */}
-                <a
-                  href={p.href}
-                  className="inline-flex items-center text-caption text-primary hover:underline"
-                >
-                  {p.label} <ArrowRight className="h-3 w-3 ml-1" />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
+            <h3 className="text-caption font-semibold mt-6 mb-2 text-vc-primary">Related pages</h3>
+            <ul className="space-y-1">
+              {term.relatedPages.map((p) => (
+                <li key={p.href}>
+                  {/* Plain <a>, not wouter's <Link>: wouter's Link reads the
+                      default useLocation hook to compute its active state,
+                      which touches the global `location` object during
+                      render — that throws under SSR (no `location` global in
+                      Node) since this page renders outside any wouter
+                      <Router ssrPath=...> that could supply a server
+                      snapshot. These are outbound links to other top-level
+                      routes anyway (not in-page client transitions), so a
+                      full navigation is correct regardless. */}
+                  <a
+                    href={p.href}
+                    className="inline-flex items-center text-caption text-vc-accent hover:underline"
+                  >
+                    {p.label} <ArrowRight className="h-3 w-3 ml-1" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        </PanelRow>
       ))}
 
-      <Card>
-        <CardContent className="p-6">
-          <h2 className="text-ui font-semibold mb-3">How they layer</h2>
-          <p className="text-caption text-muted-foreground">
+      <PanelRow cols={1} last>
+        <Panel label="How they layer" width="wide" border="last">
+          <p className="text-caption text-vc-tertiary">
             Think of SEO as the foundation that determines whether your content can be found at all,
             AEO as the discipline of being chosen as the canonical answer in answer-engine surfaces,
             and GEO as the layer that determines whether AI assistants cite you when they're
             generating responses for users. Doing all three well compounds — neither replaces the
             others.
           </p>
-        </CardContent>
-      </Card>
-    </div>
+        </Panel>
+      </PanelRow>
+    </PanelPage>
   );
 }

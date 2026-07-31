@@ -3,7 +3,6 @@ import { useSearch, useNavigate, useRouterState } from "@tanstack/react-router";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -33,6 +32,7 @@ import HistoryTab from "@/components/citations/HistoryTab";
 import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { usePrompts, useRunPrompts, useBackfillPrompts, promptKeys } from "@/hooks/usePrompts";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 export default function Citations() {
   const { toast } = useToast();
@@ -377,13 +377,13 @@ export default function Citations() {
   ];
 
   return (
-    <div className="space-y-6">
+    <PanelPage>
       {/* Live progress banner — shown only while a citation run is in
           flight for this brand. /citation-runs/state polling feeds the
           progress %; the active-runs gate provides the gating boolean. */}
       {showBanner && headlineProgress && (
-        <Card className="border-border bg-muted">
-          <CardContent className="pt-6">
+        <PanelRow cols={1}>
+          <Panel width="wide" border="last">
             <div className="flex items-center justify-between mb-2 gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="relative flex h-2 w-2 shrink-0">
@@ -396,7 +396,7 @@ export default function Citations() {
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 {headlineProgress.totalChecks > 0 && (
-                  <span className="text-caption text-muted-foreground">
+                  <span className="text-caption text-vc-tertiary">
                     {headlineProgress.totalCited} cited / {headlineProgress.totalChecks} checks
                   </span>
                 )}
@@ -415,33 +415,41 @@ export default function Citations() {
               </div>
             </div>
             <Progress value={headlineProgress.progressPct} className="h-2" />
-          </CardContent>
-        </Card>
+          </Panel>
+        </PanelRow>
       )}
 
       {brandsLoading ? (
-        <Skeleton className="h-10 w-full" />
+        <div className="px-8 py-6">
+          <Skeleton className="h-10 w-full" />
+        </div>
       ) : brands.length === 0 ? (
-        <p className="text-muted-foreground text-caption">
-          Create a brand first to start tracking citations.
-        </p>
+        <div className="px-8 py-6">
+          <p className="text-vc-tertiary text-caption">
+            Create a brand first to start tracking citations.
+          </p>
+        </div>
       ) : !selectedBrandId ? (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <Sparkles className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="text-page font-semibold text-foreground mb-2">
-              Select a Brand to Get Started
-            </h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Choose a brand above to generate strategic citation prompts and track how AI engines
-              mention your brand.
-            </p>
-          </CardContent>
-        </Card>
+        <PanelRow cols={1} last>
+          <Panel width="wide" border="last">
+            <div className="py-16 text-center">
+              <Sparkles className="h-16 w-16 mx-auto text-vc-hover mb-4" />
+              <h3 className="text-page font-semibold text-vc-primary mb-2">
+                Select a Brand to Get Started
+              </h3>
+              <p className="text-vc-tertiary max-w-md mx-auto">
+                Choose a brand above to generate strategic citation prompts and track how AI engines
+                mention your brand.
+              </p>
+            </div>
+          </Panel>
+        </PanelRow>
       ) : (
         <>
-          {/* Tab bar + Run Check on the same row. */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border">
+          {/* Tab bar + Run Check on the same row. Tab strip is a
+              non-panel content surface — flagged per the conversion task's
+              own rule that tab strips don't fit the panel grammar. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-vc-default px-8 pt-6">
             <div className="flex gap-1" role="tablist" aria-label="Citations">
               {TABS.map((tab) => {
                 const Icon = tab.icon;
@@ -457,7 +465,7 @@ export default function Citations() {
                     className={`flex items-center gap-2 px-4 py-2.5 text-caption font-medium transition-colors border-b-2 -mb-px ${
                       isActive
                         ? "border-primary text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                        : "border-transparent text-vc-tertiary hover:text-foreground hover:border-vc-default"
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -527,7 +535,7 @@ export default function Citations() {
                       ) : (
                         <div>
                           <div className="font-medium">Re-check stored responses</div>
-                          <div className="text-caption text-muted-foreground">
+                          <div className="text-caption text-vc-tertiary">
                             Re-apply detection to old runs after adding name variations. Free — no
                             AI calls.
                           </div>
@@ -543,47 +551,57 @@ export default function Citations() {
           {/* PROMPTS TAB */}
           {activeTab === "prompts" &&
             (promptsIsError ? (
-              <ErrorState
-                title="Couldn't load prompts"
-                description="We hit an error fetching this brand's citation prompts."
-                onRetry={() => refetchPrompts()}
-                isRetrying={promptsIsRefetching}
-              />
+              <div className="px-8 py-6">
+                <ErrorState
+                  title="Couldn't load prompts"
+                  description="We hit an error fetching this brand's citation prompts."
+                  onRetry={() => refetchPrompts()}
+                  isRetrying={promptsIsRefetching}
+                />
+              </div>
             ) : (
-              <PromptsTab
-                selectedBrandId={selectedBrandId}
-                selectedBrand={selectedBrand}
-                prompts={prompts}
-                promptsLoading={promptsLoading}
-                hasPrompts={hasPrompts}
-                promptsAgeLabel={promptsAgeLabel}
-              />
+              <div className="px-8 py-6">
+                <PromptsTab
+                  selectedBrandId={selectedBrandId}
+                  selectedBrand={selectedBrand}
+                  prompts={prompts}
+                  promptsLoading={promptsLoading}
+                  hasPrompts={hasPrompts}
+                  promptsAgeLabel={promptsAgeLabel}
+                />
+              </div>
             ))}
 
           {/* RESULTS TAB */}
           {activeTab === "results" && (
-            <ResultsTab
-              selectedBrandId={selectedBrandId}
-              hasPrompts={hasPrompts}
-              runMutation={runMutation}
-            />
+            <div className="px-8 py-6">
+              <ResultsTab
+                selectedBrandId={selectedBrandId}
+                hasPrompts={hasPrompts}
+                runMutation={runMutation}
+              />
+            </div>
           )}
 
           {/* HISTORY TAB */}
-          {activeTab === "history" && <HistoryTab selectedBrandId={selectedBrandId} />}
+          {activeTab === "history" && (
+            <div className="px-8 py-6">
+              <HistoryTab selectedBrandId={selectedBrandId} />
+            </div>
+          )}
 
           {/* SCHEDULE TAB — cadence is non-configurable; see scheduler.ts */}
           {activeTab === "schedule" && (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-caption text-muted-foreground">
+            <PanelRow cols={1} last>
+              <Panel width="wide" border="last">
+                <p className="text-caption text-vc-tertiary">
                   Citation scans run weekly for every brand.
                 </p>
-              </CardContent>
-            </Card>
+              </Panel>
+            </PanelRow>
           )}
         </>
       )}
-    </div>
+    </PanelPage>
   );
 }

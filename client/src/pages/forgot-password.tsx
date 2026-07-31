@@ -3,18 +3,11 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 export default function ForgotPassword() {
   const { toast } = useToast();
@@ -55,114 +48,116 @@ export default function ForgotPassword() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
-                <CheckCircle className="h-8 w-8 text-foreground" />
+      <PanelPage className="flex items-center justify-center p-4">
+        <PanelRow cols={1} last className="w-full max-w-md">
+          <Panel width="wide" border="last">
+            <div className="text-center">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 bg-vc-muted rounded-full flex items-center justify-center">
+                  <CheckCircle className="h-8 w-8 text-vc-primary" />
+                </div>
               </div>
-            </div>
-            <CardTitle className="text-page font-semibold text-foreground">
-              Check your email
-            </CardTitle>
-            <CardDescription className="mt-2">
-              If an account exists for <span className="font-medium">{email}</span>, you'll receive
-              a password reset link shortly.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <div className="bg-muted rounded-lg p-4 mb-4">
-              <Mail className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-              <p className="text-caption text-muted-foreground">
-                Don't see the email? Check your spam folder or try again.
+              <h1 className="text-page font-semibold text-vc-primary">Check your email</h1>
+              <p className="mt-2 text-caption text-vc-tertiary">
+                If an account exists for <span className="font-medium">{email}</span>, you'll
+                receive a password reset link shortly.
               </p>
             </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setSubmitted(false);
-                setEmail("");
-              }}
-              data-testid="button-try-again"
-            >
-              Try a different email
-            </Button>
-          </CardContent>
-          <CardFooter className="justify-center">
-            <a
-              href="/login"
-              className="text-caption text-primary hover:text-primary/90 flex items-center gap-1"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back to sign in
-            </a>
-          </CardFooter>
-        </Card>
-      </div>
+            <div className="mt-6 text-center">
+              <div className="bg-vc-muted rounded-lg p-4 mb-4">
+                <Mail className="h-6 w-6 mx-auto text-vc-tertiary mb-2" />
+                <p className="text-caption text-vc-tertiary">
+                  Don't see the email? Check your spam folder or try again.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setSubmitted(false);
+                  setEmail("");
+                }}
+                data-testid="button-try-again"
+              >
+                Try a different email
+              </Button>
+            </div>
+            <div className="mt-6 flex justify-center">
+              <a
+                href="/login"
+                className="text-caption text-vc-accent hover:text-vc-accent/90 flex items-center gap-1"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to sign in
+              </a>
+            </div>
+          </Panel>
+        </PanelRow>
+      </PanelPage>
     );
   }
 
   return (
     // Title/robots moved to src/routes/_app/forgot-password.tsx's `head()`
     // — metadata belongs to the route, not this component.
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <BrandLogo imgClassName="h-12" textClassName="text-page" />
-          </div>
-          <CardTitle className="text-page font-semibold text-foreground">
-            Reset your password
-          </CardTitle>
-          <CardDescription>Enter your email and we'll send you a reset link</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {errorMessage && (
-              <Alert variant="destructive" data-testid="alert-error">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{errorMessage}</AlertDescription>
-              </Alert>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                data-testid="input-email"
-              />
+    <PanelPage className="flex items-center justify-center p-4">
+      <PanelRow cols={1} last className="w-full max-w-md">
+        <Panel width="wide" border="last">
+          <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <BrandLogo imgClassName="h-12" textClassName="text-page" />
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={forgotMutation.isPending}
-              data-testid="button-send-reset"
-            >
-              {forgotMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                "Send reset link"
+            <h1 className="text-page font-semibold text-vc-primary">Reset your password</h1>
+            <p className="mt-1 text-caption text-vc-tertiary">
+              Enter your email and we'll send you a reset link
+            </p>
+          </div>
+          <div className="mt-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {errorMessage && (
+                <Alert variant="destructive" data-testid="alert-error">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
               )}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="justify-center">
-          <a
-            href="/login"
-            className="text-caption text-primary hover:text-primary/90 flex items-center gap-1"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to sign in
-          </a>
-        </CardFooter>
-      </Card>
-    </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  data-testid="input-email"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={forgotMutation.isPending}
+                data-testid="button-send-reset"
+              >
+                {forgotMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "Send reset link"
+                )}
+              </Button>
+            </form>
+          </div>
+          <div className="mt-6 flex justify-center">
+            <a
+              href="/login"
+              className="text-caption text-vc-accent hover:text-vc-accent/90 flex items-center gap-1"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to sign in
+            </a>
+          </div>
+        </Panel>
+      </PanelRow>
+    </PanelPage>
   );
 }

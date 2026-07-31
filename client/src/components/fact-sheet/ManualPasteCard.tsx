@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -15,15 +14,15 @@ export function ManualPasteCard({ runId: _runId, onSubmit, onManualFill, busy }:
   const valid = text.length > 0 && text.length <= 50_000;
 
   return (
-    <Card data-testid="manual-paste-card">
-      <CardHeader>
-        <CardTitle>We couldn't read your site automatically</CardTitle>
-        <CardDescription>
+    <div data-testid="manual-paste-card">
+      <div className="mb-4">
+        <h3 className="text-ui font-semibold">We couldn't read your site automatically</h3>
+        <p className="mt-1 text-caption text-muted-foreground">
           Some sites block automated readers, or content is rendered in a way we can't reach. Paste
           your About text below and we'll do the rest.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
+        </p>
+      </div>
+      <div className="space-y-3">
         <Textarea
           rows={12}
           value={text}
@@ -43,7 +42,7 @@ export function ManualPasteCard({ runId: _runId, onSubmit, onManualFill, busy }:
             Or fill fields manually
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

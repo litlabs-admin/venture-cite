@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +16,12 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { safeExternalHref } from "@/lib/urlSafety";
 import { cn } from "@/lib/utils";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import {
   Bot,
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  Search,
   Globe,
   FileText,
   Copy,
@@ -155,18 +154,12 @@ export default function CrawlerCheck() {
     // client/src/pages/diagnose.tsx (no route of its own) — title/meta
     // removed per this task's blanket rule; /diagnose falls back to root
     // defaults.
-    <div className="space-y-8">
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
-            Check Website
-          </CardTitle>
-          <CardDescription>
+    <PanelPage>
+      <PanelRow cols={1}>
+        <Panel label="Check Website" width="wide" border="last">
+          <p className="mb-4 text-data text-vc-tertiary">
             Enter a website URL to check if AI crawlers have permission to access it
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
           <div className="flex gap-4 mb-4">
             <Input
               placeholder="Enter website URL (e.g., venturepr.com)"
@@ -206,30 +199,32 @@ export default function CrawlerCheck() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </Panel>
+      </PanelRow>
 
       {checkMutation.isPending && (
-        <Card>
-          <CardContent className="pt-6">
+        <PanelRow cols={1} last={!checkResult}>
+          <Panel width="wide" border="last">
             <div className="space-y-4">
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-24 w-full" />
               <Skeleton className="h-48 w-full" />
             </div>
-          </CardContent>
-        </Card>
+          </Panel>
+        </PanelRow>
       )}
 
       {checkResult && !checkMutation.isPending && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+        <>
+          <PanelRow cols={1}>
+            <Panel
+              label={
                 <span className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
+                  <Globe className="h-3.5 w-3.5" />
                   Results for {checkResult.url}
                 </span>
+              }
+              action={
                 <a
                   href={safeExternalHref(checkResult.robotsTxtUrl)}
                   target="_blank"
@@ -238,55 +233,48 @@ export default function CrawlerCheck() {
                 >
                   View robots.txt <ExternalLink className="h-3 w-3" />
                 </a>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+              }
+              width="wide"
+              border="last"
+            >
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <Card>
-                  <CardContent className="pt-4 text-center">
-                    <div
-                      className="text-stat font-semibold tabular-nums text-primary"
-                      data-testid="geo-score"
-                    >
-                      {checkResult.summary.geoScore}%
-                    </div>
-                    <p className="text-caption text-muted-foreground">GEO Access Score</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4 text-center">
-                    <div
-                      className="text-stat font-semibold tabular-nums text-foreground inline-flex items-center justify-center gap-1.5"
-                      data-testid="allowed-count"
-                    >
-                      <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-                      {checkResult.summary.allowed}
-                    </div>
-                    <p className="text-caption text-muted-foreground">Allowed</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4 text-center">
-                    <div
-                      className="text-stat font-semibold tabular-nums text-destructive"
-                      data-testid="blocked-count"
-                    >
-                      {checkResult.summary.blocked}
-                    </div>
-                    <p className="text-caption text-muted-foreground">Blocked</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4 text-center">
-                    <div
-                      className="text-stat font-semibold tabular-nums text-warning"
-                      data-testid="unknown-count"
-                    >
-                      {checkResult.summary.unknown}
-                    </div>
-                    <p className="text-caption text-muted-foreground">Unknown</p>
-                  </CardContent>
-                </Card>
+                <div className="text-center">
+                  <div
+                    className="text-stat font-semibold tabular-nums text-primary"
+                    data-testid="geo-score"
+                  >
+                    {checkResult.summary.geoScore}%
+                  </div>
+                  <p className="text-caption text-muted-foreground">GEO Access Score</p>
+                </div>
+                <div className="text-center">
+                  <div
+                    className="text-stat font-semibold tabular-nums text-foreground inline-flex items-center justify-center gap-1.5"
+                    data-testid="allowed-count"
+                  >
+                    <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+                    {checkResult.summary.allowed}
+                  </div>
+                  <p className="text-caption text-muted-foreground">Allowed</p>
+                </div>
+                <div className="text-center">
+                  <div
+                    className="text-stat font-semibold tabular-nums text-destructive"
+                    data-testid="blocked-count"
+                  >
+                    {checkResult.summary.blocked}
+                  </div>
+                  <p className="text-caption text-muted-foreground">Blocked</p>
+                </div>
+                <div className="text-center">
+                  <div
+                    className="text-stat font-semibold tabular-nums text-warning"
+                    data-testid="unknown-count"
+                  >
+                    {checkResult.summary.unknown}
+                  </div>
+                  <p className="text-caption text-muted-foreground">Unknown</p>
+                </div>
               </div>
 
               <Progress value={checkResult.summary.geoScore} className="h-3 mb-4" />
@@ -311,18 +299,21 @@ export default function CrawlerCheck() {
                   </AlertDescription>
                 </Alert>
               )}
-            </CardContent>
-          </Card>
+            </Panel>
+          </PanelRow>
 
           {checkResult.recommendations.length > 0 && (
-            <Card className="border-warning/30">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-warning">
-                  <AlertTriangle className="h-5 w-5" />
-                  Recommendations
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <PanelRow cols={1}>
+              <Panel
+                label={
+                  <span className="flex items-center gap-2 text-warning">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Recommendations
+                  </span>
+                }
+                width="wide"
+                border="last"
+              >
                 <div className="space-y-4">
                   {checkResult.recommendations.map((rec, index) => {
                     // The backend prefixes its single highest-impact line with
@@ -359,21 +350,24 @@ export default function CrawlerCheck() {
                     );
                   })}
                 </div>
-              </CardContent>
-            </Card>
+              </Panel>
+            </PanelRow>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bot className="h-5 w-5" />
-                AI Crawler Details
-              </CardTitle>
-              <CardDescription>
+          <PanelRow cols={1} last={!checkResult.rawRobotsTxt}>
+            <Panel
+              label={
+                <span className="flex items-center gap-2">
+                  <Bot className="h-3.5 w-3.5" />
+                  AI Crawler Details
+                </span>
+              }
+              width="wide"
+              border="last"
+            >
+              <p className="mb-4 text-data text-vc-tertiary">
                 Detailed status for each AI platform crawler, grouped by vendor
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
               {(() => {
                 // Group crawlers by vendor category for a cleaner UI than
                 // a flat 15-row accordion. Category order matches the
@@ -481,18 +475,21 @@ export default function CrawlerCheck() {
                   </div>
                 );
               })()}
-            </CardContent>
-          </Card>
+            </Panel>
+          </PanelRow>
 
           {checkResult.rawRobotsTxt && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Raw robots.txt Content
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <PanelRow cols={1} last>
+              <Panel
+                label={
+                  <span className="flex items-center gap-2">
+                    <FileText className="h-3.5 w-3.5" />
+                    Raw robots.txt Content
+                  </span>
+                }
+                width="wide"
+                border="last"
+              >
                 <div className="relative">
                   <pre className="p-4 bg-muted rounded-lg text-caption font-mono overflow-x-auto max-h-96 overflow-y-auto">
                     {checkResult.rawRobotsTxt}
@@ -506,11 +503,11 @@ export default function CrawlerCheck() {
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </Panel>
+            </PanelRow>
           )}
-        </div>
+        </>
       )}
-    </div>
+    </PanelPage>
   );
 }

@@ -13,7 +13,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -47,6 +46,7 @@ import DistributeDialog from "@/components/articles/DistributeDialog";
 import { AIGeneratedPill } from "@/components/AIGeneratedPill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import type { Article, Brand } from "@shared/schema";
 
 const STATUS_OPTIONS = [
@@ -234,401 +234,413 @@ export default function Articles() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        {articlesQuery.isLoading ? (
-          <div className="grid gap-4" aria-hidden="true">
-            {[0, 1, 2].map((i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <div className="flex items-start gap-3">
-                    <Skeleton className="h-4 w-4 rounded mt-1.5" />
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <Skeleton className="h-6 w-1/2" />
-                        <Skeleton className="h-5 w-16" />
+      <PanelPage>
+        <PanelRow cols={1} last>
+          <Panel width="wide" border="last">
+            {articlesQuery.isLoading ? (
+              <div className="grid gap-4" aria-hidden="true">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="rounded-vc-panel border border-vc-default bg-card">
+                    <div className="p-6">
+                      <div className="flex items-start gap-3">
+                        <Skeleton className="h-4 w-4 rounded mt-1.5" />
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <Skeleton className="h-6 w-1/2" />
+                            <Skeleton className="h-5 w-16" />
+                          </div>
+                          <Skeleton className="h-4 w-full max-w-md" />
+                        </div>
                       </div>
-                      <Skeleton className="h-4 w-full max-w-md" />
+                    </div>
+                    <div className="p-6 pt-0">
+                      <div className="flex flex-wrap items-center gap-3 mb-3">
+                        <Skeleton className="h-5 w-20" />
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <Skeleton className="h-5 w-14" />
+                        <Skeleton className="h-5 w-16" />
+                        <Skeleton className="h-5 w-12" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Skeleton className="h-8 w-20" />
+                        <Skeleton className="h-8 w-20" />
+                      </div>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap items-center gap-3 mb-3">
-                    <Skeleton className="h-5 w-20" />
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-4 w-16" />
-                  </div>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Skeleton className="h-5 w-14" />
-                    <Skeleton className="h-5 w-16" />
-                    <Skeleton className="h-5 w-12" />
-                  </div>
-                  <div className="flex gap-2">
-                    <Skeleton className="h-8 w-20" />
-                    <Skeleton className="h-8 w-20" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : articlesIsError ? (
-          <ErrorState
-            title="Couldn't load your articles"
-            onRetry={() => {
-              void refetchArticles();
-            }}
-            isRetrying={articlesIsRefetching}
-          />
-        ) : brandsIsError ? (
-          <ErrorState
-            title="Couldn't load your brands"
-            onRetry={() => {
-              void refetchBrands();
-            }}
-            isRetrying={brandsIsRefetching}
-          />
-        ) : articles.length === 0 && statusFilter === "ready" ? (
-          <EmptyState
-            icon={FileText}
-            title="No articles yet"
-            description="Generate and save content to see your articles here."
-            action={{
-              label: "Create Your First Article",
-              onClick: () => navigate({ to: "/content" }),
-              href: "/content",
-            }}
-          />
-        ) : (
-          <>
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-              <div className="relative flex-1 w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by title, excerpt, or keyword…"
-                  className="pl-9"
-                  data-testid="input-articles-search"
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-caption text-muted-foreground hover:text-foreground"
-                  >
-                    Clear
-                  </button>
-                )}
+                ))}
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-articles-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {brands.length > 1 && (
-                <Select value={brandFilter} onValueChange={setBrandFilter}>
-                  <SelectTrigger
-                    className="w-full sm:w-[200px]"
-                    data-testid="select-articles-brand"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All brands</SelectItem>
-                    {brands.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-articles-sort">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest first</SelectItem>
-                  <SelectItem value="oldest">Oldest first</SelectItem>
-                  <SelectItem value="title">Title (A–Z)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Bulk action toolbar — shown when anything is selected. */}
-            {selected.size > 0 && (
-              <div className="flex items-center justify-between p-2 px-3 border rounded-md bg-muted/50">
-                <span className="text-caption">
-                  {selected.size} selected
-                  <button
-                    onClick={() => setSelected(new Set())}
-                    className="ml-3 text-caption text-muted-foreground hover:text-foreground"
-                  >
-                    Clear
-                  </button>
-                </span>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" /> Delete selected
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete {selected.size} article(s)?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Their distribution history and revisions will also be deleted. This cannot
-                        be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => bulkDeleteMutation.mutate(Array.from(selected))}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Delete permanently
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            )}
-
-            {/* Select-all (only when there are articles to act on) */}
-            {visible.length > 0 && (
-              <div className="flex items-center gap-2 px-1">
-                <Checkbox
-                  id="select-all"
-                  checked={allVisibleSelected}
-                  onCheckedChange={toggleSelectAll}
-                />
-                <label
-                  htmlFor="select-all"
-                  className="text-caption text-muted-foreground cursor-pointer"
-                >
-                  Select all {visible.length} on this page
-                </label>
-              </div>
-            )}
-
-            {filtered.length === 0 ? (
-              <Card>
-                <CardContent className="py-10 text-center text-muted-foreground">
-                  {search ? (
-                    <>
-                      No articles match &ldquo;{search}&rdquo;.
-                      <Button
-                        variant="link"
-                        size="sm"
+            ) : articlesIsError ? (
+              <ErrorState
+                title="Couldn't load your articles"
+                onRetry={() => {
+                  void refetchArticles();
+                }}
+                isRetrying={articlesIsRefetching}
+              />
+            ) : brandsIsError ? (
+              <ErrorState
+                title="Couldn't load your brands"
+                onRetry={() => {
+                  void refetchBrands();
+                }}
+                isRetrying={brandsIsRefetching}
+              />
+            ) : articles.length === 0 && statusFilter === "ready" ? (
+              <EmptyState
+                icon={FileText}
+                title="No articles yet"
+                description="Generate and save content to see your articles here."
+                action={{
+                  label: "Create Your First Article",
+                  onClick: () => navigate({ to: "/content" }),
+                  href: "/content",
+                }}
+              />
+            ) : (
+              <>
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                  <div className="relative flex-1 w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search by title, excerpt, or keyword…"
+                      className="pl-9"
+                      data-testid="input-articles-search"
+                    />
+                    {search && (
+                      <button
                         onClick={() => setSearch("")}
-                        className="ml-2"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-caption text-muted-foreground hover:text-foreground"
                       >
-                        Clear search
-                      </Button>
-                    </>
-                  ) : (
-                    "No articles match the current filter."
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger
+                      className="w-full sm:w-[200px]"
+                      data-testid="select-articles-status"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {brands.length > 1 && (
+                    <Select value={brandFilter} onValueChange={setBrandFilter}>
+                      <SelectTrigger
+                        className="w-full sm:w-[200px]"
+                        data-testid="select-articles-brand"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All brands</SelectItem>
+                        {brands.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
-                </CardContent>
-              </Card>
-            ) : null}
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                    <SelectTrigger
+                      className="w-full sm:w-[180px]"
+                      data-testid="select-articles-sort"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Newest first</SelectItem>
+                      <SelectItem value="oldest">Oldest first</SelectItem>
+                      <SelectItem value="title">Title (A–Z)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="grid gap-4">
-              {visible.map((article, articleIndex) => {
-                const brand = article.brandId ? brandsById.get(article.brandId) : null;
-                const excerpt = deriveExcerpt(article);
-                const visibleKeywords = (article.keywords || []).slice(0, 5);
-                const overflowKeywords = (article.keywords || []).slice(5);
-                return (
-                  <Card
-                    key={article.id}
-                    data-testid={`card-article-${article.id}`}
-                    data-tour-id={articleIndex === 0 ? "articles.firstResult" : undefined}
-                  >
-                    <CardHeader>
-                      <div className="flex items-start gap-3">
-                        <Checkbox
-                          checked={selected.has(article.id)}
-                          onCheckedChange={() => toggleSelected(article.id)}
-                          className="mt-1.5"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <CardTitle
-                              className="text-page wrap-break-word"
-                              data-testid={`title-${article.id}`}
-                            >
-                              {article.title || "Untitled"}
-                            </CardTitle>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {article.aiGenerated && <AIGeneratedPill />}
-                              <StatusBadge status={article.status ?? "ready"} />
+                {/* Bulk action toolbar — shown when anything is selected. */}
+                {selected.size > 0 && (
+                  <div className="flex items-center justify-between p-2 px-3 border rounded-md bg-muted/50">
+                    <span className="text-caption">
+                      {selected.size} selected
+                      <button
+                        onClick={() => setSelected(new Set())}
+                        className="ml-3 text-caption text-muted-foreground hover:text-foreground"
+                      >
+                        Clear
+                      </button>
+                    </span>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" /> Delete selected
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete {selected.size} article(s)?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Their distribution history and revisions will also be deleted. This
+                            cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => bulkDeleteMutation.mutate(Array.from(selected))}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete permanently
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
+
+                {/* Select-all (only when there are articles to act on) */}
+                {visible.length > 0 && (
+                  <div className="flex items-center gap-2 px-1">
+                    <Checkbox
+                      id="select-all"
+                      checked={allVisibleSelected}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                    <label
+                      htmlFor="select-all"
+                      className="text-caption text-muted-foreground cursor-pointer"
+                    >
+                      Select all {visible.length} on this page
+                    </label>
+                  </div>
+                )}
+
+                {filtered.length === 0 ? (
+                  <div className="rounded-vc-panel border border-vc-default bg-card py-10 text-center text-muted-foreground">
+                    {search ? (
+                      <>
+                        No articles match &ldquo;{search}&rdquo;.
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={() => setSearch("")}
+                          className="ml-2"
+                        >
+                          Clear search
+                        </Button>
+                      </>
+                    ) : (
+                      "No articles match the current filter."
+                    )}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4">
+                  {visible.map((article, articleIndex) => {
+                    const brand = article.brandId ? brandsById.get(article.brandId) : null;
+                    const excerpt = deriveExcerpt(article);
+                    const visibleKeywords = (article.keywords || []).slice(0, 5);
+                    const overflowKeywords = (article.keywords || []).slice(5);
+                    return (
+                      <div
+                        key={article.id}
+                        data-testid={`card-article-${article.id}`}
+                        data-tour-id={articleIndex === 0 ? "articles.firstResult" : undefined}
+                        className="rounded-vc-panel border border-vc-default bg-card"
+                      >
+                        <div className="p-6">
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              checked={selected.has(article.id)}
+                              onCheckedChange={() => toggleSelected(article.id)}
+                              className="mt-1.5"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <p
+                                  className="text-page wrap-break-word"
+                                  data-testid={`title-${article.id}`}
+                                >
+                                  {article.title || "Untitled"}
+                                </p>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {article.aiGenerated && <AIGeneratedPill />}
+                                  <StatusBadge status={article.status ?? "ready"} />
+                                </div>
+                              </div>
+                              {excerpt && (
+                                <p className="text-caption text-muted-foreground line-clamp-2">
+                                  {excerpt}
+                                </p>
+                              )}
                             </div>
                           </div>
-                          {excerpt && (
-                            <p className="text-caption text-muted-foreground line-clamp-2">
-                              {excerpt}
-                            </p>
-                          )}
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap items-center gap-3 text-caption text-muted-foreground mb-3">
-                        {brand && (
-                          <Badge variant="outline" className="font-normal">
-                            {brand.name}
-                          </Badge>
-                        )}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="flex items-center gap-1 cursor-default">
-                              <Calendar className="w-4 h-4" />
-                              {formatDistanceToNow(new Date(article.createdAt), {
-                                addSuffix: true,
-                              })}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {format(new Date(article.createdAt), "PPpp")}
-                          </TooltipContent>
-                        </Tooltip>
-                        {article.viewCount > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Eye className="w-4 h-4" />
-                            {formatViewCount(article.viewCount)} views
-                          </span>
-                        )}
-                        {article.industry && (
-                          <span className="flex items-center gap-1">
-                            <Tag className="w-4 h-4" />
-                            {article.industry}
-                          </span>
-                        )}
-                      </div>
-
-                      {visibleKeywords.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {visibleKeywords.map((kw, idx) => (
-                            <Badge key={idx} variant="outline" className="text-caption">
-                              {kw}
-                            </Badge>
-                          ))}
-                          {overflowKeywords.length > 0 && (
+                        <div className="p-6 pt-0">
+                          <div className="flex flex-wrap items-center gap-3 text-caption text-muted-foreground mb-3">
+                            {brand && (
+                              <Badge variant="outline" className="font-normal">
+                                {brand.name}
+                              </Badge>
+                            )}
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Badge variant="secondary" className="text-caption cursor-default">
-                                  +{overflowKeywords.length} more
-                                </Badge>
+                                <span className="flex items-center gap-1 cursor-default">
+                                  <Calendar className="w-4 h-4" />
+                                  {formatDistanceToNow(new Date(article.createdAt), {
+                                    addSuffix: true,
+                                  })}
+                                </span>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <div className="max-w-xs flex flex-wrap gap-1">
-                                  {overflowKeywords.map((kw, idx) => (
-                                    <span
-                                      key={idx}
-                                      className="text-label bg-muted px-1.5 py-0.5 rounded"
-                                    >
-                                      {kw}
-                                    </span>
-                                  ))}
-                                </div>
+                                {format(new Date(article.createdAt), "PPpp")}
                               </TooltipContent>
                             </Tooltip>
-                          )}
-                        </div>
-                      )}
+                            {article.viewCount > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Eye className="w-4 h-4" />
+                                {formatViewCount(article.viewCount)} views
+                              </span>
+                            )}
+                            {article.industry && (
+                              <span className="flex items-center gap-1">
+                                <Tag className="w-4 h-4" />
+                                {article.industry}
+                              </span>
+                            )}
+                          </div>
 
-                      <div className="flex gap-2 flex-wrap">
-                        <ViewEditDialog
-                          article={article}
-                          autoOpen={editId === article.id}
-                          onAutoOpenHandled={() => navigate({ to: "/articles", replace: true })}
-                        />
-                        {article.status === "ready" && (
-                          <DistributeDialog
-                            articleId={article.id}
-                            aiGenerated={article.aiGenerated}
-                          />
-                        )}
-                        {article.status === "draft" && (
-                          <Link to="/content/$articleId" params={{ articleId: article.id }}>
-                            <Button variant="outline" size="sm">
-                              Continue draft
-                            </Button>
-                          </Link>
-                        )}
-                        {article.status === "failed" && (
-                          <Link to="/content/$articleId" params={{ articleId: article.id }}>
-                            <Button variant="outline" size="sm">
-                              Retry generation
-                            </Button>
-                          </Link>
-                        )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" /> Delete
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete article?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete &quot;{article.title || "Untitled"}
-                                &quot; along with its revisions and distribution history. This
-                                cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteMutation.mutate(article.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete permanently
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                          {visibleKeywords.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              {visibleKeywords.map((kw, idx) => (
+                                <Badge key={idx} variant="outline" className="text-caption">
+                                  {kw}
+                                </Badge>
+                              ))}
+                              {overflowKeywords.length > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-caption cursor-default"
+                                    >
+                                      +{overflowKeywords.length} more
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="max-w-xs flex flex-wrap gap-1">
+                                      {overflowKeywords.map((kw, idx) => (
+                                        <span
+                                          key={idx}
+                                          className="text-label bg-muted px-1.5 py-0.5 rounded"
+                                        >
+                                          {kw}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex gap-2 flex-wrap">
+                            <ViewEditDialog
+                              article={article}
+                              autoOpen={editId === article.id}
+                              onAutoOpenHandled={() => navigate({ to: "/articles", replace: true })}
+                            />
+                            {article.status === "ready" && (
+                              <DistributeDialog
+                                articleId={article.id}
+                                aiGenerated={article.aiGenerated}
+                              />
+                            )}
+                            {article.status === "draft" && (
+                              <Link to="/content/$articleId" params={{ articleId: article.id }}>
+                                <Button variant="outline" size="sm">
+                                  Continue draft
+                                </Button>
+                              </Link>
+                            )}
+                            {article.status === "failed" && (
+                              <Link to="/content/$articleId" params={{ articleId: article.id }}>
+                                <Button variant="outline" size="sm">
+                                  Retry generation
+                                </Button>
+                              </Link>
+                            )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" /> Delete
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete article?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete &quot;{article.title || "Untitled"}
+                                    &quot; along with its revisions and distribution history. This
+                                    cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteMutation.mutate(article.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete permanently
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-            {hasMore && (
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
-                  className="text-caption text-primary hover:underline"
-                  data-testid="button-load-more-articles"
-                >
-                  Load {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more
-                  {" · "}
-                  <span className="text-muted-foreground">
-                    showing {visibleCount} of {filtered.length}
-                  </span>
-                </button>
-              </div>
+                    );
+                  })}
+                </div>
+                {hasMore && (
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+                      className="text-caption text-primary hover:underline"
+                      data-testid="button-load-more-articles"
+                    >
+                      Load {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more
+                      {" · "}
+                      <span className="text-muted-foreground">
+                        showing {visibleCount} of {filtered.length}
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
+          </Panel>
+        </PanelRow>
+      </PanelPage>
     </TooltipProvider>
   );
 }

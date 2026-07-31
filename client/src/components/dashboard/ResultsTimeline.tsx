@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { PanelLabel } from "@/components/dashboard-panels/primitives";
 import { CheckCircle2, Circle } from "lucide-react";
 
 // Locked copy for the 4 milestones in the GEO results timeline. Thresholds
@@ -79,7 +79,7 @@ export default function ResultsTimeline({ compact = false }: { compact?: boolean
 
   if (compact) {
     return (
-      <p className="text-caption text-muted-foreground px-1">
+      <p className="text-caption text-vc-tertiary px-1">
         {current.label} — {current.description} First AI citations typically appear 1–2 weeks after
         publish.
       </p>
@@ -87,54 +87,50 @@ export default function ResultsTimeline({ compact = false }: { compact?: boolean
   }
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <h2 className="text-ui font-semibold mb-4">What to expect</h2>
+    <div>
+      <PanelLabel>What to expect</PanelLabel>
 
-        <ol className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          {MILESTONES.map((m, i) => {
-            const done = i < currentIdx;
-            const current = i === currentIdx;
-            const baseClasses = "rounded-md border p-3 flex flex-col gap-1 transition-colors";
-            const stateClasses = current
-              ? "border-primary bg-primary/5"
-              : done
-                ? "border-muted bg-muted/30 text-muted-foreground"
-                : "border-border bg-card";
-            return (
-              <li
-                key={m.label}
-                className={`${baseClasses} ${stateClasses}`}
-                // Tag the current milestone so tests + downstream code can
-                // locate it without relying on visual styling.
-                data-testid={current ? "current-week" : undefined}
-              >
-                <div className="flex items-center gap-2">
-                  {done ? (
-                    <CheckCircle2 className="h-4 w-4 text-positive" aria-hidden="true" />
-                  ) : (
-                    <Circle
-                      className={"h-4 w-4 " + (current ? "text-primary" : "text-muted-foreground")}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span
-                    className={"text-caption font-medium " + (current ? "text-foreground" : "")}
-                  >
-                    {m.label}
-                  </span>
-                </div>
-                <p className="text-caption leading-snug">{m.description}</p>
-              </li>
-            );
-          })}
-        </ol>
+      <ol className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+        {MILESTONES.map((m, i) => {
+          const done = i < currentIdx;
+          const current = i === currentIdx;
+          const baseClasses = "rounded-md border p-3 flex flex-col gap-1 transition-colors";
+          const stateClasses = current
+            ? "border-vc-accent bg-vc-accent-subtle"
+            : done
+              ? "border-vc-default bg-vc-muted/30 text-vc-tertiary"
+              : "border-vc-default bg-vc-surface";
+          return (
+            <li
+              key={m.label}
+              className={`${baseClasses} ${stateClasses}`}
+              // Tag the current milestone so tests + downstream code can
+              // locate it without relying on visual styling.
+              data-testid={current ? "current-week" : undefined}
+            >
+              <div className="flex items-center gap-2">
+                {done ? (
+                  <CheckCircle2 className="h-4 w-4 text-positive" aria-hidden="true" />
+                ) : (
+                  <Circle
+                    className={"h-4 w-4 " + (current ? "text-vc-accent" : "text-vc-tertiary")}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className={"text-caption font-medium " + (current ? "text-vc-primary" : "")}>
+                  {m.label}
+                </span>
+              </div>
+              <p className="text-caption leading-snug">{m.description}</p>
+            </li>
+          );
+        })}
+      </ol>
 
-        <p className="text-caption text-muted-foreground mt-4">
-          AI engines re-index new content on their own schedule &mdash; first citations typically
-          appear 1&ndash;2 weeks after a publish.
-        </p>
-      </CardContent>
-    </Card>
+      <p className="text-caption text-vc-tertiary mt-4">
+        AI engines re-index new content on their own schedule &mdash; first citations typically
+        appear 1&ndash;2 weeks after a publish.
+      </p>
+    </div>
   );
 }

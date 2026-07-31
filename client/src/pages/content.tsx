@@ -24,7 +24,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useRouterState, useSearch } from "@tanstack/react-router";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -63,6 +62,7 @@ import { StatusDot } from "@/components/foundations/StatusDot";
 import { ErrorState } from "@/components/ui/error-state";
 import { useToast } from "@/hooks/use-toast";
 import { useArticleAutoSave } from "@/hooks/useArticleAutoSave";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import type { Article, Brand } from "@shared/schema";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -590,13 +590,17 @@ export default function Content() {
   if (brandsIsError) {
     return (
       <TooltipProvider>
-        <div className="space-y-8">
-          <ErrorState
-            title="Couldn't load your brands"
-            onRetry={() => refetchBrands()}
-            isRetrying={brandsIsRefetching}
-          />
-        </div>
+        <PanelPage>
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
+              <ErrorState
+                title="Couldn't load your brands"
+                onRetry={() => refetchBrands()}
+                isRetrying={brandsIsRefetching}
+              />
+            </Panel>
+          </PanelRow>
+        </PanelPage>
       </TooltipProvider>
     );
   }
@@ -604,13 +608,17 @@ export default function Content() {
   if (draftsIsError) {
     return (
       <TooltipProvider>
-        <div className="space-y-8">
-          <ErrorState
-            title="Couldn't load your drafts"
-            onRetry={() => refetchDrafts()}
-            isRetrying={draftsIsRefetching}
-          />
-        </div>
+        <PanelPage>
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
+              <ErrorState
+                title="Couldn't load your drafts"
+                onRetry={() => refetchDrafts()}
+                isRetrying={draftsIsRefetching}
+              />
+            </Panel>
+          </PanelRow>
+        </PanelPage>
       </TooltipProvider>
     );
   }
@@ -618,49 +626,53 @@ export default function Content() {
   if (brandsData && brands.length === 0) {
     return (
       <TooltipProvider>
-        <div className="space-y-8">
-          <EmptyState
-            title="Add a brand first"
-            description="Articles are tied to a brand so AI-citation tracking can attribute the result correctly."
-            action={{
-              label: "Add a brand",
-              onClick: () => navigate({ to: "/brands" }),
-              href: "/brands",
-            }}
-          />
-        </div>
+        <PanelPage>
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
+              <EmptyState
+                title="Add a brand first"
+                description="Articles are tied to a brand so AI-citation tracking can attribute the result correctly."
+                action={{
+                  label: "Add a brand",
+                  onClick: () => navigate({ to: "/brands" }),
+                  href: "/brands",
+                }}
+              />
+            </Panel>
+          </PanelRow>
+        </PanelPage>
       </TooltipProvider>
     );
   }
 
   if (!article) {
     return (
-      <div className="space-y-8" aria-hidden="true">
-        <Skeleton className="h-10 w-full max-w-sm" />
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-40" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-56" />
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
-            </CardContent>
-          </Card>
-        </div>
+      <div aria-hidden="true">
+        <PanelPage>
+          <div className="px-8 py-6">
+            <Skeleton className="h-10 w-full max-w-sm" />
+          </div>
+          <PanelRow cols={2} last>
+            <Panel width="wide">
+              <Skeleton className="h-6 w-40 mb-4" />
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </Panel>
+            <Panel width="wide" border="last">
+              <Skeleton className="h-6 w-56 mb-4" />
+              <div className="space-y-2">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </div>
+            </Panel>
+          </PanelRow>
+        </PanelPage>
       </div>
     );
   }
@@ -681,67 +693,77 @@ export default function Content() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-8">
-        <DraftToolbar
-          drafts={drafts}
-          activeDraftId={article.id}
-          onNewArticle={() => newArticleMutation.mutate()}
-          onLoadDraft={(d) => goToArticle(d.id)}
-          onDeleteDraft={(id) => setPendingDeleteId(id)}
-        />
+      <PanelPage>
+        <div className="px-8 py-6 space-y-6">
+          <DraftToolbar
+            drafts={drafts}
+            activeDraftId={article.id}
+            onNewArticle={() => newArticleMutation.mutate()}
+            onLoadDraft={(d) => goToArticle(d.id)}
+            onDeleteDraft={(id) => setPendingDeleteId(id)}
+          />
 
-        <BeginnerTips />
+          <BeginnerTips />
 
-        {usageData?.success && usageData.data && <UsageWidget data={usageData.data} />}
+          {usageData?.success && usageData.data && <UsageWidget data={usageData.data} />}
+        </div>
 
         {article.status === "ready" ? (
-          <ReadyEditor
-            article={article}
-            content={contentDraft}
-            onContentChange={(next) => {
-              userEditedContent.current = true;
-              setContentDraft(next);
-            }}
-          />
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
+              <ReadyEditor
+                article={article}
+                content={contentDraft}
+                onContentChange={(next) => {
+                  userEditedContent.current = true;
+                  setContentDraft(next);
+                }}
+              />
+            </Panel>
+          </PanelRow>
         ) : article.status === "generating" ? (
-          <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-6">
-            <div className="flex items-center gap-3">
-              <StatusDot tone="pending" aria-label="Generating" />
-              <p className="text-caption font-medium text-muted-foreground">
-                Generating ({elapsedSeconds}s)
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="ml-auto"
-                onClick={() => article && cancelMutation.mutate(article.id)}
-                disabled={cancelMutation.isPending}
-                data-testid="cancel-generation-button"
-              >
-                Cancel
-              </Button>
-            </div>
+          <PanelRow cols={1} last>
+            <Panel width="wide" border="last">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <StatusDot tone="pending" aria-label="Generating" />
+                  <p className="text-caption font-medium text-muted-foreground">
+                    Generating ({elapsedSeconds}s)
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto"
+                    onClick={() => article && cancelMutation.mutate(article.id)}
+                    disabled={cancelMutation.isPending}
+                    data-testid="cancel-generation-button"
+                  >
+                    Cancel
+                  </Button>
+                </div>
 
-            <div className="space-y-3">
-              {[{ lines: 3 }, { lines: 4 }, { lines: 5 }, { lines: 3 }].map((section, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="h-5 w-1/3 animate-pulse rounded bg-muted" />
-                  {Array.from({ length: section.lines }).map((_, j) => (
-                    <div
-                      key={j}
-                      className="h-3 animate-pulse rounded bg-muted/60"
-                      style={{ width: `${60 + ((i + j) % 4) * 8}%` }}
-                    />
+                <div className="space-y-3">
+                  {[{ lines: 3 }, { lines: 4 }, { lines: 5 }, { lines: 3 }].map((section, i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="h-5 w-1/3 animate-pulse rounded bg-muted" />
+                      {Array.from({ length: section.lines }).map((_, j) => (
+                        <div
+                          key={j}
+                          className="h-3 animate-pulse rounded bg-muted/60"
+                          style={{ width: `${60 + ((i + j) % 4) * 8}%` }}
+                        />
+                      ))}
+                    </div>
                   ))}
                 </div>
-              ))}
-            </div>
 
-            <p className="text-caption text-muted-foreground">
-              Generating your article. This may take 30-90 seconds. You can leave this page —
-              generation will continue and you can return to see the finished article.
-            </p>
-          </div>
+                <p className="text-caption text-muted-foreground">
+                  Generating your article. This may take 30-90 seconds. You can leave this page —
+                  generation will continue and you can return to see the finished article.
+                </p>
+              </div>
+            </Panel>
+          </PanelRow>
         ) : (
           <DraftForm
             brands={brands}
@@ -804,7 +826,7 @@ export default function Content() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </PanelPage>
     </TooltipProvider>
   );
 }
@@ -821,27 +843,23 @@ function ReadyEditor({
   onContentChange: (next: string) => void;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 flex-wrap min-w-0">
-            <span className="truncate">{article.title || "Untitled"}</span>
-            {article.aiGenerated && <AIGeneratedPill />}
-          </span>
-          <Link to="/articles" search={{ edit: article.id }}>
-            <Button variant="outline" size="sm">
-              Open in Articles
-            </Button>
-          </Link>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <MarkdownEditor value={content} onChange={onContentChange} />
-        <p className="text-caption text-muted-foreground mt-3">
-          Edits auto-save. Open in Articles for Auto-Improve, version history, and distribution.
-        </p>
-      </CardContent>
-    </Card>
+    <>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 flex-wrap min-w-0 text-page">
+          <span className="truncate">{article.title || "Untitled"}</span>
+          {article.aiGenerated && <AIGeneratedPill />}
+        </span>
+        <Link to="/articles" search={{ edit: article.id }}>
+          <Button variant="outline" size="sm">
+            Open in Articles
+          </Button>
+        </Link>
+      </div>
+      <MarkdownEditor value={content} onChange={onContentChange} />
+      <p className="text-caption text-muted-foreground mt-3">
+        Edits auto-save. Open in Articles for Auto-Improve, version history, and distribution.
+      </p>
+    </>
   );
 }
 
@@ -918,12 +936,9 @@ function DraftForm(props: DraftFormProps) {
   );
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>Content Generator</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <PanelRow cols={2} last>
+      <Panel label="Content Generator" width="wide">
+        <div className="space-y-4">
           {errorBanner && (
             <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-caption text-destructive">
               {errorBanner}
@@ -1200,65 +1215,66 @@ function DraftForm(props: DraftFormProps) {
                     : ""}
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {industry && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                Popular Topics in {industry}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onRefreshTopics}
-                disabled={popularTopicsLoading}
-              >
-                {popularTopicsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Refresh"}
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {popularTopicsLoading ? (
-              <div className="flex items-center gap-2 text-caption text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" /> Loading…
-              </div>
-            ) : popularTopics.length === 0 ? (
-              <p className="text-caption text-muted-foreground">
-                No popular topics for this industry yet.
-              </p>
-            ) : (
-              <div className="grid gap-2">
-                {popularTopics.map((topic, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      const exists = keywords.some(
-                        (k) => k.toLowerCase() === topic.topic.toLowerCase(),
-                      );
-                      if (!exists) setKeywords([...keywords, topic.topic]);
-                    }}
-                    className="flex items-start gap-3 p-3 text-left bg-muted hover:bg-muted/70 rounded-lg transition-colors"
-                  >
-                    <Plus className="w-4 h-4 text-muted-foreground mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-caption">{topic.topic}</h4>
-                      {topic.description && (
-                        <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
-                          {topic.description}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <Panel
+          label={
+            <span className="flex items-center gap-2">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Popular Topics in {industry}
+            </span>
+          }
+          action={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRefreshTopics}
+              disabled={popularTopicsLoading}
+            >
+              {popularTopicsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Refresh"}
+            </Button>
+          }
+          width="wide"
+          border="last"
+        >
+          {popularTopicsLoading ? (
+            <div className="flex items-center gap-2 text-caption text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+            </div>
+          ) : popularTopics.length === 0 ? (
+            <p className="text-caption text-muted-foreground">
+              No popular topics for this industry yet.
+            </p>
+          ) : (
+            <div className="grid gap-2">
+              {popularTopics.map((topic, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    const exists = keywords.some(
+                      (k) => k.toLowerCase() === topic.topic.toLowerCase(),
+                    );
+                    if (!exists) setKeywords([...keywords, topic.topic]);
+                  }}
+                  className="flex items-start gap-3 p-3 text-left bg-muted hover:bg-muted/70 rounded-lg transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-muted-foreground mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-caption">{topic.topic}</h4>
+                    {topic.description && (
+                      <p className="text-caption text-muted-foreground mt-1 line-clamp-2">
+                        {topic.description}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </Panel>
       )}
-    </div>
+    </PanelRow>
   );
 }

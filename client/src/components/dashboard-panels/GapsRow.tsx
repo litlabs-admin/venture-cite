@@ -29,7 +29,13 @@ function cellStyle(alpha: number) {
     // CSS Color 4 slash syntax. Comma-form rgba() silently drops the whole
     // declaration when fed a single space-separated var().
     backgroundColor: `rgb(var(--brand-accent-rgb) / ${alpha})`,
-    color: alpha >= 0.4 ? "#fff" : "var(--foreground)",
+    // --brand-accent-fg, not a literal white. The chip is the accent at alpha
+    // over the page canvas, so in DARK it resolves LIGHT (dark's accent is the
+    // pale periwinkle #7f9bff) and white-on-light would be unreadable. That
+    // token is the designed label colour for exactly this surface: white in
+    // light, near-black in dark — see index.css's note that dark "inverts the
+    // label to near-black" because the accent cannot carry white at AA.
+    color: alpha >= 0.4 ? "var(--brand-accent-fg)" : "var(--foreground)",
   };
 }
 

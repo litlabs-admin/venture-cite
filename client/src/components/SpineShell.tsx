@@ -55,22 +55,35 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
   };
 
   return (
-    <Tabs value={active} onValueChange={setTab} className="space-y-4">
-      {/* sticky so the Monitor/Diagnose/Act/Report stage tabs stay
-          on-screen when the user scrolls into a long page body.
-          Without this, child sticky toolbars (e.g. the article picker
-          on the Signals page) had nothing to anchor against and looked
-          orphaned at the top of the viewport. backdrop-blur keeps the
-          underlying scroll visible so the sticky element doesn't feel
-          like a hard banner. */}
+    <Tabs value={active} onValueChange={setTab}>
+      {/* Full-bleed tab band. This is the shared chrome above 13 pages across
+          four stage routes, so it sets the grammar those pages sit in: a
+          hairline-bounded strip flush to the viewport edge, no rounded pill,
+          no gap between triggers — separation is a 1px rule, same as every
+          panel row on the Dashboard.
+
+          Still sticky, for the original reason: without it, child sticky
+          toolbars (e.g. the article picker on the Signals page) have nothing
+          to anchor against and look orphaned at the top of the viewport.
+          `bg-vc-surface` rather than a translucent blur — the panel grammar
+          has no frosted layers, and a solid band keeps the hairline crisp
+          while content scrolls beneath it. */}
       <TabsList
-        className="grid h-auto w-full gap-1 sticky top-0 z-20 bg-background/95 backdrop-blur"
+        className="grid h-auto w-full gap-0 rounded-none border-b border-vc-default bg-vc-surface p-0 sticky top-0 z-20"
         style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
       >
         {tabs.map((t) => {
           const Icon = t.icon;
           return (
-            <TabsTrigger key={t.value} value={t.value} data-tour-id={t.tourId} className="w-full">
+            <TabsTrigger
+              key={t.value}
+              value={t.value}
+              data-tour-id={t.tourId}
+              // Underline-on-active, not a filled pill: a pill needs a radius
+              // and a fill, and this surface has neither. The 2px inset
+              // bottom border sits on the band's own hairline.
+              className="w-full rounded-none border-b-2 border-transparent px-4 py-3 text-caption text-vc-tertiary shadow-none transition-colors hover:text-vc-primary data-[state=active]:border-vc-accent data-[state=active]:bg-transparent data-[state=active]:text-vc-primary data-[state=active]:shadow-none"
+            >
               <Icon className="mr-2 h-4 w-4 shrink-0" />
               <span className="truncate">{t.label}</span>
             </TabsTrigger>
@@ -89,7 +102,7 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
           // attention colour and this isn't an attention case.
           <div
             key={`${t.value}-desc`}
-            className="flex items-center gap-2 text-caption text-muted-foreground"
+            className="flex items-center gap-2 border-b border-vc-default px-8 py-3 text-caption text-vc-tertiary"
           >
             <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
             <p>{t.description}</p>

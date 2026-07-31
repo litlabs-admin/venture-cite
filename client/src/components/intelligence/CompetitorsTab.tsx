@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +17,7 @@ import { BarChart3, Eye, Plus, Users, Trash2 } from "lucide-react";
 import type { Competitor } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { PanelLabel, NoValue } from "@/components/dashboard-panels/primitives";
 
 interface LeaderboardEntry {
   name: string;
@@ -198,192 +198,184 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
         </Dialog>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3 mb-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-caption font-medium text-muted-foreground">
-              Competitors Tracked
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-stat font-semibold" data-testid="stat-competitor-count">
-              {leaderboardMeta?.totalTracked ?? competitorsList.length}
+      <div className="grid grid-cols-1 border border-vc-default sm:grid-cols-3 mb-4">
+        <div className="border-b border-vc-default px-4 py-4 sm:border-b-0 sm:border-r">
+          <PanelLabel>Competitors Tracked</PanelLabel>
+          <div
+            className="mt-2 text-stat font-semibold tabular-nums"
+            data-testid="stat-competitor-count"
+          >
+            {leaderboardMeta?.totalTracked ?? competitorsList.length}
+          </div>
+          {leaderboardMeta && (
+            <div className="text-caption text-muted-foreground mt-1">
+              {leaderboardMeta.withActivity} with activity in last 30d
             </div>
-            {leaderboardMeta && (
-              <div className="text-caption text-muted-foreground mt-1">
-                {leaderboardMeta.withActivity} with activity in last 30d
-              </div>
+          )}
+        </div>
+        <div className="border-b border-vc-default px-4 py-4 sm:border-b-0 sm:border-r">
+          <PanelLabel>Leaderboard Entries</PanelLabel>
+          <div
+            className="mt-2 text-stat font-semibold tabular-nums"
+            data-testid="stat-leaderboard-count"
+          >
+            {leaderboard.length}
+          </div>
+        </div>
+        <div className="px-4 py-4">
+          <PanelLabel>Your Ranking</PanelLabel>
+          <div
+            className="mt-2 text-stat font-semibold tabular-nums text-primary"
+            data-testid="stat-your-rank"
+          >
+            {leaderboard.findIndex((e) => e.isOwn) >= 0 ? (
+              `#${leaderboard.findIndex((e) => e.isOwn) + 1}`
+            ) : (
+              <NoValue />
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-caption font-medium text-muted-foreground">
-              Leaderboard Entries
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-stat font-semibold" data-testid="stat-leaderboard-count">
-              {leaderboard.length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-caption font-medium text-muted-foreground">
-              Your Ranking
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-stat font-semibold text-primary" data-testid="stat-your-rank">
-              {leaderboard.findIndex((e) => e.isOwn) >= 0
-                ? `#${leaderboard.findIndex((e) => e.isOwn) + 1}`
-                : "—"}
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Your Competitors
-            </CardTitle>
-            <CardDescription>Companies you're tracking for AI citation comparison</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {competitorsLoading ? (
-              <div className="space-y-3" aria-hidden="true">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
-                  >
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-40" />
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                    <Skeleton className="h-8 w-8 rounded-md shrink-0" />
+        <div className="border border-vc-default">
+          <div className="border-b border-vc-default px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-vc-tertiary" />
+              <PanelLabel>Your Competitors</PanelLabel>
+            </div>
+            <p className="mt-1 text-caption text-muted-foreground">
+              Companies you're tracking for AI citation comparison
+            </p>
+          </div>
+          {competitorsLoading ? (
+            <div aria-hidden="true">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between px-4 py-3 border-b border-vc-default last:border-b-0"
+                >
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-40" />
+                    <Skeleton className="h-4 w-16" />
                   </div>
-                ))}
-              </div>
-            ) : competitorsList.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="font-medium mb-1">No competitors added yet</p>
-                <p className="text-caption">
-                  Add competitors to start comparing your AI visibility against theirs
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {competitorsList.map((comp) => (
-                  <div
-                    key={comp.id}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
-                    data-testid={`competitor-item-${comp.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div
-                        className="font-medium truncate"
-                        data-testid={`text-comp-name-${comp.id}`}
-                      >
-                        {comp.name}
-                      </div>
-                      <div className="text-caption text-muted-foreground flex items-center gap-1">
-                        <Eye className="w-3 h-3" />
-                        <span className="truncate">{comp.domain}</span>
-                      </div>
-                      {comp.industry && (
-                        <Badge variant="outline" className="text-caption mt-1">
-                          {comp.industry}
-                        </Badge>
-                      )}
+                  <Skeleton className="h-8 w-8 rounded-md shrink-0" />
+                </div>
+              ))}
+            </div>
+          ) : competitorsList.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="font-medium mb-1">No competitors added yet</p>
+              <p className="text-caption">
+                Add competitors to start comparing your AI visibility against theirs
+              </p>
+            </div>
+          ) : (
+            <div>
+              {competitorsList.map((comp) => (
+                <div
+                  key={comp.id}
+                  className="flex items-center justify-between px-4 py-3 border-b border-vc-default last:border-b-0 transition-colors hover:bg-vc-muted/50"
+                  data-testid={`competitor-item-${comp.id}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate" data-testid={`text-comp-name-${comp.id}`}>
+                      {comp.name}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteCompetitorMutation.mutate(comp.id)}
-                      className="text-muted-foreground hover:text-destructive shrink-0"
-                      data-testid={`button-delete-comp-${comp.id}`}
-                      aria-label={`Delete competitor ${comp.name}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="text-caption text-muted-foreground flex items-center gap-1">
+                      <Eye className="w-3 h-3" />
+                      <span className="truncate">{comp.domain}</span>
+                    </div>
+                    {comp.industry && (
+                      <Badge variant="outline" className="text-caption mt-1">
+                        {comp.industry}
+                      </Badge>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteCompetitorMutation.mutate(comp.id)}
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    data-testid={`button-delete-comp-${comp.id}`}
+                    aria-label={`Delete competitor ${comp.name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
-              Citation Leaderboard
-            </CardTitle>
-            <CardDescription>How you rank vs competitors across AI platforms</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {leaderboardLoading ? (
-              <div className="space-y-2" aria-hidden="true">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30"
-                  >
-                    <Skeleton className="h-6 w-8 shrink-0" />
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <Skeleton className="h-4 w-28" />
-                      <Skeleton className="h-3 w-20" />
-                    </div>
-                    <div className="text-right space-y-2">
-                      <Skeleton className="h-5 w-10 ml-auto" />
-                      <Skeleton className="h-3 w-14 ml-auto" />
-                    </div>
+        <div className="border border-vc-default">
+          <div className="border-b border-vc-default px-4 py-3">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-vc-tertiary" />
+              <PanelLabel>Citation Leaderboard</PanelLabel>
+            </div>
+            <p className="mt-1 text-caption text-muted-foreground">
+              How you rank vs competitors across AI platforms
+            </p>
+          </div>
+          {leaderboardLoading ? (
+            <div aria-hidden="true">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 px-4 py-3 border-b border-vc-default last:border-b-0"
+                >
+                  <Skeleton className="h-6 w-8 shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-20" />
                   </div>
-                ))}
-              </div>
-            ) : leaderboard.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="font-medium mb-1">No leaderboard data</p>
-                <p className="text-caption">Add competitors and record citations to see rankings</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {leaderboard.map((entry, index) => (
-                  <div
-                    key={`${entry.domain}-${index}`}
-                    className={`flex items-center gap-3 p-3 rounded-lg border ${
-                      entry.isOwn ? "bg-primary/5 border-primary/30" : "bg-muted/30"
-                    }`}
-                    data-testid={`leaderboard-entry-${index}`}
-                  >
-                    <span className="text-ui font-semibold w-8 text-center text-muted-foreground">
-                      {index + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate">{entry.name}</span>
-                        {entry.isOwn && <Badge className="text-caption">You</Badge>}
-                      </div>
-                      <span className="text-caption text-muted-foreground">{entry.domain}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-page font-semibold">{entry.totalCitations}</div>
-                      <div className="text-caption text-muted-foreground">citations</div>
-                    </div>
+                  <div className="text-right space-y-2">
+                    <Skeleton className="h-5 w-10 ml-auto" />
+                    <Skeleton className="h-3 w-14 ml-auto" />
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              ))}
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="font-medium mb-1">No leaderboard data</p>
+              <p className="text-caption">Add competitors and record citations to see rankings</p>
+            </div>
+          ) : (
+            <div>
+              {leaderboard.map((entry, index) => (
+                <div
+                  key={`${entry.domain}-${index}`}
+                  className={`flex items-center gap-3 px-4 py-3 border-b border-vc-default last:border-b-0 transition-colors hover:bg-vc-muted/50 ${
+                    entry.isOwn ? "bg-primary/5" : ""
+                  }`}
+                  data-testid={`leaderboard-entry-${index}`}
+                >
+                  <span className="text-ui font-semibold w-8 text-center tabular-nums text-muted-foreground">
+                    {index + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{entry.name}</span>
+                      {entry.isOwn && <Badge className="text-caption">You</Badge>}
+                    </div>
+                    <span className="text-caption text-muted-foreground">{entry.domain}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-page font-semibold tabular-nums">
+                      {entry.totalCitations}
+                    </div>
+                    <div className="text-caption text-muted-foreground">citations</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

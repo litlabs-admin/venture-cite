@@ -1,22 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Link, useSearch } from "@tanstack/react-router";
 import { apiRequest } from "@/lib/queryClient";
 import { isAllowedStripeRedirect } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
 import { Check, ArrowLeft, Sparkles, Crown, Zap, Users, Gift, Loader2 } from "lucide-react";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 interface StripeProduct {
   id: string;
@@ -154,12 +146,12 @@ export default function Pricing() {
     // (not under `_app`, which is ssr:false). Title/meta come from that
     // route's `head()` — this component renders none of its own, per the
     // project's "metadata belongs to the route" rule.
-    <div className="min-h-screen bg-muted/30">
-      <div className="container mx-auto px-4 py-12">
+    <PanelPage>
+      <div className="px-8 py-6 max-w-5xl mx-auto">
         <div className="mb-8">
           <Link
             to="/"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+            className="inline-flex items-center text-caption text-vc-tertiary hover:text-vc-primary mb-4"
             data-testid="link-back"
           >
             <ArrowLeft className="w-4 h-4 mr-1" /> Back to Home
@@ -184,19 +176,22 @@ export default function Pricing() {
         )}
 
         <div className="text-center mb-12">
-          <Badge className="mb-4 bg-muted text-muted-foreground hover:bg-muted">
+          <Badge className="mb-4 bg-vc-muted text-vc-tertiary hover:bg-vc-muted">
             <Sparkles className="w-3 h-3 mr-1" /> Launch Pricing
           </Badge>
-          <h1 className="text-4xl font-bold mb-4" data-testid="text-page-title">
+          <h1
+            className="text-page font-semibold text-vc-primary mb-4"
+            data-testid="text-page-title"
+          >
             Choose Your GEO Plan
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-ui text-vc-tertiary max-w-2xl mx-auto">
             Optimize your brand's visibility in AI search engines with our comprehensive GEO
             platform
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 mb-12 max-w-5xl mx-auto">
+        <PanelRow cols={3} className="mb-12">
           {(products.length > 0
             ? products.map((product, idx) => ({
                 name: product.name,
@@ -212,105 +207,111 @@ export default function Pricing() {
               }))
             : defaultPlans
           ).map((plan, idx) => (
-            <Card
-              key={plan.name}
-              className={`relative ${plan.popular ? "border-2 border-primary shadow-lg scale-105" : ""}`}
-              data-testid={`pricing-card-${plan.name.toLowerCase()}`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary">
-                    <Crown className="w-3 h-3 mr-1" /> Most Popular
-                  </Badge>
+            <div key={plan.name} data-testid={`pricing-card-${plan.name.toLowerCase()}`}>
+              <Panel
+                width="narrow"
+                border={idx === 2 ? "last" : "row"}
+                className={`relative ${plan.popular ? "ring-2 ring-vc-accent" : ""}`}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge className="bg-vc-accent">
+                      <Crown className="w-3 h-3 mr-1" /> Most Popular
+                    </Badge>
+                  </div>
+                )}
+                <div className="text-center pb-2">
+                  <h2 className="text-page font-semibold text-vc-primary">{plan.name}</h2>
+                  <p className="text-caption text-vc-tertiary">{plan.description}</p>
                 </div>
-              )}
-              <CardHeader className="text-center pb-2">
-                <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                <CardDescription>{plan.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="text-center">
-                <div className="mb-6">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  <span className="text-muted-foreground">/{plan.interval}</span>
+                <div className="text-center">
+                  <div className="mb-6">
+                    <span className="text-stat font-semibold tabular-nums text-vc-primary">
+                      {plan.price}
+                    </span>
+                    <span className="text-caption text-vc-tertiary">/{plan.interval}</span>
+                  </div>
+                  <ul className="space-y-3 text-left">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <Check className="w-5 h-5 text-positive shrink-0 mt-0.5" />
+                        <span className="text-data text-vc-secondary">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="space-y-3 text-left">
-                  {plan.features.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <Check className="w-5 h-5 text-positive shrink-0 mt-0.5" />
-                      <span className="text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-              <CardFooter>
-                <Button
-                  // No bg override. The `default` variant rests as an accent
-                  // TINT with accent-coloured label and only goes solid on
-                  // hover; forcing `bg-primary` here repainted the background
-                  // solid while leaving the label accent-blue, i.e. blue text
-                  // on a blue fill — invisible. The popular plan is already
-                  // distinguished by its ring, scale and "Most Popular" badge.
-                  className="w-full"
-                  variant={plan.popular ? "default" : "outline"}
-                  // Behaviour is driven by TIER first, then by price
-                  // availability. It used to check `plan.priceId` first, which
-                  // was harmless only while Stripe returned no products: the
-                  // moment real products load (i.e. the moment billing goes
-                  // live) every tier that has a price went straight to
-                  // checkout — including Free, which would open a $0/month
-                  // subscription instead of signing the visitor up, and
-                  // Enterprise, whose button says "Contact Sales" but would
-                  // have immediately charged $249/month.
-                  onClick={() => {
-                    if (plan.tier === "free") {
-                      // Free is an account, not a purchase. Never route it
-                      // through Checkout even though it has a $0 price object.
-                      window.location.href = "/register";
-                      return;
-                    }
-                    if ("priceId" in plan && plan.priceId) {
-                      checkoutMutation.mutate(plan.priceId);
-                      return;
-                    }
-                    toast({
-                      title: "This plan isn't available for self-serve checkout yet.",
-                      description: "Please contact us and we'll get you set up.",
-                    });
-                  }}
-                  disabled={checkoutMutation.isPending}
-                  data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
-                >
-                  {checkoutMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  {/* The label must describe what the button actually does.
+                <div className="mt-6">
+                  <Button
+                    // No bg override. The `default` variant rests as an accent
+                    // TINT with accent-coloured label and only goes solid on
+                    // hover; forcing `bg-primary` here repainted the background
+                    // solid while leaving the label accent-blue, i.e. blue text
+                    // on a blue fill — invisible. The popular plan is already
+                    // distinguished by its ring, scale and "Most Popular" badge.
+                    className="w-full"
+                    variant={plan.popular ? "default" : "outline"}
+                    // Behaviour is driven by TIER first, then by price
+                    // availability. It used to check `plan.priceId` first, which
+                    // was harmless only while Stripe returned no products: the
+                    // moment real products load (i.e. the moment billing goes
+                    // live) every tier that has a price went straight to
+                    // checkout — including Free, which would open a $0/month
+                    // subscription instead of signing the visitor up, and
+                    // Enterprise, whose button says "Contact Sales" but would
+                    // have immediately charged $249/month.
+                    onClick={() => {
+                      if (plan.tier === "free") {
+                        // Free is an account, not a purchase. Never route it
+                        // through Checkout even though it has a $0 price object.
+                        window.location.href = "/register";
+                        return;
+                      }
+                      if ("priceId" in plan && plan.priceId) {
+                        checkoutMutation.mutate(plan.priceId);
+                        return;
+                      }
+                      toast({
+                        title: "This plan isn't available for self-serve checkout yet.",
+                        description: "Please contact us and we'll get you set up.",
+                      });
+                    }}
+                    disabled={checkoutMutation.isPending}
+                    data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
+                  >
+                    {checkoutMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    {/* The label must describe what the button actually does.
                       Enterprise previously read "Contact Sales" while wired
                       to Checkout — a $249/month charge behind a button that
                       promises a conversation. It has a real, active price in
                       Stripe, so self-serve is honest; if you'd rather this be
                       sales-led, the fix is to give it its own branch above
                       (contact link) rather than to change this label back. */}
-                  {plan.tier === "free"
-                    ? "Get Started"
-                    : "priceId" in plan && plan.priceId
-                      ? "Subscribe"
-                      : "Contact Sales"}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-
-        <Card className="max-w-md mx-auto">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-2">
-              <Gift className="w-6 h-6 text-muted-foreground" />
+                    {plan.tier === "free"
+                      ? "Get Started"
+                      : "priceId" in plan && plan.priceId
+                        ? "Subscribe"
+                        : "Contact Sales"}
+                  </Button>
+                </div>
+              </Panel>
             </div>
-            <CardTitle>Have a Beta Invite Code?</CardTitle>
-            <CardDescription>Enter your code to unlock beta access for free</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
+          ))}
+        </PanelRow>
+
+        <PanelRow cols={1} className="max-w-md mx-auto">
+          <Panel width="wide" border="last">
+            <div className="text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-vc-muted flex items-center justify-center mb-2">
+                <Gift className="w-6 h-6 text-vc-tertiary" />
+              </div>
+              <h2 className="text-page font-semibold text-vc-primary">Have a Beta Invite Code?</h2>
+              <p className="text-caption text-vc-tertiary">
+                Enter your code to unlock beta access for free
+              </p>
+            </div>
+            <div className="mt-4 flex gap-2">
               <Input
                 placeholder="Enter invite code"
                 value={betaCode}
@@ -330,12 +331,12 @@ export default function Pricing() {
                 )}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </Panel>
+        </PanelRow>
 
         <div className="mt-16 text-center">
-          <h3 className="text-xl font-semibold mb-4">Trusted by Leading Brands</h3>
-          <p className="text-muted-foreground mb-8">
+          <h3 className="text-ui font-semibold text-vc-primary mb-4">Trusted by Leading Brands</h3>
+          <p className="text-caption text-vc-tertiary mb-8">
             Join hundreds of companies optimizing their AI search visibility
           </p>
           <div className="flex justify-center gap-8 flex-wrap opacity-50">
@@ -345,6 +346,6 @@ export default function Pricing() {
           </div>
         </div>
       </div>
-    </div>
+    </PanelPage>
   );
 }

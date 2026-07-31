@@ -27,7 +27,7 @@ const RANGES = [
 ] as const;
 type RangeKey = (typeof RANGES)[number]["key"];
 
-const ACCENT = "#3b5bf6";
+const ACCENT = "var(--brand-accent)";
 
 function fmtDay(iso: string) {
   const d = new Date(iso);
@@ -45,7 +45,7 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded border border-vc-default bg-white px-3 py-2 shadow-vc-overlay">
+    <div className="rounded border border-vc-default bg-vc-surface px-3 py-2 shadow-vc-overlay">
       <p className="mb-0.5 text-label text-vc-tertiary">{label ? fmtDay(label) : ""}</p>
       <p className="font-mono text-body font-semibold tabular-nums text-vc-primary">
         {payload[0].value}
@@ -76,7 +76,7 @@ export function VisibilityChart({
         <div className="flex items-center gap-2">
           <PanelLabel>Visibility over time</PanelLabel>
         </div>
-        <fieldset className="inline-flex h-7 items-center rounded border border-vc-default bg-white p-0.5">
+        <fieldset className="inline-flex h-7 items-center rounded border border-vc-default bg-vc-surface p-0.5">
           <legend className="sr-only">Visibility chart date range</legend>
           {RANGES.map((r) => (
             <label
@@ -121,20 +121,28 @@ export function VisibilityChart({
                   <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#f5f5f4" vertical={false} />
+              <CartesianGrid stroke="var(--bg-surface-1)" vertical={false} />
               <XAxis
                 dataKey="date"
                 tickFormatter={fmtDay}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fontSize: 10, fontFamily: "JetBrains Mono, monospace", fill: "#a8a29e" }}
+                tick={{
+                  fontSize: 10,
+                  fontFamily: "JetBrains Mono, monospace",
+                  fill: "var(--fg-disabled)",
+                }}
                 minTickGap={32}
               />
               <YAxis
                 tickLine={false}
                 axisLine={false}
                 width={44}
-                tick={{ fontSize: 10, fontFamily: "JetBrains Mono, monospace", fill: "#a8a29e" }}
+                tick={{
+                  fontSize: 10,
+                  fontFamily: "JetBrains Mono, monospace",
+                  fill: "var(--fg-disabled)",
+                }}
                 // Auto-fit with headroom, like the reference — a fixed 0–100
                 // axis flattens real movement into an unreadable line.
                 domain={[
@@ -142,7 +150,7 @@ export function VisibilityChart({
                   (max: number) => Math.min(100, Math.ceil((max + 5) / 5) * 5),
                 ]}
               />
-              <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#e7e5e4" }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ stroke: "var(--border-default)" }} />
               <Area
                 type="monotone"
                 dataKey="value"
@@ -150,7 +158,7 @@ export function VisibilityChart({
                 strokeWidth={1.5}
                 fill="url(#ccVisGrad)"
                 dot={false}
-                activeDot={{ r: 3, fill: ACCENT, stroke: "#fff", strokeWidth: 1.5 }}
+                activeDot={{ r: 3, fill: ACCENT, stroke: "var(--bg-surface-2)", strokeWidth: 1.5 }}
               />
             </AreaChart>
           </ResponsiveContainer>

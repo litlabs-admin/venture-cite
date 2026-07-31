@@ -3,7 +3,6 @@ import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { usePromptHistory, usePromptRunDetails, type CitationRunEntry } from "@/hooks/usePrompts";
 import { useInspector } from "@/components/AppShell";
 import PromptDetail from "./PromptDetail";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Accordion,
@@ -41,6 +40,7 @@ import {
 import { PlatformResultCard, type PlatformResult } from "./PlatformResultCard";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { chartTheme } from "@/lib/chartTheme";
+import { PanelLabel } from "@/components/dashboard-panels/primitives";
 
 type ChartFilter = "auto" | "manual" | "re-detect" | "all";
 type DateFilter = "7" | "30" | "90" | "all";
@@ -161,48 +161,48 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
     <>
       {/* Citation rate trend chart */}
       {filteredHistory.length >= 2 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-ui flex items-center gap-2">
+        <div className="border-b border-vc-default pb-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <PanelLabel>
+                <span className="inline-flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
                   Citation Rate Over Time
-                </CardTitle>
-                <CardDescription>
-                  {filteredHistory.length} runs in window. Failed and re-detect runs are excluded
-                  from the line. Times shown in your local timezone.
-                </CardDescription>
-              </div>
-              {/* Wave 9: filter dropdowns. Default = "auto" (scheduled
-                  runs only) so the trend is apples-to-apples. */}
-              <div className="flex gap-2 shrink-0">
-                <Select value={chartFilter} onValueChange={(v) => setChartFilter(v as ChartFilter)}>
-                  <SelectTrigger className="w-[130px] h-8 text-caption">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Scheduled only</SelectItem>
-                    <SelectItem value="manual">Manual only</SelectItem>
-                    <SelectItem value="re-detect">Re-detect only</SelectItem>
-                    <SelectItem value="all">All triggers</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as DateFilter)}>
-                  <SelectTrigger className="w-[110px] h-8 text-caption">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7">Last 7 days</SelectItem>
-                    <SelectItem value="30">Last 30 days</SelectItem>
-                    <SelectItem value="90">Last 90 days</SelectItem>
-                    <SelectItem value="all">All time</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                </span>
+              </PanelLabel>
+              <p className="mt-1 text-caption text-vc-tertiary">
+                {filteredHistory.length} runs in window. Failed and re-detect runs are excluded from
+                the line. Times shown in your local timezone.
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
+            {/* Wave 9: filter dropdowns. Default = "auto" (scheduled
+                runs only) so the trend is apples-to-apples. */}
+            <div className="flex gap-2 shrink-0">
+              <Select value={chartFilter} onValueChange={(v) => setChartFilter(v as ChartFilter)}>
+                <SelectTrigger className="w-[130px] h-8 text-caption">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Scheduled only</SelectItem>
+                  <SelectItem value="manual">Manual only</SelectItem>
+                  <SelectItem value="re-detect">Re-detect only</SelectItem>
+                  <SelectItem value="all">All triggers</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as DateFilter)}>
+                <SelectTrigger className="w-[110px] h-8 text-caption">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="all">All time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="mt-3">
             <div className="h-[240px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
@@ -290,21 +290,23 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Run history as expandable rows */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-ui flex items-center gap-2">
+      <div>
+        <PanelLabel>
+          <span className="inline-flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Run History
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </span>
+        </PanelLabel>
+        <div className="mt-3">
           <TooltipProvider delayDuration={150}>
-            <div className="space-y-2">
+            <div>
+              {/* List rows: hairline separation, no radius, hover highlight —
+                  replaces the previous space-y-2 rounded-card rows. */}
               {visibleRuns.map((run, i) => {
                 const prev = filteredHistory[i + 1];
                 const delta = prev ? run.citationRate - prev.citationRate : 0;
@@ -316,22 +318,22 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                 const statusMeta = STATUS_META[status] ?? STATUS_META.succeeded;
 
                 return (
-                  <div key={run.id} className="overflow-hidden rounded">
+                  <div key={run.id} className="border-b border-vc-default last:border-b-0">
                     <button
                       type="button"
                       onClick={() => setExpandedRunId(isExpanded ? null : run.id)}
-                      className="w-full flex items-center gap-3 px-2 py-2.5 text-left rounded hover:bg-muted/40 transition-colors"
+                      className="w-full flex items-center gap-3 px-2 py-2.5 text-left hover:bg-vc-muted/50 transition-colors"
                     >
                       {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <ChevronDown className="h-4 w-4 text-vc-hover shrink-0" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <ChevronRight className="h-4 w-4 text-vc-hover shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-caption">
                           {format(new Date(run.startedAt), "MMM d, yyyy")}
                         </span>
-                        <span className="text-caption text-muted-foreground ml-2">
+                        <span className="text-caption text-vc-tertiary ml-2">
                           {format(new Date(run.startedAt), "h:mm a")}
                         </span>
                       </div>
@@ -346,7 +348,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                             {delta > 0 ? `+${delta}` : delta}%
                           </span>
                         )}
-                        <span className="text-caption text-muted-foreground">
+                        <span className="text-caption text-vc-tertiary tabular-nums">
                           {run.totalCited}/{run.totalChecks}
                         </span>
                         <Badge variant="outline" className="text-caption">
@@ -358,7 +360,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span
-                                className="inline-flex items-center gap-1.5 text-caption text-muted-foreground"
+                                className="inline-flex items-center gap-1.5 text-caption text-vc-tertiary"
                                 data-testid={`status-badge-${run.id}`}
                               >
                                 <StatusDot tone={statusMeta.tone} aria-label={statusMeta.label} />
@@ -398,7 +400,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                     </button>
 
                     {isExpanded && (
-                      <div className="border-t border-border px-2 py-4 bg-muted/20">
+                      <div className="border-t border-vc-default px-2 py-4 bg-vc-muted/20">
                         {(() => {
                           // Wave 9: cache-first render — re-opening a
                           // previously-fetched run is instant.
@@ -407,8 +409,8 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                           if (!cached && runDetailLoading) {
                             return (
                               <div className="flex items-center justify-center py-8">
-                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                <span className="ml-2 text-caption text-muted-foreground">
+                                <Loader2 className="h-5 w-5 animate-spin text-vc-hover" />
+                                <span className="ml-2 text-caption text-vc-tertiary">
                                   Loading run details...
                                 </span>
                               </div>
@@ -416,7 +418,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                           }
                           if (!detail?.byPrompt) {
                             return (
-                              <p className="text-caption text-muted-foreground text-center py-4">
+                              <p className="text-caption text-vc-tertiary text-center py-4">
                                 No detail data available for this run.
                               </p>
                             );
@@ -497,23 +499,21 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
               >
                 Load {Math.min(PAGE_SIZE, filteredHistory.length - visibleCount)} more
                 {" · "}
-                <span className="text-muted-foreground">
+                <span className="text-vc-tertiary">
                   showing {visibleCount} of {filteredHistory.length}
                 </span>
               </button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </>
   ) : (
-    <Card>
-      <CardContent className="py-12 text-center">
-        <Calendar className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-        <p className="text-muted-foreground">
-          No run history yet. Run a citation check to start tracking trends.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="py-12 text-center">
+      <Calendar className="h-12 w-12 mx-auto text-vc-hover mb-3" />
+      <p className="text-vc-tertiary">
+        No run history yet. Run a citation check to start tracking trends.
+      </p>
+    </div>
   );
 }

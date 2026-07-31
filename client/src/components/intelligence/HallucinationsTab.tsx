@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,6 +24,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { safeExternalHref } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "@tanstack/react-router";
+import { Panel, PanelRow } from "@/components/dashboard-panels/Panel";
 
 const SEVERITY_RANK: Record<string, number> = {
   critical: 0,
@@ -180,109 +180,97 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-label font-medium uppercase tracking-wider text-muted-foreground">
-              Total Detected
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className="tnum text-stat font-semibold leading-none text-foreground"
-              data-testid="stat-total-hallucinations"
-            >
-              {halStats.total}
-            </div>
-            <p className="mt-1.5 text-caption text-muted-foreground">inaccuracies found</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-label font-medium uppercase tracking-wider text-muted-foreground">
-              Resolved
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className="tnum text-stat font-semibold leading-none text-(--positive)"
-              data-testid="stat-resolved"
-            >
-              {halStats.resolved}
-            </div>
-            <p className="mt-1.5 text-caption text-muted-foreground">
-              {halStats.total > 0
-                ? `${((halStats.resolved / halStats.total) * 100).toFixed(0)}% resolution rate`
-                : "no issues yet"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-label font-medium uppercase tracking-wider text-muted-foreground">
-              Critical Issues
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className="tnum text-stat font-semibold leading-none text-(--negative)"
-              data-testid="stat-critical"
-            >
-              {halStats.bySeverity?.critical || 0}
-            </div>
-            <p className="mt-1.5 text-caption text-muted-foreground">need immediate attention</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-label font-medium uppercase tracking-wider text-muted-foreground">
-              Brand Facts
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className="tnum text-stat font-semibold leading-none text-foreground"
-              data-testid="stat-facts"
-            >
-              {facts.length}
-            </div>
-            <p className="mt-1.5 text-caption text-muted-foreground">verified facts stored</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="min-w-0">
-          <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5" />
-                  Detected Hallucinations
-                </CardTitle>
-                <CardDescription>
-                  AI claims that don&apos;t match your brand facts. The platform badge shows which
-                  AI engine made the claim.
-                </CardDescription>
+      <PanelRow cols={1}>
+        <Panel width="wide" border="last">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 md:grid-cols-4">
+            <div>
+              <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
+                Total Detected
+              </p>
+              <div
+                className="tabular-nums text-stat font-semibold leading-none text-foreground"
+                data-testid="stat-total-hallucinations"
+              >
+                {halStats.total}
               </div>
-              <Select value={severityFilter} onValueChange={setSeverityFilter}>
-                <SelectTrigger className="w-40" data-testid="select-severity-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All severities</SelectItem>
-                  <SelectItem value="critical">Critical only</SelectItem>
-                  <SelectItem value="high">High only</SelectItem>
-                  <SelectItem value="medium">Medium only</SelectItem>
-                  <SelectItem value="low">Low only</SelectItem>
-                </SelectContent>
-              </Select>
+              <p className="mt-1.5 text-caption text-muted-foreground">inaccuracies found</p>
             </div>
-          </CardHeader>
-          <CardContent>
+
+            <div>
+              <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
+                Resolved
+              </p>
+              <div
+                className="tabular-nums text-stat font-semibold leading-none text-(--positive)"
+                data-testid="stat-resolved"
+              >
+                {halStats.resolved}
+              </div>
+              <p className="mt-1.5 text-caption text-muted-foreground">
+                {halStats.total > 0
+                  ? `${((halStats.resolved / halStats.total) * 100).toFixed(0)}% resolution rate`
+                  : "no issues yet"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
+                Critical Issues
+              </p>
+              <div
+                className="tabular-nums text-stat font-semibold leading-none text-(--negative)"
+                data-testid="stat-critical"
+              >
+                {halStats.bySeverity?.critical || 0}
+              </div>
+              <p className="mt-1.5 text-caption text-muted-foreground">need immediate attention</p>
+            </div>
+
+            <div>
+              <p className="text-label font-medium uppercase tracking-wider text-muted-foreground">
+                Brand Facts
+              </p>
+              <div
+                className="tabular-nums text-stat font-semibold leading-none text-foreground"
+                data-testid="stat-facts"
+              >
+                {facts.length}
+              </div>
+              <p className="mt-1.5 text-caption text-muted-foreground">verified facts stored</p>
+            </div>
+          </div>
+        </Panel>
+      </PanelRow>
+
+      <PanelRow cols={2}>
+        <Panel
+          width="wide"
+          label={
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Detected Hallucinations
+            </span>
+          }
+          action={
+            <Select value={severityFilter} onValueChange={setSeverityFilter}>
+              <SelectTrigger className="w-40" data-testid="select-severity-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All severities</SelectItem>
+                <SelectItem value="critical">Critical only</SelectItem>
+                <SelectItem value="high">High only</SelectItem>
+                <SelectItem value="medium">Medium only</SelectItem>
+                <SelectItem value="low">Low only</SelectItem>
+              </SelectContent>
+            </Select>
+          }
+        >
+          <div className="min-w-0">
+            <p className="mb-4 text-data text-muted-foreground">
+              AI claims that don&apos;t match your brand facts. The platform badge shows which AI
+              engine made the claim.
+            </p>
             {factSheetTooSmall && (
               <div
                 className="mb-4 flex items-start gap-2 rounded-md border border-(--warning)/20 bg-(--warning)/10 p-3 text-caption text-(--warning)"
@@ -373,7 +361,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                             </Badge>
                           )}
                           {seenCount && seenCount > 1 && (
-                            <span className="tnum text-data text-muted-foreground">
+                            <span className="tabular-nums text-data text-muted-foreground">
                               · seen {seenCount}×
                             </span>
                           )}
@@ -487,18 +475,23 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Panel
+          width="wide"
+          border="last"
+          label={
+            <span className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
               Brand Fact Sheet
-            </CardTitle>
-            <CardDescription>Your source of truth for AI verification</CardDescription>
-          </CardHeader>
-          <CardContent>
+            </span>
+          }
+        >
+          <div className="min-w-0">
+            <p className="mb-4 text-data text-muted-foreground">
+              Your source of truth for AI verification
+            </p>
             {facts.length === 0 ? (
               <div className="text-center py-8">
                 <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
@@ -536,9 +529,9 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </Panel>
+      </PanelRow>
     </>
   );
 }

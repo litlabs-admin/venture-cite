@@ -82,7 +82,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-vc-page">
       {/* data-tour-id values are literal build-gate targets — scripts/
           verify-tour-targets.ts greps for these exact strings and fails the
           build if a registered tour step has nothing to point at. */}

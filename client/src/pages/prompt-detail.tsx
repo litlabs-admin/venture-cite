@@ -89,21 +89,28 @@ function ScoreChart({ series }: { series: { at: string; score: number }[] }) {
     >
       <defs>
         <linearGradient id="pdGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3b5bf6" stopOpacity="0.14" />
-          <stop offset="100%" stopColor="#3b5bf6" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--brand-accent)" stopOpacity="0.14" />
+          <stop offset="100%" stopColor="var(--brand-accent)" stopOpacity="0" />
         </linearGradient>
       </defs>
       {[0, 50, 100].map((v) => {
         const y = pad.t + ih - (v / 100) * ih;
         return (
           <g key={v}>
-            <line x1={pad.l} x2={w - pad.r} y1={y} y2={y} stroke="#f5f5f4" strokeWidth="1" />
+            <line
+              x1={pad.l}
+              x2={w - pad.r}
+              y1={y}
+              y2={y}
+              stroke="var(--bg-surface-1)"
+              strokeWidth="1"
+            />
             <text
               x={pad.l - 6}
               y={y + 3}
               textAnchor="end"
               fontSize="10"
-              fill="#a8a29e"
+              fill="var(--fg-disabled)"
               fontFamily="JetBrains Mono, monospace"
             >
               {v}
@@ -112,13 +119,25 @@ function ScoreChart({ series }: { series: { at: string; score: number }[] }) {
         );
       })}
       <path d={area} fill="url(#pdGrad)" />
-      <path d={line} fill="none" stroke="#3b5bf6" strokeWidth="1.5" strokeLinejoin="round" />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--brand-accent)"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
       {pts.map((p) => (
-        <circle key={p.at} cx={p.x} cy={p.y} r="2.5" fill="#3b5bf6">
+        <circle key={p.at} cx={p.x} cy={p.y} r="2.5" fill="var(--brand-accent)">
           <title>{`${fmt(p.at)} — ${p.score}`}</title>
         </circle>
       ))}
-      <text x={pad.l} y={h - 6} fontSize="10" fill="#a8a29e" fontFamily="JetBrains Mono, monospace">
+      <text
+        x={pad.l}
+        y={h - 6}
+        fontSize="10"
+        fill="var(--fg-disabled)"
+        fontFamily="JetBrains Mono, monospace"
+      >
         {fmt(pts[0].at)}
       </text>
       <text
@@ -126,7 +145,7 @@ function ScoreChart({ series }: { series: { at: string; score: number }[] }) {
         y={h - 6}
         textAnchor="end"
         fontSize="10"
-        fill="#a8a29e"
+        fill="var(--fg-disabled)"
         fontFamily="JetBrains Mono, monospace"
       >
         {fmt(pts[pts.length - 1].at)}
@@ -172,7 +191,7 @@ export default function PromptDetailPage() {
   }, [history, range]);
 
   if (promptsLoading) {
-    return <div className="h-screen bg-white" />;
+    return <div className="h-screen bg-vc-page" />;
   }
 
   if (!prompt) {
@@ -201,9 +220,9 @@ export default function PromptDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-vc-page">
       {/* Top bar */}
-      <div className="sticky top-0 z-20 border-b border-vc-default bg-white">
+      <div className="sticky top-0 z-20 border-b border-vc-default bg-vc-surface">
         <div className="flex h-[56px] items-center justify-between gap-3 px-8">
           <Link
             to="/monitor"
@@ -283,7 +302,7 @@ export default function PromptDetailPage() {
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-flex h-6 items-center gap-1.5 rounded border border-vc-default bg-white px-2">
+          <span className="inline-flex h-6 items-center gap-1.5 rounded border border-vc-default bg-vc-surface px-2">
             <span
               className={`h-1.5 w-1.5 rounded-full ${
                 prompt.status === "tracked" ? "bg-vc-accent" : "bg-vc-hover"
@@ -303,7 +322,7 @@ export default function PromptDetailPage() {
           <section className="border-b border-vc-default px-8 py-6">
             <div className="flex items-center justify-between">
               <h3 className={SECTION_LABEL}>Visibility</h3>
-              <div className="inline-flex h-7 items-center rounded border border-vc-default bg-white p-0.5">
+              <div className="inline-flex h-7 items-center rounded border border-vc-default bg-vc-surface p-0.5">
                 {RANGES.map((r) => (
                   <button
                     key={r.key}
@@ -456,7 +475,7 @@ export default function PromptDetailPage() {
                       </div>
                       <div>
                         {pl.rank ? (
-                          <span className="inline-flex h-5 min-w-[30px] items-center justify-center rounded border border-vc-default bg-white px-1.5 text-data font-semibold tabular-nums text-vc-secondary">
+                          <span className="inline-flex h-5 min-w-[30px] items-center justify-center rounded border border-vc-default bg-vc-surface px-1.5 text-data font-semibold tabular-nums text-vc-secondary">
                             #{pl.rank}
                           </span>
                         ) : pl.isCited ? (

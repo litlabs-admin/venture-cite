@@ -1,6 +1,5 @@
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,6 +22,7 @@ import type { KeywordResearch } from "@shared/schema";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import {
   Search,
   Sparkles,
@@ -179,298 +179,307 @@ export default function KeywordResearchPage() {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Title/description moved to src/routes/_app/keyword-research.tsx's
-          `head()` — metadata belongs to the route, not this component. */}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <Card className="lg:col-span-1">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-caption text-muted-foreground flex items-center gap-2">
-              <Filter className="h-4 w-4" />
+    // Title/description moved to src/routes/_app/keyword-research.tsx's
+    // `head()` — metadata belongs to the route, not this component.
+    <PanelPage>
+      <PanelRow cols={3}>
+        <Panel
+          label={
+            <span className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5" />
               Filter Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger data-testid="select-status-filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" data-testid="filter-all">
-                  All Keywords
-                </SelectItem>
-                <SelectItem value="discovered" data-testid="filter-discovered">
-                  Discovered
-                </SelectItem>
-                <SelectItem value="targeted" data-testid="filter-targeted">
-                  Targeted
-                </SelectItem>
-                <SelectItem value="content_created" data-testid="filter-content-created">
-                  Content Created
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
+            </span>
+          }
+          width="narrow"
+        >
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger data-testid="select-status-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" data-testid="filter-all">
+                All Keywords
+              </SelectItem>
+              <SelectItem value="discovered" data-testid="filter-discovered">
+                Discovered
+              </SelectItem>
+              <SelectItem value="targeted" data-testid="filter-targeted">
+                Targeted
+              </SelectItem>
+              <SelectItem value="content_created" data-testid="filter-content-created">
+                Content Created
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </Panel>
 
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-caption text-muted-foreground flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
+        <Panel
+          label={
+            <span className="flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5" />
               AI Discovery
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Button
-              onClick={() => discoverMutation.mutate()}
-              disabled={!selectedBrandId || discoverMutation.isPending}
-              className="w-full"
-              data-testid="button-discover-keywords"
-            >
-              {discoverMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {keywordLoadingMessage}
-                </>
-              ) : (
-                <>
-                  <Search className="h-4 w-4 mr-2" />
-                  Discover Keywords with AI
-                </>
-              )}
-            </Button>
-            <p className="text-caption text-muted-foreground mt-2">
-              AI analyzes your brand, industry, and competitors to find high-opportunity keywords
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            </span>
+          }
+          width="wide"
+          span={2}
+          border="last"
+        >
+          <Button
+            onClick={() => discoverMutation.mutate()}
+            disabled={!selectedBrandId || discoverMutation.isPending}
+            className="w-full"
+            data-testid="button-discover-keywords"
+          >
+            {discoverMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {keywordLoadingMessage}
+              </>
+            ) : (
+              <>
+                <Search className="h-4 w-4 mr-2" />
+                Discover Keywords with AI
+              </>
+            )}
+          </Button>
+          <p className="text-caption text-muted-foreground mt-2">
+            AI analyzes your brand, industry, and competitors to find high-opportunity keywords
+          </p>
+        </Panel>
+      </PanelRow>
 
-      {!selectedBrandId ? (
-        <EmptyState
-          icon={Search}
-          title="Select a Brand to Start"
-          description="Choose a brand above to discover AI-optimized keywords and generate content that gets cited."
-        />
-      ) : keywordsIsError ? (
-        <ErrorState
-          title="Couldn't load keywords"
-          onRetry={() => refetchKeywords()}
-          isRetrying={keywordsIsRefetching}
-        />
-      ) : keywordsLoading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <Skeleton className="h-12 w-12 rounded-lg" />
-                  <div className="flex-1">
-                    <Skeleton className="h-5 w-48 mb-2" />
-                    <Skeleton className="h-4 w-32" />
+      <PanelRow cols={1} last>
+        <Panel width="wide" border="last">
+          {!selectedBrandId ? (
+            <EmptyState
+              icon={Search}
+              title="Select a Brand to Start"
+              description="Choose a brand above to discover AI-optimized keywords and generate content that gets cited."
+            />
+          ) : keywordsIsError ? (
+            <ErrorState
+              title="Couldn't load keywords"
+              onRetry={() => refetchKeywords()}
+              isRetrying={keywordsIsRefetching}
+            />
+          ) : keywordsLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-lg border border-border bg-card p-6">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-12 w-12 rounded-lg" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-48 mb-2" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : filteredKeywords.length === 0 ? (
-        <EmptyState
-          icon={Sparkles}
-          title="No Keywords Found"
-          description={
-            <>
-              Click "Discover Keywords with AI" to find high-opportunity keywords for{" "}
-              {selectedBrand?.name}.
-            </>
-          }
-          action={{
-            label: "Discover Keywords",
-            onClick: () => discoverMutation.mutate(),
-          }}
-        />
-      ) : (
-        <div className="space-y-4">
-          <Alert className="mb-4" data-testid="alert-ai-estimated">
-            <Sparkles className="h-4 w-4" />
-            <AlertDescription>
-              These figures are AI-estimated, not measured. Real search-volume integration is
-              planned.
-            </AlertDescription>
-          </Alert>
+              ))}
+            </div>
+          ) : filteredKeywords.length === 0 ? (
+            <EmptyState
+              icon={Sparkles}
+              title="No Keywords Found"
+              description={
+                <>
+                  Click "Discover Keywords with AI" to find high-opportunity keywords for{" "}
+                  {selectedBrand?.name}.
+                </>
+              }
+              action={{
+                label: "Discover Keywords",
+                onClick: () => discoverMutation.mutate(),
+              }}
+            />
+          ) : (
+            <div className="space-y-4">
+              <Alert className="mb-4" data-testid="alert-ai-estimated">
+                <Sparkles className="h-4 w-4" />
+                <AlertDescription>
+                  These figures are AI-estimated, not measured. Real search-volume integration is
+                  planned.
+                </AlertDescription>
+              </Alert>
 
-          <div className="flex items-center justify-between">
-            <p className="text-muted-foreground">
-              Showing {filteredKeywords.length} keyword{filteredKeywords.length !== 1 ? "s" : ""}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => discoverMutation.mutate()}
-              disabled={discoverMutation.isPending}
-              data-testid="button-refresh-keywords"
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-2 ${discoverMutation.isPending ? "animate-spin" : ""}`}
-              />
-              Find More
-            </Button>
-          </div>
+              <div className="flex items-center justify-between">
+                <p className="text-muted-foreground">
+                  Showing {filteredKeywords.length} keyword
+                  {filteredKeywords.length !== 1 ? "s" : ""}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => discoverMutation.mutate()}
+                  disabled={discoverMutation.isPending}
+                  data-testid="button-refresh-keywords"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 mr-2 ${discoverMutation.isPending ? "animate-spin" : ""}`}
+                  />
+                  Find More
+                </Button>
+              </div>
 
-          {filteredKeywords.map((keyword) => (
-            <Card
-              key={keyword.id}
-              className="transition-colors"
-              data-testid={`keyword-card-${keyword.id}`}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3
-                        className="text-ui font-semibold text-foreground"
-                        data-testid={`text-keyword-${keyword.id}`}
-                      >
-                        {keyword.keyword}
-                      </h3>
-                      <Badge
-                        className={intentColors[keyword.intent || "informational"]}
-                        data-testid={`badge-intent-${keyword.id}`}
-                      >
-                        {keyword.intent}
-                      </Badge>
-                      {keyword.category && (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          {keyword.category}
+              {filteredKeywords.map((keyword) => (
+                <div
+                  key={keyword.id}
+                  className="rounded-lg border border-border bg-card p-6 transition-colors"
+                  data-testid={`keyword-card-${keyword.id}`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3
+                          className="text-ui font-semibold text-foreground"
+                          data-testid={`text-keyword-${keyword.id}`}
+                        >
+                          {keyword.keyword}
+                        </h3>
+                        <Badge
+                          className={intentColors[keyword.intent || "informational"]}
+                          data-testid={`badge-intent-${keyword.id}`}
+                        >
+                          {keyword.intent}
                         </Badge>
+                        {keyword.category && (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            {keyword.category}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <TooltipProvider delayDuration={200}>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                          <div>
+                            <p className="text-caption text-muted-foreground mb-1">
+                              Opportunity Score
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className={`text-ui font-semibold inline-flex items-center gap-1 ${getScoreColor(keyword.opportunityScore)}`}
+                                    data-testid={`score-opportunity-${keyword.id}`}
+                                  >
+                                    {keyword.opportunityScore}
+                                    {keyword.opportunityScore >= 80 && (
+                                      <CheckCircle className="h-3 w-3" aria-hidden="true" />
+                                    )}
+                                    <Sparkles className="h-3 w-3 text-muted-foreground" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
+                              </Tooltip>
+                              <Progress value={keyword.opportunityScore} className="h-2 flex-1" />
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-caption text-muted-foreground mb-1">
+                              AI Citation Potential
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className={`text-ui font-semibold inline-flex items-center gap-1 ${getScoreColor(keyword.aiCitationPotential)}`}
+                                    data-testid={`score-citation-${keyword.id}`}
+                                  >
+                                    {keyword.aiCitationPotential}
+                                    {keyword.aiCitationPotential >= 80 && (
+                                      <CheckCircle className="h-3 w-3" aria-hidden="true" />
+                                    )}
+                                    <Sparkles className="h-3 w-3 text-muted-foreground" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
+                              </Tooltip>
+                              <Progress
+                                value={keyword.aiCitationPotential}
+                                className="h-2 flex-1"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-caption text-muted-foreground mb-1">Search Volume</p>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-ui font-semibold text-foreground inline-flex items-center gap-1">
+                                  {keyword.searchVolume
+                                    ? keyword.searchVolume.toLocaleString()
+                                    : "—"}
+                                  <Sparkles className="h-3 w-3 text-muted-foreground" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
+                            </Tooltip>
+                          </div>
+
+                          <div>
+                            <p className="text-caption text-muted-foreground mb-1">Difficulty</p>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-ui font-semibold text-foreground inline-flex items-center gap-1">
+                                  {keyword.difficulty || "—"}
+                                  <Sparkles className="h-3 w-3 text-muted-foreground" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      </TooltipProvider>
+
+                      {keyword.relatedKeywords && keyword.relatedKeywords.length > 0 && (
+                        <div className="mt-4">
+                          <p className="text-caption text-muted-foreground mb-2">
+                            Related Keywords
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {keyword.relatedKeywords.map((related, i) => (
+                              <Badge key={i} variant="secondary" className="text-caption">
+                                {related}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
 
-                    <TooltipProvider delayDuration={200}>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                        <div>
-                          <p className="text-caption text-muted-foreground mb-1">
-                            Opportunity Score
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span
-                                  className={`text-ui font-semibold inline-flex items-center gap-1 ${getScoreColor(keyword.opportunityScore)}`}
-                                  data-testid={`score-opportunity-${keyword.id}`}
-                                >
-                                  {keyword.opportunityScore}
-                                  {keyword.opportunityScore >= 80 && (
-                                    <CheckCircle className="h-3 w-3" aria-hidden="true" />
-                                  )}
-                                  <Sparkles className="h-3 w-3 text-muted-foreground" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
-                            </Tooltip>
-                            <Progress value={keyword.opportunityScore} className="h-2 flex-1" />
-                          </div>
-                        </div>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleGenerateContent(keyword)}
+                        className=""
+                        data-testid={`button-generate-content-${keyword.id}`}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Generate Content
+                      </Button>
 
-                        <div>
-                          <p className="text-caption text-muted-foreground mb-1">
-                            AI Citation Potential
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span
-                                  className={`text-ui font-semibold inline-flex items-center gap-1 ${getScoreColor(keyword.aiCitationPotential)}`}
-                                  data-testid={`score-citation-${keyword.id}`}
-                                >
-                                  {keyword.aiCitationPotential}
-                                  {keyword.aiCitationPotential >= 80 && (
-                                    <CheckCircle className="h-3 w-3" aria-hidden="true" />
-                                  )}
-                                  <Sparkles className="h-3 w-3 text-muted-foreground" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
-                            </Tooltip>
-                            <Progress value={keyword.aiCitationPotential} className="h-2 flex-1" />
-                          </div>
-                        </div>
+                      <Badge variant="outline" className="justify-center text-caption">
+                        {contentTypeLabels[keyword.suggestedContentType || "article"] ||
+                          keyword.suggestedContentType}
+                      </Badge>
 
-                        <div>
-                          <p className="text-caption text-muted-foreground mb-1">Search Volume</p>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-ui font-semibold text-foreground inline-flex items-center gap-1">
-                                {keyword.searchVolume ? keyword.searchVolume.toLocaleString() : "—"}
-                                <Sparkles className="h-3 w-3 text-muted-foreground" />
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
-                          </Tooltip>
-                        </div>
-
-                        <div>
-                          <p className="text-caption text-muted-foreground mb-1">Difficulty</p>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-ui font-semibold text-foreground inline-flex items-center gap-1">
-                                {keyword.difficulty || "—"}
-                                <Sparkles className="h-3 w-3 text-muted-foreground" />
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>{AI_ESTIMATED_TOOLTIP}</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </div>
-                    </TooltipProvider>
-
-                    {keyword.relatedKeywords && keyword.relatedKeywords.length > 0 && (
-                      <div className="mt-4">
-                        <p className="text-caption text-muted-foreground mb-2">Related Keywords</p>
-                        <div className="flex flex-wrap gap-2">
-                          {keyword.relatedKeywords.map((related, i) => (
-                            <Badge key={i} variant="secondary" className="text-caption">
-                              {related}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleGenerateContent(keyword)}
-                      className=""
-                      data-testid={`button-generate-content-${keyword.id}`}
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Generate Content
-                    </Button>
-
-                    <Badge variant="outline" className="justify-center text-caption">
-                      {contentTypeLabels[keyword.suggestedContentType || "article"] ||
-                        keyword.suggestedContentType}
-                    </Badge>
-
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => deleteMutation.mutate(keyword.id)}
-                      className="text-muted-foreground hover:text-destructive"
-                      data-testid={`button-delete-keyword-${keyword.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteMutation.mutate(keyword.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                        data-testid={`button-delete-keyword-${keyword.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </PanelRow>
+    </PanelPage>
   );
 }

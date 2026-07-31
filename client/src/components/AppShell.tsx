@@ -82,13 +82,35 @@ function shellTitleFor(location: string, tab: string | null): string | null {
   return spineTitleFor(location, tab);
 }
 
-/** The Dashboard draws its own full-bleed hairline grid and owns its
- *  horizontal padding. Wrapping it in the shell's padded, max-width canvas
- *  would inset every row border away from the viewport edge. */
+/** Routes whose page draws its own full-bleed hairline grid and owns its
+ *  horizontal padding. Wrapping one of these in the shell's padded,
+ *  max-width canvas insets every row border away from the viewport edge.
+ *
+ *  MIGRATION NOTE: the panel grammar is being rolled out across every page.
+ *  A route joins this list only once its page ACTUALLY renders <PanelPage> /
+ *  <PanelRow> / <Panel> — adding it early strips the padding a Card-based
+ *  page still relies on, and the content ends up flush against the viewport.
+ *  So this list grows one converted page at a time; it is a record of what
+ *  has migrated, not a wish list. */
+const FULL_BLEED_EXACT = new Set([
+  "/",
+  "/dashboard",
+  "/settings",
+  "/report",
+  // Spine routes flip only when EVERY tab they host has converted — one route
+  // hosts 3-6 tab pages, so a half-converted spine would strip the padding a
+  // Card-based sibling tab still needs.
+  "/diagnose", // crawler-check, geo-signals, HallucinationsTab
+  "/setup", // brands, brand-fact-sheet, ai-visibility
+  "/monitor", // citations, competitors, TrendsTab, MentionsTab
+  "/act", // content, articles, keyword-research, geo-tools, faq-manager, community-engagement
+]);
+// The prompt detail page draws its own top bar, section hairlines and 340px
+// aside edge-to-edge, so it takes the unpadded canvas too.
+const FULL_BLEED_PREFIXES = ["/prompts/"];
+
 function isFullBleed(location: string) {
-  // The prompt detail page draws its own top bar, section hairlines and
-  // 340px aside edge-to-edge, so it takes the unpadded canvas too.
-  return location === "/" || location === "/dashboard" || location.startsWith("/prompts/");
+  return FULL_BLEED_EXACT.has(location) || FULL_BLEED_PREFIXES.some((p) => location.startsWith(p));
 }
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -159,7 +181,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           forgets a text-* class inherits the browser's 16px and sticks out of
           a UI where 90% of text is 10–13px. Scoped to the shell so the
           marketing pages keep their own larger register. */}
-      <div className="vc-app flex min-h-screen bg-white">
+      <div className="vc-app flex min-h-screen bg-vc-page">
         {/* Skip link — keyboard / screen-reader (carried from AppLayout). */}
         <a
           href="#main-content"
@@ -175,7 +197,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex min-w-0 flex-1 flex-col lg:ml-[200px] print:ml-0">
           {/* Mobile top bar (carried from AppLayout). */}
-          <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-vc-default bg-white px-4 lg:hidden print:hidden">
+          <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-vc-default bg-vc-surface px-4 lg:hidden print:hidden">
             <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
               <SheetTrigger asChild>
                 {/* nav.mobileToggle is the welcome tour's stand-in for the
@@ -215,7 +237,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               the left and the controls right-aligned at h-8. No backdrop
               blur, no shadow — this chrome is a hairline, not a layer. */}
           {ownsContextBar && (
-            <div className="sticky top-0 z-20 hidden h-[56px] items-center border-b border-vc-default bg-white px-8 lg:flex print:hidden">
+            <div className="sticky top-0 z-20 hidden h-[56px] items-center border-b border-vc-default bg-vc-surface px-8 lg:flex print:hidden">
               {/* No brand mark or page title here: the sidebar already shows
                   both — the logo at its head, and the active stage highlighted
                   in the nav. Repeating them put the logo on screen twice and

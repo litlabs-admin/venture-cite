@@ -26,7 +26,6 @@ import {
   XCircle,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
@@ -40,6 +39,8 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { safeExternalHref } from "@/lib/urlSafety";
+import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
+import { NoValue } from "@/components/dashboard-panels/primitives";
 
 type Event = {
   id: string;
@@ -143,16 +144,16 @@ function fmtDuration(ms: number | null | undefined): string {
 }
 
 function OutcomeIcon({ outcome }: { outcome: "ok" | "skipped" | "failed" }) {
-  if (outcome === "ok") return <CheckCircle className="h-3.5 w-3.5 text-foreground" />;
+  if (outcome === "ok") return <CheckCircle className="h-3.5 w-3.5 text-vc-primary" />;
   if (outcome === "failed") return <XCircle className="h-3.5 w-3.5 text-destructive" />;
-  return <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />;
+  return <ChevronRight className="h-3.5 w-3.5 text-vc-tertiary" />;
 }
 
 function EventCard({ event }: { event: Event }) {
   const [open, setOpen] = useState(false);
   const colorClass = STEP_COLORS[event.stepName] ?? STEP_COLORS.unknown;
   return (
-    <div className="rounded-md border border-border bg-card p-3 text-caption">
+    <div className="border-b border-vc-default py-3 text-caption last:border-b-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -163,14 +164,14 @@ function EventCard({ event }: { event: Event }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Badge className={cn("font-mono text-label", colorClass)}>{event.stepName}</Badge>
-              <span className="text-caption text-muted-foreground tnum">
+              <span className="text-caption text-vc-tertiary tabular-nums">
                 {fmtDuration(event.durationMs)}
               </span>
-              <span className="text-label text-muted-foreground tnum">
+              <span className="text-label text-vc-tertiary tabular-nums">
                 {new Date(event.createdAt).toISOString().slice(11, 23)}
               </span>
             </div>
-            <p className="mt-0.5 truncate text-caption text-foreground">
+            <p className="mt-0.5 truncate text-caption text-vc-primary">
               {(event.metadata.url as string) ||
                 (event.metadata.brandUrl as string) ||
                 (event.metadata.errorMessage as string) ||
@@ -180,13 +181,13 @@ function EventCard({ event }: { event: Event }) {
         </div>
         <ChevronRight
           className={cn(
-            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+            "h-4 w-4 shrink-0 text-vc-tertiary transition-transform",
             open && "rotate-90",
           )}
         />
       </button>
       {open && (
-        <pre className="mt-2 max-h-72 overflow-auto rounded bg-(--bg-surface-1) p-2 text-data text-foreground font-mono">
+        <pre className="mt-2 max-h-72 overflow-auto bg-vc-muted p-2 text-data text-vc-primary font-mono">
           {JSON.stringify(event.metadata, null, 2)}
         </pre>
       )}
@@ -206,16 +207,19 @@ function Stat({
   // "ok" is neutral text + a check icon, not green/chart-4 — colour never
   // carries the outcome by itself.
   const toneClass =
-    tone === "warn" ? "text-(--warning)" : tone === "fail" ? "text-destructive" : "text-foreground";
+    tone === "warn" ? "text-(--warning)" : tone === "fail" ? "text-destructive" : "text-vc-primary";
   return (
-    <div className="rounded-md border border-border bg-card p-3">
+    <div className="border-b border-vc-default px-6 py-4 first:pl-0 last:border-b-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
       <div
-        className={cn("text-metric font-semibold tnum inline-flex items-center gap-1.5", toneClass)}
+        className={cn(
+          "text-stat font-semibold tabular-nums inline-flex items-center gap-1.5",
+          toneClass,
+        )}
       >
         {tone === "ok" && <CheckCircle className="h-4 w-4" aria-hidden="true" />}
         {value}
       </div>
-      <div className="mt-0.5 text-data uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-data uppercase tracking-wider text-vc-tertiary">{label}</div>
     </div>
   );
 }
@@ -242,39 +246,43 @@ export default function AdminScrapeInspector() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto max-w-6xl py-8 space-y-4">
-        <Skeleton className="h-12 w-1/3" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
+      <PanelPage>
+        <div className="space-y-4 px-8 py-6">
+          <Skeleton className="h-12 w-1/3" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </PanelPage>
     );
   }
 
   if (isError || !data?.success) {
     return (
-      <div className="container mx-auto max-w-6xl py-8">
-        <ErrorState
-          title="Could not load scrape"
-          description={error instanceof Error ? error.message : "Unknown error"}
-          onRetry={() => window.location.reload()}
-        />
-      </div>
+      <PanelPage>
+        <div className="px-8 py-6">
+          <ErrorState
+            title="Could not load scrape"
+            description={error instanceof Error ? error.message : "Unknown error"}
+            onRetry={() => window.location.reload()}
+          />
+        </div>
+      </PanelPage>
     );
   }
 
   const { run, brand, pages, logs, events, facts, totals } = data.data;
 
   return (
-    <div className="container mx-auto max-w-6xl py-8 space-y-6">
+    <PanelPage>
       {/* Title moved to src/routes/_app/admin.scrape.$runId.tsx's `head()`
           — metadata belongs to the route, not this component. That route
           can only set a static title (no loader computes the brand name
           server-side), unlike this component's former dynamic title. */}
 
       {/* Header */}
-      <div>
+      <div className="px-8 py-6">
         <div className="flex items-baseline gap-2 mb-1">
-          <h1 className="text-page font-semibold text-foreground">
+          <h1 className="text-page font-semibold text-vc-primary">
             {brand?.name ?? "Unknown brand"}
           </h1>
           {brand?.website && (
@@ -282,7 +290,7 @@ export default function AdminScrapeInspector() {
               href={safeExternalHref(brand.website)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-caption text-primary hover:underline"
+              className="inline-flex items-center gap-1 text-caption text-vc-accent hover:underline"
             >
               <Globe className="h-3.5 w-3.5" />
               {brand.website}
@@ -290,7 +298,7 @@ export default function AdminScrapeInspector() {
             </a>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground tnum">
+        <div className="flex flex-wrap items-center gap-2 text-caption text-vc-tertiary tabular-nums">
           <span>Run {run.id.slice(0, 8)}</span>
           <span>·</span>
           <Badge
@@ -322,76 +330,92 @@ export default function AdminScrapeInspector() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Stat
-          label="Pages OK"
-          value={`${totals.pagesOk}/${totals.pages}`}
-          tone={totals.pagesOk === totals.pages ? "ok" : "warn"}
-        />
-        <Stat label="Pages skipped" value={totals.pagesSkipped} />
-        <Stat
-          label="Pages failed"
-          value={totals.pagesFailed}
-          tone={totals.pagesFailed > 0 ? "fail" : undefined}
-        />
-        <Stat
-          label="Events failed"
-          value={totals.eventsFailed}
-          tone={totals.eventsFailed > 0 ? "fail" : undefined}
-        />
-        <Stat label="Facts (total)" value={totals.facts} tone={totals.facts > 0 ? "ok" : "warn"} />
-      </div>
+      <PanelRow cols={1}>
+        <Panel label="Overview" width="wide" border="last">
+          <div className="grid grid-cols-2 md:grid-cols-5">
+            <Stat
+              label="Pages OK"
+              value={`${totals.pagesOk}/${totals.pages}`}
+              tone={totals.pagesOk === totals.pages ? "ok" : "warn"}
+            />
+            <Stat label="Pages skipped" value={totals.pagesSkipped} />
+            <Stat
+              label="Pages failed"
+              value={totals.pagesFailed}
+              tone={totals.pagesFailed > 0 ? "fail" : undefined}
+            />
+            <Stat
+              label="Events failed"
+              value={totals.eventsFailed}
+              tone={totals.eventsFailed > 0 ? "fail" : undefined}
+            />
+            <Stat
+              label="Facts (total)"
+              value={totals.facts}
+              tone={totals.facts > 0 ? "ok" : "warn"}
+            />
+          </div>
+        </Panel>
+      </PanelRow>
 
       {/* Event timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-ui">
-            <Clock className="h-4 w-4" />
-            Event timeline ({events.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <PanelRow cols={1}>
+        <Panel
+          label={
+            <span className="inline-flex items-center gap-2">
+              <Clock className="h-3 w-3" />
+              {`Event timeline (${events.length})`}
+            </span>
+          }
+          width="wide"
+          border="last"
+        >
           {events.length === 0 ? (
-            <p className="text-caption text-muted-foreground">
+            <p className="text-caption text-vc-tertiary">
               No events recorded. (Either this run pre-dates the event log, or it failed before any
               event could be written. Check the page list below for context.)
             </p>
           ) : (
             events.map((e) => <EventCard key={e.id} event={e} />)
           )}
-        </CardContent>
-      </Card>
+        </Panel>
+      </PanelRow>
 
       {/* Per-source aggregate logs (static_pages / search_llm / user_enrich / aggregate) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-ui">
-            <AlertTriangle className="h-4 w-4" />
-            Per-source aggregate ({logs.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <PanelRow cols={1}>
+        <Panel
+          label={
+            <span className="inline-flex items-center gap-2">
+              <AlertTriangle className="h-3 w-3" />
+              {`Per-source aggregate (${logs.length})`}
+            </span>
+          }
+          width="wide"
+          border="last"
+        >
           <Table className="text-caption">
             <TableHeader>
-              <TableRow className="text-left text-caption text-muted-foreground uppercase tracking-wider hover:bg-transparent">
+              <TableRow className="text-left text-caption text-vc-tertiary uppercase tracking-wider hover:bg-transparent">
                 <TableHead className="h-auto px-0 pb-2">Source</TableHead>
                 <TableHead className="h-auto px-0 pb-2">Status</TableHead>
-                <TableHead className="h-auto px-0 pb-2 tnum">Facts</TableHead>
-                <TableHead className="h-auto px-0 pb-2 tnum">Latency</TableHead>
+                <TableHead className="h-auto px-0 pb-2 tabular-nums">Facts</TableHead>
+                <TableHead className="h-auto px-0 pb-2 tabular-nums">Latency</TableHead>
                 <TableHead className="h-auto px-0 pb-2">Error</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {logs.map((log) => (
-                <TableRow key={log.id} className="border-t border-border hover:bg-transparent">
+                <TableRow key={log.id} className="border-t border-vc-default hover:bg-transparent">
                   <TableCell className="py-2 px-0 font-mono text-caption">{log.source}</TableCell>
                   <TableCell className="py-2 px-0">
                     <Badge variant={log.status === "done" ? "default" : "secondary"}>
                       {log.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="py-2 px-0 tnum">{log.factCount ?? "—"}</TableCell>
-                  <TableCell className="py-2 px-0 tnum text-caption text-muted-foreground">
+                  <TableCell className="py-2 px-0 tabular-nums">
+                    {log.factCount ?? <NoValue />}
+                  </TableCell>
+                  <TableCell className="py-2 px-0 tabular-nums text-caption text-vc-tertiary">
                     {fmtDuration(log.latencyMs)}
                   </TableCell>
                   <TableCell className="py-2 px-0 text-caption text-destructive">
@@ -401,31 +425,34 @@ export default function AdminScrapeInspector() {
               ))}
               {logs.length === 0 && (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={5} className="py-2 px-0 text-caption text-muted-foreground">
+                  <TableCell colSpan={5} className="py-2 px-0 text-caption text-vc-tertiary">
                     No logs.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </Panel>
+      </PanelRow>
 
       {/* Pages table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-ui">
-            <FileText className="h-4 w-4" />
-            Pages ({pages.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <PanelRow cols={1}>
+        <Panel
+          label={
+            <span className="inline-flex items-center gap-2">
+              <FileText className="h-3 w-3" />
+              {`Pages (${pages.length})`}
+            </span>
+          }
+          width="wide"
+          border="last"
+        >
           <Table className="text-caption">
             <TableHeader>
-              <TableRow className="text-left text-caption text-muted-foreground uppercase tracking-wider hover:bg-transparent">
+              <TableRow className="text-left text-caption text-vc-tertiary uppercase tracking-wider hover:bg-transparent">
                 <TableHead className="h-auto px-0 pb-2">URL</TableHead>
                 <TableHead className="h-auto px-0 pb-2">Status</TableHead>
-                <TableHead className="h-auto px-0 pb-2 tnum">Facts</TableHead>
+                <TableHead className="h-auto px-0 pb-2 tabular-nums">Facts</TableHead>
                 <TableHead className="h-auto px-0 pb-2">Error</TableHead>
               </TableRow>
             </TableHeader>
@@ -433,14 +460,14 @@ export default function AdminScrapeInspector() {
               {pages.map((p) => (
                 <TableRow
                   key={p.id}
-                  className="border-t border-border align-top hover:bg-transparent"
+                  className="border-t border-vc-default align-top hover:bg-transparent"
                 >
                   <TableCell className="py-2 px-0">
                     <a
                       href={safeExternalHref(p.url)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline break-all"
+                      className="text-vc-accent hover:underline break-all"
                     >
                       {p.url}
                     </a>
@@ -458,12 +485,14 @@ export default function AdminScrapeInspector() {
                       {p.status ?? "pending"}
                     </Badge>
                     {p.statusCode && (
-                      <span className="ml-2 text-caption text-muted-foreground tnum">
+                      <span className="ml-2 text-caption text-vc-tertiary tabular-nums">
                         {p.statusCode}
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="py-2 px-0 tnum">{p.factCount ?? "—"}</TableCell>
+                  <TableCell className="py-2 px-0 tabular-nums">
+                    {p.factCount ?? <NoValue />}
+                  </TableCell>
                   <TableCell className="py-2 px-0 text-caption text-destructive">
                     {p.errorKind ?? ""}
                   </TableCell>
@@ -471,43 +500,46 @@ export default function AdminScrapeInspector() {
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </Panel>
+      </PanelRow>
 
       {/* Facts (final state) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-ui">
-            <CheckCircle className="h-4 w-4" />
-            Facts in DB ({facts.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-1.5 max-h-96 overflow-auto">
+      <PanelRow cols={1} last>
+        <Panel
+          label={
+            <span className="inline-flex items-center gap-2">
+              <CheckCircle className="h-3 w-3" />
+              {`Facts in DB (${facts.length})`}
+            </span>
+          }
+          width="wide"
+          border="last"
+        >
+          <div className="max-h-96 space-y-1.5 overflow-auto">
             {facts.map((f) => (
               <div
                 key={f.id}
-                className="flex items-start gap-2 text-caption border-b border-border pb-1.5"
+                className="flex items-start gap-2 border-b border-vc-default pb-1.5 text-caption"
               >
                 <Badge variant="outline" className="font-mono text-label">
                   {f.domain}.{f.factKey}
                 </Badge>
                 <span className="flex-1">{f.factValue}</span>
-                <span className="text-muted-foreground">{f.source}</span>
+                <span className="text-vc-tertiary">{f.source}</span>
               </div>
             ))}
             {facts.length === 0 && (
-              <p className="text-caption text-muted-foreground">No facts persisted.</p>
+              <p className="text-caption text-vc-tertiary">No facts persisted.</p>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </Panel>
+      </PanelRow>
 
-      <p className="text-caption text-muted-foreground">
-        <Link to="/admin/scrape" className="text-primary hover:underline">
+      <p className="px-8 py-4 text-caption text-vc-tertiary">
+        <Link to="/admin/scrape" className="text-vc-accent hover:underline">
           ← Back to recent runs
         </Link>
       </p>
-    </div>
+    </PanelPage>
   );
 }
