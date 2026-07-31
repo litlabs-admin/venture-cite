@@ -95,12 +95,12 @@ const messages: Message[] = [
     // the "X of 8 models" framing in favour of naming the engines, per
     // rebrand instructions.
     role: "AI",
-    text: "Day 9: cited in ChatGPT and Perplexity comparisons now.",
+    text: "Day 9: recommended in ChatGPT and Perplexity comparisons now.",
     tag: { label: "rising", pulsing: false },
   },
   {
     role: "AI",
-    text: "You're back in the answer. I'll watch for slippage.",
+    text: "You're on the shortlist again. I'll watch for slippage.",
     tag: { label: "watching", pulsing: false },
   },
 ];

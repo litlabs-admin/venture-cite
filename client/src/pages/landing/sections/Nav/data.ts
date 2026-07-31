@@ -18,25 +18,25 @@ export const productFeatures: NavItem[] = [
   {
     name: "Citations",
     href: "#platform-section",
-    description: "See what AI reads about you",
+    description: "The sources behind each recommendation",
     iconSlug: "citations",
   },
   {
     name: "Share of answer",
     href: "#platform-section",
-    description: "How much of the answer you own",
+    description: "How often you are the brand named",
     iconSlug: "perception",
   },
   {
     name: "Competitors",
     href: "#revenue-section",
-    description: "Benchmark against rivals",
+    description: "Who gets recommended instead of you",
     iconSlug: "competitors",
   },
   {
     name: "Content",
     href: "#philosophy-section",
-    description: "Generate citation-ready pages",
+    description: "Publish what earns the recommendation",
     iconSlug: "workflows",
   },
   {
@@ -50,9 +50,9 @@ export const productFeatures: NavItem[] = [
 // Product mega-menu, right column top ("Solutions"). Header delay 80ms;
 // items stagger at 120 + index*30ms (120/150/180).
 export const productSolutions: NavItem[] = [
-  { name: "Startups", href: "/register", description: "Beat the giants" },
-  { name: "Agencies", href: "/register", description: "Multi-client management" },
-  { name: "Enterprise", href: "/register", description: "Security and scale" },
+  { name: "Startups", href: "/register", description: "Get named alongside the giants" },
+  { name: "Agencies", href: "/register", description: "Recommendations, tracked per client" },
+  { name: "Enterprise", href: "/register", description: "Every brand, every market" },
 ];
 
 // Product mega-menu, right column bottom ("Tools"). Header delay 160ms;
@@ -71,12 +71,12 @@ export const productTools: NavItem[] = [
   {
     name: "Share-of-answer report",
     href: "#revenue-section",
-    description: "Weekly, by engine and topic",
+    description: "Who was recommended, weekly",
   },
   {
     name: "FAQ optimization",
     href: "#philosophy-section",
-    description: "Answer the questions engines ask",
+    description: "Answer the questions buyers ask",
   },
 ];
 
@@ -99,13 +99,13 @@ export const resourcesList: NavItem[] = [
   {
     name: "How it works",
     href: "#platform-section",
-    description: "Track, understand, improve",
+    description: "Get tracked, understood, recommended",
     iconSrc: "/venturecite/images/resources/api-blue.png",
   },
   {
     name: "Why now",
     href: "#why-now-section",
-    description: "What changed about discovery",
+    description: "Why AI now writes the shortlist",
     iconSlug: "data",
   },
 ];

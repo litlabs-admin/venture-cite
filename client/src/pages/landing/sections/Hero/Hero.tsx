@@ -38,13 +38,18 @@ export function Hero() {
             >
               {/* H1 names the OUTCOME the buyer is paying for — being
                   recommended — not the mechanism (tracking, citations,
-                  monitoring). "Recommends", not "mentions": a mention is
-                  neutral and a brand can be mentioned as the loser of a
-                  comparison. There is deliberately no accent-coloured full
-                  stop: --accent is interactive/brand only, never
-                  decorative. */}
+                  monitoring). "Recommended", not "mentioned": a mention is
+                  neutral, and a brand can be mentioned as the loser of a
+                  comparison.
+
+                  Deliberately NO engine names here. Listing ChatGPT, Claude
+                  and Perplexity turns the promise into a feature list and
+                  dates the headline every time the field moves; "AI engines"
+                  is the category, and the logo row below already names them.
+                  Also no accent-coloured full stop: --accent is
+                  interactive/brand only, never decorative. */}
               <h1 className="text-[22px] sm:text-[26px] lg:text-[32px] font-semibold text-vc-primary tracking-[-0.025em] leading-[1.2] mb-4 max-w-[820px] mx-auto">
-                Be the brand ChatGPT, Claude, and Perplexity recommend.
+                Get your brand recommended by AI engines.
               </h1>
 
               {/* Subhead carries the stakes and the mechanism, in that order:
@@ -57,8 +62,8 @@ export function Hero() {
                 }`}
                 style={{ transitionDelay: "100ms" }}
               >
-                Buyers ask AI what to buy before they ask you. See who it names instead, and what it
-                takes to be on that list.
+                Buyers ask AI what to buy before they ask you. See which brands it recommends today,
+                why it picks them, and what it takes to be named instead.
               </p>
 
               <div

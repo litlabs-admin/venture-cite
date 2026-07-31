@@ -122,7 +122,7 @@ export function Platform() {
                         eyebrow="Track"
                         heading="Know every prompt that recommends you — and every one that names a rival"
                         body="Track who gets recommended across ChatGPT, Claude, Perplexity, Gemini, and more, on the questions your buyers actually ask. Your position, prompt by prompt."
-                        linkText="Explore tracking"
+                        linkText="See who gets recommended"
                         href="#why-now-section"
                         isVisible={isVisible}
                       />

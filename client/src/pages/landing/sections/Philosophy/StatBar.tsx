@@ -13,9 +13,9 @@ const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 // imported here — reinstate it if/when real metrics exist.
 const stats = [
   { label: "Every major engine", delayMs: 0 },
-  { label: "Citations & sources", delayMs: 50 },
-  { label: "Competitor benchmarks", delayMs: 100 },
-  { label: "Weekly reports", delayMs: 150 },
+  { label: "Why they get picked", delayMs: 50 },
+  { label: "Who is named instead", delayMs: 100 },
+  { label: "A weekly plan to fix it", delayMs: 150 },
 ];
 
 function StatTile({
