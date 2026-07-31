@@ -487,3 +487,52 @@
   mix-blend-mode: overlay;
   opacity: 0.45;
 }
+
+/*
+ * ANCHOR NAVIGATION — smooth scroll, and landing on the right spot.
+ *
+ * Two separate problems, both visible when clicking a nav/footer link:
+ *
+ * 1. The id lives on <section>, but that section's "[01] WHY NOW / The Shift"
+ *    header is its PRECEDING SIBLING, outside it (see SectionHeader.tsx). A
+ *    bare jump to #platform-section therefore scrolls that header off the top
+ *    of the viewport — you land past the thing you clicked.
+ * 2. The nav is `sticky top-0` at 52px (56px from sm), so it covers whatever
+ *    the browser does put at the top.
+ *
+ * scroll-margin-top fixes both at once: it tells the browser to stop that
+ * many pixels EARLIER, which pulls the header back into view and clears the
+ * nav. Measured in-browser rather than guessed — header is 37.3px tall at
+ * 375px and 45px from sm up, so:
+ *     mobile   52 (nav) + 38 (header) + 10 (breathing room) = 100px
+ *     sm and up 56 (nav) + 45 (header) + 11                 = 112px
+ *
+ * Applied to every [id] section, so #revenue-section and
+ * #learn-research-section still land correctly for anyone holding a deep
+ * link, even though the chrome no longer advertises them.
+ */
+.vc-home section[id] {
+  scroll-margin-top: 100px;
+}
+
+@media (min-width: 640px) {
+  .vc-home section[id] {
+    scroll-margin-top: 112px;
+  }
+}
+
+/*
+ * Smooth scrolling, scoped to the landing page. `scroll-behavior` has to sit
+ * on the scrolling element (html), not on .vc-home, so it is scoped with
+ * :has() — the dashboard keeps instant jumps, which is what its scroll
+ * restoration and guided tour expect.
+ */
+html:has(.vc-home) {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.vc-home) {
+    scroll-behavior: auto;
+  }
+}

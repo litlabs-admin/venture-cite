@@ -30,8 +30,10 @@ export const pageSections: SectionLink[] = [
   { name: "Why now", href: "#why-now-section" },
   { name: "Platform", href: "#platform-section" },
   { name: "Approach", href: "#philosophy-section" },
-  { name: "Proof", href: "#revenue-section" },
-  { name: "Research", href: "#learn-research-section" },
 ];
+
+// #revenue-section and #learn-research-section still exist on the page and
+// still carry their ids — they are simply no longer advertised in the chrome.
+// Anyone holding a deep link to either one keeps landing in the right place.
 
 export const containerMaxWidth = 1120;

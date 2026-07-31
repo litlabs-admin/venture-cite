@@ -35,6 +35,36 @@ export function MobileMenu() {
     };
   }, [isOpen]);
 
+  // Section links cannot just close the menu and let the browser follow the
+  // href. The effect above locks body scroll while the menu is open, and the
+  // unlock only lands after this render commits — a SMOOTH scroll kicked off
+  // against a still-locked body is dropped on the floor, so the tap closed
+  // the menu and went nowhere. (The old instant jump survived it, which is
+  // why this only broke when scroll-behavior became smooth.)
+  //
+  // So: swallow the navigation, close, and scroll on the second frame, once
+  // the unlock has been committed and painted.
+  //
+  // scrollIntoView is called with no `behavior`, deliberately — that inherits
+  // the CSS scroll-behavior, which styles.css sets to smooth for this page and
+  // back to auto under prefers-reduced-motion. Passing "smooth" here would
+  // override the accessibility opt-out. It honours scroll-margin-top too, so
+  // the landing offset stays in one place.
+  const goToSection = (href: string) => (e: React.MouseEvent) => {
+    const target = document.querySelector(href);
+    if (!target) return; // let the browser try the href rather than dead-end
+    e.preventDefault();
+    setIsOpen(false);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        target.scrollIntoView({ block: "start" });
+        // Keep the URL honest without re-triggering a jump, which assigning
+        // location.hash would do.
+        history.replaceState(null, "", href);
+      }),
+    );
+  };
+
   return (
     <>
       <button
@@ -59,7 +89,7 @@ export function MobileMenu() {
                   <a
                     key={section.href}
                     href={section.href}
-                    onClick={() => setIsOpen(false)}
+                    onClick={goToSection(section.href)}
                     className="block px-4 py-2.5 text-[15px] font-medium rounded transition-colors text-vc-secondary hover:bg-vc-muted hover:text-vc-primary"
                   >
                     {section.name}
