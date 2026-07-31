@@ -36,6 +36,11 @@ const stubs = vi.hoisted(() => ({
   deleteOldFactScrapeLogs: vi.fn(async () => 0),
   deleteExpiredFactScrapeCache: vi.fn(async () => 0),
   deleteExpiredLlmConcurrencySlots: vi.fn(async () => 0),
+  // Both used to be scheduler-only jobs with no orchestrator step, so they
+  // never needed stubbing here. They are orchestrator steps now — without
+  // DISABLE_IN_PROCESS_SCHEDULER they would otherwise never run at all.
+  deleteOldTourEvents: vi.fn(async () => 0),
+  detectFactScrapeFailureRate: vi.fn(async () => ({ alerted: 0 })),
   dbSelect: vi.fn(),
 }));
 
@@ -49,6 +54,7 @@ vi.mock("../../server/scheduler", () => ({
   runWeeklyCatchupKickoff: stubs.runWeeklyCatchupKickoff,
   runWeeklyDigestAggregator: stubs.runWeeklyDigestAggregator,
   runWeeklyReportJob: stubs.runWeeklyReportJob,
+  detectFactScrapeFailureRate: stubs.detectFactScrapeFailureRate,
 }));
 vi.mock("../../server/lib/citationReconciliation", () => ({
   reconcileOrphanCitationRuns: stubs.reconcileOrphanCitationRuns,
@@ -125,6 +131,7 @@ vi.mock("../../server/storage", () => ({
     deleteOldFactScrapeLogs: stubs.deleteOldFactScrapeLogs,
     deleteExpiredFactScrapeCache: stubs.deleteExpiredFactScrapeCache,
     deleteExpiredLlmConcurrencySlots: stubs.deleteExpiredLlmConcurrencySlots,
+    deleteOldTourEvents: stubs.deleteOldTourEvents,
   },
 }));
 vi.mock("../../server/db", () => ({

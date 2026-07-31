@@ -84,6 +84,29 @@ services:
       # So the external scheduler owns scheduling, and this flag switches the
       # in-process one off. If you ever move to a paid always-on plan and
       # drop the external scheduler, set this to false instead.
+      #
+      # ── CALL THE ORCHESTRATOR HOURLY, NOT DAILY. ──
+      # Not a preference — daily silently loses work, for two reasons:
+      #
+      # 1. BUDGET. The orchestrator's wall-clock budget is CRON_TOTAL_BUDGET_MS,
+      #    derived from VERCEL_FUNCTION_BUDGET_MS (unset here => 60s default,
+      #    so 57s). The per-step caps in STEP_CAPS_MS sum to ~411s, and
+      #    v2-monthly-fact-refresh alone may take 50s of the 57. On a busy tick
+      #    the later steps are SKIPPED — reported in `skippedDueToBudget`, but
+      #    the response still says success:true. Most steps roll forward via
+      #    their own lastXxxAt timestamps, so the next tick picks them up.
+      #    Hourly means "next tick" is an hour away rather than a day.
+      #
+      # 2. DAY-GATED WORK. mention-scan, listicle-scan and competitor-discovery
+      #    run only when isMonday; weekly-report-legacy only when isSunday. A
+      #    single daily call gives each ONE attempt per week — if that attempt
+      #    is starved by budget, the job waits a full week. Hourly gives 24
+      #    attempts on the correct day, and server/lib/jobDebounce.ts (20h
+      #    window on both) guarantees only the first one does the work.
+      #
+      # Hourly also restores auto-citation's real cadence: the in-process
+      # scheduler ran it at "0 * * * *", and the orchestrator is now its only
+      # trigger. Its debounce window is 45min, deliberately under the hour.
       - key: DISABLE_IN_PROCESS_SCHEDULER
         value: "true"
       # Pin to the version verified with real builds this session

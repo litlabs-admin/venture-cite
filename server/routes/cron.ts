@@ -28,7 +28,9 @@ import {
   runWeeklyCatchupKickoff,
   runWeeklyDigestAggregator,
   runWeeklyReportJob,
+  detectFactScrapeFailureRate,
 } from "../scheduler";
+import { runTourEventsCleanupJob } from "../lib/tourCleanup";
 import { runFactScrapeBackstop } from "../lib/factAgent/v2/factScrapeBackstop";
 import { runMonthlyFactRefresh } from "../lib/factAgent/v2/runMonthlyRefresh";
 import { runWeeklySummary } from "../lib/factAgent/v2/weeklySummary";
@@ -91,6 +93,14 @@ const STEP_CAPS_MS = {
   // (every Analyze click writes a row) and schema_audits accumulates
   // one row per unique URL. Without these the tables grow unboundedly.
   "signals-retention-prune": 5_000,
+  // Both of these were registered ONLY in the in-process node-cron scheduler
+  // (server/scheduler.ts) and had no orchestrator step. That was survivable
+  // while both schedulers ran; it is not once DISABLE_IN_PROCESS_SCHEDULER is
+  // set, which is the documented Render shape — they would simply never run
+  // again, silently. tour_events would grow without bound and the fact-scrape
+  // failure alert would stop firing with no error to notice.
+  "tour-events-cleanup": 5_000,
+  "detect-fact-scrape-failure": 5_000,
 } as const;
 
 type StepName = keyof typeof STEP_CAPS_MS;
@@ -268,6 +278,14 @@ export function setupCronRoutes(app: Express): void {
       await orch.run("drain-pending-citation-runs", (deadline) =>
         drainPendingCitationRuns(deadline),
       );
+
+      // Both are millisecond-scale daily housekeeping, and both used to live
+      // only in the in-process scheduler. They sit in the CHEAP block rather
+      // than with the other daily housekeeping further down because the steps
+      // below can legitimately consume the whole budget on a busy tick, and a
+      // retention prune that is skipped every day never runs at all.
+      await orch.run("tour-events-cleanup", () => runTourEventsCleanupJob());
+      await orch.run("detect-fact-scrape-failure", () => detectFactScrapeFailureRate());
 
       // v2 backstop: completes any run abandoned by the client. Runs once a day
       // here (Hobby cron limit); when on Pro we'll also have a dedicated
