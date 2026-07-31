@@ -94,13 +94,10 @@ const envSchema = z.object({
   // Buffer feature don't need to set it.
   BUFFER_ENCRYPTION_KEY: z.string().optional(),
 
-  // Reddit OAuth credentials for the Mentions feature.
-  // Create a Reddit script app at https://www.reddit.com/prefs/apps;
-  // required for the Mentions feature.
-  REDDIT_CLIENT_ID: z.string().min(1).optional(),
-  REDDIT_CLIENT_SECRET: z.string().min(1).optional(),
-  REDDIT_USERNAME: z.string().min(1).optional(),
-  REDDIT_PASSWORD: z.string().min(1).optional(),
+  // No REDDIT_* credentials. The mention scanner reads Reddit
+  // unauthenticated only (public JSON + RSS fallback); the OAuth path and
+  // these four vars were removed together. Re-declaring them here would
+  // advertise a configuration that nothing reads.
 });
 
 const parsed = envSchema.safeParse(process.env);

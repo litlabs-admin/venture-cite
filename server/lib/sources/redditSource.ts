@@ -1,4 +1,4 @@
-import { redditFetch, redditPublicFetch, hasRedditOAuthCredentials } from "../redditOAuth";
+import { redditPublicFetch } from "../redditFetch";
 import { passesBrandPresenceGate } from "../brandPresenceGate";
 import { acquireOrWait } from "../rateLimitBuckets";
 import type { MentionPlatform } from "../canonicalUrl";
@@ -120,109 +120,37 @@ function parseRedditRss(xml: string): RssItem[] {
 /**
  * Scan Reddit for brand mentions.
  *
- * Three execution modes, picked at runtime:
- *   1. OAuth (credentials set) — full power: search + comment-tree expansion.
- *   2. Public JSON (no credentials) — /search.json against www.reddit.com.
- *      Comment-tree expansion is SKIPPED (would burn the unauth quota).
- *   3. RSS fallback (when public JSON returns 403/429) — /search.rss.
- *      Lower fidelity (no engagement scores, no NSFW flag, no comments).
+ * Two execution modes, both unauthenticated:
+ *   1. Public JSON — /search.json against www.reddit.com. Comment-tree
+ *      expansion is SKIPPED (it would burn the unauth quota).
+ *   2. RSS fallback (when public JSON returns 403/429) — /search.rss.
+ *      Lower fidelity: no engagement scores, no NSFW flag, no comments.
+ *
+ * THERE IS NO OAUTH PATH — it was removed deliberately. This scanner is
+ * unauthenticated by design and carries no Reddit credentials.
+ *
+ * KNOWN LIMITATION: Reddit currently 403s unauthenticated traffic on BOTH
+ * of these endpoints. Measured 2026-07-30 across every tracked brand;
+ * source_health's last successful Reddit scan is 2026-05-27. When that
+ * happens this returns `failed`, not an empty list — the caller records a
+ * source failure, because an empty list would read as "nothing was said
+ * about this brand", which is a different and false claim.
  */
 export async function scanRedditSource(
   input: RedditScanInput,
 ): Promise<{ mentions: RedditMention[]; failed?: string }> {
-  const useOAuth = hasRedditOAuthCredentials();
   // First scan (no sinceUnix): cast a wide net with t=year.
   // Subsequent scans (sinceUnix set): only look at the last week to keep
   // requests fast and results fresh.
   const t = input.sinceUnix === undefined ? "year" : "week";
 
   try {
-    if (useOAuth) {
-      const acquired = await acquireOrWait("reddit", input.brandId, 30_000);
-      if (!acquired) {
-        return { mentions: [], failed: "reddit rate-limited (try again later)" };
-      }
-      return await scanViaOAuth(input, t);
-    }
-    // Public path manages its own rate-limit acquires per variation call.
+    // The public path manages its own rate-limit acquires per variation call.
     return await scanViaPublic(input, t);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { mentions: [], failed: `reddit error: ${message}` };
   }
-}
-
-// ─── OAuth path ──────────────────────────────────────────────────────────────
-
-async function scanViaOAuth(
-  input: RedditScanInput,
-  t: string,
-): Promise<{ mentions: RedditMention[]; failed?: string }> {
-  const searchPath = `/search?q=${encodeURIComponent(input.query)}&sort=new&t=${t}&limit=25&restrict_sr=false`;
-  const res = await redditFetch(searchPath);
-  if (!res.ok) return { mentions: [], failed: `reddit ${res.status}` };
-
-  const json = (await res.json()) as RedditListing;
-  const children = json.data?.children ?? [];
-  const mentions: RedditMention[] = [];
-
-  for (const child of children) {
-    if (child.kind !== "t3") continue;
-    const data = child.data as RedditPostData;
-    if (data.over_18 === true) continue;
-    if (data.removed_by_category) continue;
-    if (data.author === "[deleted]" || data.author === "[removed]") continue;
-    if (data.selftext === "[removed]" || data.selftext === "[deleted]") continue;
-
-    const gate = passesBrandPresenceGate(
-      { title: data.title, selftext: data.selftext ?? "" },
-      input.variations,
-    );
-    if (gate.matched) {
-      mentions.push({
-        platform: "reddit" as MentionPlatform,
-        sourceUrl: `https://reddit.com${data.permalink}`,
-        sourceTitle: data.title.slice(0, 500),
-        mentionContext: data.selftext?.slice(0, 2000) ?? "",
-        authorUsername: data.author,
-        mentionedAt: data.created_utc ? new Date(data.created_utc * 1000) : undefined,
-        mentionLocation: "post",
-        matchedVariation: gate.matchedVariation,
-        matchedField: gate.matchedField,
-        engagementInputs: { ups: data.ups || 0, comments: data.num_comments || 0 },
-      });
-    }
-
-    // Comment-tree expansion (OAuth-only — too expensive on unauth quota).
-    const commentToken = await acquireOrWait("reddit", input.brandId, 10_000);
-    if (!commentToken) continue;
-    const commentRes = await redditFetch(`${data.permalink}.json?limit=50&depth=2`);
-    if (!commentRes.ok) continue;
-    const commentBody = (await commentRes.json()) as [RedditListing, RedditListing];
-    if (!Array.isArray(commentBody) || commentBody.length < 2) continue;
-    const comments = collectComments(commentBody[1]);
-    for (const c of comments) {
-      if (c.body === "[deleted]" || c.body === "[removed]") continue;
-      if (c.author === "[deleted]") continue;
-      if (!c.body) continue;
-      const cGate = passesBrandPresenceGate({ comment: c.body }, input.variations);
-      if (!cGate.matched) continue;
-      mentions.push({
-        platform: "reddit" as MentionPlatform,
-        sourceUrl: `https://reddit.com${c.permalink ?? data.permalink}`,
-        sourceTitle: data.title,
-        mentionContext: c.body.slice(0, 2000),
-        authorUsername: c.author,
-        mentionedAt: c.created_utc ? new Date(c.created_utc * 1000) : undefined,
-        mentionLocation: "comment",
-        matchedVariation: cGate.matchedVariation,
-        matchedField: cGate.matchedField,
-        engagementInputs: { ups: c.ups || 0, comments: 0 },
-      });
-    }
-  }
-
-  return { mentions };
 }
 
 // ─── Public path: /search.json with RSS fallback ─────────────────────────────
@@ -348,7 +276,7 @@ async function scanViaPublic(
   if (mentions.length === 0 && failures.length === variations.length) {
     return {
       mentions: [],
-      failed: `reddit: ${failures[0] ?? "all variation queries failed"} (public + rss both blocked — set REDDIT_* env vars for OAuth)`,
+      failed: `reddit: ${failures[0] ?? "all variation queries failed"} (public JSON + RSS both blocked — Reddit refuses unauthenticated traffic)`,
     };
   }
 
