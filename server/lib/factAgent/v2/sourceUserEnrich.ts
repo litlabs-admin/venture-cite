@@ -2,9 +2,9 @@
 // canonical 8-domain fact schema with confidence=1.0 (user is authoritative).
 //
 // Two paths:
-//   1. LLM (GPT direct) — semantically maps free-form fields to schema slots.
+//   1. LLM (GPT direct) - semantically maps free-form fields to schema slots.
 //      Concurrency-gated, JSON-mode response.
-//   2. Deterministic fallback — straight column-to-fact mapping. Runs when
+//   2. Deterministic fallback - straight column-to-fact mapping. Runs when
 //      the LLM is unavailable. Source 3 must never fail the run.
 import OpenAI from "openai";
 import { withSlot } from "../../llmConcurrency";
@@ -13,7 +13,7 @@ import { logger } from "../../logger";
 import { FactsResponseSchema, type Fact } from "@shared/factAgent/schema";
 import { LLM_CALL_TIMEOUT_MS } from "./vercelBudget";
 
-// Standalone client — avoids pulling in routesShared → ownership → db which
+// Standalone client - avoids pulling in routesShared → ownership → db which
 // requires DATABASE_URL and is not needed by this pure-LLM helper.
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -55,7 +55,7 @@ export interface UserEnrichOutcome {
 
 const SYSTEM_PROMPT = `You are reshaping a brand's self-provided fields into a canonical fact schema.
 
-The user typed these fields themselves during onboarding. Treat them as authoritative — confidence MUST be 1.0 on every fact. Do not invent or paraphrase beyond minimal cleanup.
+The user typed these fields themselves during onboarding. Treat them as authoritative - confidence MUST be 1.0 on every fact. Do not invent or paraphrase beyond minimal cleanup.
 
 Map fields to the 8-domain schema:
   identity:    name, description, tagline, mission
@@ -74,7 +74,7 @@ Return JSON in exactly this shape:
       "domain": "identity"|"offerings"|"positioning"|"team"|"operations"|"credentials"|"growth"|"contact",
       "subcategory": "<short label matching the field>",
       "factKey": "<short label>",
-      "factValue": "<the user's value, verbatim — preserve the spaces between words; only trim leading/trailing whitespace>",
+      "factValue": "<the user's value, verbatim - preserve the spaces between words; only trim leading/trailing whitespace>",
       "valueType": "string"|"number"|"array",
       "valuePayload": null|object,
       "confidence": 1.0,
@@ -109,7 +109,7 @@ function buildUserPrompt(brand: UserEnrichBrand): string {
 
 // The genuinely-safe interpretation of "clean whitespace": collapse internal
 // runs of whitespace (newlines/tabs/double spaces) to a single space and trim
-// the ends. Crucially it NEVER removes the single spaces between words — the
+// the ends. Crucially it NEVER removes the single spaces between words - the
 // old prompt wording ("cleaned of whitespace only") led the LLM to delete every
 // space, producing values like "VenturePRspecializes…". Applied deterministically
 // server-side so whitespace handling no longer depends on the model behaving.
@@ -141,7 +141,7 @@ function sourceStringsFor(brand: UserEnrichBrand): string[] {
 
 // Deterministic repair for the exact failure mode behind "VenturePRspecializes…":
 // a small model deletes the spaces from a value it was told to echo verbatim.
-// tidyWhitespace can only COLLAPSE runs, never re-insert deleted spaces — but
+// tidyWhitespace can only COLLAPSE runs, never re-insert deleted spaces - but
 // the authoritative source field still has them. If the model's value matches a
 // source string once spaces+case are ignored, and that source is the longer
 // (properly-spaced) form, snap back to the source. Exact despaced equality means
@@ -158,7 +158,7 @@ export function restoreSpacesFromSources(value: string, sources: string[]): stri
 
 function deterministicFallback(brand: UserEnrichBrand): Fact[] {
   const out: Fact[] = [];
-  // v2: subcategory is no longer in Fact — the server derives it from
+  // v2: subcategory is no longer in Fact - the server derives it from
   // (domain, factKey) before persistence. The push helper takes the
   // controlled-vocab key directly.
   const push = (

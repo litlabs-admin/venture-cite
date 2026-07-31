@@ -2,7 +2,7 @@
 -- response analyzer can persist sentiment derived from relevance alongside
 -- rank/relevance on competitor citation rows (matches geo_rankings.sentiment).
 --
--- Also add sentiment to geo_rankings if it doesn't already exist there — the
+-- Also add sentiment to geo_rankings if it doesn't already exist there - the
 -- column is referenced by analytics.ts but has never been guaranteed by a
 -- migration. Use IF NOT EXISTS so this is a no-op when it's already present.
 

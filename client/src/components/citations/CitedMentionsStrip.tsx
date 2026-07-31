@@ -7,7 +7,7 @@ export type CitedMention = {
   platform: string;
   /** Truncated prompt text */
   prompt: string;
-  /** Full AI response text — used to extract a snippet. May be null
+  /** Full AI response text - used to extract a snippet. May be null
    *  if the response wasn't stored, in which case we fall back to the
    *  saved citationContext snippet. */
   fullResponse: string | null;
@@ -15,7 +15,7 @@ export type CitedMention = {
    *  extracted on-the-fly; this is the saved one from geo_rankings). */
   savedSnippet: string | null;
   /** Optional anchor: if the parent provides an onClick, the card
-   *  becomes interactive — typically scrolls to the matching
+   *  becomes interactive - typically scrolls to the matching
    *  PlatformResultCard in the accordion below. */
   onClick?: () => void;
 };

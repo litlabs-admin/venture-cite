@@ -55,7 +55,7 @@ export function HeroBento() {
               <RankingsList />
             </div>
 
-            {/* Row 2 — desktop grid */}
+            {/* Row 2 - desktop grid */}
             <div className="hidden md:grid md:grid-cols-12 md:min-h-[280px]">
               <div className="col-span-4 border-r border-vc-hairline">
                 <CrawlersPanel />
@@ -68,7 +68,7 @@ export function HeroBento() {
               </div>
             </div>
 
-            {/* Row 2 — mobile snap-scroll carousel (same 3 panels, DOM-equivalent
+            {/* Row 2 - mobile snap-scroll carousel (same 3 panels, DOM-equivalent
                 to source's second static copy, mounted from the same shared
                 components rather than duplicated markup) */}
             <div className="md:hidden relative">

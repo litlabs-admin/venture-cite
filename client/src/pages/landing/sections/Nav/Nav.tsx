@@ -5,7 +5,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 
 // The two mega-menus this used to open (Product and Resources, ~30 links
 // between them) are gone. They advertised a product surface the app does not
-// have — most rows resolved to /register or to an anchor on this same page —
+// have - most rows resolved to /register or to an anchor on this same page -
 // and a one-page site does not need a hover-triggered navigation system.
 // What is left is the page's own sections, plus the two conversion actions.
 
@@ -17,7 +17,7 @@ export function Nav() {
         style={{ maxWidth: containerMaxWidth }}
       >
         <Link to="/" className="shrink-0" aria-label="VentureCite home">
-          {/* Wordmark is 779x258 (~3:1), not the square mark this replaced —
+          {/* Wordmark is 779x258 (~3:1), not the square mark this replaced -
               height-constrained with w-auto so it can't squash. */}
           <BrandLogo imgClassName="h-[26px] w-auto" textClassName="text-body" />
         </Link>
@@ -47,7 +47,7 @@ export function Nav() {
             </Link>
             {/* One primary action, one colour. This used to be the dark
                 ink-fill tier, on the reasoning that the accent belonged to
-                the hero CTA alone — but the same "Get started" then rendered
+                the hero CTA alone - but the same "Get started" then rendered
                 ink here, accent in the hero and closing CTA, and a pale
                 accent-subtle in the footer. Three colours for one action
                 reads as three different actions. Hierarchy comes from size

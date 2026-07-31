@@ -4,12 +4,12 @@
 // The original monolith now only mounts this module via setupBrandRoutes.
 //
 // Includes:
-//   POST /api/brands/create-from-website — LLM-fill brand fields from website and persist
-//   GET  /api/brands                    — list user's (non-soft-deleted)
-//   GET  /api/brands/:id                — single brand
-//   POST /api/brands                    — manual create
-//   PUT  /api/brands/:id                — update with optional optimistic lock
-//   DELETE /api/brands/:id              — soft-delete with 30-day grace
+//   POST /api/brands/create-from-website - LLM-fill brand fields from website and persist
+//   GET  /api/brands                    - list user's (non-soft-deleted)
+//   GET  /api/brands/:id                - single brand
+//   POST /api/brands                    - manual create
+//   PUT  /api/brands/:id                - update with optional optimistic lock
+//   DELETE /api/brands/:id              - soft-delete with 30-day grace
 
 import type { Express } from "express";
 import { z } from "zod";
@@ -86,7 +86,7 @@ export function setupBrandRoutes(app: Express): void {
           if (existingBrands.length >= tierLimit) {
             return res.status(403).json({
               success: false,
-              error: `Brand limit reached — your ${tier} plan allows ${tierLimit}. Delete an existing brand or upgrade for more.`,
+              error: `Brand limit reached - your ${tier} plan allows ${tierLimit}. Delete an existing brand or upgrade for more.`,
               limitReached: true,
             });
           }
@@ -426,7 +426,7 @@ Be specific and accurate based on the content. If you can't determine something,
 
   // Wave 6.6: pre-delete preview. Called when the user opens the delete
   // dialog so we can show exact counts ("this will remove 47 articles, 12
-  // runs, 5 prompts"). Counts only the heaviest child tables — the FK
+  // runs, 5 prompts"). Counts only the heaviest child tables - the FK
   // cascade sweeps many more, but surfacing every single one would be noise.
   app.get(
     "/api/brands/:id/deletion-preview",
@@ -476,7 +476,7 @@ Be specific and accurate based on the content. If you can't determine something,
         }
 
         // Wave 4.5: soft-delete with 30-day grace. The cron-driven brand
-        // purge job hard-deletes after the window — at which point the FK
+        // purge job hard-deletes after the window - at which point the FK
         // cascade clears every child row. List queries already filter
         // `deleted_at IS NULL` so the brand vanishes from the UI immediately.
         const softDeleted = await storage.softDeleteBrand(req.params.id);

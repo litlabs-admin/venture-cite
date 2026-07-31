@@ -1,4 +1,4 @@
-// v2 endpoint surface — Plan 2 ships only POST /scrape-one.
+// v2 endpoint surface - Plan 2 ships only POST /scrape-one.
 // Plans 3-5 add /search-llm, /user-enrich, /plan, /aggregate, /paste, etc.
 
 import type { Express, Request, Response } from "express";
@@ -60,13 +60,13 @@ const pasteSchema = z.object({
   text: z.string().min(1).max(50_000),
 });
 
-// OpenAI primary provider client adapter — wraps the existing singleton.
+// OpenAI primary provider client adapter - wraps the existing singleton.
 //
 // 2026-05-28: honour the prompt's `responseFormat` when present. The v2
 // extraction prompt sends a strict json_schema; without passing it
 // through here, the route handlers (scrape-one / search-llm / paste)
 // received json_object responses that produced factKey strings
-// outside the controlled vocab — and our post-parse vocab filter
+// outside the controlled vocab - and our post-parse vocab filter
 // dropped them all, yielding zero facts on the dev server.
 const openaiProvider: ProviderClient = {
   name: "openai",
@@ -111,11 +111,11 @@ const openrouterClient = process.env.OPENROUTER_API_KEY
 
 const openrouterClaudeProvider: ProviderClient | null = openrouterClient
   ? {
-      // "anthropic" is the slot bucket in llm_concurrency_slots — sized for
+      // "anthropic" is the slot bucket in llm_concurrency_slots - sized for
       // Claude-family concurrent calls. The actual network egress is via
       // OpenRouter, but the model is Claude, so we account for it there.
       // Claude via OpenRouter doesn't honour OpenAI's json_schema mode
-      // yet — we send json_object and rely on the Zod post-validation +
+      // yet - we send json_object and rely on the Zod post-validation +
       // the post-parse vocab filter in extractionPrompt.ts to catch any
       // shape drift.
       name: "anthropic",
@@ -166,7 +166,7 @@ export function setupFactSheetV2Routes(app: Express): void {
 
         // GPT (OpenAI direct) is the primary extractor. Claude is the
         // secondary model and is reached ONLY via OpenRouter per project
-        // policy — no direct Anthropic SDK. callWithFailover invokes the
+        // policy - no direct Anthropic SDK. callWithFailover invokes the
         // secondary on transient errors (5xx/429/network) from the primary.
         const providers: ProviderClient[] = [openaiProvider];
         if (openrouterClaudeProvider) providers.push(openrouterClaudeProvider);
@@ -556,7 +556,7 @@ export function setupFactSheetV2Routes(app: Express): void {
         // runFullScrapeForBrand; the client discovers it via the existing
         // GET /runs?brandId= poll + SSE stream. Resumable through the
         // fact-scrape backstop + monthly-refresh cron if the function is
-        // suspended mid-run — no browser tab required.
+        // suspended mid-run - no browser tab required.
         //
         // Lazy import: runFullScrape pulls in `db` at module load (which
         // throws without DATABASE_URL). Importing it here instead of at

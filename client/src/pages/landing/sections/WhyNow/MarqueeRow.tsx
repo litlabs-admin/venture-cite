@@ -3,7 +3,7 @@
 // This was previously an infinitely-drifting marquee (drift-left/drift-right,
 // six queries duplicated 3x per row, 12px text). At that size the queries read
 // as texture rather than as content, so the section now renders a single
-// static row of three pills at 14px — legible at 1x — and the drift animation
+// static row of three pills at 14px - legible at 1x - and the drift animation
 // is gone. See the comment at the call site in WhyNow.tsx.
 //
 // The `drift-left` / `drift-right` keyframes in styles.css are now unused by

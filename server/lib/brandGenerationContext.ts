@@ -84,7 +84,7 @@ export function renderCompetitorBlock(
   if (!resolved.length) return "";
   const lines = resolved.map(({ name, tracked }) => {
     if (!tracked) {
-      return `- ${name} — (no verified facts available; hedge or omit specific claims about this competitor)`;
+      return `- ${name} - (no verified facts available; hedge or omit specific claims about this competitor)`;
     }
     const parts: string[] = [];
     if (tracked.industry) parts.push(`industry: ${tracked.industry}`);
@@ -92,7 +92,7 @@ export function renderCompetitorBlock(
     if (tracked.description) {
       parts.push(`description: ${String(tracked.description).slice(0, 400)}`);
     }
-    const meta = parts.length ? ` — ${parts.join("; ")}` : "";
+    const meta = parts.length ? ` - ${parts.join("; ")}` : "";
     return `- ${tracked.name}${meta}`;
   });
   return ["Competitors to compare against:", ...lines].join("\n");

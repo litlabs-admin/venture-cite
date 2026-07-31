@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 //
-// Tests for MentionsTab composition — Task 20 of the Mentions Rebuild plan.
+// Tests for MentionsTab composition - Task 20 of the Mentions Rebuild plan.
 // Tests: empty states, list render, loadMore, detail-sheet URL, filter URL
 // persistence, delete undo toast, and a11y (axe skipped until Task 24).
 
@@ -11,10 +11,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
 // ---------------------------------------------------------------------------
-// vitest-axe — enabled in Task 24
+// vitest-axe - enabled in Task 24
 // ---------------------------------------------------------------------------
 // `toHaveNoViolations` was never actually exported from vitest-axe's main
-// entry (it only lives in "vitest-axe/matchers") — importing it from
+// entry (it only lives in "vitest-axe/matchers") - importing it from
 // "vitest-axe" silently resolved to `undefined` under vitest 3's more
 // lenient expect.extend(). vitest 4's expect.extend() accesses matcher
 // internals eagerly and throws on an undefined matcher, which is what
@@ -93,7 +93,7 @@ vi.mock("@/components/ui/toast", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock useMentions — controls all hook output from one place
+// Mock useMentions - controls all hook output from one place
 // ---------------------------------------------------------------------------
 
 const useMentionsMock = vi.fn();
@@ -312,7 +312,7 @@ describe("MentionsTab", () => {
     );
   });
 
-  // 1. No brandId — select-brand empty state
+  // 1. No brandId - select-brand empty state
   it("renders 'select a brand' when brandId is null", () => {
     useMentionsMock.mockReturnValue(makeHookReturn());
     renderTab(null);
@@ -400,7 +400,7 @@ describe("MentionsTab", () => {
     const card = screen.getByTestId("mention-card-m1");
     await userEvent.click(card);
     // URL should now include mention=m1. navigate() takes `search` as an
-    // updater function, so assert on what the updater actually produces —
+    // updater function, so assert on what the updater actually produces -
     // a shallow argument match cannot see through the closure.
     expect(navigateMock).toHaveBeenCalledWith(
       expect.objectContaining({ replace: true, search: expect.any(Function) }),
@@ -409,7 +409,7 @@ describe("MentionsTab", () => {
       search: (prev: Record<string, string>) => Record<string, string>;
     };
     expect(call.search({})).toEqual({ mention: "m1" });
-    // Unrelated params must survive — dropping brandId here would silently
+    // Unrelated params must survive - dropping brandId here would silently
     // reset the user's brand selection when they open a mention.
     expect(call.search({ brandId: "b1" })).toEqual({ brandId: "b1", mention: "m1" });
   });
@@ -428,13 +428,13 @@ describe("MentionsTab", () => {
   it("calls deleteMention when the hook fires deleteMention, and toast was called", async () => {
     // The undo-toast is fired by the hook itself (onSuccess), which we mock.
     // We verify here that if we trigger delete from the card menu, deleteMention is called.
-    // The toast assertion checks that the hook's toastMock integration works —
+    // The toast assertion checks that the hook's toastMock integration works -
     // we simulate by calling the hook's deleteMention directly on render.
     const deleteMentionMock = vi.fn();
     const mentions = [makeMention("m1")];
     useMentionsMock.mockReturnValue(makeHookReturn({ mentions, deleteMention: deleteMentionMock }));
     renderTab(BRAND_ID);
-    // The MentionCard mock doesn't expose a delete button — this test verifies
+    // The MentionCard mock doesn't expose a delete button - this test verifies
     // the hook's deleteMention is wired and callable from the tab.
     // We directly verify the prop is passed by checking deleteMentionMock can be called.
     deleteMentionMock("m1");
@@ -452,13 +452,13 @@ describe("MentionsTab", () => {
     );
   });
 
-  // 9. axe a11y — Task 24: assert no critical/serious violations
+  // 9. axe a11y - Task 24: assert no critical/serious violations
   it("MentionsTab passes axe-core (no critical or serious violations)", async () => {
     const mentions = [makeMention("m1")];
     useMentionsMock.mockReturnValue(makeHookReturn({ mentions }));
     const { container } = renderTab(BRAND_ID);
     const results = await axe(container);
-    // Filter to critical + serious only — minor/moderate are deferred
+    // Filter to critical + serious only - minor/moderate are deferred
     const blocking = (results.violations ?? []).filter(
       (v: any) => v.impact === "critical" || v.impact === "serious",
     );

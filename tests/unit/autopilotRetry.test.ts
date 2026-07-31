@@ -237,7 +237,7 @@ describe("POST /api/onboarding/autopilot-retry", () => {
       userId: "user-1",
       autopilotStatus: "running_citations",
     });
-    // CAS returns false — another caller already won, or status isn't "failed".
+    // CAS returns false - another caller already won, or status isn't "failed".
     storageStubs.transitionAutopilotFromFailedToPending.mockResolvedValue(false);
 
     const r = await call(app, "POST", "/api/onboarding/autopilot-retry", { brandId: BRAND_ID });

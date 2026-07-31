@@ -1,7 +1,7 @@
-// Card 01 visual — the 8-logo grid (_reference/index.html:2479, single
+// Card 01 visual - the 8-logo grid (_reference/index.html:2479, single
 // unbroken line). Filenames, order and titles are verbatim from source.
 // Note "Claude" here uses claude.svg (not the claude.png used elsewhere on
-// the page, e.g. WhyNow's marquee) — checked against this section's actual
+// the page, e.g. WhyNow's marquee) - checked against this section's actual
 // markup rather than assumed consistent with other sections.
 const logos = [
   { name: "ChatGPT", src: "/venturecite/images/ai-logos/chatgpt.svg" },
@@ -16,7 +16,7 @@ const logos = [
 
 // Source's dimmed grayscale look (opacity: 0.18, filter: grayscale(1)) is
 // the DEFAULT/settled state, paired with a 450ms opacity+filter transition
-// for a hover-driven brighten — reproduced here as CSS opacity/grayscale
+// for a hover-driven brighten - reproduced here as CSS opacity/grayscale
 // utilities plus hover: variants (equivalent to source's per-item
 // hover-triggered inline-style swap), rather than as a pre-mount reveal.
 export function AiLogoGrid() {

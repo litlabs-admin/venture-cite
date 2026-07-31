@@ -112,7 +112,7 @@ beforeEach(() => {
   lastQueryKey = null;
 });
 
-describe("persistFacts v2 — provenance preservation", () => {
+describe("persistFacts v2 - provenance preservation", () => {
   it("first observation creates a row with a single-source valuePayload", async () => {
     lastQueryKey = "b1|identity|Brand name|name";
     const f = buildFact({});
@@ -211,7 +211,7 @@ describe("persistFacts v2 — provenance preservation", () => {
     );
   });
 
-  it("respects prior dismissal — no insert, no update", async () => {
+  it("respects prior dismissal - no insert, no update", async () => {
     const key = "b1|identity|Brand name|name";
     lastQueryKey = key;
     fakeStore.set(key, {

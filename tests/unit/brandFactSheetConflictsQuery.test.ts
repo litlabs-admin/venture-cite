@@ -52,7 +52,7 @@ describe("brandFactSheet conflicts + accept/dismiss", () => {
         factKey: "primary",
         factValue: "engineering leaders",
       },
-      // A user-only row with no conflict — should NOT appear
+      // A user-only row with no conflict - should NOT appear
       {
         id: "u2",
         brandId: "b1",

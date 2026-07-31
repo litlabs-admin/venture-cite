@@ -63,7 +63,7 @@ export default function ViewEditDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpen]);
 
-  // Re-hydrate when the article prop changes — covers the case where the
+  // Re-hydrate when the article prop changes - covers the case where the
   // parent list refetches after a save.
   useEffect(() => {
     setTitle(article.title ?? "");
@@ -376,7 +376,7 @@ export default function ViewEditDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Conflict modal — opens when any save/improve/restore returns 409 */}
+      {/* Conflict modal - opens when any save/improve/restore returns 409 */}
       <Dialog open={!!conflict} onOpenChange={(o) => !o && setConflict(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>

@@ -1,4 +1,4 @@
-// spec §3.12.D + §3.12.H — horizontal filter bar for the Mentions table.
+// spec §3.12.D + §3.12.H - horizontal filter bar for the Mentions table.
 // Mobile (<sm): collapses into a "Filters (N)" button that opens a Sheet.
 // Desktop (>=sm): 6 controls in a horizontal row.
 
@@ -67,7 +67,7 @@ interface FilterControlsProps {
 }
 
 function FilterControls({ filters, onChange, stacked = false }: FilterControlsProps) {
-  // Local state for the debounced search input — keeps the text field
+  // Local state for the debounced search input - keeps the text field
   // responsive while the actual onChange fires 300 ms after the user stops.
   const [searchDraft, setSearchDraft] = useState(filters.q ?? "");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -234,7 +234,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
       {/* Row: chip + mobile toggle + (desktop) filter controls + clear btn   */}
       {/* ------------------------------------------------------------------ */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* "New since last scan" chip — always visible */}
+        {/* "New since last scan" chip - always visible */}
         <button
           type="button"
           onClick={() => onChange("newSinceLastScan", !filters.newSinceLastScan)}
@@ -250,7 +250,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
           New since last scan
         </button>
 
-        {/* Mobile: "Filters (N)" button — hidden at sm+ */}
+        {/* Mobile: "Filters (N)" button - hidden at sm+ */}
         <div className="flex items-center gap-2 sm:hidden">
           <Button
             variant="outline"
@@ -269,7 +269,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
           </Button>
         </div>
 
-        {/* Desktop: full filter controls — hidden below sm */}
+        {/* Desktop: full filter controls - hidden below sm */}
         <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:gap-2">
           <FilterControls filters={filters} onChange={onChange} />
           {/* Active-filter count badge (desktop) */}
@@ -281,7 +281,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
           )}
         </div>
 
-        {/* Clear button — always visible when filters are active */}
+        {/* Clear button - always visible when filters are active */}
         {hasActiveFilters && (
           <Button
             variant="ghost"
@@ -297,7 +297,7 @@ export default function MentionsFilters({ filters, onChange, onClear }: Mentions
       </div>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Mobile Sheet — opens on small screens                               */}
+      {/* Mobile Sheet - opens on small screens                               */}
       {/* ------------------------------------------------------------------ */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="right" className="w-[300px] sm:max-w-[300px]">

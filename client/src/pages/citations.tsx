@@ -50,14 +50,14 @@ export default function Citations() {
   // Wave 9: POST /run is now async (returns ~100ms with runId). Completion
   // arrives via the polling /citation-runs/state channel + active-runs gate;
   // the mutation toast just confirms the run started. Two-tab races receive
-  // 409 with the existing runId — surfaced as an "already running" toast
+  // 409 with the existing runId - surfaced as an "already running" toast
   // rather than an error.
   const runMutationImpl = useRunPrompts(selectedBrandId);
   // The shared hook only knows the request/response shape; page-specific UI
   // reactions (toasts, optimistic banner state) live here since they touch
   // this component's state. `runCheck` wraps `.mutate` so both call sites
   // (the button below and the one passed down into ResultsTab) get the same
-  // behavior — matching the pre-refactor mutation, whose onSuccess/onError
+  // behavior - matching the pre-refactor mutation, whose onSuccess/onError
   // were baked in at creation and therefore fired for every caller.
   const runCheck = () => {
     runMutationImpl.mutate(undefined, {
@@ -120,7 +120,7 @@ export default function Citations() {
           const total = counts.rankings + counts.listicles + counts.wikipedia;
           const description =
             total === 0
-              ? "No changes — everything already matches the current variant list."
+              ? "No changes - everything already matches the current variant list."
               : `Updated ${counts.rankings} ranking${counts.rankings === 1 ? "" : "s"}, ${counts.listicles} listicle${counts.listicles === 1 ? "" : "s"}, ${counts.wikipedia} wiki mention${counts.wikipedia === 1 ? "" : "s"}. ${counts.newlyCited} newly re-detected. (${Math.round(durationMs / 100) / 10}s)`;
           toast({ title: "Re-check complete", description });
         } else {
@@ -149,7 +149,7 @@ export default function Citations() {
   ]);
 
   // Wave 9: keep the rotating loading messages cycling for the entire run,
-  // not just the (now ~100ms) kickoff request. Run is async — once the
+  // not just the (now ~100ms) kickoff request. Run is async - once the
   // mutation resolves the UI relies entirely on `hasActive` for in-flight
   // state, so the messages should follow the same signal.
   const runLoadingMessage = useLoadingMessages(runMutation.isPending || hasActive, [
@@ -172,15 +172,15 @@ export default function Citations() {
   } | null>(null);
 
   // Wave 9.2: optimistic banner. The active-runs gate polls every 8s, so
-  // the first ~8s after clicking Run had no banner — looked like nothing
+  // the first ~8s after clicking Run had no banner - looked like nothing
   // happened. `pendingRunId` is seeded from the kickoff response and
   // displayed alongside `hasActive`. Cleared the moment the gate query
   // confirms the run, OR after 30s if the gate never sees it (run
-  // failed before registering, network issue, etc.) — bounded so a
+  // failed before registering, network issue, etc.) - bounded so a
   // stuck pendingRunId can't keep the banner up forever.
   const [pendingRunId, setPendingRunId] = useState<string | null>(null);
 
-  // Reset live state on brand switch — both polled liveProgress and the
+  // Reset live state on brand switch - both polled liveProgress and the
   // optimistic pendingRunId. Without the second, switching brand mid-run
   // would keep showing the old brand's optimistic banner until 30s timed
   // out.
@@ -219,7 +219,7 @@ export default function Citations() {
       try {
         // /state polls every tick to refresh the UI. /advance drives the
         // run forward server-side and is gated to a single in-flight call
-        // per run — without that gate, a 25s slice + 1s tick produces ~25
+        // per run - without that gate, a 25s slice + 1s tick produces ~25
         // concurrent /advance lambdas all racing to claim the same pairs,
         // causing duplicate geo_rankings rows and inflated totalChecks.
         const stateResp = apiRequest(
@@ -339,7 +339,7 @@ export default function Citations() {
 
   // URL-addressable inner tab bar (`?ptab=`). citations.tsx renders inside
   // whichever spine stage route mounted it (/monitor), which has no single
-  // typed `Route.useSearch()` here — same loose-read pattern AppShell.tsx
+  // typed `Route.useSearch()` here - same loose-read pattern AppShell.tsx
   // and SpineShell use for `tab` (see native-api-contract.md rule 3).
   // `ptab` is declared on monitorSearchSchema in
   // src/routes/-shared/searchSchemas.ts.
@@ -378,7 +378,7 @@ export default function Citations() {
 
   return (
     <PanelPage>
-      {/* Live progress banner — shown only while a citation run is in
+      {/* Live progress banner - shown only while a citation run is in
           flight for this brand. /citation-runs/state polling feeds the
           progress %; the active-runs gate provides the gating boolean. */}
       {showBanner && headlineProgress && (
@@ -391,7 +391,7 @@ export default function Citations() {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
                 </span>
                 <span className="text-caption font-medium truncate">
-                  Citation run in progress — {headlineProgress.progressPct}%
+                  Citation run in progress - {headlineProgress.progressPct}%
                 </span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
@@ -447,7 +447,7 @@ export default function Citations() {
       ) : (
         <>
           {/* Tab bar + Run Check on the same row. Tab strip is a
-              non-panel content surface — flagged per the conversion task's
+              non-panel content surface - flagged per the conversion task's
               own rule that tab strips don't fit the panel grammar. */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-vc-default px-8 pt-6">
             <div className="flex gap-1" role="tablist" aria-label="Citations">
@@ -536,7 +536,7 @@ export default function Citations() {
                         <div>
                           <div className="font-medium">Re-check stored responses</div>
                           <div className="text-caption text-vc-tertiary">
-                            Re-apply detection to old runs after adding name variations. Free — no
+                            Re-apply detection to old runs after adding name variations. Free - no
                             AI calls.
                           </div>
                         </div>
@@ -590,7 +590,7 @@ export default function Citations() {
             </div>
           )}
 
-          {/* SCHEDULE TAB — cadence is non-configurable; see scheduler.ts */}
+          {/* SCHEDULE TAB - cadence is non-configurable; see scheduler.ts */}
           {activeTab === "schedule" && (
             <PanelRow cols={1} last>
               <Panel width="wide" border="last">

@@ -9,16 +9,16 @@ type Message = {
   tag?: { label: string; pulsing: boolean };
 };
 
-// Card 03 visual — the unique 20-message transcript
+// Card 03 visual - the unique 20-message transcript
 // (_reference/index.html:2514-2582), verbatim text and tags, in source
 // order. The raw DOM repeats this same sequence many times back-to-back to
 // fake a scrolling loop (confirmed by re-reading a sample of the repeats at
-// e.g. lines 2584-2654 and 2656-2719, byte-identical to this array) — here
+// e.g. lines 2584-2654 and 2656-2719, byte-identical to this array) - here
 // it's duplicated programmatically instead of hand-copied.
 const messages: Message[] = [
   { role: "You", text: "What's quietly costing me answers?" },
   {
-    // Source read "Reading how 8 models describe you." — dropped the "8
+    // Source read "Reading how 8 models describe you." - dropped the "8
     // models" count framing (VentureCite's covered engines are ChatGPT,
     // Claude, Perplexity, Gemini, Copilot, Google AI Overview) in favour of
     // naming the engines directly, per rebrand instructions.
@@ -91,7 +91,7 @@ const messages: Message[] = [
     tag: { label: "checking", pulsing: true },
   },
   {
-    // Source read "Day 9: cited in 4 of 8 models on comparisons." — dropped
+    // Source read "Day 9: cited in 4 of 8 models on comparisons." - dropped
     // the "X of 8 models" framing in favour of naming the engines, per
     // rebrand instructions.
     role: "AI",
@@ -152,7 +152,7 @@ function TranscriptRow({ message }: { message: Message }) {
 // Masked-viewport height (120px) and gradient stops (fade in over the first
 // 26%, solid 26%-74%, fade out over the last 26%) are verbatim from
 // _reference/index.html:2512. Scroll speed (36s, defined on .chat-scroll in
-// app/globals.css) was not verified against source — see build report.
+// app/globals.css) was not verified against source - see build report.
 export function ChatTranscriptDemo() {
   return (
     <div

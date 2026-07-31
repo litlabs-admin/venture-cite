@@ -6,7 +6,7 @@
 //   2. getLastGeoSignalRunAt returns null when the brand has no runs.
 //   3. getLastGeoSignalRunAt returns the most recent ranAt for the brand.
 //
-// Mocking pattern mirrors tests/unit/articlesAIGenerated.test.ts — wrap
+// Mocking pattern mirrors tests/unit/articlesAIGenerated.test.ts - wrap
 // db with a Drizzle-chain proxy that captures .values()/.where() so we
 // can assert on payload + steer the returned rows.
 

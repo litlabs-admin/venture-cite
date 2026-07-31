@@ -1,10 +1,10 @@
-// Theme system — production-grade light / dark / system toggle.
+// Theme system - production-grade light / dark / system toggle.
 //
 // Design decisions, locked:
 //
 // 1. Three modes, not two. "system" follows OS prefers-color-scheme; "light"
 //    and "dark" are explicit overrides. This is what GitHub, Vercel, and
-//    Linear ship — anything less feels primitive in 2026.
+//    Linear ship - anything less feels primitive in 2026.
 //
 // 2. Light is the FALLBACK when no signal is available. Light is now the
 //    product's canonical look ("LIGHT is the default the user lands on").
@@ -17,7 +17,7 @@
 //
 // 4. No FOUC. The pre-hydration script in index.html runs SYNCHRONOUSLY
 //    before React mounts and applies the right class on `<html>`. This
-//    module never sets the initial class — it only updates it on user
+//    module never sets the initial class - it only updates it on user
 //    action or system-pref change. See `themePreloadScript` (string) below
 //    for the script that mirrors this module's logic in vanilla JS.
 //
@@ -29,7 +29,7 @@
 //    on very old browsers; we default to light, since light is the
 //    product's canonical look.
 //
-// No React imports here — this module is pure logic so it can also be
+// No React imports here - this module is pure logic so it can also be
 // imported by the preload-script generator without dragging React into the
 // critical-path bundle.
 
@@ -41,7 +41,7 @@ export type ResolvedTheme = "light" | "dark";
 export const THEME_STORAGE_KEY = "vc-theme-v1";
 
 /** When no signal is available anywhere, we land here. Hand-tuned to match
- *  the CSS token system, which is light-first — light is the product's
+ *  the CSS token system, which is light-first - light is the product's
  *  canonical look. */
 const FALLBACK_THEME: ResolvedTheme = "light";
 
@@ -57,7 +57,7 @@ function isTheme(value: unknown): value is Theme {
  *  The app chrome (sidebar, context bar, Dashboard) is a light-only
  *  surface built against the reference design system, so following the OS
  *  into dark used to put a light dashboard inside dark chrome. Users who
- *  explicitly pick dark or system still get it — this is only the default
+ *  explicitly pick dark or system still get it - this is only the default
  *  for someone who has never chosen. */
 export function getStoredTheme(): Theme {
   if (typeof window === "undefined") return "light";
@@ -70,14 +70,14 @@ export function getStoredTheme(): Theme {
   }
 }
 
-/** Persist the user's choice. Silent failure if storage is unavailable —
+/** Persist the user's choice. Silent failure if storage is unavailable -
  *  the in-memory state still works for the current session. */
 export function setStoredTheme(theme: Theme): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {
-    // Private mode / quota / disabled — non-fatal.
+    // Private mode / quota / disabled - non-fatal.
   }
 }
 
@@ -142,7 +142,7 @@ export function subscribeToSystemTheme(callback: (next: ResolvedTheme) => void):
   return () => mq.removeListener(handler);
 }
 
-/** Subscribe to storage events — fires when ANOTHER tab updates the theme
+/** Subscribe to storage events - fires when ANOTHER tab updates the theme
  *  (the `storage` event does not fire in the originating tab). Returns
  *  an unsubscribe. */
 export function subscribeToStorageTheme(callback: (next: Theme) => void): () => void {

@@ -37,7 +37,7 @@ import type { PromptScoreHistory } from "@/hooks/usePrompts";
 //
 // TWO REFERENCE FEATURES ARE DELIBERATELY NOT REPRODUCED, on different
 // grounds:
-//   * AI VOL renders as a dash. It is a per-row VALUE with no source yet —
+//   * AI VOL renders as a dash. It is a per-row VALUE with no source yet -
 //     the same treatment the Dashboard gives its unbacked metrics.
 //   * Tags and Audiences (the column, the two sibling tabs, the filters) are
 //     omitted entirely. Those are whole features with interactive controls,
@@ -48,7 +48,7 @@ import type { PromptScoreHistory } from "@/hooks/usePrompts";
 export type PromptRowModel = {
   prompt: BrandPrompt;
   history: PromptScoreHistory | undefined;
-  /** Cited on zero platforms in the latest run — the reference's "blind spot". */
+  /** Cited on zero platforms in the latest run - the reference's "blind spot". */
   blindSpot: boolean;
 };
 
@@ -111,7 +111,7 @@ function useDismiss<T extends HTMLElement>(open: boolean, close: () => void) {
 }
 
 /** 48×14 sparkline of a prompt's recent scores. Flat line when a single run
- *  exists — one point is a position, not a trend, so it is drawn as such. */
+ *  exists - one point is a position, not a trend, so it is drawn as such. */
 function Sparkline({ series }: { series: PromptScoreHistory["series"] }) {
   if (!series.length) {
     return <div className="h-3.5 w-12" aria-hidden />;
@@ -277,7 +277,7 @@ export function PromptsTable({
           new Date(b.prompt.createdAt ?? 0).getTime() - new Date(a.prompt.createdAt ?? 0).getTime(),
       );
     if (sort === "az") sorted.sort((a, b) => a.prompt.prompt.localeCompare(b.prompt.prompt));
-    // Manual order is the stored orderIndex and has no meaningful reverse —
+    // Manual order is the stored orderIndex and has no meaningful reverse -
     // flipping it would fight the drag-reorder the user just performed.
     if (dir === "asc" && sort !== "manual") sorted.reverse();
     return sorted;
@@ -399,7 +399,7 @@ export function PromptsTable({
         </div>
 
         <div className="ml-auto flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
-          {/* Run summary — same figures as the reference's header chip. */}
+          {/* Run summary - same figures as the reference's header chip. */}
           <span className="mr-1 hidden items-center gap-2.5 text-data lg:flex">
             {summary.lastRun && (
               <span className="flex items-center gap-1.5 text-vc-text-muted">
@@ -443,7 +443,7 @@ export function PromptsTable({
             >
               <SlidersHorizontal className="h-3 w-3" aria-hidden />
               Filter
-              {/* Counts only a filter the user actually chose — "active" is
+              {/* Counts only a filter the user actually chose - "active" is
                   the default and must not read as an applied filter. */}
               {status !== "active" && (
                 <span className="rounded bg-vc-accent-subtle px-1 font-mono text-label text-vc-accent">
@@ -708,7 +708,7 @@ export function PromptsTable({
                 onClick={(e) => editingId === p.id && e.stopPropagation()}
               >
                 {editingId === p.id ? (
-                  // Edit in place, like the reference — the row becomes an
+                  // Edit in place, like the reference - the row becomes an
                   // input rather than opening a dialog over the table.
                   <input
                     autoFocus
@@ -762,7 +762,7 @@ export function PromptsTable({
                     >
                       <Copy className="h-3 w-3" aria-hidden />
                     </button>
-                    {/* Rank slip — positive rankDelta means the mean placement
+                    {/* Rank slip - positive rankDelta means the mean placement
                         got worse since the previous run. */}
                     {h?.rankDelta !== null && h?.rankDelta !== undefined && h.rankDelta > 0 && (
                       <span
@@ -1042,7 +1042,7 @@ export function PromptsTable({
             onKeyDown={(e) => e.key === "Enter" && submitDraft()}
             onBlur={submitDraft}
             placeholder={
-              atCap ? `At the ${cap}-prompt limit — switch one off first` : "Add a prompt..."
+              atCap ? `At the ${cap}-prompt limit - switch one off first` : "Add a prompt..."
             }
             className="min-w-0 flex-1 bg-transparent text-body text-vc-primary outline-none placeholder:text-vc-text-muted disabled:cursor-not-allowed"
           />

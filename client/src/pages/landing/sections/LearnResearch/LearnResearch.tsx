@@ -5,7 +5,7 @@ import { DataTileGrid } from "./DataTileGrid";
 import { ArrowRightIcon } from "./icons";
 import { resourceCards } from "./data";
 
-// Learn/Research section — _reference/index.html lines 3410-3592. Unlike the
+// Learn/Research section - _reference/index.html lines 3410-3592. Unlike the
 // other numbered sections, this one carries its own top margin and inlines
 // its own "[05]" eyebrow directly (no separate sibling SectionHeader div),
 // so it does not use the shared SectionHeader component.

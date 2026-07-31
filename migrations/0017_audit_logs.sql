@@ -9,7 +9,7 @@
 --     without trawling structured log files.
 --
 -- user_id is ON DELETE SET NULL so the audit row survives an account
--- deletion — keeping a record of *that the deletion happened* is the
+-- deletion - keeping a record of *that the deletion happened* is the
 -- whole point. We accept that detached rows can't be re-linked to a
 -- live user.
 

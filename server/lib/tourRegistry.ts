@@ -2,7 +2,7 @@
 //
 // Single source of truth for valid tour IDs and event types accepted by the
 // tour engine API. Server validates inbound writes against these. Must stay
-// exactly in sync with the client registry at client/src/tours/registry.ts —
+// exactly in sync with the client registry at client/src/tours/registry.ts -
 // tests/unit/tourRegistryParity.test.ts asserts the two lists are identical,
 // so a drift fails CI rather than silently 400-ing state writes/events.
 

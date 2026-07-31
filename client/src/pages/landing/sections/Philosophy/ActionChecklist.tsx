@@ -1,6 +1,6 @@
 import { ChecklistTickIcon } from "./icons";
 
-// Card 02 visual — the 3-row action checklist (_reference/index.html:2488-2501).
+// Card 02 visual - the 3-row action checklist (_reference/index.html:2488-2501).
 // Checkboxes are unchecked in the settled/default state (empty square, tick
 // undrawn) per source's actual resting classes/styles.
 const items = [

@@ -70,7 +70,7 @@ describe("kickoffBrandPromptsRun", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.runId).toBe("run-1");
-    // Should not await the heavy run — well under any reasonable AI call time.
+    // Should not await the heavy run - well under any reasonable AI call time.
     expect(elapsed).toBeLessThan(200);
     expect(storageMock.createCitationRun).toHaveBeenCalledWith(
       expect.objectContaining({ brandId: "brand-1", status: "running", progressPct: 0 }),

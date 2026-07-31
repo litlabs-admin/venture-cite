@@ -1,6 +1,6 @@
 // Canonical visibility math. ONE definition of the citation rate AND the
 // composite visibility score, so every surface shows the same number for
-// the same brand/platform (PRODUCT.md principle 2 — "one number means one
+// the same brand/platform (PRODUCT.md principle 2 - "one number means one
 // thing everywhere").
 //
 // The visibility-score formula here is the dashboard-hero formula, which
@@ -24,7 +24,7 @@ export function citationRatePct(cited: number, total: number): number {
 
 /**
  * Canonical visibility score, integer 0..100. Works at any scope (whole
- * brand or a single platform) — pass that scope's aggregates.
+ * brand or a single platform) - pass that scope's aggregates.
  *
  * - `cited` / `total`: cited vs total (prompt × engine) checks in scope.
  * - `avgRank`: mean rank of the cited rows. <= 0 means "no rank data" →

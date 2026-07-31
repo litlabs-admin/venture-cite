@@ -4,7 +4,7 @@
 // real-world enterprise URLs. Tier 1 only matched the exact strings
 // "/about" / "/pricing" / "/team" / "/products". Real brands use
 // "/who-we-are", "/our-company", "/leadership", "/case-studies/...",
-// "/customers/...", "/solutions/...", etc. — all of which fell through
+// "/customers/...", "/solutions/...", etc. - all of which fell through
 // to tier 0 and competed on equal footing with arbitrary sitemap noise.
 // Broadened to capture the common variants while keeping the strict
 // "no sub-segments for tier 1, anchor segments for tier 2" structure.
@@ -26,7 +26,7 @@
 // spectrum of company-identity paths real brands use. Specific additions:
 //
 //   TIER_1: heritage, history, story, culture, values, vision, research,
-//           safety, investors, locations, contact (was tier 2 — bumped
+//           safety, investors, locations, contact (was tier 2 - bumped
 //           because contact pages reliably carry HQ + legal name)
 //   TIER_2: testimonials, why-us, why-choose-us, changelog, roadmap,
 //           methodology, method
@@ -34,7 +34,7 @@
 // We also normalise separators before matching: `/our_company`,
 // `/aboutus`, `/our-company` all collapse to the same canonical form.
 //
-// Tier 3 is more selective — `/integrations` only drops the listing
+// Tier 3 is more selective - `/integrations` only drops the listing
 // page, individual `/integrations/<vendor>` pages now go to tier 0
 // because for some brands (Zapier, Make) integrations ARE the product.
 import { canonicalizeUrl } from "../canonicalize";
@@ -47,19 +47,19 @@ function normalizeSeparators(path: string): string {
     .replace(/\/+/g, "/"); // collapse double slashes
 }
 
-// Tier 1 — exact single-segment paths. Trailing slash already stripped
+// Tier 1 - exact single-segment paths. Trailing slash already stripped
 // and separators normalised by the caller. NB: the `index.html?` clause
 // is for static-site brands.
 const TIER_1 =
   /^\/(?:|index\.html?|about(?:-us|-the-company)?|company|our-company|who-we-are|our-story|our-mission|mission|company-overview|overview|pricing(?:-plans)?|plans|team|leadership|management|product|products|product-tour|heritage|history|story|culture|values|vision|research|safety|investors?|impact|sustainability|approach)$/i;
 
-// Tier 2 — features, solutions, customers, case studies, use cases,
+// Tier 2 - features, solutions, customers, case studies, use cases,
 // contact, security, careers, methodology. PREFIX-matched on `/` so
 // /case-studies/<slug>, /customers/<slug>, /solutions/<slug> all count.
 const TIER_2 =
   /^\/(?:features?|platform|solutions?|customers?|testimonials?|case-studies?|case-study|use-cases?|use-case|services?|contact(?:-us)?|security|trust|careers?|jobs|locations?|offices|why-us|why-choose-us|changelog|roadmap|methodology|method|our-work|portfolio|clients?)(?:\/|$)/i;
 
-// Tier 3 — prefix-match paths to DROP entirely. Includes blog / press
+// Tier 3 - prefix-match paths to DROP entirely. Includes blog / press
 // / news / legal / docs / help. NOTE: bare `/integrations` (no slash)
 // dropped, but `/integrations/<vendor>` falls through to tier 0
 // because integration pages ARE product pages for some brands.
@@ -76,7 +76,7 @@ const MAX_URLS = 10;
 // The language subtag is validated against the real ISO 639-1 set rather
 // than matched as "any 2-3 letters". That shape was too permissive and
 // caused a production mis-scoring bug: `/api` parsed as a locale, got
-// stripped to `/`, and `/` matches TIER_1's empty alternative — so `/api`
+// stripped to `/`, and `/` matches TIER_1's empty alternative - so `/api`
 // scored as the HOMEPAGE and took top scraping priority. `/faq`, `/seo`,
 // `/app` and `/dev` all did the same, crowding real brand-identity pages
 // out of the 10-URL budget on any site that has them.
@@ -87,7 +87,7 @@ const MAX_URLS = 10;
 //
 // Trade-off, deliberate: 3-letter ISO 639-2/3 codes (e.g. `/fil/`) are no
 // longer stripped. Those are rare on marketing sites, and the failure mode
-// is mild — the page falls through to tier 0 (still eligible) rather than
+// is mild - the page falls through to tier 0 (still eligible) rather than
 // being mis-promoted to tier 1. The old behaviour's failure mode was the
 // expensive direction.
 const ISO_639_1 = new Set(
@@ -200,7 +200,7 @@ export function selectTopUrls(brandUrl: string, candidates: string[]): string[] 
   // Tier-0 fallback: prefer DIVERSE paths and SHORT paths over the
   // sitemap's incidental order. Without this, Samsung's sitemap (which
   // happens to list 200+ sustainability sub-pages first) fills every
-  // remaining slot with sustainability/* — leaving the actual brand-
+  // remaining slot with sustainability/* - leaving the actual brand-
   // identity pages unscraped. Sort by:
   //   1. Path depth ASC (shorter = more likely top-level)
   //   2. Path length ASC (tiebreaker)

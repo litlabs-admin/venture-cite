@@ -1,5 +1,5 @@
 // tests/e2e/support/auth.ts
-// dotenv must load before we read process.env below — the Playwright test
+// dotenv must load before we read process.env below - the Playwright test
 // runner process does not inherit .env the way the webServer child process
 // does (server/app.ts loads "dotenv/config" itself). Same pattern used by
 // tests/integration/*.test.ts and tests/unit/*.test.ts in this repo.
@@ -13,14 +13,14 @@ export const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? "";
 // Where the authenticated browser storage state (cookies + localStorage,
 // including the Supabase session token) gets written by tests/e2e/auth.setup.ts
 // and read back by every spec that wants to start already logged in (see
-// playwright.config.ts's "chromium" project). Lives under playwright/.auth/ —
-// Playwright's own documented convention for this — rather than under
+// playwright.config.ts's "chromium" project). Lives under playwright/.auth/ -
+// Playwright's own documented convention for this - rather than under
 // test-results/, which Playwright wipes on every invocation; a single-spec
 // run (e.g. `npx playwright test tests/e2e/foo.spec.ts`) still depends on the
 // "setup" project having produced this file, and a wiped test-results/ turned
 // that into an ENOENT the moment auth.setup.ts wasn't part of the same
 // command. playwright/.auth/ is gitignored (see .gitignore) rather than
-// anywhere that could be committed — this file holds a real session token.
+// anywhere that could be committed - this file holds a real session token.
 // Never log or print its contents.
 export const STORAGE_STATE = "playwright/.auth/state.json";
 
@@ -64,18 +64,18 @@ export async function login(page: Page): Promise<void> {
 /**
  * Asserts the authenticated app rendered rather than the marketing page.
  *
- * The dashboard and the marketing landing page no longer share a URL — the
+ * The dashboard and the marketing landing page no longer share a URL - the
  * TanStack Start migration split them ("/" is public and server-rendered,
  * "/dashboard" is the authenticated app). But the landing page still renders
  * a bare <main>, so SEL.appMain ("main") cannot tell the two apart: if auth
  * silently broke and a redirect dropped the user back on the landing page, a
  * plain "main is visible" check would still pass. We therefore assert on
  * SEL.authenticatedMain ("main#main-content"), which only AppShell renders
- * (client/src/components/AppShell.tsx:180) — see selectors.ts for the
+ * (client/src/components/AppShell.tsx:180) - see selectors.ts for the
  * uniqueness evidence.
  *
- * "/welcome" is rendered without AppShell (src/routes/_app/welcome.tsx) —
- * client/src/pages/welcome.tsx has no <main> element at all — so on that
+ * "/welcome" is rendered without AppShell (src/routes/_app/welcome.tsx) -
+ * client/src/pages/welcome.tsx has no <main> element at all - so on that
  * path we assert on the welcome screen's own onboarding input instead.
  */
 export async function expectAuthenticated(page: Page): Promise<void> {

@@ -33,7 +33,7 @@ export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: s
   // Wave 9.3: scope both queries to the active brand. Previously these
   // omitted brandId entirely, so the server's no-brand-id branch
   // aggregated leaderboards across every brand the user owned and
-  // mixed multi-brand competitor lists into the panel — switching
+  // mixed multi-brand competitor lists into the panel - switching
   // brands didn't change what was rendered.
   const { data: competitorsData, isLoading: competitorsLoading } = useQuery<{
     success: boolean;

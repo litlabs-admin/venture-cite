@@ -12,12 +12,12 @@ import { cn } from "@/lib/utils";
 
 // ─── Pulse ───────────────────────────────────────────────────────────────────
 // The Dashboard's action-first worklist. One ranked list answering "what
-// do I do next", merging three REAL measured sources — no estimates, no
+// do I do next", merging three REAL measured sources - no estimates, no
 // fabricated revenue/traffic (PRODUCT.md: honest by construction):
 //
-//   1. Run-change alerts  (/api/brands/:id/alerts)         — something regressed
-//   2. Recommendations    (/api/brands/:id/recommendations) — deterministic P0/P1/P2
-//   3. Open hallucinations (/api/hallucinations/stats/:id)  — standing accuracy debt
+//   1. Run-change alerts  (/api/brands/:id/alerts)         - something regressed
+//   2. Recommendations    (/api/brands/:id/recommendations) - deterministic P0/P1/P2
+//   3. Open hallucinations (/api/hallucinations/stats/:id)  - standing accuracy debt
 //
 // Replaces RecommendationsPanel on `/`. RecommendationsPanel itself stays the
 // deep view at /diagnose?tab=issues, so this only changes what home renders.
@@ -59,7 +59,7 @@ type HallucinationStats = {
 };
 
 // One normalised row. `rank` orders the list (0 = most urgent). `marker` is
-// the only colour on the row — a small dot, severity not decoration.
+// the only colour on the row - a small dot, severity not decoration.
 type PulseItem = {
   key: string;
   dismissKey: string | null; // null = not dismissible (always shown)
@@ -80,7 +80,7 @@ const ACTIONABLE_ALERTS: Record<string, { href: string; cta: string }> = {
 };
 
 /** Resolve a row's destination: decompose the href (a mix of local
- *  `/stage?tab=…` literals and server-supplied `ctaHref`/`nextHref` strings —
+ *  `/stage?tab=…` literals and server-supplied `ctaHref`/`nextHref` strings -
  *  never a compile-time route literal), then carry the active brand so the
  *  selection stays sticky when navigating from Pulse. Decomposed once here
  *  rather than round-tripping through a URL string on the way to the Link. */
@@ -102,7 +102,7 @@ function writeDismissed(key: string, value: Record<string, string>): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // Quota errors are non-fatal — the row just won't stay hidden.
+    // Quota errors are non-fatal - the row just won't stay hidden.
   }
 }
 
@@ -128,7 +128,7 @@ export default function Pulse() {
     setDismissed(readDismissed(dismissStoreKey));
   }, [dismissStoreKey]);
 
-  // Recommendations are the spine of the worklist — its loading/error state
+  // Recommendations are the spine of the worklist - its loading/error state
   // governs the section. Alerts + hallucinations are enrichment: if either
   // fails it degrades to "no rows from that source", never a broken panel.
   const recsQ = useQuery<{ success: boolean; data: Recommendation[] }>({
@@ -151,7 +151,7 @@ export default function Pulse() {
     if (!selectedBrandId) return [];
     const out: PulseItem[] = [];
 
-    // 1 — Run-change alerts. Keep only recent, actionable types; one row per
+    // 1 - Run-change alerts. Keep only recent, actionable types; one row per
     // type (newest, since the API returns sentAt-desc).
     const recentCutoff = Date.now() - ALERT_RECENT_DAYS * MS_PER_DAY;
     const seenAlertTypes = new Set<string>();
@@ -181,7 +181,7 @@ export default function Pulse() {
       });
     }
 
-    // 2 — Deterministic recommendations. P0 = required blocker, P1/P2 = lower.
+    // 2 - Deterministic recommendations. P0 = required blocker, P1/P2 = lower.
     for (const r of recsQ.data?.data ?? []) {
       const rank = r.priority === "P0" ? 1 : r.priority === "P1" ? 3 : 4;
       out.push({
@@ -198,7 +198,7 @@ export default function Pulse() {
       });
     }
 
-    // 3 — Standing open hallucinations. Skipped when a fresh
+    // 3 - Standing open hallucinations. Skipped when a fresh
     // new_hallucinations alert already says the same thing more urgently.
     const stats = hallucQ.data?.data;
     if (stats && !hasFreshHallucAlert) {

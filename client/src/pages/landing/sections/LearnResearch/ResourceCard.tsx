@@ -27,7 +27,7 @@ export function ResourceCard({ item, isVisible }: { item: ResourceCardData; isVi
       </div>
       <div className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 flex flex-col justify-center">
         <div className="flex items-center gap-2 mb-0.5">
-          {/* Must match LearnResearch's own desktop eyebrow — this is the
+          {/* Must match LearnResearch's own desktop eyebrow - this is the
               mobile stand-in for it, not an independent number. */}
           {item.showMobileEyebrow && (
             <span className="lg:hidden text-[11px] font-semibold tracking-[0.08em] text-vc-accent tabular-nums">

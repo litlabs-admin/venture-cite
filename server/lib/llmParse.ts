@@ -3,7 +3,7 @@
 // the result with the provided Zod schema.
 //
 // Every LLM output we persist (agent outreach body, competitor inference,
-// hallucination judge, remediation steps) should go through this — bare
+// hallucination judge, remediation steps) should go through this - bare
 // JSON.parse + try/catch silently swallows malformed output and stores
 // garbage, which is how several of the recently-found bugs shipped.
 import type { ZodTypeAny, z } from "zod";

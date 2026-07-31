@@ -33,7 +33,7 @@ describe("keyword_research provenance column", () => {
 // Behavioral test for the AI-discovery insert path.
 //
 // POST /api/keyword-research/discover no longer runs the OpenAI call inline
-// and inserts synchronously — it now enqueues a Vercel-Hobby-safe background
+// and inserts synchronously - it now enqueues a Vercel-Hobby-safe background
 // job via enqueueLlmJob() (server/lib/llmJobs.ts) and returns 202 + jobId
 // immediately. The actual OpenAI Responses run happens on OpenAI's
 // infrastructure; the client polls GET /api/llm-jobs/:jobId, which calls
@@ -131,7 +131,7 @@ vi.mock("../../server/lib/sentryReport", () => ({
 // Minimal in-memory llm_jobs table. enqueueLlmJob()/pollLlmJob() (server/lib/
 // llmJobs.ts) and the ownership check in server/routes/llmJobs.ts all read
 // and write schema.llmJobs directly (bypassing the storage layer), so the
-// generic no-op chain used for every other table isn't enough here — we need
+// generic no-op chain used for every other table isn't enough here - we need
 // insert to actually persist a row that a later select can find by id.
 vi.mock("../../server/db", async () => {
   const schema = await vi.importActual<any>("@shared/schema");
@@ -338,7 +338,7 @@ describe("POST /api/keyword-research/discover", () => {
     const kickoff = await call(app, "POST", "/api/keyword-research/discover", {
       brandId: BRAND_ID,
     });
-    // The route no longer inserts synchronously — it enqueues a background
+    // The route no longer inserts synchronously - it enqueues a background
     // job and returns 202 with a jobId to poll.
     expect(kickoff.status).toBe(202);
     expect(kickoff.body?.jobId).toBeTruthy();

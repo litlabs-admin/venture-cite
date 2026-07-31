@@ -1,6 +1,6 @@
 // Postgres advisory-lock wrapper for cron jobs. Prevents two scheduler
 // instances (horizontal scale, container restart overlap) from running the
-// same job body simultaneously — one instance acquires the lock, others
+// same job body simultaneously - one instance acquires the lock, others
 // see "busy" and skip the tick.
 import { pool } from "../db";
 import { logger } from "./logger";
@@ -34,7 +34,7 @@ function stringToInt32(input: string): number {
 
 // Per-entity advisory lock keyed by a stable namespace + a string ID
 // (typically a UUID). Used for "only one slice of citation run X in
-// flight at a time" — Vercel can spawn many concurrent /advance calls
+// flight at a time" - Vercel can spawn many concurrent /advance calls
 // for the same run, and without this guard they race on the same
 // (run, prompt, platform) pairs and produce duplicate geo_rankings rows.
 export const dynamicLockNamespaces = {
@@ -84,7 +84,7 @@ export async function withDynamicAdvisoryLock<T>(
 
 // Runs `fn` holding a session-level advisory lock for `key`. If another
 // process already holds the lock, resolves with `{ ran: false }` and does
-// NOT invoke fn — the caller should treat this as a successful skip.
+// NOT invoke fn - the caller should treat this as a successful skip.
 export async function withAdvisoryLock<T>(
   key: LockKey,
   label: string,

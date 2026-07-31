@@ -1,8 +1,8 @@
-# Phase 0 baseline — TanStack Start migration e2e gate
+# Phase 0 baseline - TanStack Start migration e2e gate
 
 **Date:** 2026-07-25
 **Branch:** `claude/vite-ssr-vs-ssg-c7d345`
-**Commit:** none — nothing in Phase 0 was committed. Every file this phase
+**Commit:** none - nothing in Phase 0 was committed. Every file this phase
 touched (`playwright.config.ts`, `tests/e2e/**`, `package.json`,
 `package-lock.json`, `.env.example`, `.gitignore`, this document, and
 `tests/e2e/README.md`) is uncommitted in the working tree. There is
@@ -13,7 +13,7 @@ the plan this baseline closes out.)
 This document is the reference every later migration phase compares against:
 the suite must be green before the migration starts (confirmed below) and
 green again at the end of every phase. If a test goes red mid-migration, fix
-the app, not the test — see `tests/e2e/README.md` for the full rule and the
+the app, not the test - see `tests/e2e/README.md` for the full rule and the
 rationale.
 
 ## Result
@@ -33,12 +33,12 @@ above are transcribed directly from that capture, not re-run.
 
 The setup project reuses a still-valid cached login
 (`playwright/.auth/state.json`), so it performs **0** logins on a warm cache
-and 1 on a cold one. `auth-login.spec.ts` — the spec that tests logging in —
+and 1 on a cold one. `auth-login.spec.ts` - the spec that tests logging in -
 performs **2** real logins per run. **Total: 2 real logins per run (3 cold).**
 
 The login endpoint rate-limits at **10 attempts per (IP, email) per 15
 minutes** (`server/auth.ts:244-251`), so roughly five full-suite runs fit in a
-window. Exceeding it does **not** surface as a visible 429 — it appears as
+window. Exceeding it does **not** surface as a visible 429 - it appears as
 `TimeoutError: page.waitForURL` at `tests/e2e/support/auth.ts`, which looks
 like an auth regression. This was hit and diagnosed during Phase 0; see
 `tests/e2e/README.md`.
@@ -62,28 +62,28 @@ like an auth regression. This was hit and diagnosed during Phase 0; see
 
 ## Skipped tests
 
-Two tests are skipped, both understood and both legitimate — but for
+Two tests are skipped, both understood and both legitimate - but for
 different reasons, and only one of them should stay skipped forever.
 
-1. **`tours.spec.ts:140:3` — "Tour engine e2e › brand switch mid-tour
-   cancels"** — structurally untestable, not just currently broken. The tour
+1. **`tours.spec.ts:140:3` - "Tour engine e2e › brand switch mid-tour
+   cancels"** - structurally untestable, not just currently broken. The tour
    engine's `useModalOverlay` blocks every click outside the active tour
    step's own target element, and the brand selector is never that target
    mid-tour, so a real user click on the brand switcher cannot land while a
    tour is open. This was verified empirically by letting a real click retry
    against the overlay for 60 seconds with no success. There is no fixture or
    code path that makes this scenario reachable through the UI as currently
-   built. **No action expected** — this is a permanent, documented skip.
+   built. **No action expected** - this is a permanent, documented skip.
 
-2. **`tours.spec.ts:52:3` — "global welcome tour fires for new user and
-   persists"** — unconditionally skipped so the suite's pass/skip count stays
+2. **`tours.spec.ts:52:3` - "global welcome tour fires for new user and
+   persists"** - unconditionally skipped so the suite's pass/skip count stays
    **stable across runs**. Two reasons, both verified:
    - The test is **one-shot**. Clicking the tour to "Done" PATCHes completion
      to the server for the shared account, and
      `client/src/tours/engine/eligibility.ts:46-47` then returns false
-     permanently. There is no reset operation —
+     permanently. There is no reset operation -
      `server/routes/tours.ts`'s `PatchOpSchema` whitelist has no global-clear
-     op — so after its first-ever run the test could never pass again. An
+     op - so after its first-ever run the test could never pass again. An
      earlier baseline recorded 61/2 while this test still ran; the following
      run would have silently become 60/3.
    - Independently, `client/src/tours/engine/shepherdAdapter.ts` has a race:
@@ -109,7 +109,7 @@ Application source was explicitly out of scope for Phase 0 (only `tests/`,
 `package.json`, and `docs/` could change), so **none of the following were
 fixed**. Each is now pinned by an assertion in the suite so a later
 migration phase cannot silently change the behavior without the gate
-noticing — per the rule that behavior changes must be reviewed, not
+noticing - per the rule that behavior changes must be reviewed, not
 absorbed silently. Two are security-relevant (marked below); the rest are
 correctness, SEO, or accessibility findings.
 
@@ -135,20 +135,20 @@ correctness, SEO, or accessibility findings.
    exists.** `client/src/App.tsx:196-211`'s redirect table sends
    `/ai-intelligence` to `/monitor?tab=share-of-answer`, but the current
    monitor tab set is `overview`, `citations`, `competitors`, `trends`,
-   `mentions` — `share-of-answer` isn't one of them. `SpineShell` silently
+   `mentions` - `share-of-answer` isn't one of them. `SpineShell` silently
    falls back to the `overview` tab instead of erroring. Found while writing
    `legacy-redirects.spec.ts` (Task 7); the test asserts the real fallback
    (`overview`), not the table's stated target.
 
 4. **`?edit=<nonexistent-id>` is never cleared from the URL.** When the query
    param references an article id that doesn't exist, the edit dialog
-   correctly never opens — but unlike the "real id" path, the query param is
+   correctly never opens - but unlike the "real id" path, the query param is
    never stripped from the URL afterward; it sits there indefinitely. Found
    while writing `url-state.spec.ts` (Task 8).
 
 5. **`CardTitle` renders a `<div>`, not a heading element.** Every card
    title in the settings UI (and elsewhere `CardTitle` is used) sits outside
-   the page's heading hierarchy — screen-reader users navigating by heading
+   the page's heading hierarchy - screen-reader users navigating by heading
    cannot jump to card titles. Accessibility finding from
    `settings-theme.spec.ts` (Task 9).
 
@@ -169,14 +169,14 @@ correctness, SEO, or accessibility findings.
    here), so the lookup throws before any Stripe API call happens. This is
    pinned in `billing.spec.ts` as "POST /api/stripe/checkout 500s on a
    well-formed but unrecognized priceId (pre-existing bug, pinned for
-   migration parity)" — deliberately encoding the bug, not endorsing it. Once
+   migration parity)" - deliberately encoding the bug, not endorsing it. Once
    the `stripe` schema exists, the route will start returning 400 instead of
-   500, and this test will fail loudly, forcing an update — the intended
+   500, and this test will fail loudly, forcing an update - the intended
    failure mode.
 
 8. **[Security-relevant] That same 500 response leaks the raw database
-   driver error — including literal SQL text and the caller-supplied
-   `priceId` reflected back — straight into the client-facing JSON body.**
+   driver error - including literal SQL text and the caller-supplied
+   `priceId` reflected back - straight into the client-facing JSON body.**
    `server/routes/billing.ts`, around line 187, puts `error.message` directly
    into the response with no `NODE_ENV` production redaction, unlike
    `server/routes.ts`'s `sendError` helper, which does redact in production.
@@ -185,7 +185,7 @@ correctness, SEO, or accessibility findings.
    Found and flagged by the reviewer during Task 10's review pass, logged in
    the `billing.spec.ts` file as item 14 of its findings.
 
-9. **`/pricing` is dead code — fully built but never routed.**
+9. **`/pricing` is dead code - fully built but never routed.**
    `client/src/pages/pricing.tsx` is a complete page (products grid,
    checkout mutation, Stripe success/canceled banners, ~330 lines) but
    `client/src/App.tsx`'s router never mounts a `/pricing` route for it, so
@@ -207,7 +207,7 @@ things anyone flagged as wrong:
   A naive strict-equality read against the URL's unquoted id would silently
   fail. `url-state.spec.ts` reads it with `JSON.parse` to match.
 - The app authenticates via a Supabase JWT sent as an `Authorization: Bearer`
-  header, not cookies — confirmed by `playwright/.auth/state.json` having
+  header, not cookies - confirmed by `playwright/.auth/state.json` having
   zero cookies. Any test (or future migration code) that assumes a cookie
   session is wrong.
 

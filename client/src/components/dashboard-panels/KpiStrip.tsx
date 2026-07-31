@@ -10,7 +10,7 @@ import type { HallucinationStats, Listicle } from "./useDashboardData";
 //   caption  9px / tertiary / mt-1
 //
 // Tiles whose metric has no backing measurement render `–` and a caption
-// naming what's missing, in the same chrome — the strip never loses a column
+// naming what's missing, in the same chrome - the strip never loses a column
 // and never shows a number the data can't support.
 
 function TileLabel({ children, tip }: { children: React.ReactNode; tip: React.ReactNode }) {
@@ -135,7 +135,7 @@ export function KpiStrip({
         {/* `–` until a scan has actually completed. The mention scan is
             opt-in (brands.monitor_mentions gates the weekly cron) and
             otherwise runs on demand from Monitor › Mentions, so an unscanned
-            brand is the normal starting state — and it used to render a
+            brand is the normal starting state - and it used to render a
             confident "0 · last 7 days", which claims a measurement nobody
             took. The caption names the missing step instead. */}
         <Tile
@@ -157,7 +157,7 @@ export function KpiStrip({
         </Tile>
 
         {/* Your position in the competitive set, from the same
-            rankLeaderboard() the Rankings panel uses — the tile and the panel
+            rankLeaderboard() the Rankings panel uses - the tile and the panel
             are one claim shown twice and must not sort independently.
             Previously specced as a cross-account GLOBAL rank, which needs an
             index that does not exist, so it rendered a permanent `–` directly
@@ -192,7 +192,7 @@ export function KpiStrip({
         </Tile>
 
         {/* Replaced "AI Traffic" (needed a Google Analytics connection that
-            does not exist). Unresolved contradicted claims — measured on every
+            does not exist). Unresolved contradicted claims - measured on every
             citation run, and the highest-stakes number on this strip. */}
         <Tile
           dest={DEST.hallucinations}

@@ -1,4 +1,4 @@
-// Tests for server/lib/sourceHealth.ts (Task 9 — Mentions Rebuild).
+// Tests for server/lib/sourceHealth.ts (Task 9 - Mentions Rebuild).
 //
 // Strategy: vi.mock("../../server/storage") to inject a fake storage
 // implementation, then exercise shouldSkipSource / recordSourceSuccess /
@@ -127,7 +127,7 @@ describe("recordSourceFailure", () => {
     expect(arg.pausedUntil?.getTime()).toBe(expected24h.getTime());
   });
 
-  it("does not overwrite lastSuccessfulScanAt — preserves prior value", async () => {
+  it("does not overwrite lastSuccessfulScanAt - preserves prior value", async () => {
     const lastSuccess = new Date("2026-05-04T10:00:00Z");
     stubs.getSourceHealth.mockResolvedValue(
       makeHealth({ consecutiveFailures: 1, lastSuccessfulScanAt: lastSuccess }),

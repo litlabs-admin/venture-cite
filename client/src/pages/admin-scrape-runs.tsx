@@ -30,7 +30,7 @@ function statusToVariant(status: string): "ok" | "warn" | "fail" {
 }
 
 function fmtDur(start: string, end: string | null): string {
-  if (!end) return "—";
+  if (!end) return "-";
   const ms = new Date(end).getTime() - new Date(start).getTime();
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
@@ -52,12 +52,12 @@ export default function AdminScrapeRuns() {
       const res = await apiRequest("GET", "/api/admin/scrape/runs/recent");
       return res.json();
     },
-    refetchInterval: 15_000, // auto-refresh — operators usually leave this open
+    refetchInterval: 15_000, // auto-refresh - operators usually leave this open
   });
 
   return (
     <PanelPage>
-      {/* Title moved to src/routes/_app/admin.scrape.tsx's `head()` —
+      {/* Title moved to src/routes/_app/admin.scrape.tsx's `head()` -
           metadata belongs to the route, not this component. */}
       <div className="px-8 py-6">
         <h1 className="text-page font-semibold text-vc-primary">Recent fact-sheet scrapes</h1>
@@ -121,7 +121,7 @@ export default function AdminScrapeRuns() {
                             </span>
                           )}
                           <span className="text-label text-vc-tertiary">
-                            {run.triggeredBy ?? "—"}
+                            {run.triggeredBy ?? "-"}
                           </span>
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0 text-caption text-vc-tertiary tabular-nums">

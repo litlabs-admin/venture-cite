@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Hoisted db mock — chain proxy returning thenable for all Drizzle ops.
+// Hoisted db mock - chain proxy returning thenable for all Drizzle ops.
 const dbMock = vi.hoisted(() => {
   const proxy: Record<string, unknown> = {};
   const fn = vi.fn(() => proxy);

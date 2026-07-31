@@ -3,13 +3,13 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Public pages (unauthenticated)", () => {
   // client/src/App.tsx's HomePage() renders "/" differently depending on
-  // useAuth().isAuthenticated — the authenticated dashboard vs. the
+  // useAuth().isAuthenticated - the authenticated dashboard vs. the
   // logged-out marketing landing page (client/src/pages/landing/index.tsx).
   // This file is explicitly testing the logged-out marketing pages, but the
   // suite's default "chromium" project now reuses the shared authenticated
   // STORAGE_STATE (see tests/e2e/auth.setup.ts and playwright.config.ts) so
   // that other specs don't re-hit the rate-limited login endpoint. Opt this
-  // file back out with a genuinely empty, unauthenticated context —
+  // file back out with a genuinely empty, unauthenticated context -
   // otherwise "landing page renders with its title and description" would
   // assert against the authenticated dashboard instead of the marketing
   // page it's meant to cover.
@@ -28,14 +28,14 @@ test.describe("Public pages (unauthenticated)", () => {
     //
     // React 19 hoists <title>/<meta>/<link> children rendered anywhere in the
     // tree directly into <head> itself, so Helmet's data-rh="true" marker no
-    // longer appears on the tags it manages — react-helmet-async is expected
+    // longer appears on the tags it manages - react-helmet-async is expected
     // to be removed entirely once the framework migration lands, at which
     // point this marker disappears for good, and client/src/lib/
     // dedupeStaticMeta.ts (which keys off data-rh to remove the static
     // duplicate) can no longer find Helmet's tag either, so both the static
     // and page-specific description tags may now coexist in <head>. Locate
     // the tag by its exact page-specific content instead of by the marker or
-    // by .first()/a loose regex — either of those would still pass even if
+    // by .first()/a loose regex - either of those would still pass even if
     // this page's own <Helmet> description were deleted, since it would
     // simply fall back to matching the static tag.
     const description = page.locator(

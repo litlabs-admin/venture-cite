@@ -94,7 +94,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function Articles() {
   const { toast } = useToast();
   // /_app/articles.tsx declares `validateSearch` (articlesSearchSchema), so
-  // `edit` is a real typed field here — no more manual URLSearchParams
+  // `edit` is a real typed field here - no more manual URLSearchParams
   // parsing of the raw query string. Named `routeSearch` (not `search`) to
   // avoid colliding with the free-text search box's own `search` state
   // below.
@@ -114,7 +114,7 @@ export default function Articles() {
   // Selection (for bulk delete)
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Articles list — server-side status filter so we don't pull drafts when
+  // Articles list - server-side status filter so we don't pull drafts when
   // the user only wants ready articles.
   const articlesQuery = useQuery<{ success: boolean; data: Article[] }>({
     queryKey: ["/api/articles", "list", statusFilter],
@@ -163,7 +163,7 @@ export default function Articles() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      // Sequential — small N, no need for parallelism.
+      // Sequential - small N, no need for parallelism.
       for (const id of ids) {
         await apiRequest("DELETE", `/api/articles/${id}`);
       }
@@ -368,7 +368,7 @@ export default function Articles() {
                   </Select>
                 </div>
 
-                {/* Bulk action toolbar — shown when anything is selected. */}
+                {/* Bulk action toolbar - shown when anything is selected. */}
                 {selected.size > 0 && (
                   <div className="flex items-center justify-between p-2 px-3 border rounded-md bg-muted/50">
                     <span className="text-caption">

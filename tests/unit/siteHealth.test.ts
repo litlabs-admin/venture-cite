@@ -1,10 +1,10 @@
-// Site health citation-readiness scoring — pure function tests.
+// Site health citation-readiness scoring - pure function tests.
 //
 // Weights (see server/routes/dashboard.ts scoreSiteHealth):
 //   discovery (35): robots.txt=10, sitemap.xml=15, llms.txt=10
 //   crawler access (35): round(allowed/total*35)
 //   crawl success (30): round(pagesFetched/(pagesFetched+pagesFailed)*30),
-//     EXCLUDED (not zeroed) when there is no crawl run — rescale over 70.
+//     EXCLUDED (not zeroed) when there is no crawl run - rescale over 70.
 
 import { describe, it, expect, vi } from "vitest";
 
@@ -80,7 +80,7 @@ describe("scoreSiteHealth", () => {
 
   it("unknown (null) discovery files are EXCLUDED from both earned and attainable, not scored as missing", () => {
     // 2 confirmed present + 3 unknown must score IDENTICALLY to a site where
-    // only those same 2 files were ever probed — never as "3/5 missing".
+    // only those same 2 files were ever probed - never as "3/5 missing".
     const withUnknowns = scoreSiteHealth({
       website: "https://example.com",
       discovery: { robotsTxt: true, sitemapXml: true, llmsTxt: null },
@@ -89,7 +89,7 @@ describe("scoreSiteHealth", () => {
     });
     const onlyConfirmed = scoreSiteHealth({
       website: "https://example.com",
-      // llmsTxt omitted from scoring entirely — same attainable denominator
+      // llmsTxt omitted from scoring entirely - same attainable denominator
       // as the "unknown" case above should produce.
       discovery: { robotsTxt: true, sitemapXml: true, llmsTxt: null },
       crawlers: { total: 10, allowed: 10 },

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// The Reddit scanner is UNAUTHENTICATED ONLY. The OAuth path — token exchange,
-// authenticated fetch, and comment-tree expansion — was removed, along with
+// The Reddit scanner is UNAUTHENTICATED ONLY. The OAuth path - token exchange,
+// authenticated fetch, and comment-tree expansion - was removed, along with
 // server/lib/redditOAuth.ts. What remains is public JSON with an RSS fallback,
 // so these tests exercise that path rather than pinning to a mode that no
 // longer exists (the previous suite mocked hasRedditOAuthCredentials() to true).
@@ -65,7 +65,7 @@ beforeEach(() => {
   mockAcquireOrWait.mockResolvedValue(true);
 });
 
-describe("scanRedditSource — public JSON path", () => {
+describe("scanRedditSource - public JSON path", () => {
   it("returns a shaped mention from a matching post", async () => {
     mockPublicFetch.mockResolvedValue(okJson(listing([post()])));
 
@@ -126,10 +126,10 @@ describe("scanRedditSource — public JSON path", () => {
   });
 });
 
-describe("scanRedditSource — blocked and failing", () => {
+describe("scanRedditSource - blocked and failing", () => {
   // Live behaviour as of 2026-07-30: Reddit 403s unauthenticated traffic on
   // BOTH the JSON and RSS endpoints. The scan must report a source FAILURE,
-  // never an empty success — an empty list reads as "nothing was said about
+  // never an empty success - an empty list reads as "nothing was said about
   // this brand", which is a different and false claim.
   it("reports failed (not an empty success) when both JSON and RSS are blocked", async () => {
     mockPublicFetch.mockResolvedValue(errStatus(403));
@@ -150,7 +150,7 @@ describe("scanRedditSource — blocked and failing", () => {
     expect(r.failed).toBeTruthy();
   });
 
-  it("never throws out of the scanner — a fetch rejection becomes `failed`", async () => {
+  it("never throws out of the scanner - a fetch rejection becomes `failed`", async () => {
     mockPublicFetch.mockRejectedValue(new Error("socket hang up"));
 
     const r = await scanRedditSource(BASE_INPUT);

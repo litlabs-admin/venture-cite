@@ -4,7 +4,7 @@ import type { Brand } from "@shared/schema";
 
 // Centralised auth check for `:brandId` route params. Replaces the pattern
 // of calling requireUser + requireBrand separately at the top of every
-// handler (easy to forget — several endpoints were missing one or both).
+// handler (easy to forget - several endpoints were missing one or both).
 //
 // Additionally blocks access to soft-deleted brands, which `requireBrand`
 // by itself does not.

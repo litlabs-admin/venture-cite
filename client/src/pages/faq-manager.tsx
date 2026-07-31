@@ -99,7 +99,7 @@ export default function FaqManager() {
     },
     onSuccess: (data: any) => {
       // Surface the REAL insert count from the server's report. The previous
-      // toast lied — "FAQs generated successfully!" fired even when zero rows
+      // toast lied - "FAQs generated successfully!" fired even when zero rows
       // were inserted (LLM returned malformed JSON, all merged as duplicates,
       // etc.). Now we read report.inserted to tell the user what happened.
       const inserted = data?.report?.inserted ?? data?.data?.length ?? 0;
@@ -115,7 +115,7 @@ export default function FaqManager() {
       });
       queryClient.invalidateQueries({ queryKey: [`/api/faqs?brandId=${selectedBrandId}`] });
       setGenerateTopic("");
-      // Jump to the Manage FAQs tab so the freshly generated FAQs are visible —
+      // Jump to the Manage FAQs tab so the freshly generated FAQs are visible -
       // otherwise the user stays on the Generate tab and it looks like "nothing
       // happened" even though rows were created.
       if (inserted > 0) {
@@ -237,7 +237,7 @@ export default function FaqManager() {
 
   const getScoreColor = (score: number) => {
     // Zero (including cold-start, no FAQs yet) is a neutral "no data" state,
-    // not a failing one — colour only arrives once there's a real score.
+    // not a failing one - colour only arrives once there's a real score.
     if (score <= 0) return "text-foreground";
     // High score: neutral text, not green/chart-4. The check icon rendered
     // alongside the value is what signals "good", not colour.
@@ -247,8 +247,8 @@ export default function FaqManager() {
   };
 
   const getScoreBadge = (score: number) => {
-    // Mirrors getScoreColor above. Badge's "default" variant is bg-primary —
-    // the accent — and green marks ACTIONS, never outcomes, so a good score
+    // Mirrors getScoreColor above. Badge's "default" variant is bg-primary -
+    // the accent - and green marks ACTIONS, never outcomes, so a good score
     // renders neutral-filled instead of accented. A cold-start 0 is missing
     // data rather than a failure, so it stays outlined. The exact number is
     // rendered inside the badge either way ("AI Score: 72%"), so collapsing
@@ -260,7 +260,7 @@ export default function FaqManager() {
 
   return (
     // Only ever rendered client-side, as a lazy tab inside
-    // client/src/pages/act.tsx (no route of its own) — title/meta removed
+    // client/src/pages/act.tsx (no route of its own) - title/meta removed
     // per this task's blanket rule; /act falls back to root defaults.
     <PanelPage>
       {!selectedBrandId && (

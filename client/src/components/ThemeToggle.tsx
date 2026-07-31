@@ -1,4 +1,4 @@
-// Standalone theme toggle — three-button segmented control for use anywhere
+// Standalone theme toggle - three-button segmented control for use anywhere
 // outside a dropdown (Settings page primarily). Roving-tabindex keyboard
 // pattern: arrow keys move between options, Space/Enter selects, Home/End
 // jump to ends. Matches WAI-ARIA radiogroup semantics so screen readers
@@ -25,7 +25,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   // Refs for roving-tabindex focus management. Without this, arrow-key
   // navigation works at the radiogroup level but actual focus doesn't
-  // move with the selection — screen-reader UX feels jumpy.
+  // move with the selection - screen-reader UX feels jumpy.
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const handleKeyDown = useCallback(
@@ -58,7 +58,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       className={cn(
         // 1px border + matched inner padding so the active "chip" sits
         // flush. The shadow recess is dark-mode only, light gets a hairline
-        // — handled by --border-default + --bg-surface-1 token swap.
+        // - handled by --border-default + --bg-surface-1 token swap.
         "inline-flex items-center gap-0.5 rounded-lg border border-border bg-(--bg-surface-1) p-0.5",
         className,
       )}
@@ -86,7 +86,7 @@ export function ThemeToggle({ className }: { className?: string }) {
               "transition-colors",
               "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
               selected
-                ? // Raised neutral chip — matches the active-nav treatment.
+                ? // Raised neutral chip - matches the active-nav treatment.
                   // No indigo here; brand colour stays reserved.
                   "bg-(--bg-surface-3) text-foreground shadow-(--elevation-raised)"
                 : "text-muted-foreground hover:text-foreground",

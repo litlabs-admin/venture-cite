@@ -9,7 +9,7 @@
 // POST /api/auth/login itself.
 //
 // This exists because server/auth.ts rate-limits that endpoint to 10
-// attempts per (IP, email) per 15 minutes (loginRateLimit) — a
+// attempts per (IP, email) per 15 minutes (loginRateLimit) - a
 // beforeEach(login) pattern repeated across every spec file burns through
 // that budget almost immediately and turns real defects into 429 flakes.
 // Authenticating exactly once here, and only re-authenticating explicitly in
@@ -38,7 +38,7 @@ import { login, expectAuthenticated, STORAGE_STATE } from "./support/auth";
 // treats as a failure.
 //
 // This must NOT be "/". It used to be, on the reasoning that "/" was the
-// post-login landing route and therefore gated — that stopped being true
+// post-login landing route and therefore gated - that stopped being true
 // when the TanStack Start migration split "/" into a public,
 // server-rendered marketing page. A logged-out visit to "/" now returns a
 // perfectly good 200 instead of bouncing to /login, which makes it a much
@@ -50,7 +50,7 @@ const GATED_ROUTE = "/dashboard";
 // The probe below proves the token works *now*; it says nothing about
 // whether it survives the run. A Supabase access token lives an hour, so a
 // cached state reused at minute 59 passes setup and then starts returning
-// 401s partway through — surfacing as unrelated-looking failures ("Test
+// 401s partway through - surfacing as unrelated-looking failures ("Test
 // account has no brands") in whichever specs happen to run late. That is
 // exactly what this margin prevents; it costs one extra login, rarely.
 const MIN_REMAINING_TOKEN_MS = 15 * 60 * 1000;
@@ -74,12 +74,12 @@ setup("authenticate", async ({ browser }) => {
   let reused = false;
 
   if (forceLogin) {
-    console.log("[auth.setup] E2E_FORCE_LOGIN=1 set — skipping cache reuse, logging in fresh.");
+    console.log("[auth.setup] E2E_FORCE_LOGIN=1 set - skipping cache reuse, logging in fresh.");
   } else if (!fs.existsSync(STORAGE_STATE)) {
-    console.log("[auth.setup] No cached storage state found — logging in fresh.");
+    console.log("[auth.setup] No cached storage state found - logging in fresh.");
   } else {
     // Load the existing file into its own context (do NOT touch the
-    // "page" fixture's default context — the setup project intentionally
+    // "page" fixture's default context - the setup project intentionally
     // has no storageState of its own, see playwright.config.ts) and check
     // whether it's still authenticated before trusting it.
     const context = await browser.newContext({ storageState: STORAGE_STATE });
@@ -93,7 +93,7 @@ setup("authenticate", async ({ browser }) => {
       // session, so a gated route can render fine while the *stored* JWT
       // snapshot in this file is already expired. Specs that call the API
       // directly (billing.spec.ts, welcome-brand.spec.ts) extract that raw
-      // token via support/bearer-token.ts and got 401s — intermittently at
+      // token via support/bearer-token.ts and got 401s - intermittently at
       // first, since the tests latest in the run are most exposed, then
       // consistently once the token fully lapsed.
       //
@@ -121,7 +121,7 @@ setup("authenticate", async ({ browser }) => {
         const remainingMs = expiryMs - Date.now();
         if (remainingMs < MIN_REMAINING_TOKEN_MS) {
           throw new Error(
-            `cached token expires in ${Math.round(remainingMs / 1000)}s — too close to lapse`,
+            `cached token expires in ${Math.round(remainingMs / 1000)}s - too close to lapse`,
           );
         }
       }
@@ -137,7 +137,7 @@ setup("authenticate", async ({ browser }) => {
       // 🔴 Persist the session back to disk before trusting the reuse.
       //
       // Everything above validated the token held by the LIVE PAGE, and the
-      // in-page Supabase client silently refreshes on load — so a state file
+      // in-page Supabase client silently refreshes on load - so a state file
       // whose stored JWT expired hours ago still passes both the page check
       // and the bearer probe, because both see the refreshed token. Without
       // this write, the file keeps the dead JWT, every spec loads it via
@@ -146,16 +146,16 @@ setup("authenticate", async ({ browser }) => {
       //
       // That is not hypothetical: it is exactly how a 3-hour-old state file
       // produced four unrelated-looking failures while setup logged "still
-      // valid". Re-saving is also what makes the reuse worth having — it
+      // valid". Re-saving is also what makes the reuse worth having - it
       // rolls the expiry forward instead of counting down to it.
       await context.storageState({ path: STORAGE_STATE });
 
       reused = true;
       console.log(
-        "[auth.setup] Cached storage state is still valid (page + bearer token verified) — refreshed session written back, 0 logins performed.",
+        "[auth.setup] Cached storage state is still valid (page + bearer token verified) - refreshed session written back, 0 logins performed.",
       );
     } catch {
-      console.log("[auth.setup] Cached storage state is stale/expired — logging in fresh.");
+      console.log("[auth.setup] Cached storage state is stale/expired - logging in fresh.");
     } finally {
       await context.close();
     }
@@ -164,7 +164,7 @@ setup("authenticate", async ({ browser }) => {
   if (reused) {
     // The reuse check above already ran expectAuthenticated() successfully
     // against a live page loaded from this exact file, so the file on disk
-    // is confirmed good — nothing left to do.
+    // is confirmed good - nothing left to do.
     return;
   }
 

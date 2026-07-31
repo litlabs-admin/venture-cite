@@ -36,7 +36,7 @@ vi.mock("../../server/storage", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// db mock — chainable query-builder stand-in. Each call to db.select()/
+// db mock - chainable query-builder stand-in. Each call to db.select()/
 // db.insert() pops the next queued result off a FIFO so tests can script
 // exactly what each sequential query in a handler returns.
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ function queueInsert(result: unknown) {
 }
 
 // ---------------------------------------------------------------------------
-// crawlerAccess / platformDetect / perceptionScorer mocks — these do real
+// crawlerAccess / platformDetect / perceptionScorer mocks - these do real
 // network / LLM work in production and must never run in tests.
 // ---------------------------------------------------------------------------
 const crawlerStubs = vi.hoisted(() => ({
@@ -351,11 +351,11 @@ describe("GET /api/dashboard/site-health/:brandId", () => {
     expect(r.status).toBe(200);
     // All FIVE discovery files the reference checks. mcp.json and
     // security.txt were added later; asserting the whole object (rather than
-    // individual keys) is deliberate — it fails loudly if a file is added to
+    // individual keys) is deliberate - it fails loudly if a file is added to
     // the probe but never surfaced in the response.
     //
     // Tri-state shape: a rejected probe is UNKNOWN (null), not "confirmed
-    // absent" (false) — that conflation is exactly the bug this endpoint
+    // absent" (false) - that conflation is exactly the bug this endpoint
     // used to have (a network failure reading the same as a real 404).
     expect(r.body.data.discovery).toEqual({
       robotsTxt: null,
@@ -384,7 +384,7 @@ describe("GET /api/dashboard/site-health/:brandId", () => {
     const brand = makeBrand();
     storageStubs.getBrandById.mockResolvedValue(brand);
     // Introduce a delay so all 10 concurrent requests land while the first
-    // compute is still in flight — this is what exercises the coalescing map.
+    // compute is still in flight - this is what exercises the coalescing map.
     crawlerStubs.fetchRobots.mockImplementation(
       () =>
         new Promise((resolve) =>
@@ -535,7 +535,7 @@ describe("POST /api/dashboard/perception/:brandId/run", () => {
   it("returns data: null and never scores/inserts when there is no evidence", async () => {
     const brand = makeBrand();
     storageStubs.getBrandById.mockResolvedValue(brand);
-    queueSelect([]); // cooldown check — no prior run
+    queueSelect([]); // cooldown check - no prior run
     queueSelect([]); // geoRankings rows
     perceptionStubs.gatherEvidence.mockReturnValue([]);
 

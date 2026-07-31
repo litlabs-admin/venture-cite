@@ -3,30 +3,30 @@
 // Wave 7 (content unification): the legacy three-table model
 // (content_drafts + content_generation_jobs + articles) was collapsed into a
 // single articles table with status='draft'|'generating'|'ready'|'failed'.
-// The /api/content-drafts CRUD endpoints are gone — drafts are just articles
+// The /api/content-drafts CRUD endpoints are gone - drafts are just articles
 // with status='draft' now (see /api/articles/draft in routes/articles.ts).
 //
 // What remains here:
-//   POST /api/articles/:id/generate          — enqueue a generation job for
+//   POST /api/articles/:id/generate          - enqueue a generation job for
 //                                               an existing draft article
-//   GET  /api/content-jobs/active            — caller's most recent in-flight
+//   GET  /api/content-jobs/active            - caller's most recent in-flight
 //                                               or recently-finished job
-//   GET  /api/content-jobs/:jobId            — poll a single job (JSON)
-//   GET  /api/content-jobs/:jobId/state      — poll status + elapsedSeconds
-//   POST /api/content/:articleId/cancel      — cancel the article's active job
-//   POST /api/content-jobs/:jobId/advance    — drive one slice of OpenAI
+//   GET  /api/content-jobs/:jobId            - poll a single job (JSON)
+//   GET  /api/content-jobs/:jobId/state      - poll status + elapsedSeconds
+//   POST /api/content/:articleId/cancel      - cancel the article's active job
+//   POST /api/content-jobs/:jobId/advance    - drive one slice of OpenAI
 //                                               Responses run (Vercel migration)
-//   POST /api/content-jobs/:jobId/cancel     — mark cancelled; next /advance bails
-//   POST /api/articles/:id/improve           — Auto-Improve: 1 rewrite pass,
+//   POST /api/content-jobs/:jobId/cancel     - mark cancelled; next /advance bails
+//   POST /api/articles/:id/improve           - Auto-Improve: 1 rewrite pass,
 //                                               creates a revision, bumps
 //                                               version, no fork.
-//   POST /api/keyword-suggestions            — keyword brainstorm (unchanged)
-//   GET  /api/popular-topics                 — trending topics by industry
-//   POST /api/keyword-research/discover      — AI keyword discovery
-//   GET  /api/keyword-research/:brandId      — list research rows
+//   POST /api/keyword-suggestions            - keyword brainstorm (unchanged)
+//   GET  /api/popular-topics                 - trending topics by industry
+//   POST /api/keyword-research/discover      - AI keyword discovery
+//   GET  /api/keyword-research/:brandId      - list research rows
 //   GET  /api/keyword-research/:brandId/opportunities
-//   PATCH /api/keyword-research/:id          — update row
-//   DELETE /api/keyword-research/:id         — delete row
+//   PATCH /api/keyword-research/:id          - update row
+//   DELETE /api/keyword-research/:id         - delete row
 
 import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
@@ -61,7 +61,7 @@ import { captureAndFlush } from "../lib/sentryReport";
 import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
 
 // ─────────────────────────────────────────────────────────────────────────
-// Keyword discovery handler — registered at module-load. The poll endpoint
+// Keyword discovery handler - registered at module-load. The poll endpoint
 // in routes/llmJobs.ts dispatches to this handler when the OpenAI Responses
 // background run completes. The handler is responsible for:
 //   - validating the structured output
@@ -95,9 +95,7 @@ registerLlmJobHandler<
     // Tolerate both shapes the model historically returned:
     // either { keywords: [...] } or a bare [...] array.
     const parsed = structuredOutput as
-      | { keywords?: DiscoveredKeyword[] }
-      | DiscoveredKeyword[]
-      | null;
+      { keywords?: DiscoveredKeyword[] } | DiscoveredKeyword[] | null;
     const keywords: DiscoveredKeyword[] = Array.isArray(parsed)
       ? parsed
       : Array.isArray(parsed?.keywords)
@@ -149,7 +147,7 @@ registerLlmJobHandler<
         data: [],
         count: 0,
         message:
-          "No new keywords found — try completing your brand profile (description, products, target audience) for better results.",
+          "No new keywords found - try completing your brand profile (description, products, target audience) for better results.",
       };
     }
 
@@ -157,7 +155,7 @@ registerLlmJobHandler<
   },
 });
 // Foundations Plan 1, Task 4: the previous time-driven "phase label"
-// (Brainstorming → Drafting → Writing → Polishing) was theatre — the
+// (Brainstorming → Drafting → Writing → Polishing) was theatre - the
 // Responses API background mode doesn't expose intra-run progress, so
 // those labels were uncorrelated with what the model was actually doing.
 // We now show honest elapsed seconds only, plus a Cancel button.
@@ -197,7 +195,7 @@ export function setupContentRoutes(app: Express): void {
   // Wave 7: the article must already exist in status='draft'. The route
   // verifies ownership, atomically reserves a quota slot + inserts the
   // generation job + flips the article to status='generating' (well, the
-  // worker actually flips it on claim — see setArticleGeneratingFromDraft).
+  // worker actually flips it on claim - see setArticleGeneratingFromDraft).
   // Returns the jobId immediately; the client polls or streams.
   app.post(
     "/api/articles/:id/generate",
@@ -210,7 +208,7 @@ export function setupContentRoutes(app: Express): void {
         if (article.status !== "draft" && article.status !== "failed") {
           return res.status(409).json({
             success: false,
-            error: `Cannot generate — article is in status '${article.status}'.`,
+            error: `Cannot generate - article is in status '${article.status}'.`,
             code: "invalid_status",
           });
         }
@@ -288,7 +286,7 @@ export function setupContentRoutes(app: Express): void {
         // switches to the streaming view immediately. The worker's claim
         // (which polls every 5-60s) used to do this transition, but that
         // left a long window where the form was still visible after the
-        // user clicked Generate. Doing it here is safe — the worker only
+        // user clicked Generate. Doing it here is safe - the worker only
         // reads articleId from the job and re-confirms ownership.
         await db
           .update(schema.articles)
@@ -296,12 +294,12 @@ export function setupContentRoutes(app: Express): void {
           .where(eq(schema.articles.id, article.id));
 
         // Server-side drive: progress the job without requiring an open
-        // browser tab. Additive — the client /advance loop still runs as
+        // browser tab. Additive - the client /advance loop still runs as
         // the fast path when a tab is open (Vercel Hobby has no frequent
         // cron); the per-job slice lock (claimContentJobForSlice) makes
         // client + server coexist (only one slice at a time). Whatever
         // doesn't finish in this function's window is resumed by the
-        // daily cron's drainPendingContentJobs — same backstop as today,
+        // daily cron's drainPendingContentJobs - same backstop as today,
         // but a tab is no longer REQUIRED for progress.
         const driveDeadlineMs = Date.now() + 50_000;
         waitUntil(
@@ -314,7 +312,7 @@ export function setupContentRoutes(app: Express): void {
                   const outcome = await runArticleSlice(jobId, sliceDeadlineMs);
                   if (outcome.done) break;
                 }
-                // The OpenAI Responses run is background:true — it needs
+                // The OpenAI Responses run is background:true - it needs
                 // wall-clock time on OpenAI's side; don't hot-poll.
                 await new Promise((r) => setTimeout(r, 4_000));
               }
@@ -392,7 +390,7 @@ export function setupContentRoutes(app: Express): void {
   // Vercel migration: replaces the streamBuffer-tail approach. Returns a
   // time-driven phase label + elapsedMs while in-progress, and done:true
   // with the terminal status once finished. The ?since= query param is
-  // dropped — clients now render phase progress, not raw token content.
+  // dropped - clients now render phase progress, not raw token content.
   app.get(
     "/api/content-jobs/:jobId/state",
     asyncHandler(async (req: Request, res: Response) => {
@@ -501,7 +499,7 @@ export function setupContentRoutes(app: Express): void {
         } as any);
         // The worker will notice on its next tick and refund + reset the
         // article. But if the job never made it to 'running' (claim hadn't
-        // happened yet) we should refund + reset here — otherwise the article
+        // happened yet) we should refund + reset here - otherwise the article
         // sits in 'draft' but the quota stays consumed.
         if (job.status === "pending") {
           const { refundArticleQuota } = await import("../lib/usageLimit");
@@ -604,7 +602,7 @@ export function setupContentRoutes(app: Express): void {
         // history is untouched (no orphan "rewrite I'm about to do" rows).
         const beforeContent = article.content;
 
-        const systemPrompt = `You are an expert editor. Rewrite the user's article to be clearer, more authoritative, and more readable while preserving all factual content, structure, and markdown formatting. Return ONLY the rewritten markdown — no preamble, no commentary.${instructions ? `\n\nFollow these specific instructions: ${instructions}` : ""}`;
+        const systemPrompt = `You are an expert editor. Rewrite the user's article to be clearer, more authoritative, and more readable while preserving all factual content, structure, and markdown formatting. Return ONLY the rewritten markdown - no preamble, no commentary.${instructions ? `\n\nFollow these specific instructions: ${instructions}` : ""}`;
 
         const response = await openai.chat.completions.create({
           model: MODELS.contentHumanize,
@@ -740,7 +738,7 @@ export function setupContentRoutes(app: Express): void {
   // The hardcoded fallback only covers four "headline" industries. For
   // anything else, callers fall through to the LLM branch above; if that
   // fails too we serve a generic single-entry fallback. Documented rather
-  // than expanded — exhaustive coverage of 50+ industries is not worth the
+  // than expanded - exhaustive coverage of 50+ industries is not worth the
   // hardcoded-list maintenance burden.
   app.get(
     "/api/popular-topics",
@@ -849,7 +847,7 @@ export function setupContentRoutes(app: Express): void {
         }
 
         // Diagnostic breadcrumb so prod logs reveal which path is failing
-        // when users hit "Discover" — invocation count, profile state, etc.
+        // when users hit "Discover" - invocation count, profile state, etc.
         logger.info(
           {
             brandId,
@@ -931,7 +929,7 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
             input: userPrompt,
             responseFormat: { type: "json_object" },
           });
-          // 202 Accepted — the work is running on OpenAI's infra. The
+          // 202 Accepted - the work is running on OpenAI's infra. The
           // client polls /api/llm-jobs/:jobId and renders the result
           // when status='succeeded'.
           return res.status(202).json({
@@ -939,7 +937,7 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
             jobId: job.jobId,
             status: job.status,
             pollUrl: `/api/llm-jobs/${job.jobId}`,
-            message: "Discovering keywords — this usually takes 10-20s.",
+            message: "Discovering keywords - this usually takes 10-20s.",
           });
         } catch (aiErr: unknown) {
           const e = aiErr as { status?: number; name?: string };

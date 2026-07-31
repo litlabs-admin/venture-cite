@@ -11,7 +11,7 @@ export const geoToolsTour: TourConfig = {
       id: "intro",
       title: "GEO Assets",
       content:
-        "Discover and track citation assets — listicles, Wikipedia pages, and BOFU comparison content AI engines cite.",
+        "Discover and track citation assets - listicles, Wikipedia pages, and BOFU comparison content AI engines cite.",
     },
     {
       id: "tabs",
@@ -19,7 +19,7 @@ export const geoToolsTour: TourConfig = {
       attachTo: "bottom",
       title: "Three asset surfaces",
       content:
-        "Listicles, Wikipedia, and BOFU — each a different place to earn an AI citation. (FAQs moved to the FAQ editor; brand mentions to Community.)",
+        "Listicles, Wikipedia, and BOFU - each a different place to earn an AI citation. (FAQs moved to the FAQ editor; brand mentions to Community.)",
     },
   ],
 };

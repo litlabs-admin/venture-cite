@@ -7,7 +7,7 @@ const baseHealth = {
   crawlers: { total: 10, allowed: 10, blocked: 0, blockedCrawlers: [] as string[] },
 };
 
-describe("computeSiteHealthFindings — no crawl", () => {
+describe("computeSiteHealthFindings - no crawl", () => {
   it("returns [] when pagesCrawled is null", () => {
     expect(
       computeSiteHealthFindings(
@@ -22,7 +22,7 @@ describe("computeSiteHealthFindings — no crawl", () => {
   });
 });
 
-describe("computeSiteHealthFindings — discoverability", () => {
+describe("computeSiteHealthFindings - discoverability", () => {
   it("flags missing llms.txt at 10 pts", () => {
     const findings = computeSiteHealthFindings(
       { ...baseHealth, discovery: { ...baseHealth.discovery, llmsTxt: false } },
@@ -53,7 +53,7 @@ describe("computeSiteHealthFindings — discoverability", () => {
   });
 });
 
-describe("computeSiteHealthFindings — crawler access", () => {
+describe("computeSiteHealthFindings - crawler access", () => {
   it("scales points by blocked/total of the 35-pt weight and lists blocked crawler names", () => {
     const findings = computeSiteHealthFindings(
       {
@@ -74,7 +74,7 @@ describe("computeSiteHealthFindings — crawler access", () => {
   });
 });
 
-describe("computeSiteHealthFindings — content quality", () => {
+describe("computeSiteHealthFindings - content quality", () => {
   const pages = [
     { url: "https://ex.com/a", statusCode: 500, errorKind: null, factCount: 0 },
     { url: "https://ex.com/b", statusCode: 404, errorKind: null, factCount: 0 },
@@ -105,7 +105,7 @@ describe("computeSiteHealthFindings — content quality", () => {
   });
 });
 
-describe("computeSiteHealthFindings — content structure (advisory)", () => {
+describe("computeSiteHealthFindings - content structure (advisory)", () => {
   it("flags missing mcp.json / security.txt at 0 pts, advisory:true", () => {
     const findings = computeSiteHealthFindings(
       { ...baseHealth, discovery: { ...baseHealth.discovery, mcpJson: false, securityTxt: false } },
@@ -121,7 +121,7 @@ describe("computeSiteHealthFindings — content structure (advisory)", () => {
   });
 });
 
-describe("computeSiteHealthFindings — unknown (unmeasured) discovery", () => {
+describe("computeSiteHealthFindings - unknown (unmeasured) discovery", () => {
   it("does not flag a 'missing' finding when a file is null (unknown), only when confirmed false", () => {
     const findings = computeSiteHealthFindings(
       { ...baseHealth, discovery: { ...baseHealth.discovery, llmsTxt: null } },
@@ -131,7 +131,7 @@ describe("computeSiteHealthFindings — unknown (unmeasured) discovery", () => {
   });
 });
 
-describe("computeSiteHealthFindings — sort order", () => {
+describe("computeSiteHealthFindings - sort order", () => {
   it("sorts findings descending by points", () => {
     const findings = computeSiteHealthFindings(
       {

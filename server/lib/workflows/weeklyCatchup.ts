@@ -160,7 +160,7 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
         const newlyWonIds = (delta.newlyWon as string[] | undefined) ?? [];
 
         const systemPrompt = firstRun
-          ? 'You write one-sentence weekly insights for GEO citation reports. This is the first week of data — no prior comparison available. Summarize current state only; do not invent trends or deltas. Return JSON {"insight": string}. Keep it under 30 words.'
+          ? 'You write one-sentence weekly insights for GEO citation reports. This is the first week of data - no prior comparison available. Summarize current state only; do not invent trends or deltas. Return JSON {"insight": string}. Keep it under 30 words.'
           : 'You write one-sentence weekly insights for GEO citation reports. Return JSON {"insight": string}. Keep it under 30 words.';
 
         let topInsight = "";
@@ -209,7 +209,7 @@ export const weeklyCatchupWorkflow: WorkflowDefinition = {
     },
     {
       // The actual aggregate-and-send happens in scheduler.ts
-      // (runWeeklyDigestAggregator) — which checks if ALL of a user's
+      // (runWeeklyDigestAggregator) - which checks if ALL of a user's
       // per-brand weekly_catchup runs have reached terminal status, then
       // sends ONE digest email covering every brand. This step just records
       // completion so the scheduler can detect readiness.

@@ -4,13 +4,13 @@
 // The original monolith now only mounts this module via setupCommunityRoutes.
 //
 // Includes:
-//   GET    /api/community-posts       — list posts (optionally scoped to brand)
-//   POST   /api/community-posts       — create a community post
-//   GET    /api/community-posts/:id   — fetch a single post
-//   PATCH  /api/community-posts/:id   — update a post
-//   DELETE /api/community-posts/:id   — delete a post
-//   POST   /api/community-discover    — AI-powered community group discovery
-//   POST   /api/community-generate    — AI-powered community post generation
+//   GET    /api/community-posts       - list posts (optionally scoped to brand)
+//   POST   /api/community-posts       - create a community post
+//   GET    /api/community-posts/:id   - fetch a single post
+//   PATCH  /api/community-posts/:id   - update a post
+//   DELETE /api/community-posts/:id   - delete a post
+//   POST   /api/community-discover    - AI-powered community group discovery
+//   POST   /api/community-generate    - AI-powered community post generation
 
 import type { Express } from "express";
 import { storage } from "../storage";

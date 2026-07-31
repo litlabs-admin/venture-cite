@@ -105,7 +105,7 @@ export interface IStorage {
   updateBrand(id: string, brand: Partial<InsertBrand>): Promise<Brand | undefined>;
   // Wave 4.4: optimistic-lock variant. Caller passes the version they
   // last read; returns undefined if the row's version no longer matches
-  // (someone else wrote in between) — caller surfaces 409 Conflict.
+  // (someone else wrote in between) - caller surfaces 409 Conflict.
   updateBrandIfVersion(
     id: string,
     expectedVersion: number,
@@ -209,7 +209,7 @@ export interface IStorage {
   // pre-created row over to runBrandPrompts via options.runId).
   getCitationRunById(runId: string): Promise<CitationRun | undefined>;
   // Wave 9.1: recompute totals + breakdown for a single run from
-  // geo_rankings. The canonical aggregator — every code path that mutates
+  // geo_rankings. The canonical aggregator - every code path that mutates
   // is_cited on a ranking should call this so the run header stays in
   // sync with the drill-down. Returns the new totals for the caller's
   // convenience (no-op if the run has no rankings yet).
@@ -268,7 +268,7 @@ export interface IStorage {
   // daily cron orchestrator to drain orphaned generations.
   listAdvanceablePendingJobs(limit: number): Promise<ContentGenerationJob[]>;
   // Vercel migration: link an OpenAI Responses run to a content job.
-  // Idempotent — passing the same id is a no-op. Used by runArticleSlice's
+  // Idempotent - passing the same id is a no-op. Used by runArticleSlice's
   // first call to record which OpenAI run owns this job.
   updateContentJobResponseId(jobId: string, openaiResponseId: string): Promise<void>;
   getActiveContentJob(userId: string): Promise<ContentGenerationJob | undefined>;
@@ -292,7 +292,7 @@ export interface IStorage {
   deleteCompetitor(id: string): Promise<boolean>;
   ignoreCompetitor(id: string): Promise<boolean>;
 
-  // Per-run, per-prompt competitor citation detail (Wave 2 — symmetric
+  // Per-run, per-prompt competitor citation detail (Wave 2 - symmetric
   // with geo_rankings for the brand).
   createCompetitorGeoRanking(row: InsertCompetitorGeoRanking): Promise<CompetitorGeoRanking>;
   getCompetitorGeoRankings(
@@ -571,7 +571,7 @@ export interface IStorage {
   // --- cross-instance concurrency ---
   /** PG advisory lock keyed by hashtext('fact-scrape:' || brand_id). Returns
    *  true if the caller now holds the lock, false otherwise. The lock is
-   *  transaction-scoped — must be held for the entire run. */
+   *  transaction-scoped - must be held for the entire run. */
   tryAcquireScrapeLock(brandId: string): Promise<boolean>;
   /** Best-effort release (no-op if not held). */
   releaseScrapeLock(brandId: string): Promise<void>;
@@ -595,7 +595,7 @@ export interface IStorage {
   createAlertHistory(history: InsertAlertHistory): Promise<AlertHistory>;
   getAlertHistory(brandId: string, limit?: number): Promise<AlertHistory[]>;
 
-  // Agent Task Queue — minimal surface kept for the workflow engine. The
+  // Agent Task Queue - minimal surface kept for the workflow engine. The
   // /api/agent-tasks routes were deleted with the agent-dashboard page, so
   // list / stats / next-queued / delete methods are gone too. Only the four
   // methods workflowEngine + agentTaskExecutor actually call remain.
@@ -675,7 +675,7 @@ export interface IStorage {
     userId: string,
     opts: { status?: string | string[]; brandId?: string; limit?: number; offset?: number },
   ): Promise<Article[]>;
-  // Returns the article currently linked to a generation job — used by the
+  // Returns the article currently linked to a generation job - used by the
   // worker on success/failure to flip status and write content. Owner-scoped.
   getArticleByJobId(jobId: string): Promise<Article | undefined>;
   // Atomic helpers used by the worker.
@@ -687,7 +687,7 @@ export interface IStorage {
   createRevision(input: InsertArticleRevision): Promise<ArticleRevision>;
   listRevisions(articleId: string, limit?: number): Promise<ArticleRevision[]>;
   getRevisionById(revisionId: string): Promise<ArticleRevision | undefined>;
-  // Chatbot threads (Phase 5 v2 — multi-thread).
+  // Chatbot threads (Phase 5 v2 - multi-thread).
   listChatbotThreads(
     userId: string,
     limit?: number,
@@ -763,7 +763,7 @@ export interface IStorage {
   setBrandMonitorMentions(brandId: string, enabled: boolean): Promise<void>;
   listBrandsWithMentionMonitoring(): Promise<{ id: string; userId: string }[]>;
 
-  // Mention helpers (new additions — existing getBrandMentions/deleteBrandMention
+  // Mention helpers (new additions - existing getBrandMentions/deleteBrandMention
   // are kept for backward compat; new methods coexist until routes phase)
   getBrandMention(id: string): Promise<BrandMention | undefined>;
   deleteManyBrandMentions(ids: string[]): Promise<number>;

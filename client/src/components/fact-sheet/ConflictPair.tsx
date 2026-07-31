@@ -116,13 +116,13 @@ function renderSide(
   const sourceLabel = isUser ? "👤 You" : "🤖 AI";
 
   return (
-    // Only the AI-sourced side gets an accent border, to flag "verify this" —
+    // Only the AI-sourced side gets an accent border, to flag "verify this" -
     // the user's own entry keeps the card's default neutral border. This used
     // to be border-primary/40 vs border-chart-4/40, but --primary is the
     // action-only green accent; using it here to label "your side" (not a
     // button, not an action) collided with the "green = actions" rule. The
     // AI side keeps --chart-4 because that use is categorical (which side of
-    // the comparison this is), not a stand-in for "success" — the same kind
+    // the comparison this is), not a stand-in for "success" - the same kind
     // of legitimate categorical use as the platform colour ramp.
     <div
       className={cn("border border-vc-default p-3 text-caption", !isUser && "border-chart-4/40")}
@@ -208,7 +208,7 @@ function ArrayMergePanel({
       <div className="mb-1 text-caption font-medium text-foreground">Merge items (preview)</div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
-          <div className="mb-1 text-caption text-muted-foreground">From AI — add to merged</div>
+          <div className="mb-1 text-caption text-muted-foreground">From AI - add to merged</div>
           <ul className="space-y-1">
             {aiItems.map((item, i) => (
               <li key={i} className="flex items-center justify-between gap-2 text-caption">

@@ -4,7 +4,7 @@
 // components/sections/Pricing/icons.tsx.
 type IconProps = { size?: number; className?: string };
 
-// CTA arrow, identical markup to Pricing/icons.tsx's ArrowRightIcon — kept
+// CTA arrow, identical markup to Pricing/icons.tsx's ArrowRightIcon - kept
 // as a local copy per-section rather than shared, matching existing
 // convention (each section owns its own icons.tsx).
 export function ArrowRightIcon({ size = 14, className }: IconProps) {
@@ -31,7 +31,7 @@ export function ArrowRightIcon({ size = 14, className }: IconProps) {
 // Card 02 checklist checkbox tick (index.html:2489 and identical siblings).
 // Source ships it as a draw-in animation (pathLength=1, stroke-dasharray=1,
 // stroke-dashoffset=1, transitioning on a hover/interaction trigger this
-// rebuild doesn't wire up per the simplify-choreography rule) — rendered
+// rebuild doesn't wire up per the simplify-choreography rule) - rendered
 // here at its settled/resting dashoffset of 1, i.e. undrawn, matching the
 // checklist's unchecked resting state.
 export function ChecklistTickIcon() {
@@ -53,7 +53,7 @@ export function ChecklistTickIcon() {
 }
 
 // Card 03 chat-transcript "done" tag icon (index.html:2521 and identical
-// siblings) — static checkmark, currentColor, no draw-in.
+// siblings) - static checkmark, currentColor, no draw-in.
 export function TagCheckIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">

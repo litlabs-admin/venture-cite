@@ -16,13 +16,13 @@ import { SiteHealthPanel } from "@/components/dashboard-panels/PromptsRow";
 // returned an older/partial shape it threw
 //   "Cannot read properties of undefined (reading 'robotsTxt')"
 // and, because the panel renders inside the dashboard tree, the error boundary
-// swallowed the ENTIRE dashboard — the user could not open the page at all.
+// swallowed the ENTIRE dashboard - the user could not open the page at all.
 //
 // A single panel must never be able to do that. These tests feed it payloads
 // that are wrong in the ways a real deploy can be wrong, and assert only that
 // it renders something rather than throwing.
 
-// Deliberately not typed as SiteHealth — the whole point is that these are
+// Deliberately not typed as SiteHealth - the whole point is that these are
 // shapes TypeScript would reject but a running server can still send.
 const legacyShape = {
   website: "https://example.com",
@@ -91,7 +91,7 @@ describe("SiteHealthPanel payload resilience", () => {
     // Critical stays red; the quiet tiers stay neutral, per the blue-safe ramp.
     //
     // Asserted as TOKENS, not hex. These were literal #a8a29e / #d6d3d1, which
-    // pinned the swatches to light mode — a literal here renders identically
+    // pinned the swatches to light mode - a literal here renders identically
     // under `.dark` and the ramp disappears against the dark canvas. Every
     // colour on this surface now resolves through a theme variable.
     const swatches = [...container.querySelectorAll<HTMLElement>("span.h-2.w-2")];
@@ -101,7 +101,7 @@ describe("SiteHealthPanel payload resilience", () => {
   });
 });
 
-describe("SiteHealthPanel — pending (deadline-timeout placeholder)", () => {
+describe("SiteHealthPanel - pending (deadline-timeout placeholder)", () => {
   it("renders 'Measuring…' and no score/number when pending is true", () => {
     render(
       <SiteHealthPanel
@@ -137,7 +137,7 @@ describe("SiteHealthPanel — pending (deadline-timeout placeholder)", () => {
   });
 });
 
-describe("SiteHealthPanel — unknown (unmeasured) discovery entries", () => {
+describe("SiteHealthPanel - unknown (unmeasured) discovery entries", () => {
   it("renders the tri-state chip counting only CONFIRMED files, not unknown ones", () => {
     render(
       <SiteHealthPanel
@@ -165,14 +165,14 @@ describe("SiteHealthPanel — unknown (unmeasured) discovery entries", () => {
         loading={false}
       />,
     );
-    // 2 confirmed present (robots, sitemap) out of 5 — llmsTxt/mcpJson are
+    // 2 confirmed present (robots, sitemap) out of 5 - llmsTxt/mcpJson are
     // unknown and must NOT be counted as failures, and the chip says so.
     expect(screen.getByText(/2\/5 discovery/)).toBeTruthy();
     expect(screen.getByText(/2 unknown/)).toBeTruthy();
   });
 });
 
-describe("SiteHealthPanel — sitemap URL count vs audited pages", () => {
+describe("SiteHealthPanel - sitemap URL count vs audited pages", () => {
   const base = {
     website: "https://example.com",
     checkedAt: new Date().toISOString(),

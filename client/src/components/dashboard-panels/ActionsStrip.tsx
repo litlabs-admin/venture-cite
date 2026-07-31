@@ -8,7 +8,7 @@ import type { Recommendation } from "./useDashboardData";
 //
 // The reference shows a "0/2" completion bar. Recommendations here have no
 // completed state to count, so that segment is omitted rather than rendered
-// permanently at zero — an always-empty progress bar reads as broken.
+// permanently at zero - an always-empty progress bar reads as broken.
 
 const IMPACT: Record<Recommendation["priority"], string> = {
   P0: "High Impact",

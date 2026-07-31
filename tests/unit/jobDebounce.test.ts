@@ -1,6 +1,6 @@
 // Guards the double-run fix.
 //
-// Six jobs are registered in TWO places — the in-process node-cron scheduler
+// Six jobs are registered in TWO places - the in-process node-cron scheduler
 // and POST /api/cron/daily-orchestrator. The advisory locks already in those
 // job bodies stop two runners OVERLAPPING; they do nothing when one fires
 // fifteen minutes after the other, because by then the lock is released. That
@@ -110,7 +110,7 @@ describe("withJobDebounce", () => {
   });
 
   it("does not record completion when the body throws", async () => {
-    // A failed run must stay re-runnable — recording it would suppress the
+    // A failed run must stay re-runnable - recording it would suppress the
     // retry for the whole window.
     stubs.getSystemState.mockResolvedValue(null);
     const body = vi.fn().mockRejectedValue(new Error("smtp down"));
@@ -143,7 +143,7 @@ describe("withJobDebounce", () => {
 describe("DEBOUNCE_WINDOWS", () => {
   it("keeps every window shorter than its job's real cadence", async () => {
     // A window at or above the cadence would swallow legitimate scheduled
-    // runs — the guard is for double-fires, not for scheduling.
+    // runs - the guard is for double-fires, not for scheduling.
     expect(DEBOUNCE_WINDOWS["auto-citation"]).toBeLessThan(HOUR); // hourly job
     expect(DEBOUNCE_WINDOWS["weekly-report"]).toBeLessThan(7 * 24 * HOUR); // weekly
     expect(DEBOUNCE_WINDOWS["mention-scan"]).toBeLessThan(7 * 24 * HOUR); // weekly

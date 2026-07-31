@@ -86,7 +86,7 @@ export async function sendOutreachEmailViaResend(params: {
   from?: string;
 }): Promise<{ messageId: string | null }> {
   if (!resend) {
-    throw new Error("Resend not configured — set RESEND_API_KEY to send outreach email");
+    throw new Error("Resend not configured - set RESEND_API_KEY to send outreach email");
   }
   const from = params.from || FROM_ADDRESS;
   const result = await resend.emails.send({
@@ -105,17 +105,17 @@ export async function sendOutreachEmailViaResend(params: {
 
 export async function sendWeeklyVisibilityReport(data: WeeklyReportData): Promise<boolean> {
   if (!resend) {
-    logger.warn("[email] Resend not configured — skipping weekly report");
+    logger.warn("[email] Resend not configured - skipping weekly report");
     return false;
   }
 
   // Skip if the recipient is bounced/complained/unsubscribed. Returns true
-  // here because skip is the *correct* outcome — the caller's stat
+  // here because skip is the *correct* outcome - the caller's stat
   // shouldn't count this as a failure (we just didn't try).
   if (!(await isAddressDeliverable(data.userId))) {
     logger.info(
       { userId: data.userId, template: "weekly_report" },
-      "email skipped — recipient not deliverable",
+      "email skipped - recipient not deliverable",
     );
     return true;
   }
@@ -213,7 +213,7 @@ export async function sendWeeklyVisibilityReport(data: WeeklyReportData): Promis
   // List-Unsubscribe (RFC 2369) + List-Unsubscribe-Post (RFC 8058):
   // surfaces the native one-click unsubscribe button in Gmail / Outlook /
   // Apple Mail and protects deliverability. The token is HMAC-signed so
-  // the URL alone authenticates the action — no session needed for the
+  // the URL alone authenticates the action - no session needed for the
   // unauth POST endpoint.
   const unsubToken = signUnsubscribeToken(data.userId, "weekly_report");
   const unsubUrl = `${APP_URL}/api/unsubscribe?token=${encodeURIComponent(unsubToken)}`;
@@ -221,7 +221,7 @@ export async function sendWeeklyVisibilityReport(data: WeeklyReportData): Promis
   // Wave 3.6: send via retry helper (3 retries / 1s/2s/4s backoff).
   // Permanent errors (invalid address, etc.) bail immediately and land
   // in the DLQ; transient errors get retried; success short-circuits.
-  const subject = `Your Weekly AI Visibility Report — ${totalCitedAllBrands} citation${totalCitedAllBrands === 1 ? "" : "s"}`;
+  const subject = `Your Weekly AI Visibility Report - ${totalCitedAllBrands} citation${totalCitedAllBrands === 1 ? "" : "s"}`;
   const result = await withEmailRetry(() =>
     resend!.emails.send({
       from: FROM_ADDRESS,
@@ -253,7 +253,7 @@ export async function sendWeeklyVisibilityReport(data: WeeklyReportData): Promis
 }
 
 // ---------------------------------------------------------------------------
-// Weekly agent digest — dedicated template (NOT the visibility report above).
+// Weekly agent digest - dedicated template (NOT the visibility report above).
 // One entry per brand the user owns. Scheduler aggregates all of a user's
 // per-brand weekly_catchup workflow runs into a single send.
 
@@ -286,13 +286,13 @@ export async function sendWeeklyDigest(
   digestPayload: WeeklyDigestPayload,
 ): Promise<boolean> {
   if (!resend) {
-    logger.info("sendWeeklyDigest: Resend not configured — skipping");
+    logger.info("sendWeeklyDigest: Resend not configured - skipping");
     return false;
   }
   if (!(await isAddressDeliverable(digestPayload.user.id))) {
     logger.info(
       { userId: digestPayload.user.id, template: "weekly_digest" },
-      "weekly digest skipped — recipient not deliverable",
+      "weekly digest skipped - recipient not deliverable",
     );
     // Return false so the aggregator does NOT stamp lastWeeklyReportSentAt.
     // Next run we'll try again; if the user fixes deliverability, we'll send.
@@ -303,13 +303,13 @@ export async function sendWeeklyDigest(
   const greeting = user.firstName ? `Hi ${escapeHtml(user.firstName)},` : "Hi,";
   const weekOf = new Date().toLocaleDateString();
   // Match the original line's styling tokens exactly so we don't churn
-  // the email design — only the content gets the optional "Week N" suffix.
+  // the email design - only the content gets the optional "Week N" suffix.
   const weekNLine =
     digestPayload.weekN === null
       ? `<p style="color:#6b7280;margin:0 0 20px">Week of ${weekOf}</p>`
       : `<p style="color:#6b7280;margin:0 0 20px">Week of ${weekOf} · Week ${digestPayload.weekN + 1} since you started VentureCite</p>`;
   const n = brandBriefs.length;
-  const subject = `Your VentureCite Weekly Digest — ${n} brand${n === 1 ? "" : "s"}`;
+  const subject = `Your VentureCite Weekly Digest - ${n} brand${n === 1 ? "" : "s"}`;
 
   const brandSections = brandBriefs
     .map((b) => {
@@ -321,7 +321,7 @@ export async function sendWeeklyDigest(
             ? `<span style="color:#16a34a">+${b.delta} pts</span>`
             : `<span style="color:#dc2626">${b.delta} pts</span>`;
       const firstRunNote = b.firstRun
-        ? `<p style="margin:8px 0 0;color:#92400e;font-size:13px;font-style:italic">This is your first week of data — no prior comparison available.</p>`
+        ? `<p style="margin:8px 0 0;color:#92400e;font-size:13px;font-style:italic">This is your first week of data - no prior comparison available.</p>`
         : "";
       const lostLine =
         !b.firstRun && b.newlyLost.length > 0

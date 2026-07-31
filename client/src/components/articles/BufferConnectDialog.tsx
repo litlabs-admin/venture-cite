@@ -1,4 +1,4 @@
-// Buffer connect dialog — bring-your-own-key.
+// Buffer connect dialog - bring-your-own-key.
 //
 // Renders one of two states based on `connected`:
 //   • Disconnected: the Connect button opens a dialog with a masked
@@ -8,7 +8,7 @@
 //     toast. On 400 invalid_token / missing_token we render an inline
 //     error under the input. On 502 we show "Couldn't reach Buffer."
 //   • Connected: the Disconnect button hits DELETE /api/buffer/connection
-//     and invalidates /profiles. No confirmation modal — disconnecting
+//     and invalidates /profiles. No confirmation modal - disconnecting
 //     is reversible by reconnecting with the same (or a fresh) token.
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";

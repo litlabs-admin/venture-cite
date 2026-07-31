@@ -5,7 +5,7 @@ import { useActiveCitationRuns } from "./useActiveCitationRuns";
 // Wave 9 fix: TanStack Query merges `refetchInterval` defaults at observer
 // creation time, not on already-mounted observers. The previous incarnation
 // of this hook called `queryClient.setQueryDefaults(...)` after a run started
-// — which silently did nothing for any page already on screen, so dependent
+// - which silently did nothing for any page already on screen, so dependent
 // dashboards never auto-refreshed during a run.
 //
 // New contract: this hook returns the polling cadence the caller threads

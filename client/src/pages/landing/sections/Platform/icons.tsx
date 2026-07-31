@@ -7,7 +7,7 @@
 // Pricing/icons.tsx, Revenue/icons.tsx.
 type IconProps = { size?: number; className?: string };
 
-// Verbatim from index.html 2044 (stroke-width 2) — used at 14px in the
+// Verbatim from index.html 2044 (stroke-width 2) - used at 14px in the
 // "Explore tracking" / "See how it works" / "Start improving" links, and at
 // 11px in the Built For strip's agency/startup/enterprise links.
 export function ArrowRightIcon({ size = 14, className }: IconProps) {
@@ -31,7 +31,7 @@ export function ArrowRightIcon({ size = 14, className }: IconProps) {
   );
 }
 
-// Verbatim from index.html 2068-2069 (stroke-width 2.5) — Visibility/Rank/
+// Verbatim from index.html 2068-2069 (stroke-width 2.5) - Visibility/Rank/
 // Mentions trend badges and the Top Sources chips (G2, Reddit, Capterra).
 export function TrendingUpIcon({ size = 10, className }: IconProps) {
   return (
@@ -54,7 +54,7 @@ export function TrendingUpIcon({ size = 10, className }: IconProps) {
   );
 }
 
-// Verbatim from index.html 2218-2220 (stroke-width 2.5) — the flat-trend
+// Verbatim from index.html 2218-2220 (stroke-width 2.5) - the flat-trend
 // TechCrunch chip in the Top Sources row.
 export function MinusIcon({ size = 10, className }: IconProps) {
   return (
@@ -76,7 +76,7 @@ export function MinusIcon({ size = 10, className }: IconProps) {
   );
 }
 
-// Verbatim from index.html 2297-2299 / 2368 (stroke-width 2.5) — the
+// Verbatim from index.html 2297-2299 / 2368 (stroke-width 2.5) - the
 // diff panel's "applying" status check, present twice (file-tab status
 // pill and footer row). Both instances are captured opacity:0/scale(0.7)
 // in source (mid-animation into a completed state); reproduced hidden in
@@ -101,7 +101,7 @@ export function CheckIcon({ size = 11, className }: IconProps) {
   );
 }
 
-// Verbatim from index.html 2371 (stroke-width 2) — "Re-crawl queued" badge.
+// Verbatim from index.html 2371 (stroke-width 2) - "Re-crawl queued" badge.
 export function RefreshCwIcon({ size = 9, className }: IconProps) {
   return (
     <svg
@@ -125,7 +125,7 @@ export function RefreshCwIcon({ size = 9, className }: IconProps) {
   );
 }
 
-// Verbatim from index.html 2290-2291 (stroke-width 1.75) — a custom lucide
+// Verbatim from index.html 2290-2291 (stroke-width 1.75) - a custom lucide
 // variant (not a stock lucide-react icon name) rendered as the file-tab
 // icon on the "running-shoes/index.html" diff panel.
 export function FileCodeCornerIcon({ size = 13, className }: IconProps) {

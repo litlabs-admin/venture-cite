@@ -1,21 +1,21 @@
 /*
- * VentureCite marketing homepage — scoped stylesheet.
+ * VentureCite marketing homepage - scoped stylesheet.
  *
  * Everything here is confined to the `.vc-home` subtree so it can coexist
  * with the app's dark-by-default OKLCH token system. Ported from
- * trakkr.ai/app/globals.css (custom-property + keyframe blocks only — the
+ * trakkr.ai/app/globals.css (custom-property + keyframe blocks only - the
  * Tailwind-default @theme palette is not copied, Tailwind v3 already ships it)
  * and trakkr.ai/app/vc-ds-tokens.css.
  *
  * Color utilities (bg-vc-surface, text-vc-primary, …) are generated from the
- * `--color-vc-*` keys in the `@theme` block of client/src/index.css — this is
+ * `--color-vc-*` keys in the `@theme` block of client/src/index.css - this is
  * Tailwind v4, CSS-first; there is no tailwind.config.ts in the repo. The vars
  * below exist only because a handful of components read them from inline
  * styles or SVG attributes, which `@theme` keys cannot serve.
  *
  * SCOPING CAVEAT: `.vc-home` can only override custom properties it declares
- * itself. Bare names the dark app owns on `:root` — `--accent`, `--border`,
- * `--primary`, `--chart-1`…`--chart-5` — still resolve to DASHBOARD values
+ * itself. Bare names the dark app owns on `:root` - `--accent`, `--border`,
+ * `--primary`, `--chart-1`…`--chart-5` - still resolve to DASHBOARD values
  * inside this subtree. Never read those from a landing inline style; use the
  * `--color-*` names declared below.
  */
@@ -30,7 +30,7 @@
    *
    * The marketing site runs a cool, blue-accented palette; the product app
    * stays on the green `vc-*` tokens. Both are expressed through the SAME
-   * utility names (bg-vc-accent, text-vc-primary, …) — Tailwind v4's plain
+   * utility names (bg-vc-accent, text-vc-primary, …) - Tailwind v4's plain
    * `@theme` compiles those to `var(--color-vc-*)` references, so redeclaring
    * the properties here rebinds every landing utility without emitting a
    * single new class and without touching the dashboard.
@@ -59,7 +59,7 @@
   --text-body-color: #6e7280;
   --text-muted-color: #9ca0ae;
 
-  /* Cool gray ramp — replaces the warm stone ramp the product app uses. */
+  /* Cool gray ramp - replaces the warm stone ramp the product app uses. */
   --color-gray-50: #fafafc;
   --color-gray-100: #f2f2f6;
   --color-gray-200: #e8e8f0;
@@ -71,7 +71,7 @@
   --color-gray-800: #26273a;
   --color-gray-900: #16162e;
 
-  /* Legacy aliases — still referenced by a few inline styles. */
+  /* Legacy aliases - still referenced by a few inline styles. */
   --color-green-50: var(--accent-subtle);
   --color-green-100: var(--accent-tint-2);
   --color-green-500: var(--accent);
@@ -175,7 +175,7 @@
  *
  * MUST stay inside `@layer base`. Cascade layers outrank specificity: an
  * UNLAYERED rule beats everything in `@layer utilities`, so writing this at
- * the top level silently killed every border-* utility on the landing —
+ * the top level silently killed every border-* utility on the landing -
  * `border-vc-accent`, `border-rose-500`, all of them resolved to this one
  * colour. `:where()` does not save you; zero specificity is irrelevant across
  * layers.
@@ -191,9 +191,9 @@
 /* ── Animations ───────────────────────────────────────────────────────────
    Ported verbatim from trakkr.ai/app/globals.css, which took them from the
    compiled source (_reference/index.html inline <style> blocks). Only the
-   keyframes this page actually uses — not the ~124 in the dashboard bundle. */
+   keyframes this page actually uses - not the ~124 in the dashboard bundle. */
 
-/* Why Now marquee rows — _reference/index.html:1808-1839 */
+/* Why Now marquee rows - _reference/index.html:1808-1839 */
 @keyframes drift-left {
   0% {
     transform: translateX(0);
@@ -221,7 +221,7 @@
   animation-play-state: paused;
 }
 
-/* Decorative dot grid behind the Closing CTA — index-CjQYU9CS.css:9192 */
+/* Decorative dot grid behind the Closing CTA - index-CjQYU9CS.css:9192 */
 .vc-home .mkt-dot-grid {
   background-image: radial-gradient(
     circle,
@@ -231,7 +231,7 @@
   background-size: var(--vc-mkt-dot-spacing) var(--vc-mkt-dot-spacing);
 }
 
-/* Philosophy — pulsing dot on in-progress chat tags. index.html:2427-2439 */
+/* Philosophy - pulsing dot on in-progress chat tags. index.html:2427-2439 */
 @keyframes assistant-breath {
   0%,
   100% {
@@ -245,7 +245,7 @@
   animation: assistant-breath 1.4s ease-in-out infinite;
 }
 
-/* Philosophy card 03's looping chat transcript — simplified choreography,
+/* Philosophy card 03's looping chat transcript - simplified choreography,
    speed (36s) not verified against source. */
 @keyframes chat-scroll {
   0% {
@@ -262,7 +262,7 @@
   animation-play-state: paused;
 }
 
-/* Hero Bento — chart width override + mobile snap-carousel scrollbar hiding.
+/* Hero Bento - chart width override + mobile snap-carousel scrollbar hiding.
    index.html:1115-1138 and 1799-1803. */
 .vc-home .hero-bento-chart .recharts-wrapper,
 .vc-home .hero-bento-chart .recharts-surface {
@@ -367,7 +367,7 @@
 
 /*
  * HeroBento badge language. Deltas, ranks and tags render as filled pills
- * rather than bare coloured text — this is what carries the dashboard-card
+ * rather than bare coloured text - this is what carries the dashboard-card
  * look in the hero. Ported from the reference's globals.css.
  */
 .vc-home .hb-pill {
@@ -489,20 +489,20 @@
 }
 
 /*
- * ANCHOR NAVIGATION — smooth scroll, and landing on the right spot.
+ * ANCHOR NAVIGATION - smooth scroll, and landing on the right spot.
  *
  * Two separate problems, both visible when clicking a nav/footer link:
  *
  * 1. The id lives on <section>, but that section's "[01] WHY NOW / The Shift"
  *    header is its PRECEDING SIBLING, outside it (see SectionHeader.tsx). A
  *    bare jump to #platform-section therefore scrolls that header off the top
- *    of the viewport — you land past the thing you clicked.
+ *    of the viewport - you land past the thing you clicked.
  * 2. The nav is `sticky top-0` at 52px (56px from sm), so it covers whatever
  *    the browser does put at the top.
  *
  * scroll-margin-top fixes both at once: it tells the browser to stop that
  * many pixels EARLIER, which pulls the header back into view and clears the
- * nav. Measured in-browser rather than guessed — header is 37.3px tall at
+ * nav. Measured in-browser rather than guessed - header is 37.3px tall at
  * 375px and 45px from sm up, so:
  *     mobile   52 (nav) + 38 (header) + 10 (breathing room) = 100px
  *     sm and up 56 (nav) + 45 (header) + 11                 = 112px
@@ -524,7 +524,7 @@
 /*
  * Smooth scrolling, scoped to the landing page. `scroll-behavior` has to sit
  * on the scrolling element (html), not on .vc-home, so it is scoped with
- * :has() — the dashboard keeps instant jumps, which is what its scroll
+ * :has() - the dashboard keeps instant jumps, which is what its scroll
  * restoration and guided tour expect.
  */
 html:has(.vc-home) {

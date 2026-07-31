@@ -1,4 +1,4 @@
-// Coverage for the mentions REST endpoints (Mentions Rebuild — Task 15).
+// Coverage for the mentions REST endpoints (Mentions Rebuild - Task 15).
 //
 // Verifies ownership scoping (C13/C14 regression), Zod validation,
 // URL host whitelist + javascript: rejection, status-PATCH transition
@@ -6,7 +6,7 @@
 // scan-status scoping.
 //
 // Storage, ownership helpers, runMentionScan, safeFetchText, and
-// judgeSentimentBatch are all stubbed — no DB or network I/O.
+// judgeSentimentBatch are all stubbed - no DB or network I/O.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import express from "express";
@@ -82,7 +82,7 @@ const stubs = vi.hoisted(() => ({
   acquireOrWait: vi.fn(async () => true),
 }));
 
-// Mock isAuthenticated — always passes, sets req.user = { id: "user-1" }
+// Mock isAuthenticated - always passes, sets req.user = { id: "user-1" }
 vi.mock("../../server/auth", () => ({
   isAuthenticated: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
     (req as any).user = { id: "user-1" };
@@ -159,7 +159,7 @@ function buildApp(): express.Express {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
   // Mount at root so test URLs can use bare paths (e.g. "/uuid" → /:brandId).
-  // In production, routes.ts mounts at /api/brand-mentions — the router itself
+  // In production, routes.ts mounts at /api/brand-mentions - the router itself
   // is agnostic to the mount point.
   app.use("/", mentionsRouter);
   return app;
@@ -262,7 +262,7 @@ describe("GET /api/brand-mentions/alerts/:brandId (C14 regression)", () => {
   });
 });
 
-describe("POST /api/brand-mentions — manual add", () => {
+describe("POST /api/brand-mentions - manual add", () => {
   it("3. rejects javascript: URL with 400 (Audit C5/G1 regression)", async () => {
     const r = await call(app, "POST", "/", {
       brandId: BRAND_UUID,
@@ -307,7 +307,7 @@ describe("PATCH /api/brand-mentions/:id", () => {
     expect(r.body).toMatchObject({ error: "invalid_transition" });
   });
 
-  it("7. enforces ownership — 404 cross-tenant (Audit C13 regression)", async () => {
+  it("7. enforces ownership - 404 cross-tenant (Audit C13 regression)", async () => {
     stubs.requireMentionOwnership.mockResolvedValue(null);
     const r = await call(app, "PATCH", `/${OTHER_UUID}`, { status: "acknowledged" });
     expect(r.status).toBe(404);
@@ -325,7 +325,7 @@ describe("DELETE /api/brand-mentions/:id", () => {
 });
 
 describe("POST /api/brand-mentions/scans/:brandId", () => {
-  it("9. idempotent — second call returns the in-progress scanId (Audit A17 regression)", async () => {
+  it("9. idempotent - second call returns the in-progress scanId (Audit A17 regression)", async () => {
     stubs.getActiveScanJobForBrand.mockResolvedValue({ id: SCAN_UUID, status: "running" });
     const r = await call(app, "POST", `/scans/${BRAND_UUID}`);
     expect(r.status).toBe(200);

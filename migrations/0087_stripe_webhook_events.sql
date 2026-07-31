@@ -2,7 +2,7 @@
 -- always assumed exists.
 --
 -- WHY THIS IS URGENT: WebhookHandlers.processWebhook() calls
--- recordStripeEvent() — an INSERT into public.stripe_webhook_events — as the
+-- recordStripeEvent() - an INSERT into public.stripe_webhook_events - as the
 -- FIRST thing it does after signature verification, before any event is
 -- dispatched. The table was never created by any migration in this repo
 -- (verified: `select to_regclass('public.stripe_webhook_events')` → null),
@@ -15,12 +15,12 @@
 -- then retries the delivery for up to 3 days, failing identically each time.
 --
 -- Columns match exactly what the handler reads and writes:
---   event_id     — Stripe's event.id, the idempotency key. PRIMARY KEY so the
+--   event_id     - Stripe's event.id, the idempotency key. PRIMARY KEY so the
 --                  handler's `ON CONFLICT (event_id) DO NOTHING ... RETURNING`
 --                  correctly returns zero rows on a retry.
---   event_type   — event.type, recorded for debugging unexpected traffic.
---   received_at  — when we first saw it.
---   processed_at — NULL until the handler's side effects have fully
+--   event_type   - event.type, recorded for debugging unexpected traffic.
+--   received_at  - when we first saw it.
+--   processed_at - NULL until the handler's side effects have fully
 --                  completed. The handler deliberately distinguishes
 --                  "recorded" from "processed": a row with processed_at IS
 --                  NULL means a previous attempt died mid-flight, and Stripe's

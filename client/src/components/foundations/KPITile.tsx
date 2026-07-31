@@ -19,7 +19,7 @@ export function KPITile({
   className?: string;
 }) {
   const formattedValue = typeof value === "number" ? value.toLocaleString() : value;
-  // "up" is a neutral text colour, not green/chart-4 — the ArrowUp icon
+  // "up" is a neutral text colour, not green/chart-4 - the ArrowUp icon
   // below is what signals direction, not colour. Green is reserved for
   // actions, not for marking a delta as a good outcome.
   const deltaColor =

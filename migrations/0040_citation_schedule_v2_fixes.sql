@@ -14,7 +14,7 @@
 --
 -- (b) Recompute platform_breakdown JSONB for every citation_runs row.
 --     Migration 0039 fixed total_checks/total_cited/citation_rate but
---     not the per-platform breakdown — HistoryTab tooltips still show
+--     not the per-platform breakdown - HistoryTab tooltips still show
 --     stale per-platform numbers on rows where re-detect later flipped
 --     is_cited values. Rebuild from the source of truth (geo_rankings).
 

@@ -6,13 +6,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
-    <title>VentureCite — Get cited by AI search engines</title>
+    <title>VentureCite - Get cited by AI search engines</title>
     <!--
       Phase 2 Task 6a: this document is no longer what gets served to real
-      requests. TanStack Start's own SSR document — rendered from
+      requests. TanStack Start's own SSR document - rendered from
       src/routes/__root.tsx's RootDocument, for every route, including the
       ssr:false ones (only THEIR content is skipped during SSR, not the
-      root shell) — replaces it entirely once Start owns routing. Confirmed
+      root shell) - replaces it entirely once Start owns routing. Confirmed
       by reading @tanstack/react-start-server's renderRouterToStream /
       StartServer pipeline: there is no step anywhere in it that reads or
       merges this file.
@@ -23,12 +23,12 @@
           body (a hand-kept mirror of the marketing landing copy for non-JS
           crawlers). "/" is now real SSR (src/routes/index.tsx renders the
           actual Landing component), which is strictly better, live content
-          — the static mirror was already flagged in Task 4's report as a
+          - the static mirror was already flagged in Task 4's report as a
           known duplication to resolve here.
         - The data-static-fallback <meta name="description"> and the
           runtime dedup it required (client/src/lib/dedupeStaticMeta.ts,
           left in place per this task's instructions but no longer called
-          from anywhere as of this change — see the Task 6a report). React
+          from anywhere as of this change - see the Task 6a report). React
           19's native per-key <title>/<meta> hoisting already makes a
           page-specific tag win over a root-level default with no runtime
           JS needed, which is what src/routes/__root.tsx's RootDocument now
@@ -38,7 +38,7 @@
       robots, Open Graph, Twitter Card, the JSON-LD SoftwareApplication
       schema, the theme FOUC-blocking script, and the Inter/JetBrains Mono
       font preconnect + stylesheet links) MOVED verbatim into
-      src/routes/__root.tsx's RootDocument, so it is not duplicated here —
+      src/routes/__root.tsx's RootDocument, so it is not duplicated here -
       keeping two hand-kept copies in sync was exactly the kind of drift
       risk this migration is meant to remove. What remains below (charset,
       viewport, favicon, a default title) is kept only as a minimal,

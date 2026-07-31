@@ -64,7 +64,7 @@ export function discoverSubdomainUrls(html: string, baseUrl: string): string[] {
     // Extract first subdomain label (everything before the registered domain).
     const hostLc = abs.hostname.toLowerCase();
     const registered = registeredDomain(hostLc);
-    if (hostLc === registered) continue; // apex itself — already the brand URL
+    if (hostLc === registered) continue; // apex itself - already the brand URL
     const sub = hostLc.slice(0, hostLc.length - registered.length - 1);
     const firstLabel = sub.split(".")[0];
     if (!HIGH_SIGNAL_SUBDOMAINS.has(firstLabel)) continue;

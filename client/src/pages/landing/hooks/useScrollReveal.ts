@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 // Usage: attach `ref` to the section's outer element, use `isVisible` to
 // toggle each child between its opacity-0/translate-y-8 start classes and
 // opacity-100/translate-y-0, with transition-all duration-700 and the shared
-// easing cubic-bezier(0.16, 1, 0.3, 1) — stagger children with an inline
+// easing cubic-bezier(0.16, 1, 0.3, 1) - stagger children with an inline
 // transitionDelay of roughly `${index * 100}ms`.
 export function useScrollReveal<T extends HTMLElement = HTMLDivElement>() {
   const ref = useRef<T | null>(null);

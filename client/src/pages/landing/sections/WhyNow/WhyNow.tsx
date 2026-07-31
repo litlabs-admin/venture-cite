@@ -93,7 +93,7 @@ export function WhyNow() {
                 </div>
               </div>
 
-              {/* Query row — nested inside the same bordered panel, divided by
+              {/* Query row - nested inside the same bordered panel, divided by
                   border-t. Was two infinitely-drifting marquee rows of six
                   pills each at 12px, which read as texture rather than
                   content. Now three pills at 14px in a static three-column

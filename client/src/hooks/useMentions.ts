@@ -1,4 +1,4 @@
-// useMentions — single source of truth for the Mentions tab data layer.
+// useMentions - single source of truth for the Mentions tab data layer.
 //
 // Owns: paginated mention list (infinite scroll), filter state (URL-persisted),
 // stats derived from first page, active-scan polling, scan cooldown, and all
@@ -62,7 +62,7 @@ const activeScansKey = (brandId: string | null) =>
   ["/api/brand-mentions/scans/active", brandId] as const;
 
 // ---------------------------------------------------------------------------
-// Filter param names — must match what the server reads from the query string.
+// Filter param names - must match what the server reads from the query string.
 // ---------------------------------------------------------------------------
 
 const FILTER_KEYS: (keyof MentionFilters)[] = [
@@ -77,13 +77,13 @@ const FILTER_KEYS: (keyof MentionFilters)[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// restoreMention — approximate "undo delete" via a fresh manual-add POST.
+// restoreMention - approximate "undo delete" via a fresh manual-add POST.
 //
 // LIMITATION: This is not a true DB-level undelete. It re-submits the row as
 // a manual-add, which runs the brand-presence gate again server-side. For
 // accidentally deleted rows the data generally re-appears. If the server rejects
 // the URL (e.g., no longer matches brand-presence gate) the restore silently
-// fails — the hook shows a failure toast in that case.
+// fails - the hook shows a failure toast in that case.
 // ---------------------------------------------------------------------------
 
 async function restoreMention(row: BrandMention, brandId: string): Promise<void> {
@@ -105,14 +105,14 @@ export function useMentions(brandId: string | null) {
   const search = useSearch({ strict: false });
 
   // -------------------------------------------------------------------------
-  // Filter state — URL is the single source of truth
+  // Filter state - URL is the single source of truth
   //
   // This hook is mounted from multiple routes, so search is read/written
   // loosely ({ strict: false } / to: ".") rather than against one route's
-  // typed search — see native-api-contract.md rule 3. None of the mention
+  // typed search - see native-api-contract.md rule 3. None of the mention
   // filter keys (status/platform/sentiment/from/to/q/sort/newSinceLastScan)
-  // are declared in src/routes/-shared/searchSchemas.ts — they're not owned
-  // by any single route — so they fall through each schema's `.passthrough()`
+  // are declared in src/routes/-shared/searchSchemas.ts - they're not owned
+  // by any single route - so they fall through each schema's `.passthrough()`
   // catchall, which types unknown keys as `unknown`; no cast is needed to
   // index `search` with a dynamic key. Every value is still coerced
   // explicitly rather than trusted as-is: `src/router.tsx` pins the whole
@@ -169,7 +169,7 @@ export function useMentions(brandId: string | null) {
   }, [navigate]);
 
   // -------------------------------------------------------------------------
-  // List query — infinite scroll
+  // List query - infinite scroll
   // -------------------------------------------------------------------------
 
   const listQuery = useInfiniteQuery<MentionPage, Error>({
@@ -320,7 +320,7 @@ export function useMentions(brandId: string | null) {
   }, [brandId, scanCooldown.canStart, startScanMutation]);
 
   // -------------------------------------------------------------------------
-  // updateStatus — optimistic mutation
+  // updateStatus - optimistic mutation
   // -------------------------------------------------------------------------
 
   const updateStatusMutation = useMutation<
@@ -366,7 +366,7 @@ export function useMentions(brandId: string | null) {
   );
 
   // -------------------------------------------------------------------------
-  // deleteMention — optimistic + 5s undo toast
+  // deleteMention - optimistic + 5s undo toast
   // -------------------------------------------------------------------------
 
   const deleteMentionMutation = useMutation<
@@ -404,7 +404,7 @@ export function useMentions(brandId: string | null) {
       const row = ctx?.deleted;
       if (!row || !brandId) return;
       // Show a 5-second undo toast. Undo re-submits via manualAdd (approximate
-      // undelete — see restoreMention comment above).
+      // undelete - see restoreMention comment above).
       toast({
         title: "Mention deleted",
         description: row.sourceTitle ?? row.sourceUrl,
@@ -507,7 +507,7 @@ export function useMentions(brandId: string | null) {
   );
 
   // -------------------------------------------------------------------------
-  // markFalsePositive — sugar over updateStatus
+  // markFalsePositive - sugar over updateStatus
   // -------------------------------------------------------------------------
 
   const markFalsePositive = useCallback(

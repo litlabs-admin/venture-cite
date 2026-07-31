@@ -4,13 +4,13 @@
 // The original monolith now only mounts this module via setupAnalyticsRoutes.
 //
 // Includes:
-//   POST /api/check-crawler-permissions    — robots.txt-based AI crawler audit
-//   GET  /api/geo-analytics/:brandId       — SoV + AI visibility + sentiment rollup
-//   POST /api/analyze-sentiment            — OpenAI sentiment classifier
-//   POST /api/geo-analytics/:brandId/snapshot — persist a visibility snapshot
-//   GET  /api/geo-analytics/:brandId/history  — snapshot history
-//   GET  /api/geo-opportunities/:brandId   — brand-specific opportunity finder
-//   GET  /api/geo-opportunities            — industry-generic opportunity finder
+//   POST /api/check-crawler-permissions    - robots.txt-based AI crawler audit
+//   GET  /api/geo-analytics/:brandId       - SoV + AI visibility + sentiment rollup
+//   POST /api/analyze-sentiment            - OpenAI sentiment classifier
+//   POST /api/geo-analytics/:brandId/snapshot - persist a visibility snapshot
+//   GET  /api/geo-analytics/:brandId/history  - snapshot history
+//   GET  /api/geo-opportunities/:brandId   - brand-specific opportunity finder
+//   GET  /api/geo-opportunities            - industry-generic opportunity finder
 
 import type { Express } from "express";
 import { storage } from "../storage";
@@ -39,7 +39,7 @@ import { captureAndFlush } from "../lib/sentryReport";
 export function setupAnalyticsRoutes(app: Express): void {
   // ========== AI CRAWLER PERMISSION CHECKER ==========
 
-  // Check AI crawler permissions for a URL — SSRF-guarded + rate-limited.
+  // Check AI crawler permissions for a URL - SSRF-guarded + rate-limited.
   app.post(
     "/api/check-crawler-permissions",
     aiLimitMiddleware,
@@ -107,7 +107,7 @@ export function setupAnalyticsRoutes(app: Express): void {
 
           if (blockedSearch.length > 0) {
             recommendations.push(
-              `CRITICAL: ${blockedSearch.length} search indexing bot(s) blocked: ${blockedSearch.map((c) => c.platform).join(", ")}. These determine whether you appear in AI search answers — unblock these first.`,
+              `CRITICAL: ${blockedSearch.length} search indexing bot(s) blocked: ${blockedSearch.map((c) => c.platform).join(", ")}. These determine whether you appear in AI search answers - unblock these first.`,
             );
           }
           if (blockedRealtime.length > 0) {
@@ -117,7 +117,7 @@ export function setupAnalyticsRoutes(app: Express): void {
           }
           if (blockedTraining.length > 0) {
             recommendations.push(
-              `${blockedTraining.length} training crawler(s) blocked: ${blockedTraining.map((c) => c.platform).join(", ")}. Acceptable if intentional — these only affect future model training, not current answers.`,
+              `${blockedTraining.length} training crawler(s) blocked: ${blockedTraining.map((c) => c.platform).join(", ")}. Acceptable if intentional - these only affect future model training, not current answers.`,
             );
           }
         }
@@ -129,7 +129,7 @@ export function setupAnalyticsRoutes(app: Express): void {
           // Generate the snippet straight from AI_CRAWLERS so adding/removing a
           // bot keeps the recommendation in sync with what we actually check.
           // One directive block per bot (User-agent + Allow pair with a blank
-          // line between) — some parsers mishandle stacked User-agent lines
+          // line between) - some parsers mishandle stacked User-agent lines
           // before a single Disallow, so keep each bot isolated.
           const byPurpose: Record<"search" | "realtime" | "training", typeof AI_CRAWLERS> = {
             search: [],
@@ -155,17 +155,17 @@ export function setupAnalyticsRoutes(app: Express): void {
           };
           pushSection(
             "search",
-            "Search indexing bots — these determine whether you appear in AI search answers",
+            "Search indexing bots - these determine whether you appear in AI search answers",
             byPurpose.search,
           );
           pushSection(
             "realtime",
-            "Realtime browsing bots — fired when a user asks an assistant to open your URL",
+            "Realtime browsing bots - fired when a user asks an assistant to open your URL",
             byPurpose.realtime,
           );
           pushSection(
             "training",
-            "Training crawlers — opt out here if you don't want content used in future model training",
+            "Training crawlers - opt out here if you don't want content used in future model training",
             byPurpose.training,
           );
           const snippet = [
@@ -210,7 +210,7 @@ export function setupAnalyticsRoutes(app: Express): void {
 
   const AI_PLATFORMS = SHARED_AI_PLATFORMS;
 
-  // Get comprehensive GEO analytics for a brand — :brandId is ownership-
+  // Get comprehensive GEO analytics for a brand - :brandId is ownership-
   // checked via app.param before this handler runs.
   app.get(
     "/api/geo-analytics/:brandId",
@@ -247,7 +247,7 @@ export function setupAnalyticsRoutes(app: Express): void {
 
         // Wave 9.2: prefer the indexed (brandPromptId, since) read over
         // the all-rankings scan + post-filter. The article-tied rankings
-        // are loaded separately and merged below — they aren't tied to
+        // are loaded separately and merged below - they aren't tied to
         // citation runs and don't suffer from the mixed-window problem.
         const promptRankings =
           brandPrompts.length > 0
@@ -255,7 +255,7 @@ export function setupAnalyticsRoutes(app: Express): void {
             : [];
         // Wave 9.3: indexed read with the same `since` filter as the
         // brand-prompt path. Previously this fetched every geo_ranking
-        // row globally and post-filtered in memory — both inefficient
+        // row globally and post-filtered in memory - both inefficient
         // and prone to mixing all-time article rankings into a fresh
         // run's window if `checkedAt` precision drifted.
         const articleRankings = articleIds.size
@@ -280,20 +280,20 @@ export function setupAnalyticsRoutes(app: Express): void {
           const citations = platformRankings.filter((r) => r.isCited === 1).length;
           // `mentions` here = total checks run on this platform. Kept on the
           // row for downstream consumers that want "checks attempted," but
-          // it is NOT fed into the visibility score — that would credit
+          // it is NOT fed into the visibility score - that would credit
           // non-cited checks, which is the root cause of the 15/100 score
           // users saw with zero citations.
           const mentions = platformRankings.length;
 
           // Average rank across CITED rows only (not across all rankings).
-          // Rank was previously computed over every row with a rank field —
+          // Rank was previously computed over every row with a rank field -
           // which pulled down the visibility signal even when the brand
           // wasn't cited.
           const citedRows = platformRankings.filter((r) => r.isCited === 1);
           const rankedItems = citedRows.filter((r) => r.rank !== null && r.rank !== undefined);
           // Use a separate `avgRankRaw` for scoring (treat missing rank as
           // 0 = no penalty) and emit `avgRank: number | null` for the UI
-          // so it can show "—" for "no rank data" vs a real 0.
+          // so it can show "-" for "no rank data" vs a real 0.
           const avgRankRaw =
             rankedItems.length > 0
               ? rankedItems.reduce((sum, r) => sum + (r.rank || 0), 0) / rankedItems.length
@@ -301,7 +301,7 @@ export function setupAnalyticsRoutes(app: Express): void {
           const avgRank: number | null =
             rankedItems.length > 0 ? Math.round(avgRankRaw * 10) / 10 : null;
 
-          // Count sentiment (only from cited rows — sentiment of a not-cited
+          // Count sentiment (only from cited rows - sentiment of a not-cited
           // row is noise).
           const sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
           for (const ranking of citedRows) {
@@ -310,7 +310,7 @@ export function setupAnalyticsRoutes(app: Express): void {
             sentimentCounts[sentiment]++;
           }
 
-          // Canonical visibility score (server/lib/visibilityMetrics.ts) —
+          // Canonical visibility score (server/lib/visibilityMetrics.ts) -
           // the SAME definition as the dashboard hero and /entity-strength.
           // This used to be a different citation-count × multiplier model,
           // so the dashboard and GEO Analytics disagreed for the same
@@ -343,7 +343,7 @@ export function setupAnalyticsRoutes(app: Express): void {
 
         // Get competitor data for Share of Voice calculation. Pass the
         // same `sinceFilter` so the leaderboard's totals come from the
-        // same window as the brand metrics — otherwise SoV mixes a
+        // same window as the brand metrics - otherwise SoV mixes a
         // run-window numerator with an all-time denominator and reads
         // dramatically too low during a fresh run. When no run is
         // active the leaderboard helper falls back to its 30-day default.
@@ -366,7 +366,7 @@ export function setupAnalyticsRoutes(app: Express): void {
         // The numerator MUST match the own-brand total the leaderboard used
         // to build the denominator. brandTotalCitations only sums platforms
         // in AI_PLATFORMS, but the leaderboard's own-brand bucket counts
-        // every platform label — so a citation on a platform outside
+        // every platform label - so a citation on a platform outside
         // AI_PLATFORMS deflated SoV (numerator missed it, denominator kept
         // it). Read the own row straight from the leaderboard for a
         // consistent numerator/denominator; fall back defensively if for
@@ -378,7 +378,7 @@ export function setupAnalyticsRoutes(app: Express): void {
             ? Math.round((brandSovCitations / totalMarketCitations) * 1000) / 10
             : 0;
 
-        // Overall AI Visibility Score — average of per-platform scores across
+        // Overall AI Visibility Score - average of per-platform scores across
         // platforms that actually have check data. Previously this averaged
         // across every platform in AI_PLATFORMS, which dragged the score
         // down with zeros for platforms the user hasn't run yet (and also
@@ -843,7 +843,7 @@ Consider:
                 brandWebsiteCitationShare: pct(ownSite),
               }
             : {
-                // No citation data yet — surface zeros so the user sees "run a
+                // No citation data yet - surface zeros so the user sees "run a
                 // citation check first" rather than misleading industry averages.
                 thirdPartyCitationShare: 0,
                 redditCitationShare: 0,

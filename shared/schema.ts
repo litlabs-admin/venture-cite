@@ -52,7 +52,7 @@ export const users = pgTable("users", {
   onboardingState: jsonb("onboarding_state").default({}).notNull(),
   bufferAccessToken: text("buffer_access_token"),
   // Soft-delete (Wave 2.2). Set when the user requests account deletion
-  // — the row stays for the 30-day grace period so an admin can restore
+  // - the row stays for the 30-day grace period so an admin can restore
   // accidental deletions; the daily cron then hard-deletes after grace.
   deletedAt: timestamp("deleted_at"),
   deletionScheduledFor: timestamp("deletion_scheduled_for"),
@@ -208,7 +208,7 @@ export const brands = pgTable(
 
 // Articles are the single source of truth for user-authored content.
 // Wave 7 (content unification) collapsed the old `content_drafts` table into
-// this one — see migration 0033. Lifecycle: draft → generating → ready
+// this one - see migration 0033. Lifecycle: draft → generating → ready
 // (or failed). Drafts have no content yet; generating jobs are linked via
 // `jobId`; ready articles have content + at least one row in
 // `article_revisions`.
@@ -351,7 +351,7 @@ export type InsertKeywordResearch = z.infer<typeof insertKeywordResearchSchema>;
 
 // Background job queue for content generation so long-running GPT calls
 // survive page navigation, logout, and browser refresh. Polled in-process
-// by server/contentGenerationWorker.ts — no Redis/BullMQ dependency.
+// by server/contentGenerationWorker.ts - no Redis/BullMQ dependency.
 export const contentGenerationJobs = pgTable(
   "content_generation_jobs",
   {
@@ -411,7 +411,7 @@ export type InsertContentGenerationJob = z.infer<typeof insertContentGenerationJ
 // call: keyword discovery, FAQ generation, hallucination detection,
 // prompt generation, suggestion generation, etc. Pattern:
 //   1. Route handler calls openai.responses.create({ background: true,
-//      store: true }) — returns immediately with a response_id.
+//      store: true }) - returns immediately with a response_id.
 //   2. Row inserted here with status='running' + response_id.
 //   3. Client polls GET /api/llm-jobs/:id; poll handler calls
 //      openai.responses.retrieve(response_id) and on completion
@@ -501,7 +501,7 @@ export const brandPrompts = pgTable(
     prompt: text("prompt").notNull(),
     rationale: text("rationale"),
     orderIndex: integer("order_index").default(0).notNull(),
-    isActive: integer("is_active").default(1).notNull(), // legacy — use `status` instead
+    isActive: integer("is_active").default(1).notNull(), // legacy - use `status` instead
     status: text("status").default("tracked").notNull(), // "tracked" | "suggested" | "archived"
     // Richer classification promoted from the deprecated prompt_portfolio
     // table so every tracked prompt carries funnel + category dimensions.
@@ -572,7 +572,7 @@ export const geoSignalRuns = pgTable(
     }),
     ranAt: timestamp("ran_at").defaultNow().notNull(),
     overallScore: integer("overall_score"),
-    // 2026-05-28: payload jsonb column dropped (migration 0080) — it
+    // 2026-05-28: payload jsonb column dropped (migration 0080) - it
     // was write-only, up to 32 KB per row, never read by any consumer.
     // overallScore + ranAt cover everything the Pulse engine and
     // Inspector actually need.
@@ -588,7 +588,7 @@ export type GeoSignalRun = typeof geoSignalRuns.$inferSelect;
 export type InsertGeoSignalRun = z.infer<typeof insertGeoSignalRunSchema>;
 
 // ============================================================================
-// Spec 2: Brand Fact Sheet redesign — scrape runs + pages + cost caps
+// Spec 2: Brand Fact Sheet redesign - scrape runs + pages + cost caps
 // ============================================================================
 
 // One row per scrape run. Slice-resumable via `status='slice_pending'`.
@@ -699,7 +699,7 @@ export type BrandMonthlyCostCap = typeof brandMonthlyCostCaps.$inferSelect;
 export type InsertBrandMonthlyCostCap = z.infer<typeof insertBrandMonthlyCostCapSchema>;
 
 // Per-step telemetry for fact-sheet scrapes (migration 0076). One row
-// per significant event during a run — sitemap probes, page fetches,
+// per significant event during a run - sitemap probes, page fetches,
 // LLM calls, fact drops, terminal status. The /admin/scrape/:runId
 // inspector reads from this table to render the timeline.
 //
@@ -792,7 +792,7 @@ export const geoRankings = pgTable(
       onDelete: "set null",
     }),
     // Denormalized brand link (migration 0072). geo_rankings previously
-    // had no brand_id — every consumer joined via brand_prompts/articles,
+    // had no brand_id - every consumer joined via brand_prompts/articles,
     // which was an easy "forgot the join → wrong brand's data" footgun.
     // New rows set this directly; old rows were backfilled from those
     // join paths. Nullable: the brand_prompt FK is ON DELETE SET NULL, so
@@ -939,7 +939,7 @@ export const competitors = pgTable(
 );
 
 // Per-run, per-prompt competitor citation detail. Mirrors geo_rankings so
-// competitors are tracked with the same fidelity as the brand — one row
+// competitors are tracked with the same fidelity as the brand - one row
 // per (competitor × run × prompt × platform), containing whether the
 // competitor was cited, its rank, relevance, and a snippet of the
 // mentioning response. Powers the competitor leaderboard, drill-downs
@@ -1682,7 +1682,7 @@ export type InsertApiCost = typeof apiCosts.$inferInsert;
 // ─── Audit log (Wave 2.1) ─────────────────────────────────────────
 // Sensitive operations (delete, subscription change, admin action) write
 // a row here via server/lib/audit.ts. Migration in 0017_audit_logs.sql.
-// user_id is ON DELETE SET NULL — log rows survive account deletion.
+// user_id is ON DELETE SET NULL - log rows survive account deletion.
 export const auditLogs = pgTable(
   "audit_logs",
   {
@@ -1746,7 +1746,7 @@ export const schemaAudits = pgTable(
     // Full audit result payload (detected schemas, raw JSON-LD, etc).
     // The `additionalTypes` array lives inside this jsonb as
     // `payload.additionalTypes`; the old top-level `additional_types`
-    // sidecar column was dropped in migration 0080 — it duplicated
+    // sidecar column was dropped in migration 0080 - it duplicated
     // data already inside `schemas`.
     schemas: jsonb("schemas").notNull(),
     // Per-type completeness scores, e.g. { Article: 0.75, FAQPage: 0.4 }.
@@ -2003,7 +2003,7 @@ export const systemState = pgTable("system_state", {
 
 // ── Brand perception scoring (migration 0088) ──────────────────────────
 // Mirrors migrations/0088_brand_perception_runs.sql exactly. Every axis
-// column is nullable — a judge that can't assess an axis from the
+// column is nullable - a judge that can't assess an axis from the
 // available evidence records NULL, never a middling default.
 export const brandPerceptionRuns = pgTable(
   "brand_perception_runs",
@@ -2014,7 +2014,7 @@ export const brandPerceptionRuns = pgTable(
       .references(() => brands.id, { onDelete: "cascade" }),
     // numeric(4,1): the reference reports one decimal of precision
     // (e.g. 66.6); INTEGER silently rounded that away. Drizzle returns
-    // numeric columns as strings — callers MUST convert to number before
+    // numeric columns as strings - callers MUST convert to number before
     // serialising (see serializePerceptionRun in server/routes/dashboard.ts).
     trust: numeric("trust", { precision: 4, scale: 1 }),
     quality: numeric("quality", { precision: 4, scale: 1 }),

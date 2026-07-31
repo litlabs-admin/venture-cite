@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { attachAiLogger } from "./lib/aiLogger";
 import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
 
-// Dedicated client for the citation-judge LLM. Uses gpt-4o-mini for cost —
+// Dedicated client for the citation-judge LLM. Uses gpt-4o-mini for cost -
 // a judge call runs ~$0.0002 per response.
 const judgeClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -29,7 +29,7 @@ export interface JudgeVerdict {
   rank: number | null;
   /**
    * 0-100 score for how directly the response answers the user's question.
-   * Independent of whether the brand was cited — a high-relevance response
+   * Independent of whether the brand was cited - a high-relevance response
    * that doesn't cite the brand still hurts us (AI found a better answer
    * elsewhere). Null if the judge didn't return a usable number.
    */
@@ -69,14 +69,14 @@ export async function judgeCitation(params: {
 
   const systemMsg = `You are a precise citation judge. You decide whether an AI-generated response cites a specific brand/company.
 
-A "citation" means the response explicitly refers to THIS brand — by its name, a known variation, its website/domain, or an unambiguous description. Generic English words that happen to overlap with the brand name do NOT count (e.g., "venture capital" is not a citation of a brand called "Venture PR"). Industry-generic terms (e.g., "PR agency", "CRM software") do NOT count unless the specific brand is named.
+A "citation" means the response explicitly refers to THIS brand - by its name, a known variation, its website/domain, or an unambiguous description. Generic English words that happen to overlap with the brand name do NOT count (e.g., "venture capital" is not a citation of a brand called "Venture PR"). Industry-generic terms (e.g., "PR agency", "CRM software") do NOT count unless the specific brand is named.
 
 Return JSON only, exactly in this shape:
 {"cited": boolean, "rank": number | null, "relevance": number, "reasoning": "short sentence"}
 
 "rank" is the 1-indexed position of the brand's first mention inside an ordered/numbered list or ranked recommendation in the response. If the brand is mentioned but not inside such a list, return null.
 
-"relevance" is 0-100 — how directly the response answers the user's underlying question overall (independent of whether the brand was cited). 100 = fully answers, 50 = partially answers, 0 = off-topic.`;
+"relevance" is 0-100 - how directly the response answers the user's underlying question overall (independent of whether the brand was cited). 100 = fully answers, 50 = partially answers, 0 = off-topic.`;
 
   const userMsg = `Brand profile:
 ${profile}

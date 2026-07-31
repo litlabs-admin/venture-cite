@@ -5,7 +5,7 @@ import { pageSections } from "@/pages/landing/sections/Nav/data";
 import { BrandLogo } from "@/components/BrandLogo";
 
 // index.html:3627-3769. Every reveal block in the source is already
-// captured in its settled state (opacity-100, translate-y-0) — per the
+// captured in its settled state (opacity-100, translate-y-0) - per the
 // project's settled-vs-transient rule that's the resting look, rendered by
 // default here and wired to play in via useScrollReveal + IntersectionObserver
 // rather than treated as the permanent state. The transition classes
@@ -18,7 +18,7 @@ function revealY(isVisible: boolean) {
   return `${REVEAL} ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`;
 }
 
-// index.html:3743-3746 — the bottom bar's reveal wrapper only ever carries
+// index.html:3743-3746 - the bottom bar's reveal wrapper only ever carries
 // "opacity-100" in the source, never a translate-y-* class, so only opacity
 // is toggled here (unlike the blocks above it, which pair opacity with translate-y).
 function revealOpacity(isVisible: boolean) {
@@ -29,7 +29,7 @@ export function Footer() {
   // No scroll-reveal here: the footer is the last element on the page, so
   // a scroll-triggered IntersectionObserver with the sitewide -40% bottom
   // rootMargin can never be satisfied once the user is scrolled all the way
-  // down (its resting position never crosses the trigger line) — that left
+  // down (its resting position never crosses the trigger line) - that left
   // the footer permanently invisible for anyone who scrolled straight to
   // the bottom. This animation was never confirmed against source either
   // (see migration report), so rendering it always-visible is both safer
@@ -40,7 +40,7 @@ export function Footer() {
     <footer className="bg-vc-surface">
       <div className="bg-vc-surface border-y border-vc-default relative">
         <div className="px-4 sm:px-6 lg:px-8 mx-auto" style={{ maxWidth: 1120 }}>
-          {/* Mobile condensed block — index.html:3630-3674 */}
+          {/* Mobile condensed block - index.html:3630-3674 */}
           <div className="sm:hidden py-6">
             <div
               className={`flex items-start gap-3 mb-5 pb-5 border-b border-vc-default ${revealY(isVisible)}`}
@@ -74,7 +74,7 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Desktop grid — index.html:3675-3739 */}
+          {/* Desktop grid - index.html:3675-3739 */}
           <div className="hidden sm:grid grid-cols-3 lg:grid-cols-[180px_1fr_160px] gap-6 lg:gap-0 py-10 lg:py-0">
             <div
               className={`col-span-3 lg:col-span-1 lg:py-10 lg:px-6 lg:border-r border-vc-default flex flex-col ${revealY(
@@ -115,7 +115,7 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Bottom bar — index.html:3742-3752 */}
+      {/* Bottom bar - index.html:3742-3752 */}
       <div className="px-4 sm:px-6 lg:px-8 mx-auto" style={{ maxWidth: 1120 }}>
         <div
           className={`py-3 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 ${revealOpacity(
@@ -127,7 +127,7 @@ export function Footer() {
             © 2026 VentureCite. All rights reserved.
           </span>
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* No live status page exists yet — the source's status-widget
+            {/* No live status page exists yet - the source's status-widget
                   link is replaced with the same "Built for the AI search
                   era" line landing.tsx's footer strip uses, keeping the
                   dot + text layout instead of inventing an unsourced page. */}

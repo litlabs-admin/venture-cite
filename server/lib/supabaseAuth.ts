@@ -3,10 +3,10 @@
 //
 // It is deliberately SEPARATE from supabaseAdmin. supabase-js stores the
 // session returned by signInWithPassword on the calling client and then uses
-// that user JWT — not the apikey — as the Authorization header for subsequent
+// that user JWT - not the apikey - as the Authorization header for subsequent
 // Storage / PostgREST requests:
 //   https://supabase.com/docs/guides/troubleshooting/why-is-my-service-role-key-client-getting-rls-errors-or-not-returning-data-7_1K9z
-// Calling signInWithPassword on supabaseAdmin therefore "poisons" it — the next
+// Calling signInWithPassword on supabaseAdmin therefore "poisons" it - the next
 // server-side Storage upload (logoStorage.ts) runs as `authenticated` instead
 // of `service_role` and fails RLS with "new row violates row-level security
 // policy". Keeping all credential checks on this client guarantees
@@ -18,7 +18,7 @@
 //
 // Key choice: sign-in needs no elevated privilege, so we prefer the anon key
 // (least privilege). We fall back to the service-role key only when the anon
-// key isn't set in the server env — that still works, and the poisoning is
+// key isn't set in the server env - that still works, and the poisoning is
 // harmless here because this client never touches Storage or tables.
 
 import { createClient } from "@supabase/supabase-js";

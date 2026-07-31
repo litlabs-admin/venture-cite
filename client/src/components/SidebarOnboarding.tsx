@@ -26,7 +26,7 @@ export default function SidebarOnboarding({ onNavigate }: { onNavigate?: () => v
     refetchOnMount: true,
   });
   // Read brands + articles from their existing caches so creating either
-  // flips the relevant step instantly — those queries already invalidate
+  // flips the relevant step instantly - those queries already invalidate
   // on create/delete throughout the app.
   const { data: brandsResp } = useQuery<{ success: boolean; data: any[] }>({
     queryKey: ["/api/brands"],

@@ -31,7 +31,7 @@ export async function runFactScrapeBackstop(): Promise<{ processed: number }> {
     if (ageMs > 10 * 60_000) {
       logger.error(
         { ageMs, prevFiredAt: prevFired.iso },
-        "fact_scrape_backstop: previous cron tick was stale — cron may have stopped",
+        "fact_scrape_backstop: previous cron tick was stale - cron may have stopped",
       );
     }
   }

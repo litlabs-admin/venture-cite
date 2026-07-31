@@ -16,7 +16,7 @@ describe("buildTone", () => {
     expect(t.score).toBeNull();
   });
 
-  it("scores all-negative as 0 — a real, measured floor", () => {
+  it("scores all-negative as 0 - a real, measured floor", () => {
     const t = buildTone({ positive: 0, neutral: 0, negative: 5 })!;
     expect(t.total).toBe(5);
     expect(t.score).toBe(0);

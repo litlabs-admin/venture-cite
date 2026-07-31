@@ -17,7 +17,7 @@ import type { TrackedContentUrl } from "@shared/schema";
 import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
 
 // ChatGPT citation checks go through the direct OpenAI client.
-// Citation runs execute in slices via /advance polling on Vercel —
+// Citation runs execute in slices via /advance polling on Vercel -
 // each slice is bounded by VERCEL_FUNCTION_BUDGET_MS, so the per-LLM
 // timeout must inherit that limit. On Hobby (10s function) this is
 // ~6.3s; on Pro (60s) it's 25s. A 45s timeout against a 10s function
@@ -31,7 +31,7 @@ attachAiLogger(openai);
 
 // Claude / Gemini / Perplexity / DeepSeek all route through OpenRouter so we
 // don't have to maintain four separate provider SDKs. OpenRouter is OpenAI
-// SDK-compatible — same chat.completions.create shape, just a different
+// SDK-compatible - same chat.completions.create shape, just a different
 // baseURL and API key.
 const openrouter = process.env.OPENROUTER_API_KEY
   ? (() => {
@@ -131,7 +131,7 @@ export async function checkForCitation(
   };
 
   // Wave 8: matcher already said "yes" above. The LLM judge runs only to
-  // enrich rank/relevance — it CANNOT flip isCited back to false. If the
+  // enrich rank/relevance - it CANNOT flip isCited back to false. If the
   // judge says cited=false but the matcher hit, we still return
   // isCited=true (matcher wins) and discard the judge's rank/relevance.
   try {
@@ -151,7 +151,7 @@ export async function checkForCitation(
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error({ msg: msg }, `[citationChecker] judge call failed —`);
+    logger.error({ msg: msg }, `[citationChecker] judge call failed -`);
     // Wave 8: judge failure no longer flips matcher-yes to no. The
     // matcher already determined the brand is named in the response; we
     // record isCited=true with no rank/relevance enrichment.
@@ -248,17 +248,17 @@ function extractStructuredCitations(resp: unknown): string[] {
 // OpenRouter live web grounding for models that don't ground natively
 // (Claude / Gemini / DeepSeek). 2026-05-27: switched from an invented
 // `tools:[{type:"openrouter:web_search"}]` entry (silently ignored by
-// the OpenRouter API — Claude/Gemini/DeepSeek citation checks were
+// the OpenRouter API - Claude/Gemini/DeepSeek citation checks were
 // running against stale training data) to the documented `plugins`
 // extension. Per https://openrouter.ai/docs/guides/features/plugins/web-search
 // the supported forms are:
 //   1) `:online` suffix on model name (shortcut for the `web` plugin)
-//   2) `plugins: [{ id: "web", max_results: 5, ... }]` — full control
+//   2) `plugins: [{ id: "web", max_results: 5, ... }]` - full control
 // We use form 2 so we can tune max_results without minting a separate
 // model slug per engine. Cast: the OpenAI SDK doesn't type `plugins`,
 // but OpenRouter accepts it as a top-level extension to the
 // OpenAI-compatible chat-completions schema. Annotations still arrive on
-// `choices[].message.annotations` as url_citation entries — no consumer
+// `choices[].message.annotations` as url_citation entries - no consumer
 // change needed.
 const OPENROUTER_WEB_SEARCH_PLUGIN = {
   id: "web" as const,
@@ -266,7 +266,7 @@ const OPENROUTER_WEB_SEARCH_PLUGIN = {
 };
 
 // Per-platform query. ChatGPT hits OpenAI directly; the other four go through
-// OpenRouter. No simulation fallbacks — if OPENROUTER_API_KEY is missing the
+// OpenRouter. No simulation fallbacks - if OPENROUTER_API_KEY is missing the
 // caller gets a clear context string so the UI can surface it.
 //
 // userId is optional for legacy callers (e.g. ad-hoc /api/citation/check
@@ -298,12 +298,12 @@ export async function runPlatformCitationCheck(
   };
   // Real GEO measurement: query each engine WITH LIVE WEB GROUNDING, as
   // itself (no persona spoof), deterministically (temperature 0 where the
-  // model allows it). The system message stays deliberately neutral — the
+  // model allows it). The system message stays deliberately neutral - the
   // old prompt nudged the model to name brands, inflating measured
   // visibility; we measure the way a normal user would ask. Expect lower
   // (more honest) citation rates than the prior ungrounded temp-0.7 path.
   const systemMsg =
-    "Answer the question helpfully, accurately, and naturally — exactly as you would for any user.";
+    "Answer the question helpfully, accurately, and naturally - exactly as you would for any user.";
 
   const cfg =
     CITATION_MODELS[platform] ?? (platform === "GPT-4" ? CITATION_MODELS.ChatGPT : undefined);
@@ -324,7 +324,7 @@ export async function runPlatformCitationCheck(
       relevance: null,
       responseText: "",
       structuredCitations: [],
-      error: `${platform} check skipped — OPENROUTER_API_KEY is not configured.`,
+      error: `${platform} check skipped - OPENROUTER_API_KEY is not configured.`,
     };
   }
 
@@ -347,7 +347,7 @@ export async function runPlatformCitationCheck(
   // engine is pinned to 0 so a weekly measurement isn't a random walk.
   if (cfg.supportsTemperature) params.temperature = 0;
   // Live web grounding for OpenRouter models that don't ground natively.
-  // Attach as a top-level `plugins` array (OpenRouter extension) — see
+  // Attach as a top-level `plugins` array (OpenRouter extension) - see
   // the OPENROUTER_WEB_SEARCH_PLUGIN definition above for the
   // why-not-tools rationale.
   if (cfg.webSearchTool) {
@@ -371,7 +371,7 @@ export async function runPlatformCitationCheck(
   const structuredCitations = extractStructuredCitations(chatResponse);
   // Observability: when web grounding silently returns zero citations
   // (e.g. an engine rejected our plugins/tools extension, or upstream
-  // grounding is offline) we want it in the logs at WARN — not
+  // grounding is offline) we want it in the logs at WARN - not
   // discoverable only by manually inspecting geo_rankings. ChatGPT
   // search-preview + Perplexity sonar should always return at least a
   // few citations; Claude/Gemini/DeepSeek depend on the `plugins`
@@ -385,7 +385,7 @@ export async function runPlatformCitationCheck(
           responseLength: responseText.length,
           hasPlugins: !!cfg.webSearchTool,
         },
-        "citationChecker: grounded engine returned 0 structured citations — web search may be broken",
+        "citationChecker: grounded engine returned 0 structured citations - web search may be broken",
       );
     }
   }
@@ -442,8 +442,8 @@ export async function runBrandPrompts(
   }
 
   const brandName = brand.companyName || brand.name || "";
-  // Pass every name we know about — short name, company name, and any
-  // stored variations — into the detector so "Notion Labs, Inc." also
+  // Pass every name we know about - short name, company name, and any
+  // stored variations - into the detector so "Notion Labs, Inc." also
   // matches a response that just says "Notion".
   const brandNameVariations = [
     brand.name || "",
@@ -508,12 +508,12 @@ export async function runBrandPrompts(
   }
 
   // Load competitors once so every task can pre-filter responses against them.
-  // getCompetitors defaults to excluding deletedAt rows — ignored competitors
+  // getCompetitors defaults to excluding deletedAt rows - ignored competitors
   // are soft-deleted too, so they're already filtered.
   const competitors = await storage.getCompetitors(brandId).catch((err) => {
     logger.warn(
       { err: err },
-      `[citationChecker] getCompetitors failed — proceeding without competitor tracking:`,
+      `[citationChecker] getCompetitors failed - proceeding without competitor tracking:`,
     );
     return [];
   });
@@ -521,7 +521,7 @@ export async function runBrandPrompts(
     `[citationChecker] loaded ${competitors.length} active competitors for brand ${brandId}`,
   );
 
-  // Wave 9.4: tracked content URLs — the brand's own published BOFU/FAQ
+  // Wave 9.4: tracked content URLs - the brand's own published BOFU/FAQ
   // pages. Loaded once per run; substring-matched against each LLM
   // response below so we can stamp last_cited_at + bump
   // citation_runs.self_citation_count whenever an AI engine cites
@@ -537,7 +537,7 @@ export async function runBrandPrompts(
   const competitorDetections = new Map<string, Map<string, number>>(); // competitorId → platform → cited count
   let competitorDetectionsCapWarned = false; // fires once per run if we hit the 5000-competitor cap
   // Platforms where we've already done auto-discovery of new competitors
-  // this run — once per (runId, platform) to cap LLM cost at ~5 extra
+  // this run - once per (runId, platform) to cap LLM cost at ~5 extra
   // calls per run total.
   const autoDiscoveredPlatforms = new Set<string>();
 
@@ -569,7 +569,7 @@ export async function runBrandPrompts(
       ].filter((s): s is string => typeof s === "string" && s.trim().length > 0),
     );
   }
-  // Helper to append a variant to the cache idempotently — also writes to
+  // Helper to append a variant to the cache idempotently - also writes to
   // DB so the variant persists across runs. Lower-case dedupe matches the
   // matcher's canonicalization.
   const appendVariation = async (entityId: string, kind: "brand" | "competitor", form: string) => {
@@ -588,14 +588,14 @@ export async function runBrandPrompts(
   };
 
   // Wave 9: per-run disagreement counter. Persisted on finalize so HistoryTab
-  // can surface "matcher and analyzer disagreed on N of M checks" — useful
+  // can surface "matcher and analyzer disagreed on N of M checks" - useful
   // for tuning the variation list. Rate >5% suggests the brand needs more
   // user-supplied variations.
   let disagreementCount = 0;
 
   // Flatten all (prompt × platform) pairs into one queue and run them with a
   // fixed concurrency ceiling. As soon as one task finishes (AI call + DB
-  // insert) the next one starts — no per-prompt batching, no waiting for the
+  // insert) the next one starts - no per-prompt batching, no waiting for the
   // slowest sibling. Concurrency = 5 keeps the burst size predictable and
   // well under every platform's rate limit.
   const CONCURRENCY = 5;
@@ -610,7 +610,7 @@ export async function runBrandPrompts(
   // Cumulative counts across prior slices, so progress percent + totalChecks
   // + totalCited reflect the whole run, not just this slice. Without these,
   // every /advance call resets the visible numbers (the bug where the
-  // progress bar shows "5/5 — 20%" for a run that already has 28 rankings).
+  // progress bar shows "5/5 - 20%" for a run that already has 28 rankings).
   let resumedChecks = 0;
   let resumedCited = 0;
   if (options.resume) {
@@ -640,7 +640,7 @@ export async function runBrandPrompts(
     `[citationChecker] ${options.resume ? "resuming" : "starting"} ${prompts.length} prompts × ${cappedPlatforms.length} platforms = ${queue.length} pending checks (concurrency=${CONCURRENCY}${options.resume ? `, ${alreadyDone.size} already done` : ""})`,
   );
 
-  // Wave A: build the tracked-entity list once — brand + every competitor.
+  // Wave A: build the tracked-entity list once - brand + every competitor.
   // Passed to analyzeResponse on each task so a single LLM call returns
   // cited/rank/relevance/context/citedUrls for every entity plus any
   // untracked brands (candidates for auto-discovery).
@@ -657,7 +657,7 @@ export async function runBrandPrompts(
     const started = Date.now();
 
     // 1. Fetch the platform response with a single retry on transient failure
-    // (rate limit, breaker trip, network blip). skipJudge=true — analyzer
+    // (rate limit, breaker trip, network blip). skipJudge=true - analyzer
     // below does all citation judgment in one merged call.
     const attemptFetch = async (): Promise<{
       text: string;
@@ -702,7 +702,7 @@ export async function runBrandPrompts(
     if (fetchError) {
       logger.error(
         { fetchError: fetchError },
-        `[citationChecker] prompt ${promptIdx} ${platform} FAILED after retry in ${Date.now() - started}ms —`,
+        `[citationChecker] prompt ${promptIdx} ${platform} FAILED after retry in ${Date.now() - started}ms -`,
       );
     } else {
       logger.info(
@@ -713,7 +713,7 @@ export async function runBrandPrompts(
     // 2. Merged analyzer call: one JSON response returns {brands, tracked,
     // untracked}. tracked[entityId] contains each tracked entity's verdict
     // (cited, rank, relevance, context, citedUrls). untracked holds every
-    // other brand the analyzer surfaced — feeds auto-discovery.
+    // other brand the analyzer surfaced - feeds auto-discovery.
     const trackedEntities: TrackedEntity[] = [
       {
         kind: "brand",
@@ -760,7 +760,7 @@ export async function runBrandPrompts(
     // the brand/competitor edit UI.
     // Wave 9: append every analyzer-surfaced variant into the run-scoped
     // cache (and persist to DB). This replaces the per-response
-    // getBrandById + getCompetitors round-trip — same correctness, ~50
+    // getBrandById + getCompetitors round-trip - same correctness, ~50
     // fewer reads per typical run.
     for (const te of trackedEntities) {
       const verdict = analysis.tracked[te.id];
@@ -773,7 +773,7 @@ export async function runBrandPrompts(
       }
     }
 
-    // Wave 8: matcher-authoritative `isCited`. Run the universal matcher —
+    // Wave 8: matcher-authoritative `isCited`. Run the universal matcher -
     // its verdict overrides the analyzer's `cited` boolean for every
     // isCited write below. Analyzer's enrichment fields (rank, relevance,
     // context, citedUrls) are still used, but only when matcher confirms.
@@ -837,7 +837,7 @@ export async function runBrandPrompts(
       }
     }
 
-    // Disagreement logging — useful for tuning the variation list. Both
+    // Disagreement logging - useful for tuning the variation list. Both
     // directions are interesting: matcher-yes/analyzer-no usually means
     // a phrase that's a citation but the analyzer judged off-topic;
     // matcher-no/analyzer-yes usually means analyzer hallucinated or
@@ -885,7 +885,7 @@ export async function runBrandPrompts(
       citationContext = `${statusLine}\n\n||| RAW_RESPONSE |||\n${responseText}`;
     }
 
-    // 3. citingOutletUrl — prefer the analyzer's explicitly-attributed URL
+    // 3. citingOutletUrl - prefer the analyzer's explicitly-attributed URL
     // for the brand, fall back to the first URL regex-extracted from the
     // response. Feeds Source Types, authority_score, and Citation Quality.
     const analyzerUrl = brandVerdict?.citedUrls?.[0] ?? null;
@@ -906,7 +906,7 @@ export async function runBrandPrompts(
       }
     }
 
-    // 4. Competitor citation rows — one per competitor the matcher hit on
+    // 4. Competitor citation rows - one per competitor the matcher hit on
     // this response. Absence of a row = not cited (keeps table narrow).
     // Wave 8: matcher is authoritative for isCited; analyzer's rank/
     // relevance only used when matcher agrees.
@@ -962,18 +962,18 @@ export async function runBrandPrompts(
             competitorDetectionsCapWarned = true;
             logger.warn(
               { brandId, runId: citationRun.id, cap: 5000 },
-              "citationChecker: competitorDetections cap hit — additional competitors dropped from this run",
+              "citationChecker: competitorDetections cap hit - additional competitors dropped from this run",
             );
           }
         });
       }
 
-      // 5. Auto-discovery — upsert analyzer.untracked brands as new
+      // 5. Auto-discovery - upsert analyzer.untracked brands as new
       // competitors with discoveredBy='citation_auto'. Only when the
       // brand was cited (filters off-topic responses) and only once per
       // (runId, platform) with a per-platform cap to bound storm risk.
       // Wave 8: each candidate is matcher-confirmed against the response
-      // text before insert — protects against analyzer hallucinations
+      // text before insert - protects against analyzer hallucinations
       // creating phantom competitor rows for brands that aren't actually
       // mentioned.
       if (isCited && !autoDiscoveredPlatforms.has(platform) && analysis.untracked.length > 0) {
@@ -1021,7 +1021,7 @@ export async function runBrandPrompts(
           // Matcher-confirm the candidate before persisting. Use the
           // analyzer's reported name + variants as the entity definition,
           // and the response text as the haystack. If the matcher can't
-          // find the brand at all, skip — analyzer probably hallucinated.
+          // find the brand at all, skip - analyzer probably hallucinated.
           const candMatch = matchEntity(responseText, {
             id: `auto-${name}`,
             name,
@@ -1061,7 +1061,7 @@ export async function runBrandPrompts(
       }
     }
 
-    // 6. Write the brand's geo_ranking row (always — denominator for
+    // 6. Write the brand's geo_ranking row (always - denominator for
     // citation-rate) and brand_mentions on cited responses.
     // Phase 3: capture URLs the LLM cited in its response. We feed
     // extractCitedUrls a synthetic input that prepends Perplexity's
@@ -1095,12 +1095,12 @@ export async function runBrandPrompts(
       rankings.push(row);
       if (isCited) totalCited += 1;
       logger.info(
-        `[citationChecker] prompt ${promptIdx} ${platform} saved at ${Date.now() - started}ms — cited=${isCited}`,
+        `[citationChecker] prompt ${promptIdx} ${platform} saved at ${Date.now() - started}ms - cited=${isCited}`,
       );
     } catch (dbErr) {
       logger.error(
         { dbErr: dbErr },
-        `[citationChecker] prompt ${promptIdx} ${platform} DB insert failed —`,
+        `[citationChecker] prompt ${promptIdx} ${platform} DB insert failed -`,
       );
     }
   };
@@ -1186,7 +1186,7 @@ export async function runBrandPrompts(
   }
 
   // Finalize the run row with aggregate totals + per-platform breakdown.
-  // Re-query so totals reflect the entire run, not just this slice — on
+  // Re-query so totals reflect the entire run, not just this slice - on
   // Vercel a multi-slice resume run only has the final slice's rankings
   // in the local `rankings` array.
   const allRankings = options.resume
@@ -1211,7 +1211,7 @@ export async function runBrandPrompts(
   // Wave 8: classify the run as succeeded / partial / failed based on what
   // actually got persisted. 'partial' = some checks went through but at
   // least one platform fully failed (every task on it errored). For now
-  // we treat any run with rankings present as succeeded — the platform-
+  // we treat any run with rankings present as succeeded - the platform-
   // level partial-failure detection is left for a future tighter pass.
   const runStatus: "succeeded" | "failed" = totalChecks === 0 ? "failed" : "succeeded";
 
@@ -1224,22 +1224,22 @@ export async function runBrandPrompts(
     status: runStatus,
     progressPct: 100,
     // Wave 9: surface a reason on HistoryTab when a run finalizes with zero
-    // rankings — helps users tell "0% citation rate" apart from "every API
+    // rankings - helps users tell "0% citation rate" apart from "every API
     // call failed". The detached kickoff overwrites this if the run threw.
     ...(runStatus === "failed" && totalChecks === 0
-      ? { errorMessage: "All platform calls failed — no rankings were saved." }
+      ? { errorMessage: "All platform calls failed - no rankings were saved." }
       : {}),
     disagreementCount,
   } as any);
 
   logger.info(
-    `[citationChecker] run ${citationRun.id} complete — ${totalCited}/${totalChecks} cited (${citationRate}%)`,
+    `[citationChecker] run ${citationRun.id} complete - ${totalCited}/${totalChecks} cited (${citationRate}%)`,
   );
 
-  // Post-processing stage. All three are best-effort — a failure here must
+  // Post-processing stage. All three are best-effort - a failure here must
   // never revert the rankings we already saved.
 
-  // 1. Competitor citation snapshots — one row per (competitor, platform,
+  // 1. Competitor citation snapshots - one row per (competitor, platform,
   // runId). runId is used as the idempotency key so retries don't inflate
   // leaderboard totals.
   for (const [competitorId, perPlatform] of Array.from(competitorDetections.entries())) {
@@ -1257,7 +1257,7 @@ export async function runBrandPrompts(
     }
   }
 
-  // 2. Metrics history — one row per tracked metric so the trend chart has
+  // 2. Metrics history - one row per tracked metric so the trend chart has
   // a real data point from this run.
   try {
     const { recordCurrentMetrics } = await import("./lib/metricsSnapshot");
@@ -1266,7 +1266,7 @@ export async function runBrandPrompts(
     logger.warn({ err: err }, `[citationChecker] metrics snapshot failed:`);
   }
 
-  // 3. Hallucination detection — compare each cited response against the
+  // 3. Hallucination detection - compare each cited response against the
   // brand fact sheet. Skipped if the fact sheet is empty.
   try {
     const { detectHallucinationsForRun, reverifyHallucinationsForRun } =
@@ -1282,7 +1282,7 @@ export async function runBrandPrompts(
     logger.warn({ err: err }, `[citationChecker] hallucination detection failed:`);
   }
 
-  // 4. Run-change alerts — diff this run's snapshots (written in step 2)
+  // 4. Run-change alerts - diff this run's snapshots (written in step 2)
   // against the prior run's and persist alert_history rows. MUST run after
   // steps 2 + 3 so the visibility_score / hallucinations snapshots exist.
   // Best-effort: a failure here must never revert saved rankings.
@@ -1350,11 +1350,11 @@ export async function kickoffBrandPromptsRun(
       );
       return { ok: false, reason: "already_running", runId: existing.id };
     }
-    // Wave 9.2: race window — the partial unique index tripped, but
+    // Wave 9.2: race window - the partial unique index tripped, but
     // by the time we re-read active runs, the conflicting row has
     // already finalized. Retry the insert exactly once. If it still
     // collides, surface as a "race" result; the caller (route) returns
-    // 500 with a generic "couldn't start run — try again" message.
+    // 500 with a generic "couldn't start run - try again" message.
     // Bounded so we can never recurse on a pathological loop.
     try {
       const retry = await newRow();

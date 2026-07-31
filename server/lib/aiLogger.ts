@@ -4,7 +4,7 @@ import type OpenAI from "openai";
 // response to stdout so you can see exactly what's being sent and received.
 // Works for any OpenAI-SDK-compatible client (OpenAI, OpenRouter, etc.).
 //
-// Writes to console only — no files — so it works on Vercel's ephemeral
+// Writes to console only - no files - so it works on Vercel's ephemeral
 // filesystem. Safe to leave on in production; noisy but cheap.
 //
 // Idempotent: a Symbol-keyed guard prevents re-wrapping if attached twice.

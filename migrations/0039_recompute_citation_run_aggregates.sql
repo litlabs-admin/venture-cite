@@ -4,7 +4,7 @@
 -- total_checks (cached at finalize time), while the drill-down reads
 -- geo_rankings live. When re-detect-all later flipped is_cited on stored
 -- rankings, the inline re-aggregation either didn't run for some runs
--- (race?), didn't persist, or was bypassed for older data — leaving the
+-- (race?), didn't persist, or was bypassed for older data - leaving the
 -- header showing e.g. "2/50" while the drill-down sums to "16/50". Same
 -- effect on the trend chart, the dashboard, and the citation_rate column.
 --
@@ -15,9 +15,9 @@
 --   * UPDATE…FROM joins on run_id and only updates matched rows, so runs
 --     with no rankings (orphans / re-detect rows from earlier Wave 9
 --     pass that 0038 should have already deleted) are untouched.
---   * total_cited as integer SUM(is_cited::int) — is_cited is stored as
+--   * total_cited as integer SUM(is_cited::int) - is_cited is stored as
 --     0/1 already, but the cast is defensive against any boolean drift.
---   * platform_breakdown is a JSONB column we don't recompute here —
+--   * platform_breakdown is a JSONB column we don't recompute here -
 --     it's used by HistoryTab tooltip only and self-heals on the next
 --     run finalize. Worth a follow-up if it diverges noticeably.
 

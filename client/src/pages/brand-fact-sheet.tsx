@@ -31,7 +31,7 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { EmptyState } from "@/components/foundations/EmptyState";
 import { ErrorState } from "@/components/ui/error-state";
 
-// Plan 2.3 hook — consume only.
+// Plan 2.3 hook - consume only.
 import { useScrapeRunStream } from "@/hooks/useScrapeRunStream";
 
 import { ManualPasteCard } from "@/components/fact-sheet/ManualPasteCard";
@@ -144,7 +144,7 @@ export default function BrandFactSheet() {
    */
   const [rescrapeError, setRescrapeError] = useState<string | null>(null);
   // True between kicking a re-scrape and the server-side run row
-  // appearing in runsQuery — keeps the runs poll hot so the freshly
+  // appearing in runsQuery - keeps the runs poll hot so the freshly
   // created run is discovered within a tick.
   const [expectingRun, setExpectingRun] = useState(false);
 
@@ -240,7 +240,7 @@ export default function BrandFactSheet() {
   // be derived from `runs` above: that list is capped at the 10 most recent
   // runs, so several consecutive failed/cancelled runs push every completed
   // run off the page and the UI would wrongly claim no scrape ever
-  // succeeded. Query the latest completed run directly instead — see UI
+  // succeeded. Query the latest completed run directly instead - see UI
   // audit #10 and server/routes/factSheet.ts's `/runs/latest-completed`.
   const latestCompletedQuery = useQuery<{ success: boolean; run: ScrapeRun | null }>({
     queryKey: ["/api/brand-fact-sheet/runs/latest-completed", { brandId: selectedBrandId }],
@@ -312,7 +312,7 @@ export default function BrandFactSheet() {
   }, [activeRun, expectingRun]);
 
   // Safety: if a kicked run never shows (silent server failure) don't poll
-  // forever — give up the hot poll after 20s.
+  // forever - give up the hot poll after 20s.
   useEffect(() => {
     if (!expectingRun) return;
     const t = setTimeout(() => setExpectingRun(false), 20_000);
@@ -438,8 +438,8 @@ export default function BrandFactSheet() {
   const lastScrapedAt = latestCompleted?.completedAt ?? null;
 
   // Second legitimate path (UI audit #10): legacy v1-scraped facts have no
-  // run row at all — `POST /api/brand-facts/scrape/:brandId` was removed in
-  // favor of the run-based pipeline (see server/routes/publications.ts) —
+  // run row at all - `POST /api/brand-facts/scrape/:brandId` was removed in
+  // favor of the run-based pipeline (see server/routes/publications.ts) -
   // but the facts themselves still carry a `lastVerified` timestamp. When
   // there's no completed run on record, fall back to the most recent
   // `lastVerified` across resolved facts so the page doesn't claim "Never"
@@ -524,7 +524,7 @@ export default function BrandFactSheet() {
 
   /* ---------- terminal-failure detection (Plan 2.5 Task 9) ----------
    * Mixed-success (some pages done, some failed) does NOT render the failure
-   * banner — only `failed`/`timeout` runs with an explicit error_kind do.
+   * banner - only `failed`/`timeout` runs with an explicit error_kind do.
    */
   const isTerminalFailure =
     !!latestRun && TERMINAL_FAILURE_STATUSES.includes(latestRun.status) && !!latestRun.errorKind;
@@ -536,13 +536,13 @@ export default function BrandFactSheet() {
   return (
     // This component is only ever rendered client-side, as a lazy tab
     // inside client/src/pages/setup.tsx (no route of its own to attach
-    // `head()` to) — see this task's report. Title/meta removed per this
+    // `head()` to) - see this task's report. Title/meta removed per this
     // task's blanket "metadata belongs to the route" rule; /setup falls
     // back to the root's site-wide defaults.
     <PanelPage>
       {selectedBrand && (
         <>
-          {/* HEADER SECTION — Task 8 */}
+          {/* HEADER SECTION - Task 8 */}
           <div data-tour-id="fact-sheet.header">
             <PanelRow cols={1}>
               <Panel
@@ -556,7 +556,7 @@ export default function BrandFactSheet() {
                 }
               >
                 <p className="mb-3 text-data text-vc-tertiary">
-                  We re-scrape monthly. Re-scrape on demand — duplicates are skipped.
+                  We re-scrape monthly. Re-scrape on demand - duplicates are skipped.
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 text-caption">
@@ -565,7 +565,7 @@ export default function BrandFactSheet() {
                       {lastScrapedAt
                         ? formatRelativeTime(lastScrapedAt)
                         : legacyVerifiedAt
-                          ? `No scrape run on record — facts verified ${formatRelativeTime(legacyVerifiedAt)}`
+                          ? `No scrape run on record - facts verified ${formatRelativeTime(legacyVerifiedAt)}`
                           : "Never"}
                     </div>
                   </div>
@@ -612,7 +612,7 @@ export default function BrandFactSheet() {
             </PanelRow>
           </div>
 
-          {/* MANUAL PASTE FALLBACK — latest completed run found zero facts */}
+          {/* MANUAL PASTE FALLBACK - latest completed run found zero facts */}
           {latestCompleted && latestCompleted.factsExtracted === 0 && (
             <PanelRow cols={1}>
               <Panel width="wide" border="last">
@@ -629,12 +629,12 @@ export default function BrandFactSheet() {
                         queryKey: ["/api/brand-facts", selectedBrandId],
                       });
                     } catch {
-                      // Paste failed — error already logged by apiRequest. UI shows the
+                      // Paste failed - error already logged by apiRequest. UI shows the
                       // unchanged "0 facts" state; user can retry.
                     }
                   }}
                   onManualFill={() => {
-                    // For MVP, just close/dismiss — the existing FactRow edit button
+                    // For MVP, just close/dismiss - the existing FactRow edit button
                     // and EditFactDialog are already on the page.
                   }}
                 />
@@ -642,7 +642,7 @@ export default function BrandFactSheet() {
             </PanelRow>
           )}
 
-          {/* RE-SCRAPE BLOCKED ALERT — cooldown / cost cap from /full-rescrape */}
+          {/* RE-SCRAPE BLOCKED ALERT - cooldown / cost cap from /full-rescrape */}
           {rescrapeError && (
             <PanelRow cols={1}>
               <Panel width="wide" border="last">
@@ -653,7 +653,7 @@ export default function BrandFactSheet() {
             </PanelRow>
           )}
 
-          {/* PER-PAGE PANEL — Plan 2.5 Task 8 */}
+          {/* PER-PAGE PANEL - Plan 2.5 Task 8 */}
           {(stream.isStreaming || displayPages.length > 0) && activeRunId ? (
             <PanelRow cols={1}>
               <Panel width="wide" border="last">
@@ -667,7 +667,7 @@ export default function BrandFactSheet() {
             </PanelRow>
           ) : null}
 
-          {/* TERMINAL FAILURE STATE — Plan 2.5 Task 9 */}
+          {/* TERMINAL FAILURE STATE - Plan 2.5 Task 9 */}
           {isTerminalFailure && latestRun ? (
             <PanelRow cols={1}>
               <Panel width="wide" border="last">
@@ -682,7 +682,7 @@ export default function BrandFactSheet() {
             </PanelRow>
           ) : null}
 
-          {/* DIFF SECTION — Task 9 */}
+          {/* DIFF SECTION - Task 9 */}
           <div data-tour-id="fact-sheet.diff">
             <PanelRow cols={1}>
               <Panel width="wide" border="last" label="Conflicts to resolve">
@@ -779,8 +779,8 @@ export default function BrandFactSheet() {
             </PanelRow>
           </div>
 
-          {/* RESOLVED FACTS — Task 10 */}
-          {/* TODO(spec-2 Plan 2.5): delta indicators (new / changed / removed) — needs prior-run comparison query */}
+          {/* RESOLVED FACTS - Task 10 */}
+          {/* TODO(spec-2 Plan 2.5): delta indicators (new / changed / removed) - needs prior-run comparison query */}
           <PanelRow cols={1} last>
             <Panel
               width="wide"
@@ -856,7 +856,7 @@ export default function BrandFactSheet() {
         </>
       )}
 
-      {/* Add fact dialog — manual user-authoritative entry. */}
+      {/* Add fact dialog - manual user-authoritative entry. */}
       <Dialog open={!!newFact} onOpenChange={(open) => !open && setNewFact(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>

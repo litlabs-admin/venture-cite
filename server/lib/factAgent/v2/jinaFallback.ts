@@ -1,8 +1,8 @@
 // Jina Reader fallback for client-rendered SPAs.
 //
-// When the static fetcher returns a "hollow shell" — i.e. the page has
+// When the static fetcher returns a "hollow shell" - i.e. the page has
 // no hydration payload, no JSON-LD structured data, and less than 200
-// chars of body text — we can't extract facts from the raw HTML. The
+// chars of body text - we can't extract facts from the raw HTML. The
 // fallback is Jina Reader (https://r.jina.ai/<url>), a free public
 // service that renders the page server-side and returns clean
 // markdown. This unlocks every React/Vue/SvelteKit SPA we currently
@@ -37,7 +37,7 @@ const JINA_MAX_BYTES = 500_000;
 
 export interface JinaResult {
   /** True iff the fetch succeeded and the markdown looks non-trivial.
-   *  False otherwise — callers should fall through to whatever they
+   *  False otherwise - callers should fall through to whatever they
    *  were going to do without Jina. */
   ok: boolean;
   /** Cleaned markdown body. Trimmed to ~200 KB if the page is huge. */

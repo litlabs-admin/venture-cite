@@ -57,7 +57,7 @@ describe("findSelfCitationsInText", () => {
 
   it("matches across host casing and trailing slash", () => {
     const hits = findSelfCitationsInText(
-      "Read more at HTTPS://Acme.com/Compare/Salesforce/ — it's helpful.",
+      "Read more at HTTPS://Acme.com/Compare/Salesforce/ - it's helpful.",
       [t1],
     );
     expect(hits).toHaveLength(1);

@@ -13,7 +13,7 @@ interface BrandSelectorProps {
   placeholder?: string;
   /** When true, shows the industry alongside the name (used on forms where more context helps). */
   showIndustry?: boolean;
-  /** Override the default hook-driven selection (rare — use only for forms). */
+  /** Override the default hook-driven selection (rare - use only for forms). */
   value?: string;
   onValueChange?: (id: string) => void;
 }
@@ -54,7 +54,7 @@ export default function BrandSelector({
         {brands.map((brand) => (
           <SelectItem key={brand.id} value={brand.id} data-testid={`select-brand-${brand.id}`}>
             {showIndustry
-              ? `${brand.name}${brand.industry ? ` — ${brand.industry}` : ""}`
+              ? `${brand.name}${brand.industry ? ` - ${brand.industry}` : ""}`
               : brand.name}
           </SelectItem>
         ))}

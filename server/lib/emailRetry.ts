@@ -26,7 +26,7 @@ export interface RetryFailureResult {
 
 export type RetryResult<T> = RetryAttemptResult<T> | RetryFailureResult;
 
-// True when an error is worth retrying. False = permanent — give up
+// True when an error is worth retrying. False = permanent - give up
 // immediately (e.g. invalid address) so we don't keep hitting the API
 // for a recipient that will never accept mail.
 export function isTransientError(err: unknown): boolean {

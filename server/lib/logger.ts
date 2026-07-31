@@ -4,7 +4,7 @@ import pino, { type LoggerOptions } from "pino";
 // Per-request context propagated through async stacks. The HTTP middleware
 // runs the rest of the request inside `requestContext.run({...}, next)`, so
 // any code path during that request can read `requestContext.getStore()` to
-// retrieve the request ID, user ID, etc. — without threading it through
+// retrieve the request ID, user ID, etc. - without threading it through
 // every function signature.
 export interface RequestContext {
   requestId: string;
@@ -103,7 +103,7 @@ const baseOptions: LoggerOptions = {
 //
 // The pretty transport is built inside a try/catch, and that is load-bearing
 // rather than defensive habit. `transport.target` is resolved by pino from a
-// STRING at runtime, which no bundler can trace — so a bundle that includes
+// STRING at runtime, which no bundler can trace - so a bundle that includes
 // this branch but not pino-pretty throws at module load, not at first log.
 // This module is imported by the SSR entry, so that throw took down every
 // route with an opaque 500: the marketing pages, /health, everything.
@@ -133,7 +133,7 @@ function createLogger() {
     });
   } catch {
     // pino-pretty unavailable (bundled runtime, pruned install). Fall back
-    // to structured JSON on stdout — still fully usable, just not pretty.
+    // to structured JSON on stdout - still fully usable, just not pretty.
     return pino(baseOptions);
   }
 }

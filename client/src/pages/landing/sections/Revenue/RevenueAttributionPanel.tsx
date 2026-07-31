@@ -2,12 +2,12 @@ import { TrendingUpIcon } from "./icons";
 
 const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 
-// By Source rows — dollar amounts fully recoverable verbatim from
+// By Source rows - dollar amounts fully recoverable verbatim from
 // index.html 3069-3104. Fill-bar widths were captured pre-animation at
 // "width: 0%"; since the real dollar amounts are known, each bar's settled
-// width is derived as (amount / largest) * 100 — proportional to ChatGPT,
-// the largest source — a legitimate derivation, not an invented value.
-// One-family blue ramp instead of the neutral grey ramp — ChatGPT (the
+// width is derived as (amount / largest) * 100 - proportional to ChatGPT,
+// the largest source - a legitimate derivation, not an invented value.
+// One-family blue ramp instead of the neutral grey ramp - ChatGPT (the
 // leading source) carries the deepest/most saturated blue, the other three
 // step down through lighter blue tints rather than switching to grey.
 const BY_SOURCE = [
@@ -42,12 +42,12 @@ const BY_SOURCE = [
 ];
 const MAX_AMOUNT = BY_SOURCE[0].amount;
 
-// Revenue Attribution · This month panel — the right half of the
+// Revenue Attribution · This month panel - the right half of the
 // two-panel mockup (index.html 3058-3115). Note the "Avg. session value /
 // Top page conv." recap row (index.html 3107-3114) is, per a careful
 // div-nesting re-verification against source, the 4th child *inside this
 // same panel's flex-col* (after By Source), not a separate element
-// spanning both panels — see closing report.
+// spanning both panels - see closing report.
 export function RevenueAttributionPanel({ isVisible }: { isVisible: boolean }) {
   return (
     <div className="p-4 sm:p-5 lg:p-6 flex flex-col h-full">

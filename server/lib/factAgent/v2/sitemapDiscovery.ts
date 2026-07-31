@@ -6,11 +6,11 @@
 //   3. Sitemap: directive in <brand>/robots.txt
 //
 // 2026-05-28 production fix: real-world sites (Adyen, Samsung, Notion,
-// most enterprise sites) ship a SITEMAP-INDEX at /sitemap.xml — an XML
+// most enterprise sites) ship a SITEMAP-INDEX at /sitemap.xml - an XML
 // file with <sitemap><loc>nested-sitemap.xml</loc></sitemap> entries,
 // NOT a flat list of page URLs. The old `parseLocs` was a pure regex
 // over <loc> tags that happily returned the NESTED SITEMAP URLs as if
-// they were pages — the executor then tried to scrape XML files as
+// they were pages - the executor then tried to scrape XML files as
 // HTML and skipped them all as `skipped_non_html`, ending up with zero
 // usable pages.
 //
@@ -24,10 +24,10 @@
 //   - Recursion fans out to at most MAX_NESTED_SITEMAPS (8) leaf files
 //   - Combined entry count capped at MAX_ENTRIES (200) across the run
 //   - Non-page URL extensions (.xml, .json, .rss, .atom, .gz, .txt)
-//     are dropped — they're either nested sitemaps we already
+//     are dropped - they're either nested sitemaps we already
 //     processed OR data files the page-scraper will reject anyway.
 //
-// Same-domain filtering still applies — strips CDN/affiliate links.
+// Same-domain filtering still applies - strips CDN/affiliate links.
 
 export interface SitemapFetcher {
   (url: string, opts?: { maxBytes?: number }): Promise<{ status: number; text: string }>;
@@ -98,7 +98,7 @@ async function fetchAndParse(fetcher: SitemapFetcher, url: string): Promise<Pars
       return parseSitemap(res.text);
     }
   } catch {
-    // Network errors — silently skip.
+    // Network errors - silently skip.
   }
   return null;
 }
@@ -234,7 +234,7 @@ export async function discoverSitemapUrls(
     if (rootParsed.locs.length >= 20) break;
   }
 
-  // robots.txt Sitemap: directive — always check; merge if found.
+  // robots.txt Sitemap: directive - always check; merge if found.
   try {
     const robots = await fetcher(`${origin}/robots.txt`, { maxBytes: 100_000 });
     if (robots.status >= 200 && robots.status < 300) {
@@ -258,14 +258,14 @@ export async function discoverSitemapUrls(
       }
     }
   } catch {
-    // ignore — robots.txt is best-effort here
+    // ignore - robots.txt is best-effort here
   }
 
   if (rootParsed.locs.length === 0) return [];
 
   // Collect leaf page URLs. If the root is a urlset, those <loc>s ARE
   // the page URLs. If it's a sitemapindex, the <loc>s point to nested
-  // sitemaps — fetch up to MAX_NESTED_SITEMAPS of them, ranked by the
+  // sitemaps - fetch up to MAX_NESTED_SITEMAPS of them, ranked by the
   // brand-locale heuristic.
   let pageUrls: string[] = [];
 
@@ -274,7 +274,7 @@ export async function discoverSitemapUrls(
     // Samsung's 66 country-locale variants of the same sitemap structure
     // collapse to one fetch instead of consuming all 8 nested slots on
     // duplicates. The canonical path here is the sitemap URL with its
-    // locale prefix stripped — different country versions of the same
+    // locale prefix stripped - different country versions of the same
     // sitemap structure have identical canonical paths.
     const canonicalizeSitemapPath = (u: string): string => {
       try {
@@ -316,7 +316,7 @@ export async function discoverSitemapUrls(
       pageUrls.push(...nestedParsed.locs);
     }
   } else {
-    // urlset or unknown — trust the <loc>s as candidates.
+    // urlset or unknown - trust the <loc>s as candidates.
     pageUrls = rootParsed.locs;
   }
 

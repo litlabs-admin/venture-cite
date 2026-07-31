@@ -8,7 +8,7 @@ const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 //
 // No longer a link. Each card used to be an <a> wrapping the whole tile,
 // ending in a "See all features" CTA and arrow that pointed at another
-// section of this same page — an affordance promising a destination when all
+// section of this same page - an affordance promising a destination when all
 // it did was scroll. The card makes its point; it does not need to send you
 // anywhere. The numeral's hover colour went with it, for the same reason: it
 // signalled interactivity the card no longer has.

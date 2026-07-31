@@ -1,4 +1,4 @@
-// ScanStatusPanel — Task 19.5, spec §3.12 flows A/B/F
+// ScanStatusPanel - Task 19.5, spec §3.12 flows A/B/F
 //
 // Renders the scan-control surface for the Mentions tab: brand variation
 // search terms, scan button with cooldown/active state, per-source progress
@@ -179,7 +179,7 @@ export function ScanStatusPanel({
   onAddVariation,
   onToggleMonitor,
 }: ScanStatusPanelProps) {
-  // Live countdown — re-render every 60s when a cooldown is active.
+  // Live countdown - re-render every 60s when a cooldown is active.
   const [_tick, setTick] = useState(0);
   useEffect(() => {
     if (!scanCooldown.nextAvailableAt) return;
@@ -253,7 +253,7 @@ export function ScanStatusPanel({
           {/* First-scan banner (flow F) */}
           {isFirstScan && (
             <div className="rounded-md bg-muted px-3 py-2 text-caption text-foreground">
-              First scan — pulling up to 1 year of history; this may take longer than usual.
+              First scan - pulling up to 1 year of history; this may take longer than usual.
             </div>
           )}
 
@@ -268,7 +268,7 @@ export function ScanStatusPanel({
             </Button>
           </div>
 
-          {/* Per-source progress chips — aria-live so screen readers announce updates */}
+          {/* Per-source progress chips - aria-live so screen readers announce updates */}
           {isActivelyScanning && (
             <div aria-live="polite" aria-atomic="false" className="flex flex-wrap gap-1.5">
               {SOURCES.map((src) => (
@@ -278,7 +278,7 @@ export function ScanStatusPanel({
           )}
         </div>
 
-        {/* ── Last completed scan summary (flow B — no active scan) ───── */}
+        {/* ── Last completed scan summary (flow B - no active scan) ───── */}
         {!isActivelyScanning && lastCompletedScan && (
           <>
             <hr />

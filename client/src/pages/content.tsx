@@ -12,7 +12,7 @@
 // background mode runs the work on OpenAI's infra. Client polls /state for
 // status + elapsedSeconds, drives /advance to kick off and progress the
 // run. The previous "phase label" (Brainstorming → Polishing) was fake
-// theatre uncorrelated with actual model progress — Foundations Plan 1
+// theatre uncorrelated with actual model progress - Foundations Plan 1
 // Task 4 replaced it with honest elapsed seconds + a Cancel button.
 // articles.content is filled by the server when the run completes,
 // so a user who navigates away and back picks up the finished article from
@@ -92,17 +92,17 @@ type Usage = {
 function friendlyErrorMessage(errorKind: string | null, fallback: string | null): string {
   switch (errorKind) {
     case "openai_429":
-      return "AI service was busy. Quota was refunded — please try again in a moment.";
+      return "AI service was busy. Quota was refunded - please try again in a moment.";
     case "openai_5xx":
-      return "AI service had a temporary error. Quota was refunded — please try again.";
+      return "AI service had a temporary error. Quota was refunded - please try again.";
     case "circuit":
-      return "AI service is temporarily unavailable. Quota was refunded — please try again shortly.";
+      return "AI service is temporarily unavailable. Quota was refunded - please try again shortly.";
     case "timeout":
-      return "Generation timed out. Quota was refunded — please try again.";
+      return "Generation timed out. Quota was refunded - please try again.";
     case "budget":
       return "Daily AI spend cap reached. Try again later or contact support.";
     case "invalid_input":
-      return "Invalid input — check your keywords and industry, then try again.";
+      return "Invalid input - check your keywords and industry, then try again.";
     case "cancelled":
       return "Generation was cancelled.";
     default:
@@ -119,7 +119,7 @@ export default function Content() {
   const loc = useRouterState({ select: (s) => s.location.pathname });
   // Content is mounted at both /_app/content (no articleId) and
   // /_app/content/$articleId (see content.tsx / content.$articleId.tsx route
-  // files) — strict:false reads whichever of those actually matched, exactly
+  // files) - strict:false reads whichever of those actually matched, exactly
   // like the old wouter useRoute() match-against-current-pathname did.
   const routeParams = useParams({ strict: false });
   const articleIdFromRoute = routeParams.articleId ?? null;
@@ -131,7 +131,7 @@ export default function Content() {
   // recycling the most recent draft. See keyword-research.tsx → handleGenerateContent.
   //
   // Content is mounted at three routes (/content, /content/:articleId, and
-  // embedded as the Act › Create tab at /act), so — like routeParams above —
+  // embedded as the Act › Create tab at /act), so - like routeParams above -
   // this reads search with { strict: false } rather than a single route's
   // typed Route.useSearch(). /_app/content.tsx, /_app/content.$articleId.tsx,
   // and /_app/act.tsx all declare validateSearch (searchSchemas.ts), so every
@@ -213,7 +213,7 @@ export default function Content() {
     setBootstrapping(true);
     (async () => {
       // If we have seed params from the Keyword Research handoff, always
-      // create a fresh draft pre-populated with them — don't reuse the
+      // create a fresh draft pre-populated with them - don't reuse the
       // most recent draft (the user explicitly asked to write about a
       // specific keyword).
       if (!seedParams) {
@@ -303,7 +303,7 @@ export default function Content() {
   const hydratedForId = useRef<string | null>(null);
   // Tracks whether the user has actually typed in the textarea since the
   // last server hydration. The auto-save effect only fires PATCH `content`
-  // when this is true — otherwise we'd PATCH the empty contentDraft right
+  // when this is true - otherwise we'd PATCH the empty contentDraft right
   // after a hydration race and wipe the article.
   const userEditedContent = useRef<boolean>(false);
 
@@ -325,7 +325,7 @@ export default function Content() {
 
   // Re-hydrate `contentDraft` whenever the server-side content changes
   // (e.g. when the worker flips status to 'ready' and writes the content)
-  // — but only if the user hasn't started typing yet. This is the fix for
+  // - but only if the user hasn't started typing yet. This is the fix for
   // the "article appeared as title-only after streaming" bug: hydration
   // used to fire only on first id match, so the empty contentDraft from
   // the draft state stuck around forever.
@@ -361,7 +361,7 @@ export default function Content() {
   useEffect(() => {
     if (!article || hydratedForId.current !== article.id) return;
     if (article.status !== "ready") return;
-    if (!userEditedContent.current) return; // Bug-A guard — see ref above.
+    if (!userEditedContent.current) return; // Bug-A guard - see ref above.
     if (contentDraft === (article.content ?? "")) return;
     autoSave.queueContent(contentDraft);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -373,7 +373,7 @@ export default function Content() {
   const isGenerating = article?.status === "generating";
 
   // Vercel migration (Responses API): client polls /state every 1s for
-  // status + elapsedSeconds. Drives /advance every ~7s — first call kicks
+  // status + elapsedSeconds. Drives /advance every ~7s - first call kicks
   // off the OpenAI Responses run; subsequent calls poll the run status.
   // When /state.done arrives, we refetch the article (which now has final
   // content in articles.content) and stop polling.
@@ -409,7 +409,7 @@ export default function Content() {
           }
         }
       } catch {
-        // Transient network failure — keep polling.
+        // Transient network failure - keep polling.
       }
       const interval = document.visibilityState === "visible" ? 1000 : 4000;
       stateTimer = setTimeout(pollState, interval);
@@ -422,7 +422,7 @@ export default function Content() {
           await apiRequest("POST", `/api/content-jobs/${activeJobId}/advance`);
         }
       } catch {
-        // ignore — /state polling will surface failure
+        // ignore - /state polling will surface failure
       }
       advanceTimer = setTimeout(driveAdvance, 7000);
     };
@@ -475,7 +475,7 @@ export default function Content() {
         refetchDrafts();
         toast({
           title: "Generation started",
-          description: "Streaming your article. Cancel any time — quota will be refunded.",
+          description: "Streaming your article. Cancel any time - quota will be refunded.",
         });
       } else if (data.limitReached) {
         toast({
@@ -758,7 +758,7 @@ export default function Content() {
                 </div>
 
                 <p className="text-caption text-muted-foreground">
-                  Generating your article. This may take 30-90 seconds. You can leave this page —
+                  Generating your article. This may take 30-90 seconds. You can leave this page -
                   generation will continue and you can return to see the finished article.
                 </p>
               </div>
@@ -972,7 +972,7 @@ function DraftForm(props: DraftFormProps) {
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p className="text-caption">
-                    The industry this <em>article</em> targets — can differ from your brand's home
+                    The industry this <em>article</em> targets - can differ from your brand's home
                     industry. Useful when you want to write for an adjacent vertical.
                   </p>
                 </TooltipContent>
@@ -981,7 +981,7 @@ function DraftForm(props: DraftFormProps) {
             <IndustryCombobox value={industry} onChange={setIndustry} />
             {selectedBrand && industry && industry !== selectedBrand.industry && (
               <p className="text-caption text-muted-foreground mt-1">
-                Different from {selectedBrand.name}'s home industry ({selectedBrand.industry}) —
+                Different from {selectedBrand.name}'s home industry ({selectedBrand.industry}) -
                 that's fine.
               </p>
             )}
@@ -1111,7 +1111,7 @@ function DraftForm(props: DraftFormProps) {
                     : "border-muted hover:border-muted-foreground/30"
                 }`}
               >
-                <span className="text-caption font-semibold">B2C — Consumer</span>
+                <span className="text-caption font-semibold">B2C - Consumer</span>
                 <span className="text-caption text-muted-foreground text-center">
                   Conversational, lifestyle-focused, relatable
                 </span>
@@ -1125,7 +1125,7 @@ function DraftForm(props: DraftFormProps) {
                     : "border-muted hover:border-muted-foreground/30"
                 }`}
               >
-                <span className="text-caption font-semibold">B2B — Business</span>
+                <span className="text-caption font-semibold">B2B - Business</span>
                 <span className="text-caption text-muted-foreground text-center">
                   Professional, data-driven, industry authority
                 </span>

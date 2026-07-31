@@ -55,7 +55,7 @@ import { MODELS } from "../server/lib/modelConfig";
 // ── Configuration ────────────────────────────────────────────────────
 
 /** Per-brand thresholds. A run fails if MORE than this fraction of
- *  brands in a category degrade vs baseline. 20% is generous — we
+ *  brands in a category degrade vs baseline. 20% is generous - we
  *  expect <5% category-level variance run over run. */
 const REGRESSION_THRESHOLD = 0.2;
 
@@ -456,7 +456,7 @@ function printSummary(report: BenchmarkReport): void {
   console.log("");
   console.log(`╔${"═".repeat(78)}╗`);
   console.log(
-    `║ Brand fact sheet benchmark — ${meta.subset} (${meta.brandCount} brands, LLM=${meta.llmEnabled})${" ".repeat(Math.max(0, 78 - 51 - meta.subset.length - meta.brandCount.toString().length))}║`,
+    `║ Brand fact sheet benchmark - ${meta.subset} (${meta.brandCount} brands, LLM=${meta.llmEnabled})${" ".repeat(Math.max(0, 78 - 51 - meta.subset.length - meta.brandCount.toString().length))}║`,
   );
   console.log(`╚${"═".repeat(78)}╝`);
   console.log(`Duration: ${(meta.totalDurationMs / 1000).toFixed(1)}s`);
@@ -476,7 +476,7 @@ function printSummary(report: BenchmarkReport): void {
     console.log("Per-brand zero-pages (these are the URLs the discovery layer fails on):");
     for (const b of report.brands.filter((b) => b.pagesOk === 0)) {
       console.log(
-        `   ${b.name.padEnd(20)} ${b.url} — sitemap=${b.sitemapUrlCount} selected=${b.selectedUrlCount}${b.fatalError ? " FATAL:" + b.fatalError.slice(0, 60) : ""}`,
+        `   ${b.name.padEnd(20)} ${b.url} - sitemap=${b.sitemapUrlCount} selected=${b.selectedUrlCount}${b.fatalError ? " FATAL:" + b.fatalError.slice(0, 60) : ""}`,
       );
     }
     console.log("");

@@ -6,7 +6,7 @@ import { CheckCircle2, Circle } from "lucide-react";
 // (`minDays`) are inclusive lower bounds on the age of the user's OLDEST
 // brand. We pick the highest milestone whose threshold the user has reached.
 //
-// Order matters here — `currentMilestoneIndex` walks the list low-to-high.
+// Order matters here - `currentMilestoneIndex` walks the list low-to-high.
 const MILESTONES: Array<{
   label: string;
   description: string;
@@ -24,7 +24,7 @@ const MILESTONES: Array<{
   },
   {
     label: "Week 2–3",
-    description: "First citations show up — AI engines have a 1–2 week lag.",
+    description: "First citations show up - AI engines have a 1–2 week lag.",
     minDays: 14,
   },
   {
@@ -80,7 +80,7 @@ export default function ResultsTimeline({ compact = false }: { compact?: boolean
   if (compact) {
     return (
       <p className="text-caption text-vc-tertiary px-1">
-        {current.label} — {current.description} First AI citations typically appear 1–2 weeks after
+        {current.label} - {current.description} First AI citations typically appear 1–2 weeks after
         publish.
       </p>
     );

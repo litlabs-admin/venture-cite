@@ -1,11 +1,11 @@
 // User account self-service endpoints (GDPR-driven).
 //
-// First per-domain route file under server/routes/ — Wave 5 will split
+// First per-domain route file under server/routes/ - Wave 5 will split
 // the 7000-line monolithic server/routes.ts the same way.
 //
 // Endpoints:
-//   POST /api/user/delete        — schedule deletion (Art. 17, soft-first)
-//   GET  /api/user/export        — export user-owned data (Art. 20)
+//   POST /api/user/delete        - schedule deletion (Art. 17, soft-first)
+//   GET  /api/user/export        - export user-owned data (Art. 20)
 //
 // Both require authentication and re-confirmation of the user's password
 // to prevent CSRF + session-hijack from causing irreversible data loss
@@ -36,7 +36,7 @@ import { captureAndFlush } from "../lib/sentryReport";
 const GRACE_PERIOD_DAYS = 30;
 
 // User-id-keyed rate limit for the export endpoint. 1 per 24h per user
-// is the GDPR-friendly default — Art. 12(5) lets you refuse "manifestly
+// is the GDPR-friendly default - Art. 12(5) lets you refuse "manifestly
 // unfounded or excessive" requests, which a daily redownload at scale
 // qualifies as. Keyed by user id (not IP) so a CGNATted attacker can't
 // share a bucket with the legitimate user.
@@ -77,7 +77,7 @@ function sanitizeUserRow(row: typeof users.$inferSelect): Record<string, unknown
 
 // Pull every row owned (directly or via brand) by this user.
 //
-// Coverage is explicit per-table rather than dynamic FK introspection —
+// Coverage is explicit per-table rather than dynamic FK introspection -
 // new tables that should be exportable need to be added here. The audit
 // (audit/group-7-data-handling.md) is the source of truth for what's
 // considered user-owned.
@@ -118,7 +118,7 @@ async function buildUserExport(userId: string): Promise<Record<string, unknown>>
     db.select().from(schema.auditLogs).where(eq(schema.auditLogs.userId, userId)),
   ]);
 
-  // geoRankings keys off article_id (not brand_id) — second-pass query.
+  // geoRankings keys off article_id (not brand_id) - second-pass query.
   const articleIds = articles.map((a) => a.id);
   const geoRankings =
     articleIds.length === 0
@@ -190,12 +190,12 @@ export function setupUserAccountRoutes(app: Express) {
         if (!user.email) {
           return res.status(400).json({
             success: false,
-            error: "Account has no email on file — contact support to delete.",
+            error: "Account has no email on file - contact support to delete.",
           });
         }
 
         // Re-verify the password against Supabase to guard against session
-        // theft. Don't issue a new session — we just want the credential check.
+        // theft. Don't issue a new session - we just want the credential check.
         // Use the dedicated auth client, not supabaseAdmin: signInWithPassword
         // poisons the calling client's Authorization header and would break
         // service-role Storage uploads (see server/lib/supabaseAuth.ts).
@@ -305,7 +305,7 @@ export function setupUserAccountRoutes(app: Express) {
   );
 
   // Foundations Plan 3 Task 2: profile update (firstName, lastName,
-  // timezone). Partial body allowed — only sent fields are written.
+  // timezone). Partial body allowed - only sent fields are written.
   app.patch(
     "/api/user/profile",
     isAuthenticated,
@@ -398,7 +398,7 @@ export function setupUserAccountRoutes(app: Express) {
         if (!user.email) {
           return res.status(400).json({
             success: false,
-            error: "Account has no email on file — contact support.",
+            error: "Account has no email on file - contact support.",
           });
         }
         const { currentPassword, newPassword } = parsed.data;
@@ -413,7 +413,7 @@ export function setupUserAccountRoutes(app: Express) {
 
         // Re-auth on the dedicated auth client (supabaseAuth), NOT
         // supabaseAdmin. The old code used supabaseAdmin here "because the
-        // anon-key client was fragile" — but that is exactly what poisoned the
+        // anon-key client was fragile" - but that is exactly what poisoned the
         // shared service-role client's Authorization header and broke
         // server-side Storage uploads with RLS errors. supabaseAuth prefers the
         // anon key and falls back to the service key, so it works in every env
@@ -433,7 +433,7 @@ export function setupUserAccountRoutes(app: Express) {
         });
         if (updateError) {
           // admin.updateUserById enforces password strength + leaked-password
-          // (HIBP) rules, so a rejected password is a user-actionable 4xx — not
+          // (HIBP) rules, so a rejected password is a user-actionable 4xx - not
           // an upstream 502. Surface the real reason (e.g. "Password is known to
           // be compromised") so the user can pick another; keep the generic 502
           // only for genuine GoTrue/network failures (no internal detail leak).
@@ -448,7 +448,7 @@ export function setupUserAccountRoutes(app: Express) {
 
         // Revoke all OTHER sessions (every device except the one used to
         // make this call). Without this, a stolen-then-rotated password
-        // leaves attacker tokens valid on other devices. Non-fatal — the
+        // leaves attacker tokens valid on other devices. Non-fatal - the
         // password change itself succeeded; logging is enough on failure.
         try {
           const bearer = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");

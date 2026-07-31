@@ -4,7 +4,7 @@
 // toBeDisabled, etc.) to vitest's `expect`. Required for any .test.tsx that
 // renders React components.
 //
-// Server-only tests (.test.ts) load this too — it's harmless for them
+// Server-only tests (.test.ts) load this too - it's harmless for them
 // because the matchers only fire when DOM elements are passed to expect().
 //
 // We do NOT load dotenv/config here because tests that use vi.stubEnv /

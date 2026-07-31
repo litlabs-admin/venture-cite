@@ -1,11 +1,11 @@
 // client/src/tours/pages/dashboard.tour.ts
 //
 // Replayable tour for the Dashboard (/, /dashboard). The page used
-// to be called "Dashboard" — both /dashboard and / route to the same
+// to be called "Dashboard" - both /dashboard and / route to the same
 // surface, but the heading in the AppShell context bar is now
 // "Dashboard" and the copy below has been refreshed to match.
 //
-// Manual trigger — only fires via the page-help "?" button or replay.
+// Manual trigger - only fires via the page-help "?" button or replay.
 // The auto-firing onboarding tour is `global-welcome` (routes "/", "/dashboard").
 import type { TourConfig } from "../types";
 
@@ -27,13 +27,13 @@ export const dashboardTour: TourConfig = {
       attachTo: "bottom",
       title: "The three KPIs",
       content: (ctx) =>
-        `AI Visibility · This week · Cited checks. Real measured signals only — no estimates. You're tracking ${ctx.counts.brands} brand${ctx.counts.brands === 1 ? "" : "s"} and ${ctx.counts.articles} article${ctx.counts.articles === 1 ? "" : "s"} right now.`,
+        `AI Visibility · This week · Cited checks. Real measured signals only - no estimates. You're tracking ${ctx.counts.brands} brand${ctx.counts.brands === 1 ? "" : "s"} and ${ctx.counts.articles} article${ctx.counts.articles === 1 ? "" : "s"} right now.`,
     },
     {
       id: "progress-ring",
       target: "dashboard.recommendations",
       attachTo: "top",
-      title: "Worklist — what to do next",
+      title: "Worklist - what to do next",
       content:
         "A ranked, action-first feed: regressions, required setup, and suggested improvements. Required items can't be dismissed; the rest you can snooze for a week.",
     },

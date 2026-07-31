@@ -78,7 +78,7 @@ const STEP_CAPS_MS = {
   "v2-lifecycle-cleanup": 30_000,
   "v2-monthly-fact-refresh": 50_000,
   "v2-weekly-summary": 20_000,
-  // Phase 4 (2026-05-28): per-fact re-verification — cheaper than a
+  // Phase 4 (2026-05-28): per-fact re-verification - cheaper than a
   // full re-scrape. Processes up to ~20 stale facts per tick.
   "fact-reverification-batch": 30_000,
   // Phase 1: events table retention. 90-day rolling window prevents
@@ -96,7 +96,7 @@ const STEP_CAPS_MS = {
   // Both of these were registered ONLY in the in-process node-cron scheduler
   // (server/scheduler.ts) and had no orchestrator step. That was survivable
   // while both schedulers ran; it is not once DISABLE_IN_PROCESS_SCHEDULER is
-  // set, which is the documented Render shape — they would simply never run
+  // set, which is the documented Render shape - they would simply never run
   // again, silently. tour_events would grow without bound and the fact-scrape
   // failure alert would stop firing with no error to notice.
   "tour-events-cleanup": 5_000,
@@ -175,7 +175,7 @@ class Orchestrator {
 }
 
 // Drain pending content_generation_jobs whose /advance lock has expired.
-// Runs ONE slice for the oldest available job per cron tick — multiple
+// Runs ONE slice for the oldest available job per cron tick - multiple
 // jobs in serial would blow the budget and the next cron tick picks up
 // any remaining stragglers.
 async function drainPendingContentJobs(
@@ -265,7 +265,7 @@ export function setupCronRoutes(app: Express): void {
 
       const orch = new Orchestrator(ORCHESTRATOR_BUDGET_MS);
 
-      // Cheap maintenance first — these are millisecond-scale and run
+      // Cheap maintenance first - these are millisecond-scale and run
       // unconditionally so orphans get reconciled even on a fully-loaded
       // cron tick.
       await orch.run("fail-stuck-content-jobs", () => failStuckContentJobsForOrchestrator());
@@ -436,14 +436,14 @@ export function setupCronRoutes(app: Express): void {
         return await storage.pruneChatbotMessages();
       });
 
-      // Stripe product setup — was on boot, moved here so first Vercel
+      // Stripe product setup - was on boot, moved here so first Vercel
       // deploy doesn't need a manual sync. setupStripeProducts is
       // idempotent (skips existing products).
       if (process.env.STRIPE_SECRET_KEY) {
         await orch.run("stripe-products-setup", () => setupStripeProducts());
       }
 
-      // Heavy iterations — pass the per-step deadline so they bail out of
+      // Heavy iterations - pass the per-step deadline so they bail out of
       // their per-brand loop when budget runs low. Brands not processed
       // today carry their old `lastXxxAt` timestamps and get picked up on
       // the next cron tick.

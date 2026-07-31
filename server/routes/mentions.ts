@@ -42,7 +42,7 @@ export const mentionsRouter = Router();
 // On every response that includes a timestamp the user will see as relative
 // time ("about 6 hours ago"), we attach `ageSeconds` computed against
 // `Date.now()` on the request handler. The client renders the relative label
-// from `ageSeconds` directly — no `new Date()` anchoring needed on the client.
+// from `ageSeconds` directly - no `new Date()` anchoring needed on the client.
 //
 // We also include the ISO string for absolute-date displays (detail sheet).
 // ---------------------------------------------------------------------------
@@ -100,11 +100,11 @@ const ALLOWED_TRANSITIONS: Record<Status, readonly Status[]> = {
 };
 
 // ============================================================
-// LIST — cursor-paginated mentions for a brand
+// LIST - cursor-paginated mentions for a brand
 // MUST be registered before /:id to avoid route conflicts.
 // ============================================================
 mentionsRouter.get("/alerts/:brandId", isAuthenticated, async (req, res) => {
-  // Legacy alerts endpoint — now ownership-gated (audit C14 fix).
+  // Legacy alerts endpoint - now ownership-gated (audit C14 fix).
   const { brandId } = req.params;
   const userId = (req as any).user!.id as string;
   let owned: any;
@@ -119,7 +119,7 @@ mentionsRouter.get("/alerts/:brandId", isAuthenticated, async (req, res) => {
   res.json({ data: result.rows });
 });
 
-// Active scans list — MUST be registered BEFORE /scans/:scanId to avoid route conflict.
+// Active scans list - MUST be registered BEFORE /scans/:scanId to avoid route conflict.
 mentionsRouter.get("/scans/active", isAuthenticated, async (req, res) => {
   const userId = (req as any).user!.id as string;
   const rows = await storage.getActiveScanJobsForUser(userId);
@@ -127,7 +127,7 @@ mentionsRouter.get("/scans/active", isAuthenticated, async (req, res) => {
   res.json({ rows: enriched });
 });
 
-// Last completed scan for a brand — MUST be before /scans/:scanId to avoid conflict.
+// Last completed scan for a brand - MUST be before /scans/:scanId to avoid conflict.
 mentionsRouter.get("/scans/last/:brandId", isAuthenticated, async (req, res) => {
   const userId = (req as any).user!.id as string;
   const owned = await requireBrand(req.params.brandId, userId).catch(() => null);
@@ -205,7 +205,7 @@ mentionsRouter.post("/", isAuthenticated, async (req, res) => {
   }
   if (!owned) return res.status(404).json({ error: "not_found" });
 
-  // Platform host whitelist — sourceUrl is already validated as http(s) by Zod
+  // Platform host whitelist - sourceUrl is already validated as http(s) by Zod
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(sourceUrl);
@@ -270,7 +270,7 @@ mentionsRouter.post("/", isAuthenticated, async (req, res) => {
   // Canonical URL
   const canonical = canonicalizeMentionUrl(platform, sourceUrl);
 
-  // Insert (idempotent — returns null on dedup conflict)
+  // Insert (idempotent - returns null on dedup conflict)
   const inserted = await storage.tryInsertBrandMention({
     brandId,
     platform,
@@ -422,7 +422,7 @@ mentionsRouter.post("/scans/:brandId", isAuthenticated, async (req, res) => {
   // within the same function lifetime.
   //
   // Locally (`npm run dev`), `@vercel/functions`' `waitUntil` is a no-op
-  // wrapper that just kicks off the promise — the scan still runs because
+  // wrapper that just kicks off the promise - the scan still runs because
   // Node keeps the process alive.
   waitUntil(
     runMentionScan(job.id).catch((err) => {

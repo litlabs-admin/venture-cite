@@ -3,7 +3,7 @@ import { scrollRevealEase } from "@/pages/landing/hooks/useScrollReveal";
 import { TrendingUpIcon, MinusIcon } from "./icons";
 import { faviconUrl } from "@/pages/landing/faviconUrl";
 
-// Row 02 "Understand" mockup — "Citation footprint" + "Top Sources" +
+// Row 02 "Understand" mockup - "Citation footprint" + "Top Sources" +
 // "Search Queries" cards, verbatim structure from
 // _reference/index.html 2163-2249. Per the simplify-choreography rule the
 // dozens of individually-delayed child fades are collapsed into the ONE
@@ -12,13 +12,13 @@ import { faviconUrl } from "@/pages/landing/faviconUrl";
 //
 // The 4 legend percentages (Reviews 43% / Social 24% / News 20% / Other
 // 13%) ARE verbatim/recoverable text content in source. Only the bar
-// SEGMENT WIDTHS were captured as inline `width: 0%` (pre-animation) — the
+// SEGMENT WIDTHS were captured as inline `width: 0%` (pre-animation) - the
 // widths below are derived directly from these confirmed percentages
 // (43% / 24% / 20% / 13%, summing to 100%), which is a legitimate
 // derivation rather than an invented value.
 // One-family blue ramp (accent -> tint) instead of the neutral grey ramp, so
 // the whole footprint bar reads as a single coherent blue chart rather than
-// "one blue segment among greys" — matches the Hero illustration's mostly-blue
+// "one blue segment among greys" - matches the Hero illustration's mostly-blue
 // treatment.
 const footprintSegments = [
   { key: "reviews", label: "Reviews", pct: 43, color: "var(--accent)" },

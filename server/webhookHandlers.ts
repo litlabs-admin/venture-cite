@@ -39,7 +39,7 @@ async function markStripeEventProcessed(eventId: string): Promise<void> {
 
 // True only once the event's side effects have fully completed (processed_at
 // stamped). A row can exist with processed_at IS NULL if a prior attempt
-// recorded the event but then threw mid-processing — in which case Stripe's
+// recorded the event but then threw mid-processing - in which case Stripe's
 // retry MUST be allowed to re-run the handler, not skipped as a duplicate.
 async function isStripeEventProcessed(eventId: string): Promise<boolean> {
   const result = await db.execute(sql`
@@ -71,7 +71,7 @@ export class WebhookHandlers {
 
     // Idempotency: Stripe retries on any non-2xx. Skip ONLY events whose side
     // effects previously completed (processed_at stamped). An event recorded
-    // but not finished — because a prior attempt threw mid-handler — must be
+    // but not finished - because a prior attempt threw mid-handler - must be
     // re-run, not silently dropped (that used to permanently lose paid
     // upgrades on any transient DB/Stripe error). Handlers here are idempotent
     // (setter-style updates), so re-running is safe.
@@ -80,13 +80,13 @@ export class WebhookHandlers {
       if (await isStripeEventProcessed(event.id)) {
         logger.info(
           { eventId: event.id, type: event.type },
-          "stripe webhook: duplicate event (already processed) — skipping",
+          "stripe webhook: duplicate event (already processed) - skipping",
         );
         return;
       }
       logger.warn(
         { eventId: event.id, type: event.type },
-        "stripe webhook: event recorded but not finished on a prior attempt — reprocessing",
+        "stripe webhook: event recorded but not finished on a prior attempt - reprocessing",
       );
     }
 
@@ -127,7 +127,7 @@ export class WebhookHandlers {
 
         if (Object.keys(updates).length > 0) {
           await storage.updateUserStripeInfo(userId, updates);
-          logger.info({ userId, updates }, "stripe: checkout.session.completed — user updated");
+          logger.info({ userId, updates }, "stripe: checkout.session.completed - user updated");
         }
         break;
       }
@@ -172,7 +172,7 @@ export class WebhookHandlers {
 
         const previousTier = user.accessTier;
         await storage.updateUserStripeInfo(user.id, { accessTier: "free" });
-        logger.info({ userId: user.id }, "stripe: customer.subscription.deleted — reset to free");
+        logger.info({ userId: user.id }, "stripe: customer.subscription.deleted - reset to free");
         await logSystemAudit(user.id, {
           action: "subscription.cancel",
           entityType: "subscription",

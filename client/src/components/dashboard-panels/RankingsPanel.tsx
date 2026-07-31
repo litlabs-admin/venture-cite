@@ -10,7 +10,7 @@ import { rankLeaderboard, type LeaderRow } from "./useDashboardData";
 // The figure IS share of voice, so it carries a `%`. Monitor's Overview tab
 // rendered the identical numbers a second time as a donut ("Share of AI
 // Voice", same /api/competitors/leaderboard response); that panel was
-// retired rather than ported — the unit here is what made the two read as
+// retired rather than ported - the unit here is what made the two read as
 // different metrics.
 //
 // Row spec: 34px tall, px-6 py-2,
@@ -23,7 +23,7 @@ import { rankLeaderboard, type LeaderRow } from "./useDashboardData";
 //
 // DELTA IS NULL BY DESIGN: no competitor history table exists, so there is
 // nothing to diff against. Every row shows `–` until competitor snapshots are
-// recorded — inventing a movement number here would be the easiest possible
+// recorded - inventing a movement number here would be the easiest possible
 // lie for this panel to tell.
 
 function favicon(domain: string) {
@@ -102,7 +102,7 @@ export function RankingsPanel({ rows, loading }: { rows: LeaderRow[]; loading: b
   const ownIndex = ownRank === null ? -1 : ownRank - 1;
   const ownRef = useRef<HTMLDivElement>(null);
 
-  // The reference scrolls your own row into view on load — with a long
+  // The reference scrolls your own row into view on load - with a long
   // leaderboard, "where do I stand" is the whole point of the panel and
   // landing on rank #1 of someone else's list answers nothing. Scoped to the
   // list container so the page itself never jumps.

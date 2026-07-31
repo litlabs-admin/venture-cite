@@ -4,9 +4,9 @@
  * Most navigation in this app can name its destination statically, and should:
  * `<Link to="/monitor" search={{ tab: "citations" }} />` is fully type-checked
  * against the generated route tree. These helpers exist for the minority of
- * cases where the destination arrives at runtime as an opaque string — the
+ * cases where the destination arrives at runtime as an opaque string - the
  * `ctaHref`/`nextHref` fields on recommendations and run-change alerts, and the
- * onboarding step links — where no literal type is available to check against.
+ * onboarding step links - where no literal type is available to check against.
  *
  * They deliberately do NOT paper over the typed path. If you are reaching for
  * `toLinkTarget` with a string you control, use a literal `to` + `search`
@@ -21,7 +21,7 @@ export interface LinkTarget {
  * Split a runtime href (`/diagnose?tab=hallucinations`) into TanStack Router's
  * `to` + `search` shape.
  *
- * TanStack treats `to` as a path, not a URL — a `?query` embedded in it is not
+ * TanStack treats `to` as a path, not a URL - a `?query` embedded in it is not
  * parsed out, it becomes part of the path and the route fails to match. So any
  * href carrying its own query string must be decomposed before use.
  */

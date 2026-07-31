@@ -2,7 +2,7 @@ import { Resend } from "resend";
 import { logger } from "./logger";
 
 // One-shot welcome email sent the first time a user successfully logs in
-// after verifying their address. Kept deliberately small — Resend is the
+// after verifying their address. Kept deliberately small - Resend is the
 // same provider used for the weekly digest, so we reuse the existing
 // RESEND_API_KEY + RESEND_FROM_ADDRESS env vars instead of inventing new
 // ones. Send failures are swallowed by the caller (welcome email is a
@@ -17,7 +17,7 @@ const APP_URL = process.env.APP_URL || "https://venturecite.app";
 // Plan 4 audit (BUG #8): firstName lands inside an HTML email body. A
 // user who registered with `firstName: "<script>"` (or worse, an
 // `<img onerror>` payload) would have attacker-controlled HTML rendered
-// in an email signed by our DKIM — brand-damage and content-spoof
+// in an email signed by our DKIM - brand-damage and content-spoof
 // vector even if mail clients sanitize. Escape before interpolation.
 function escapeHtml(s: string): string {
   return s
@@ -30,7 +30,7 @@ function escapeHtml(s: string): string {
 
 export async function sendWelcomeEmail(to: string, firstName?: string | null): Promise<boolean> {
   if (!resend) {
-    logger.info({ template: "welcome" }, "welcome email skipped — Resend not configured");
+    logger.info({ template: "welcome" }, "welcome email skipped - Resend not configured");
     return false;
   }
   const safeFirstName = firstName ? escapeHtml(firstName) : "";

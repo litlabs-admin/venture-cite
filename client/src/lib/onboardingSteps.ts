@@ -3,7 +3,7 @@ import { Building2, PenLine, ScanEye, Target } from "lucide-react";
 
 // Single source of truth for the 4 onboarding steps. Both the sidebar
 // onboarding widget AND the dashboard onboarding ring read from this
-// file — extract here so adding/removing a step touches one place.
+// file - extract here so adding/removing a step touches one place.
 
 export interface OnboardingStep {
   id: string;
@@ -59,7 +59,7 @@ export const STEPS: OnboardingStep[] = [
     link: "/setup?tab=visibility",
     linkText: "View guide",
     icon: ScanEye,
-    // Server-only — localStorage would leak across user accounts on the
+    // Server-only - localStorage would leak across user accounts on the
     // same browser (e.g. logout + new signup would see the step pre-done).
     checkFn: (d) => Boolean(d?.visibilityVisited),
   },
@@ -71,7 +71,7 @@ export const STEPS: OnboardingStep[] = [
     link: "/monitor?tab=citations",
     linkText: "Run check",
     icon: Target,
-    // Done the moment the user triggers their first run — no need to wait
+    // Done the moment the user triggers their first run - no need to wait
     // for an actual cited result.
     checkFn: (d) =>
       (d?.citationRunsCount || 0) > 0 ||

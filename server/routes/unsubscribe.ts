@@ -2,12 +2,12 @@
 //
 // Reached from the List-Unsubscribe header in transactional emails. The
 // HMAC-signed token in the URL authenticates the user, so this route is
-// intentionally unauth'd — mail clients (Gmail, Outlook) fire POST
+// intentionally unauth'd - mail clients (Gmail, Outlook) fire POST
 // requests here directly without any cookie or bearer token, per RFC 8058.
 //
 // Both GET and POST are handled:
-//   - POST /api/unsubscribe?token=...  — RFC 8058 one-click button
-//   - GET  /api/unsubscribe?token=...  — friendly browser landing page
+//   - POST /api/unsubscribe?token=...  - RFC 8058 one-click button
+//   - GET  /api/unsubscribe?token=...  - friendly browser landing page
 
 import type { Express } from "express";
 import { eq } from "drizzle-orm";
@@ -30,7 +30,7 @@ async function applyUnsubscribe(userId: string, list: UnsubscribeList): Promise<
   const column = LIST_TO_COLUMN[list];
   if (!column) return { ok: false };
 
-  // Drizzle's typed update needs an object literal — building dynamically
+  // Drizzle's typed update needs an object literal - building dynamically
   // requires a small cast, which is fine because the column key is from
   // the constant LIST_TO_COLUMN map (no user-controlled key).
   const updates = { [column]: 0 } as Record<string, unknown>;
@@ -53,7 +53,7 @@ export function setupUnsubscribeRoutes(app: Express) {
         if (!verified) {
           // HTML, not JSON: this is reached both by RFC 8058 one-click mail
           // clients (which ignore the body) AND by a human submitting the GET
-          // confirmation form — the human must see a page, not raw JSON.
+          // confirmation form - the human must see a page, not raw JSON.
           return res
             .status(400)
             .type("html")
@@ -101,7 +101,7 @@ export function setupUnsubscribeRoutes(app: Express) {
   // (Gmail image proxy, corporate link scanners) auto-issue GET requests,
   // which would otherwise silently unsubscribe users. So GET only verifies
   // the HMAC token and renders a confirmation page whose button POSTs back
-  // to this same endpoint — the POST handler above performs the real change.
+  // to this same endpoint - the POST handler above performs the real change.
   app.get(
     "/api/unsubscribe",
     asyncHandler(async (req, res) => {
@@ -135,7 +135,7 @@ export function setupUnsubscribeRoutes(app: Express) {
             htmlPage(
               "Confirm unsubscribe",
               `You're about to stop receiving <strong>${listLabel}</strong> emails. ` +
-                "Click the button below to confirm — you can re-enable them anytime from your account settings." +
+                "Click the button below to confirm - you can re-enable them anytime from your account settings." +
                 `<form method="POST" action="/api/unsubscribe?token=${encodeURIComponent(token)}" style="margin-top:24px">` +
                 `<button type="submit" style="display:inline-block;background:#7c3aed;color:#fff;border:0;padding:12px 24px;border-radius:6px;font-size:16px;cursor:pointer">Confirm unsubscribe</button>` +
                 "</form>",

@@ -1,13 +1,13 @@
 // Wave 9: orphan-run reconciliation runs once on boot to mark stale
 // `running` rows as failed. Without it, a server crash mid-run leaves
-// the row pinned forever — every dependent page polls indefinitely and
+// the row pinned forever - every dependent page polls indefinitely and
 // the partial unique index from migration 0035 blocks new runs for
 // that brand.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // vi.mock factories are hoisted to the top of the file, so any helpers
-// they close over must come from vi.hoisted() — top-level let/const isn't
+// they close over must come from vi.hoisted() - top-level let/const isn't
 // available yet when the factory runs.
 const { queryMock, loggerMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),

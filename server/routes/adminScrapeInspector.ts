@@ -35,7 +35,7 @@ export function setupAdminScrapeInspectorRoutes(app: Express): void {
         return res.status(404).json({ success: false, error: "Run not found" });
       }
 
-      // 2. Brand context (name + URL — we want the inspector to label
+      // 2. Brand context (name + URL - we want the inspector to label
       // the report with the brand, not just a UUID).
       const brandRows = await db
         .select({
@@ -64,7 +64,7 @@ export function setupAdminScrapeInspectorRoutes(app: Express): void {
         .where(eq(schema.factScrapeLogs.runId, runId))
         .orderBy(asc(schema.factScrapeLogs.createdAt));
 
-      // 5. Event timeline — the heart of the inspector. Every
+      // 5. Event timeline - the heart of the inspector. Every
       // significant step the scraper took, in order.
       const events = await db
         .select()

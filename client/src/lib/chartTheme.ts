@@ -3,14 +3,14 @@
 // own hex values.
 //
 // Design tokens are OKLCH color values (client/src/index.css) referenced as
-// raw `var(--token)`. Never wrap them in `hsl(...)` — that double-wraps an
+// raw `var(--token)`. Never wrap them in `hsl(...)` - that double-wraps an
 // oklch() value and the whole declaration is dropped by the browser.
 export const chartTheme = {
   series: {
-    // Primary "visibility / share-of-answer" metric — the accent-anchored
+    // Primary "visibility / share-of-answer" metric - the accent-anchored
     // head of the data-viz ramp (was a stray hardcoded #3b82f6).
     visibility: "var(--chart-1)",
-    // Negative / issues — theme-aware destructive red.
+    // Negative / issues - theme-aware destructive red.
     issues: "var(--destructive)",
     // There was a third entry here, `quality: "var(--chart-4)"`, commented
     // "design-system green". It had NO consumers, and --chart-4 is violet
@@ -26,7 +26,7 @@ export const chartTheme = {
     // decision, not a rename.
   },
   // Categorical palette for multi-series / donut charts (competitor slices
-  // etc.). Raw var() — the --chart-* tokens are oklch(), same as every other
+  // etc.). Raw var() - the --chart-* tokens are oklch(), same as every other
   // token in this file; never wrap them in hsl() (see the file header).
   palette: [
     "var(--chart-1)",

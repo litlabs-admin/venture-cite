@@ -1,12 +1,12 @@
-// Source health gate helper (Task 9 — Mentions Rebuild).
+// Source health gate helper (Task 9 - Mentions Rebuild).
 //
 // Tracks consecutive scan failures per (brandId, source) pair and
 // automatically pauses a source for 24 h after three consecutive failures.
 //
 // Public API:
-//   shouldSkipSource   — check whether a source is currently paused
-//   recordSourceSuccess — reset failure counter on a successful scan
-//   recordSourceFailure — increment counter, pause after ≥3 failures
+//   shouldSkipSource   - check whether a source is currently paused
+//   recordSourceSuccess - reset failure counter on a successful scan
+//   recordSourceFailure - increment counter, pause after ≥3 failures
 
 import { storage } from "../storage";
 import type { InsertSourceHealth } from "@shared/schema";
@@ -81,7 +81,7 @@ export async function recordSourceFailure(
     lastFailureAt: now,
     lastFailureReason: reason.slice(0, MAX_REASON_LENGTH),
     pausedUntil,
-    // Preserve the prior lastSuccessfulScanAt — do not overwrite it.
+    // Preserve the prior lastSuccessfulScanAt - do not overwrite it.
     lastSuccessfulScanAt: existing?.lastSuccessfulScanAt ?? null,
   };
   await storage.upsertSourceHealth(input);

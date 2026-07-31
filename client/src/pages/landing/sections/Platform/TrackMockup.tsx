@@ -3,18 +3,18 @@ import { scrollRevealEase } from "@/pages/landing/hooks/useScrollReveal";
 import { TrendingUpIcon } from "./icons";
 import { faviconUrl } from "@/pages/landing/faviconUrl";
 
-// Row 01 "Track" mockup — a fake Nike workspace card, verbatim structure
+// Row 01 "Track" mockup - a fake Nike workspace card, verbatim structure
 // from _reference/index.html 2053-2129. Source captures this card mid
 // entrance: dozens of individually opacity-0/transform/transition-delay'd
 // child elements (header, 3 stat cells, chart, by-model list). Per the
 // simplify-choreography rule, that per-element choreography is collapsed
 // into the ONE outer reveal already applied by the caller (the wrapper at
-// index.html:2051, 700ms translateY(20px) delay 150ms) — everything below
+// index.html:2051, 700ms translateY(20px) delay 150ms) - everything below
 // renders at its settled/final look.
 //
 // HARDCODED DYNAMIC DATA: the Visibility/Mentions stat values and all 4
 // "By Model" scores are captured as literal "0" in source (pre-count-up
-// placeholder state) — the real target numbers are not recoverable from
+// placeholder state) - the real target numbers are not recoverable from
 // this static snapshot. Small plausible round numbers are substituted
 // below and flagged again in the closing report. The Rank stat ("#3 /10",
 // trend "+2") and all three trend deltas (+3, +2, +12) ARE real captured
@@ -34,12 +34,12 @@ const LINE_D =
   "M 0 107.52 C 17.77777777777778 107.52, 17.77777777777778 97.2454054054054, 35.55555555555556 97.2454054054054 C 53.333333333333336 97.2454054054054, 53.333333333333336 84.40216216216217, 71.11111111111111 84.40216216216217 C 88.88888888888889 84.40216216216217, 88.88888888888889 71.55891891891892, 106.66666666666666 71.55891891891892 C 124.44444444444444 71.55891891891892, 124.44444444444444 56.14702702702702, 142.22222222222223 56.14702702702702 C 160 56.14702702702702, 160 43.303783783783786, 177.77777777777777 43.303783783783786 C 195.55555555555554 43.303783783783786, 195.55555555555554 30.46054054054053, 213.33333333333331 30.46054054054053 C 231.1111111111111 30.46054054054053, 231.1111111111111 22.754594594594593, 248.88888888888889 22.754594594594593 C 266.6666666666667 22.754594594594593, 266.6666666666667 17.6172972972973, 284.44444444444446 17.6172972972973 C 302.22222222222223 17.6172972972973, 302.22222222222223 12.480000000000006, 320 12.480000000000006";
 
 // HARDCODED DYNAMIC DATA: all 4 scores captured as literal "0" pre-reveal
-// in source (index.html 2114/2118/2122/2126) — unrecoverable, substituted
+// in source (index.html 2114/2118/2122/2126) - unrecoverable, substituted
 // with plausible descending placeholders. Row/name/score color classes are
-// NOT uniform — verbatim per-row from source: ChatGPT is the sole
+// NOT uniform - verbatim per-row from source: ChatGPT is the sole
 // highlighted row (bg-accent-subtle/30, text-accent name+score); Claude's
 // name is text-secondary but its score is uniquely text-primary (not
-// text-secondary like Perplexity/Gemini) — reproduced exactly, not
+// text-secondary like Perplexity/Gemini) - reproduced exactly, not
 // normalized into a single "highlighted vs not" rule.
 const byModel = [
   {
@@ -101,7 +101,7 @@ export function TrackMockup({ isVisible }: { isVisible: boolean }) {
                 <div className="flex items-center gap-2.5 px-4 py-3 border-r border-vc-default w-[180px] shrink-0">
                   {/* Plain <img>, not next/image: this is an external Google
                       favicon-service URL and next.config.ts has no
-                      remotePatterns configured for it (verified — see
+                      remotePatterns configured for it (verified - see
                       closing report). Matches source's own literal <img>
                       tag anyway. */}
                   <img

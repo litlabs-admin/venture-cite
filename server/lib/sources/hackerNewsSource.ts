@@ -12,7 +12,7 @@ export type HNScanInput = {
   query: string;
   /** Brand name variations to match against hit fields. */
   variations: string[];
-  /** Owning brand — used as the rate-limit scope. */
+  /** Owning brand - used as the rate-limit scope. */
   brandId: string;
   /** When set, adds `numericFilters=created_at_i>sinceUnix` to the request. */
   sinceUnix?: number;
@@ -257,12 +257,12 @@ export async function scanHackerNewsSource(
       try {
         itemRes = await fetchWithTimeout(itemUrl);
       } catch {
-        // Network error — skip this story
+        // Network error - skip this story
         continue;
       }
 
       if (!itemRes.ok) {
-        // HTTP error — skip this story
+        // HTTP error - skip this story
         continue;
       }
 

@@ -10,7 +10,7 @@
 -- Why "enable, no policies" is the correct fix for this codebase:
 --
 --   * The client (client/src/lib/supabase.ts) uses Supabase ONLY for auth.
---     There is no supabase.from()/.rpc() anywhere — no app code reads tables
+--     There is no supabase.from()/.rpc() anywhere - no app code reads tables
 --     through the anon PostgREST path, so locking it shut breaks nothing.
 --
 --   * All table I/O goes through Drizzle over the direct Postgres pool
@@ -18,7 +18,7 @@
 --     owner and is NOT subject to RLS (we deliberately do NOT FORCE RLS, so
 --     the owner connection keeps full access).
 --
---   * server/supabase.ts (supabaseAdmin) is service-role keyed — it has
+--   * server/supabase.ts (supabaseAdmin) is service-role keyed - it has
 --     BYPASSRLS and is used only for auth.* calls, never table reads.
 --
 -- RLS enabled with zero policies = default-deny for the anon/authenticated

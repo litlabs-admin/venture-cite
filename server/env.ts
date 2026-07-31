@@ -4,13 +4,13 @@ import { z } from "zod";
 // error (naming every missing/malformed variable) before the server starts
 // listening, so the app fails fast instead of silently booting half-broken.
 //
-// Import this file ONCE, as early as possible in server/index.ts — after
+// Import this file ONCE, as early as possible in server/index.ts - after
 // `dotenv/config` and before any module that reads process.env.
 
 // Auto-resolve the public app URL so a fresh deploy works without manual
 // APP_URL config. Order:
-//   1. APP_URL (explicit override — wins when set)
-//   2. VERCEL_URL (auto-injected by Vercel — *.vercel.app, no protocol)
+//   1. APP_URL (explicit override - wins when set)
+//   2. VERCEL_URL (auto-injected by Vercel - *.vercel.app, no protocol)
 //   3. http://localhost:5000 in dev
 const resolvedAppUrl =
   process.env.APP_URL ||
@@ -35,7 +35,7 @@ const envSchema = z.object({
   // product setup behind `if (process.env.STRIPE_SECRET_KEY)`.
   //
   // Requiring them here was the one thing that turned "billing not configured"
-  // into "the entire site is down" — including the public marketing pages,
+  // into "the entire site is down" - including the public marketing pages,
   // which never touch Stripe. A missing payment integration should disable
   // payments, not the homepage. Checkout and webhook endpoints still fail
   // loudly and specifically at the point of use.
@@ -44,9 +44,9 @@ const envSchema = z.object({
 
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
 
-  // Optional — features degrade if absent, but shouldn't block boot.
+  // Optional - features degrade if absent, but shouldn't block boot.
   // OPENROUTER_API_KEY is optional in core, but REQUIRED at runtime for the
-  // chatbot endpoint. The endpoint throws a clear error if missing — easier
+  // chatbot endpoint. The endpoint throws a clear error if missing - easier
   // to debug than a process-startup hard-fail in environments that don't
   // use the chatbot.
   OPENROUTER_API_KEY: z.string().optional(),
@@ -57,7 +57,7 @@ const envSchema = z.object({
 
   SESSION_SECRET: z.string().optional(),
 
-  // Observability — both optional. If SENTRY_DSN is unset, error capture
+  // Observability - both optional. If SENTRY_DSN is unset, error capture
   // is a silent no-op (safe in dev). LOG_LEVEL defaults to debug in dev,
   // info in prod (handled inside server/lib/logger.ts).
   SENTRY_DSN: z.string().url().optional(),
@@ -66,7 +66,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).optional(),
 
   // Postgres TLS hardening (see server/db.ts for the precedence order).
-  // Both optional — without them, the pool falls back to permissive TLS
+  // Both optional - without them, the pool falls back to permissive TLS
   // (still encrypted, no chain verification) with a boot warning in prod.
   DATABASE_CA_CERT_PATH: z.string().optional(),
   DATABASE_SSL_REJECT_UNAUTHORIZED: z.enum(["true", "false"]).optional(),
@@ -89,7 +89,7 @@ const envSchema = z.object({
 
   // AES-256-GCM key for encrypting user-supplied Buffer access tokens
   // at rest (users.buffer_access_token). Generate with
-  // `openssl rand -base64 32` (must decode to 32 bytes). Optional —
+  // `openssl rand -base64 32` (must decode to 32 bytes). Optional -
   // tokenCipher only loads it lazily, so deployments that don't use the
   // Buffer feature don't need to set it.
   BUFFER_ENCRYPTION_KEY: z.string().optional(),

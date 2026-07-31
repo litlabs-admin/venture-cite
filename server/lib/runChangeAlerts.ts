@@ -2,7 +2,7 @@ import { storage } from "../storage";
 import { logger } from "./logger";
 
 /**
- * Phase 8 — "automate around weekly".
+ * Phase 8 - "automate around weekly".
  *
  * Runs at the end of every citation run (manual AND cron), AFTER
  * recordCurrentMetrics + hallucination detection. It diffs this run's
@@ -137,7 +137,7 @@ export async function detectRunChangeAlerts(brandId: string): Promise<RunChangeA
 
 /**
  * Detect + persist. Each alert becomes one `alert_history` row
- * (sentVia="in_app" — not an email/slack send, an in-product change record).
+ * (sentVia="in_app" - not an email/slack send, an in-product change record).
  * Returns the alerts so the caller / digest can reuse them without re-query.
  */
 export async function recordRunChangeAlerts(brandId: string): Promise<RunChangeAlert[]> {

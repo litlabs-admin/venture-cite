@@ -29,7 +29,7 @@ vi.mock("../../server/lib/routesShared", async () => {
   };
 });
 
-// sourceUserEnrich creates its own OpenAI instance — intercept at the SDK level.
+// sourceUserEnrich creates its own OpenAI instance - intercept at the SDK level.
 vi.mock("openai", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("openai");
   return {

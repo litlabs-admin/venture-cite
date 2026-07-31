@@ -1,6 +1,6 @@
 // Standalone migration runner for the Vercel build step.
 //
-// Usage: `npm run db:migrate` — invoked from package.json's build script
+// Usage: `npm run db:migrate` - invoked from package.json's build script
 // before vite + esbuild. Applies any pending migrations sequentially.
 // Exits non-zero on failure so the build aborts before deploying a
 // schema-mismatched function bundle.
@@ -36,7 +36,7 @@ async function main(): Promise<void> {
     try {
       await pool.end();
     } catch {
-      // ignore — we're exiting anyway
+      // ignore - we're exiting anyway
     }
   }
 }

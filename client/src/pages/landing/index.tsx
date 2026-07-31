@@ -10,15 +10,15 @@ import { LearnResearch } from "./sections/LearnResearch/LearnResearch";
 import { ClosingCta } from "./sections/ClosingCta/ClosingCta";
 import { Footer } from "./sections/Footer/Footer";
 
-// The marketing homepage — served at "/" for logged-out visitors. Ported from
+// The marketing homepage - served at "/" for logged-out visitors. Ported from
 // the standalone Next.js build in trakkr.ai/ (kept as the pixel reference),
 // then rebranded to VentureCite. Section order is verbatim from
-// trakkr.ai/app/page.tsx. All styling is scoped under .vc-home — see
+// trakkr.ai/app/page.tsx. All styling is scoped under .vc-home - see
 // styles.css.
 export default function Landing() {
   return (
     <div className="vc-home min-h-screen bg-vc-surface relative">
-      {/* Title/description moved to src/routes/index.tsx's `head()` —
+      {/* Title/description moved to src/routes/index.tsx's `head()` -
           metadata belongs to the route, not this component. */}
 
       {/* Page-wide column guides, verbatim from index.html:680-681 */}
@@ -34,7 +34,7 @@ export default function Landing() {
       <Nav />
 
       <main>
-        {/* Hero region — Hero and HeroBento share one background: a vertical
+        {/* Hero region - Hero and HeroBento share one background: a vertical
             gradient running white at the top to saturated blue at the bottom,
             so the headline reads on white while the dashboard card sits on
             blue. Anchored bottom so the saturated end always lands behind the

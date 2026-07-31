@@ -64,7 +64,7 @@ function triggerLabel(value: string): string {
   return value.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Wave 9 -> Phase 2.6: status is a run outcome, not a badge-worthy category —
+// Wave 9 -> Phase 2.6: status is a run outcome, not a badge-worthy category -
 // per the app's rule (see foundations/StatusDot.tsx), status renders as a
 // dot + plain text, never a filled/tinted chip. Green is reserved for
 // actions, so "succeeded" uses the neutral check glyph, not a green fill.
@@ -105,7 +105,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
   const [chartFilter, setChartFilter] = useState<ChartFilter>("auto");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
 
-  // Apply date filter first — affects both the chart and the row list.
+  // Apply date filter first - affects both the chart and the row list.
   const filteredHistory = useMemo(() => {
     if (dateFilter === "all") return runHistory;
     const days = Number(dateFilter);
@@ -114,7 +114,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
   }, [runHistory, dateFilter]);
 
   // Wave 6.7: pagination state. Server already returns the full list, so we
-  // paginate client-side — 20 is a readable first page; "Load more" reveals
+  // paginate client-side - 20 is a readable first page; "Load more" reveals
   // the next batch rather than dropping the user into an overwhelming wall
   // of rows on brands with years of history.
   const PAGE_SIZE = 20;
@@ -124,7 +124,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
 
   // Wave 9: drill-down cache. Previously every accordion-open re-fetched
   // run details even after closing/reopening. We cache per runId in
-  // component state — TanStack already caches the latest fetch, but
+  // component state - TanStack already caches the latest fetch, but
   // switching between runs on the same panel was thrashing the cache key.
   // Wave 9.2: LRU-capped at 10 entries. Detail blobs can be ~100KB each
   // (full LLM responses across 50 platform calls); a long History
@@ -210,7 +210,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                   // matching the trigger filter. Failed runs distort the
                   // line; re-detect runs are noisy because they don't
                   // represent fresh AI calls. Pre-Wave-8 rows have no
-                  // status — treat them as succeeded (the previous
+                  // status - treat them as succeeded (the previous
                   // behavior).
                   data={filteredHistory
                     .filter((r) => r.completedAt)
@@ -305,7 +305,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
         <div className="mt-3">
           <TooltipProvider delayDuration={150}>
             <div>
-              {/* List rows: hairline separation, no radius, hover highlight —
+              {/* List rows: hairline separation, no radius, hover highlight -
                   replaces the previous space-y-2 rounded-card rows. */}
               {visibleRuns.map((run, i) => {
                 const prev = filteredHistory[i + 1];
@@ -354,7 +354,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                         <Badge variant="outline" className="text-caption">
                           {triggerLabel(run.triggeredBy)}
                         </Badge>
-                        {/* Wave 9: status badge — succeeded/partial/failed/cancelled.
+                        {/* Wave 9: status badge - succeeded/partial/failed/cancelled.
                           Failed shows error_message in tooltip. */}
                         {(status !== "succeeded" || run.errorMessage) && (
                           <Tooltip>
@@ -374,7 +374,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                             )}
                           </Tooltip>
                         )}
-                        {/* Wave 9: disagreement badge — surface when matcher
+                        {/* Wave 9: disagreement badge - surface when matcher
                           and analyzer LLM disagreed on >5% of checks. Above
                           5% suggests the brand needs more name variations. */}
                         {(run.disagreementCount ?? 0) > 0 &&
@@ -402,7 +402,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                     {isExpanded && (
                       <div className="border-t border-vc-default px-2 py-4 bg-vc-muted/20">
                         {(() => {
-                          // Wave 9: cache-first render — re-opening a
+                          // Wave 9: cache-first render - re-opening a
                           // previously-fetched run is instant.
                           const cached = drilldownCache[run.id];
                           const detail = cached ?? runDetailData?.data;

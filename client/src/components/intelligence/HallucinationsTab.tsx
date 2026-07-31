@@ -118,7 +118,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
       // Wave E: the list query is keyed by the FULL URL with query string
       // (line 44 above). TanStack Query does exact matching on
       // single-element string arrays, so invalidating the bare path
-      // `["/api/hallucinations"]` never fires a refetch — the DB updated
+      // `["/api/hallucinations"]` never fires a refetch - the DB updated
       // but the UI showed stale state until a page reload. Match the
       // list's key exactly here.
       queryClient.invalidateQueries({
@@ -137,7 +137,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
       }),
   });
 
-  // "Not a hallucination" — the detector flagged a false positive (e.g. a
+  // "Not a hallucination" - the detector flagged a false positive (e.g. a
   // differently-worded but accurate description). PATCH remediationStatus to
   // "dismissed" (a legal transition from pending/in_progress).
   const dismissHallucinationMutation = useMutation({
@@ -164,7 +164,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
   // Severity ramp collapsed to two visually distinct treatments: critical
   // and high both need action; medium and low are informational. The old
   // 4-step ramp had high and medium differing only by 10% vs 8% background
-  // alpha — not a perceptible tier. The precise severity word is still
+  // alpha - not a perceptible tier. The precise severity word is still
   // shown as the badge's text, so no information is lost.
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -379,7 +379,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                               onClick={() => dismissHallucinationMutation.mutate(hal.id)}
                               disabled={dismissHallucinationMutation.isPending}
                               data-testid={`button-dismiss-${hal.id}`}
-                              title="The AI's claim is actually accurate — hide this false positive"
+                              title="The AI's claim is actually accurate - hide this false positive"
                             >
                               <X className="mr-1 h-4 w-4" />
                               Not a hallucination
@@ -399,7 +399,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                       </div>
 
                       {/* Claim vs. fact: quote-style with semantic accents.
-                          No heavy block fills — DESIGN.md asks colour to
+                          No heavy block fills - DESIGN.md asks colour to
                           encode importance, not category. The left rule does
                           the work; the text reads cleanly on a neutral card. */}
                       <div className="min-w-0 space-y-3">
@@ -450,7 +450,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                         {/* Generic guidance now lives once in the section-level
                             panel above the list. Only render this per-card
                             block when a detection carries genuinely specific
-                            steps — the pipeline never populates
+                            steps - the pipeline never populates
                             remediationSteps today, but the field exists on
                             the schema, so a future producer isn't silently
                             dropped. */}
@@ -513,7 +513,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
                     <div className="flex items-center justify-between">
                       {/* fact.subcategory is already the human label derived
                           from factKey (see subcategoryFor in
-                          shared/factAgent/schema.ts) — e.g. factKey "tagline"
+                          shared/factAgent/schema.ts) - e.g. factKey "tagline"
                           -> subcategory "Tagline". Rendering both said the
                           same name twice; the raw key is still available on
                           hover for debugging/provenance. */}

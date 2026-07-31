@@ -60,7 +60,7 @@ export interface HybridDiscoveryOpts {
 
 export interface HybridDiscoveryResult {
   urls: string[];
-  /** Provenance for the inspector — which source contributed each URL
+  /** Provenance for the inspector - which source contributed each URL
    *  and what the LLM ranker said about it. */
   provenance: Array<{
     url: string;

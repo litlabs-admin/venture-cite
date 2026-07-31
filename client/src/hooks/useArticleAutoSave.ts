@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 // in one field doesn't reset the other. Both flush serially through the
 // same `inflight` ref so a second flush can't race a first.
 //
-// On 409 we surface a toast with a Reload button — the user has to decide
+// On 409 we surface a toast with a Reload button - the user has to decide
 // whether to discard their local changes. We can't auto-merge.
 
 type Patch = Record<string, unknown>;

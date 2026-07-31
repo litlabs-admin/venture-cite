@@ -150,8 +150,8 @@ export async function runAggregate(args: RunAggregateArgs): Promise<AggregateRes
   // 2026-05-28 fix: runFullScrape.ts persists facts per-page but never
   // bumps `factsExtracted` on the run row (only the /scrape-one route
   // calls incrementScrapeRunCounters). When the bulk re-scrape path is
-  // used — which is what the brand-fact-sheet page actually hits via
-  // POST /full-rescrape — the run row's factsExtracted stayed at 0,
+  // used - which is what the brand-fact-sheet page actually hits via
+  // POST /full-rescrape - the run row's factsExtracted stayed at 0,
   // so the UI's "We couldn't read your site automatically" paste card
   // fired on EVERY completed run regardless of how many facts the LLM
   // actually produced. We now compute the rollup from the per-source
@@ -164,14 +164,14 @@ export async function runAggregate(args: RunAggregateArgs): Promise<AggregateRes
   // 2026-05-28 SAFETY NET: the terminal-status UPDATE is the ONE write
   // that absolutely has to land. If it doesn't, the SSE stream never
   // sees a terminal status, the frontend reconnects forever, and the
-  // backstop retries up to 10 × 5 min before finally giving up — what
+  // backstop retries up to 10 × 5 min before finally giving up - what
   // the user described as "stuck in an infinite loop on Adyen."
   //
   // We split the write into two steps:
-  //   (a) The minimal terminal write — status, errorKind, completedAt.
+  //   (a) The minimal terminal write - status, errorKind, completedAt.
   //       This is the SLA. If even this fails, we bubble up so the
   //       caller's catch can record the failure mode.
-  //   (b) The rollup write — factsExtracted / pagesFetched / pagesFailed.
+  //   (b) The rollup write - factsExtracted / pagesFetched / pagesFailed.
   //       Nice to have for the UI but not load-bearing for run
   //       termination. Wrap in its own try/catch so a malformed SQL
   //       template or column-name issue can never wedge the run.

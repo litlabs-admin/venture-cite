@@ -18,11 +18,11 @@ export default tseslint.config(
       "*.tsbuildinfo",
       "drizzle/**",
       ".husky/**",
-      // TanStack Router codegen — its own header says to exclude it from
+      // TanStack Router codegen - its own header says to exclude it from
       // linters and formatters. The plugin rewrites it on every dev-server
       // start, so anything we "fix" here comes straight back.
       "src/routeTree.gen.ts",
-      // Local vendored tool/skill caches — not project source, never lint
+      // Local vendored tool/skill caches - not project source, never lint
       // (also gitignored). Their browser/UMD bundles otherwise flood the
       // report and break lint-staged if accidentally staged.
       ".agents/**",
@@ -42,7 +42,7 @@ export default tseslint.config(
   // TypeScript rules
   ...tseslint.configs.recommended,
 
-  // React rules — only for client/
+  // React rules - only for client/
   {
     files: ["client/**/*.{ts,tsx}"],
     plugins: {
@@ -75,7 +75,7 @@ export default tseslint.config(
     },
   },
 
-  // Server / shared / scripts — Node globals
+  // Server / shared / scripts - Node globals
   {
     files: ["server/**/*.ts", "shared/**/*.ts", "scripts/**/*.ts"],
     languageOptions: {
@@ -88,7 +88,7 @@ export default tseslint.config(
       "no-console": "off",
       // Guardrail: never run user-auth (session-minting) calls on the
       // service-role client. supabase-js stores the returned session on the
-      // calling client and then uses the user's JWT — not the service key —
+      // calling client and then uses the user's JWT - not the service key -
       // as the Authorization header, so the next Storage/PostgREST call loses
       // service_role and fails RLS ("new row violates row-level security
       // policy"). Use supabaseAuth (server/lib/supabaseAuth.ts) instead.
@@ -98,19 +98,19 @@ export default tseslint.config(
           selector:
             "CallExpression[callee.object.object.name='supabaseAdmin'][callee.object.property.name='auth'][callee.property.name='signInWithPassword']",
           message:
-            "Do not call signInWithPassword on supabaseAdmin — it poisons the service-role client's Authorization header and breaks service-role Storage/PostgREST with RLS errors. Use supabaseAuth from server/lib/supabaseAuth.ts.",
+            "Do not call signInWithPassword on supabaseAdmin - it poisons the service-role client's Authorization header and breaks service-role Storage/PostgREST with RLS errors. Use supabaseAuth from server/lib/supabaseAuth.ts.",
         },
         {
           selector:
             "CallExpression[callee.object.object.name='supabaseAdmin'][callee.object.property.name='auth'][callee.property.name='setSession']",
           message:
-            "Do not call setSession on supabaseAdmin — it poisons the service-role client. Use supabaseAuth from server/lib/supabaseAuth.ts.",
+            "Do not call setSession on supabaseAdmin - it poisons the service-role client. Use supabaseAuth from server/lib/supabaseAuth.ts.",
         },
       ],
     },
   },
 
-  // Tests — Vitest globals + relaxed rules
+  // Tests - Vitest globals + relaxed rules
   {
     files: ["tests/**/*.{ts,tsx}", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     languageOptions: {
@@ -124,7 +124,7 @@ export default tseslint.config(
     },
   },
 
-  // Project-wide overrides — pragmatic for a codebase that didn't have
+  // Project-wide overrides - pragmatic for a codebase that didn't have
   // ESLint until now. Tighten gradually.
   {
     rules: {
@@ -141,6 +141,6 @@ export default tseslint.config(
     },
   },
 
-  // Prettier — must come last to disable conflicting style rules
+  // Prettier - must come last to disable conflicting style rules
   prettier,
 );

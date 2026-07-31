@@ -1,7 +1,7 @@
 import { useScrollReveal, scrollRevealEase } from "@/pages/landing/hooks/useScrollReveal";
 import { DomainCaptureForm } from "./DomainCaptureForm";
 
-// Closing CTA — verbatim from _reference/index.html lines 3593-3625. No
+// Closing CTA - verbatim from _reference/index.html lines 3593-3625. No
 // section-header eyebrow precedes this one (see SectionHeader.tsx's own
 // note confirming that).
 //
@@ -28,7 +28,7 @@ export function ClosingCta() {
             The art is a ~square gradient: white for its top third, then a
             fast transition to saturated blue. Under `cover` the section's
             short box cropped a window out of the MIDDLE of that image, so
-            the transition landed exactly on the copy — the heading sat on
+            the transition landed exactly on the copy - the heading sat on
             near-white (fine) while the paragraph 60px below sat on
             rgb(72,99,255) at a measured 1.03:1 against its own colour.
             Invisible, and no text colour fixes it: on a mid-luminance blue,
@@ -36,8 +36,8 @@ export function ClosingCta() {
             both ends of the ramp anyway.
 
             Stretching the gradient to 1.8x the box height and anchoring it
-            top puts the copy block on the white end — measured in-browser at
-            17.67:1 for the heading and 4.79:1 for the paragraph, both AA —
+            top puts the copy block on the white end - measured in-browser at
+            17.67:1 for the heading and 4.79:1 for the paragraph, both AA -
             while the bottom row stays genuinely blue, rgb(88,113,255), so
             the section keeps the blue floor it is drawn around. Past 2x the
             paragraph stops improving (4.79 is its ceiling, set by its own
@@ -69,7 +69,7 @@ export function ClosingCta() {
             </h2>
             <p className="text-[13px] sm:text-[14px] lg:text-[16px] text-vc-secondary leading-relaxed mb-6 sm:mb-8 max-w-[520px] mx-auto">
               Recommendation tracking, share-of-answer, competitor benchmarks, and AI content
-              generation — across ChatGPT, Claude, Perplexity, Gemini, Copilot, and Google AI
+              generation - across ChatGPT, Claude, Perplexity, Gemini, Copilot, and Google AI
               Overview.
             </p>
             <div

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { safeParseJson } from "../../server/lib/safeParseJson";
 
-describe("safeParseJson — canonical dirty-LLM-JSON parser", () => {
+describe("safeParseJson - canonical dirty-LLM-JSON parser", () => {
   it("returns null for empty/nullish input", () => {
     expect(safeParseJson("")).toBeNull();
     expect(safeParseJson(null)).toBeNull();

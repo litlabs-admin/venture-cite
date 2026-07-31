@@ -17,7 +17,7 @@ import type { Perception, PlatformRank } from "@/components/dashboard-panels/use
 //
 // Same honesty rules as the dashboard panel this expands: a null axis is
 // skipped, `overall` is never recomputed client-side, and rendering this page
-// never itself triggers a scoring run — only the Re-score button does, and
+// never itself triggers a scoring run - only the Re-score button does, and
 // that is rate-limited server-side (1h cooldown, 429 + Retry-After).
 
 type PerceptionEnvelope = { success: boolean; data: Perception | null };
@@ -30,10 +30,10 @@ const AXES = [
   ["innovation", "Innovation"],
 ] as const;
 
-/** Per-axis values carry one decimal — matches the reference and the
+/** Per-axis values carry one decimal - matches the reference and the
  *  dashboard panel's own fmt1. */
 const fmt1 = (n: number) => n.toFixed(1);
-/** The headline score is an integer — deliberate asymmetry with the per-axis
+/** The headline score is an integer - deliberate asymmetry with the per-axis
  *  decimals, matching the reference. Do not "fix" this to match fmt1. */
 const fmt0 = (n: number) => String(Math.round(n));
 
@@ -61,9 +61,9 @@ function Chip({ children, tone }: { children: React.ReactNode; tone: "praised" |
 }
 
 /** Category score column: large text-stat number over a full-width bar,
- *  matching the reference's layout (bar BENEATH the label, not beside it —
+ *  matching the reference's layout (bar BENEATH the label, not beside it -
  *  see docs/optimize-perception-reference.md "Rebuild decisions"). Null axes
- *  never draw a bar or a fabricated number — a dash and no track. */
+ *  never draw a bar or a fabricated number - a dash and no track. */
 function CategoryScoreColumn({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="flex flex-col gap-2">
@@ -95,7 +95,7 @@ function CategoryScoreColumn({ label, value }: { label: string; value: number | 
 const TREND_SLOTS = 7;
 
 /** Bar strip of past run scores, oldest first, matching the dashboard panel's
- *  own TrendStrip but larger — this is the page's dedicated section, not a
+ *  own TrendStrip but larger - this is the page's dedicated section, not a
  *  sidebar sparkline. Fewer than 2 points cannot show a trend, so the section
  *  says that in words instead of drawing a flat line off one point. */
 function PerceptionOverTime({ history, overall }: { history: number[]; overall: number | null }) {
@@ -103,7 +103,7 @@ function PerceptionOverTime({ history, overall }: { history: number[]; overall: 
     return (
       <p className="text-body text-vc-tertiary">
         {overall !== null
-          ? `Tracking started — your first score is ${fmt1(overall)}. Historical trends appear after your next analysis.`
+          ? `Tracking started - your first score is ${fmt1(overall)}. Historical trends appear after your next analysis.`
           : "Tracking started. Historical trends appear after your next analysis."}
       </p>
     );
@@ -139,8 +139,8 @@ function PerceptionOverTime({ history, overall }: { history: number[]; overall: 
 }
 
 // ─── AI Model Breakdown ──────────────────────────────────────────────────────
-// Reads GET /api/dashboard/rankings/:brandId — the same per-platform rollup
-// the dashboard's Platforms panel uses — and reports CITATION counts per
+// Reads GET /api/dashboard/rankings/:brandId - the same per-platform rollup
+// the dashboard's Platforms panel uses - and reports CITATION counts per
 // model. This is deliberately NOT a per-platform perception score: perception
 // is scored as one aggregate judge run over round-robined evidence
 // (server/lib/perceptionScorer.ts), which does not preserve per-platform
@@ -191,7 +191,7 @@ function AiModelBreakdown({ platforms, loading }: { platforms: PlatformRank[]; l
   if (platforms.length === 0) {
     return (
       <p className="text-data text-vc-tertiary">
-        No platform-level citation data yet — run a citation check to populate this.
+        No platform-level citation data yet - run a citation check to populate this.
       </p>
     );
   }
@@ -259,14 +259,14 @@ export default function PerceptionPage() {
         const body = error.body as { retryAfterSeconds?: number } | undefined;
         const secs = body?.retryAfterSeconds ?? 0;
         const mins = Math.max(1, Math.round(secs / 60));
-        setCooldownMsg(`Scored recently — try again in ${mins} min`);
+        setCooldownMsg(`Scored recently - try again in ${mins} min`);
         return;
       }
       setCooldownMsg("Couldn't start a new scoring run. Try again shortly.");
     },
   });
 
-  // Defensive defaults — a partial payload (an older shape, a degraded
+  // Defensive defaults - a partial payload (an older shape, a degraded
   // response) must never throw and take the page down.
   const praised = perception?.praised ?? [];
   const questioned = perception?.questioned ?? [];
@@ -274,7 +274,7 @@ export default function PerceptionPage() {
   const history = useMemo(() => perception?.history ?? [], [perception]);
 
   // 7-day change only renders when history actually has an older point to
-  // compare against — otherwise it's a dash, never a fabricated 0.
+  // compare against - otherwise it's a dash, never a fabricated 0.
   const change = history.length >= 2 ? history[history.length - 1] - history[0] : null;
 
   const reScoreButton = (
@@ -327,7 +327,7 @@ export default function PerceptionPage() {
       </div>
 
       {!perception ? (
-        // NEVER SCORED — a first-class empty state, not an error.
+        // NEVER SCORED - a first-class empty state, not an error.
         <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-vc-default py-16 text-center">
           <p className="text-body text-vc-tertiary">
             This brand has never been scored for perception.
@@ -425,7 +425,7 @@ export default function PerceptionPage() {
 
           {/* Category scores: five large text-stat numbers, each over a
               full-width bar (see docs/optimize-perception-reference.md
-              "Rebuild decisions" — the reference puts the bar UNDER the
+              "Rebuild decisions" - the reference puts the bar UNDER the
               label, not beside it, unlike the dashboard's compact panel). */}
           <div>
             <PanelLabel>Category Scores</PanelLabel>

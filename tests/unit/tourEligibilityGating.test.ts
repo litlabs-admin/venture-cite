@@ -3,7 +3,7 @@
 //
 // Measured from production (admin@venturecite.com, 2026-07-30): the account
 // had `global: { v: 2, skippedAt: "2026-07-29T19:18:01.391Z" }` persisted and
-// STILL logged 7 `tour_auto_fired` events for global-welcome the next day —
+// STILL logged 7 `tour_auto_fired` events for global-welcome the next day -
 // 133 auto-fires against 6 completions and 21 skips in total. The writes were
 // always landing. The orchestrator simply asked `shouldAutoFire` before
 // /api/tours/state resolved, and `useTourState` yields `{}` until it does.
@@ -34,7 +34,7 @@ describe("shouldAutoFire cannot distinguish 'loading' from 'never seen'", () => 
     expect(shouldAutoFire(globalWelcomeTour, skipped, ctx, "/dashboard")).toBe(false);
   });
 
-  it("fires on an empty state — which is what an in-flight query looks like", () => {
+  it("fires on an empty state - which is what an in-flight query looks like", () => {
     // NOT a bug in this function: with no record there is genuinely nothing
     // to suppress on. It is the reason TourOrchestrator must gate on
     // `isLoading` before calling it at all.

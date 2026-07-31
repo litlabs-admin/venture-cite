@@ -12,7 +12,7 @@ export function initSentry(): void {
       (import.meta.env.VITE_SENTRY_ENVIRONMENT as string | undefined) ??
       (import.meta.env.MODE as string | undefined) ??
       "development",
-    // No automatic tracing — flip this on once we want spans.
+    // No automatic tracing - flip this on once we want spans.
     tracesSampleRate: 0,
     // Don't replay sessions by default (PII risk + cost).
     replaysSessionSampleRate: 0,

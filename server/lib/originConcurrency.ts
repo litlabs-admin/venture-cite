@@ -2,15 +2,15 @@
 //
 // Site Health fires five discovery probes + a robots.txt fetch + a platform
 // detection fetch + a sitemap fetch (recursively, for sitemapindex children)
-// — all against the SAME customer origin, and all roughly concurrently
+// - all against the SAME customer origin, and all roughly concurrently
 // (server/routes/dashboard.ts's computeSiteHealth Promise.all). Apple.com got
 // hammered with this many parallel requests during testing; a customer's own
 // site deserves the same restraint we'd want applied to ours.
 //
 // Bounded concurrency PER ORIGIN, no queue-of-known-jobs (the pattern in
 // runFullScrape.ts ~line 452 assumes a fixed job list processed upfront;
-// here calls arrive from independent call sites — fetchRobots, fetchDiscovery,
-// detectPlatform, getSitemapUrlCount — so a semaphore that calls acquire/
+// here calls arrive from independent call sites - fetchRobots, fetchDiscovery,
+// detectPlatform, getSitemapUrlCount - so a semaphore that calls acquire/
 // release around each fetch is the shape that actually fits). No p-limit
 // dependency: this is the same "bounded work, no unbounded Map" spirit as
 // the site-health cache above, just guarding concurrency instead of memory.

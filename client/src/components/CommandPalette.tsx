@@ -35,12 +35,12 @@ import { openChatbotPrompt } from "@/lib/openChatbotPrompt";
 
 // ─── Cmd-K command palette ───────────────────────────────────────────────────
 // Global keyboard-first switcher. Two intents:
-//   Go to — every authenticated route + each spine tab as a deep-link
-//   Ask   — hand the typed query to the assistant (openChatbotPrompt)
+//   Go to - every authenticated route + each spine tab as a deep-link
+//   Ask   - hand the typed query to the assistant (openChatbotPrompt)
 //
 // The Cmd/Ctrl+K listener that toggles `open` lives in AppShell so the palette
 // is one keystroke away from every authenticated route. This component is pure
-// UI: it never owns the shortcut. No in-palette mutations by design — Act items
+// UI: it never owns the shortcut. No in-palette mutations by design - Act items
 // route to where the action happens, they don't fire side effects here.
 //
 // The nav table mirrors the spine tab definitions in pages/{monitor,diagnose,
@@ -49,7 +49,7 @@ import { openChatbotPrompt } from "@/lib/openChatbotPrompt";
 
 type Icon = React.ComponentType<{ className?: string }>;
 
-/** Every route this palette links to, as a literal union — not `string` —
+/** Every route this palette links to, as a literal union - not `string` -
  *  so `navigate({ to: entry.to })` below stays checked against the
  *  generated route tree. Tab-scoped destinations carry their tab in the
  *  separate `tab` field rather than baked into the path string. */

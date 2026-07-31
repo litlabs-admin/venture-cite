@@ -1,5 +1,5 @@
 // Canonical "parse possibly-dirty LLM JSON" helper. ONE implementation,
-// shared by the routes layer and the lib scanners — it was previously
+// shared by the routes layer and the lib scanners - it was previously
 // copy-pasted byte-for-byte into 6 files.
 //
 // Zero dependencies on purpose: importing this never drags a heavier
@@ -7,7 +7,7 @@
 // stays safe to use from unit-tested pure code.
 //
 // It strips markdown code fences, extracts the first balanced {...}/[...]
-// span, and returns null on ANY parse failure — callers decide the
+// span, and returns null on ANY parse failure - callers decide the
 // fallback shape. For schema-validated parsing use parseLLMJson
 // (server/lib/llmParse.ts); for the fact-extraction LLM repair loop use
 // parseFactsWithRepair (factAgent/v2/extractionPrompt.ts).

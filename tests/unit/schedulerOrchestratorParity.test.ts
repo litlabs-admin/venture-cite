@@ -4,7 +4,7 @@
 // DISABLE_IN_PROCESS_SCHEDULER (the documented Render shape) switches the
 // node-cron scheduler off entirely and makes POST /api/cron/daily-orchestrator
 // the only trigger for scheduled work. Any job registered ONLY in the
-// scheduler then stops running — with no error, no failed step and no log
+// scheduler then stops running - with no error, no failed step and no log
 // line, because nothing is left to report it.
 //
 // That is exactly what happened to tour-events-cleanup (tour_events would
@@ -60,7 +60,7 @@ describe("scheduler ↔ orchestrator job parity", () => {
 
   it("gives every orchestrator step a budget cap", () => {
     // A step with no STEP_CAPS_MS entry gets `cap === undefined`, so its
-    // deadline becomes NaN and Math.min(budget, NaN) is NaN — the step would
+    // deadline becomes NaN and Math.min(budget, NaN) is NaN - the step would
     // run with a meaningless deadline.
     const caps = read("server/routes/cron.ts");
     const capBlock = caps.slice(caps.indexOf("const STEP_CAPS_MS"), caps.indexOf("} as const;"));

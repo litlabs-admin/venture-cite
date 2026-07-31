@@ -10,7 +10,7 @@
 --     geography, content_style)
 --
 -- Also:
---   * Drops the slug column + unique index — articles are now referenced by id only.
+--   * Drops the slug column + unique index - articles are now referenced by id only.
 --   * Adds articles.external_url so the GEO Signals page can link to the article on
 --     the user's own site without fabricating a /article/<slug> URL.
 --   * Creates article_revisions for Auto-Improve history + diff/restore.
@@ -71,7 +71,7 @@ ALTER TABLE content_generation_jobs
   ADD COLUMN IF NOT EXISTS refunded_at timestamp;
 
 -- Allow 'cancelled' as a terminal state. (status was previously a free-text
--- column with no CHECK constraint — just add the new value to the implicit
+-- column with no CHECK constraint - just add the new value to the implicit
 -- enum and document the allowed set.)
 DO $$ BEGIN
   ALTER TABLE content_generation_jobs
@@ -109,13 +109,13 @@ CREATE INDEX IF NOT EXISTS article_revisions_article_idx
 -- 4. Backfill orphan articles into a per-user "Personal" brand.
 --
 -- Some legacy articles were created with brand_id = NULL (allowed by the
--- previous schema). Going forward brand_id must be NOT NULL — so for every
+-- previous schema). Going forward brand_id must be NOT NULL - so for every
 -- user that owns at least one orphan article we create one Personal brand
 -- and reassign their orphans to it. Idempotent: re-runs find nothing to do.
 -- ---------------------------------------------------------------------------
 
 -- NOTE: the historical articles table allowed a nullable brand_id. The current
--- schema definition (shared/schema.ts) declares brand_id NOT NULL — but in
+-- schema definition (shared/schema.ts) declares brand_id NOT NULL - but in
 -- practice older rows from before that constraint may still exist on legacy
 -- environments. The block below is defensive: it only fires if any null-brand
 -- rows exist, otherwise it's a cheap no-op.
@@ -180,7 +180,7 @@ END $$;
 
 -- Any remaining orphans (no linked draft, no linked job → no way to recover
 -- ownership) are deleted. These represent unrecoverable data created before
--- proper user-tracking. In practice the count should be 0 — but we don't want
+-- proper user-tracking. In practice the count should be 0 - but we don't want
 -- the NOT NULL constraint below to fail on a stragglers.
 DELETE FROM articles WHERE brand_id IS NULL;
 

@@ -1,7 +1,7 @@
-// JSON-LD @type extraction — pulled out of server/routes/geoSignals.ts so it
+// JSON-LD @type extraction - pulled out of server/routes/geoSignals.ts so it
 // can be reused by server/lib/pageContentAnalysis.ts without pulling in that
 // route file's Express/DB import chain (routesShared -> ownership -> db,
-// which throws at import time when DATABASE_URL isn't set — exactly the kind
+// which throws at import time when DATABASE_URL isn't set - exactly the kind
 // of thing a "pure, framework-free" analyser must never depend on).
 // geoSignals.ts re-exports these two names for backwards compatibility with
 // any other importer; this file is the single source of truth.

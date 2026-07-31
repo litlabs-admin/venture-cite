@@ -4,18 +4,18 @@ import type { GapCell, GapMatrixRow } from "./useDashboardData";
 // ─── Competitor Gaps ────────────────────────────────────────────────────
 // Row 6 of the dashboard: the gap matrix, full width. It carries one column
 // per query category and one row per core competitor, so it is the widest
-// thing on the page — sharing the row left the table cramped and scrolling.
+// thing on the page - sharing the row left the table cramped and scrolling.
 //
 // The gap matrix moved here when the Monitor "Overview" tab was retired. It
-// was <Card>-based there — rounded, shadowed, gap-separated, semantic tokens
+// was <Card>-based there - rounded, shadowed, gap-separated, semantic tokens
 // (text-muted-foreground / border-border / bg-primary). None of that exists
 // on this page, so it is rebuilt on the dashboard's own grammar rather than
 // relocated: full-bleed cells, hairline separation, vc-* stone ramp,
 // PanelLabel eyebrows, tabular-nums on every figure.
 //
 // PROMPT COVERAGE lives in the gap panel's header, not in a panel of its
-// own. It is derived from this same matrix — the brand row's yes/partial
-// cell count — so as a separate panel it was a third rendering of one
+// own. It is derived from this same matrix - the brand row's yes/partial
+// cell count - so as a separate panel it was a third rendering of one
 // dataset. As a header figure it costs no extra row.
 
 // Cell tint: the accent at continuous opacity, the mechanism the matrix
@@ -33,7 +33,7 @@ function cellStyle(alpha: number) {
     // over the page canvas, so in DARK it resolves LIGHT (dark's accent is the
     // pale periwinkle #7f9bff) and white-on-light would be unreadable. That
     // token is the designed label colour for exactly this surface: white in
-    // light, near-black in dark — see index.css's note that dark "inverts the
+    // light, near-black in dark - see index.css's note that dark "inverts the
     // label to near-black" because the accent cannot carry white at AA.
     color: alpha >= 0.4 ? "var(--brand-accent-fg)" : "var(--foreground)",
   };
@@ -54,7 +54,7 @@ function Cell({ state }: { state: GapCell }) {
       </span>
     );
   if (state === "no")
-    // Binary — no scalar behind "they appear, you don't" — so a flat tint
+    // Binary - no scalar behind "they appear, you don't" - so a flat tint
     // rather than a point on the continuous scale.
     return (
       <span className={`${base} bg-destructive/15 text-destructive`} title="They appear, you don't">
@@ -111,7 +111,7 @@ function CompetitorGapsPanel({
       <div className="mb-4 flex h-5 items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-2">
           <PanelLabel>Competitor Gaps</PanelLabel>
-          {/* Prompt coverage — same matrix, read down the brand's own row. */}
+          {/* Prompt coverage - same matrix, read down the brand's own row. */}
           {covered !== null && categories.length > 0 && (
             <>
               <span className="h-3 w-px flex-shrink-0 bg-vc-subtle" aria-hidden />

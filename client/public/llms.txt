@@ -2,7 +2,7 @@
 
 > VentureCite is a Generative Engine Optimization (GEO) platform. It shows brands
 > where AI search engines overlook, misread, or undersell them, then helps fix the
-> pages and sources shaping every AI answer — so the brand gets cited accurately.
+> pages and sources shaping every AI answer - so the brand gets cited accurately.
 
 ## What it does
 

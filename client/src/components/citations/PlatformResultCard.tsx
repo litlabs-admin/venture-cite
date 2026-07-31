@@ -18,7 +18,7 @@ export type PlatformResult = {
   // newly-added name variation. Rank is null on these rows because the
   // original LLM run didn't see the brand, so we have no honest rank signal.
   reDetectedAt?: string | null;
-  // Wave 9: optional — when present, lets the "Open in chat" link send the
+  // Wave 9: optional - when present, lets the "Open in chat" link send the
   // user directly to a fresh chat with the same prompt pre-filled.
   prompt?: string;
   /** Phase 3: list of URLs the LLM cited in its response. Null on
@@ -30,7 +30,7 @@ export type PlatformResult = {
 // brand colors look right; everything else falls back to a stable hash → HSL
 // so a 6th / 7th platform doesn't render as plain grey.
 
-// Wave 9: inline color hash for unknown platforms. djb2-ish — stable across
+// Wave 9: inline color hash for unknown platforms. djb2-ish - stable across
 // renders, distributes hues evenly. Returns CSS variables so the same
 // value works for bg/text/border with consistent opacity.
 function hashHue(s: string): number {
@@ -110,7 +110,7 @@ export function PlatformResultCard({
     if (deepLink) {
       window.open(deepLink, "_blank", "noopener,noreferrer");
     } else if (result.prompt) {
-      // Fallback for platforms with no public deep-link query — copy the
+      // Fallback for platforms with no public deep-link query - copy the
       // prompt so the user can paste it.
       navigator.clipboard
         .writeText(result.prompt)
@@ -159,7 +159,7 @@ export function PlatformResultCard({
       </div>
 
       {/* Wave 9: failure pill. Previously, a "Check failed: rate limited"
-          snippet was hidden behind an expand toggle — the user had no
+          snippet was hidden behind an expand toggle - the user had no
           way to see WHY the platform didn't respond without clicking
           through. Show it inline + tinted red so it's unmissable. */}
       {isError && (
@@ -216,7 +216,7 @@ export function PlatformResultCard({
                     title={
                       deepLink
                         ? `Open this prompt in ${result.platform}`
-                        : `Copy the prompt — ${result.platform} has no deep-link support`
+                        : `Copy the prompt - ${result.platform} has no deep-link support`
                     }
                     data-testid={`button-open-in-chat-${result.platform.toLowerCase()}`}
                   >
@@ -244,7 +244,7 @@ export function PlatformResultCard({
                         try {
                           hostname = new URL(url).hostname;
                         } catch {
-                          // Defensive — render the raw URL if URL parsing fails.
+                          // Defensive - render the raw URL if URL parsing fails.
                         }
                         return (
                           <a

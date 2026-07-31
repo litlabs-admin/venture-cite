@@ -1,4 +1,4 @@
-// Tests for server/lib/runMentionScan.ts (Task 14 — Mentions Rebuild).
+// Tests for server/lib/runMentionScan.ts (Task 14 - Mentions Rebuild).
 //
 // Strategy: vi.mock storage and scanBrandMentions. Tests verify orchestration
 // logic: idempotency guards, status transitions, error handling, and logging.

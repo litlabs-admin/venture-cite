@@ -16,10 +16,10 @@ const viteLogger = createLogger();
 // (Phase 2 Task 6): the dev fallback below always answers 200 instead of
 // consulting an allowlist. This changes the status code returned for
 // genuinely unknown paths (previously 404, now 200) but not routing or
-// content — the client-side router still owns deciding what renders, and
+// content - the client-side router still owns deciding what renders, and
 // still shows its NotFound page for a path it doesn't know, exactly as
 // before. serveStatic() itself (the prod fallback this allowlist also used
-// to gate) was removed entirely in Phase 2 Task 7 — see the comment below.
+// to gate) was removed entirely in Phase 2 Task 7 - see the comment below.
 export { log } from "./log";
 
 export async function setupVite(app: Express, server: Server) {
@@ -35,8 +35,8 @@ export async function setupVite(app: Express, server: Server) {
     customLogger: {
       ...viteLogger,
       // Log Vite errors, but do NOT kill the process. This previously called
-      // process.exit(1), which meant any dev-mode Vite error — a transform
-      // failure, an unresolved import, an HMR hiccup — terminated the whole
+      // process.exit(1), which meant any dev-mode Vite error - a transform
+      // failure, an unresolved import, an HMR hiccup - terminated the whole
       // server. That produced a silent death: exit code 1, no stack trace
       // (process.exit truncates buffered output) and no graceful-shutdown log,
       // because no signal was ever sent.
@@ -79,12 +79,12 @@ export async function setupVite(app: Express, server: Server) {
 // entry point, not server/index.ts. The `node-server`/`render-com` Nitro
 // presets already set `serveStatic: true` and serve static assets
 // themselves, and with `rootDir` pointed at the repo root (vite.config.ts)
-// Nitro renders every route through real SSR per request — there is no
+// Nitro renders every route through real SSR per request - there is no
 // static `dist/public/index.html` shell to fall back to, and there does
 // not need to be one. Proved with a real production build + a real running
 // `node dist/server/index.mjs` server (see
 // scratchpad/p2/task-7-batch5-report.md): `/`, `/privacy`, `/glossary` all
 // return real server-rendered HTML; `/health` and `/api/*` reach the same
 // Express app via the Nitro/srvx bridge (src/server/expressBridge.ts).
-// server/index.ts (this file's only remaining caller) is dev-only now —
+// server/index.ts (this file's only remaining caller) is dev-only now -
 // see its top-of-file comment.

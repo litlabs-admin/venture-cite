@@ -8,7 +8,7 @@
 -- more boolean columns on the users table.
 --
 -- Shape: one row per (user, type). Missing row == default (enabled).
--- Critical notifications (billing, security) are never stored here —
+-- Critical notifications (billing, security) are never stored here -
 -- they're hardcoded at the send site as non-dismissable.
 --
 -- weekly_report_enabled stays in place for back-compat with the
@@ -28,7 +28,7 @@ create index if not exists notification_preferences_user_idx
 
 -- Seed: copy the existing weekly_report_enabled flag into the new
 -- table so the first read through the preferences API reflects the
--- user's current state. Idempotent — safe to re-run.
+-- user's current state. Idempotent - safe to re-run.
 insert into public.notification_preferences (user_id, type, email_enabled)
 select id, 'weekly_report', weekly_report_enabled = 1
   from public.users

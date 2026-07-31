@@ -1,4 +1,4 @@
-# VentureCite → TanStack Start Migration — Design
+# VentureCite → TanStack Start Migration - Design
 
 **Date:** 2026-07-25
 **Status:** Approved for planning
@@ -13,7 +13,7 @@ Measured size at time of writing:
 
 |          |                                                                                  |
 | -------- | -------------------------------------------------------------------------------- |
-| Total    | ~95k LOC — 48k client / 44k server / 3k shared                                   |
+| Total    | ~95k LOC - 48k client / 44k server / 3k shared                                   |
 | Client   | 272 files, 126 components, 36 routes (48 `<Route>` declarations)                 |
 | Server   | 168 files, 24 Express route modules, esbuild-bundled into one Vercel function    |
 | Coupling | 33 files import `wouter` · 20 use `react-helmet-async` · 14 touch `localStorage` |
@@ -32,15 +32,15 @@ separate marketing site out.
 3. Runs correctly on **both** Render (free tier) and Vercel, with no manual
    per-host reconfiguration.
 4. Keep the existing Express API intact.
-5. No regressions — verified, not asserted.
+5. No regressions - verified, not asserted.
 
 ## 3. Non-goals (explicitly out of scope)
 
-- Marketing pages and the Airtable blog — phase 2 work, after this lands.
-- The trakkr→venturecite rebrand — **already complete**. Verified: no
+- Marketing pages and the Airtable blog - phase 2 work, after this lands.
+- The trakkr→venturecite rebrand - **already complete**. Verified: no
   user-visible "trakkr" remains; the 31 surviving mentions are code comments
   documenting the landing page's design source.
-- Removing the old home page — **already done**; `/home2` redirects to `/`.
+- Removing the old home page - **already done**; `/home2` redirects to `/`.
 - Changing authentication.
 - Server-rendering the logged-in dashboard.
 
@@ -59,12 +59,12 @@ separate marketing site out.
 
 ### Rejected alternatives
 
-- **Next.js** — would replace Vite with Turbopack, require `"use client"`
+- **Next.js** - would replace Vite with Turbopack, require `"use client"`
   annotation across the codebase, and its ISR depends on Vercel-specific
   plumbing (self-hosting it needs a persistent disk or a Redis cache handler).
   Worse fit for a dual-host requirement.
-- **Separate marketing site** — rejected; user wants one unified stack.
-- **Strangler migration** — considered and rejected by the user in favour of a
+- **Separate marketing site** - rejected; user wants one unified stack.
+- **Strangler migration** - considered and rejected by the user in favour of a
   big-bang branch.
 
 ## 5. Architecture
@@ -84,7 +84,7 @@ src/
     api/
       $.ts                    catch-all → Express via fromNodeMiddleware
   components/  hooks/  lib/  tours/    moved as-is from client/src
-server/                       UNCHANGED — all 24 route modules, scheduler, workers
+server/                       UNCHANGED - all 24 route modules, scheduler, workers
 ```
 
 The tree above is indicative, not exhaustive. `App.tsx` also carries ~12
@@ -99,7 +99,7 @@ inventory feeding the implementation plan.
 ### Express mounting
 
 > ⚠️ **CORRECTED 2026-07-27 after API research.** This section previously said
-> `fromNodeMiddleware()`. That mechanism is **stale** — it predates Start going
+> `fromNodeMiddleware()`. That mechanism is **stale** - it predates Start going
 > Vite-native. The current stack is Nitro 3 + srvx + h3v2, where an Express app
 > is adapted with **`srvx/node`'s `toFetchHandler(expressApp)`**, producing a
 > `(Request) => Promise<Response>` that is wired into a splat server route
@@ -113,10 +113,10 @@ inventory feeding the implementation plan.
 A single catch-all server route forwards `/api/*`, `/webhooks/*` and `/health`
 into the existing Express app. No changes to `server/`.
 
-### Client-only dashboard — confirmed mechanism
+### Client-only dashboard - confirmed mechanism
 
-The design's central assumption — public pages server-render while the
-dashboard does not — is supported directly: **`createFileRoute` takes an
+The design's central assumption - public pages server-render while the
+dashboard does not - is supported directly: **`createFileRoute` takes an
 `ssr: false` option**, and setting it on a parent layout route makes the whole
 subtree client-only (children inherit and cannot loosen it).
 
@@ -133,7 +133,7 @@ public routes only.
 
 `@tanstack/react-start@1.168.32` is the `latest` dist-tag with **no
 prerelease suffix**; the last six published versions are all stable. Verified
-directly against the npm registry, not from release notes — the `beta` and
+directly against the npm registry, not from release notes - the `beta` and
 `alpha` tags are stranded on much older versions and are misleading.
 
 **Known behavioural difference:** on Render the process is persistent, so long
@@ -159,7 +159,7 @@ Business logic is identical across all three; only the trigger differs.
 The app uses the query string as its source of truth for a large amount of UI
 state, always written with `replace: true` so tab and filter changes do not
 spam browser history. This is a behavioural contract, not an implementation
-detail — shareable and bookmarkable URLs depend on it.
+detail - shareable and bookmarkable URLs depend on it.
 
 | Param       | Owner                    | Purpose                                                           |
 | ----------- | ------------------------ | ----------------------------------------------------------------- |
@@ -173,7 +173,7 @@ TanStack Router's typed search params are a good fit here and an upgrade over
 the current hand-rolled `URLSearchParams` parsing, which is independently
 reimplemented in at least two hooks.
 
-**Highest-complexity route:** `content.tsx` is dual-addressed — standalone at
+**Highest-complexity route:** `content.tsx` is dual-addressed - standalone at
 `/content/:articleId` using a path param, and embedded as the Act spine's
 Create tab at `/act?tab=create&article=<id>` using a search param, switching
 mode on a pathname prefix check. This needs deliberate reproduction.
@@ -187,7 +187,7 @@ redirect and the free-tier bounce).
 **The landing page subtree is already SSR-clean.** Every browser-global access
 under `client/src/pages/landing/` is confined to effects or event handlers, and
 both portal components already use the correct `mounted`-gate pattern. The page
-we most want to server-render needs no SSR remediation — the work there is
+we most want to server-render needs no SSR remediation - the work there is
 purely head-tag migration.
 
 Genuinely SSR-unsafe, all outside the landing subtree:
@@ -195,9 +195,9 @@ Genuinely SSR-unsafe, all outside the landing subtree:
 | File                                                        | Issue                                                                                                      | Severity                                                                                                                   |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `App.tsx` route guards (3 sites)                            | `window.location.href` in the **render body**, unguarded                                                   | Crashes if ever server-rendered. Dashboard-only today, but a shared root layout would expose it                            |
-| `use-persisted-state.ts`                                    | `localStorage` in a `useState` lazy initializer                                                            | try/catch'd, so no crash — but guarantees a hydration mismatch                                                             |
+| `use-persisted-state.ts`                                    | `localStorage` in a `useState` lazy initializer                                                            | try/catch'd, so no crash - but guarantees a hydration mismatch                                                             |
 | `dashboard/Pulse.tsx`, `dashboard/RecommendationsPanel.tsx` | same lazy-initializer pattern                                                                              | same                                                                                                                       |
-| `tours/engine/shepherdAdapter.ts`                           | top-level `import Shepherd from "shepherd.js"`, and `TourOrchestrator` is mounted **eagerly** in `App.tsx` | Unverified third-party SSR safety. Should be lazy-loaded regardless — it is dashboard-only code riding in the eager bundle |
+| `tours/engine/shepherdAdapter.ts`                           | top-level `import Shepherd from "shepherd.js"`, and `TourOrchestrator` is mounted **eagerly** in `App.tsx` | Unverified third-party SSR safety. Should be lazy-loaded regardless - it is dashboard-only code riding in the eager bundle |
 | `main.tsx`                                                  | `document.getElementById` at module scope                                                                  | Replaced by the framework client entry anyway                                                                              |
 
 `lib/theme.ts` and `ThemeProvider.tsx` are correctly guarded and will not throw,
@@ -209,8 +209,8 @@ users get a flash on every server-rendered page.
 
 19 files emit `<Helmet>`. Every one is limited to `<title>`, sometimes
 `<meta name="description">`, and on auth pages `<meta name="robots"
-content="noindex">`. `glossary.tsx` is a second, inconsistent pattern — manual
-`document.title` and meta injection inside an effect — and folds into the same
+content="noindex">`. `glossary.tsx` is a second, inconsistent pattern - manual
+`document.title` and meta injection inside an effect - and folds into the same
 migration.
 
 **There are no `og:`, `twitter:`, `<link rel="canonical">` or JSON-LD tags
@@ -274,7 +274,7 @@ Single pass to latest. Highest-risk first.
 | Decision         | Target             | Verification                                                                                                                                                                                        |
 | ---------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ESLint           | **hold at 9.x**    | `eslint-plugin-react@latest` peers cap at `eslint ^9.7`. ESLint 10 confirmed blocked. Bump `typescript-eslint`, `eslint-config-prettier` and `eslint-plugin-react-refresh` only                     |
-| TypeScript       | **6.0.3**, defer 7 | `6.0.2` / `6.0.3` are real stable releases (not RCs). Critically, `typescript-eslint` peers `typescript >=4.8.4 <6.1.0` — so **6.0.3 keeps type-aware linting working**, where 7.0.2 would break it |
+| TypeScript       | **6.0.3**, defer 7 | `6.0.2` / `6.0.3` are real stable releases (not RCs). Critically, `typescript-eslint` peers `typescript >=4.8.4 <6.1.0` - so **6.0.3 keeps type-aware linting working**, where 7.0.2 would break it |
 | `drizzle-zod`    | **0.8.3**          | Latest; exactly the version zod 4 requires                                                                                                                                                          |
 | `@types/express` | **5.0.6**          | Latest; matches Express 5                                                                                                                                                                           |
 
@@ -282,18 +282,18 @@ Staging through 6 also isolates the 5→6 breaking-change set from the 6→7 set
 rather than absorbing both blind. TypeScript 7 becomes its own project once
 `typescript-eslint` supports it.
 
-**Hard blockers — cannot go to latest:**
+**Hard blockers - cannot go to latest:**
 
 | Package              | Blocker                                                                                                                                                                                                                                                                                                                                          |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `eslint` 9→10        | `eslint-plugin-react` has **no** ESLint-10-compatible release. ESLint 10 removes `context.getFilename()`, which the `react/display-name` rule calls — and this repo spreads `react.configs.recommended.rules` across every `client/**/*.tsx`. `npm run lint` and the husky pre-commit hook would crash, not warn. Upstream bug open with no ETA. |
-| `typescript` 5.6→7.0 | TypeScript 7 **ships no compiler API**, and `typescript-eslint` hard-caps at `<6.1.0` — the issue to support TS7 was closed _not planned_. Breaks type-aware linting and `npm run check`. Also a double-major jump skipping all of 6.x. Microsoft's own guidance is to alias a `@typescript/typescript6` compat package for tooling.             |
+| `eslint` 9→10        | `eslint-plugin-react` has **no** ESLint-10-compatible release. ESLint 10 removes `context.getFilename()`, which the `react/display-name` rule calls - and this repo spreads `react.configs.recommended.rules` across every `client/**/*.tsx`. `npm run lint` and the husky pre-commit hook would crash, not warn. Upstream bug open with no ETA. |
+| `typescript` 5.6→7.0 | TypeScript 7 **ships no compiler API**, and `typescript-eslint` hard-caps at `<6.1.0` - the issue to support TS7 was closed _not planned_. Breaks type-aware linting and `npm run check`. Also a double-major jump skipping all of 6.x. Microsoft's own guidance is to alias a `@typescript/typescript6` compat package for tooling.             |
 
 **Sequencing constraints (mandatory):**
 
-- `tailwindcss` + `tailwind-merge` must land in the **same** commit — v3 of tailwind-merge assumes v4 class syntax via the shared `cn()` helper.
-- `react-day-picker` + `date-fns` must land in the **same** commit — rdp 8.10.1's peer range rejects date-fns v4.
-- `zod` + `drizzle-zod` must land in the **same** commit — drizzle-zod is only zod-v4-safe at **≥0.8.3**; the current 0.7.x has an unbounded peer range, so npm will _not_ stop a broken install.
+- `tailwindcss` + `tailwind-merge` must land in the **same** commit - v3 of tailwind-merge assumes v4 class syntax via the shared `cn()` helper.
+- `react-day-picker` + `date-fns` must land in the **same** commit - rdp 8.10.1's peer range rejects date-fns v4.
+- `zod` + `drizzle-zod` must land in the **same** commit - drizzle-zod is only zod-v4-safe at **≥0.8.3**; the current 0.7.x has an unbounded peer range, so npm will _not_ stop a broken install.
 - `typescript` must ship alone, if at all.
 
 **Corrections to earlier assumptions:**
@@ -301,22 +301,22 @@ rather than absorbing both blind. TypeScript 7 becomes its own project once
 - **Tailwind 4 does _not_ break the OKLCH token system.** In `@config` compat mode the exclusion list doesn't touch `theme.extend.colors`, `darkMode`, `content` or `plugins`. The hand-written `oklch(...)` values are outside Tailwind's generated palette entirely. This was the highest-scrutiny item and it turns out to be the most robust.
 - **Stripe is LOW risk, not high.** `server/stripeClient.ts` pins the outgoing API version (`2026-02-25.clover`), so the wire format doesn't move with the SDK bump. Every v21/v22 breaking change is either already satisfied or unused. **The single most important rule for that PR: do not touch that pin.**
 - **React 19 is LOW risk.** No `propTypes`, `defaultProps`, `ReactDOM.render`, string refs or zero-arg `useRef()` anywhere. Every third-party peer already declares React 19 support.
-- **recharts 3 does not require React 19** — it supports 16.8 through 19.
+- **recharts 3 does not require React 19** - it supports 16.8 through 19.
 - **Express 5 has only two real breaks:** the bare `app.use("*", …)` wildcards at `server/vite.ts:79,113` (dev-only path; Vercel bypasses them), and `@types/express` being pinned to an exact 4.x. The scary-sounding query-parser default change is a complete no-op given actual usage.
 
 **Concrete work surfaced:**
 
-- **zod 4:** 13 `ZodError.errors` call sites will throw on every malformed request — `assistant.ts`, `brands.ts` (×2), `factSheet.ts` (×6), `factSheetV2.ts` (×7), `userAccount.ts` (×2). Mechanical `.errors`→`.issues`.
-- **Tailwind 4:** 64 `outline-none` occurrences across 41 files (codemod handles it); 330 `space-x`/`space-y`/`divide` occurrences whose selector semantics change — needs visual QA, not find/replace. Also `@tailwindcss/vite` is already a dependency but **never registered in `vite.config.ts`** — inert today.
-- **Sentry:** audit acknowledged blind spots — a full `server/`-wide `Sentry.` sweep and a `client/src` `ErrorBoundary` sweep still need doing.
+- **zod 4:** 13 `ZodError.errors` call sites will throw on every malformed request - `assistant.ts`, `brands.ts` (×2), `factSheet.ts` (×6), `factSheetV2.ts` (×7), `userAccount.ts` (×2). Mechanical `.errors`→`.issues`.
+- **Tailwind 4:** 64 `outline-none` occurrences across 41 files (codemod handles it); 330 `space-x`/`space-y`/`divide` occurrences whose selector semantics change - needs visual QA, not find/replace. Also `@tailwindcss/vite` is already a dependency but **never registered in `vite.config.ts`** - inert today.
+- **Sentry:** audit acknowledged blind spots - a full `server/`-wide `Sentry.` sweep and a `client/src` `ErrorBoundary` sweep still need doing.
 
-**Dead code found — deleting removes upgrade risk entirely:**
+**Dead code found - deleting removes upgrade risk entirely:**
 
 | Item                                           | Status                                                                                      |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `components/ui/chart.tsx`                      | Zero import sites, but still typechecked — recharts 3 types could break CI over unused code |
+| `components/ui/chart.tsx`                      | Zero import sites, but still typechecked - recharts 3 types could break CI over unused code |
 | `components/ui/calendar.tsx`                   | Zero call sites; its entire v8-era API is invalid under react-day-picker 10                 |
-| `@stripe/stripe-js`, `@stripe/react-stripe-js` | **Zero usage** — checkout is server-driven hosted Checkout, never Elements                  |
+| `@stripe/stripe-js`, `@stripe/react-stripe-js` | **Zero usage** - checkout is server-driven hosted Checkout, never Elements                  |
 | `zod-validation-error`                         | Zero imports                                                                                |
 | `lib/draftStore.ts`                            | No call sites found                                                                         |
 
@@ -337,10 +337,10 @@ Each phase must leave the E2E suite green before the next begins.
 
 | Phase                | Content                                                                                                                                                  | Exit criteria                      |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| **0 — Safety net**   | ~10 Playwright specs on the _current_ app: login, signup, password reset, welcome/brand setup, 5 spine pages, settings, billing checkout, landing render | All green against current `main`   |
-| **1 — Dependencies** | Every upgrade in §7, on the existing framework                                                                                                           | E2E green, `npm run check` clean   |
-| **2 — Framework**    | Routing, four mechanical sweeps, Express mount                                                                                                           | E2E green                          |
-| **3 — Deploy**       | Nitro presets, `CRON_MODE`, `render.yaml`, `vercel.json`, parity check                                                                                   | App verified working on both hosts |
+| **0 - Safety net**   | ~10 Playwright specs on the _current_ app: login, signup, password reset, welcome/brand setup, 5 spine pages, settings, billing checkout, landing render | All green against current `main`   |
+| **1 - Dependencies** | Every upgrade in §7, on the existing framework                                                                                                           | E2E green, `npm run check` clean   |
+| **2 - Framework**    | Routing, four mechanical sweeps, Express mount                                                                                                           | E2E green                          |
+| **3 - Deploy**       | Nitro presets, `CRON_MODE`, `render.yaml`, `vercel.json`, parity check                                                                                   | App verified working on both hosts |
 
 ## 10. Execution model
 
@@ -352,18 +352,18 @@ work: file sweeps, test authoring, config generation, inventory.
 
 1. External scheduler for Render free must be set up by the user; endpoint URLs
    and schedules will be supplied.
-2. ✅ **DECIDED — Render region: Singapore.** Supabase Postgres is in
+2. ✅ **DECIDED - Render region: Singapore.** Supabase Postgres is in
    `ap-southeast-1` (Singapore), and Render offers a Singapore region. Using
    it keeps the app and database co-located; any other choice adds a
    cross-region round trip to every query, which compounds badly because
    dashboard pages issue many queries per render.
-3. ✅ **DECIDED — canonical domain: `venturecite.com`, single domain for
+3. ✅ **DECIDED - canonical domain: `venturecite.com`, single domain for
    everything.** It is already what `client/index.html` declares as the
    canonical URL and uses across every Open Graph and Twitter tag, so this
    is the lowest-friction choice. Supabase auth redirect URLs, the Stripe
    webhook endpoint and CORS must all be set to it.
    ⚠️ **Inconsistency to resolve during Phase 3:** the codebase also
-   references `venturecite.app` in two places — `APP_URL` defaults to
+   references `venturecite.app` in two places - `APP_URL` defaults to
    `https://venturecite.app` (`server/emailService.ts:13`) and the fallback
    email sender is `VentureCite <reports@venturecite.app>`. Either align
    them to `.com`, or keep `.app` deliberately as a separate sending domain
@@ -377,13 +377,13 @@ work: file sweeps, test authoring, config generation, inventory.
    `docs/phase1_completion.md:457`) when `server/email.ts` became
    `emailService.ts`, but the local `.env` kept the dead key with the
    placeholder value `no-reply@yourdomain.com`. Renaming it would have made
-   the app send from an unverified domain — strictly worse than the existing
+   the app send from an unverified domain - strictly worse than the existing
    fallback. The dead line was deleted instead; behaviour is unchanged and
    correct. **Still to confirm: whether the Vercel environment carries the
    same dead key.**
 6. Pre-existing bug, surfaced by the route inventory: `ai-visibility.tsx` passes
    external URLs and `mailto:` links into wouter's `<Link>`, which the client
-   router intercepts. Needs a decision during the port — fix to plain `<a>`
+   router intercepts. Needs a decision during the port - fix to plain `<a>`
    rather than porting the bug forward.
 7. Three files navigate directly to retired paths rather than their canonical
    spine URLs, paying an extra redirect hop: `brands.tsx` → `/brand-fact-sheet`,
@@ -398,28 +398,28 @@ work: file sweeps, test authoring, config generation, inventory.
    (27-35), Twitter card (38-44) and JSON-LD (47). The original finding came
    from scanning `<Helmet>` blocks in page components and was wrongly
    generalised. The real, much smaller issue: these are **site-wide and
-   static**, so every route inherits the homepage's tags — there are no
+   static**, so every route inherits the homepage's tags - there are no
    per-page canonicals or OG images. That matters once the marketing site
    grows to many pages, not before.
    9a. **Duplicate meta descriptions on every Helmet page.** `client/index.html`
    ships a static crawler-fallback `<meta name="description">`, and
-   `react-helmet-async` _appends_ rather than replaces — so two coexist.
+   `react-helmet-async` _appends_ rather than replaces - so two coexist.
    Crawlers most likely read the generic static one, not the page-specific
    copy. Found while writing the Task 3 e2e spec. The Start head API
    replaces rather than appends, so migrating head tags fixes this by
-   construction — but verify it rather than assuming.
-10. `client/src/lib/draftStore.ts` appears to be dead code — no call sites found
+   construction - but verify it rather than assuming.
+10. `client/src/lib/draftStore.ts` appears to be dead code - no call sites found
     for `getActiveDraftId` / `setActiveDraftId` / `clearActiveDraftId`. Confirm
     before carrying it across.
 11. **Billing is non-functional in the local environment** (found by the Task 10
     e2e spec, all three verified directly):
     - The `STRIPE_SECRET_KEY` in `.env` has an `sk_test_` prefix but is
-      **invalid** — Stripe returns 401 `Invalid API Key provided`. Safe, but
+      **invalid** - Stripe returns 401 `Invalid API Key provided`. Safe, but
       dead. This is why `setupStripeProducts()` fails at boot and
       `/api/stripe/products` returns an empty array.
     - The **`stripe` Postgres schema does not exist** in this database, so a
       well-formed `priceId` yields a 500 rather than a Checkout Session.
-    - **`/pricing` is dead code** — `pricing.tsx` exists but is never routed in
+    - **`/pricing` is dead code** - `pricing.tsx` exists but is never routed in
       `App.tsx`, so the path 404s. The landing nav data confirms the pricing
       section was deliberately removed.
       **Confirm whether production shares any of these before the migration**, and
@@ -428,7 +428,7 @@ work: file sweeps, test authoring, config generation, inventory.
       gate but must not be mistaken for the behaviour being desirable.
 12. 🔒 **Systemic information disclosure: raw error messages returned to
     clients.** `res.status(500).json({ success: false, error: error.message })`
-    appears at **19 sites across 7 route modules** — `billing.ts`,
+    appears at **19 sites across 7 route modules** - `billing.ts`,
     `content.ts`, `factSheet.ts`, `factSheetV2.ts`, `geoSignals.ts`,
     `intelligence.ts`, `onboarding.ts`. The raw driver message reaches the
     client, **including SQL statement text**. Currently observable via
@@ -438,7 +438,7 @@ work: file sweeps, test authoring, config generation, inventory.
     addressed and is worth fixing independently of the migration: capture
     detail to Sentry (already wired via `captureAndFlush`) and return a
     generic message.
-13. **Race in the tour engine.** `client/src/tours/engine/shepherdAdapter.ts` — when
+13. **Race in the tour engine.** `client/src/tours/engine/shepherdAdapter.ts` - when
     a step fails to build, Shepherd's own `next()` cascades to `complete()`
     _without_ invoking the adapter's `onComplete` handler, so the tour's
     completion bookkeeping is skipped. This makes a tour click-through
@@ -449,7 +449,7 @@ work: file sweeps, test authoring, config generation, inventory.
     eligibility (`client/src/tours/engine/eligibility.ts:46-47`) is
     permanently false once completed. That makes the global-welcome
     auto-fire path untestable after its first run on any account. Worth a
-    reset op — for testing, for support, and for re-onboarding users.
+    reset op - for testing, for support, and for re-onboarding users.
 15. **A successful payment would land on a 404.** `server/routes/billing.ts`
     sets `success_url` and `cancel_url` to `${baseUrl}/pricing?success=true`
     / `?canceled=true`, but `/pricing` is not routed in `App.tsx` (see item

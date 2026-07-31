@@ -2,11 +2,11 @@
 //
 // Before the brand-name enforcement landed, the generators only *asked* the LLM
 // not to use the brand's name, so some stored brand_prompts.prompt values name
-// the brand — which guarantees a fake self-citation on every run. This finds
+// the brand - which guarantees a fake self-citation on every run. This finds
 // those rows (using the SAME matcher the citation run uses) and, for affected
 // brands, regenerates a clean set via the now-fixed generators.
 //
-// Historical geo_rankings rows are left untouched — that's run history; the
+// Historical geo_rankings rows are left untouched - that's run history; the
 // point is future runs use clean prompts.
 //
 // Usage (from repo root, with your local env):
@@ -51,7 +51,7 @@ async function main() {
     trackedLeaksTotal += trackedLeaks.length;
     suggestedLeaksTotal += suggestedLeaks.length;
     console.log(
-      `\n[brand] ${brand.name} (${brand.id}) — ${trackedLeaks.length} tracked / ${suggestedLeaks.length} suggested prompt(s) name the brand`,
+      `\n[brand] ${brand.name} (${brand.id}) - ${trackedLeaks.length} tracked / ${suggestedLeaks.length} suggested prompt(s) name the brand`,
     );
     for (const p of [...trackedLeaks, ...suggestedLeaks]) {
       console.log(`   • ${JSON.stringify(p.prompt.slice(0, 90))}`);

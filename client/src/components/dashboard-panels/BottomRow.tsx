@@ -12,7 +12,7 @@ import type { TrendWeek, HallucinationStats, Listicle } from "./useDashboardData
 // something that cannot be connected.
 //
 // They were replaced with two things already measured for every brand and
-// surfaced nowhere on this page — hallucination severity, and presence in the
+// surfaced nowhere on this page - hallucination severity, and presence in the
 // "best of" roundups AI engines lean on.
 
 function favicon(domain: string) {
@@ -46,7 +46,7 @@ function CitationsPanel({
           <PanelLink dest={DEST.citations}>Explore</PanelLink>
         </div>
 
-        {/* Weekly sparkline — real cited counts, dimmed flat when all zero. */}
+        {/* Weekly sparkline - real cited counts, dimmed flat when all zero. */}
         <div className="relative mb-4">
           <div className={`flex h-12 items-end gap-px ${hasSpark ? "" : "opacity-20"}`}>
             {(spark.length ? spark : Array.from({ length: 7 }).map(() => null)).map((w, i) => (
@@ -54,7 +54,7 @@ function CitationsPanel({
                 key={i}
                 className={`flex-1 rounded-t-sm ${hasSpark ? "bg-vc-accent/70" : "bg-vc-hover"}`}
                 style={{ height: `${w ? Math.max(4, (w.cited / max) * 100) : 30}%` }}
-                title={w ? `${w.cited} cited — week of ${w.weekStart}` : undefined}
+                title={w ? `${w.cited} cited - week of ${w.weekStart}` : undefined}
               />
             ))}
           </div>
@@ -122,7 +122,7 @@ function CitationsPanel({
 // ─── Hallucinations ──────────────────────────────────────────────────────────
 // Replaced "AI Traffic", which needed a Google Analytics connection that does
 // not exist. This is the one genuinely alarming thing already measured about a
-// brand — claims an engine stated that contradict the fact sheet — and the
+// brand - claims an engine stated that contradict the fact sheet - and the
 // dashboard never mentioned it. Severity ramp matches the Site Health panel's.
 const SEVERITY: { key: string; label: string; color: string }[] = [
   { key: "critical", label: "crit", color: "var(--negative)" },

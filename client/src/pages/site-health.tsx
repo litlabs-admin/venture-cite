@@ -28,13 +28,13 @@ import {
 //   Body:      issues grouped by severity, each listing the affected page
 //              URLs
 //
-// HONESTY: this page has no data source for "crawl → cite rate" — no join
-// exists between fact-scrape pages and which prompts cited them — so that
+// HONESTY: this page has no data source for "crawl → cite rate" - no join
+// exists between fact-scrape pages and which prompts cited them - so that
 // stat renders as unmeasured, exactly like the dashboard's AI Traffic tile,
 // never a fabricated ratio.
 //
 // Every nested field is defaulted before being read: a payload missing
-// `discovery`/`crawlers`/`crawl` must render the page, not throw — this is
+// `discovery`/`crawlers`/`crawl` must render the page, not throw - this is
 // the same bug class the dashboard's SiteHealthPanel regression-guards
 // against (tests/unit/siteHealthPanel.test.tsx).
 
@@ -65,7 +65,7 @@ const SEVERITY_LABEL: Record<string, string> = {
 const SEVERITY_ORDER = ["critical", "high", "medium", "low"] as const;
 
 // Which existing route best addresses a finding's category. Only real
-// destinations from primitives.tsx's DEST map — a category with no good fit
+// destinations from primitives.tsx's DEST map - a category with no good fit
 // (CONTENT STRUCTURE's advisory findings) gets no link rather than a fake one.
 const CATEGORY_DEST: Partial<Record<SiteHealthFindingCategory, Dest>> = {
   DISCOVERABILITY: DEST.crawler,
@@ -127,7 +127,7 @@ function MetaTile({ label, children }: { label: string; children: React.ReactNod
 }
 
 // Tri-state: true = confirmed present (accent dot), false = confirmed
-// absent (grey dot, same as before), null = UNKNOWN — a distinct dash/muted
+// absent (grey dot, same as before), null = UNKNOWN - a distinct dash/muted
 // treatment, deliberately NOT the same look as "absent". A file we never
 // got an answer for (timeout / 429 / network error) is not the same claim
 // as a file we confirmed missing.
@@ -182,7 +182,7 @@ function IssueGroup({
               {p.url}
             </span>
             <span className="flex-shrink-0 tabular-nums text-vc-tertiary">
-              {p.statusCode ?? p.errorKind ?? "—"}
+              {p.statusCode ?? p.errorKind ?? "-"}
             </span>
           </li>
         ))}
@@ -191,7 +191,7 @@ function IssueGroup({
   );
 }
 
-/** Left-accent callout for the single highest-point finding — the one thing
+/** Left-accent callout for the single highest-point finding - the one thing
  *  worth fixing before anything else. */
 function TopPriority({ finding }: { finding: SiteHealthFinding }) {
   const dest = CATEGORY_DEST[finding.category];
@@ -228,7 +228,7 @@ function TopPriority({ finding }: { finding: SiteHealthFinding }) {
 }
 
 /** Remaining findings, each with an eyebrow category, affected-path preview,
- *  and a bar sized relative to the top (highest-point) finding — so the row
+ *  and a bar sized relative to the top (highest-point) finding - so the row
  *  widths communicate "how much this matters next to the biggest issue"
  *  rather than an absolute, uncalibrated percentage. */
 function WhatToFixNext({
@@ -313,7 +313,7 @@ export default function SiteHealthDetailPage() {
   });
   // Per-page CONTENT findings (meta tags, OG tags, headings, readability,
   // structured answer formats, FAQ content, content density). Separate
-  // query from `health`/`pages` above — it re-fetches page HTML server-side
+  // query from `health`/`pages` above - it re-fetches page HTML server-side
   // and is cached 6h, so it must never block the main render.
   const contentFindingsQuery = useQuery<{
     success: boolean;
@@ -327,7 +327,7 @@ export default function SiteHealthDetailPage() {
   const health = healthQuery.data?.data ?? null;
 
   // NORMALISE BEFORE READING. Same defensive shape as the dashboard's
-  // SiteHealthPanel — a payload missing a nested object must not throw.
+  // SiteHealthPanel - a payload missing a nested object must not throw.
   const discovery = health?.discovery ?? {
     robotsTxt: null,
     sitemapXml: null,
@@ -349,7 +349,7 @@ export default function SiteHealthDetailPage() {
     lastCrawlAt: null,
   };
   // "Pages" stat prefers the sitemap's URL count (the SITE's size) and falls
-  // back to the audited count only when the sitemap is unavailable — see
+  // back to the audited count only when the sitemap is unavailable - see
   // docs/optimize-perception-reference.md for why these are different
   // numbers and must not be conflated.
   const pageCountForStat = crawl.sitemapUrlCount ?? crawl.pagesCrawled;
@@ -361,7 +361,7 @@ export default function SiteHealthDetailPage() {
 
   // Content findings load independently (separate cached endpoint) and are
   // always 0-pt/advisory, so appending them never changes point-sorted
-  // order — they simply extend the "What To Fix Next" list.
+  // order - they simply extend the "What To Fix Next" list.
   const contentFindings = contentFindingsQuery.data?.data?.findings ?? [];
   const findings = [
     ...computeSiteHealthFindings({ crawl, discovery, crawlers }, pages),
@@ -371,7 +371,7 @@ export default function SiteHealthDetailPage() {
 
   function exportCsv() {
     const rows: (string | number | null)[][] = [
-      ["VentureCite — Site Health export"],
+      ["VentureCite - Site Health export"],
       ["Brand", brand?.name ?? ""],
       ["Website", health?.website ?? ""],
       ["Generated", new Date().toISOString()],
@@ -463,7 +463,7 @@ export default function SiteHealthDetailPage() {
       </div>
 
       {/* Tab strip: only Findings is implemented; Pages/Issues are disabled
-          with real badge counts — a control that goes nowhere is worse than
+          with real badge counts - a control that goes nowhere is worse than
           no control, so these stay disabled rather than faked as clickable. */}
       {!loading && health?.website && (
         <div className="border-b border-vc-default px-8 py-3">
@@ -494,13 +494,13 @@ export default function SiteHealthDetailPage() {
           </p>
         </div>
       ) : health.pending ? (
-        // Compute hasn't finished within the server's deadline — a timeout is
+        // Compute hasn't finished within the server's deadline - a timeout is
         // not a measurement. Never render a score/zeroes here; the background
         // compute keeps running and the next load gets the real answer.
         <div className="flex flex-col items-center justify-center px-8 py-16 text-center">
           <p className="mb-1 text-body text-vc-tertiary">Measuring…</p>
           <p className="text-data text-vc-tertiary/80">
-            Auditing this site is taking longer than usual — refresh in a few seconds.
+            Auditing this site is taking longer than usual - refresh in a few seconds.
           </p>
         </div>
       ) : (
@@ -533,7 +533,7 @@ export default function SiteHealthDetailPage() {
                 crawl.sitemapUrlCount !== null && crawl.pagesCrawled !== null
                   ? `${crawl.pagesCrawled} audited`
                   : crawl.sitemapUrlCount === null
-                    ? "Sitemap unavailable — showing audited count"
+                    ? "Sitemap unavailable - showing audited count"
                     : undefined
               }
             />
@@ -544,12 +544,12 @@ export default function SiteHealthDetailPage() {
               }
             />
             {/* No data source joins fact-scrape pages to which prompts cited
-                them, so this stat is genuinely unmeasured — same treatment
+                them, so this stat is genuinely unmeasured - same treatment
                 as the dashboard's AI Traffic tile. */}
             <StatTile
               label="Crawl → Cite Rate"
               value={<NoValue className="text-metric font-semibold" />}
-              caption="No data source yet — requires linking crawled pages to citation results."
+              caption="No data source yet - requires linking crawled pages to citation results."
             />
           </div>
 
@@ -582,7 +582,7 @@ export default function SiteHealthDetailPage() {
           </div>
 
           {/* Top priority + What to fix next, derived from the same pure
-              findings module the /api layer could expose — see
+              findings module the /api layer could expose - see
               shared/siteHealthFindings.ts. Nothing renders when there's no
               crawl or nothing to fix. */}
           {findings.length > 0 && (

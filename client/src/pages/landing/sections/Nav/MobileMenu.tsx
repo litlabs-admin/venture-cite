@@ -8,7 +8,7 @@ import { pageSections } from "./data";
 // below the 52/56px nav bar, body scroll locked while open, Escape closes.
 //
 // The source renders the overlay as a sibling of <nav>, not nested inside
-// it — because <nav> has backdrop-blur-sm, and backdrop-filter creates a
+// it - because <nav> has backdrop-blur-sm, and backdrop-filter creates a
 // new containing block for fixed-position descendants. Nesting the overlay
 // inside <nav> here collapsed it to 0 height (top-[52px] + bottom-0
 // resolved against nav's own ~52px box, not the viewport). Portalling to
@@ -37,7 +37,7 @@ export function MobileMenu() {
 
   // Section links cannot just close the menu and let the browser follow the
   // href. The effect above locks body scroll while the menu is open, and the
-  // unlock only lands after this render commits — a SMOOTH scroll kicked off
+  // unlock only lands after this render commits - a SMOOTH scroll kicked off
   // against a still-locked body is dropped on the floor, so the tap closed
   // the menu and went nowhere. (The old instant jump survived it, which is
   // why this only broke when scroll-behavior became smooth.)
@@ -45,7 +45,7 @@ export function MobileMenu() {
   // So: swallow the navigation, close, and scroll on the second frame, once
   // the unlock has been committed and painted.
   //
-  // scrollIntoView is called with no `behavior`, deliberately — that inherits
+  // scrollIntoView is called with no `behavior`, deliberately - that inherits
   // the CSS scroll-behavior, which styles.css sets to smooth for this page and
   // back to auto under prefers-reduced-motion. Passing "smooth" here would
   // override the accessibility opt-out. It honours scroll-margin-top too, so
@@ -81,9 +81,9 @@ export function MobileMenu() {
             <div className="px-4 py-3">
               <div className="space-y-0.5">
                 {/* The page's sections, same list the desktop nav and the
-                    footer render. This used to be three separate blocks —
+                    footer render. This used to be three separate blocks -
                     top links, a Solutions group and a Tools group, each with
-                    its own placeholder icon — advertising a product surface
+                    its own placeholder icon - advertising a product surface
                     that does not exist. */}
                 {pageSections.map((section) => (
                   <a

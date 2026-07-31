@@ -1,6 +1,6 @@
 // tests/integration/tourRetention.test.ts
 // dotenv must load BEFORE the server/db import so DATABASE_URL is set when
-// the pool initializes. Global setup intentionally doesn't load dotenv —
+// the pool initializes. Global setup intentionally doesn't load dotenv -
 // see tests/setup.ts.
 import "dotenv/config";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
@@ -34,12 +34,12 @@ describe("tour events retention (integration)", () => {
     const fresh = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000); // 10d ago
 
     // storage.deleteOldTourEvents() retains on server_received_at (server
-    // clock), NOT occurred_at (client-influenced) — see the comment on
+    // clock), NOT occurred_at (client-influenced) - see the comment on
     // deleteOldTourEvents in server/databaseStorage.ts: "retention must
     // key off a trusted column so rows can't dodge or trigger early
     // cleanup." insertTourEventSchema (shared/schema.ts) deliberately
     // omits serverReceivedAt for that same reason, so
-    // storage.recordTourEvents() can't be used to backdate it — insert
+    // storage.recordTourEvents() can't be used to backdate it - insert
     // directly against the Drizzle table instead so the test can control
     // the column the retention query actually filters on.
     await db.insert(tourEvents).values([

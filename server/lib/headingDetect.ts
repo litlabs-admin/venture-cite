@@ -1,8 +1,8 @@
-// Heading detection — pulled out of server/lib/geoSignalsScoring.ts so it can
+// Heading detection - pulled out of server/lib/geoSignalsScoring.ts so it can
 // be reused by server/lib/pageContentAnalysis.ts without pulling in that
 // file's `openai` singleton import (geoSignalsScoring.ts -> routesShared.ts
 // -> ownership.ts -> db.ts, which throws at import time when DATABASE_URL
-// isn't set — exactly what a "pure, framework-free" analyser must avoid).
+// isn't set - exactly what a "pure, framework-free" analyser must avoid).
 // geoSignalsScoring.ts re-exports this name for backwards compatibility;
 // this file is the single source of truth.
 

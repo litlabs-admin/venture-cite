@@ -2,7 +2,7 @@
 // Inputs: URL + brand context + fetcher + llm + robots cache.
 // Output: PageOutcome with facts, diagnostics, optional canonical redirect.
 //
-// The fetcher and llm are injected for testability — production wires
+// The fetcher and llm are injected for testability - production wires
 // safeFetchTextWithLockedIp + the failover LLM client.
 import { canonicalizeUrl } from "../canonicalize";
 import { detectLanguage } from "../langDetect";
@@ -159,7 +159,7 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
     headersLower[k.toLowerCase()] = v;
   }
 
-  // 3. content-type guard — skip binaries, PDFs, images, etc.
+  // 3. content-type guard - skip binaries, PDFs, images, etc.
   if (isNonHtml(res.contentType)) {
     return empty("skipped_non_html", {
       statusCode: res.status,
@@ -186,7 +186,7 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
     });
   }
 
-  // 6. Canonical redirect — informational, NOT a skip.
+  // 6. Canonical redirect - informational, NOT a skip.
   //
   // 2026-05-28 production fix: the previous behaviour was to drop ANY
   // page whose <link rel="canonical"> pointed elsewhere. This silently
@@ -244,7 +244,7 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
     });
   }
 
-  // 10. Hollow-shell guard — pure CSR SPA with no extractable signal.
+  // 10. Hollow-shell guard - pure CSR SPA with no extractable signal.
   //
   // 2026-05-28 (Phase 2): instead of giving up immediately, fall back
   // to Jina Reader (https://r.jina.ai/<url>) which renders the page
@@ -366,7 +366,7 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
     }
   }
 
-  // 13b. Structured-data pre-pass — extract facts from JSON-LD
+  // 13b. Structured-data pre-pass - extract facts from JSON-LD
   // BEFORE the LLM stage so they're available even if the LLM call
   // fails or is skipped. Schema.org Organization markup is the
   // single highest-signal source per byte on most brand sites:
@@ -374,7 +374,7 @@ export async function runStaticSource(args: RunStaticSourceArgs): Promise<PageOu
   const structuredFacts = extractStructuredFacts(res.text, canonical);
   // Merge: LLM facts come second so that when both produce the same
   // (domain, factKey), the LLM's confidence value drives the
-  // persistFacts merge — but structured facts at confidence 1.0
+  // persistFacts merge - but structured facts at confidence 1.0
   // almost always win. The consolidator handles the rest.
   const mergedFacts = [...structuredFacts, ...parseResult.facts];
 

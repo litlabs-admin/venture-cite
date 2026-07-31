@@ -1,7 +1,7 @@
 // Fold leaderboard rows that are the same company.
 //
 // Two curated ("core") competitor rows can share a domain under different
-// names — "Samsung" and "Samsung Electronics" both sit on samsung.com — and
+// names - "Samsung" and "Samsung Electronics" both sit on samsung.com - and
 // the uniqueness index is (brand_id, lower(name), lower(domain)), so nothing
 // upstream prevents the pair.
 //
@@ -36,7 +36,7 @@ export function normaliseDomainKey(domain: string | null | undefined): string {
  * Build the competitor rows of the leaderboard: one per CORE competitor,
  * carrying the citations of every row for the same company.
  *
- * Presentation is core-only — the leaderboard is a competitive set, so it
+ * Presentation is core-only - the leaderboard is a competitive set, so it
  * holds competitor brands and nothing else. But citations are keyed by
  * competitor row id, and the same company routinely exists as both a core row
  * and a citation-mined `discovered` one (measured live: core

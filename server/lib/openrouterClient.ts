@@ -3,7 +3,7 @@ import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 
 let cached: OpenAI | null = null;
 
-// Lazy singleton — instantiated on first use so tests can mock the
+// Lazy singleton - instantiated on first use so tests can mock the
 // module before construction. Uses OpenAI SDK pointed at OpenRouter
 // (OpenAI-compatible API). Throws if OPENROUTER_API_KEY missing.
 export function getOpenRouterClient(): OpenAI {

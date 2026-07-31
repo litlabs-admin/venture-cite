@@ -1,11 +1,11 @@
-# VentureCite — Phase 2 Completion Log
+# VentureCite - Phase 2 Completion Log
 
 > Tracks what was built or fixed at each stage, what changed, and how to verify it.
 > Appended as each item in phase2_goals.md is completed.
 
 ---
 
-## Track 1 — Auth Fabric Fixes
+## Track 1 - Auth Fabric Fixes
 
 **Goal:** Replace every raw `fetch()` call in Phase 2 feature pages with `apiRequest()` so the Bearer token is attached and 401 errors are surfaced correctly via `ApiError`.
 
@@ -13,7 +13,7 @@
 
 ### Background
 
-`apiRequest()` in `client/src/lib/queryClient.ts` calls `buildHeaders()`, which attaches the Supabase JWT Bearer token to every request. Pages that used raw `fetch()` sent requests without auth headers — backend returned 401, the page silently showed empty data with no error message, and users appeared logged out when they weren't.
+`apiRequest()` in `client/src/lib/queryClient.ts` calls `buildHeaders()`, which attaches the Supabase JWT Bearer token to every request. Pages that used raw `fetch()` sent requests without auth headers - backend returned 401, the page silently showed empty data with no error message, and users appeared logged out when they weren't.
 
 ### Files Changed
 
@@ -40,7 +40,7 @@
 
 ---
 
-## Track 2 — apiRequest Signature Fix (crawler-check.tsx)
+## Track 2 - apiRequest Signature Fix (crawler-check.tsx)
 
 **Goal:** Fix incorrect `apiRequest` parameter order in `crawler-check.tsx` that caused the crawler permissions check to silently fail.
 
@@ -48,7 +48,7 @@
 
 ### Background
 
-`apiRequest(method, url, data)` is the correct signature. `crawler-check.tsx` was calling `apiRequest(url, method, data)` — the method string ended up as the URL, causing a malformed fetch that threw an error before reaching the server. The onSuccess handler then never ran and the page showed no results.
+`apiRequest(method, url, data)` is the correct signature. `crawler-check.tsx` was calling `apiRequest(url, method, data)` - the method string ended up as the URL, causing a malformed fetch that threw an error before reaching the server. The onSuccess handler then never ran and the page showed no results.
 
 Additionally the return was typed `as unknown as CrawlerCheckResponse` without calling `.json()`, meaning the caller received a raw `Response` object, not the parsed data.
 
@@ -71,7 +71,7 @@ Additionally the return was typed `as unknown as CrawlerCheckResponse` without c
 
 ---
 
-## Track 3 — Onboarding Completion Fixes
+## Track 3 - Onboarding Completion Fixes
 
 **Goal:** Fix four onboarding flow issues: dashboard false-error banner, "View AI Visibility Guide" step not completing across devices, "Generate content" step not reflecting server data, and schedule tab stale copy.
 
@@ -82,16 +82,16 @@ Additionally the return was typed `as unknown as CrawlerCheckResponse` without c
 Four issues were found in the Getting Started / dashboard flow and fixed in the same commit as the Phase 1 hardening pass:
 
 1. **Dashboard "Some data failed to load" banner** showed for new users with no brands on first render due to a transient 401 race.
-2. **"View AI Visibility Guide" step** read `localStorage["venturecite-visibility-visited"]` but nothing in the codebase wrote it — the step was permanently stuck at incomplete.
-3. **"Generate AI-optimized content" step** inferred completion from `articles.length` on the client, but the server filtered articles by brand ownership — a user whose articles had a NULL `brandId` would see the step remain stuck.
+2. **"View AI Visibility Guide" step** read `localStorage["venturecite-visibility-visited"]` but nothing in the codebase wrote it - the step was permanently stuck at incomplete.
+3. **"Generate AI-optimized content" step** inferred completion from `articles.length` on the client, but the server filtered articles by brand ownership - a user whose articles had a NULL `brandId` would see the step remain stuck.
 4. **Schedule tab copy** said "Automatically regenerate prompts… Generates 10 new prompts" which was wrong after the tracked-prompts model change.
 
 ### Files Changed
 
 | File                                          | Change                                                                                                                                                                                               |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client/src/pages/home.tsx`                   | `loadError` gated behind `hasBrands &&` — banner only fires when real data failed, not for empty accounts.                                                                                           |
-| `migrations/0014_user_onboarding_flags.sql`   | **Created** — `ALTER TABLE users ADD COLUMN IF NOT EXISTS visibility_guide_visited_at TIMESTAMP`.                                                                                                    |
+| `client/src/pages/home.tsx`                   | `loadError` gated behind `hasBrands &&` - banner only fires when real data failed, not for empty accounts.                                                                                           |
+| `migrations/0014_user_onboarding_flags.sql`   | **Created** - `ALTER TABLE users ADD COLUMN IF NOT EXISTS visibility_guide_visited_at TIMESTAMP`.                                                                                                    |
 | `shared/schema.ts`                            | Added `visibilityGuideVisitedAt: timestamp("visibility_guide_visited_at")` to `users` table.                                                                                                         |
 | `server/routes.ts`                            | Extended `/api/onboarding-status` to include `hasArticles` boolean and `visibilityVisited` boolean from user row. Added `POST /api/onboarding/visibility-visited` endpoint (idempotent).             |
 | `client/src/pages/ai-visibility.tsx`          | `useEffect` on mount: POSTs to `/api/onboarding/visibility-visited` then invalidates onboarding-status query.                                                                                        |
@@ -149,7 +149,7 @@ The following items were identified during the Phase 2 audit but deferred. Each 
 
 **What it would do:** The `/api/revenue/webhook` endpoint currently accepts any POST without verifying the source. Adding HMAC verification for Shopify (`X-Shopify-Hmac-Sha256`) and Stripe (`stripe-signature`) would prevent forged revenue events from inflating analytics.
 
-**Why it's out of scope now:** The revenue analytics feature has zero real users generating real purchase events yet. Shipping the HMAC check first (before the webhook even has traffic) is the right order, but it belongs in a dedicated security pass with its own test suite — not as part of a frontend auth-fabric batch.
+**Why it's out of scope now:** The revenue analytics feature has zero real users generating real purchase events yet. Shipping the HMAC check first (before the webhook even has traffic) is the right order, but it belongs in a dedicated security pass with its own test suite - not as part of a frontend auth-fabric batch.
 
 ### D. GEO Analytics IDOR audit
 
@@ -159,7 +159,7 @@ The following items were identified during the Phase 2 audit but deferred. Each 
 
 ### E. Zod request-body validation on Phase 2 endpoints
 
-**What it would do:** Every Phase 2 `POST`/`PATCH` route would validate the request body against a Zod schema before hitting storage. Today the server trusts the client for field names and types — a crafted request can send extra fields that Drizzle ignores but that waste DB bandwidth, or omit required fields and produce a cryptic DB error.
+**What it would do:** Every Phase 2 `POST`/`PATCH` route would validate the request body against a Zod schema before hitting storage. Today the server trusts the client for field names and types - a crafted request can send extra fields that Drizzle ignores but that waste DB bandwidth, or omit required fields and produce a cryptic DB error.
 
 **Why it's out of scope now:** Requires defining shared Zod schemas in `shared/schema.ts` for ~40 insert payloads, wiring them into a `validateBody(schema)` middleware, and migrating every route caller. That's the same scope as deferred item C from the Phase 1 hardening pass and needs its own review cycle.
 
@@ -173,11 +173,11 @@ The following items were identified during the Phase 2 audit but deferred. Each 
 
 **What it would do:** The current page is an honest "Coming Soon" placeholder. The full feature would: fetch `publication_references` and `publication_metrics` rows for the selected brand, show which outlets have cited the brand or its competitors, rank them by AI citation frequency across engines, and surface "pitch opportunities" (outlets that cite competitors but not the user's brand).
 
-**Why it's out of scope now:** Requires a data pipeline that actually populates `publication_references` rows — either from AI citation scraping results or manual import. The schema exists but there's no ingestion job. Until there's data, a real UI would just render an empty state identical to the stub. Ship when the ingestion pipeline exists.
+**Why it's out of scope now:** Requires a data pipeline that actually populates `publication_references` rows - either from AI citation scraping results or manual import. The schema exists but there's no ingestion job. Until there's data, a real UI would just render an empty state identical to the stub. Ship when the ingestion pipeline exists.
 
 ---
 
-## Track 4 — Routing & Sidebar Integration
+## Track 4 - Routing & Sidebar Integration
 
 **Goal:** Every Phase 2 feature page should be routable from its proper navigation entry, not hidden behind a placeholder "Coming Soon" splash.
 
@@ -185,7 +185,7 @@ The following items were identified during the Phase 2 audit but deferred. Each 
 
 ### Background
 
-`client/src/App.tsx` was wiring every Phase 2 route to a `comingSoon(name)` helper that rendered the generic `<ComingSoon>` component — even though full implementations for all 18 pages already existed under `client/src/pages/`. The sidebar grouped everything under a collapsible "Upcoming" section with "Soon" labels, so users couldn't tell real features from placeholders.
+`client/src/App.tsx` was wiring every Phase 2 route to a `comingSoon(name)` helper that rendered the generic `<ComingSoon>` component - even though full implementations for all 18 pages already existed under `client/src/pages/`. The sidebar grouped everything under a collapsible "Upcoming" section with "Soon" labels, so users couldn't tell real features from placeholders.
 
 ### Files Changed
 
@@ -202,7 +202,7 @@ The following items were identified during the Phase 2 audit but deferred. Each 
 
 ---
 
-## Track 5 — Page Layout & Styling Consistency
+## Track 5 - Page Layout & Styling Consistency
 
 **Goal:** Every Phase 2 page matches the Phase 1 layout contract so the product feels like one app. Phase 1 pages use `<div className="space-y-8">` as the root (AppLayout already supplies the container + max-width + padding) and `<PageHeader title description actions />` for the heading.
 
@@ -212,9 +212,9 @@ The following items were identified during the Phase 2 audit but deferred. Each 
 
 Phase 2 pages had accumulated three separate "personal styles":
 
-1. Some wrapped content in a redundant `container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl` — duplicating AppLayout's own container.
+1. Some wrapped content in a redundant `container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl` - duplicating AppLayout's own container.
 2. Some used gradient full-page backgrounds (`bg-linear-to-br from-slate-950 via-slate-900 to-violet-950`, `bg-stone-50`, etc.).
-3. Gradient KPI cards with hardcoded `text-white`, `text-blue-100`, `w-8 h-8` icons — invisible in light mode.
+3. Gradient KPI cards with hardcoded `text-white`, `text-blue-100`, `w-8 h-8` icons - invisible in light mode.
 4. Manual back-to-home buttons, even though the sidebar handles navigation.
 5. Custom `h1` with `text-4xl font-bold bg-linear-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent` instead of the shared `PageHeader` component.
 
@@ -222,12 +222,12 @@ Phase 2 pages had accumulated three separate "personal styles":
 
 Every Phase 2 feature page. Summary by category:
 
-**Root wrapper normalized** — Replaced `container mx-auto ... max-w-7xl` with `<div className="space-y-8">` (17 pages):
+**Root wrapper normalized** - Replaced `container mx-auto ... max-w-7xl` with `<div className="space-y-8">` (17 pages):
 `agent-dashboard.tsx`, `ai-intelligence.tsx`, `ai-traffic.tsx`, `analytics-integrations.tsx`, `brand-fact-sheet.tsx`, `client-reports.tsx`, `community-engagement.tsx`, `competitors.tsx`, `crawler-check.tsx`, `faq-manager.tsx`, `geo-analytics.tsx`, `geo-opportunities.tsx`, `geo-rankings.tsx`, `geo-signals.tsx`, `geo-tools.tsx`, `outreach.tsx`, `revenue-analytics.tsx`.
 
-**PageHeader adopted everywhere** — Custom manual headers replaced with `<PageHeader title description actions />`. Actions slot is used for brand selectors where applicable (ai-traffic, revenue-analytics, client-reports, outreach, agent-dashboard, geo-signals, geo-tools) or a primary action button (competitors → "Add Competitor").
+**PageHeader adopted everywhere** - Custom manual headers replaced with `<PageHeader title description actions />`. Actions slot is used for brand selectors where applicable (ai-traffic, revenue-analytics, client-reports, outreach, agent-dashboard, geo-signals, geo-tools) or a primary action button (competitors → "Add Competitor").
 
-**Hardcoded colors stripped** — Global sed pass across all 17 pages converted:
+**Hardcoded colors stripped** - Global sed pass across all 17 pages converted:
 
 - `bg-slate-900`/`bg-slate-800`/`border-slate-700`/`border-slate-600` → Card defaults
 - `bg-slate-800/50` → `bg-muted/50`
@@ -237,15 +237,15 @@ Every Phase 2 feature page. Summary by category:
 - `text-gray-900 dark:text-white` → `text-foreground`
 - `text-{color}-400` → `text-{color}-500` (works in both themes)
 
-**Gradient stat cards rewritten** in `ai-traffic.tsx`, `geo-opportunities.tsx`, `client-reports.tsx` to match the Phase 1 KPI pattern — plain Card with `p-5`, uppercase tracking-wide label, `w-4 h-4 text-muted-foreground` icon, `text-3xl font-semibold text-foreground tracking-tight` value.
+**Gradient stat cards rewritten** in `ai-traffic.tsx`, `geo-opportunities.tsx`, `client-reports.tsx` to match the Phase 1 KPI pattern - plain Card with `p-5`, uppercase tracking-wide label, `w-4 h-4 text-muted-foreground` icon, `text-3xl font-semibold text-foreground tracking-tight` value.
 
-**Spinners unified** — `revenue-analytics.tsx` custom border-spinner replaced with `<Loader2 className="h-8 w-8 animate-spin" />`.
+**Spinners unified** - `revenue-analytics.tsx` custom border-spinner replaced with `<Loader2 className="h-8 w-8 animate-spin" />`.
 
-**Banner/alert blocks normalized** — `geo-rankings.tsx` "Live Citation Monitoring" green banner and `analytics-integrations.tsx` blue info alert converted from hardcoded `bg-{color}-50 dark:bg-{color}-950 text-{color}-800` boxes to plain `<Card>` with a neutral icon and semantic text colors.
+**Banner/alert blocks normalized** - `geo-rankings.tsx` "Live Citation Monitoring" green banner and `analytics-integrations.tsx` blue info alert converted from hardcoded `bg-{color}-50 dark:bg-{color}-950 text-{color}-800` boxes to plain `<Card>` with a neutral icon and semantic text colors.
 
-**Badges unified** — `crawler-check.tsx` allowed/blocked/unknown badges use `variant="outline"` with semantic border/text tints instead of `bg-{color}-100 text-{color}-800` hardcoding.
+**Badges unified** - `crawler-check.tsx` allowed/blocked/unknown badges use `variant="outline"` with semantic border/text tints instead of `bg-{color}-100 text-{color}-800` hardcoding.
 
-**publication-intelligence.tsx rewritten** — Was a 60-line bespoke "Coming Soon" splash with gradient min-h-screen wrapper, `text-4xl` h1, and colored badge grid. Now a 48-line page using `PageHeader` + a single `<Card>` with `Newspaper` icon — consistent with the rest of the app while still honestly labeled "Coming Soon".
+**publication-intelligence.tsx rewritten** - Was a 60-line bespoke "Coming Soon" splash with gradient min-h-screen wrapper, `text-4xl` h1, and colored badge grid. Now a 48-line page using `PageHeader` + a single `<Card>` with `Newspaper` icon - consistent with the rest of the app while still honestly labeled "Coming Soon".
 
 ### Pass Criteria
 
@@ -257,7 +257,7 @@ Every Phase 2 feature page. Summary by category:
 
 ---
 
-## Track 6 — React Query Key Handling
+## Track 6 - React Query Key Handling
 
 **Goal:** Fix the default `getQueryFn` in `client/src/lib/queryClient.ts` so Phase 2 pages whose `queryKey` carries filter objects or conditional brand IDs actually hit the right URL instead of building `/api/foo/[object Object]`.
 
@@ -267,9 +267,9 @@ Every Phase 2 feature page. Summary by category:
 
 The previous `getQueryFn` did `fetch(queryKey.join("/"))`. Three failure modes:
 
-1. **Object segments become `[object Object]`** — `agent-dashboard.tsx` uses `queryKey: ["/api/agent-tasks", { brandId, status }]` which is the idiomatic way to trigger refetches when filters change. The old join produced `/api/agent-tasks/[object Object]` and all agent-dashboard tabs returned 404.
-2. **Undefined segments become the literal string `undefined`** — any page that constructs `["/api/x", selectedBrandId]` before the brand list loads hit `/api/x/undefined`.
-3. **No way to express query-string params** — pages had to write custom `queryFn` overrides just to add `?brandId=…`, which most didn't.
+1. **Object segments become `[object Object]`** - `agent-dashboard.tsx` uses `queryKey: ["/api/agent-tasks", { brandId, status }]` which is the idiomatic way to trigger refetches when filters change. The old join produced `/api/agent-tasks/[object Object]` and all agent-dashboard tabs returned 404.
+2. **Undefined segments become the literal string `undefined`** - any page that constructs `["/api/x", selectedBrandId]` before the brand list loads hit `/api/x/undefined`.
+3. **No way to express query-string params** - pages had to write custom `queryFn` overrides just to add `?brandId=…`, which most didn't.
 
 ### Files Changed
 
@@ -299,7 +299,7 @@ Custom `queryFn` overrides in `ai-traffic.tsx`, `client-reports.tsx`, `revenue-a
 
 ---
 
-## Track 7 — Database Schema Parity
+## Track 7 - Database Schema Parity
 
 **Goal:** On a fresh deploy, every table referenced by Phase 2 storage methods must exist in the database before the server takes its first request.
 
@@ -307,7 +307,7 @@ Custom `queryFn` overrides in `ai-traffic.tsx`, `client-reports.tsx`, `revenue-a
 
 ### Background
 
-`shared/schema.ts` declared 44 Drizzle tables, but the handcrafted SQL migrations (`0001`–`0014`) only ever executed `CREATE TABLE` for ~15 of them. The remaining 29 Phase 2 tables existed solely in Drizzle source and were only created via `npm run db:push` (a manual Drizzle-kit command). Worse, `migrations/0001_auth_sync.sql` (lines 63–91) runs `ALTER TABLE public.<phase2_table> ENABLE ROW LEVEL SECURITY` on all 29 of those tables — which hard-fails with `relation does not exist` on any fresh DB where `db:push` wasn't run first. Server boot in `server/index.ts:240` runs SQL migrations but does **not** invoke `drizzle-kit push`, so the schema drift is never reconciled.
+`shared/schema.ts` declared 44 Drizzle tables, but the handcrafted SQL migrations (`0001`–`0014`) only ever executed `CREATE TABLE` for ~15 of them. The remaining 29 Phase 2 tables existed solely in Drizzle source and were only created via `npm run db:push` (a manual Drizzle-kit command). Worse, `migrations/0001_auth_sync.sql` (lines 63–91) runs `ALTER TABLE public.<phase2_table> ENABLE ROW LEVEL SECURITY` on all 29 of those tables - which hard-fails with `relation does not exist` on any fresh DB where `db:push` wasn't run first. Server boot in `server/index.ts:240` runs SQL migrations but does **not** invoke `drizzle-kit push`, so the schema drift is never reconciled.
 
 Effect: every Phase 2 storage query threw `relation "public.<table>" does not exist`, the route caught it, the frontend rendered an empty state, and users saw a feature that silently returned nothing.
 
@@ -315,7 +315,7 @@ Effect: every Phase 2 storage query threw `relation "public.<table>" does not ex
 
 | File                                | Change                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `migrations/0000_phase2_schema.sql` | **Created** — 559-line migration that creates all 29 missing Phase 2 tables with `CREATE TABLE IF NOT EXISTS`, exact column types matching `shared/schema.ts`, matching `ON DELETE CASCADE`/`SET NULL` FK semantics, and 31 indexes. Named `0000_` so it sorts **before** `0001_auth_sync.sql` and the RLS statements find the tables they need. Idempotent — safe to run alongside any environment that already executed `db:push`. |
+| `migrations/0000_phase2_schema.sql` | **Created** - 559-line migration that creates all 29 missing Phase 2 tables with `CREATE TABLE IF NOT EXISTS`, exact column types matching `shared/schema.ts`, matching `ON DELETE CASCADE`/`SET NULL` FK semantics, and 31 indexes. Named `0000_` so it sorts **before** `0001_auth_sync.sql` and the RLS statements find the tables they need. Idempotent - safe to run alongside any environment that already executed `db:push`. |
 
 ### Tables Created
 
@@ -331,21 +331,21 @@ Community: `community_posts`.
 ### Pass Criteria
 
 - [x] Fresh DB boot applies `0000_phase2_schema.sql` before `0001_auth_sync.sql`, RLS statements succeed
-- [x] Existing environments (where `db:push` was run manually) see `0000_` as a no-op — every `IF NOT EXISTS` skips
+- [x] Existing environments (where `db:push` was run manually) see `0000_` as a no-op - every `IF NOT EXISTS` skips
 - [x] Every Phase 2 endpoint can now execute its storage query without hitting `relation does not exist`
 - [x] `npx tsc --noEmit` clean
 
 ---
 
-## Track 8 — Phase 1 → Phase 2 Data Flow
+## Track 8 - Phase 1 → Phase 2 Data Flow
 
-**Goal:** Phase 2 analytics pages (AI Intelligence, AI Traffic, Opportunities, Client Reports) should show real numbers derived from Phase 1 data (articles, brand prompts, citation runs, geo rankings) — not empty arrays waiting for a Phase 2 ingestion pipeline that doesn't exist yet.
+**Goal:** Phase 2 analytics pages (AI Intelligence, AI Traffic, Opportunities, Client Reports) should show real numbers derived from Phase 1 data (articles, brand prompts, citation runs, geo rankings) - not empty arrays waiting for a Phase 2 ingestion pipeline that doesn't exist yet.
 
 **Status:** Complete
 
 ### Background
 
-Most Phase 2 stats endpoints read exclusively from their own Phase 2 tables (`prompt_portfolio`, `citation_quality`, `ai_sources`, etc.). Those tables are only populated when the user manually creates rows through a Phase 2 CRUD flow — which no user would do on day one, so every stats tab rendered zeros. Meanwhile the user's Phase 1 `geo_rankings` rows contained all the ground-truth citation data needed to compute these same stats.
+Most Phase 2 stats endpoints read exclusively from their own Phase 2 tables (`prompt_portfolio`, `citation_quality`, `ai_sources`, etc.). Those tables are only populated when the user manually creates rows through a Phase 2 CRUD flow - which no user would do on day one, so every stats tab rendered zeros. Meanwhile the user's Phase 1 `geo_rankings` rows contained all the ground-truth citation data needed to compute these same stats.
 
 ### Files Changed
 
@@ -370,7 +370,7 @@ Most Phase 2 stats endpoints read exclusively from their own Phase 2 tables (`pr
 
 - If `ai_sources` is empty → group the brand's cited `geo_rankings` by `(domain, aiPlatform)`, return synthetic `AiSource`-shaped rows with `authorityScore = min(100, count × 10)`, `occurrenceCount = count`, most-recent URL/context, and `sourceType` inferred from domain. Nothing is persisted; the synthesis is recomputed on each request.
 
-### `/api/geo-opportunities/:brandId` — Real Per-Brand Computation
+### `/api/geo-opportunities/:brandId` - Real Per-Brand Computation
 
 - Loads `brand_prompts` + the brand's article-scoped `geo_rankings`, filters to `isCited=1`.
 - Extracts the domain of each ranking's `citingOutletUrl`.
@@ -385,12 +385,12 @@ Most Phase 2 stats endpoints read exclusively from their own Phase 2 tables (`pr
 - [x] AI Intelligence → Citation Quality tab shows rank-derived primary/secondary split from real citations
 - [x] AI Traffic → Top Citation Sources tab lists real domains from the brand's citing outlets
 - [x] Opportunities → no brand sees "21% Reddit" when they have no Reddit citations; zero-data state is honest
-- [x] Every fallback is a read-only projection — no Phase 1 data is copied into Phase 2 tables
+- [x] Every fallback is a read-only projection - no Phase 1 data is copied into Phase 2 tables
 - [x] `npx tsc --noEmit` clean
 
 ---
 
-## Track 9 — geo-signals UI Consistency & geo-tools Crash
+## Track 9 - geo-signals UI Consistency & geo-tools Crash
 
 **Goal:** Finish the two Phase 2 pages still carrying the old dark-only styling and fix a latent crash on the GEO Tools → Mentions tab.
 
@@ -405,7 +405,7 @@ Most Phase 2 stats endpoints read exclusively from their own Phase 2 tables (`pr
 
 | File                               | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client/src/pages/geo-tools.tsx`   | Mentions tab wrapped in an IIFE that extracts `stats` and `mentions` with safe defaults (`{ total: 0, byPlatform: {}, bySentiment: {…} }`). All 6 accessor paths corrected — `stats` read from `mentionsData.stats` (not `.data.stats`) and `mentions` read from `mentionsData.data` (array, not object).                                                                                                                                                                                                                                                                                                                                                                     |
+| `client/src/pages/geo-tools.tsx`   | Mentions tab wrapped in an IIFE that extracts `stats` and `mentions` with safe defaults (`{ total: 0, byPlatform: {}, bySentiment: {…} }`). All 6 accessor paths corrected - `stats` read from `mentionsData.stats` (not `.data.stats`) and `mentions` read from `mentionsData.data` (array, not object).                                                                                                                                                                                                                                                                                                                                                                     |
 | `client/src/pages/geo-signals.tsx` | Dark-only styling normalized via sed: slate backgrounds/borders → Card defaults; `text-white` → `text-foreground`; `text-{color}-400` → `text-{color}-500`; `data-[state=active]:bg-violet-600` stripped; `bg-violet-600 hover:bg-violet-700` primary buttons replaced with default Button variant. Top 4 stat cards rewritten to the Phase 1 KPI pattern (uppercase tracking-wide label, `w-4 h-4 text-muted-foreground` icon, `text-3xl font-semibold tracking-tight` value with de-emphasized denominator). Pipeline stage bubbles kept their color-coded status backgrounds (pass/warning/fail) with white icon foregrounds since those are meaningful status indicators. |
 
 ### Pass Criteria
@@ -432,32 +432,32 @@ Remaining work tracked in `PHASE2_FEATURES.md` under "Out of Scope" and "Product
 
 ---
 
-## Track 10 — Schema Promotions, Automation, and Data-Wiring Fixes
+## Track 10 - Schema Promotions, Automation, and Data-Wiring Fixes
 
-**Goal:** Three of the highest-value Phase 2 dashboards (GEO Analytics, Client Reports, AI Intelligence) were returning zeros even for users with real Phase 1 citation data. Five other Phase 2 surfaces (Competitors, Brand Fact Sheet, Mentions, Listicles, Hallucinations) required manual CRUD when they should have been data-driven. And three "analytics" Phase 2 tables (`prompt_portfolio`, `citation_quality`, `ai_sources`) were designed with richer fields than Phase 1 but nothing populated them — the dashboards only rendered anything because `getShareOfAnswerStats` / `getCitationQualityStats` / `getTopAiSources` had Phase 1 fallbacks. This track fixes all three problems as one coherent pass.
+**Goal:** Three of the highest-value Phase 2 dashboards (GEO Analytics, Client Reports, AI Intelligence) were returning zeros even for users with real Phase 1 citation data. Five other Phase 2 surfaces (Competitors, Brand Fact Sheet, Mentions, Listicles, Hallucinations) required manual CRUD when they should have been data-driven. And three "analytics" Phase 2 tables (`prompt_portfolio`, `citation_quality`, `ai_sources`) were designed with richer fields than Phase 1 but nothing populated them - the dashboards only rendered anything because `getShareOfAnswerStats` / `getCitationQualityStats` / `getTopAiSources` had Phase 1 fallbacks. This track fixes all three problems as one coherent pass.
 
 **Status:** Complete
 
 ### Resolution strategy
 
-Instead of keeping the empty Phase 2 analytics tables (double-writing would just be a sync problem), promote the genuinely useful "richer fields" onto the Phase 1 tables that every operation already writes. Then automate the five manual features using existing `scheduler.ts` / `citationChecker.ts` / `safeFetch.ts` patterns — no new job queue, no new frameworks.
+Instead of keeping the empty Phase 2 analytics tables (double-writing would just be a sync problem), promote the genuinely useful "richer fields" onto the Phase 1 tables that every operation already writes. Then automate the five manual features using existing `scheduler.ts` / `citationChecker.ts` / `safeFetch.ts` patterns - no new job queue, no new frameworks.
 
 ### Schema promotions
 
-**Migration** — [migrations/0015_enrich_phase1_analytics.sql](migrations/0015_enrich_phase1_analytics.sql) (new). Six columns across four tables:
+**Migration** - [migrations/0015_enrich_phase1_analytics.sql](migrations/0015_enrich_phase1_analytics.sql) (new). Six columns across four tables:
 
 | From Phase 2                      | To Phase 1                     | How it gets populated                                                                                               |
 | --------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `prompt_portfolio.category`       | `brand_prompts.category`       | Set at generation time — existing OpenAI brand-prompt call extended to return `category` + `funnelStage` per prompt |
+| `prompt_portfolio.category`       | `brand_prompts.category`       | Set at generation time - existing OpenAI brand-prompt call extended to return `category` + `funnelStage` per prompt |
 | `prompt_portfolio.funnelStage`    | `brand_prompts.funnel_stage`   | Same call. TOFU / MOFU / BOFU                                                                                       |
 | `prompt_portfolio.region`         | `brand_prompts.region`         | Defaults `"global"`, user-overridable                                                                               |
-| `citation_quality.sourceType`     | `geo_rankings.source_type`     | Pattern-match on `citingOutletUrl` domain at write time (community / reference / video / web) — no LLM call         |
+| `citation_quality.sourceType`     | `geo_rankings.source_type`     | Pattern-match on `citingOutletUrl` domain at write time (community / reference / video / web) - no LLM call         |
 | `citation_quality.authorityScore` | `geo_rankings.authority_score` | Heuristic `min(100, priorDomainOccurrences * 10 + 10)`, computed from an in-memory map built once per run           |
-| `citation_quality.relevanceScore` | `geo_rankings.relevance_score` | Returned by the existing `judgeCitation()` LLM call — one extra JSON field, zero extra calls                        |
+| `citation_quality.relevanceScore` | `geo_rankings.relevance_score` | Returned by the existing `judgeCitation()` LLM call - one extra JSON field, zero extra calls                        |
 
 Plus `brand_fact_sheet.source` ("manual" / "scraped" provenance) and `competitors.discovered_by` ("manual" / "ai" / "citation_mining").
 
-After this, `prompt_portfolio`, `citation_quality`, and `ai_sources` are tombstones — not written to, not read from by new code. Their storage aggregate methods keep the same signatures but now read directly from the enriched Phase 1 columns.
+After this, `prompt_portfolio`, `citation_quality`, and `ai_sources` are tombstones - not written to, not read from by new code. Their storage aggregate methods keep the same signatures but now read directly from the enriched Phase 1 columns.
 
 ### Automation pipelines (new)
 
@@ -474,8 +474,8 @@ All five automations live in `server/lib/*.ts`, use `safeFetchText` for external
 
 ### Data-wiring fixes
 
-- **`geo_rankings` filter widening.** Both [server/routes.ts:3634](server/routes.ts#L3634) (geo-analytics) and [server/routes.ts:3775](server/routes.ts#L3775) (client-reports) filtered `allRankings.filter(r => r.articleId && articleIds.includes(r.articleId))`. Citation checks write rows with `articleId: null, brandPromptId: bp.id` ([citationChecker.ts:335-336](server/citationChecker.ts#L335)) so every brand-prompt citation was silently dropped — users saw zeros even with hundreds of cited rankings. Both endpoints now build a `brandPromptIds` Set alongside `articleIds` and widen the filter to `(r.articleId && articleIds.has(r.articleId)) || (r.brandPromptId && brandPromptIds.has(r.brandPromptId))`.
-- **Client-reports previous-period math.** Previously hardcoded `previousBMF: 0, previousSOV: 0, previousCitationRate: 0, previousPromptCoverage: 0`. Aggregation extracted into an `aggregate(windowStart, windowEnd)` closure and called twice — once for `[now - period, now]`, once for `[now - 2×period, now - period]`. Real trend arrows.
+- **`geo_rankings` filter widening.** Both [server/routes.ts:3634](server/routes.ts#L3634) (geo-analytics) and [server/routes.ts:3775](server/routes.ts#L3775) (client-reports) filtered `allRankings.filter(r => r.articleId && articleIds.includes(r.articleId))`. Citation checks write rows with `articleId: null, brandPromptId: bp.id` ([citationChecker.ts:335-336](server/citationChecker.ts#L335)) so every brand-prompt citation was silently dropped - users saw zeros even with hundreds of cited rankings. Both endpoints now build a `brandPromptIds` Set alongside `articleIds` and widen the filter to `(r.articleId && articleIds.has(r.articleId)) || (r.brandPromptId && brandPromptIds.has(r.brandPromptId))`.
+- **Client-reports previous-period math.** Previously hardcoded `previousBMF: 0, previousSOV: 0, previousCitationRate: 0, previousPromptCoverage: 0`. Aggregation extracted into an `aggregate(windowStart, windowEnd)` closure and called twice - once for `[now - period, now]`, once for `[now - 2×period, now - period]`. Real trend arrows.
 - **`/api/ai-sources/:brandId` endpoint** was calling `storage.getAiSources()` (reads only the Phase 2 table, always empty) instead of `storage.getTopAiSources()` (has the geo-rankings groupby fallback). Switched.
 - **`metrics_history` auto-populate.** `storage.recordCurrentMetrics()` existed but was never called. New `server/lib/metricsSnapshot.ts` writes three rows per citation run (`citation_rate`, `citation_quality`, `hallucinations_unresolved`) so the trend chart has real data going forward.
 
@@ -485,12 +485,12 @@ All five automations live in `server/lib/*.ts`, use `safeFetchText` for external
 
 1. **Builds a domain-occurrence map** once per run (scans prior cited rankings for this brand's prompts) to drive `authorityScore`.
 2. **Per (prompt × platform) task**: extracts the first URL in the response (`extractFirstUrl`), classifies it (`classifySourceType`), computes `authorityScore`, reads `relevance` from the judge. Writes all four fields onto the `geo_rankings` row.
-3. **Runs a competitor-detection pass** inline for every cited response — cheap string pre-filter per competitor against the response, no per-competitor LLM call.
+3. **Runs a competitor-detection pass** inline for every cited response - cheap string pre-filter per competitor against the response, no per-competitor LLM call.
 4. **Post-aggregate hooks**: `recordCurrentMetrics()` → `metrics_history`; `detectHallucinationsForRun()` → `brand_hallucinations` (skipped if fact sheet has < 3 rows).
 
-[server/citationJudge.ts](server/citationJudge.ts) — `JudgeVerdict` now includes `relevance: number | null`. System prompt extended with "Also return `relevance` (0-100): how directly the response answers the user's question." Zero extra LLM calls.
+[server/citationJudge.ts](server/citationJudge.ts) - `JudgeVerdict` now includes `relevance: number | null`. System prompt extended with "Also return `relevance` (0-100): how directly the response answers the user's question." Zero extra LLM calls.
 
-[server/lib/promptGenerator.ts](server/lib/promptGenerator.ts) — OpenAI prompt returns `category` + `funnelStage` per prompt; values written to `brand_prompts`.
+[server/lib/promptGenerator.ts](server/lib/promptGenerator.ts) - OpenAI prompt returns `category` + `funnelStage` per prompt; values written to `brand_prompts`.
 
 ### Files Changed
 
@@ -523,7 +523,7 @@ All five automations live in `server/lib/*.ts`, use `safeFetchText` for external
 - [x] Every `brand_prompts` row generated after this migration has `category` and `funnel_stage` set (unless the model returned nothing usable)
 - [x] Brand creation triggers async fact scrape + competitor discovery without blocking the response
 - [x] Every citation run writes `metrics_history` rows and attempts hallucination detection (skipped quietly if fact sheet < 3 rows)
-- [x] Weekly cron schedule registered at server boot — 4 new entries visible in startup logs
+- [x] Weekly cron schedule registered at server boot - 4 new entries visible in startup logs
 - [x] Listicle discover endpoint now returns real fetched URLs, not hypothetical LLM suggestions
 
 ### Out of scope (still pending)
@@ -536,7 +536,7 @@ All five automations live in `server/lib/*.ts`, use `safeFetchText` for external
 
 ---
 
-## Track 11 — Agent automations do real work + deeper fact-sheet scrape
+## Track 11 - Agent automations do real work + deeper fact-sheet scrape
 
 After Track 10 landed, two follow-up gaps surfaced during live QA:
 
@@ -549,40 +549,40 @@ Rewrote the switch in [server/routes/agent.ts](server/routes/agent.ts) `POST /ap
 
 | Task type                   | Before                             | Now                                                                                                              |
 | --------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `content_generation`        | OpenAI text saved as payload       | `enqueueContentGenerationJob(userId, brandId, payload)` — goes through the existing worker                       |
-| `outreach`                  | OpenAI email text saved as payload | `storage.createOutreachEmail({ status: "draft", ... })` — real draft row                                         |
-| `prompt_test`               | OpenAI response saved              | `runBrandPrompts(brandId, undefined, { triggeredBy: "manual" })` — runs full citation pipeline                   |
-| `source_analysis`           | OpenAI analysis saved              | `storage.getTopAiSources(brandId, 25)` — real aggregation                                                        |
-| `hallucination_remediation` | OpenAI remediation text saved      | `storage.updateBrandHallucination(id, { remediationSteps, remediationStatus: "in_progress" })` — real row update |
+| `content_generation`        | OpenAI text saved as payload       | `enqueueContentGenerationJob(userId, brandId, payload)` - goes through the existing worker                       |
+| `outreach`                  | OpenAI email text saved as payload | `storage.createOutreachEmail({ status: "draft", ... })` - real draft row                                         |
+| `prompt_test`               | OpenAI response saved              | `runBrandPrompts(brandId, undefined, { triggeredBy: "manual" })` - runs full citation pipeline                   |
+| `source_analysis`           | OpenAI analysis saved              | `storage.getTopAiSources(brandId, 25)` - real aggregation                                                        |
+| `hallucination_remediation` | OpenAI remediation text saved      | `storage.updateBrandHallucination(id, { remediationSteps, remediationStatus: "in_progress" })` - real row update |
 | `seo_update`                | Not handled                        | `enqueueContentGenerationJob` with refresh payload                                                               |
 
 Each case returns a structured `action` + the artifact id (e.g. `{ action: "content_generation_enqueued", jobId }`) so the UI can link through to the real resource.
 
-### 11.2 Fact-sheet scraper — homepage + link discovery + confidence dedupe
+### 11.2 Fact-sheet scraper - homepage + link discovery + confidence dedupe
 
 [server/lib/factExtractor.ts](server/lib/factExtractor.ts):
 
 - **Homepage scan first.** Fetches `/` before the path list, extracts hero/tagline/stats facts that only appear there.
-- **Dynamic link discovery** via new `discoverInternalLinks(baseUrl, html, limit=12)`. Scans `<a href>` tags, filters to same-origin URLs whose href/anchor text matches `about|story|company|team|leadership|founder|pricing|plan|press|newsroom|customer|case-study|career|contact|investor|media|faq`. Merged with the fixed path list — covers sites that use `/our-story`, `/leadership`, `/plans`, etc.
+- **Dynamic link discovery** via new `discoverInternalLinks(baseUrl, html, limit=12)`. Scans `<a href>` tags, filters to same-origin URLs whose href/anchor text matches `about|story|company|team|leadership|founder|pricing|plan|press|newsroom|customer|case-study|career|contact|investor|media|faq`. Merged with the fixed path list - covers sites that use `/our-story`, `/leadership`, `/plans`, etc.
 - **Expanded fixed path list:** 9 → 18 entries (adds `/our-story`, `/leadership`, `/plans`, `/media`, `/customers`, `/case-studies`, `/careers`, `/contact`, `/investors`).
 - **Expanded OpenAI prompt.** System prompt now enumerates specific fact keys per category (e.g. `year_founded`, `total_funding_raised`, `ceo_name`, `product_names`, `pricing_tier_amount`, `hq_city`, `customer_count`). Bumped `max_tokens` 1,200 → 1,800.
 - **Cross-page confidence dedupe.** All extractions collected into a `Map<"cat::key", {value, confidence, sourceUrl}>`. Highest-confidence candidate wins per key. Replaces the old first-page-wins insert loop.
 - **`allowOverwrite` option.** Defaults to `false` (on-demand UI scan stays append-only). The monthly refresh cron passes `true` to update stale values. Existing `refreshScrapedFacts` untouched.
 
-### 11.3 Fact-sheet UI — use the rich scraper, use the stored website
+### 11.3 Fact-sheet UI - use the rich scraper, use the stored website
 
 [client/src/pages/brand-fact-sheet.tsx](client/src/pages/brand-fact-sheet.tsx):
 
-- The "Auto-Fill from URL" card was calling the shallow `POST /api/brands/autofill` endpoint (7 generic fields only). Swapped to `POST /api/brand-facts/scrape/:brandId` — the deep Track 10 endpoint that goes through `scrapeBrandFacts()`.
+- The "Auto-Fill from URL" card was calling the shallow `POST /api/brands/autofill` endpoint (7 generic fields only). Swapped to `POST /api/brand-facts/scrape/:brandId` - the deep Track 10 endpoint that goes through `scrapeBrandFacts()`.
 - Removed the URL input entirely. The card now shows the brand's stored `website` in a read-only pill; the button (labelled "Scan Website" / "Re-scan Website" depending on whether facts exist) triggers the scrape with no typing. If the brand has no website, a link to `/brands?edit=:brandId` is surfaced.
-- `FACT_CATEGORIES` rewritten to match the scraper's 8-category output (`founding/funding/team/products/pricing/locations/achievements/other`). `SUGGESTED_FACTS` expanded with keys the scraper actually writes — manual entries now match scraped ones.
-- Legacy rows saved under old category names (`company_info`, `statistics`, `features`) still render — any unknown category routes to "Other" instead of being silently dropped.
+- `FACT_CATEGORIES` rewritten to match the scraper's 8-category output (`founding/funding/team/products/pricing/locations/achievements/other`). `SUGGESTED_FACTS` expanded with keys the scraper actually writes - manual entries now match scraped ones.
+- Legacy rows saved under old category names (`company_info`, `statistics`, `features`) still render - any unknown category routes to "Other" instead of being silently dropped.
 
 ### 11.4 Files touched
 
 | File                                                                           | Change                                                                                                   |
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| [server/routes/agent.ts](server/routes/agent.ts)                               | Execute endpoint rewritten — 6 task types do real work                                                   |
+| [server/routes/agent.ts](server/routes/agent.ts)                               | Execute endpoint rewritten - 6 task types do real work                                                   |
 | [server/lib/factExtractor.ts](server/lib/factExtractor.ts)                     | Homepage scan, link discovery, 18-path list, expanded prompt, cross-page dedupe, `allowOverwrite` option |
 | [client/src/pages/brand-fact-sheet.tsx](client/src/pages/brand-fact-sheet.tsx) | Swap to rich scrape endpoint, drop URL input, unify categories                                           |
 
@@ -598,7 +598,7 @@ Each case returns a structured `action` + the artifact id (e.g. `{ action: "cont
 
 ---
 
-## Section 12 — Wave 5 — Four-feature correctness + honesty pass
+## Section 12 - Wave 5 - Four-feature correctness + honesty pass
 
 Four consecutive deep-audit loops on GEO Tools, GEO Signals, Agents, and Crawler Check. Every bug below was reproduced from source before the fix landed.
 
@@ -608,16 +608,16 @@ Previous tracks prioritized feature reach over correctness. Live walkthroughs su
 
 This section is the cleanup: honest logic, correct shapes, real deep-links, and the minimum structural additions (workflow engine, schema-audit cache, embedding primitives) needed for the four features to deliver what their labels claim.
 
-### 12.1 GEO Tools — four tabs fixed
+### 12.1 GEO Tools - four tabs fixed
 
-- **Listicles:** frontend read `data.opportunities` while server returned `{listicles: [...]}`. Fix: frontend reads `data.listicles`, mounts `GET /api/listicles?brandId=` query, scanner throws on missing `OPENROUTER_API_KEY` and returns `{inserted, candidates, reason}`. Also removed the `response_format: json_object` from the Perplexity/Sonar call — unsupported on that model and caused 100% 400s.
-- **Wikipedia:** handler invented URLs via LLM. Rewritten as `server/lib/wikipediaScanner.ts` — real MediaWiki search, extract fetch, grounded LLM classification into `existing` / `opportunity` / `irrelevant`. UI splits the tab into two sections.
+- **Listicles:** frontend read `data.opportunities` while server returned `{listicles: [...]}`. Fix: frontend reads `data.listicles`, mounts `GET /api/listicles?brandId=` query, scanner throws on missing `OPENROUTER_API_KEY` and returns `{inserted, candidates, reason}`. Also removed the `response_format: json_object` from the Perplexity/Sonar call - unsupported on that model and caused 100% 400s.
+- **Wikipedia:** handler invented URLs via LLM. Rewritten as `server/lib/wikipediaScanner.ts` - real MediaWiki search, extract fetch, grounded LLM classification into `existing` / `opportunity` / `irrelevant`. UI splits the tab into two sections.
 - **BOFU:** free-text "Compare with" replaced by shadcn Popover+Command combobox bound to `GET /api/competitors?brandId=`; multi-select + Enter-to-add freeform.
 - **Mentions:** dropped `mineFromCitations()` (source of noisy `platform="web"` rows and dead external links). Added `searchQuora(query)` as the third real social source. Rows open a `<Sheet>` drawer instead of an external anchor.
 
 Files: [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx), [server/lib/listicleScanner.ts](server/lib/listicleScanner.ts), `server/lib/wikipediaScanner.ts` (new), [server/lib/mentionScanner.ts](server/lib/mentionScanner.ts), [server/routes/contentTypes.ts](server/routes/contentTypes.ts).
 
-### 12.2 GEO Signals — full honest rebuild
+### 12.2 GEO Signals - full honest rebuild
 
 **Old scorecard was fiction.** "Gecko Score" was substring matching with no stopword removal. "BM25" wasn't BM25. "PCTR" didn't measure CTR. "Jetstream" was hardcoded substring checks for English conjunctions. "Boost/Bury" was "has facts AND has lists."
 
@@ -635,11 +635,11 @@ Files: [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx), [server
 
 **Rebuilt chunker:** normalizes CRLF and `<br><br>`; protects code blocks; heading regex dropped the "any capital letter" false-positive; `hasDirectAnswer` uses verb/copula heuristic instead of the absurd "2–5 sentence" rule. Apply-to-Article has a real line-LCS diff + `expectedVersion` optimistic lock.
 
-**Rebuilt Schema Lab:** 14 types (up from 7). Stopped hardcoding `searchable/indexable/retrievable` — measures real field-completeness per type (Article checks headline/author/datePublished/dateModified/articleBody). New `schema_audits` cache table (7-day TTL). Charset auto-detected. `<noscript>` JSON-LD extracted.
+**Rebuilt Schema Lab:** 14 types (up from 7). Stopped hardcoding `searchable/indexable/retrievable` - measures real field-completeness per type (Article checks headline/author/datePublished/dateModified/articleBody). New `schema_audits` cache table (7-day TTL). Charset auto-detected. `<noscript>` JSON-LD extracted.
 
 **Rebuilt Pipeline Sim:** every stage computes from the same primitives as Tab 1. Signal stage == Tab 1 `overallScore` exactly. All hardcoded strings ("NLU processing: Intent classified as informational", "Gemini 2.5 Flash generation: Ready", "Safety filters: Passed") removed.
 
-**State reducer:** cross-tab ghost state fixed — per-article slice keyed by `(brandId, articleId)`. Switching articles clears top stat cards.
+**State reducer:** cross-tab ghost state fixed - per-article slice keyed by `(brandId, articleId)`. Switching articles clears top stat cards.
 
 **Deep-link fixed:** `/articles?edit={id}` now auto-opens the article's edit dialog via a `useEffect` in [client/src/pages/articles.tsx](client/src/pages/articles.tsx) and strips the param after open. Previously broken.
 
@@ -647,29 +647,29 @@ Files: [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx), [server
 
 Files: `server/lib/geoSignalsScoring.ts` (new), [server/routes/geoSignals.ts](server/routes/geoSignals.ts), [client/src/pages/geo-signals.tsx](client/src/pages/geo-signals.tsx), [client/src/pages/articles.tsx](client/src/pages/articles.tsx), `migrations/0030_schema_audits_and_article_version.sql` (new).
 
-### 12.3 Agents — workflow engine + 10 breaking bugs
+### 12.3 Agents - workflow engine + 10 breaking bugs
 
 **New substrate.** `workflow_runs` + `workflow_approvals` tables; a workflow step IS an `agent_task` with `workflowRunId` + `workflowStepKey` columns added. 30s scheduler tick advances pending runs via `advanceRun(runId)`. No new worker. Three flagship workflows shipped: Win a Prompt, Weekly Catch-up, Fix a Losing Article.
 
 **Engine correctness:**
 
 - Per-step approval ordering: synthetic-approval steps run their body first (user sees real output), then pause. Task-based approval steps complete the task, then pause for review.
-- Approval payload threaded end-to-end — server route → engine → next step's `priorOutputs`.
+- Approval payload threaded end-to-end - server route → engine → next step's `priorOutputs`.
 - Rejection is terminal (cancelled + reason), not "reset to pending" (which had caused infinite loops).
 - Parallel steps now actually parallel via `Promise.allSettled` (was sequential `for await`).
 - `onPartialFailure: "continue"` for fan-out steps.
 - Advisory-lock rescue after 5 min staleness.
-- `awaitJob` step type — workflow waits for `content_generation_jobs.status = "completed"` before advancing to steps that need `articleId`.
+- `awaitJob` step type - workflow waits for `content_generation_jobs.status = "completed"` before advancing to steps that need `articleId`.
 
 **10 breaking bugs fixed** in the same pass (deep-audit numbers):
 
 1. `prompt_test` emitted flat per-(prompt, platform) entries; all three consumers (weekly delta, fix-losing recheck, win-a-prompt baseline) expected `{promptId, cited, checks, platforms, bestRank}[]`. Handler now emits the consumer-expected shape.
-2. Approval payload was destructured out of the route body and the engine signature didn't accept it — user edits never reached `buildInput`. Fixed end-to-end.
-3. Win-a-Prompt's `outreach_drafts` failed 100% — listicles returned `email: null`, outreach handler threw "recipientEmail required." Fix: drafts step filters to listicles with emails; warns in the approval banner when none are pitchable.
-4. `(ctx.run.brandId || "").slice(0, 0)` typo always returned empty string — every pitch said "our brand" instead of the real brand name. Fix: thread `brandName` from `content_brief` output to `outreach_drafts`.
-5. `content_brief` threw when `gap_analysis` returned no data (new brands with no citation history) — run died at step 3. Fix: synthesize 4 generic starter angles with `firstRun: true`; UI shows amber warning banner.
-6. `fixLosingArticle.recheck_citation` shape mismatch — `stillLosingPromptIds` always empty, chain-to-outreach always said "all cited." Fix: uses new byPrompt shape + guards undefined counts.
-7. `apply_rewrite` bypassed the optimistic lock — workflows could clobber concurrent user edits. Fix: uses `updateArticleIfVersion`.
+2. Approval payload was destructured out of the route body and the engine signature didn't accept it - user edits never reached `buildInput`. Fixed end-to-end.
+3. Win-a-Prompt's `outreach_drafts` failed 100% - listicles returned `email: null`, outreach handler threw "recipientEmail required." Fix: drafts step filters to listicles with emails; warns in the approval banner when none are pitchable.
+4. `(ctx.run.brandId || "").slice(0, 0)` typo always returned empty string - every pitch said "our brand" instead of the real brand name. Fix: thread `brandName` from `content_brief` output to `outreach_drafts`.
+5. `content_brief` threw when `gap_analysis` returned no data (new brands with no citation history) - run died at step 3. Fix: synthesize 4 generic starter angles with `firstRun: true`; UI shows amber warning banner.
+6. `fixLosingArticle.recheck_citation` shape mismatch - `stillLosingPromptIds` always empty, chain-to-outreach always said "all cited." Fix: uses new byPrompt shape + guards undefined counts.
+7. `apply_rewrite` bypassed the optimistic lock - workflows could clobber concurrent user edits. Fix: uses `updateArticleIfVersion`.
 8. `runChunkOptimize` had no truncation, no response format, no refusal detection. Fix: 12k-char cap, prompt-injection prelude, refusal-pattern rejection, heading-presence sanity check.
 9. Parallel engine execution was sequential. Fix: `Promise.allSettled`.
 10. `sendWeeklyDigest` returned `true` on undeliverable recipients, stamping `lastWeeklyReportSentAt` → user never retried. Fix: returns `false`, aggregator retries next run.
@@ -678,11 +678,11 @@ Files: `server/lib/geoSignalsScoring.ts` (new), [server/routes/geoSignals.ts](se
 
 **UI rebuilt:** 3 tabs (Workflows default / Task Queue / Runs History) + new route `/agent/runs/:runId` with approval banner (3 summary shapes: brief, listicle multi-select, chunk-optimize diff). Deep-links `/agent?taskId=`, `/content?jobId=`, `/outreach?emailId=`, `/ai-intelligence?tab=` all honored.
 
-**Per-type Create Task form.** Replaced the one-shape form with per-type sub-forms matching the Zod schemas in `server/lib/agentTaskSchemas.ts` that were already strict — the form wasn't passing the right fields through.
+**Per-type Create Task form.** Replaced the one-shape form with per-type sub-forms matching the Zod schemas in `server/lib/agentTaskSchemas.ts` that were already strict - the form wasn't passing the right fields through.
 
 Files: [server/lib/workflowEngine.ts](server/lib/workflowEngine.ts), [server/lib/agentTaskExecutor.ts](server/lib/agentTaskExecutor.ts), `server/storage/workflowStorage.ts`, `server/lib/workflows/{winAPrompt,weeklyCatchup,fixLosingArticle,registry}.ts`, [server/scheduler.ts](server/scheduler.ts), [server/routes/agent.ts](server/routes/agent.ts), [server/emailService.ts](server/emailService.ts), [client/src/pages/agent-dashboard.tsx](client/src/pages/agent-dashboard.tsx) (rewritten), `client/src/pages/agent-run.tsx`, `migrations/0029_workflows.sql`.
 
-### 12.4 Crawler Check — purpose dimension + Perplexity-User + Claude-Web
+### 12.4 Crawler Check - purpose dimension + Perplexity-User + Claude-Web
 
 Added a `purpose: "training" | "search" | "realtime"` tag orthogonal to vendor `category`. This is the dimension site owners actually reason about:
 
@@ -692,9 +692,9 @@ Added a `purpose: "training" | "search" | "realtime"` tag orthogonal to vendor `
 
 **New bots:** Perplexity-User (realtime), Claude-Web (still observed in the wild alongside ClaudeBot). List now 18 bots.
 
-**Purpose-stratified recommendations:** blocked bots are split by purpose in the recommendation output — CRITICAL banner for search, warning for realtime, informational for training.
+**Purpose-stratified recommendations:** blocked bots are split by purpose in the recommendation output - CRITICAL banner for search, warning for realtime, informational for training.
 
-**Snippet generator rebuilt:** was hardcoded, now generated from `AI_CRAWLERS` grouped by purpose with section headers. One `User-agent:` + `Allow:` pair per bot (blank lines between) — some parsers mishandle stacked User-agent lines.
+**Snippet generator rebuilt:** was hardcoded, now generated from `AI_CRAWLERS` grouped by purpose with section headers. One `User-agent:` + `Allow:` pair per bot (blank lines between) - some parsers mishandle stacked User-agent lines.
 
 **Existing correct behavior confirmed:**
 
@@ -707,10 +707,10 @@ File: [server/routes/analytics.ts](server/routes/analytics.ts).
 ### 12.5 Pass criteria
 
 - [x] `npx tsc --noEmit` clean.
-- [x] Start a `win_a_prompt` workflow on a prompt with zero citation history — content_brief produces generic angles with `firstRun: true` instead of crashing.
-- [x] Start a `win_a_prompt` workflow with listicles that have no emails — drafts step skips them, approval banner warns.
-- [x] Reject a content brief — run transitions to `cancelled`, no infinite loop.
-- [x] `weekly_catchup` on a brand with <2 metrics_history rows — firstRun branch returns a valid digest payload.
+- [x] Start a `win_a_prompt` workflow on a prompt with zero citation history - content_brief produces generic angles with `firstRun: true` instead of crashing.
+- [x] Start a `win_a_prompt` workflow with listicles that have no emails - drafts step skips them, approval banner warns.
+- [x] Reject a content brief - run transitions to `cancelled`, no infinite loop.
+- [x] `weekly_catchup` on a brand with <2 metrics_history rows - firstRun branch returns a valid digest payload.
 - [x] `fix_losing_article`: chunk-optimize approval shows a real line-LCS diff; apply_rewrite fails if the article advanced between approval and write.
 - [x] GEO Signals: `/articles?edit=ID` opens the edit dialog; switching articles clears top stat cards; null `updatedAt` shows "No update timestamp" not 54 years.
 - [x] GEO Signals: Pipeline Sim Signal stage == Tab 1 overallScore exactly on the same article+query.
@@ -720,19 +720,19 @@ File: [server/routes/analytics.ts](server/routes/analytics.ts).
 ### 12.6 Open items after Wave 5
 
 - Brief approval UI is read-only (payload plumbing is live; inline `keyAngles` editor is a ~30-line follow-up).
-- `source_analysis mode=listicles_for_prompt` uses substring matching — fuzzy/embedding matching is Wave 6.
+- `source_analysis mode=listicles_for_prompt` uses substring matching - fuzzy/embedding matching is Wave 6.
 - YouTube mention source needs `YOUTUBE_API_KEY`.
-- Real Gecko embeddings call OpenAI every analyze — no pgvector cache yet. Cost is ~$0.0001/analyze; revisit if usage spikes.
+- Real Gecko embeddings call OpenAI every analyze - no pgvector cache yet. Cost is ~$0.0001/analyze; revisit if usage spikes.
 
 ---
 
-## Section 13 — Wave 6 — Universal detection + dashboard honesty pass
+## Section 13 - Wave 6 - Universal detection + dashboard honesty pass
 
 Two threads in this wave: collapse 9 ad-hoc citation/mention detection paths into one shared matcher, and rebuild the home dashboard so every number on it has an honest derivation. Plus a stack of trailing fixes that surfaced during walkthroughs.
 
 ### 13.0 Why this section exists
 
-Detection was sprawled across `citationChecker.ts`, `responseAnalyzer.ts`, `mentionScanner.ts`, `listicleScanner.ts`, `wikipediaScanner.ts`, `hallucinationDetector.ts`, plus inline regex in two more places. They disagreed with each other on edge cases (substring "PR" matched "production"; "anotion.so.store" falsely matched the variant "notion.so"; competitors with the same name in another industry produced false positives). The home dashboard had eleven cards, several of which displayed numbers that bore no relationship to the underlying data — a "Score History" that was always 0, "Brand Entity Strength" with four arbitrary subscores, "Threads Found" that was a verbatim duplicate of "Brand Mentions," and AI Visibility Scores that disagreed across pages by 50 points for the same brand.
+Detection was sprawled across `citationChecker.ts`, `responseAnalyzer.ts`, `mentionScanner.ts`, `listicleScanner.ts`, `wikipediaScanner.ts`, `hallucinationDetector.ts`, plus inline regex in two more places. They disagreed with each other on edge cases (substring "PR" matched "production"; "anotion.so.store" falsely matched the variant "notion.so"; competitors with the same name in another industry produced false positives). The home dashboard had eleven cards, several of which displayed numbers that bore no relationship to the underlying data - a "Score History" that was always 0, "Brand Entity Strength" with four arbitrary subscores, "Threads Found" that was a verbatim duplicate of "Brand Mentions," and AI Visibility Scores that disagreed across pages by 50 points for the same brand.
 
 This section is the cleanup: one detection contract, one matching algorithm, every dashboard card backed by a transparent formula or removed.
 
@@ -740,30 +740,30 @@ This section is the cleanup: one detection contract, one matching algorithm, eve
 
 New file: [server/lib/brandMatcher.ts](server/lib/brandMatcher.ts). Single entry point `detectBrandAndCompetitors(text, brand, competitors)` returns `{matched, hitVariants, positions}` per entity. Three matching rules:
 
-- **Name variant** — whole-word + possessive-tolerant: `\b<word>(?:[''’]s)?\b`. Multi-word variants tolerate any whitespace (multiple spaces, newlines).
-- **Domain variant** — URL-boundary aware: `(?:^|[\s/:<>"'.])(?:www\.)?<domain>(?=[/\s?#:<>"']|$)`. Allows `.` on the left so `docs.notion.so` matches the variant `notion.so`; right-boundary excludes `.` so `anotion.so.store` doesn't.
-- **Ambiguity gate** — variants ≤3 chars or in the curated `AMBIGUOUS_WORDS` set (apple, target, square, notion, venture, etc.) require a signal token (`company`, `app`, `platform`, `founded`, `acquired`, `saas`, `ceo`, ...) within ±60 chars. Stops common-word brand names from false-positiving on every sentence.
+- **Name variant** - whole-word + possessive-tolerant: `\b<word>(?:[''’]s)?\b`. Multi-word variants tolerate any whitespace (multiple spaces, newlines).
+- **Domain variant** - URL-boundary aware: `(?:^|[\s/:<>"'.])(?:www\.)?<domain>(?=[/\s?#:<>"']|$)`. Allows `.` on the left so `docs.notion.so` matches the variant `notion.so`; right-boundary excludes `.` so `anotion.so.store` doesn't.
+- **Ambiguity gate** - variants ≤3 chars or in the curated `AMBIGUOUS_WORDS` set (apple, target, square, notion, venture, etc.) require a signal token (`company`, `app`, `platform`, `founded`, `acquired`, `saas`, `ceo`, ...) within ±60 chars. Stops common-word brand names from false-positiving on every sentence.
 
 Diacritic folding applied to both haystack and variant. Legal suffixes stripped from primary names (`Notion Labs, Inc.` → also matches `Notion Labs`). Domain extracted from `entity.website ?? entity.domain`.
 
-Test suite at [tests/unit/brandMatcher.test.ts](tests/unit/brandMatcher.test.ts) — 30 tests covering possessives, multi-word whitespace flex, subdomain matching, fake-embedded-domain rejection, signal-word proximity, diacritic folding, and edge cases. All green.
+Test suite at [tests/unit/brandMatcher.test.ts](tests/unit/brandMatcher.test.ts) - 30 tests covering possessives, multi-word whitespace flex, subdomain matching, fake-embedded-domain rejection, signal-word proximity, diacritic folding, and edge cases. All green.
 
 ### 13.2 Migrating callers + variant learning loop
 
 Replaced local detection in five library files with `detectBrandAndCompetitors` / `matchEntity`. LLM analyzers (`responseAnalyzer.ts`) still run for rank/relevance, but stopped doing local fuzzy matching.
 
-The analyzer now feeds a **variant-learning loop**: when the LLM extracts a surface form for a tracked brand or competitor that isn't already in `nameVariations`, it auto-appends. Direct append, no pending queue — user curates from the brand/competitor edit UI. Scoped per-entity via new DAO methods `addBrandNameVariation` and `addCompetitorNameVariation` (case-insensitive dedup).
+The analyzer now feeds a **variant-learning loop**: when the LLM extracts a surface form for a tracked brand or competitor that isn't already in `nameVariations`, it auto-appends. Direct append, no pending queue - user curates from the brand/competitor edit UI. Scoped per-entity via new DAO methods `addBrandNameVariation` and `addCompetitorNameVariation` (case-insensitive dedup).
 
 ### 13.3 Schema migration + competitor edit UI
 
 Migration `0032_universal_detection.sql`:
 
-- `competitors.name_variations text[] DEFAULT ARRAY[]::text[]` — competitors now mirror brands.
-- `geo_rankings.re_detected_at timestamp` — set when "Re-check stored" reveals a new citation via an updated variant. UI badges these "Re-detected" because the rank from the original LLM pass isn't available.
+- `competitors.name_variations text[] DEFAULT ARRAY[]::text[]` - competitors now mirror brands.
+- `geo_rankings.re_detected_at timestamp` - set when "Re-check stored" reveals a new citation via an updated variant. UI badges these "Re-detected" because the rank from the original LLM pass isn't available.
 
-`PATCH /api/competitors/:id` endpoint added in [server/routes/publications.ts](server/routes/publications.ts) — whitelist of editable fields, `nameVariations` accepts comma-separated string or array. Edit dialog wired into [client/src/pages/competitors.tsx](client/src/pages/competitors.tsx).
+`PATCH /api/competitors/:id` endpoint added in [server/routes/publications.ts](server/routes/publications.ts) - whitelist of editable fields, `nameVariations` accepts comma-separated string or array. Edit dialog wired into [client/src/pages/competitors.tsx](client/src/pages/competitors.tsx).
 
-### 13.4 "Re-check stored" rebuilt — zero LLM calls
+### 13.4 "Re-check stored" rebuilt - zero LLM calls
 
 Old endpoint `POST /api/brand-prompts/:brandId/backfill-detection` re-ran the LLM judge on every stored row. Replaced with `POST /api/brand-prompts/:brandId/re-detect-all`:
 
@@ -783,23 +783,23 @@ Eleven items. Every card's data path was traced and either fixed or the card was
 
 | Card                       | Before                                                                                                                                                                                                                    | After                                                                                                                                                                                                                                               |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Score History              | Empty unless someone hit a separate snapshot endpoint nobody clicks. Always read 0 scans.                                                                                                                                 | Replaced with **Citation Trend** — 8 weekly buckets computed from `geo_rankings.checkedAt`. New endpoint `/api/dashboard/citation-trend/:brandId`.                                                                                                  |
+| Score History              | Empty unless someone hit a separate snapshot endpoint nobody clicks. Always read 0 scans.                                                                                                                                 | Replaced with **Citation Trend** - 8 weekly buckets computed from `geo_rankings.checkedAt`. New endpoint `/api/dashboard/citation-trend/:brandId`.                                                                                                  |
 | Brand Entity Strength      | 4 hand-tuned subscores (30/25/20/25), pseudo-rigorous regex for "comparison prompts," weights with no empirical basis.                                                                                                    | **Citation Health**: `round(100 × cite_rate × rank_factor)` where `rank_factor = max(0, 1 − (avg_rank − 1) / 10)`. Single transparent formula. Card shows score + cite rate + avg rank explainer.                                                   |
 | Generative Rankings        | Included Microsoft Copilot + Meta AI (not actually queried by citation runner). Snippet showed raw `\|\|\| RAW_RESPONSE \|\|\|` delimiter. Always rendered, even with zero data.                                          | `AI_PLATFORMS_CORE = [ChatGPT, Claude, Perplexity, Gemini, DeepSeek]`. Snippet split on delimiter; cited snippet preferred, falls back to non-cited if no citations. Green/red pill via `isCitedSnippet`. Platforms with zero rows hidden entirely. |
 | Platform Visibility        | Showed `reasonLine` ("Low Reddit / web citation presence") that was a hardcoded fallback string, not computed from real data.                                                                                             | `reasonLine` removed from server response and UI.                                                                                                                                                                                                   |
 | Competitors Dominating     | Top 8.                                                                                                                                                                                                                    | Top 10.                                                                                                                                                                                                                                             |
-| Competitor Gap Analysis    | Binary "yes/no" — competitor with 1 citation flagged the same as competitor with 10.                                                                                                                                      | Magnitude threshold: gap only flagged when `competitor_cited - brand_cited >= 2`. Returns `cellDiffs` per category for tooltip detail.                                                                                                              |
+| Competitor Gap Analysis    | Binary "yes/no" - competitor with 1 citation flagged the same as competitor with 10.                                                                                                                                      | Magnitude threshold: gap only flagged when `competitor_cited - brand_cited >= 2`. Returns `cellDiffs` per category for tooltip detail.                                                                                                              |
 | Share of AI Voice          | Denominator included "Others" (every untracked brand the AI happened to name); user's slice diluted to single-digit percentages. Legend used `hsl(var(--primary))` for the user's brand → near-black dot, looked missing. | Denominator restricted to tracked brand + tracked competitors. Capped at top 10 entries. Legend uses explicit hex colors so every entry has a visible dot.                                                                                          |
 | What AI Says About You     | Pulled `latestSnippet` verbatim including the delimiter; could show duplicate prompts.                                                                                                                                    | Filters to cited-only via `isCitedSnippet`; one block per platform that has a cited snippet (up to 5). Server strips delimiter via `extractResponseBody`.                                                                                           |
-| Reddit Visibility          | Three metric cards. "Threads Found" and "Brand Mentions" rendered the same `mentions.length` value with different labels — theater.                                                                                       | Two cards: **Brand Mentions** (count) + **Subreddits** (distinct community count).                                                                                                                                                                  |
+| Reddit Visibility          | Three metric cards. "Threads Found" and "Brand Mentions" rendered the same `mentions.length` value with different labels - theater.                                                                                       | Two cards: **Brand Mentions** (count) + **Subreddits** (distinct community count).                                                                                                                                                                  |
 | Your Action Plan           | Filtered queued `agent-tasks` to top 5 with hardcoded fake timeframes ("8 weeks" / "4 weeks" by regex).                                                                                                                   | Section removed. `tasks` query unmounted. `ActionPlanItem` import dropped.                                                                                                                                                                          |
-| AI Sentiment & Positioning | Quote source was the most-recent cited row's raw `citationContext` — included delimiter and "Not cited" status lines for non-cited rows.                                                                                  | Reads only when `isCitedSnippet === true` AND uses delimiter-stripped body via `extractResponseBody`.                                                                                                                                               |
+| AI Sentiment & Positioning | Quote source was the most-recent cited row's raw `citationContext` - included delimiter and "Not cited" status lines for non-cited rows.                                                                                  | Reads only when `isCitedSnippet === true` AND uses delimiter-stripped body via `extractResponseBody`.                                                                                                                                               |
 
 Files: [client/src/pages/home.tsx](client/src/pages/home.tsx), [server/routes/dashboard.ts](server/routes/dashboard.ts), [shared/constants.ts](shared/constants.ts), [client/src/components/dashboard/PlatformRankingCard.tsx](client/src/components/dashboard/PlatformRankingCard.tsx), [client/src/components/dashboard/PlatformVisibilityBar.tsx](client/src/components/dashboard/PlatformVisibilityBar.tsx), [client/src/components/dashboard/BrandEntityStrength.tsx](client/src/components/dashboard/BrandEntityStrength.tsx). Deleted: `client/src/components/dashboard/ActionPlanItem.tsx` references.
 
-### 13.6 AI Visibility Score — single formula across surfaces
+### 13.6 AI Visibility Score - single formula across surfaces
 
-Two endpoints used to disagree by 50 points on the same brand. Dashboard hero used `0.5 × cite_rate × 100 + 0.3 × avg_authority + 0.2 × (1 − not_found_rate) × 100` (the `(1 − not_found_rate)` term floored every brand at ~20 just for AI returning _any_ response). GEO Analytics used per-platform scores averaged across "platforms with data" — flattering, hid the platforms where the brand was invisible. Plus a `mentionScore` that credited every check attempt as a "mention" — gave platforms 30/100 with zero citations.
+Two endpoints used to disagree by 50 points on the same brand. Dashboard hero used `0.5 × cite_rate × 100 + 0.3 × avg_authority + 0.2 × (1 − not_found_rate) × 100` (the `(1 − not_found_rate)` term floored every brand at ~20 just for AI returning _any_ response). GEO Analytics used per-platform scores averaged across "platforms with data" - flattering, hid the platforms where the brand was invisible. Plus a `mentionScore` that credited every check attempt as a "mention" - gave platforms 30/100 with zero citations.
 
 Both endpoints now use the same global aggregate:
 
@@ -816,7 +816,7 @@ The `mentionScore` is gone. `mentions` is still reported on the row as "checks a
 
 Files: [server/routes/dashboard.ts](server/routes/dashboard.ts) (`/api/dashboard/hero/:brandId`), [server/routes/analytics.ts](server/routes/analytics.ts) (`/api/geo-analytics/:brandId`).
 
-### 13.7 Hidden pages — feature stripping for pre-launch focus
+### 13.7 Hidden pages - feature stripping for pre-launch focus
 
 Eight feature pages removed from the navigable surface. Code preserved on disk so they can be re-enabled when the underlying data becomes real:
 
@@ -831,7 +831,7 @@ Stale links from deleted features cleaned up: home.tsx `SeeAllLink` to `/geo-ran
 
 - **Welcome → /dashboard redirect bounce.** `FirstRunGate` reads cached `/api/brands` to decide whether to redirect to `/welcome`. After confirm, the cache still showed empty array → infinite redirect loop. Fix in [client/src/pages/welcome.tsx](client/src/pages/welcome.tsx): `await queryClient.invalidateQueries(["/api/brands"])` + `refetchQueries` before `setLocation("/dashboard")`.
 - **Community drafts.** Added editable draft dialog (Pencil icon button); `tick` (CheckCircle2) now reliably moves draft to Posted tab. Server PATCH coerces incoming ISO-string `postedAt` to `Date` before handing to Drizzle (timestamp columns reject string values silently). Mutation has `onError` so future failures aren't invisible.
-- **GEO Tools mentions sheet.** AI mentions (platform `ai:<engine>`, synthetic `ai://...` URL) render the full response inline in a scrollable bordered box, no "Open on" button (the synthetic URL can't be opened). Social mentions use a real `<a target="_blank">` instead of `window.open` — popup blockers no longer silently swallow the click.
+- **GEO Tools mentions sheet.** AI mentions (platform `ai:<engine>`, synthetic `ai://...` URL) render the full response inline in a scrollable bordered box, no "Open on" button (the synthetic URL can't be opened). Social mentions use a real `<a target="_blank">` instead of `window.open` - popup blockers no longer silently swallow the click.
 - **Articles page.** Brand filter Select added when user has >1 brand. Defaults to "All brands" so existing behavior preserved. Client-side filter on `article.brandId`; no API change.
 - **Competitors page.** Now requires brand selection (matching all other brand-scoped pages). BrandSelector pinned at top; competitor + leaderboard queries pass `?brandId=`. Competitor edit dialog covered in 13.3.
 - **Auth UX.** "← Back to home" link top-left inside login + register cards. Landing hero gets "Log in" button alongside "Start Free Trial". Mobile menu gets "Sign up" alongside "Log in".
@@ -840,12 +840,12 @@ Stale links from deleted features cleaned up: home.tsx `SeeAllLink` to `/geo-ran
 ### 13.9 Deploy fixes (Render)
 
 - **Empty package-lock entries.** Render's Node 22 npm refused `Invalid Version: ` from 29 packages with no `version` field in the lockfile. Local npm tolerated it; production didn't. Regenerated `package-lock.json` from a clean `npm install`. New build proceeded past install.
-- **`docs/privacy-policy.md` missing on Render.** `.gitignore` line 24 has `*.md` (only README excepted). The privacy import in [client/src/pages/privacy.tsx](client/src/pages/privacy.tsx) needs the file at build time — Render couldn't find it, build failed at Rollup. Added `!docs/privacy-policy.md` exception, force-added the file, committed.
+- **`docs/privacy-policy.md` missing on Render.** `.gitignore` line 24 has `*.md` (only README excepted). The privacy import in [client/src/pages/privacy.tsx](client/src/pages/privacy.tsx) needs the file at build time - Render couldn't find it, build failed at Rollup. Added `!docs/privacy-policy.md` exception, force-added the file, committed.
 
 ### 13.10 Pass criteria
 
 - [x] `npx tsc --noEmit` clean across server + client + shared.
-- [x] `npx vitest run` — 159/159 tests pass, including 30 new brandMatcher tests.
+- [x] `npx vitest run` - 159/159 tests pass, including 30 new brandMatcher tests.
 - [x] One detection contract used by every citation/mention surface.
 - [x] "Re-check stored" runs across rankings + listicles + wikipedia in <5s for typical user; zero LLM calls observed in server logs.
 - [x] Brand with 0 citations: dashboard AI Visibility Score = 0; GEO Analytics overall score = 0; per-platform Visibility scores = 0.
@@ -857,16 +857,16 @@ Stale links from deleted features cleaned up: home.tsx `SeeAllLink` to `/geo-ran
 
 ### 13.11 Open items after Wave 6
 
-- **`competitor_geo_rankings` not re-checked.** The "Re-check stored" loop covers `geo_rankings` (brand-side) but not the parallel competitor table — no `updateCompetitorGeoRanking` DAO exists yet, and the data shape is per-competitor-per-prompt-per-platform which 10×s the matcher work. Means the competitor leaderboard lags by up to one citation-run cycle when variants change. Fix is ~50 LOC: add the DAO, extend the loop. Deferred — the brand-side fix delivers the headline value.
-- **`brand_mentions` re-check skipped.** No `is_matched` column on `brand_mentions` — re-checking would mean _deleting_ mentions that no longer match the variant list. Destructive and surprising. Add a soft-flag column in a future wave if curating mention noise becomes a real workflow.
+- **`competitor_geo_rankings` not re-checked.** The "Re-check stored" loop covers `geo_rankings` (brand-side) but not the parallel competitor table - no `updateCompetitorGeoRanking` DAO exists yet, and the data shape is per-competitor-per-prompt-per-platform which 10×s the matcher work. Means the competitor leaderboard lags by up to one citation-run cycle when variants change. Fix is ~50 LOC: add the DAO, extend the loop. Deferred - the brand-side fix delivers the headline value.
+- **`brand_mentions` re-check skipped.** No `is_matched` column on `brand_mentions` - re-checking would mean _deleting_ mentions that no longer match the variant list. Destructive and surprising. Add a soft-flag column in a future wave if curating mention noise becomes a real workflow.
 - **Hallucination re-verification still uses `string.includes(claimSnippet)`.** The 40-char post-hoc snippet matcher in [server/lib/hallucinationDetector.ts](server/lib/hallucinationDetector.ts) wasn't migrated to the shared matcher because it's matching free-form prose, not entity names. Different shape, different rules. Could be unified later but not urgent.
-- **`authority_score` is a domain-occurrence heuristic.** Counts how often a citing-outlet domain has appeared in past citations. It's directionally meaningful but not a ground-truth authority signal. The visibility-score formula gives it 30 of 100 weight; if we ever wire real authority data (DR, RD count), the formula stays the same — just better inputs.
+- **`authority_score` is a domain-occurrence heuristic.** Counts how often a citing-outlet domain has appeared in past citations. It's directionally meaningful but not a ground-truth authority signal. The visibility-score formula gives it 30 of 100 weight; if we ever wire real authority data (DR, RD count), the formula stays the same - just better inputs.
 - **Variant learning loop has no cap.** LLM-extracted variants append unbounded. If a hallucinating model invents nonsense variants, they accumulate until a user prunes them. Per-entity max (e.g. 50) would be cheap insurance.
-- **One-shot back-detection migration.** Existing user data won't auto-realign with the new matcher until each user clicks "Re-check stored." A separate ops script that walks every brand and runs `re-detect-all` once is on the to-do — not part of any PR, just a deploy-time chore.
+- **One-shot back-detection migration.** Existing user data won't auto-realign with the new matcher until each user clicks "Re-check stored." A separate ops script that walks every brand and runs `re-detect-all` once is on the to-do - not part of any PR, just a deploy-time chore.
 
 ---
 
-## 14. Wave 7 — Content + Articles full rebuild
+## 14. Wave 7 - Content + Articles full rebuild
 
 ### 14.0 Why this wave existed
 
@@ -878,7 +878,7 @@ The audit and critique we did for these two pages produced a 20+ point list. Thi
 
 [migrations/0033_content_unification.sql](migrations/0033_content_unification.sql) collapses the three-table model:
 
-- **`articles` carries the lifecycle.** New `status text` column with `CHECK (status IN ('draft','generating','ready','failed'))`. Defaults to `'ready'` (existing rows), so the migration is non-destructive on first run. New `job_id varchar` (links to in-flight generation), `target_customers`, `geography`, `content_style` (form-state fields the legacy drafts table used to hold), and `external_url text` (where the article actually lives on the user's own site — replaces the slug-based fake URL).
+- **`articles` carries the lifecycle.** New `status text` column with `CHECK (status IN ('draft','generating','ready','failed'))`. Defaults to `'ready'` (existing rows), so the migration is non-destructive on first run. New `job_id varchar` (links to in-flight generation), `target_customers`, `geography`, `content_style` (form-state fields the legacy drafts table used to hold), and `external_url text` (where the article actually lives on the user's own site - replaces the slug-based fake URL).
 - **`articles.title` and `articles.content` are now nullable** so a draft article can exist before either is filled in. The worker writes both on transition to `ready`.
 - **Slug is gone.** `DROP INDEX articles_brand_slug_idx; ALTER TABLE articles DROP COLUMN slug.` No more public-by-slug surface.
 - **`article_revisions` table created.** Per Auto-Improve / per manual edit / per restore. Columns: `article_id`, `content`, `source IN ('generated','manual_edit','auto_improve','distribute_back')`, `created_by`, `created_at`. Every existing `ready` article gets a seed `'generated'` revision so the diff viewer has a baseline.
@@ -890,7 +890,7 @@ The audit and critique we did for these two pages produced a 20+ point list. Thi
 
 A clean cut, in deploy order so we never serve a 404 to ourselves:
 
-- **Server.** Both `/api/articles/slug/:slug` route handlers deleted (one was a duplicate dead route that was supposed to bump view count and never did). `getArticleBySlug` DAO removed; `generateSlug` private helper removed; storage interface entry removed. Worker no longer derives a slug. Sitemap stops emitting article URLs (articles aren't publicly indexable on our domain anymore — users link to their own externally-hosted versions via `articles.externalUrl`).
+- **Server.** Both `/api/articles/slug/:slug` route handlers deleted (one was a duplicate dead route that was supposed to bump view count and never did). `getArticleBySlug` DAO removed; `generateSlug` private helper removed; storage interface entry removed. Worker no longer derives a slug. Sitemap stops emitting article URLs (articles aren't publicly indexable on our domain anymore - users link to their own externally-hosted versions via `articles.externalUrl`).
 - **GEO Signals schema audit.** Used to construct a fake URL via `${brand.website}/${article.slug}` to look up cached schema audits. Now reads `article.externalUrl`; if unset, returns `completeness: null` and the UI hides the panel.
 - **Client.** `/article/:slug` route removed from [client/src/App.tsx](client/src/App.tsx). [client/src/pages/article-view.tsx](client/src/pages/article-view.tsx) deleted entirely.
 
@@ -900,37 +900,37 @@ A clean cut, in deploy order so we never serve a 404 to ourselves:
 
 Old draft methods (`createContentDraft`, `getContentDraftsByUserId`, `updateContentDraft`, `deleteContentDraft`, …) replaced by:
 
-- `createDraftArticle(userId, brandId, fields)` — creates `status='draft'` row.
-- `getArticlesByUserIdWithStatus(userId, { status?, brandId?, limit, offset })` — single status-filterable list. Status arg accepts a string or string[]. Drives both the Articles page (default `'ready'`) and the Content page's Recent Drafts dropdown (`'draft','generating','failed'`).
-- `setArticleGeneratingFromDraft`, `setArticleReady`, `setArticleFailed`, `setArticleDraft` — atomic transitions used by the worker.
-- `appendStreamBuffer(jobId, delta)` — atomic concat (`SET stream_buffer = COALESCE(stream_buffer,'') || $delta`).
-- `createRevision`, `listRevisions`, `getRevisionById` — revision history.
+- `createDraftArticle(userId, brandId, fields)` - creates `status='draft'` row.
+- `getArticlesByUserIdWithStatus(userId, { status?, brandId?, limit, offset })` - single status-filterable list. Status arg accepts a string or string[]. Drives both the Articles page (default `'ready'`) and the Content page's Recent Drafts dropdown (`'draft','generating','failed'`).
+- `setArticleGeneratingFromDraft`, `setArticleReady`, `setArticleFailed`, `setArticleDraft` - atomic transitions used by the worker.
+- `appendStreamBuffer(jobId, delta)` - atomic concat (`SET stream_buffer = COALESCE(stream_buffer,'') || $delta`).
+- `createRevision`, `listRevisions`, `getRevisionById` - revision history.
 - `failStuckContentJobs` updated to return `[{id, userId, articleId}]` so the boot recovery can refund quota and reset linked articles to draft.
 
 #### Content routes ([server/routes/content.ts](server/routes/content.ts))
 
-- `POST /api/articles/:id/generate` (replaces `POST /api/generate-content`) — body: `{keywords, industry, type, contentStyle, targetCustomers, geography}`. Verifies article ownership and `status IN ('draft','failed')`. Atomically: `withArticleQuota` reserve → insert job with `articleId` → set `articles.status='generating', jobId`. Returns `{jobId, status:'pending'}`. **Synchronous status flip** so the UI switches to streaming immediately rather than waiting for the worker to claim.
-- `GET /api/content-jobs/:jobId` — JSON poll. Includes `errorKind` so the client can show classified error messages.
-- `GET /api/content-jobs/:jobId/stream` — SSE. Tails `stream_buffer` at 250ms, emits `event: delta` per new chunk, `event: end` on terminal status. Hard cap at 5min total connection.
-- `POST /api/content-jobs/:jobId/cancel` — flips job to `cancelled`. Worker checks every 1s during the stream and aborts the OpenAI request. If the job is still `pending` when cancelled (worker hadn't claimed yet), the route refunds quota and resets the article to draft inline.
-- `POST /api/articles/:id/improve` (replaces `POST /api/rewrite-content`) — **one** rewrite pass. Snapshots current content as a `manual_edit` revision, calls gpt-4o-mini, writes new content, records an `auto_improve` revision. Optimistic-locked via `expectedVersion` (returns 409 with `current` payload). No score gating, no fork.
-- `POST /api/analyze-content` and `POST /api/rewrite-content` — **deleted**. The LLM-graded human score is gone for good.
-- All `/api/content-drafts/*` routes — **deleted**.
+- `POST /api/articles/:id/generate` (replaces `POST /api/generate-content`) - body: `{keywords, industry, type, contentStyle, targetCustomers, geography}`. Verifies article ownership and `status IN ('draft','failed')`. Atomically: `withArticleQuota` reserve → insert job with `articleId` → set `articles.status='generating', jobId`. Returns `{jobId, status:'pending'}`. **Synchronous status flip** so the UI switches to streaming immediately rather than waiting for the worker to claim.
+- `GET /api/content-jobs/:jobId` - JSON poll. Includes `errorKind` so the client can show classified error messages.
+- `GET /api/content-jobs/:jobId/stream` - SSE. Tails `stream_buffer` at 250ms, emits `event: delta` per new chunk, `event: end` on terminal status. Hard cap at 5min total connection.
+- `POST /api/content-jobs/:jobId/cancel` - flips job to `cancelled`. Worker checks every 1s during the stream and aborts the OpenAI request. If the job is still `pending` when cancelled (worker hadn't claimed yet), the route refunds quota and resets the article to draft inline.
+- `POST /api/articles/:id/improve` (replaces `POST /api/rewrite-content`) - **one** rewrite pass. Snapshots current content as a `manual_edit` revision, calls gpt-4o-mini, writes new content, records an `auto_improve` revision. Optimistic-locked via `expectedVersion` (returns 409 with `current` payload). No score gating, no fork.
+- `POST /api/analyze-content` and `POST /api/rewrite-content` - **deleted**. The LLM-graded human score is gone for good.
+- All `/api/content-drafts/*` routes - **deleted**.
 
 #### Article routes ([server/routes/articles.ts](server/routes/articles.ts))
 
-- `POST /api/articles/draft` — creates a `status='draft'` row. Drives the Content page's "New Article" button.
-- `GET /api/articles` — supports `?status=` (single value, comma-list, or `all`) and `?brandId=`. Default `status=ready`.
-- `PUT /api/articles/:id` — already had optimistic-lock support; client now always sends `expectedVersion`. Allowlist drops `slug`, adds `externalUrl`.
-- `GET /api/articles/:id/revisions` — list revisions newest-first.
-- `GET /api/articles/:id/revisions/:revId` — single revision content.
-- `POST /api/articles/:id/revisions/:revId/restore` — overwrite article with revision content, bump version, log a new `manual_edit` revision recording the restore.
-- `POST /api/articles` — **brandId now required** (no orphan articles going forward).
-- `POST /api/distribute/:articleId` — platform calls switched from sequential `for` loop to `Promise.all`. ~2× faster on multi-platform distribute.
+- `POST /api/articles/draft` - creates a `status='draft'` row. Drives the Content page's "New Article" button.
+- `GET /api/articles` - supports `?status=` (single value, comma-list, or `all`) and `?brandId=`. Default `status=ready`.
+- `PUT /api/articles/:id` - already had optimistic-lock support; client now always sends `expectedVersion`. Allowlist drops `slug`, adds `externalUrl`.
+- `GET /api/articles/:id/revisions` - list revisions newest-first.
+- `GET /api/articles/:id/revisions/:revId` - single revision content.
+- `POST /api/articles/:id/revisions/:revId/restore` - overwrite article with revision content, bump version, log a new `manual_edit` revision recording the restore.
+- `POST /api/articles` - **brandId now required** (no orphan articles going forward).
+- `POST /api/distribute/:articleId` - platform calls switched from sequential `for` loop to `Promise.all`. ~2× faster on multi-platform distribute.
 
 #### Worker rewrite ([server/contentGenerationWorker.ts](server/contentGenerationWorker.ts))
 
-Worker no longer creates the article — it fills one. On claim:
+Worker no longer creates the article - it fills one. On claim:
 
 1. Re-assert `status='generating'`, `jobId` set (idempotent because the route already did it).
 2. Build prompt (brand context + content type + style + keywords).
@@ -938,7 +938,7 @@ Worker no longer creates the article — it fills one. On claim:
 4. For each chunk: append to `stream_buffer` (flush every 16 tokens), check cancel flag every 1s.
 5. **Watchdog** runs every 1s: aborts if no chunk arrived in `STREAM_IDLE_TIMEOUT_MS = 60s` or total elapsed > `STREAM_TOTAL_TIMEOUT_MS = 5min`. Throws a synthetic `TimeoutError` so the catch handler classifies → refunds.
 6. On success: `setArticleReady(articleId, content, title)`, insert `'generated'` revision.
-7. On failure: classify error → `errorKind`, set `jobs.{status, errorKind, errorMessage, completedAt}`, set article to `failed` (or `draft` if cancelled), call `refundArticleQuota` (idempotent — checks `refunded_at IS NULL`).
+7. On failure: classify error → `errorKind`, set `jobs.{status, errorKind, errorMessage, completedAt}`, set article to `failed` (or `draft` if cancelled), call `refundArticleQuota` (idempotent - checks `refunded_at IS NULL`).
 8. Boot recovery (`STUCK_JOB_RECOVERY_MINUTES = 5`, was 15): every job left running for >5 min on startup gets failed with `errorKind='timeout'`, refunded, and its article reset.
 
 #### Quota refund helper ([server/lib/usageLimit.ts](server/lib/usageLimit.ts))
@@ -949,16 +949,16 @@ Worker no longer creates the article — it fills one. On claim:
 
 #### Shared helpers + new components
 
-- [shared/industries.ts](shared/industries.ts) (NEW) — moved the 50+ industry list out of the Content page into a shared module. Used by Content, Brand setup, Keyword research.
-- [client/src/lib/diff.ts](client/src/lib/diff.ts) (NEW) — hand-rolled line-level LCS diff. ~80 LOC, no external dep.
-- [client/src/components/content/MarkdownEditor.tsx](client/src/components/content/MarkdownEditor.tsx) (NEW) — split-pane editor: monospace `<Textarea>` left, live `<SafeMarkdown>` preview right, word + character count toolbar. Supports `editable={false}` for the streaming preview.
-- [client/src/components/content/KeywordChips.tsx](client/src/components/content/KeywordChips.tsx) (NEW) — chip-input with comma/Enter to add, Backspace-on-empty to pop. Pasting "a, b, c" splits into multiple chips.
-- [client/src/components/content/IndustryCombobox.tsx](client/src/components/content/IndustryCombobox.tsx) (NEW) — `cmdk`-backed type-to-filter combobox over the industry list, grouped by super-category.
-- [client/src/components/content/BrandCombobox.tsx](client/src/components/content/BrandCombobox.tsx) (NEW) — same pattern, brand selector. No "(generic content)" option — brand is required.
-- [client/src/hooks/useArticleAutoSave.ts](client/src/hooks/useArticleAutoSave.ts) (NEW) — single auto-save channel with two debounce timers (form 1.5s, content 2s) and a serial flush queue. Always passes `expectedVersion`. On 409: surfaces a toast and stops queuing. Replaces the legacy 6-way PATCH race.
-- [client/src/components/articles/RevisionDiff.tsx](client/src/components/articles/RevisionDiff.tsx) (NEW) — unified red/green diff renderer with a `context` prop that collapses long unchanged runs to "⋯ N unchanged lines ⋯".
-- [client/src/components/articles/ViewEditDialog.tsx](client/src/components/articles/ViewEditDialog.tsx) (NEW) — three tabs: View (SafeMarkdown), Edit (MarkdownEditor + Auto-Improve button + diff confirmation flow), Versions (revision list + diff viewer + Restore button). 409 conflict modal with Reload-latest / Force-save-mine.
-- [client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) (NEW) — extracted from the legacy 370-line block in articles.tsx. Selected platforms now persist when switching between Generate/Results tabs. Buffer profile match only auto-fires on unambiguous (single-match) cases.
+- [shared/industries.ts](shared/industries.ts) (NEW) - moved the 50+ industry list out of the Content page into a shared module. Used by Content, Brand setup, Keyword research.
+- [client/src/lib/diff.ts](client/src/lib/diff.ts) (NEW) - hand-rolled line-level LCS diff. ~80 LOC, no external dep.
+- [client/src/components/content/MarkdownEditor.tsx](client/src/components/content/MarkdownEditor.tsx) (NEW) - split-pane editor: monospace `<Textarea>` left, live `<SafeMarkdown>` preview right, word + character count toolbar. Supports `editable={false}` for the streaming preview.
+- [client/src/components/content/KeywordChips.tsx](client/src/components/content/KeywordChips.tsx) (NEW) - chip-input with comma/Enter to add, Backspace-on-empty to pop. Pasting "a, b, c" splits into multiple chips.
+- [client/src/components/content/IndustryCombobox.tsx](client/src/components/content/IndustryCombobox.tsx) (NEW) - `cmdk`-backed type-to-filter combobox over the industry list, grouped by super-category.
+- [client/src/components/content/BrandCombobox.tsx](client/src/components/content/BrandCombobox.tsx) (NEW) - same pattern, brand selector. No "(generic content)" option - brand is required.
+- [client/src/hooks/useArticleAutoSave.ts](client/src/hooks/useArticleAutoSave.ts) (NEW) - single auto-save channel with two debounce timers (form 1.5s, content 2s) and a serial flush queue. Always passes `expectedVersion`. On 409: surfaces a toast and stops queuing. Replaces the legacy 6-way PATCH race.
+- [client/src/components/articles/RevisionDiff.tsx](client/src/components/articles/RevisionDiff.tsx) (NEW) - unified red/green diff renderer with a `context` prop that collapses long unchanged runs to "⋯ N unchanged lines ⋯".
+- [client/src/components/articles/ViewEditDialog.tsx](client/src/components/articles/ViewEditDialog.tsx) (NEW) - three tabs: View (SafeMarkdown), Edit (MarkdownEditor + Auto-Improve button + diff confirmation flow), Versions (revision list + diff viewer + Restore button). 409 conflict modal with Reload-latest / Force-save-mine.
+- [client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) (NEW) - extracted from the legacy 370-line block in articles.tsx. Selected platforms now persist when switching between Generate/Results tabs. Buffer profile match only auto-fires on unambiguous (single-match) cases.
 
 #### Content page ([client/src/pages/content.tsx](client/src/pages/content.tsx))
 
@@ -968,20 +968,20 @@ Worker no longer creates the article — it fills one. On claim:
   - `draft|failed` → DraftForm (combobox + chip-input + content-type + style + targeting + Generate button). Failed shows an error banner with the classified message.
   - `generating` → GeneratingPreview (read-only MarkdownEditor showing live tokens, Cancel button visible).
   - `ready` → ReadyEditor (split-pane MarkdownEditor with auto-save, "Open in Articles" link).
-- **Streaming UX.** SSE when tab is focused; poll fallback (4s) when blurred. EventSource can't send `Authorization` headers, so the SSE URL appends `?token=<JWT>` — the route is in `SELF_AUTHED_PREFIXES` so the global Bearer guard skips it; the SSE handler validates inline.
+- **Streaming UX.** SSE when tab is focused; poll fallback (4s) when blurred. EventSource can't send `Authorization` headers, so the SSE URL appends `?token=<JWT>` - the route is in `SELF_AUTHED_PREFIXES` so the global Bearer guard skips it; the SSE handler validates inline.
 - **Optimistic flip on Generate.** `queryClient.setQueryData` patches the cached article to `status='generating'` immediately so the form-→-streaming transition is instant.
-- **Hydration.** A single `useEffect` re-hydrates `contentDraft` from `article.content` whenever the server-side content changes, gated by a `userEditedContent` ref so an in-progress edit isn't clobbered. Auto-save of `content` only fires when `userEditedContent.current === true` — fixed the bug where streaming-→-ready transition was triggering a phantom PATCH that wiped the article to `""`.
+- **Hydration.** A single `useEffect` re-hydrates `contentDraft` from `article.content` whenever the server-side content changes, gated by a `userEditedContent` ref so an in-progress edit isn't clobbered. Auto-save of `content` only fires when `userEditedContent.current === true` - fixed the bug where streaming-→-ready transition was triggering a phantom PATCH that wiped the article to `""`.
 - **Brand-less empty state.** If user has zero brands, hard stop with "Add a brand first" CTA.
 - **Removed.** AI Detection Score box, "How to Improve Your Score" tips, Issues/Strengths grid, `analyzeContentMutation`, `rewriteContentMutation`, `handleRewriteContent`, `scoreBeforeImprove`, `humanScore` state, "Save Article" button, `saveArticleMutation`, `savedArticleId`, `handleSaveArticle`. The article is created on draft entry; ready transition is handled by the worker; manual saves are PATCHes through the auto-save hook.
 - **Form-level fixes.**
   - Industry: `<Combobox>` (was scrolling Radix Select).
-  - Industry caption: "This is the industry the article targets — can differ from your brand's home industry." Per user note, brands intentionally write for adjacent verticals.
+  - Industry caption: "This is the industry the article targets - can differ from your brand's home industry." Per user note, brands intentionally write for adjacent verticals.
   - Keywords: chip-input. First chip becomes working title until the user edits.
-  - Suggest: clicking a suggestion appends/removes a chip (toggle, consistent with chip-input semantics — used to inconsistently "replace" vs "append" depending on which UI element you came from).
+  - Suggest: clicking a suggestion appends/removes a chip (toggle, consistent with chip-input semantics - used to inconsistently "replace" vs "append" depending on which UI element you came from).
   - Targeting: "Pull from brand" link in the collapsible fills `targetCustomers` from `brand.targetAudience`.
   - Generate disabled state covers all required-field gaps with an inline reason ("Pick a brand first.", "Add at least one keyword.", etc) instead of surprise toasts.
   - Loading-message array no longer mentions humanization or AI-detection passes (which no longer happen).
-- **DraftToolbar.** Now renders status badges (Draft / Generating… / Failed / Done) driven by `article.status`. Trash icon now triggers a real `<AlertDialog>` confirmation — used to silently delete.
+- **DraftToolbar.** Now renders status badges (Draft / Generating… / Failed / Done) driven by `article.status`. Trash icon now triggers a real `<AlertDialog>` confirmation - used to silently delete.
 
 #### Articles page ([client/src/pages/articles.tsx](client/src/pages/articles.tsx))
 
@@ -1000,11 +1000,11 @@ Worker no longer creates the article — it fills one. On claim:
 
 Several rebuild-introduced bugs surfaced during user testing of the dev server. Each documented here so the failure modes don't recur:
 
-- **EventSource silently 401'd.** The SSE `Authorization: Bearer` header isn't sendable from the browser — only cookies. Auth is Bearer-only. Without a fix, the SSE connection just retried forever in the background while the UI showed nothing. Fix: `SELF_AUTHED_PREFIXES` allowlist in the global guard + `?token=` query param + inline JWT validation in the SSE handler.
+- **EventSource silently 401'd.** The SSE `Authorization: Bearer` header isn't sendable from the browser - only cookies. Auth is Bearer-only. Without a fix, the SSE connection just retried forever in the background while the UI showed nothing. Fix: `SELF_AUTHED_PREFIXES` allowlist in the global guard + `?token=` query param + inline JWT validation in the SSE handler.
 - **Status flip lag.** Route handler used to set only `jobId` and leave status as `draft`; the worker's claim was the actual flip. That left a 5-60s window where the form was visible after the user clicked Generate. Fix: route handler now sets `status='generating'` synchronously; worker's `setArticleGeneratingFromDraft` allows `draft|generating → generating` (idempotent).
 - **Cache staleness post-Generate.** Even after the synchronous flip, the client's cached article was stale. Fix: `setQueryData` optimistically patches `status` and `jobId` in the mutation's `onSuccess` before refetch returns.
 - **Stuck stream with zero buffer.** Observed in production: a job claimed, OpenAI returned a stream iterator, but no chunks ever flowed. The for-await loop blocked indefinitely. The OpenAI client's `timeout: 120_000` doesn't fire on a stalled (open but empty) stream. Fix: per-stream `AbortController` + a 1s watchdog that aborts on idle (60s without chunks) or total ceiling (5min). Boot recovery shortened from 15 to 5 min.
-- **Article wiped to title-only after streaming.** The most insidious one. The hydration `useEffect` was guarded by `hydratedForId.current === article.id` — fired once per id, never again. So when the article transitioned from `draft` (content=null) to `ready` (content=full text), `contentDraft` stayed at `""`. The MarkdownEditor rendered nothing under the title, and the content auto-save effect noticed the divergence and PATCH'd `content: ""` back to the server. Fix: split into a once-per-id form-field hydration and an always-run content re-hydration gated by a `userEditedContent` ref. Auto-save of `content` only fires after the user has actually typed.
+- **Article wiped to title-only after streaming.** The most insidious one. The hydration `useEffect` was guarded by `hydratedForId.current === article.id` - fired once per id, never again. So when the article transitioned from `draft` (content=null) to `ready` (content=full text), `contentDraft` stayed at `""`. The MarkdownEditor rendered nothing under the title, and the content auto-save effect noticed the divergence and PATCH'd `content: ""` back to the server. Fix: split into a once-per-id form-field hydration and an always-run content re-hydration gated by a `userEditedContent` ref. Auto-save of `content` only fires after the user has actually typed.
 - **Article 404 → infinite spinner.** When `:articleId` pointed to a deleted or non-owned article, the query returned `success:false` but the page treated `article === null` as "still loading." Fix: query now throws on `!ok || !json.success`, and a `useEffect` on `articleQuery.isError` redirects to `/content` to re-bootstrap.
 
 ### 14.6 Critical files
@@ -1027,7 +1027,7 @@ Several rebuild-introduced bugs surfaced during user testing of the dev server. 
 | [server/routes/geoSignals.ts](server/routes/geoSignals.ts)                                                       | Schema audit reads `externalUrl`, no slug fallback                                                                               |
 | [client/src/App.tsx](client/src/App.tsx)                                                                         | Add `/content/:articleId`; remove `/article/:slug` route + `ArticleView` import                                                  |
 | [client/src/pages/article-view.tsx]                                                                              | DELETED                                                                                                                          |
-| [client/src/pages/content.tsx](client/src/pages/content.tsx)                                                     | Full rewrite — route-driven, unified model, SSE+poll, no score, no Save button                                                   |
+| [client/src/pages/content.tsx](client/src/pages/content.tsx)                                                     | Full rewrite - route-driven, unified model, SSE+poll, no score, no Save button                                                   |
 | [client/src/pages/articles.tsx](client/src/pages/articles.tsx)                                                   | Status filters, badges, brand chips, derived excerpts, bulk delete                                                               |
 | [client/src/components/content/MarkdownEditor.tsx](client/src/components/content/MarkdownEditor.tsx) (NEW)       | Split-pane markdown editor                                                                                                       |
 | [client/src/components/content/KeywordChips.tsx](client/src/components/content/KeywordChips.tsx) (NEW)           | Chip-input                                                                                                                       |
@@ -1045,8 +1045,8 @@ Several rebuild-introduced bugs surfaced during user testing of the dev server. 
 ### 14.7 Pass criteria
 
 - [x] `npx tsc --noEmit` clean across server + client + shared.
-- [x] `npx vitest run` — 159/159 still pass (no test regressions; no new tests in this wave).
-- [x] `npm run lint` — 0 errors (warnings all pre-existing).
+- [x] `npx vitest run` - 159/159 still pass (no test regressions; no new tests in this wave).
+- [x] `npm run lint` - 0 errors (warnings all pre-existing).
 - [x] Migration 0033 applies cleanly on a fresh DB and on an environment that already had `content_drafts` rows.
 - [x] Click `/content` → bootstraps to a draft article id; click Generate → streams tokens live in the preview.
 - [x] Cancel mid-stream → article returns to `draft`, quota counter went up by 1 then back down by 1.
@@ -1063,9 +1063,9 @@ Several rebuild-introduced bugs surfaced during user testing of the dev server. 
 - **Citation/ranking surface on Articles list.** Per user decision, deferred to a separate epic. The DAO + server-side join is straightforward; the UI question (where the badge goes, whether sort-by-citations belongs in this view) is the real work.
 - **Drop `human_score` and `passes_ai_detection` columns.** Kept through Wave 7 so the migration is reversible. Once we're confident no code reads them, a follow-up migration can drop both. Currently dead in the UI.
 - **`MAX_CONTENT_LENGTH` not enforced on generate.** The new generate endpoint accepts any keyword length and any prompt size; only `/api/articles/:id/improve` checks `MAX_CONTENT_LENGTH`. Generate-side cap should be added when we wire word-count overrides.
-- **Custom length per content type.** Plan called for an optional `customLengthWords` numeric override. Not implemented in this pass — the worker still uses the four hardcoded word bands. Cheap to add when the UX is ready.
+- **Custom length per content type.** Plan called for an optional `customLengthWords` numeric override. Not implemented in this pass - the worker still uses the four hardcoded word bands. Cheap to add when the UX is ready.
 - **Real AI-detection.** Removed the LLM-graded score entirely. If we ever want a real one, GPTZero / Originality.ai / Copyleaks would be the path. Out of scope for this wave.
-- **Streaming via the circuit breaker.** The streaming OpenAI call doesn't go through `openaiBreaker.run()` (the wrapper doesn't expose async iterators). Mild safety regression — accepted because a streaming call takes longer than the breaker's window anyway.
+- **Streaming via the circuit breaker.** The streaming OpenAI call doesn't go through `openaiBreaker.run()` (the wrapper doesn't expose async iterators). Mild safety regression - accepted because a streaming call takes longer than the breaker's window anyway.
 
 ### 14.9 Production CORS + APP_URL fixes (Render deploy)
 
@@ -1073,7 +1073,7 @@ After the Wave 7 push went live the production logs surfaced two CORS-shaped fai
 
 #### Static assets blocked by CORS
 
-Symptom: every page load 500'd on `/assets/index-*.js` and `/assets/index-*.css` with `CORS: origin https://www.venturecite.com not allowed`. The page is served from the same origin — CORS shouldn't even apply.
+Symptom: every page load 500'd on `/assets/index-*.js` and `/assets/index-*.css` with `CORS: origin https://www.venturecite.com not allowed`. The page is served from the same origin - CORS shouldn't even apply.
 
 Cause: Vite emits `<script crossorigin>` and `<link crossorigin>` on its module-preload tags. With `crossorigin` set, the browser sends an `Origin` header even on same-origin asset requests, which made our global CORS middleware run and reject. The request was technically same-origin but the `Origin` header was unfamiliar to the API allowlist.
 
@@ -1113,12 +1113,12 @@ Also added a boot-time log line so the resolved allowlist is visible immediately
 
 While debugging CORS we also relaxed `APP_URL` from required to optional in [server/env.ts](server/env.ts). Resolution order is now:
 
-1. `APP_URL` if set (highest priority — required when you have a custom domain like `https://venturecite.com` because Render's auto URL is the wrong host for emails).
+1. `APP_URL` if set (highest priority - required when you have a custom domain like `https://venturecite.com` because Render's auto URL is the wrong host for emails).
 2. `RENDER_EXTERNAL_URL` (Render auto-injects this; points at the `*.onrender.com` URL).
 3. `http://localhost:5000` in dev.
 4. Hard fail in production if none of the above resolve.
 
-Ship-fresh Render deploys without a custom domain now boot without manual env config — `RENDER_EXTERNAL_URL` covers email links, Stripe redirects, and CORS. Custom-domain deploys still require `APP_URL` to be set explicitly so emails don't link to the `*.onrender.com` URL.
+Ship-fresh Render deploys without a custom domain now boot without manual env config - `RENDER_EXTERNAL_URL` covers email links, Stripe redirects, and CORS. Custom-domain deploys still require `APP_URL` to be set explicitly so emails don't link to the `*.onrender.com` URL.
 
 #### CORS apex/www auto-expansion
 
@@ -1130,19 +1130,19 @@ Symptom: production was throwing `column "slug" does not exist` for every `getAr
 
 Cause: migration 0033 had been applied to the production DB (dropping the slug column), but the deployed code bundle was still pre-Wave-7 (`fd16ce8`) and Drizzle's compiled SELECT still listed `slug`. Database and code were out of sync because Wave 7 hadn't been pushed yet.
 
-Fix: pushed the Wave 7 commit. Once Render rebuilt the bundle from the new shared/schema.ts, the SELECT no longer requested a non-existent column. No code change needed beyond the original Wave 7 work — this was a deploy-ordering artifact, documented here so the failure pattern is recognizable next time a schema migration races a code push.
+Fix: pushed the Wave 7 commit. Once Render rebuilt the bundle from the new shared/schema.ts, the SELECT no longer requested a non-existent column. No code change needed beyond the original Wave 7 work - this was a deploy-ordering artifact, documented here so the failure pattern is recognizable next time a schema migration races a code push.
 
 ---
 
-## 15. Wave 8 — Analytics correctness v2 + crawler refresh + Opportunities / GEO Tools / GEO Signals fixes
+## 15. Wave 8 - Analytics correctness v2 + crawler refresh + Opportunities / GEO Tools / GEO Signals fixes
 
 ### 15.0 Why this wave existed
 
 After Wave 5 / 6 shipped the analytics scaffolding, a live QA walkthrough surfaced a second layer of failures:
 
-1. Sentiment was never populated during citation runs — geo-analytics rendered 0/0/0 forever.
+1. Sentiment was never populated during citation runs - geo-analytics rendered 0/0/0 forever.
 2. Competitor leaderboard summed brand citations only from `articles`, missing the `brand_prompts` path that holds most real citations. Brands with 29 cited rankings showed 0% share-of-voice.
-3. Share-of-Answer "By Prompt Category" bucketed by AI platform (DeepSeek, Gemini…) instead of intent (informational, transactional…) — the Phase-1 fallback author took a shortcut.
+3. Share-of-Answer "By Prompt Category" bucketed by AI platform (DeepSeek, Gemini…) instead of intent (informational, transactional…) - the Phase-1 fallback author took a shortcut.
 4. By Funnel / Competitor Comparison / Answer Stability / Tracked Prompts read from a deprecated `prompt_portfolio` table nothing in the active pipeline writes to.
 5. Citation Quality "Breakdown" card read `citation_quality` directly with no Phase-1 fallback.
 6. Source Types showed 1 because `citingOutletUrl` was rarely populated.
@@ -1154,9 +1154,9 @@ The wave also covered: a crawler-check bot-list refresh + parser bug, the Opport
 
 ### 15.1 Merged extract+judge analyzer
 
-[server/lib/responseAnalyzer.ts](server/lib/responseAnalyzer.ts) (new) — single function `analyzeResponse({responseText, trackedEntities})`. One gpt-4o-mini call returns `{brands: {name: {variants, cited, rank, relevance, context, citedUrls}}}` for every brand it detected, tracked or not. Validated with Zod (≤25 brands, ≤5 variants, ≤3 URLs). `parseLLMJson` for tolerant JSON parsing. `deriveSentiment(relevance, cited)` helper exported alongside.
+[server/lib/responseAnalyzer.ts](server/lib/responseAnalyzer.ts) (new) - single function `analyzeResponse({responseText, trackedEntities})`. One gpt-4o-mini call returns `{brands: {name: {variants, cited, rank, relevance, context, citedUrls}}}` for every brand it detected, tracked or not. Validated with Zod (≤25 brands, ≤5 variants, ≤3 URLs). `parseLLMJson` for tolerant JSON parsing. `deriveSentiment(relevance, cited)` helper exported alongside.
 
-[server/citationChecker.ts](server/citationChecker.ts) — `runPlatformCitationCheck` accepts `opts.skipJudge` so the per-response brand judge call is skipped. The main `runOne` task now:
+[server/citationChecker.ts](server/citationChecker.ts) - `runPlatformCitationCheck` accepts `opts.skipJudge` so the per-response brand judge call is skipped. The main `runOne` task now:
 
 1. Fetches the platform response (no internal judge).
 2. Calls `analyzeResponse` once with brand + every competitor as `trackedEntities`.
@@ -1170,11 +1170,11 @@ Sentiment is now derived from analyzer relevance (`>=70 positive, 40-69 neutral,
 
 Auto-discovered competitors carry `discoveredBy='citation_auto'`. UI badge added at [client/src/pages/competitors.tsx](client/src/pages/competitors.tsx) (`Auto` label) so users can review and demote them.
 
-Entity matching in the analyzer was hardening-pass strengthened: `stripSuffixes` strips legal suffixes (`Inc`, `LLC`, `Labs`, `Technologies`, etc.) on both sides of the index — so "Notion Labs, Inc." matches "Notion" and vice versa. Without this fix, real brands with formal names never matched analyzer output and the competitor pipeline produced zero rows.
+Entity matching in the analyzer was hardening-pass strengthened: `stripSuffixes` strips legal suffixes (`Inc`, `LLC`, `Labs`, `Technologies`, etc.) on both sides of the index - so "Notion Labs, Inc." matches "Notion" and vice versa. Without this fix, real brands with formal names never matched analyzer output and the competitor pipeline produced zero rows.
 
 ### 15.2 Brand citations unified across articles + brand_prompts
 
-[server/databaseStorage.ts](server/databaseStorage.ts) `getCompetitorLeaderboard` rewrote the brand-row builder to OR brand-articles AND brand-prompt rankings in a single window-scoped query, deduped by ranking id. The geo-analytics page already did this correctly — the bug was leaderboard-only.
+[server/databaseStorage.ts](server/databaseStorage.ts) `getCompetitorLeaderboard` rewrote the brand-row builder to OR brand-articles AND brand-prompt rankings in a single window-scoped query, deduped by ranking id. The geo-analytics page already did this correctly - the bug was leaderboard-only.
 
 The leaderboard endpoint now returns `meta: {totalTracked, withActivity}`. UI renders "15 tracked · 14 with activity in last 30d" instead of one number that disagreed with the competitors page count.
 
@@ -1184,10 +1184,10 @@ The leaderboard endpoint now returns `meta: {totalTracked, withActivity}`. UI re
 
 - Queries `prompt_portfolio` directly (NOT through `getPromptPortfolio`, which now synthesizes Phase-1 rows for the Tracked Prompts tab and was masking the Phase-1 stats branch).
 - When the Phase-2 table is empty (the common case): bucket `byCategory` by `brand_prompts.category`, `byFunnel` by `funnelStage` (with category-derived fallback: informational → awareness, comparison → consideration, transactional → decision).
-- `byCompetitor` joins `competitor_geo_rankings` filtered to `isCited=1`. Denominator is the brand's total checks in the window — previously every competitor showed 100% shareAgainst because total/cited counted the same rows.
-- `avgVolatility` / `volatilityDistribution` per **(brand_prompt, ai_platform) pair** across runs, not per brand_prompt alone — previous grouping mixed platforms together and inflated apparent flips. Pairs with <2 runs are skipped (no history yet).
+- `byCompetitor` joins `competitor_geo_rankings` filtered to `isCited=1`. Denominator is the brand's total checks in the window - previously every competitor showed 100% shareAgainst because total/cited counted the same rows.
+- `avgVolatility` / `volatilityDistribution` per **(brand_prompt, ai_platform) pair** across runs, not per brand_prompt alone - previous grouping mixed platforms together and inflated apparent flips. Pairs with <2 runs are skipped (no history yet).
 
-`citedPrompts` semantic fix: was `rankings.filter(isCited===1).length` (raw rows, inflated by platforms × runs). Now: `new Set(rankings.filter(...).map(r.brandPromptId)).size` — distinct prompts cited at least once. Separate `citationRate = citedChecks / totalChecks` keeps the per-check rate.
+`citedPrompts` semantic fix: was `rankings.filter(isCited===1).length` (raw rows, inflated by platforms × runs). Now: `new Set(rankings.filter(...).map(r.brandPromptId)).size` - distinct prompts cited at least once. Separate `citationRate = citedChecks / totalChecks` keeps the per-check rate.
 
 `getPromptPortfolio` synthesizes Phase-1 rows from `brand_prompts × geo_rankings` when the real table is empty so the Tracked Prompts list isn't blank for new brands.
 
@@ -1209,9 +1209,9 @@ The endpoint serves real per-row data even when the deprecated Phase-2 table is 
 
 [server/lib/metricsSnapshot.ts](server/lib/metricsSnapshot.ts) writes both `citation_rate` + `share_of_answer` (same value) and both `hallucinations` + `hallucinations_unresolved` so TrendsTab queries match.
 
-[server/databaseStorage.ts](server/databaseStorage.ts) `storage.recordCurrentMetrics` (the version called by the Trends "Record Snapshot" button — different function from `lib/metricsSnapshot.ts`) gained a Phase-1 fallback. Previously it only read `prompt_portfolio` and silently wrote nothing on click. Now Phase-2 first, Phase-1 fallback, hallucinations always.
+[server/databaseStorage.ts](server/databaseStorage.ts) `storage.recordCurrentMetrics` (the version called by the Trends "Record Snapshot" button - different function from `lib/metricsSnapshot.ts`) gained a Phase-1 fallback. Previously it only read `prompt_portfolio` and silently wrote nothing on click. Now Phase-2 first, Phase-1 fallback, hallucinations always.
 
-[client/src/components/intelligence/TrendsTab.tsx](client/src/components/intelligence/TrendsTab.tsx) `getTrendChartData` keys snapshots by ISO timestamp rounded to the minute (was `toLocaleDateString()` — day granularity). Three citation runs on the same day previously collapsed into one chart point with `.find()` returning the first row only; now each run gets its own point.
+[client/src/components/intelligence/TrendsTab.tsx](client/src/components/intelligence/TrendsTab.tsx) `getTrendChartData` keys snapshots by ISO timestamp rounded to the minute (was `toLocaleDateString()` - day granularity). Three citation runs on the same day previously collapsed into one chart point with `.find()` returning the first row only; now each run gets its own point.
 
 ### 15.6 Mentions semantics
 
@@ -1221,37 +1221,37 @@ Citation = brand in a ranked recommendation (`isCited=1`). Mention = brand name 
 
 [server/routes/analytics.ts](server/routes/analytics.ts) `totalMentions` reads from `brand_mentions` table (real source) instead of counting ranking rows. Previously "mentions" on geo-analytics was just "total checks" mislabeled.
 
-### 15.7 Hallucinations — invalidation + URL parse + state machine
+### 15.7 Hallucinations - invalidation + URL parse + state machine
 
 Three separate bugs, all fixed:
 
-[client/src/components/intelligence/HallucinationsTab.tsx:96](client/src/components/intelligence/HallucinationsTab.tsx#L96) — invalidation key changed from `["/api/hallucinations"]` to `[`/api/hallucinations?brandId=${id}`]` to match the list query exactly. Same-array exact-match is how TanStack Query compares single-string keys; the bare path never matched the parameterised list, so the DB updated but the UI showed stale state until reload.
+[client/src/components/intelligence/HallucinationsTab.tsx:96](client/src/components/intelligence/HallucinationsTab.tsx#L96) - invalidation key changed from `["/api/hallucinations"]` to `[`/api/hallucinations?brandId=${id}`]` to match the list query exactly. Same-array exact-match is how TanStack Query compares single-string keys; the bare path never matched the parameterised list, so the DB updated but the UI showed stale state until reload.
 
-[client/src/components/intelligence/HallucinationsTab.tsx:300-328](client/src/components/intelligence/HallucinationsTab.tsx) — `new URL(citingUrl)` was throwing on synthetic `ai://` URLs and bare-domain strings. Wrapped in a try/catch that prepends `https://` when no scheme is present, hides the source link entirely for `ai://` URLs.
+[client/src/components/intelligence/HallucinationsTab.tsx:300-328](client/src/components/intelligence/HallucinationsTab.tsx) - `new URL(citingUrl)` was throwing on synthetic `ai://` URLs and bare-domain strings. Wrapped in a try/catch that prepends `https://` when no scheme is present, hides the source link entirely for `ai://` URLs.
 
-[server/lib/statusTransitions.ts:29-37](server/lib/statusTransitions.ts) — added `pending → resolved` to the allowed transitions (was `pending → in_progress → resolved` only). The UI's "Mark as resolved" is a one-click flow; users shouldn't have to first toggle to in_progress. New unit test covers the direct path.
+[server/lib/statusTransitions.ts:29-37](server/lib/statusTransitions.ts) - added `pending → resolved` to the allowed transitions (was `pending → in_progress → resolved` only). The UI's "Mark as resolved" is a one-click flow; users shouldn't have to first toggle to in_progress. New unit test covers the direct path.
 
 ### 15.8 Crawler check refresh
 
 [server/routes/analytics.ts](server/routes/analytics.ts):
 
 - **Bot list updated** to current vendor names. Removed deprecated `Claude-Web`, `anthropic-ai`, `facebookexternalhit` (link previews, not AI training). Added `OAI-SearchBot`, `ClaudeBot`, `Claude-User`, `Claude-SearchBot`, `Applebot` (plain), `meta-externalagent`. Each entry carries a `category` so the UI groups by vendor.
-- **Parser bug fixed.** `Disallow:` with empty value used to normalise to `/` — that's the opposite semantic (empty Disallow = allow everything per RFC 9309). The previous code flagged every crawler as blocked on sites with `Disallow:`. Empty paths are now preserved and treated as an explicit allow-all signal in `isCrawlerBlocked`.
+- **Parser bug fixed.** `Disallow:` with empty value used to normalise to `/` - that's the opposite semantic (empty Disallow = allow everything per RFC 9309). The previous code flagged every crawler as blocked on sites with `Disallow:`. Empty paths are now preserved and treated as an explicit allow-all signal in `isCrawlerBlocked`.
 - **Recommended robots.txt snippet** now covers every vendor, grouped with comments. `criticalBlocked` set updated to current names.
 
-[client/src/pages/crawler-check.tsx](client/src/pages/crawler-check.tsx) — crawlers grouped by category in the UI ("OpenAI (3 bots)", "Anthropic (3 bots)") with per-vendor "N blocked" badge.
+[client/src/pages/crawler-check.tsx](client/src/pages/crawler-check.tsx) - crawlers grouped by category in the UI ("OpenAI (3 bots)", "Anthropic (3 bots)") with per-vendor "N blocked" badge.
 
-### 15.9 Opportunities — empty-state CTA
+### 15.9 Opportunities - empty-state CTA
 
 [client/src/pages/geo-opportunities.tsx](client/src/pages/geo-opportunities.tsx) added a "Run Citation Check →" button (wouter `<Link>` to `/citations`) inside the "No citation data yet" card. Previously a dead text-only empty state.
 
 ### 15.10 GEO Tools
 
-[server/routes/contentTypes.ts](server/routes/contentTypes.ts) — Wikipedia scan now persists each recommended page to `wikipedia_mentions` (mentionType `related`, source `wikipedia_scan`, deduped by `pageUrl`). The endpoint returns `savedRecommendations` count so the toast can reflect "Saved N new recommendations" vs "All recommendations were already tracked".
+[server/routes/contentTypes.ts](server/routes/contentTypes.ts) - Wikipedia scan now persists each recommended page to `wikipedia_mentions` (mentionType `related`, source `wikipedia_scan`, deduped by `pageUrl`). The endpoint returns `savedRecommendations` count so the toast can reflect "Saved N new recommendations" vs "All recommendations were already tracked".
 
 [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx):
 
-- BOFU toast clarified ("Saved! View in BOFU Content tab — saved to this brand's library"). Server already auto-saves at `contentTypes.ts:476` — the previous toast just didn't tell users.
+- BOFU toast clarified ("Saved! View in BOFU Content tab - saved to this brand's library"). Server already auto-saves at `contentTypes.ts:476` - the previous toast just didn't tell users.
 - Mentions tab gained a `Scan Now` button + `scanMentionsMutation` calling the existing `POST /api/brand-mentions/scan/:brandId` endpoint (Reddit + HN + citation-domain mining).
 - FAQ list status icon → clickable button. `toggleFaqOptimizedMutation` PATCHes `/api/faqs/:id` with `{isOptimized: 0|1}`. Toggles between "Mark optimized" and "Optimized" with a success toast. Replaces a read-only badge that nothing flipped.
 
@@ -1259,11 +1259,11 @@ Three separate bugs, all fixed:
 
 [client/src/pages/geo-signals.tsx](client/src/pages/geo-signals.tsx):
 
-- **Chunk Engineer "Apply to Article".** New `applyOptimizedMutation` PUTs `/api/articles/:id` with the optimised content. Buttons added next to the optimised-content textarea: "Copy" + "Apply to Article". Closes the loop — feature is now a real tool, not a report.
+- **Chunk Engineer "Apply to Article".** New `applyOptimizedMutation` PUTs `/api/articles/:id` with the optimised content. Buttons added next to the optimised-content textarea: "Copy" + "Apply to Article". Closes the loop - feature is now a real tool, not a report.
 - **"Schedule Update" → "Mark Updated".** Vaporware button is now wired: empty-body PUT to `/api/articles/:id`, which causes `storage.updateArticle` to bump `updatedAt = now()` (server-managed). Freshness scores reflect the new timestamp on next render. Articles invalidated.
 - **No-articles empty state.** When a brand has no articles, the empty `<Select>` dropdown is replaced with a "Create an article →" link to `/articles`.
 
-[server/routes/geoSignals.ts](server/routes/geoSignals.ts) — Schema Lab does a real fetch + JSON-LD parse:
+[server/routes/geoSignals.ts](server/routes/geoSignals.ts) - Schema Lab does a real fetch + JSON-LD parse:
 
 1. SSRF-safe fetch via `safeFetchText` (max 2MB, 15s timeout, custom User-Agent).
 2. Regex-extract every `<script type="application/ld+json">` block.
@@ -1272,7 +1272,7 @@ Three separate bugs, all fixed:
 5. Surface `additionalTypes` for schemas outside the catalogue (Event, Recipe, VideoObject, etc.).
 6. SSRF rejection (private IPs, file://, metadata endpoints) returns 400 with a clear error.
 
-Replaces the previous mock that returned `Math.random() > 0.3` regardless of URL — sites with FAQ schema were being told to "add FAQ schema".
+Replaces the previous mock that returned `Math.random() > 0.3` regardless of URL - sites with FAQ schema were being told to "add FAQ schema".
 
 ### 15.12 Verification
 
@@ -1294,9 +1294,9 @@ Deliberately not in this wave:
 
 ---
 
-## Wave 9 — Citations end-to-end fixes (correctness + UX + scaling)
+## Wave 9 - Citations end-to-end fixes (correctness + UX + scaling)
 
-The dominant user-reported bug — "I have to manually refresh every page" — was a TanStack Query semantics gotcha: `setQueryDefaults({ refetchInterval })` only takes effect when a new observer is created, not on already-mounted ones. The Wave 8 live-refresh hook never started polling on dependent pages because they had already mounted by the time the hook ran. Wave 9 fixes that and 30+ adjacent issues found across every Citations sub-tab.
+The dominant user-reported bug - "I have to manually refresh every page" - was a TanStack Query semantics gotcha: `setQueryDefaults({ refetchInterval })` only takes effect when a new observer is created, not on already-mounted ones. The Wave 8 live-refresh hook never started polling on dependent pages because they had already mounted by the time the hook ran. Wave 9 fixes that and 30+ adjacent issues found across every Citations sub-tab.
 
 ### 16.1 Live-refresh fix (the actual bug)
 
@@ -1306,17 +1306,17 @@ The dominant user-reported bug — "I have to manually refresh every page" — w
 
 - [migrations/0035_citation_runs_dedup.sql](../migrations/0035_citation_runs_dedup.sql): partial unique index `citation_runs(brand_id) WHERE status IN ('pending','running')`.
 - New `kickoffBrandPromptsRun` in [server/citationChecker.ts](../server/citationChecker.ts) creates the row synchronously, fires `runBrandPrompts` via `setImmediate`, returns `{ runId }` in ~100 ms. `POST /run` no longer holds HTTP open for 30-120 s. 23505 → 409 `{ error: 'already_running', runId }` so a second-tab race joins the existing stream.
-- [server/lib/citationReconciliation.ts](../server/lib/citationReconciliation.ts) called between `applyMigrations` and `initScheduler` in [server/index.ts](../server/index.ts) — marks any `pending|running` row older than 15 min as `failed` so server crashes don't permanently block the brand.
-- `bumpProgressIfDue` now bumps every 5 tasks **OR** every 1.5 s — small runs feel live.
+- [server/lib/citationReconciliation.ts](../server/lib/citationReconciliation.ts) called between `applyMigrations` and `initScheduler` in [server/index.ts](../server/index.ts) - marks any `pending|running` row older than 15 min as `failed` so server crashes don't permanently block the brand.
+- `bumpProgressIfDue` now bumps every 5 tasks **OR** every 1.5 s - small runs feel live.
 - `re-detect-all` writes a `triggeredBy='re-detect'` row so the live banner fires for it.
 
 ### 16.3 SSE hardening
 
-In [server/routes/prompts.ts](../server/routes/prompts.ts): 20 s heartbeat (comment frame), per-user 3-stream cap (oldest evicted on the 4th tab), 5-min cap sends `event: end, data: { reason: "timeout", reconnect: true }`, client reconnects with a fresh JWT (bounded to 5 retries) so long runs (>1 h, JWT lifetime) keep their banner. First-tick `lastSinceMs = run.startedAt` so a (re)connect replays existing rankings — Latest Results populates immediately. `console.warn` → `logger.warn` per CLAUDE.md.
+In [server/routes/prompts.ts](../server/routes/prompts.ts): 20 s heartbeat (comment frame), per-user 3-stream cap (oldest evicted on the 4th tab), 5-min cap sends `event: end, data: { reason: "timeout", reconnect: true }`, client reconnects with a fresh JWT (bounded to 5 retries) so long runs (>1 h, JWT lifetime) keep their banner. First-tick `lastSinceMs = run.startedAt` so a (re)connect replays existing rankings - Latest Results populates immediately. `console.warn` → `logger.warn` per CLAUDE.md.
 
 ### 16.4 Variation cache + disagreement counter
 
-Run-scoped `Map<entityId, string[]>` replaces ~50 per-response `getBrandById` + `getCompetitors` reads. Updated synchronously when `addBrandNameVariation` / `addCompetitorNameVariation` succeed so the matcher sees variants the analyzer just learned for THIS response — strict ordering preserved. [migrations/0036_citation_runs_disagreement.sql](../migrations/0036_citation_runs_disagreement.sql) adds `disagreement_count` to citation_runs; HistoryTab surfaces a tooltip when ratio ≥5%.
+Run-scoped `Map<entityId, string[]>` replaces ~50 per-response `getBrandById` + `getCompetitors` reads. Updated synchronously when `addBrandNameVariation` / `addCompetitorNameVariation` succeed so the matcher sees variants the analyzer just learned for THIS response - strict ordering preserved. [migrations/0036_citation_runs_disagreement.sql](../migrations/0036_citation_runs_disagreement.sql) adds `disagreement_count` to citation_runs; HistoryTab surfaces a tooltip when ratio ≥5%.
 
 ### 16.5 ScheduleTab v2
 
@@ -1334,14 +1334,14 @@ Run-scoped `Map<entityId, string[]>` replaces ~50 per-response `getBrandById` + 
 
 ### 16.7 Tests
 
-- [tests/unit/citationChecker.kickoff.test.ts](../tests/unit/citationChecker.kickoff.test.ts) — kickoff returns sync, dedup 23505 → 409 shape, detached failure writes errorMessage.
-- [tests/unit/citationReconciliation.test.ts](../tests/unit/citationReconciliation.test.ts) — SQL filters by status + 15 min age, swallows DB errors, logs reconciled rows.
+- [tests/unit/citationChecker.kickoff.test.ts](../tests/unit/citationChecker.kickoff.test.ts) - kickoff returns sync, dedup 23505 → 409 shape, detached failure writes errorMessage.
+- [tests/unit/citationReconciliation.test.ts](../tests/unit/citationReconciliation.test.ts) - SQL filters by status + 15 min age, swallows DB errors, logs reconciled rows.
 - 18 files / 171 tests pass.
 
 ### 16.8 Verification
 
-- `npm run check` — 0 errors.
-- `npx vitest run` — 171/171 green.
+- `npm run check` - 0 errors.
+- `npx vitest run` - 171/171 green.
 - E2E manual matrix in [docs/citation-detection.md § Wave 9](citation-detection.md).
 
 ### 16.9 Out of scope
@@ -1352,13 +1352,13 @@ Run-scoped `Map<entityId, string[]>` replaces ~50 per-response `getBrandById` + 
 - Postgres LISTEN/NOTIFY replacing SSE polling. Not needed at current scale.
 - Run cancellation. Detached run runs to completion regardless.
 
-## Wave 9.1 / 9.2 — Citations follow-ups (correctness + run-window scoping)
+## Wave 9.1 / 9.2 - Citations follow-ups (correctness + run-window scoping)
 
 Two rounds of user-reported bugs surfaced after Wave 9 shipped. The dominant theme: data shown during an active run mixed all-time history with the run's incoming numbers, so totals barely moved and aggregate cards looked frozen. Plus a handful of correctness bugs where re-detect rows polluted History, prompt-suggestion accept silently replaced rows, and historical aggregates drifted from `geo_rankings`.
 
 ### 16a.1 Re-detect rows polluting History
 
-Clicking Re-check on a single result wrote a new `citation_runs` row with `triggeredBy='re-detect'`, which appeared in HistoryTab as a fresh "run" with totals like `1/50` (only the re-detected platform was checked). User read this as "the run failed for 49 prompts". [migrations/0038_drop_redetect_runs.sql](migrations/0038_drop_redetect_runs.sql) deletes existing re-detect rows; the re-detect path no longer writes to `citation_runs` at all. Live banner trigger for the bulk `re-detect-all` flow stays (Wave 9.2 — that one IS a real run; only single-row re-checks were demoted).
+Clicking Re-check on a single result wrote a new `citation_runs` row with `triggeredBy='re-detect'`, which appeared in HistoryTab as a fresh "run" with totals like `1/50` (only the re-detected platform was checked). User read this as "the run failed for 49 prompts". [migrations/0038_drop_redetect_runs.sql](migrations/0038_drop_redetect_runs.sql) deletes existing re-detect rows; the re-detect path no longer writes to `citation_runs` at all. Live banner trigger for the bulk `re-detect-all` flow stays (Wave 9.2 - that one IS a real run; only single-row re-checks were demoted).
 
 ### 16a.2 Suggested-prompt accept forced replacement
 
@@ -1378,9 +1378,9 @@ Starting a new run left the prior run's results visible while the new run stream
 
 ### 16a.5 ScheduleTab v2 hour picker silently never fired
 
-Wave 9's hour gate inside `isBrandDueForCitation` rejects when `currentHour < auto_citation_hour`. But the `AUTO_CITATION_CRON` was `"0 6 * * *"` — daily at 06:00 UTC — so any brand that picked an hour ≥ 7 got rejected at 06:00 and the cron never ran again that day. Picker promised behavior the scheduler couldn't deliver.
+Wave 9's hour gate inside `isBrandDueForCitation` rejects when `currentHour < auto_citation_hour`. But the `AUTO_CITATION_CRON` was `"0 6 * * *"` - daily at 06:00 UTC - so any brand that picked an hour ≥ 7 got rejected at 06:00 and the cron never ran again that day. Picker promised behavior the scheduler couldn't deliver.
 
-Fix: cron default → `"0 * * * *"` (hourly check). Each tick is cheap (one SELECT + per-brand filter); per-brand gates are unchanged. [migrations/0040_citation_schedule_v2_fixes.sql](migrations/0040_citation_schedule_v2_fixes.sql) backfills `auto_citation_hour=0` for any row still at the legacy migration default of 9, so brands that never touched the picker continue firing at the legacy 06:00 ish window. New brands explicitly choose an hour. Migration 0040 also rebuilds `platform_breakdown` JSONB on every existing `citation_runs` row via `jsonb_object_agg` over `geo_rankings` — so HistoryTab tooltips stop showing stale per-platform numbers from before Wave 8.
+Fix: cron default → `"0 * * * *"` (hourly check). Each tick is cheap (one SELECT + per-brand filter); per-brand gates are unchanged. [migrations/0040_citation_schedule_v2_fixes.sql](migrations/0040_citation_schedule_v2_fixes.sql) backfills `auto_citation_hour=0` for any row still at the legacy migration default of 9, so brands that never touched the picker continue firing at the legacy 06:00 ish window. New brands explicitly choose an hour. Migration 0040 also rebuilds `platform_breakdown` JSONB on every existing `citation_runs` row via `jsonb_object_agg` over `geo_rankings` - so HistoryTab tooltips stop showing stale per-platform numbers from before Wave 8.
 
 [server/scheduler.ts](server/scheduler.ts).
 
@@ -1408,73 +1408,73 @@ First-run banner used to wait ~8 s for the active-runs gate query to detect the 
 
 [client/src/pages/citations.tsx](client/src/pages/citations.tsx).
 
-### 16a.11 HistoryTab — drilldown cache LRU + clearer trigger badges
+### 16a.11 HistoryTab - drilldown cache LRU + clearer trigger badges
 
 Drill-down details cached forever; long sessions accumulated 25 MB of stale blobs. Now LRU-capped at 10 (oldest key evicted on insert).
 
-Trigger badge used `<Badge className="capitalize">{run.triggeredBy}</Badge>`, which rendered `auto_onboarding` as `Auto_onboarding` — ugly and misleading. Replaced with an explicit label map (`manual → Manual`, `cron → Auto`, `auto_onboarding → Onboarding`, `re-detect → Re-detect`); fallback to title-case for unknowns.
+Trigger badge used `<Badge className="capitalize">{run.triggeredBy}</Badge>`, which rendered `auto_onboarding` as `Auto_onboarding` - ugly and misleading. Replaced with an explicit label map (`manual → Manual`, `cron → Auto`, `auto_onboarding → Onboarding`, `re-detect → Re-detect`); fallback to title-case for unknowns.
 
 [client/src/components/citations/HistoryTab.tsx](client/src/components/citations/HistoryTab.tsx).
 
-### 16a.12 useActiveCitationRuns — module-scoped empty-streak
+### 16a.12 useActiveCitationRuns - module-scoped empty-streak
 
 The Wave 9 idle-aware backoff stored its consecutive-empty-poll counter in a per-component `useRef`. Home calls this hook 7+ times via `useDashboardQueries` observers, each with its own ref; one fast hook (just-mounted, streak=0) keeps every other observer fast even when the page is genuinely idle. Moved the counter to module scope keyed by `brandId` so all observers on the same brand share cadence. Roughly halves idle poll volume on multi-consumer pages.
 
 [client/src/hooks/useActiveCitationRuns.ts](client/src/hooks/useActiveCitationRuns.ts).
 
-### 16a.13 ResultsTab — CSV export removed
+### 16a.13 ResultsTab - CSV export removed
 
-User explicit request. Dropped `handleExportCsv`, the button, and the `Download` icon import. No server-side change — the endpoint never knew about CSV.
+User explicit request. Dropped `handleExportCsv`, the button, and the `Download` icon import. No server-side change - the endpoint never knew about CSV.
 
 [client/src/components/citations/ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx).
 
 ### 16a.14 Verification
 
-- `npx tsc --noEmit` — 0 errors.
-- `npx vitest run` — 171/171 green.
+- `npx tsc --noEmit` - 0 errors.
+- `npx vitest run` - 171/171 green.
 - Migrations 0038, 0039, 0040 are idempotent (UPDATE that's a no-op on already-correct rows).
 
-## Wave 9.3 — AI Intelligence + GEO Tools/Analytics correctness pass
+## Wave 9.3 - AI Intelligence + GEO Tools/Analytics correctness pass
 
 End-to-end critique covered the AI Intelligence page (6 sub-tabs), GEO Tools (5 sub-tabs), and GEO Analytics. Findings mixed real cross-tenant exposure, broken-by-design UX (mutation invalidations missing the cached entry), and Wave 9.2 follow-throughs that didn't reach every consumer. This wave fixes everything user-visible without breaking existing flows.
 
 ### 17.1 Cross-tenant data leak: stat/list endpoints missing ownership
 
-`/api/prompt-portfolio/stats/:brandId`, `/api/citation-quality/stats/:brandId`, `/api/alert-settings/:brandId`, `/api/alert-history/:brandId`, `/api/bofu-content/:brandId`, and `/api/faqs/:brandId` accepted any brandId without verifying the caller owned it. The list-style siblings (e.g. `/api/hallucinations`) had been hardened, but these stat/by-brand reads slipped through. Fixed by threading `requireUser(req)` + `await requireBrand(:brandId, user.id)` through each handler. `/api/alert-history` also bounds `?limit` at 200 (was unbounded — a brand that misfires alerts overnight could load 10MB of JSON into the panel).
+`/api/prompt-portfolio/stats/:brandId`, `/api/citation-quality/stats/:brandId`, `/api/alert-settings/:brandId`, `/api/alert-history/:brandId`, `/api/bofu-content/:brandId`, and `/api/faqs/:brandId` accepted any brandId without verifying the caller owned it. The list-style siblings (e.g. `/api/hallucinations`) had been hardened, but these stat/by-brand reads slipped through. Fixed by threading `requireUser(req)` + `await requireBrand(:brandId, user.id)` through each handler. `/api/alert-history` also bounds `?limit` at 200 (was unbounded - a brand that misfires alerts overnight could load 10MB of JSON into the panel).
 
 [server/routes/intelligence.ts](server/routes/intelligence.ts), [server/routes/contentTypes.ts](server/routes/contentTypes.ts).
 
 ### 17.2 Alert duplicate-fire: missing unique constraint
 
-The `alert_settings` schema only had a brand_id index. Double-clicking the create button — or two browser tabs racing — produced two rows of the same `(brand_id, alert_type)`, each then fired its own email/Slack notification on every triggering event. The user's complaint surfaced as "I keep getting two emails for the same hallucination."
+The `alert_settings` schema only had a brand_id index. Double-clicking the create button - or two browser tabs racing - produced two rows of the same `(brand_id, alert_type)`, each then fired its own email/Slack notification on every triggering event. The user's complaint surfaced as "I keep getting two emails for the same hallucination."
 
-Fix is two-layered. [migrations/0041_alert_settings_unique.sql](migrations/0041_alert_settings_unique.sql) collapses legacy duplicates (keeping the oldest row per `(brand_id, alert_type)` so any user-edited threshold/channel survives) then adds `UNIQUE INDEX alert_settings_brand_id_alert_type_uniq`. The Wave 9.3 `POST /api/alert-settings` handler also pre-checks via `getAlertSettings(brandId)` and returns 409 with a clear message — so the UX surfaces "An alert of this type already exists" instead of a generic 500. The client mutation now has an `onError` toast that renders that message.
+Fix is two-layered. [migrations/0041_alert_settings_unique.sql](migrations/0041_alert_settings_unique.sql) collapses legacy duplicates (keeping the oldest row per `(brand_id, alert_type)` so any user-edited threshold/channel survives) then adds `UNIQUE INDEX alert_settings_brand_id_alert_type_uniq`. The Wave 9.3 `POST /api/alert-settings` handler also pre-checks via `getAlertSettings(brandId)` and returns 409 with a clear message - so the UX surfaces "An alert of this type already exists" instead of a generic 500. The client mutation now has an `onError` toast that renders that message.
 
-### 17.3 GEO Analytics — Wave 9.2 since-filter incomplete
+### 17.3 GEO Analytics - Wave 9.2 since-filter incomplete
 
 Wave 9.2 threaded `?since=` into the brand-prompt rankings path but two consumers were missed:
 
-**Article-tied rankings** were still loaded via `getGeoRankings()` (full table scan) and post-filtered in memory by `r.checkedAt >= sinceFilter`. Inefficient at scale and a precision-mismatch hazard (timestamps stored at millisecond resolution but filter dates from `new Date(ISO)` could round differently across drivers). Added [`getGeoRankingsByArticleIds(ids, sinceDate?)`](server/databaseStorage.ts#L515) — symmetric to `getGeoRankingsByBrandPromptIds` — and the `/api/geo-analytics` handler now uses the indexed call.
+**Article-tied rankings** were still loaded via `getGeoRankings()` (full table scan) and post-filtered in memory by `r.checkedAt >= sinceFilter`. Inefficient at scale and a precision-mismatch hazard (timestamps stored at millisecond resolution but filter dates from `new Date(ISO)` could round differently across drivers). Added [`getGeoRankingsByArticleIds(ids, sinceDate?)`](server/databaseStorage.ts#L515) - symmetric to `getGeoRankingsByBrandPromptIds` - and the `/api/geo-analytics` handler now uses the indexed call.
 
 **Competitor leaderboard** wasn't getting `since` at all. So during a fresh run, brand citations were filtered to the run window (e.g. 100 in the last 5 minutes) but the leaderboard's `totalMarketCitations` still summed every competitor's all-time totals (e.g. 5000). Share-of-Voice read 100/5000 = 2% during the run when the run-relative SoV was actually 50%. The `getCompetitorLeaderboard()` storage method already accepted `opts.since` (Wave B); the handler just never passed it. Now it does.
 
 [server/routes/analytics.ts](server/routes/analytics.ts).
 
-### 17.4 GEO Analytics — queryKey instability across run boundaries
+### 17.4 GEO Analytics - queryKey instability across run boundaries
 
-Client built the key as `["/api/geo-analytics", selectedBrandId, { since: since ?? "" }]`. The default queryFn skips empty-string segments, so the URL was correct, but TanStack still treats `""` and an ISO string as different cache keys. When a run completes and `since` flips back to null, the queryKey changes — TanStack drops the run-window snapshot before the new fetch returns, and the visibility score visibly jumps as all-time data rehydrates the moment the run finishes.
+Client built the key as `["/api/geo-analytics", selectedBrandId, { since: since ?? "" }]`. The default queryFn skips empty-string segments, so the URL was correct, but TanStack still treats `""` and an ISO string as different cache keys. When a run completes and `since` flips back to null, the queryKey changes - TanStack drops the run-window snapshot before the new fetch returns, and the visibility score visibly jumps as all-time data rehydrates the moment the run finishes.
 
 Fixed by using `since ?? "all"` as a stable sentinel; the server treats `since=all` the same as missing. Same key shape across the run lifecycle, no mid-flight cache evictions.
 
 [client/src/pages/geo-analytics.tsx:134](client/src/pages/geo-analytics.tsx#L134), [server/routes/analytics.ts](server/routes/analytics.ts).
 
-### 17.5 GEO Analytics — `avgRank: 0` collapses two distinct states
+### 17.5 GEO Analytics - `avgRank: 0` collapses two distinct states
 
-The handler returned `avgRank: 0` both when no cited rows had any rank field (Gemini-style platforms that don't expose rank position) and when the platform had legitimate rank-0 data. The UI rendered `metrics.avgRank || "N/A"` — falsy `0` treated as missing. Distinct states became indistinguishable.
+The handler returned `avgRank: 0` both when no cited rows had any rank field (Gemini-style platforms that don't expose rank position) and when the platform had legitimate rank-0 data. The UI rendered `metrics.avgRank || "N/A"` - falsy `0` treated as missing. Distinct states became indistinguishable.
 
-Fixed by emitting `avgRank: number | null` from the handler (with the scoring math still using a numeric `avgRankRaw` internally) and rendering `null` as "—" on the client. Existing TS type updated.
+Fixed by emitting `avgRank: number | null` from the handler (with the scoring math still using a numeric `avgRankRaw` internally) and rendering `null` as "-" on the client. Existing TS type updated.
 
-### 17.6 Competitors tab — queries ignored selectedBrandId
+### 17.6 Competitors tab - queries ignored selectedBrandId
 
 `CompetitorsTab` received `selectedBrandId` and renamed it to `_selectedBrandId` to silence an unused-arg warning. Both queries (`/api/competitors`, `/api/competitors/leaderboard`) ran without a brandId, so the server's no-brand branch aggregated every brand the user owned. Switching brands in the selector didn't change what the panel rendered.
 
@@ -1482,53 +1482,53 @@ Fixed by threading `{ brandId: selectedBrandId }` into both query keys (object s
 
 [client/src/components/intelligence/CompetitorsTab.tsx](client/src/components/intelligence/CompetitorsTab.tsx).
 
-### 17.7 Trends tab — invalidation always missed the cached entry
+### 17.7 Trends tab - invalidation always missed the cached entry
 
-Query key was `[`/api/metrics-history/${brandId}?days=${trendDays}`]`. The Record-Snapshot mutation invalidated the bare `[`/api/metrics-history/${brandId}`]` — exact-match miss because the cached key has the `?days=` suffix. The chart never refetched. User clicked "Record Snapshot", got a success toast, and the chart still showed yesterday's last point.
+Query key was `[`/api/metrics-history/${brandId}?days=${trendDays}`]`. The Record-Snapshot mutation invalidated the bare `[`/api/metrics-history/${brandId}`]` - exact-match miss because the cached key has the `?days=` suffix. The chart never refetched. User clicked "Record Snapshot", got a success toast, and the chart still showed yesterday's last point.
 
-Fixed by predicate-matching every key whose first segment starts with `/api/metrics-history/${brandId}` so the active window — whichever it happens to be — invalidates correctly.
+Fixed by predicate-matching every key whose first segment starts with `/api/metrics-history/${brandId}` so the active window - whichever it happens to be - invalidates correctly.
 
 Also fixed timezone-naive labels: snapshots are stored UTC but `toLocaleString()` rendered in the user's local zone, which made the same chart read differently for collaborators across timezones. Labels now render with `timeZone: "UTC"` and an explicit "UTC" suffix.
 
 [client/src/components/intelligence/TrendsTab.tsx](client/src/components/intelligence/TrendsTab.tsx).
 
-### 17.8 Hallucinations tab — Mark Resolved produced 409 on already-actioned rows
+### 17.8 Hallucinations tab - Mark Resolved produced 409 on already-actioned rows
 
-The "Mark Resolved" button stayed enabled even when `remediationStatus` was `verified` or `dismissed`. Server's `assertTransition` correctly rejected the call, but the UI surfaced it as "Failed to resolve" — confusing because the button was visibly clickable. Fixed by gating the button: only enabled when status is `pending` / `in_progress` / null.
+The "Mark Resolved" button stayed enabled even when `remediationStatus` was `verified` or `dismissed`. Server's `assertTransition` correctly rejected the call, but the UI surfaced it as "Failed to resolve" - confusing because the button was visibly clickable. Fixed by gating the button: only enabled when status is `pending` / `in_progress` / null.
 
 [client/src/components/intelligence/HallucinationsTab.tsx](client/src/components/intelligence/HallucinationsTab.tsx).
 
-### 17.9 Share-of-Answer tab — division-by-zero NaN renders + duplicate competitors
+### 17.9 Share-of-Answer tab - division-by-zero NaN renders + duplicate competitors
 
 Three rendering blocks (`byCategory`, `byFunnel`, `byCompetitor`) divided `data.cited / data.total` with no `>0` guard. A brand with stat rows but zero counts rendered `NaN%` and the Progress bar had `value={NaN}`. Now each block uses a single guarded computation that defaults to 0 when total is 0.
 
-Separately the create-prompt payload split competitor names by comma, trimmed, and filtered blanks but didn't dedupe — "Salesforce, salesforce" landed in `competitorSet` as two entries. The downstream win-rate matcher collapses them, but historical rows already stored both. Now we trim, drop blanks, and dedupe case-insensitively while preserving the user's first-seen casing.
+Separately the create-prompt payload split competitor names by comma, trimmed, and filtered blanks but didn't dedupe - "Salesforce, salesforce" landed in `competitorSet` as two entries. The downstream win-rate matcher collapses them, but historical rows already stored both. Now we trim, drop blanks, and dedupe case-insensitively while preserving the user's first-seen casing.
 
 [client/src/components/intelligence/ShareOfAnswerTab.tsx](client/src/components/intelligence/ShareOfAnswerTab.tsx).
 
-### 17.10 Alerts tab — threshold UI hidden for hallucinations + clearer 409
+### 17.10 Alerts tab - threshold UI hidden for hallucinations + clearer 409
 
-The threshold slider was hidden for `alertType: "hallucination_detected"`, which meant the alert always fired on every detection — but the UI gave no indication of that. New users created the alert thinking it would batch, then complained about notification volume. Now the slider is shown for hallucinations too with a count semantic ("fire when at least N new hallucinations are detected") and explanatory copy.
+The threshold slider was hidden for `alertType: "hallucination_detected"`, which meant the alert always fired on every detection - but the UI gave no indication of that. New users created the alert thinking it would batch, then complained about notification volume. Now the slider is shown for hallucinations too with a count semantic ("fire when at least N new hallucinations are detected") and explanatory copy.
 
 The create mutation now has an `onError` handler that renders the server's 409 message ("An alert of this type already exists for this brand") instead of failing silently.
 
 [client/src/components/intelligence/AlertsTab.tsx](client/src/components/intelligence/AlertsTab.tsx).
 
-### 17.11 BOFU tab — competitor names duplicated by casing
+### 17.11 BOFU tab - competitor names duplicated by casing
 
-The `CompetitorCombobox` used `value.includes(name)` for presence checks (toggle, free-form Enter, checkbox state). User adds "Salesforce" then types "salesforce" — both stored in `bofuCompetitors`, posted to `/api/bofu-content/generate`, and saved to `comparedWith` with both casings. The downstream leaderboard matcher dedupes them but the BOFU rows are duplicated permanently.
+The `CompetitorCombobox` used `value.includes(name)` for presence checks (toggle, free-form Enter, checkbox state). User adds "Salesforce" then types "salesforce" - both stored in `bofuCompetitors`, posted to `/api/bofu-content/generate`, and saved to `comparedWith` with both casings. The downstream leaderboard matcher dedupes them but the BOFU rows are duplicated permanently.
 
 Fixed via a single `indexOfCi` helper used everywhere presence is checked. First-seen casing is preserved.
 
 [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx).
 
-### 17.12 BOFU content — fake aiScore: 85
+### 17.12 BOFU content - fake aiScore: 85
 
-`/api/bofu-content/generate` hard-coded `aiScore: 85` on every save. The BOFU panel surfaced this as a real quality signal, so users read the constant 85 as a meaningful ranking. Removed — the column is nullable; the optimizer flow can populate it later via PATCH if a real scoring step is added.
+`/api/bofu-content/generate` hard-coded `aiScore: 85` on every save. The BOFU panel surfaced this as a real quality signal, so users read the constant 85 as a meaningful ranking. Removed - the column is nullable; the optimizer flow can populate it later via PATCH if a real scoring step is added.
 
 [server/routes/contentTypes.ts](server/routes/contentTypes.ts).
 
-### 17.13 FAQ generation — pre-marked as optimized
+### 17.13 FAQ generation - pre-marked as optimized
 
 The bulk-generate endpoint (`POST /api/faqs/generate/:brandId`) inserted every freshly generated FAQ with `isOptimized: 1`. Users saw the green "Optimized" check on every newly-generated row, defeating the point of the per-FAQ optimize step (which is a separate `POST /api/faqs/:id/optimize` call that refines wording). Now generation defaults to `isOptimized: 0`; the optimize endpoint flips it to 1 as it always did.
 
@@ -1536,8 +1536,8 @@ The bulk-generate endpoint (`POST /api/faqs/generate/:brandId`) inserted every f
 
 ### 17.14 Verification
 
-- `npx tsc --noEmit` — 0 errors.
-- `npx vitest run` — 171/171 green.
+- `npx tsc --noEmit` - 0 errors.
+- `npx vitest run` - 171/171 green.
 - Apply migration 0041 on next boot to dedupe legacy alert rows + install the unique index.
 
 ### 17.15 Out of scope (explicitly deferred)
@@ -1546,21 +1546,21 @@ Critique findings the user judged not worth this round:
 
 - Hallucination paraphrase clustering (MD5 dedup misses near-duplicates with different wording).
 - Sentiment threshold tuning (skewed-neutral distributions still classify "Neutral").
-- Leaderboard medal colors keyed off filtered-array index instead of true rank — only matters if filtering is added.
+- Leaderboard medal colors keyed off filtered-array index instead of true rank - only matters if filtering is added.
 - GEO Tools mentions tab: no `?since=` filter; mentions discovered across runs aren't visually marked "new this run".
 - Scan-mutation timeouts; hung scan leaves the button stuck on "Scanning…".
-- Token-in-URL for SSE (#27), CSRF (#28), Redis-backed re-detect cooldown (#29) — security follow-up pass.
+- Token-in-URL for SSE (#27), CSRF (#28), Redis-backed re-detect cooldown (#29) - security follow-up pass.
 - Wikipedia disambiguation handling, sentry classification of synthetic `ai://` source URLs.
 
 None of these block any active flow.
 
-## Wave 9.4 — GEO Tools content lifecycle, citation-tracking integration, and scanner correctness
+## Wave 9.4 - GEO Tools content lifecycle, citation-tracking integration, and scanner correctness
 
-The user's headline complaint was real and surfaced first: **BOFU content was generated but invisible** — [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx) rendered each piece as a 500-char preview inside a 160px ScrollArea with no view/edit/copy/publish/delete affordances. Generated content sat in the DB and the user had no way to actually use it. A fresh end-to-end audit of GEO Tools also surfaced harder problems: hallucinated competitor comparisons, fake `aiSurfaceScore` numbers, no DB-level dedup (concurrent scans = duplicate rows), no content lifecycle, no citation-tracking integration, scanners that swallowed rate-limit failures into silent success toasts. Wave 9.4 closes all of it.
+The user's headline complaint was real and surfaced first: **BOFU content was generated but invisible** - [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx) rendered each piece as a 500-char preview inside a 160px ScrollArea with no view/edit/copy/publish/delete affordances. Generated content sat in the DB and the user had no way to actually use it. A fresh end-to-end audit of GEO Tools also surfaced harder problems: hallucinated competitor comparisons, fake `aiSurfaceScore` numbers, no DB-level dedup (concurrent scans = duplicate rows), no content lifecycle, no citation-tracking integration, scanners that swallowed rate-limit failures into silent success toasts. Wave 9.4 closes all of it.
 
 ### 18.1 BOFU is now a real surface
 
-[client/src/components/geo-tools/BofuContentSheet.tsx](client/src/components/geo-tools/BofuContentSheet.tsx) (NEW) — full-content sheet with four tabs:
+[client/src/components/geo-tools/BofuContentSheet.tsx](client/src/components/geo-tools/BofuContentSheet.tsx) (NEW) - full-content sheet with four tabs:
 
 - **Content**: full markdown render via `SafeMarkdown` (already sanitized via rehype-sanitize). Copy-all + download-as-`.md`.
 - **Metadata**: type, primary keyword, comparedWith list, target intent, aiScore, createdAt/updatedAt, last-cited timestamp.
@@ -1571,7 +1571,7 @@ Plus a delete with browser-native confirm. The geo-tools.tsx BOFU "Generated Con
 
 ### 18.2 Brand-fact grounding for BOFU + FAQ generation
 
-[server/lib/brandGenerationContext.ts](server/lib/brandGenerationContext.ts) (NEW) — `loadBrandGenerationContext(brandId, comparedWith)` returns the brand row, active fact-sheet entries (from `brand_fact_sheet`), and resolved competitors (case-insensitive match on `name` against the tracked-competitors table). `renderFactsBlock()` and `renderCompetitorBlock()` produce prompt-ready strings.
+[server/lib/brandGenerationContext.ts](server/lib/brandGenerationContext.ts) (NEW) - `loadBrandGenerationContext(brandId, comparedWith)` returns the brand row, active fact-sheet entries (from `brand_fact_sheet`), and resolved competitors (case-insensitive match on `name` against the tracked-competitors table). `renderFactsBlock()` and `renderCompetitorBlock()` produce prompt-ready strings.
 
 Both BOFU `/generate` and FAQ `/generate` (in [server/routes/contentTypes.ts](server/routes/contentTypes.ts)) now consume these blocks. Two consequential changes:
 
@@ -1580,9 +1580,9 @@ Both BOFU `/generate` and FAQ `/generate` (in [server/routes/contentTypes.ts](se
 
 The FAQ optimizer endpoint (`POST /api/faqs/:id/optimize`) gets the same grounding treatment.
 
-### 18.3 Real `aiSurfaceScore` heuristic — the LLM no longer scores its own output
+### 18.3 Real `aiSurfaceScore` heuristic - the LLM no longer scores its own output
 
-[server/lib/faqScoring.ts](server/lib/faqScoring.ts) (NEW) — `computeAiSurfaceScore({ question, answer, brand })` returns a deterministic 0-100 integer. Range design: a "perfect" FAQ scores ~95, a "terrible" one ~15-30. Inputs:
+[server/lib/faqScoring.ts](server/lib/faqScoring.ts) (NEW) - `computeAiSurfaceScore({ question, answer, brand })` returns a deterministic 0-100 integer. Range design: a "perfect" FAQ scores ~95, a "terrible" one ~15-30. Inputs:
 
 - **Length window**: 40-80 word answers get +25 (sweet spot for AI summarization). 25-39 or 81-120 get +10. <15 gets −25; >200 gets −15.
 - **Question phrasing**: starts with what/how/why/when/where/who/which/is/are/do/does/can/should → +10. Otherwise −10.
@@ -1608,40 +1608,40 @@ Three coordinated changes:
 - `wikipedia_mentions_brand_id_page_url_uniq` ON `(brand_id, page_url)`
 - `brand_mentions_brand_id_source_url_uniq` ON `(brand_id, lower(source_url))`
 
-**Storage** gains `tryInsertListicle` / `tryInsertWikipediaMention` / `tryInsertBrandMention`, which use Drizzle's `.onConflictDoNothing().returning()` pattern. They return `Listicle | null` — null = the unique index rejected the insert, i.e. the row already existed. Scanners use the null return to count "duplicates skipped" cleanly.
+**Storage** gains `tryInsertListicle` / `tryInsertWikipediaMention` / `tryInsertBrandMention`, which use Drizzle's `.onConflictDoNothing().returning()` pattern. They return `Listicle | null` - null = the unique index rejected the insert, i.e. the row already existed. Scanners use the null return to count "duplicates skipped" cleanly.
 
-**[server/lib/scanReport.ts](server/lib/scanReport.ts)** (NEW) — typed shape returned by every scanner: `{ found, inserted, skippedDuplicate, skippedFiltered, failed: [{ url?, reason }], reverified?, lostInclusion?, warning? }`. Routes return `report` in `data`; client renders multi-line toasts via a new `formatReportLines` helper that hides zero-valued lines so a clean run shows just the meaningful signal.
+**[server/lib/scanReport.ts](server/lib/scanReport.ts)** (NEW) - typed shape returned by every scanner: `{ found, inserted, skippedDuplicate, skippedFiltered, failed: [{ url?, reason }], reverified?, lostInclusion?, warning? }`. Routes return `report` in `data`; client renders multi-line toasts via a new `formatReportLines` helper that hides zero-valued lines so a clean run shows just the meaningful signal.
 
 What this fixes:
 
-- **Concurrent-scan duplicates** ([server/lib/listicleScanner.ts](server/lib/listicleScanner.ts) old behavior: read existing URLs into a Set, loop, insert) — gone. Two users scanning the same brand simultaneously now produce exactly one row per URL.
-- **Silent partial failures** — Reddit 429s, Wikipedia 404s, Quora HTML-shape changes, Perplexity hallucinated URLs that 404 on fetch — all push into `failed[]` with a reason instead of a `console.warn`-and-continue. Toast surfaces the count: "Found 12 · Inserted 3 · Duplicates 7 · Failed 2."
+- **Concurrent-scan duplicates** ([server/lib/listicleScanner.ts](server/lib/listicleScanner.ts) old behavior: read existing URLs into a Set, loop, insert) - gone. Two users scanning the same brand simultaneously now produce exactly one row per URL.
+- **Silent partial failures** - Reddit 429s, Wikipedia 404s, Quora HTML-shape changes, Perplexity hallucinated URLs that 404 on fetch - all push into `failed[]` with a reason instead of a `console.warn`-and-continue. Toast surfaces the count: "Found 12 · Inserted 3 · Duplicates 7 · Failed 2."
 
 ### 18.6 Listicle re-verification phase
 
-Wave 9.3's audit flagged that listicle rows went stale forever — a brand could drop out of a listicle in May and the row still showed `isIncluded=1, listPosition=3` in October. [server/lib/listicleScanner.ts](server/lib/listicleScanner.ts) now does a two-phase scan:
+Wave 9.3's audit flagged that listicle rows went stale forever - a brand could drop out of a listicle in May and the row still showed `isIncluded=1, listPosition=3` in October. [server/lib/listicleScanner.ts](server/lib/listicleScanner.ts) now does a two-phase scan:
 
 1. **Re-verify** every existing row whose `last_verified_at` is missing or older than 7 days (bounded at 50 per scan). Re-fetch the URL, re-run matcher, update `is_included` / `list_position` / `competitors_mentioned` / `last_verified_at`. New report fields `reverified` and `lostInclusion` surface in the toast.
 2. **Discover** new candidates (the existing flow).
 
-Status flips are logged to the toast — "Lost inclusion: 1" tells the user a previously-included listicle has dropped them.
+Status flips are logged to the toast - "Lost inclusion: 1" tells the user a previously-included listicle has dropped them.
 
-### 18.7 Lifecycle state tracking — the dropdowns
+### 18.7 Lifecycle state tracking - the dropdowns
 
-[client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx) — inline `<Select>` per row drives a PATCH:
+[client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx) - inline `<Select>` per row drives a PATCH:
 
 **Listicles** (`outreach_status` column, default `'new'`): `new` → `contacted` → `won` / `dropped`. Stored on every listicle row, edited via the dropdown on the row card. Lets the user track outreach state without leaving the app.
 
 **Brand mentions** (`status` column, default `'new'`): `new` → `acknowledged` → `replied` / `false_positive` / `ignored`. The header summary card "Mentions: 47 · 12 unaddressed" only counts rows still at `new`. False-positive captures the common-word-brand-name case ("Apple", "Match") where the matcher mis-fires; ignored captures intentional non-engagement.
 
-Both columns are categorical, not strict state machines — users can move backward to correct mistakes. Server validates the value against an allowlist on PATCH; ownership-checked via `requireBrand` on the row's brand.
+Both columns are categorical, not strict state machines - users can move backward to correct mistakes. Server validates the value against an allowlist on PATCH; ownership-checked via `requireBrand` on the row's brand.
 
-#### 18.7.1 Followup — making the saved state visible
+#### 18.7.1 Followup - making the saved state visible
 
-User feedback after the dropdowns shipped: "but where can I see those tracked data? it just vanishes after I select something." The status was persisting correctly to the DB but the UI didn't render it back — listicle rows had no status badge at all, and mention rows only rendered a subtle outline badge when the status was non-default. Three additions:
+User feedback after the dropdowns shipped: "but where can I see those tracked data? it just vanishes after I select something." The status was persisting correctly to the DB but the UI didn't render it back - listicle rows had no status badge at all, and mention rows only rendered a subtle outline badge when the status was non-default. Three additions:
 
 - **Always-visible colored status badge on every row.** Shared display maps (`LISTICLE_STATUS_DISPLAY`, `MENTION_STATUS_DISPLAY`) define a label + color class per state. Listicles: gray "New", blue "Contacted", green "Won", muted "Dropped". Mentions: gray "New", blue "Acknowledged", green "Replied", amber "False positive", muted "Ignored". The badge sits next to the existing Included / sentiment / platform badges so the row visibly updates as soon as the user picks a value.
-- **Filter `<Select>` at the top of each tab** — "Filter by outreach" on Listicles, "Filter by status" on Mentions, default `All`. Lets users see only the rows in a chosen state (e.g. "show me only Contacted listicles") so the workflow state actually drives the view.
+- **Filter `<Select>` at the top of each tab** - "Filter by outreach" on Listicles, "Filter by status" on Mentions, default `All`. Lets users see only the rows in a chosen state (e.g. "show me only Contacted listicles") so the workflow state actually drives the view.
 - **Real total counts in the section headers** ("Tracked Listicles (12)", "Recent Mentions (47)") so the user knows how many rows the filter is hiding. The mention list display cap also bumped from 10 to 25 so the filter has room to operate.
 
 [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx).
@@ -1650,13 +1650,13 @@ User feedback after the dropdowns shipped: "but where can I see those tracked da
 
 For artifacts the scanner missed (a listicle a colleague forwarded, a Wikipedia mention discovered manually, a brand mention found in a private Slack):
 
-- `POST /api/listicles` (existed) — now uses `tryInsertListicle`, returns 409 on duplicate URL.
-- `POST /api/wikipedia` (existed) — same treatment via `tryInsertWikipediaMention`.
-- `POST /api/brand-mentions` (NEW) — `tryInsertBrandMention` + ownership check, accepts `platform` + `sourceUrl` + `mentionContext` + `sentiment`.
+- `POST /api/listicles` (existed) - now uses `tryInsertListicle`, returns 409 on duplicate URL.
+- `POST /api/wikipedia` (existed) - same treatment via `tryInsertWikipediaMention`.
+- `POST /api/brand-mentions` (NEW) - `tryInsertBrandMention` + ownership check, accepts `platform` + `sourceUrl` + `mentionContext` + `sentiment`.
 
 Three dialog components (`ManualAddListicleDialog`, `ManualAddWikipediaDialog`, `ManualAddMentionDialog`) live at the bottom of [client/src/pages/geo-tools.tsx](client/src/pages/geo-tools.tsx). "+ Add manually" buttons next to each tab's primary scan button open them.
 
-### 18.9 Citation-tracking integration — closing the loop
+### 18.9 Citation-tracking integration - closing the loop
 
 **The biggest gap from the audit**: BOFU/FAQ/listicle rows had no foreign key into `citation_runs` or `geo_rankings`. Users had no way to answer "did the BOFU page I published actually get cited?"
 
@@ -1666,7 +1666,7 @@ Fix:
 - **`citation_runs.self_citation_count`** (migration 0042): aggregate maintained by the checker.
 - **`bofu_content.last_cited_at` and `faq_items.last_cited_at`** (migration 0042): per-row timestamps stamped on every match.
 
-When a user sets `publishedUrl` on a BOFU or FAQ piece, the PATCH handler calls `syncTrackedContentUrl()` which upserts into `tracked_content_urls` (one row per source — re-publishing a different URL UPDATEs in place; clearing publishedUrl DELETEs).
+When a user sets `publishedUrl` on a BOFU or FAQ piece, the PATCH handler calls `syncTrackedContentUrl()` which upserts into `tracked_content_urls` (one row per source - re-publishing a different URL UPDATEs in place; clearing publishedUrl DELETEs).
 
 [server/lib/trackedContentMatcher.ts](server/lib/trackedContentMatcher.ts) (NEW) exposes `normalizeUrl(raw)` and `findSelfCitationsInText(text, trackedUrls)`. The citation checker ([server/citationChecker.ts](server/citationChecker.ts)) preloads tracked URLs once per run, and after the existing matcher resolves the brand/competitor verdict for a `(brand, prompt, platform)` cell, calls `findSelfCitationsInText(responseText, trackedContentUrls)`. For each hit:
 
@@ -1703,9 +1703,9 @@ UI: each opportunity row gets a "Draft mention" button. Click → modal opens wi
 
 Two coordinated changes for brands with ambiguous names ("Apple", "Match", "Square") and shared infra running multiple users' scans simultaneously:
 
-**[server/lib/brandNameAmbiguity.ts](server/lib/brandNameAmbiguity.ts)** (NEW) — hardcoded blocklist of ~80 common-word brand names. `brandNameAmbiguityScore(name)` returns 0 / 1 / 2; `brandNameWarning(name)` returns a copy-paste-ready advisory. Listicle and mention scanners check on kickoff and surface the warning in the toast (doesn't block the scan; just nudges the user to add `nameVariations`).
+**[server/lib/brandNameAmbiguity.ts](server/lib/brandNameAmbiguity.ts)** (NEW) - hardcoded blocklist of ~80 common-word brand names. `brandNameAmbiguityScore(name)` returns 0 / 1 / 2; `brandNameWarning(name)` returns a copy-paste-ready advisory. Listicle and mention scanners check on kickoff and surface the warning in the toast (doesn't block the scan; just nudges the user to add `nameVariations`).
 
-**[server/lib/rateLimitBuckets.ts](server/lib/rateLimitBuckets.ts)** (NEW) — in-process token bucket per `(provider, scopeId)`. Configured for Reddit (10 cap, 1/6 refill — matches the unauth limit), Wikipedia (30/5), Hacker News (30/5), Quora (5/0.25). `acquireOrWait(provider, scopeId, maxWaitMs)` blocks up to 30s; on timeout the mention scanner records "rate-limited" in `report.failed` rather than burning a 429.
+**[server/lib/rateLimitBuckets.ts](server/lib/rateLimitBuckets.ts)** (NEW) - in-process token bucket per `(provider, scopeId)`. Configured for Reddit (10 cap, 1/6 refill - matches the unauth limit), Wikipedia (30/5), Hacker News (30/5), Quora (5/0.25). `acquireOrWait(provider, scopeId, maxWaitMs)` blocks up to 30s; on timeout the mention scanner records "rate-limited" in `report.failed` rather than burning a 429.
 
 The previous `await sleep(REDDIT_RATE_DELAY_MS)` was per-process; concurrent users on the same instance both hit Reddit within the 100ms window and most got 429s that were then swallowed by a `console.warn` while the success toast lied. Now: explicit ETA in failure messages ("reddit rate-limited (try again in ~30s)") and the toast surfaces the count.
 
@@ -1739,15 +1739,15 @@ In-memory bucket is fine for single-instance deployment per CLAUDE.md; comments 
 
 Four new test files, 31 new assertions:
 
-- [tests/unit/faqScoring.test.ts](tests/unit/faqScoring.test.ts) — table-driven across the sweet-spot length window, short answers, non-question questions, brand-mention bumps, and clamp-to-0-100 pathological cases.
-- [tests/unit/trackedContentMatcher.test.ts](tests/unit/trackedContentMatcher.test.ts) — URL normalization across scheme / www / casing / query / fragment / trailing-slash variations; `findSelfCitationsInText` per-call dedup, multi-URL match, empty-input safety.
-- [tests/unit/rateLimitBuckets.test.ts](tests/unit/rateLimitBuckets.test.ts) — initial burst up to capacity, scope isolation, ETA estimation, `acquireOrWait` timeout return.
-- [tests/unit/brandNameAmbiguity.test.ts](tests/unit/brandNameAmbiguity.test.ts) — common-word flags, short-word fallback, null-safe handling.
+- [tests/unit/faqScoring.test.ts](tests/unit/faqScoring.test.ts) - table-driven across the sweet-spot length window, short answers, non-question questions, brand-mention bumps, and clamp-to-0-100 pathological cases.
+- [tests/unit/trackedContentMatcher.test.ts](tests/unit/trackedContentMatcher.test.ts) - URL normalization across scheme / www / casing / query / fragment / trailing-slash variations; `findSelfCitationsInText` per-call dedup, multi-URL match, empty-input safety.
+- [tests/unit/rateLimitBuckets.test.ts](tests/unit/rateLimitBuckets.test.ts) - initial burst up to capacity, scope isolation, ETA estimation, `acquireOrWait` timeout return.
+- [tests/unit/brandNameAmbiguity.test.ts](tests/unit/brandNameAmbiguity.test.ts) - common-word flags, short-word fallback, null-safe handling.
 
 ### 18.15 Verification
 
-- `npx tsc --noEmit` — 0 errors.
-- `npx vitest run` — **22 files / 202 tests passing** (171 prior + 31 new).
+- `npx tsc --noEmit` - 0 errors.
+- `npx vitest run` - **22 files / 202 tests passing** (171 prior + 31 new).
 - Migration 0042 is idempotent: `CREATE EXTENSION IF NOT EXISTS`, dedup CTEs run before the unique indexes, all `ADD COLUMN IF NOT EXISTS`, trigram index wrapped in DO block that NOTICE-skips if pg_trgm is unavailable.
 
 ### 18.16 Out of scope (deferred to a follow-up)
@@ -1762,7 +1762,7 @@ Four new test files, 31 new assertions:
 - Cross-brand competitive intelligence in the mentions tab.
 - Audit log of generation prompts (knowing exactly which fact-sheet version produced a given BOFU is desirable but adds a `generation_audit` table nothing else uses yet).
 
-## Wave 9.4 — Operational notes (Render free-tier keepalive)
+## Wave 9.4 - Operational notes (Render free-tier keepalive)
 
 Not a code change but worth recording: a GitHub Actions workflow at [.github/workflows/keep-alive.yml](.github/workflows/keep-alive.yml) pings `/health` every 5 minutes from `ubuntu-latest` runners to defeat Render's 15-minute idle-spin-down on the free tier. The endpoint runs `SELECT 1` + advisory-lock round-trip ([server/index.ts:381](server/index.ts#L381)) so a green ping confirms DB connectivity, not just process liveness. `curl -fsSL` makes non-2xx fail the workflow; `-w` prints HTTP status + total time + DNS + connect time so creeping cold-start latency is visible in the run log.
 
@@ -1774,13 +1774,13 @@ Notes for whoever inherits this:
 - Public repo = unlimited Actions minutes; private repo = 2,000/month free, ~720 burned at this cadence (still fits, but other workflows share the budget).
 - Once the service moves to a paid Render tier (or off Render entirely), the workflow becomes redundant and should be removed.
 
-## Wave 10 — Vercel Hobby single-path migration
+## Wave 10 - Vercel Hobby single-path migration
 
-Scope: move the entire app off Render's always-on Node process onto Vercel Hobby. No dual-path code, no `process.env.VERCEL` conditionals, no Render fallback — a single deployment target. Constraints accepted up front: 60s function cap, 1 cron/day, ephemeral filesystem, no in-process schedulers or workers.
+Scope: move the entire app off Render's always-on Node process onto Vercel Hobby. No dual-path code, no `process.env.VERCEL` conditionals, no Render fallback - a single deployment target. Constraints accepted up front: 60s function cap, 1 cron/day, ephemeral filesystem, no in-process schedulers or workers.
 
 ### 10.1 Single Express function via pre-bundled entry
 
-`api/index.ts` is the source-controlled function entry Vercel discovers natively. It is a six-line stub that re-exports the default handler from `api/_bundle.js` — a self-contained ESM bundle produced by the build step from `server/vercelEntry.ts`. The bundle is gitignored.
+`api/index.ts` is the source-controlled function entry Vercel discovers natively. It is a six-line stub that re-exports the default handler from `api/_bundle.js` - a self-contained ESM bundle produced by the build step from `server/vercelEntry.ts`. The bundle is gitignored.
 
 The stub-imports-bundle pattern is a workaround for two Vercel quirks discovered the hard way:
 
@@ -1838,19 +1838,19 @@ Runs each sub-job serially with crash isolation; budgets the wall clock and skip
 2. `reconcileOrphanCitationRuns`
 3. `resumeInFlightAutopilots` (deadline-bounded so it returns; remainder picked up tomorrow)
 4. `runAccountPurgeJob`, `runBrandPurgeJob`
-5. `runAutoCitationJob` — hour-of-day filter dropped (degraded from "9 AM UTC respected" to "fires at 06:00 UTC"; documented degradation)
+5. `runAutoCitationJob` - hour-of-day filter dropped (degraded from "9 AM UTC respected" to "fires at 06:00 UTC"; documented degradation)
 6. Day-of-week-gated: `runCompetitorDiscoveryJob`, `runMentionScanJob`, `runListicleScanJob`, `runWeeklyCatchupKickoff` on Mondays; `runWeeklyReportJob` on Sundays
 7. Day-of-month-gated: `runFactRefreshJob` on the 1st
 
-Test coverage: [tests/unit/cronOrchestrator.test.ts](tests/unit/cronOrchestrator.test.ts) — auth gate (no secret / wrong secret / Bearer / x-cron-secret) + per-step results array shape.
+Test coverage: [tests/unit/cronOrchestrator.test.ts](tests/unit/cronOrchestrator.test.ts) - auth gate (no secret / wrong secret / Bearer / x-cron-secret) + per-step results array shape.
 
 ### 10.5 Lazy evaluation replaces sub-daily crons
 
 Two former in-process crons collapsed into demand-driven ticks:
 
-**Workflow tick** — was a 30s cron `WORKFLOW_TICK_CRON`. Now `maybeTickActiveRunsForUser(userId)` ([server/lib/workflowEngine.ts](server/lib/workflowEngine.ts)) fires from the `attachUserIfPresent` middleware via `waitUntil`. Per-user debounce table `workflow_tick_state` prevents stampedes on parallel requests. Workflows only progress when something changes; those changes always come back through HTTP, so ticking on every authenticated request advances stuck runs within seconds.
+**Workflow tick** - was a 30s cron `WORKFLOW_TICK_CRON`. Now `maybeTickActiveRunsForUser(userId)` ([server/lib/workflowEngine.ts](server/lib/workflowEngine.ts)) fires from the `attachUserIfPresent` middleware via `waitUntil`. Per-user debounce table `workflow_tick_state` prevents stampedes on parallel requests. Workflows only progress when something changes; those changes always come back through HTTP, so ticking on every authenticated request advances stuck runs within seconds.
 
-**Weekly digest aggregator** — was a 5-min cron. Now `tryEmitWeeklyDigestForUser(userId)` ([server/lib/weeklyDigestEmitter.ts](server/lib/weeklyDigestEmitter.ts)) runs inside `tickActiveRuns`/`advanceRun` whenever a `weekly_catchup` run reaches a terminal status. The 6-day stamp on `users.lastWeeklyReportSentAt` is the dedup; concurrent firings race harmlessly because `UPDATE ... WHERE lastWeeklyReportSentAt < now() - interval '6 days'` is atomic.
+**Weekly digest aggregator** - was a 5-min cron. Now `tryEmitWeeklyDigestForUser(userId)` ([server/lib/weeklyDigestEmitter.ts](server/lib/weeklyDigestEmitter.ts)) runs inside `tickActiveRuns`/`advanceRun` whenever a `weekly_catchup` run reaches a terminal status. The 6-day stamp on `users.lastWeeklyReportSentAt` is the dedup; concurrent firings race harmlessly because `UPDATE ... WHERE lastWeeklyReportSentAt < now() - interval '6 days'` is atomic.
 
 ### 10.6 Postgres-backed rate-limit buckets
 
@@ -1858,14 +1858,14 @@ Rate-limit state moved from per-process `Map` to the `rate_limit_buckets` table 
 
 Test suite ([tests/unit/rateLimitBuckets.test.ts](tests/unit/rateLimitBuckets.test.ts)) was rewritten to spin up a real Postgres test path; semantics tests (capacity, refill rate, blocking, scope isolation) preserved.
 
-### 10.7 Content generation worker — client-driven /advance with section chunking
+### 10.7 Content generation worker - client-driven /advance with section chunking
 
 The polling content worker (`server/contentGenerationWorker.ts`) lost its `setTimeout` polling loop. Replaced by `POST /api/content-jobs/:jobId/advance` ([server/routes/content.ts](server/routes/content.ts)):
 
 1. Auth + ownership.
 2. Claim the job with `SELECT ... FOR UPDATE NOWAIT`.
 3. Compute deadline = `Date.now() + 8000`.
-4. `generateArticleSliceForJob(job, deadline)` — works on the next pending section (BOFU long-form is broken into intro / comparison / FAQ / conclusion; FAQ batches are one section per item). Each section is one OpenAI call, expected to complete under 8s. Persists `current_section`, `completed_sections`, `section_plan` (migration `0044_content_job_sectioning.sql`).
+4. `generateArticleSliceForJob(job, deadline)` - works on the next pending section (BOFU long-form is broken into intro / comparison / FAQ / conclusion; FAQ batches are one section per item). Each section is one OpenAI call, expected to complete under 8s. Persists `current_section`, `completed_sections`, `section_plan` (migration `0044_content_job_sectioning.sql`).
 5. Returns `{status, contentLength, done, error?}`. Client polls `/advance` then `/state` in a loop until `done:true`.
 
 If the user navigates away mid-generation, the job sits in `pending`/`running` until the daily cron's `failStuckContentJobs(60min)` cleans it up.
@@ -1874,8 +1874,8 @@ If the user navigates away mid-generation, the job sits in `pending`/`running` u
 
 Two streams converted from EventSource to interval polling:
 
-- **Content stream** — old: `/api/content-jobs/:jobId/stream` SSE. New: `GET /api/content-jobs/:jobId/state?since=<n>` returns `{ status, streamBuffer, contentLength, error?, done }`. Client polls every 500ms while the tab is visible, 4s while hidden. Tail-only: `?since=<n>` lets the client request only the slice of `streamBuffer` past its cursor.
-- **Citation events** — old: `/api/brands/:brandId/citation-events` SSE + a `Map<userId, Set<stream>>` with a 3-stream-per-user cap. New: `GET /api/brands/:brandId/citation-runs/state?since=<rankingId>` returns the active runs' status + progress + any `geo_rankings` rows newer than the cursor. Client polls every 1s. The cap and the in-memory map are gone (polling is cheap; no need to limit it).
+- **Content stream** - old: `/api/content-jobs/:jobId/stream` SSE. New: `GET /api/content-jobs/:jobId/state?since=<n>` returns `{ status, streamBuffer, contentLength, error?, done }`. Client polls every 500ms while the tab is visible, 4s while hidden. Tail-only: `?since=<n>` lets the client request only the slice of `streamBuffer` past its cursor.
+- **Citation events** - old: `/api/brands/:brandId/citation-events` SSE + a `Map<userId, Set<stream>>` with a 3-stream-per-user cap. New: `GET /api/brands/:brandId/citation-runs/state?since=<rankingId>` returns the active runs' status + progress + any `geo_rankings` rows newer than the cursor. Client polls every 1s. The cap and the in-memory map are gone (polling is cheap; no need to limit it).
 
 Trade-off: token-by-token SSE feel becomes 500ms-chunked. Imperceptible for long-form BOFU; slightly chunky for short FAQ items. Documented as accepted degradation.
 
@@ -1883,17 +1883,17 @@ Trade-off: token-by-token SSE feel becomes 500ms-chunked. Imperceptible for long
 
 `kickoffBrandPromptsRun` ([server/citationChecker.ts](server/citationChecker.ts)) used `setImmediate(() => runBrandPrompts(...))` to fire-and-forget the citation work behind the kickoff request. On Vercel that detached work gets killed when the lambda terminates ~60s after responding.
 
-Replaced with an inline call gated by a deadline — kickoff returns `runId` immediately as before (the work is sliced and progress-bounded), but the lambda stays alive for as much of the run as fits under the function cap. Whatever doesn't finish is picked up by the client's `/advance` polling, the same pattern as content generation.
+Replaced with an inline call gated by a deadline - kickoff returns `runId` immediately as before (the work is sliced and progress-bounded), but the lambda stays alive for as much of the run as fits under the function cap. Whatever doesn't finish is picked up by the client's `/advance` polling, the same pattern as content generation.
 
 ### 10.10 Boot-path migrations and worker init removed
 
-`server/index.ts` (now the local-dev entry only) keeps `applyMigrations()` + `initScheduler()` + `initContentGenerationWorker()` for `npm run dev`. None of those run on Vercel because Vercel uses `server/vercelEntry.ts` instead — Vercel imports the Express app, not the IIFE that boots it.
+`server/index.ts` (now the local-dev entry only) keeps `applyMigrations()` + `initScheduler()` + `initContentGenerationWorker()` for `npm run dev`. None of those run on Vercel because Vercel uses `server/vercelEntry.ts` instead - Vercel imports the Express app, not the IIFE that boots it.
 
 `reconcileOrphanCitationRuns` and `resumeInFlightAutopilots` moved into the daily cron orchestrator. They're best-effort recoveries; running them daily instead of on-boot adds at most a 24h reconciliation window, acceptable.
 
 ### 10.11 DB pool sized for serverless
 
-[server/db.ts](server/db.ts) pool: `max: 1`, `idleTimeoutMillis: 5_000` on Vercel; `max: 10`, `idleTimeoutMillis: 30_000` locally. Combined with switching `DATABASE_URL` on Vercel to Supabase's transaction pooler (port 6543, `aws-0-<region>.pooler.supabase.com`), this avoids exhausting Postgres connections under cold-start storms — the pooler is what holds the warm connections to Postgres; lambdas hold one short-lived connection to the pooler.
+[server/db.ts](server/db.ts) pool: `max: 1`, `idleTimeoutMillis: 5_000` on Vercel; `max: 10`, `idleTimeoutMillis: 30_000` locally. Combined with switching `DATABASE_URL` on Vercel to Supabase's transaction pooler (port 6543, `aws-0-<region>.pooler.supabase.com`), this avoids exhausting Postgres connections under cold-start storms - the pooler is what holds the warm connections to Postgres; lambdas hold one short-lived connection to the pooler.
 
 ### 10.12 Vite dev-only import isolation
 
@@ -1953,7 +1953,7 @@ Existing 217 tests preserved. New: [tests/unit/cronOrchestrator.test.ts](tests/u
 | Feature                      | Before                | After                                         | Notes                                                                                                      |
 | ---------------------------- | --------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Auto-citation hour-of-day    | 9 AM UTC respected    | 06:00 UTC daily                               | Dropped from cron day-of-week filter as a trade-off for the 1-cron Hobby cap.                              |
-| Workflow tick latency        | 30s cap               | "Up to next user request"                     | OK — workflows already async; users hit endpoints often.                                                   |
+| Workflow tick latency        | 30s cap               | "Up to next user request"                     | OK - workflows already async; users hit endpoints often.                                                   |
 | Weekly digest emission       | 5-min cron            | Triggered by next `weekly_catchup` completion | Effectively the same.                                                                                      |
 | SSE token-stream feel        | Token-by-token        | 500ms chunks                                  | Imperceptible for long content; mildly chunky for short.                                                   |
 | Long generations >5 min      | Single Render handler | Section-chunked across `/advance` calls       | If a single section exceeds 8s, the slice retries that section. Acceptable in observed BOFU data.          |
@@ -1967,20 +1967,20 @@ Existing 217 tests preserved. New: [tests/unit/cronOrchestrator.test.ts](tests/u
 
 ---
 
-## Wave 11 — Citation runs concurrency + duplication hardening
+## Wave 11 - Citation runs concurrency + duplication hardening
 
 After the Vercel migration shipped, citation runs exhibited two visible symptoms:
 
-1. **`totalChecks` drifting above the prompt × platform cap.** A 50-pair brand showed "61 checks". Latest Results card disagreed with the live banner — 27/29 vs 41/61.
+1. **`totalChecks` drifting above the prompt × platform cap.** A 50-pair brand showed "61 checks". Latest Results card disagreed with the live banner - 27/29 vs 41/61.
 2. **Cascading 504s on `/advance`** during a single run, then the run stalling.
 
-Root cause analysis — both symptoms came from the same defect: nothing was preventing concurrent slices for the same run.
+Root cause analysis - both symptoms came from the same defect: nothing was preventing concurrent slices for the same run.
 
 ### 11.1 Symptom 1: client polling fired /advance every 1s without waiting
 
 The polling effect in [client/src/pages/citations.tsx](client/src/pages/citations.tsx) called `/advance` fire-and-forget on each tick. With each `/advance` taking up to 25s server-side, ~25 concurrent lambdas were racing on the same run, all loading existing rankings into `alreadyDone`, all queueing the still-pending pairs, all inserting into `geo_rankings` (which had no unique constraint on `(run_id, brand_prompt_id, ai_platform)`). Duplicates accumulated; `totalChecks` = `geo_rankings` count went past the cap.
 
-Compounding bug: the effect's closure also captured a stale `liveProgress` from React state. The deps array was `[selectedBrandId, hasActive]` (not `liveProgress`), so the closure's `liveProgress?.runId` stayed undefined forever. `/advance` was never fired at all on the very first run after kickoff — the only progress was from kickoff's inline 50s deadline-bounded slice (8 checks before timeout), then the run stalled.
+Compounding bug: the effect's closure also captured a stale `liveProgress` from React state. The deps array was `[selectedBrandId, hasActive]` (not `liveProgress`), so the closure's `liveProgress?.runId` stayed undefined forever. `/advance` was never fired at all on the very first run after kickoff - the only progress was from kickoff's inline 50s deadline-bounded slice (8 checks before timeout), then the run stalled.
 
 **Fix** ([client/src/pages/citations.tsx](client/src/pages/citations.tsx)):
 
@@ -1991,13 +1991,13 @@ Compounding bug: the effect's closure also captured a stale `liveProgress` from 
 
 The client-side gate fixes a single tab. It doesn't protect against multi-tab polling, the cron drain colliding with browser polling, or any future caller. Added a per-run Postgres advisory lock around `runBrandPrompts(resume:true)`:
 
-[server/lib/advisoryLock.ts](server/lib/advisoryLock.ts) — new helper `withDynamicAdvisoryLock(namespace, entityId, label, fn)`. Hashes the entity ID (a UUID) into the int4 keyspace Postgres advisory locks accept, takes a session-level lock with `pg_try_advisory_lock(namespace, key)`. Returns `{ran: false}` if the lock is busy; the caller treats that as a successful skip.
+[server/lib/advisoryLock.ts](server/lib/advisoryLock.ts) - new helper `withDynamicAdvisoryLock(namespace, entityId, label, fn)`. Hashes the entity ID (a UUID) into the int4 keyspace Postgres advisory locks accept, takes a session-level lock with `pg_try_advisory_lock(namespace, key)`. Returns `{ran: false}` if the lock is busy; the caller treats that as a successful skip.
 
 Namespace `dynamicLockNamespaces.citationRunSlice` (`920001`) reserved for citation slices. Wraps `runBrandPrompts(resume:true)` inside `advanceCitationRun` ([server/citationChecker.ts](server/citationChecker.ts)). Concurrent `/advance` calls for the same run now serialize at the lock; the second caller returns the run's current status and the client keeps polling until the first slice releases.
 
 ### 11.3 Symptom 3: progress accounting was per-slice, not cumulative
 
-`bumpCitationRunProgress` was writing `pct = completedCount / totalTasks * 100` — but on a resume, `totalTasks` is `queue.length` after filtering out `alreadyDone`. So a slice that picked up 5 remaining pairs after 25 had been done in earlier slices wrote `pct = 100, totalChecks = 5`, then the UI banner showed "5 cited / 5 checks — 20%" while the actual DB had 30 rankings.
+`bumpCitationRunProgress` was writing `pct = completedCount / totalTasks * 100` - but on a resume, `totalTasks` is `queue.length` after filtering out `alreadyDone`. So a slice that picked up 5 remaining pairs after 25 had been done in earlier slices wrote `pct = 100, totalChecks = 5`, then the UI banner showed "5 cited / 5 checks - 20%" while the actual DB had 30 rankings.
 
 **Fix** ([server/citationChecker.ts](server/citationChecker.ts)):
 
@@ -2014,7 +2014,7 @@ The advisory lock was correctly serializing slices, but each slice was still occ
 - `kickoffBrandPromptsRun` deadline: 50s → 40s → 30s ([server/citationChecker.ts](server/citationChecker.ts)).
 - `/advance` deadline: 8s → 25s → 30s ([server/routes/prompts.ts](server/routes/prompts.ts)).
 
-The user pushed back on the iterative tuning — correctly — pointing out that a 60s function cap can't reliably wrap an unbounded number of LLM calls with high variance. The architecturally correct answer is to move the work off the request path entirely (worker process polling a queue, OpenAI Responses API background mode, etc.). That's deferred to a future wave; the deadline tightening here is a stop-gap that makes the existing design behave under observed worst-case latency.
+The user pushed back on the iterative tuning - correctly - pointing out that a 60s function cap can't reliably wrap an unbounded number of LLM calls with high variance. The architecturally correct answer is to move the work off the request path entirely (worker process polling a queue, OpenAI Responses API background mode, etc.). That's deferred to a future wave; the deadline tightening here is a stop-gap that makes the existing design behave under observed worst-case latency.
 
 ### 11.5 Files
 
@@ -2027,7 +2027,7 @@ The user pushed back on the iterative tuning — correctly — pointing out that
 
 ### 11.6 Verification
 
-- `npx tsc --noEmit` — 0 errors.
+- `npx tsc --noEmit` - 0 errors.
 - All 217 existing tests still pass.
 - Live verification post-deploy: progress bar matches Latest Results card; `totalChecks` does not exceed prompt × platform cap; no 504s under sustained polling.
 
@@ -2038,33 +2038,33 @@ The user pushed back on the iterative tuning — correctly — pointing out that
 
 ---
 
-## Wave 12 — Buffer bring-your-own-key
+## Wave 12 - Buffer bring-your-own-key
 
 Replaced the platform-owned Buffer OAuth integration with a bring-your-own-key flow.
 
 ### 12.1 Why
 
-The OAuth integration required the platform to maintain a Buffer-registered OAuth app, ship `BUFFER_CLIENT_ID` / `BUFFER_CLIENT_SECRET` env vars, and host a callback route. Buffer has no public path for end-user-issued tokens via the platform's app — every Buffer user who wants API access already creates their own developer app in Buffer's dashboard. Routing through the platform's app added zero value and added one OAuth route on the lambda surface.
+The OAuth integration required the platform to maintain a Buffer-registered OAuth app, ship `BUFFER_CLIENT_ID` / `BUFFER_CLIENT_SECRET` env vars, and host a callback route. Buffer has no public path for end-user-issued tokens via the platform's app - every Buffer user who wants API access already creates their own developer app in Buffer's dashboard. Routing through the platform's app added zero value and added one OAuth route on the lambda surface.
 
-The new flow: users generate an access token in Buffer's developer dashboard themselves, paste it into a small Connect dialog, server validates it against Buffer's `/user.json` and stores it AES-256-GCM encrypted (existing `tokenCipher` helpers, unchanged). Profile listing and posting work exactly as before — only the token's origin changed.
+The new flow: users generate an access token in Buffer's developer dashboard themselves, paste it into a small Connect dialog, server validates it against Buffer's `/user.json` and stores it AES-256-GCM encrypted (existing `tokenCipher` helpers, unchanged). Profile listing and posting work exactly as before - only the token's origin changed.
 
 ### 12.2 Server
 
 Full rewrite of [server/routes/buffer.ts](server/routes/buffer.ts):
 
-- `POST /api/buffer/connect` — body `{accessToken}`. Trims, rejects empty with `400 missing_token`. Calls Buffer `/user.json`. On 200, encrypts and persists. On 401, `400 invalid_token`. On other non-2xx or network error, `502 buffer_unreachable`.
-- `GET /api/buffer/profiles` — unchanged.
-- `POST /api/buffer/post` — unchanged.
-- `DELETE /api/buffer/connection` — replaces the old `DELETE /api/auth/buffer`. Path renamed for namespace consistency.
+- `POST /api/buffer/connect` - body `{accessToken}`. Trims, rejects empty with `400 missing_token`. Calls Buffer `/user.json`. On 200, encrypts and persists. On 401, `400 invalid_token`. On other non-2xx or network error, `502 buffer_unreachable`.
+- `GET /api/buffer/profiles` - unchanged.
+- `POST /api/buffer/post` - unchanged.
+- `DELETE /api/buffer/connection` - replaces the old `DELETE /api/auth/buffer`. Path renamed for namespace consistency.
 - Deleted: `GET /api/auth/buffer`, `GET /api/auth/buffer/callback`, `DELETE /api/auth/buffer`.
 
-`server/env.ts` — dropped `BUFFER_CLIENT_ID`, `BUFFER_CLIENT_SECRET`, `BUFFER_REDIRECT_URI` and the cross-field `.refine()` that tied them to `BUFFER_ENCRYPTION_KEY`. The encryption key remains optional (lazy-loaded by `tokenCipher`); deployments not using Buffer don't need to set it.
+`server/env.ts` - dropped `BUFFER_CLIENT_ID`, `BUFFER_CLIENT_SECRET`, `BUFFER_REDIRECT_URI` and the cross-field `.refine()` that tied them to `BUFFER_ENCRYPTION_KEY`. The encryption key remains optional (lazy-loaded by `tokenCipher`); deployments not using Buffer don't need to set it.
 
 ### 12.3 Client
 
-[client/src/components/articles/BufferConnectDialog.tsx](client/src/components/articles/BufferConnectDialog.tsx) — new component. Masked `<input type="password">` for the token, "Where do I get this?" link to `https://buffer.com/developers/api`, validation error mapping (`missing_token` / `invalid_token` / `buffer_unreachable`). On success, closes the dialog, invalidates the `/api/buffer/profiles` query so the profile picker repopulates, toasts. Disconnect path is implemented in the component for future reuse from a settings page but not currently wired into any UI.
+[client/src/components/articles/BufferConnectDialog.tsx](client/src/components/articles/BufferConnectDialog.tsx) - new component. Masked `<input type="password">` for the token, "Where do I get this?" link to `https://buffer.com/developers/api`, validation error mapping (`missing_token` / `invalid_token` / `buffer_unreachable`). On success, closes the dialog, invalidates the `/api/buffer/profiles` query so the profile picker repopulates, toasts. Disconnect path is implemented in the component for future reuse from a settings page but not currently wired into any UI.
 
-[client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) — replaced the `<a href="/api/auth/buffer">Connect Buffer</a>` link with `<BufferConnectDialog connected={false} />`. The dialog is the only UI affected; the surrounding profile picker and post composer continue to consume `/api/buffer/profiles` and `/api/buffer/post` unchanged.
+[client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) - replaced the `<a href="/api/auth/buffer">Connect Buffer</a>` link with `<BufferConnectDialog connected={false} />`. The dialog is the only UI affected; the surrounding profile picker and post composer continue to consume `/api/buffer/profiles` and `/api/buffer/post` unchanged.
 
 ### 12.4 Files
 
@@ -2090,26 +2090,26 @@ No schema change. `users.buffer_access_token` reused. Existing OAuth-connected u
 
 - Token rotation reminders / expiry banners (Buffer access tokens don't expire).
 - A separate Buffer-settings page outside `DistributeDialog`.
-- A migration shim for users connected via the deleted OAuth flow — they reconnect with a manually-generated token. Acceptable per the user's decision.
+- A migration shim for users connected via the deleted OAuth flow - they reconnect with a manually-generated token. Acceptable per the user's decision.
 - Caching the profile list locally (existing `/profiles` route fetches on demand; layering a cache is premature).
 
-## Wave 13 — Buffer v1 REST → GraphQL migration
+## Wave 13 - Buffer v1 REST → GraphQL migration
 
-After Wave 12 shipped, real-world testing revealed Buffer had retired the v1 REST API (`api.bufferapp.com/1/`). Every paste of a fresh API key returned `400 invalid_token` because Buffer's `/user.json` endpoint no longer exists. Buffer's current public API is GraphQL at `https://api.buffer.com` with `Authorization: Bearer <key>` auth, and keys are now generated at `https://publish.buffer.com/settings/api` (not the legacy `developers/api` page). Wave 12 implemented BYOK against an API surface that was already gone — this wave migrates everything to the live GraphQL API.
+After Wave 12 shipped, real-world testing revealed Buffer had retired the v1 REST API (`api.bufferapp.com/1/`). Every paste of a fresh API key returned `400 invalid_token` because Buffer's `/user.json` endpoint no longer exists. Buffer's current public API is GraphQL at `https://api.buffer.com` with `Authorization: Bearer <key>` auth, and keys are now generated at `https://publish.buffer.com/settings/api` (not the legacy `developers/api` page). Wave 12 implemented BYOK against an API surface that was already gone - this wave migrates everything to the live GraphQL API.
 
 ### 13.1 Endpoint rewrites ([server/routes/buffer.ts](server/routes/buffer.ts))
 
 All three Buffer-facing routes rewritten against the GraphQL endpoint. A new `bufferGraphQL()` helper inside the file centralizes the POST-with-Bearer pattern and JSON parsing.
 
-- **`POST /api/buffer/connect`** — validates by issuing a minimal `{ account { id } }` query. 200 with `data.account.id` non-null = valid; HTTP 401 OR a top-level `errors[].extensions.code === "UNAUTHORIZED"` / `"FORBIDDEN"` = `invalid_token`; everything else = `buffer_unreachable`. The 200-with-UNAUTHORIZED case is GraphQL-specific (REST APIs use HTTP status; GraphQL APIs use 200 + errors[]) and the most common failure mode for a wrong-account or revoked key.
-- **`GET /api/buffer/profiles`** — was a single `GET /1/profiles.json`; is now two queries: `{ account { organizations { id } } }` to discover the org list, then `channels(input: { organizationId })` for each. Buffer's data model exposes channels under organizations rather than a flat profile list. The response shape returned to the client is intentionally identical to the legacy REST mapping (`{id, service, formattedService, username, avatar}`) so `DistributeDialog`'s existing matcher logic kept working without UI changes. `formattedService` is synthesized from `service` (`"twitter"` → `"Twitter"`, `"google_business"` → `"Google Business"`).
-- **`POST /api/buffer/post`** — was a `POST /1/updates/create.json` with `profile_ids[]`; is now a `createPost` mutation per channel. The route's contract changed from `profileIds: string[]` to `channelId: string` (one channel per request — multi-channel becomes a client-side loop, which is what the existing call site already did with single-element arrays).
+- **`POST /api/buffer/connect`** - validates by issuing a minimal `{ account { id } }` query. 200 with `data.account.id` non-null = valid; HTTP 401 OR a top-level `errors[].extensions.code === "UNAUTHORIZED"` / `"FORBIDDEN"` = `invalid_token`; everything else = `buffer_unreachable`. The 200-with-UNAUTHORIZED case is GraphQL-specific (REST APIs use HTTP status; GraphQL APIs use 200 + errors[]) and the most common failure mode for a wrong-account or revoked key.
+- **`GET /api/buffer/profiles`** - was a single `GET /1/profiles.json`; is now two queries: `{ account { organizations { id } } }` to discover the org list, then `channels(input: { organizationId })` for each. Buffer's data model exposes channels under organizations rather than a flat profile list. The response shape returned to the client is intentionally identical to the legacy REST mapping (`{id, service, formattedService, username, avatar}`) so `DistributeDialog`'s existing matcher logic kept working without UI changes. `formattedService` is synthesized from `service` (`"twitter"` → `"Twitter"`, `"google_business"` → `"Google Business"`).
+- **`POST /api/buffer/post`** - was a `POST /1/updates/create.json` with `profile_ids[]`; is now a `createPost` mutation per channel. The route's contract changed from `profileIds: string[]` to `channelId: string` (one channel per request - multi-channel becomes a client-side loop, which is what the existing call site already did with single-element arrays).
 
 ### 13.2 Documentation cleanup
 
 `.env.example` Buffer block rewritten to point at `https://publish.buffer.com/settings/api` and to mention the GraphQL endpoint.
 
-`docs/feature_flows.md` — five stale references hunted down: the env-var row referencing `BUFFER_CLIENT_ID/SECRET/REDIRECT_URI`, an obsolete `APP_URL: Buffer OAuth callback default` row, a "What happens when you click Post to Buffer" section narrating the v1 REST flow, two narrative phrases ("user's stored Buffer OAuth token" / "OAuth token for Buffer posting"), and a "Buffer connection" section with v1 REST code samples. All replaced with GraphQL equivalents documenting the new `createPost` mutation and the channel-via-organization fetch pattern.
+`docs/feature_flows.md` - five stale references hunted down: the env-var row referencing `BUFFER_CLIENT_ID/SECRET/REDIRECT_URI`, an obsolete `APP_URL: Buffer OAuth callback default` row, a "What happens when you click Post to Buffer" section narrating the v1 REST flow, two narrative phrases ("user's stored Buffer OAuth token" / "OAuth token for Buffer posting"), and a "Buffer connection" section with v1 REST code samples. All replaced with GraphQL equivalents documenting the new `createPost` mutation and the channel-via-organization fetch pattern.
 
 ### 13.3 Tests
 
@@ -2122,7 +2122,7 @@ All three Buffer-facing routes rewritten against the GraphQL endpoint. A new `bu
 
 ### 13.4 Connected-state strip in DistributeDialog
 
-After successfully connecting, the disconnect-side strip with the Connect button got replaced with a green "Buffer connected · N channel(s)" strip that includes a "Disconnect Buffer" button — so the user has a confirmation that the connection landed and a one-click way to switch keys. ([client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx)).
+After successfully connecting, the disconnect-side strip with the Connect button got replaced with a green "Buffer connected · N channel(s)" strip that includes a "Disconnect Buffer" button - so the user has a confirmation that the connection landed and a one-click way to switch keys. ([client/src/components/articles/DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx)).
 
 ### 13.5 Files
 
@@ -2139,7 +2139,7 @@ After successfully connecting, the disconnect-side strip with the Connect button
 
 The connect bug → fix loop took about a day:
 
-- Initial Wave 12 ship: paste → 400 invalid_token (silent — the v1 REST endpoint just rejects everything)
+- Initial Wave 12 ship: paste → 400 invalid_token (silent - the v1 REST endpoint just rejects everything)
 - Buffer's developer docs were the smoking gun: their published API spec is GraphQL-only.
 - Migration ship: paste → 200 → channel list visible immediately.
 
@@ -2147,13 +2147,13 @@ Lesson worth recording: when a third-party integration starts failing for "no ob
 
 ---
 
-## Wave 14 — Distribute: direct-post to Buffer + expanded platforms + posted-state persistence
+## Wave 14 - Distribute: direct-post to Buffer + expanded platforms + posted-state persistence
 
-The Distribute panel previously generated platform-adapted copy for LinkedIn / Medium / Reddit / Quora and stopped there — the user copied each card's text and pasted it into Buffer manually. With BYOK working, the natural next step was a one-click Post-to-Buffer button per card. Three additions in this wave:
+The Distribute panel previously generated platform-adapted copy for LinkedIn / Medium / Reddit / Quora and stopped there - the user copied each card's text and pasted it into Buffer manually. With BYOK working, the natural next step was a one-click Post-to-Buffer button per card. Three additions in this wave:
 
 1. **Three new prompt templates** (Twitter / Facebook / Instagram) with per-platform character limits embedded as hard constraints in the prompt itself.
 2. **Per-card "Add to Buffer Queue" button** with a four-state machine (already-queued / not-connected / disabled-no-channel / queueable) and a popover channel picker for the multiple-matches case.
-3. **Posted-state persistence** — repurposing the existing `distributions.platform_post_id` column properly so closing and reopening the Distribute dialog still shows which cards have been queued.
+3. **Posted-state persistence** - repurposing the existing `distributions.platform_post_id` column properly so closing and reopening the Distribute dialog still shows which cards have been queued.
 
 ### 14.1 Server-side: prompts and the new endpoint
 
@@ -2165,11 +2165,11 @@ The Distribute panel previously generated platform-adapted copy for LinkedIn / M
 
 The platform cap raised from 5 → 7 to fit the new set ([server/routes/articles.ts:375](server/routes/articles.ts#L375)).
 
-**Pre-existing fake-stamp bug fixed.** The old generation handler stamped `distributions.platform_post_id` with a synthetic `<service>_<articleId>_<timestamp>` string at generation time — but `platform_post_id` is meant to hold the real third-party post id. The new direct-post UI correctly treats any non-null `platform_post_id` as "this row has been posted to Buffer," so every existing generated row showed as "Posted ✓" falsely. Migration `0046_clear_fake_distribution_post_ids.sql` clears those synthetic strings via a regex match (`^(linkedin|medium|reddit|quora|twitter|facebook|instagram)_[0-9a-f-]+_[0-9]+$`) — real Buffer post ids don't match the pattern so legitimate posts are preserved. The generation handler also stops writing the synthetic value going forward.
+**Pre-existing fake-stamp bug fixed.** The old generation handler stamped `distributions.platform_post_id` with a synthetic `<service>_<articleId>_<timestamp>` string at generation time - but `platform_post_id` is meant to hold the real third-party post id. The new direct-post UI correctly treats any non-null `platform_post_id` as "this row has been posted to Buffer," so every existing generated row showed as "Posted ✓" falsely. Migration `0046_clear_fake_distribution_post_ids.sql` clears those synthetic strings via a regex match (`^(linkedin|medium|reddit|quora|twitter|facebook|instagram)_[0-9a-f-]+_[0-9]+$`) - real Buffer post ids don't match the pattern so legitimate posts are preserved. The generation handler also stops writing the synthetic value going forward.
 
 **New shared helper [server/lib/bufferPost.ts](server/lib/bufferPost.ts):** extracted `postToBuffer(userId, channelId, text, scheduledAt?)` returning `{ok:true, postId} | {ok:false, code: "not_connected"|"rejected"|"unreachable", message?}`. Both `/api/buffer/post` and the new endpoint go through it. Default mode is `addToQueue` (Buffer fills the next slot from the user's per-channel posting schedule); `scheduledAt` switches to `customScheduled` with a `dueAt`. Top-level GraphQL `errors[]` are surfaced as `rejected` with the upstream message verbatim instead of being lumped with `unreachable`, so the inline UI error tells the user exactly what Buffer rejected (e.g. "Tweet too long") rather than a generic 502.
 
-**New endpoint `POST /api/distributions/:distributionId/buffer-post`** ([server/routes/articles.ts](server/routes/articles.ts)). Body `{channelId}`. Verifies article ownership (`requireArticle`) — 404 not 403 on miss per the anti-enumeration rule. Reads the row's `metadata.content`; 400 `no_content` if missing/empty. Calls `postToBuffer`; on success stamps `platform_post_id` with the Buffer post id, flips `status` to `scheduled`, sets `distributed_at`, returns 200 `{success:true, data:{platformPostId}}`. On failure preserves the row and returns the right error code.
+**New endpoint `POST /api/distributions/:distributionId/buffer-post`** ([server/routes/articles.ts](server/routes/articles.ts)). Body `{channelId}`. Verifies article ownership (`requireArticle`) - 404 not 403 on miss per the anti-enumeration rule. Reads the row's `metadata.content`; 400 `no_content` if missing/empty. Calls `postToBuffer`; on success stamps `platform_post_id` with the Buffer post id, flips `status` to `scheduled`, sets `distributed_at`, returns 200 `{success:true, data:{platformPostId}}`. On failure preserves the row and returns the right error code.
 
 The existing `/api/buffer/post` route became a thin shim over `postToBuffer` so all three callers share one code path.
 
@@ -2185,18 +2185,18 @@ The existing `/api/buffer/post` route became a thin shim over `postToBuffer` so 
 | Single match     | `matches.length === 1`  | `Add to Buffer Queue`            | Posts to that channel                                          |
 | Multiple matches | `matches.length > 1`    | `Add to Buffer Queue ▾`          | Popover lists each matching channel by username; click → posts |
 
-While a post is in flight: spinner + "Posting…", button disabled. On Buffer rejection (e.g. content over the platform's character limit), the upstream message renders inline below the button — the user can edit copy and retry without losing the rest of their cards.
+While a post is in flight: spinner + "Posting…", button disabled. On Buffer rejection (e.g. content over the platform's character limit), the upstream message renders inline below the button - the user can edit copy and retry without losing the rest of their cards.
 
-The set of platforms the button renders for: **LinkedIn, Twitter, Facebook, Instagram**. Medium / Reddit / Quora cards keep their existing Edit / Copy actions only — Buffer doesn't support those services, and no Post-to-Buffer button means no false hope.
+The set of platforms the button renders for: **LinkedIn, Twitter, Facebook, Instagram**. Medium / Reddit / Quora cards keep their existing Edit / Copy actions only - Buffer doesn't support those services, and no Post-to-Buffer button means no false hope.
 
 **`BufferConnectDialog` extended to optional controlled mode.** When both `open` and `onOpenChange` props are passed, the dialog defers to the parent for open state instead of using its internal `useState`. This lets the per-card "Connect Buffer to post" button (rendered when `!bufferConnected`) open the same dialog instance that lives in the top connection strip. Default uncontrolled behavior preserved for existing call sites.
 
-**[DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) — five wiring changes:**
+**[DistributeDialog.tsx](client/src/components/articles/DistributeDialog.tsx) - five wiring changes:**
 
 1. **Platform list** widened from 4 → 7. Buffer-supported first, copy-only after: `["LinkedIn", "Twitter", "Facebook", "Instagram", "Medium", "Reddit", "Quora"]`. A constant `BUFFER_SUPPORTED_PLATFORMS` gates the new button.
 2. **`generatedContent` row type widened** to carry `distributionId` and `platformPostId`. The `/api/distribute/:articleId` response was extended to return both per-row, so freshly-generated cards have what the new button needs without an extra round-trip.
-3. **Per-platform merge instead of replace** in `distributeMutation.onSuccess`. Previously `setGeneratedContent(data.data)` overwrote the array — generating Twitter alone after a previous LinkedIn run would erase the LinkedIn card and its queued state. The new code merges by platform: incoming rows replace same-platform existing ones; new platforms append; untouched platforms persist.
-4. **Hydrate from history on dialog open.** A new `useEffect` reads `historyData` (the existing `GET /api/distributions/:articleId` response), groups by platform, picks the most recent successful row per platform, and seeds `generatedContent` if it's empty. Closing the dialog (which resets `generatedContent` to `[]`) and reopening rehydrates the same cards — the user never loses track of what's queued.
+3. **Per-platform merge instead of replace** in `distributeMutation.onSuccess`. Previously `setGeneratedContent(data.data)` overwrote the array - generating Twitter alone after a previous LinkedIn run would erase the LinkedIn card and its queued state. The new code merges by platform: incoming rows replace same-platform existing ones; new platforms append; untouched platforms persist.
+4. **Hydrate from history on dialog open.** A new `useEffect` reads `historyData` (the existing `GET /api/distributions/:articleId` response), groups by platform, picks the most recent successful row per platform, and seeds `generatedContent` if it's empty. Closing the dialog (which resets `generatedContent` to `[]`) and reopening rehydrates the same cards - the user never loses track of what's queued.
 5. **History tab filter widened** to include `status: "scheduled"` rows (the new "queued in Buffer" status), not just `"success"`.
 
 The old `postToBufferMutation` (which targeted the legacy `/api/buffer/post` with arbitrary text) is replaced by `postDistributionMutation`, which calls the new distribution-scoped endpoint and stores per-card error messages in a `cardErrors` state map. On success: optimistic local update of `platformPostId`, invalidate `/api/distributions/:articleId` so the next refetch confirms it, toast "Queued in Buffer".
@@ -2205,12 +2205,12 @@ The old `postToBufferMutation` (which targeted the legacy `/api/buffer/post` wit
 
 New [tests/unit/distributionBufferPost.test.ts](tests/unit/distributionBufferPost.test.ts) with six cases covering the new endpoint:
 
-1. Success — distribution exists, ownership confirmed, `postToBuffer` returns `{ok:true, postId}` → 200 with `platformPostId` stamped on the row.
-2. Buffer not connected — `postToBuffer` returns `{ok:false, code:"not_connected"}` → 403, no DB write.
-3. No content — distribution row's `metadata.content` is missing/empty → 400 `no_content`, no Buffer call.
-4. Distribution not owned — `requireArticle` throws → 404 `not_found` (not 403; anti-enumeration).
-5. Buffer rejection — `postToBuffer` returns `{ok:false, code:"rejected", message:"Tweet too long."}` → 502 with the upstream message verbatim.
-6. Buffer unreachable — `postToBuffer` returns `{ok:false, code:"unreachable"}` → 502 `buffer_unreachable`.
+1. Success - distribution exists, ownership confirmed, `postToBuffer` returns `{ok:true, postId}` → 200 with `platformPostId` stamped on the row.
+2. Buffer not connected - `postToBuffer` returns `{ok:false, code:"not_connected"}` → 403, no DB write.
+3. No content - distribution row's `metadata.content` is missing/empty → 400 `no_content`, no Buffer call.
+4. Distribution not owned - `requireArticle` throws → 404 `not_found` (not 403; anti-enumeration).
+5. Buffer rejection - `postToBuffer` returns `{ok:false, code:"rejected", message:"Tweet too long."}` → 502 with the upstream message verbatim.
+6. Buffer unreachable - `postToBuffer` returns `{ok:false, code:"unreachable"}` → 502 `buffer_unreachable`.
 
 All 233 tests pass (227 → 233, +6 from the new endpoint).
 
@@ -2229,7 +2229,7 @@ All 233 tests pass (227 → 233, +6 from the new endpoint).
 
 ### 14.5 Queue timing
 
-`mode: addToQueue` lets Buffer pick the slot from the user's per-channel posting schedule (configured at `https://publish.buffer.com/account/posting-schedule`). The platform does **not** set queue timing — that's the entire point of queue mode. If a channel has no posting schedule configured in Buffer, queued posts sit in the queue indefinitely until the user adds a schedule or moves them to a custom time inside Buffer's web app. The toast description ("Will publish at the next slot in your Buffer schedule for this channel.") makes this explicit.
+`mode: addToQueue` lets Buffer pick the slot from the user's per-channel posting schedule (configured at `https://publish.buffer.com/account/posting-schedule`). The platform does **not** set queue timing - that's the entire point of queue mode. If a channel has no posting schedule configured in Buffer, queued posts sit in the queue indefinitely until the user adds a schedule or moves them to a custom time inside Buffer's web app. The toast description ("Will publish at the next slot in your Buffer schedule for this channel.") makes this explicit.
 
 The helper still accepts an optional `scheduledAt` ISO string and switches to `mode: customScheduled` with a `dueAt`, so adding a per-card date picker later is a UI-only change.
 
@@ -2246,16 +2246,16 @@ The helper still accepts an optional `scheduledAt` ISO string and switches to `m
 
 ---
 
-## Wave 15 — Production-readiness pass: SSRF + asyncHandler + Sentry capture-and-flush + console sweep
+## Wave 15 - Production-readiness pass: SSRF + asyncHandler + Sentry capture-and-flush + console sweep
 
-Driven by the items flagged in `PRODUCTION_PLAN.md` Workstream B. Five discrete fixes, all additive and shape-preserving — no response bodies changed, no try/catch removed, no architectural rewrites. The codebase still serves the same JSON to clients; the difference is what happens server-side when something goes wrong.
+Driven by the items flagged in `PRODUCTION_PLAN.md` Workstream B. Five discrete fixes, all additive and shape-preserving - no response bodies changed, no try/catch removed, no architectural rewrites. The codebase still serves the same JSON to clients; the difference is what happens server-side when something goes wrong.
 
 ### 15.1 SSRF on the Slack webhook test endpoint
 
 **Problem.** `POST /api/alerts/test/:settingId` did `fetch(setting.slackWebhookUrl, ...)` after only checking `url.hostname.endsWith("slack.com")`. Two bypasses existed:
 
-1. Attacker-controlled subdomains that happen to end with `slack.com` (or someone's tenant subdomain on Slack's infra) — the `endsWith` check passes them.
-2. **DNS rebinding** — `legit.slack.com` resolves to a public IP at validation time (passes the hostname check) and to `127.0.0.1` or `169.254.169.254` (AWS metadata) when the actual `fetch` runs milliseconds later.
+1. Attacker-controlled subdomains that happen to end with `slack.com` (or someone's tenant subdomain on Slack's infra) - the `endsWith` check passes them.
+2. **DNS rebinding** - `legit.slack.com` resolves to a public IP at validation time (passes the hostname check) and to `127.0.0.1` or `169.254.169.254` (AWS metadata) when the actual `fetch` runs milliseconds later.
 
 **Fix.** Two layers in [server/routes/intelligence.ts](server/routes/intelligence.ts):
 
@@ -2272,8 +2272,8 @@ Four `console.warn` / `console.error` calls in [server/auth.ts](server/auth.ts) 
 
 Two structural problems before this wave:
 
-1. The global Express error handler in [server/app.ts:356-375](server/app.ts#L356-L375) calls `Sentry.captureException` for any 5xx — but only for **uncaught** errors. Most route handlers use a `try { … } catch (e) { sendError(...) }` pattern that swallows the error before it ever reaches the global handler. Result: ~200 caught 5xx responses were invisible in Sentry.
-2. A handful of handlers had no top-level `try/catch` at all — a thrown error in those leaked as an unhandled rejection. Specifically: [logoProxy.ts:18](server/routes/logoProxy.ts#L18), [content.ts:490](server/routes/content.ts#L490), [content.ts:557](server/routes/content.ts#L557), and [onboarding.ts:101](server/routes/onboarding.ts#L101) (the SSE stream).
+1. The global Express error handler in [server/app.ts:356-375](server/app.ts#L356-L375) calls `Sentry.captureException` for any 5xx - but only for **uncaught** errors. Most route handlers use a `try { … } catch (e) { sendError(...) }` pattern that swallows the error before it ever reaches the global handler. Result: ~200 caught 5xx responses were invisible in Sentry.
+2. A handful of handlers had no top-level `try/catch` at all - a thrown error in those leaked as an unhandled rejection. Specifically: [logoProxy.ts:18](server/routes/logoProxy.ts#L18), [content.ts:490](server/routes/content.ts#L490), [content.ts:557](server/routes/content.ts#L557), and [onboarding.ts:101](server/routes/onboarding.ts#L101) (the SSE stream).
 
 **`asyncHandler`** ([server/lib/asyncHandler.ts](server/lib/asyncHandler.ts), 10 lines): wraps an async handler and forwards any thrown error / rejected promise to `next(err)`. Lives in its own file so utility callers (e.g. [server/routes/cron.ts](server/routes/cron.ts)) can import it without dragging in the singleton OpenAI client that [server/lib/routesShared.ts](server/lib/routesShared.ts) instantiates at module load. `routesShared` re-exports it so the 20+ route modules that already import from there don't need an import change.
 
@@ -2281,7 +2281,7 @@ Two structural problems before this wave:
 
 ### 15.4 Wrap every route handler with `asyncHandler` (additive)
 
-134 handlers across 21 route files. Every `app.<verb>("/x", async (req, res) => {…})` became `app.<verb>("/x", asyncHandler(async (req, res) => {…}))`. The handler body — including its existing try/catch and `sendError` calls — is **not modified**; the wrapper only adds a safety net for the rare path where an error escapes the inner catch.
+134 handlers across 21 route files. Every `app.<verb>("/x", async (req, res) => {…})` became `app.<verb>("/x", asyncHandler(async (req, res) => {…}))`. The handler body - including its existing try/catch and `sendError` calls - is **not modified**; the wrapper only adds a safety net for the rare path where an error escapes the inner catch.
 
 The 5 previously-unprotected handlers (§15.3) are now safe. Every future regression where a thrown error escapes a `try` is also covered.
 
@@ -2291,7 +2291,7 @@ Two test mocks needed `asyncHandler` added because they stub `routesShared`: [bu
 
 ### 15.5 Inline `Sentry.captureException` at the raw `res.status(500)` sites that bypass `sendError`
 
-49 sites — mostly older handlers (auth registration paths, billing, analytics, intelligence, content, etc.) — write the response directly via `res.status(500).json(...)` without going through `sendError`, so the §15.3 patch doesn't cover them. Each got an inline `Sentry.captureException(error, { tags: { source: "<file>:<line>" } })` immediately before the response. Response shape preserved exactly — the agent endpoint's non-standard `{ success, error, task }` shape at [agent.ts:208](server/routes/agent.ts#L208) is left intact.
+49 sites - mostly older handlers (auth registration paths, billing, analytics, intelligence, content, etc.) - write the response directly via `res.status(500).json(...)` without going through `sendError`, so the §15.3 patch doesn't cover them. Each got an inline `Sentry.captureException(error, { tags: { source: "<file>:<line>" } })` immediately before the response. Response shape preserved exactly - the agent endpoint's non-standard `{ success, error, task }` shape at [agent.ts:208](server/routes/agent.ts#L208) is left intact.
 
 A second small codemod (`scripts/add-sentry-capture.mjs`, deleted after use) inserted these by walking each `res.status(500)` site, finding the nearest `} catch (X)` above it to identify the error variable, and inserting the capture line at the matching indent. Idempotent (skips sites that already have `Sentry.captureException` within 6 lines or `sendError` within 10 lines).
 
@@ -2301,38 +2301,38 @@ A second small codemod (`scripts/add-sentry-capture.mjs`, deleted after use) ins
 
 **Skipped on purpose** (3 files):
 
-- [server/log.ts](server/log.ts) — 10-line dev-mode timestamp formatter. Its single `console.log` _is_ its purpose.
-- [server/lib/aiLogger.ts](server/lib/aiLogger.ts) — its docstring states _"Writes to console only — no files — so it works on Vercel's ephemeral filesystem. Safe to leave on in production; noisy but cheap."_ Intentional LLM-trace stdout output that callers grep for. Converting to Pino would change the format.
-- [server/setupProducts.ts](server/setupProducts.ts) — CLI script invoked manually (`tsx server/setupProducts.ts`). 9 `console.log` calls are intentional CLI UX.
+- [server/log.ts](server/log.ts) - 10-line dev-mode timestamp formatter. Its single `console.log` _is_ its purpose.
+- [server/lib/aiLogger.ts](server/lib/aiLogger.ts) - its docstring states _"Writes to console only - no files - so it works on Vercel's ephemeral filesystem. Safe to leave on in production; noisy but cheap."_ Intentional LLM-trace stdout output that callers grep for. Converting to Pino would change the format.
+- [server/setupProducts.ts](server/setupProducts.ts) - CLI script invoked manually (`tsx server/setupProducts.ts`). 9 `console.log` calls are intentional CLI UX.
 
 Final state: `grep "console\\." server/` returns hits only in the three skip-list files.
 
-### 15.7 Sentry flush via `waitUntil` — fixes the serverless event-loss caveat
+### 15.7 Sentry flush via `waitUntil` - fixes the serverless event-loss caveat
 
-Sentry's transport queues events in-process and flushes them asynchronously. On Vercel serverless that queue is fragile: the function freezes the moment the response goes out, so any queued event that hadn't been transmitted is lost. Result before this fix: Sentry would receive _some_ of the events from §15.3–15.5 — the ones that happened to flush before the function suspended — and silently drop the rest. Hard to debug because there's no error: the captures happen, the queue just never empties.
+Sentry's transport queues events in-process and flushes them asynchronously. On Vercel serverless that queue is fragile: the function freezes the moment the response goes out, so any queued event that hadn't been transmitted is lost. Result before this fix: Sentry would receive _some_ of the events from §15.3–15.5 - the ones that happened to flush before the function suspended - and silently drop the rest. Hard to debug because there's no error: the captures happen, the queue just never empties.
 
 **Fix.** [server/lib/sentryReport.ts](server/lib/sentryReport.ts) (new):
 
 ```ts
 export function captureAndFlush(err, ctx = {}) {
   Sentry.captureException(err, ctx);
-  // 2s upper bound — long enough to clear a normal queue, short
+  // 2s upper bound - long enough to clear a normal queue, short
   // enough to never approach the function's max duration.
   waitUntil(Sentry.flush(2000).catch(() => {}));
 }
 ```
 
-`waitUntil` from `@vercel/functions` keeps the function alive _after_ the response is sent (zero added request latency, bounded by `maxDuration`). Outside Vercel (`npm run dev`, long-running Node), `waitUntil` is a shim that runs the promise in the background — safe in every environment.
+`waitUntil` from `@vercel/functions` keeps the function alive _after_ the response is sent (zero added request latency, bounded by `maxDuration`). Outside Vercel (`npm run dev`, long-running Node), `waitUntil` is a shim that runs the promise in the background - safe in every environment.
 
 Applied via codemod (`scripts/swap-to-flush.mjs`, deleted after use) to every `Sentry.captureException(...)` call in the request/cron lifecycle: 33 pre-existing direct callers + 41 of the 46 inline sites added in §15.5 (the other 5 were in `server/routes.ts` which the script also covered). Total 74 sites converted in addition to the two `sendError` helpers and the global error handler.
 
 **Sites left calling `Sentry.captureException` directly** (intentional):
 
-- [server/lib/sentryReport.ts](server/lib/sentryReport.ts) — defines the wrapper.
-- [server/index.ts:26](server/index.ts#L26) — boot path. On Vercel this never runs in a request; on local dev the long-running process flushes naturally.
-- [server/auth.ts](server/auth.ts) — `Sentry.setUser({ id })` (not an exception capture, doesn't need flushing).
+- [server/lib/sentryReport.ts](server/lib/sentryReport.ts) - defines the wrapper.
+- [server/index.ts:26](server/index.ts#L26) - boot path. On Vercel this never runs in a request; on local dev the long-running process flushes naturally.
+- [server/auth.ts](server/auth.ts) - `Sentry.setUser({ id })` (not an exception capture, doesn't need flushing).
 
-**18 unused `Sentry` imports** dropped from files where every direct call was swapped to the helper. The files still report errors to Sentry — just indirectly via the helper. The dropped imports were dead code that ESLint flagged. A second small codemod (`scripts/drop-unused-sentry.mjs`, deleted after use) walked the candidate list, simulated removing the import, and only removed it when no other `Sentry.X` reference remained in the file.
+**18 unused `Sentry` imports** dropped from files where every direct call was swapped to the helper. The files still report errors to Sentry - just indirectly via the helper. The dropped imports were dead code that ESLint flagged. A second small codemod (`scripts/drop-unused-sentry.mjs`, deleted after use) walked the candidate list, simulated removing the import, and only removed it when no other `Sentry.X` reference remained in the file.
 
 **Two test mocks updated**: [contentGenerationResponses.test.ts](tests/unit/contentGenerationResponses.test.ts) and [cronOrchestrator.test.ts](tests/unit/cronOrchestrator.test.ts) extended their `Sentry` stub from `{ captureException: vi.fn() }` to `{ captureException: vi.fn(), flush: vi.fn(async () => true) }` so the helper's `Sentry.flush(2000)` call doesn't throw inside the mock.
 
@@ -2341,7 +2341,7 @@ Applied via codemod (`scripts/swap-to-flush.mjs`, deleted after use) to every `S
 | File                                                                                                                                                                                                                         | Change                                                                                                                                                                                                              |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/lib/asyncHandler.ts`                                                                                                                                                                                                 | NEW. Tiny wrapper that forwards thrown errors to `next(err)`.                                                                                                                                                       |
-| `server/lib/sentryReport.ts`                                                                                                                                                                                                 | NEW. `captureAndFlush(err, ctx)` — capture + `waitUntil(Sentry.flush(2000))`.                                                                                                                                       |
+| `server/lib/sentryReport.ts`                                                                                                                                                                                                 | NEW. `captureAndFlush(err, ctx)` - capture + `waitUntil(Sentry.flush(2000))`.                                                                                                                                       |
 | `server/lib/routesShared.ts`                                                                                                                                                                                                 | `sendError` now logs via Pino and calls `captureAndFlush` for 5xx. Re-exports `asyncHandler`.                                                                                                                       |
 | `server/routes.ts`                                                                                                                                                                                                           | Same `sendError` patch on the legacy duplicate. 11 handlers wrapped. 5 inline `Sentry.captureException` added at raw 500 sites, then swapped to `captureAndFlush`. One `console.error` (waitlist) → `logger.error`. |
 | `server/app.ts`                                                                                                                                                                                                              | Global error handler now calls `captureAndFlush` (was `Sentry.captureException`). 3 webhook captures (Stripe / Shopify / Resend) swapped to `captureAndFlush`.                                                      |
@@ -2355,7 +2355,7 @@ Applied via codemod (`scripts/swap-to-flush.mjs`, deleted after use) to every `S
 ### 15.9 Verification
 
 - `npm run check`: clean.
-- `npm test`: 233/233 passing (no new tests added; this wave is structural — every existing test still passes against the new wiring).
+- `npm test`: 233/233 passing (no new tests added; this wave is structural - every existing test still passes against the new wiring).
 - `npx eslint server/`: 0 errors. ~368 warnings, all pre-existing `@typescript-eslint/no-explicit-any` style hits unchanged from baseline.
 - `grep "console\\." server/`: only the 3 skip-list files match.
 - `grep "app\\.(get|post|put|patch|delete)" server/routes/`: every match has `asyncHandler(` after the route verb (or after a middleware identifier). No bare `async (req, res)`.
@@ -2365,7 +2365,7 @@ Applied via codemod (`scripts/swap-to-flush.mjs`, deleted after use) to every `S
 
 All changes are within the Hobby plan envelope:
 
-- No new functions, no new cron entries, no `vercel.json` changes — still 1 daily cron at `/api/cron/daily-orchestrator`.
+- No new functions, no new cron entries, no `vercel.json` changes - still 1 daily cron at `/api/cron/daily-orchestrator`.
 - No new env vars required. `SENTRY_DSN` remains optional; if unset, every `captureAndFlush` is a no-op (and `waitUntil` of a no-op is also a no-op).
 - No new dependencies. `@vercel/functions` was already in `package.json` (used by [server/auth.ts:80-84](server/auth.ts#L80-L84)).
 - Bundle size grew by a few KB. Function size is far below the 250 MB cap.
@@ -2373,17 +2373,17 @@ All changes are within the Hobby plan envelope:
 
 ### 15.11 Out of scope
 
-- The remaining items in `PRODUCTION_PLAN.md` Workstream A (chatbot, public articles directory, citation locations, CMS integration, lead magnets, services menu, agency dashboard) — those are product-feature work, separately scoped.
-- Sentry release tagging in CI (PR-time `SENTRY_RELEASE = git rev-parse HEAD`) — small CI tweak, deferred.
-- Source-map upload to Sentry on production builds — deferred.
+- The remaining items in `PRODUCTION_PLAN.md` Workstream A (chatbot, public articles directory, citation locations, CMS integration, lead magnets, services menu, agency dashboard) - those are product-feature work, separately scoped.
+- Sentry release tagging in CI (PR-time `SENTRY_RELEASE = git rev-parse HEAD`) - small CI tweak, deferred.
+- Source-map upload to Sentry on production builds - deferred.
 - Centralized `HttpError` class so handlers can `throw new HttpError(500, "Failed to X")` and let the global handler do everything. Would let us delete the per-handler try/catch entirely. Tempting but riskier than this wave's additive approach; deferred until we have evidence the current pattern is causing real bugs.
 - A retry-on-flush-failure layer for Sentry. The 2s `waitUntil` budget is generous for normal load; if Sentry's ingest is itself down, dropping the event is the right behavior (the global handler already logged it via Pino).
 
 ---
 
-## Wave 16 — Phase 0: Pre-flight cleanup (production-readiness foundation)
+## Wave 16 - Phase 0: Pre-flight cleanup (production-readiness foundation)
 
-First slice of the comprehensive Workstream-A+C product plan (`docs/superpowers/specs/2026-05-04-implement-workstream-a-and-c-design.md`). Phase 0 is the foundation that every subsequent phase builds on — Sentry observability live, server hardened, database safety verified, RUNBOOK expanded.
+First slice of the comprehensive Workstream-A+C product plan (`docs/superpowers/specs/2026-05-04-implement-workstream-a-and-c-design.md`). Phase 0 is the foundation that every subsequent phase builds on - Sentry observability live, server hardened, database safety verified, RUNBOOK expanded.
 
 ### 16.1 Sentry account setup (manual, deferred to user)
 
@@ -2392,27 +2392,27 @@ Sentry org/project signup + DSN + auth-token in Vercel env vars deferred to user
 ### 16.2 Server hardening
 
 - **B1.5 cap `competitorDetections` Map** at 5000 entries via new `addCompetitorDetection(map, id, platform, delta, onCapHit?)` helper exported from [server/citationChecker.ts](server/citationChecker.ts). Caller in `runCitationCheck` deduplicates `onCapHit` to one warn per run via local `competitorDetectionsCapWarned` boolean. 4 unit tests cover sub-cap accept, at-cap reject, post-cap update-existing, and caller-deduplication pattern.
-- **B3.1 rate limit on `/api/alerts/test/:settingId`** ([server/routes/intelligence.ts:823](server/routes/intelligence.ts#L823)) — added `aiLimitMiddleware`. Closes Slack-webhook flooding abuse vector that the Wave 15 SSRF fix did not (SSRF blocked the destination but not request volume).
-- **B1.6 chart safety comment** at [client/src/components/ui/chart.tsx:75](client/src/components/ui/chart.tsx#L75) — code comment locks in the rationale for `dangerouslySetInnerHTML` (input is hardcoded `THEMES` + caller-supplied static `config`, no user input).
+- **B3.1 rate limit on `/api/alerts/test/:settingId`** ([server/routes/intelligence.ts:823](server/routes/intelligence.ts#L823)) - added `aiLimitMiddleware`. Closes Slack-webhook flooding abuse vector that the Wave 15 SSRF fix did not (SSRF blocked the destination but not request volume).
+- **B1.6 chart safety comment** at [client/src/components/ui/chart.tsx:75](client/src/components/ui/chart.tsx#L75) - code comment locks in the rationale for `dangerouslySetInnerHTML` (input is hardcoded `THEMES` + caller-supplied static `config`, no user input).
 
 ### 16.3 Observability
 
 - **`@sentry/vite-plugin` installed + configured** in [vite.config.ts](vite.config.ts). `build.sourcemap: 'hidden'` generates source maps without exposing them publicly via `sourceMappingURL` comments. The plugin uploads them to Sentry on prod builds gated by `SENTRY_AUTH_TOKEN`. Local builds without the token skip upload silently.
-- **Client-side console sweep** — 5 `console.*` calls remaining in client code routed to `Sentry.captureException` from `@/lib/sentry`:
-  - [client/src/components/ErrorBoundary.tsx](client/src/components/ErrorBoundary.tsx) — React tree crashes now visible without users emailing support
-  - [client/src/lib/authStore.ts](client/src/lib/authStore.ts) — 2 auth-flow failures
-  - [client/src/components/intelligence/ShareOfAnswerTab.tsx](client/src/components/intelligence/ShareOfAnswerTab.tsx) — 1 mutation error
-  - [client/src/pages/reset-password.tsx](client/src/pages/reset-password.tsx) — 1 session error
+- **Client-side console sweep** - 5 `console.*` calls remaining in client code routed to `Sentry.captureException` from `@/lib/sentry`:
+  - [client/src/components/ErrorBoundary.tsx](client/src/components/ErrorBoundary.tsx) - React tree crashes now visible without users emailing support
+  - [client/src/lib/authStore.ts](client/src/lib/authStore.ts) - 2 auth-flow failures
+  - [client/src/components/intelligence/ShareOfAnswerTab.tsx](client/src/components/intelligence/ShareOfAnswerTab.tsx) - 1 mutation error
+  - [client/src/pages/reset-password.tsx](client/src/pages/reset-password.tsx) - 1 session error
 - **CSP rationale comment** added to [server/app.ts](server/app.ts) explaining why `styleSrc` includes `'unsafe-inline'` (Recharts injects per-chart theme styles via `dangerouslySetInnerHTML` at component-render time).
 
 ### 16.4 Database / migration safety
 
-- **`drizzle-kit check` clean** — no schema drift between Drizzle ORM and database.
-- **Full audit of all 47 migrations** (escalated from spec's "last 5" per user request for production-grade rigor). Found 1 P1 issue: `migrations/0011_prompt_generations.sql:11` was missing `IF NOT EXISTS` on `CREATE INDEX`. Theoretical risk only (the `applyMigrations()` runner uses `schema_migrations` table to skip already-applied migrations on re-boot), but matters for partial-restore scenarios. **Fixed inline.** All other 46 migrations are exemplary — consistent `IF NOT EXISTS`, idempotent data mutations, FK columns indexed, dedup-before-unique-index pattern.
+- **`drizzle-kit check` clean** - no schema drift between Drizzle ORM and database.
+- **Full audit of all 47 migrations** (escalated from spec's "last 5" per user request for production-grade rigor). Found 1 P1 issue: `migrations/0011_prompt_generations.sql:11` was missing `IF NOT EXISTS` on `CREATE INDEX`. Theoretical risk only (the `applyMigrations()` runner uses `schema_migrations` table to skip already-applied migrations on re-boot), but matters for partial-restore scenarios. **Fixed inline.** All other 46 migrations are exemplary - consistent `IF NOT EXISTS`, idempotent data mutations, FK columns indexed, dedup-before-unique-index pattern.
 
 ### 16.5 Operational readiness
 
-- **RUNBOOK expansion** ([docs/RUNBOOK.md](docs/RUNBOOK.md), gitignored via `*.md`) — appended four sections: schema state + migration audit findings, 5 incident scenarios (DB pool exhaustion, Stripe webhook signature failures, OpenAI/OpenRouter 429, LLM budget exceeded, stuck content jobs), backup-and-restore procedure for Supabase Free, status page placeholder.
+- **RUNBOOK expansion** ([docs/RUNBOOK.md](docs/RUNBOOK.md), gitignored via `*.md`) - appended four sections: schema state + migration audit findings, 5 incident scenarios (DB pool exhaustion, Stripe webhook signature failures, OpenAI/OpenRouter 429, LLM budget exceeded, stuck content jobs), backup-and-restore procedure for Supabase Free, status page placeholder.
 - **B8.5 backup drill / B8.6 status page** deferred to user's manual session (requires Supabase staging project + `pg_dump`/`psql` installed locally; Better Stack signup + landing footer edit).
 
 ### 16.6 Files
@@ -2439,24 +2439,24 @@ Sentry org/project signup + DSN + auth-token in Vercel env vars deferred to user
 
 ---
 
-## Wave 17 — Phase 1: Onboarding ring + expectations timeline
+## Wave 17 - Phase 1: Onboarding ring + expectations timeline
 
 Two small dashboard-visible wins that immediately answer Ben's "users get lost" and "can't tell when results will come" complaints from the meeting transcript. Builds on Phase 0's clean foundation.
 
 ### 17.1 Onboarding ring
 
-- **Single source of truth** — extracted the 4-step `STEPS` array (was inline in [client/src/components/SidebarOnboarding.tsx](client/src/components/SidebarOnboarding.tsx)) into [client/src/lib/onboardingSteps.ts](client/src/lib/onboardingSteps.ts) along with `OnboardingData` type, `isOnboardingComplete(data)`, `completedStepCount(data)`. Eliminates the "two definitions" trap before adding the second consumer.
+- **Single source of truth** - extracted the 4-step `STEPS` array (was inline in [client/src/components/SidebarOnboarding.tsx](client/src/components/SidebarOnboarding.tsx)) into [client/src/lib/onboardingSteps.ts](client/src/lib/onboardingSteps.ts) along with `OnboardingData` type, `isOnboardingComplete(data)`, `completedStepCount(data)`. Eliminates the "two definitions" trap before adding the second consumer.
 - **`OnboardingProgressRing` component** at [client/src/components/dashboard/OnboardingProgressRing.tsx](client/src/components/dashboard/OnboardingProgressRing.tsx) reuses the existing `VisibilityGauge` SVG ring. Reads from three TanStack Query caches (`/api/onboarding-status`, `/api/brands`, `/api/articles`); renders skeleton when any is loading; renders nothing when any errors; auto-dismisses + writes localStorage when all 4 steps complete.
-- **localStorage scoping** by `user.id` (`venturecite-onboarding-ring-dismissed:${user.id}`) — the existing `clearAllVentureCiteStorage()` from [client/src/lib/clientStorage.ts](client/src/lib/clientStorage.ts) wipes any `venturecite-*` prefixed key on logout, so cross-user-on-shared-browser leak is automatically prevented.
-- **Sidebar widget complement** — when complete, [SidebarOnboarding.tsx](client/src/components/SidebarOnboarding.tsx) renders a tiny "✓ Setup complete" condensed trigger instead of the in-progress version. Click still opens the same Dialog with all 4 steps checkmarked (read-only celebration view).
-- **4 RTL tests** at [tests/unit/OnboardingProgressRing.test.tsx](tests/unit/OnboardingProgressRing.test.tsx) — skeleton state, partial-data state, auto-dismiss + localStorage write, user.id-scoped dismissal (no cross-account leak).
+- **localStorage scoping** by `user.id` (`venturecite-onboarding-ring-dismissed:${user.id}`) - the existing `clearAllVentureCiteStorage()` from [client/src/lib/clientStorage.ts](client/src/lib/clientStorage.ts) wipes any `venturecite-*` prefixed key on logout, so cross-user-on-shared-browser leak is automatically prevented.
+- **Sidebar widget complement** - when complete, [SidebarOnboarding.tsx](client/src/components/SidebarOnboarding.tsx) renders a tiny "✓ Setup complete" condensed trigger instead of the in-progress version. Click still opens the same Dialog with all 4 steps checkmarked (read-only celebration view).
+- **4 RTL tests** at [tests/unit/OnboardingProgressRing.test.tsx](tests/unit/OnboardingProgressRing.test.tsx) - skeleton state, partial-data state, auto-dismiss + localStorage write, user.id-scoped dismissal (no cross-account leak).
 
 ### 17.2 Expectations timeline
 
-- **`ResultsTimeline` component** at [client/src/components/dashboard/ResultsTimeline.tsx](client/src/components/dashboard/ResultsTimeline.tsx) — static horizontal 4-milestone timeline (Day 0 / Week 1 / Week 2-3 / Week 4+) with current-week highlight derived from `min(brand.createdAt)` for the user. Computes `daysSinceOldest` from `/api/brands` query; clamps to `[0, 365]`; `currentMilestoneIndex` returns 0–3.
-- **`EmptyResultsHero` component** at [client/src/components/citations/EmptyResultsHero.tsx](client/src/components/citations/EmptyResultsHero.tsx) — replaces the citations page's generic empty state with the 1–2 week LLM lag explainer. Wired into [ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx) when `totalChecks === 0`. CTA gated by `hasPrompts && !runMutation.isPending` (don't surface "Run a check" when there's nothing to run or one's in flight).
+- **`ResultsTimeline` component** at [client/src/components/dashboard/ResultsTimeline.tsx](client/src/components/dashboard/ResultsTimeline.tsx) - static horizontal 4-milestone timeline (Day 0 / Week 1 / Week 2-3 / Week 4+) with current-week highlight derived from `min(brand.createdAt)` for the user. Computes `daysSinceOldest` from `/api/brands` query; clamps to `[0, 365]`; `currentMilestoneIndex` returns 0–3.
+- **`EmptyResultsHero` component** at [client/src/components/citations/EmptyResultsHero.tsx](client/src/components/citations/EmptyResultsHero.tsx) - replaces the citations page's generic empty state with the 1–2 week LLM lag explainer. Wired into [ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx) when `totalChecks === 0`. CTA gated by `hasPrompts && !runMutation.isPending` (don't surface "Run a check" when there's nothing to run or one's in flight).
 - **Weekly digest email** ([server/emailService.ts](server/emailService.ts) `WeeklyDigestPayload` extended with `weekN: number | null`; [server/lib/weeklyDigestEmitter.ts](server/lib/weeklyDigestEmitter.ts) extends `userBrands.select` with `createdAt`, computes `weekN` from oldest brand, passes to `sendWeeklyDigest`). Email body now reads "Week of X · Week N since you started VentureCite" (uses `weekN + 1` for human-friendly counting).
-- **3 RTL tests** at [tests/unit/ResultsTimeline.test.tsx](tests/unit/ResultsTimeline.test.tsx) — correct milestone for 16-day-old brand (Week 2-3), brand-new clamps to Day 0, oldest-brand selection across multiple brands.
+- **3 RTL tests** at [tests/unit/ResultsTimeline.test.tsx](tests/unit/ResultsTimeline.test.tsx) - correct milestone for 16-day-old brand (Week 2-3), brand-new clamps to Day 0, oldest-brand selection across multiple brands.
 
 ### 17.3 Test infrastructure (one-time investment paying off Phase 1+)
 
@@ -2468,9 +2468,9 @@ Two small dashboard-visible wins that immediately answer Ben's "users get lost" 
 
 After parallel-agent execution, three minor deviations were flagged and fixed:
 
-1. **`SidebarOnboarding.tsx` had both `isComplete` and `complete`** computing the same boolean two ways — collapsed to single `isComplete = isOnboardingComplete(data)`.
-2. **Email `weekNLine` styling tokens** were `color:#666;margin:0 0 24px` (per plan) but original line used `color:#6b7280;margin:0 0 20px` — restored original to avoid email-design churn.
-3. **`runLoadingMessage` prop on `ResultsTab`** was unused after the empty-state refactor — dropped from the type and from the parent's prop pass at `citations.tsx:561`.
+1. **`SidebarOnboarding.tsx` had both `isComplete` and `complete`** computing the same boolean two ways - collapsed to single `isComplete = isOnboardingComplete(data)`.
+2. **Email `weekNLine` styling tokens** were `color:#666;margin:0 0 24px` (per plan) but original line used `color:#6b7280;margin:0 0 20px` - restored original to avoid email-design churn.
+3. **`runLoadingMessage` prop on `ResultsTab`** was unused after the empty-state refactor - dropped from the type and from the parent's prop pass at `citations.tsx:561`.
 
 ### 17.5 Wouter v3 cleanups (additional)
 
@@ -2483,13 +2483,13 @@ After Phase 1 finished, two new files used the deprecated Wouter v2 nested-`<a>`
 
 ---
 
-## Wave 18 — Phase 2: Per-page explainers + glossary + sidebar reorder
+## Wave 18 - Phase 2: Per-page explainers + glossary + sidebar reorder
 
 Introduces the most reusable infrastructure of the entire product plan. The `pageExplainers.ts` config becomes a referenceable knowledge base that the upcoming chatbot (Wave 20) imports to ground its answers, and that empty states (later wave) reference for fall-back copy. Single source of truth across many surfaces.
 
 ### 18.1 PageHeader extension + GeoConceptBadge
 
-- **`PageHeader.tsx`** ([client/src/components/PageHeader.tsx](client/src/components/PageHeader.tsx)) extended with optional `explainer?: PageExplainer` prop. When present, renders an `(i)` Info icon button next to the title that opens a Radix Popover with summary + optional prerequisites + optional expectedOutcome + optional related-concept badge. Backward-compatible — existing callers without the prop work unchanged.
+- **`PageHeader.tsx`** ([client/src/components/PageHeader.tsx](client/src/components/PageHeader.tsx)) extended with optional `explainer?: PageExplainer` prop. When present, renders an `(i)` Info icon button next to the title that opens a Radix Popover with summary + optional prerequisites + optional expectedOutcome + optional related-concept badge. Backward-compatible - existing callers without the prop work unchanged.
 - **`PageExplainer` type** exported from `PageHeader.tsx`:
   ```ts
   export type PageExplainer = {
@@ -2499,34 +2499,34 @@ Introduces the most reusable infrastructure of the entire product plan. The `pag
     relatedConcept?: "GEO" | "AEO" | "SEO";
   };
   ```
-- **`GeoConceptBadge` component** ([client/src/components/GeoConceptBadge.tsx](client/src/components/GeoConceptBadge.tsx)) — inline pill that hover-cards a definition + click-jumps to `/glossary#<concept>` anchor. Uses existing Radix `HoverCard` + `Badge`. Three concepts: GEO, AEO, SEO.
+- **`GeoConceptBadge` component** ([client/src/components/GeoConceptBadge.tsx](client/src/components/GeoConceptBadge.tsx)) - inline pill that hover-cards a definition + click-jumps to `/glossary#<concept>` anchor. Uses existing Radix `HoverCard` + `Badge`. Three concepts: GEO, AEO, SEO.
 
 ### 18.2 Centralized pageExplainers config + 26-page wiring
 
-- **[client/src/lib/pageExplainers.ts](client/src/lib/pageExplainers.ts)** — single export `pageExplainers` const with explainer entries for all 26 authenticated pages. Adding/editing copy across the app is a one-file edit.
-- **26 page files modified** — each gets one `import { pageExplainers } from "@/lib/pageExplainers"` line + one `explainer={pageExplainers.<key>}` prop on its `<PageHeader>` call site (28 total call sites including loading/empty variants on `home.tsx` and `content.tsx`).
+- **[client/src/lib/pageExplainers.ts](client/src/lib/pageExplainers.ts)** - single export `pageExplainers` const with explainer entries for all 26 authenticated pages. Adding/editing copy across the app is a one-file edit.
+- **26 page files modified** - each gets one `import { pageExplainers } from "@/lib/pageExplainers"` line + one `explainer={pageExplainers.<key>}` prop on its `<PageHeader>` call site (28 total call sites including loading/empty variants on `home.tsx` and `content.tsx`).
 - **Why centralized:** chatbot system prompt (Wave 20) will import this same map to keep its answers in sync with what users see in the popovers; empty states (later wave) fall back to `pageExplainers[page].expectedOutcome` for generic copy. Prevents "the popover says X but the chatbot says Y" drift.
 
 ### 18.3 Public `/glossary` route
 
-- **[client/src/pages/glossary.tsx](client/src/pages/glossary.tsx)** — public route (no `<AuthenticatedRoute>` wrapper) with three sections: GEO (Generative Engine Optimization), AEO (Answer Engine Optimization), SEO (Search Engine Optimization). Each section: definition, why it matters, how VentureCite covers it, related pages.
-- **SEO surface** — inline `useEffect` sets `<title>` and `<meta name="description">` (matches existing codebase pattern, no React Helmet dep). JSON-LD `DefinedTermSet` schema injected via `dangerouslySetInnerHTML` for AI engines + Google rich-results.
+- **[client/src/pages/glossary.tsx](client/src/pages/glossary.tsx)** - public route (no `<AuthenticatedRoute>` wrapper) with three sections: GEO (Generative Engine Optimization), AEO (Answer Engine Optimization), SEO (Search Engine Optimization). Each section: definition, why it matters, how VentureCite covers it, related pages.
+- **SEO surface** - inline `useEffect` sets `<title>` and `<meta name="description">` (matches existing codebase pattern, no React Helmet dep). JSON-LD `DefinedTermSet` schema injected via `dangerouslySetInnerHTML` for AI engines + Google rich-results.
 - **Lazy-loaded** via render-prop pattern matching the existing `/privacy` route (the only other lazy public route). Avoids loading the glossary code on initial paint for authenticated users.
-- **Anchor links** — each section uses `id={term.id}` + `scroll-mt-16` so deep-links (`/glossary#geo`, `/glossary#aeo`, `/glossary#seo`) work. The `GeoConceptBadge` uses these.
+- **Anchor links** - each section uses `id={term.id}` + `scroll-mt-16` so deep-links (`/glossary#geo`, `/glossary#aeo`, `/glossary#seo`) work. The `GeoConceptBadge` uses these.
 
 ### 18.4 Sidebar reorder into workflow sequence
 
-- **[client/src/components/Sidebar.tsx](client/src/components/Sidebar.tsx)** — 5 NAV\_\* arrays restructured into Setup → Create → Measure → Grow → Optimize order:
-  - **Setup**: Dashboard, Brands, AI Visibility (moved from Tools — it's a one-time setup checklist, not a tool)
-  - **Create**: Content, Articles (moved from Main — it's an output of Create, not Setup), Keywords
+- **[client/src/components/Sidebar.tsx](client/src/components/Sidebar.tsx)** - 5 NAV\_\* arrays restructured into Setup → Create → Measure → Grow → Optimize order:
+  - **Setup**: Dashboard, Brands, AI Visibility (moved from Tools - it's a one-time setup checklist, not a tool)
+  - **Create**: Content, Articles (moved from Main - it's an output of Create, not Setup), Keywords
   - **Measure**: Citations (moved from Tools), GEO Analytics, AI Intelligence, Reports (moved from Optimize)
   - **Grow**: Community, Opportunities, Competitors
   - **Optimize**: GEO Tools, Signals, Crawler Check, FAQ Manager, Fact Sheet
-- **No URL changes** — bookmarks still work. Section labels updated to "Setup / Create / Measure / Grow / Optimize" so the workflow order is communicated at a glance.
+- **No URL changes** - bookmarks still work. Section labels updated to "Setup / Create / Measure / Grow / Optimize" so the workflow order is communicated at a glance.
 
 ### 18.5 Wouter v3 cleanups (additional)
 
-After Phase 2 shipped, the new `glossary.tsx` (Phase 2) and `OnboardingProgressRing.tsx` (Phase 1) used the deprecated Wouter v2 nested-`<a>` pattern. Fixed both via parallel agents — `<Link href="..." className="...">children</Link>` directly. Pre-existing usage in `landing.tsx` left for a project-wide cleanup pass later.
+After Phase 2 shipped, the new `glossary.tsx` (Phase 2) and `OnboardingProgressRing.tsx` (Phase 1) used the deprecated Wouter v2 nested-`<a>` pattern. Fixed both via parallel agents - `<Link href="..." className="...">children</Link>` directly. Pre-existing usage in `landing.tsx` left for a project-wide cleanup pass later.
 
 ### 18.6 Files (highlights)
 
@@ -2542,36 +2542,36 @@ After Phase 2 shipped, the new `glossary.tsx` (Phase 2) and `OnboardingProgressR
 
 ### 18.7 Verification
 
-- `npm run check` clean. `npm test` 244/244 (no new tests — layout-only per convention). 0 lint errors.
+- `npm run check` clean. `npm test` 244/244 (no new tests - layout-only per convention). 0 lint errors.
 - Manual smoke: every authenticated page has the `(i)` icon next to its title; click → popover with the right copy. Glossary renders publicly with anchor jumps + JSON-LD in DOM. Sidebar shows new workflow grouping.
 
 ---
 
-## Wave 19 — Phase 3: Citation locations (highlight + snippet strip + URL extraction)
+## Wave 19 - Phase 3: Citation locations (highlight + snippet strip + URL extraction)
 
 Self-contained to the citations pages. Directly answers Ben's literal complaint from the meeting: "it didn't tell me where the citations were or what they were."
 
 ### 19.1 Brand-mention highlighting
 
-- **Custom rehype plugin** at [client/src/lib/highlightTermsRehype.ts](client/src/lib/highlightTermsRehype.ts) — `createHighlightPlugin(terms): Plugin<[], Root>` factory. Walks hast text nodes (NOT markdown source — that would corrupt links/code blocks); skips text inside `<code>`, `<pre>`, `<a>`. Splits matched text into `[text, mark, text, mark, ...]` and replaces in parent's children.
-- **Lookaround word-boundary** — replaced standard `\b` with `(?<![A-Za-z0-9_])(...)(?![A-Za-z0-9_])` because `\b` doesn't match terms ending in non-word chars like "C++" (the `+` is already a non-word char, so there's no "boundary"). Lookaround handles both standard names AND symbol-laden ones.
-- **Sanitize schema extended** ([client/src/components/SafeMarkdown.tsx](client/src/components/SafeMarkdown.tsx)) — `defaultSchema.tagNames` extended with `"mark"` so the sanitizer doesn't strip the highlighting tags. `Pluggable[]` type from `unified` used to type the plugin array (mutable, not `as const`, to match React-Markdown's expected shape).
+- **Custom rehype plugin** at [client/src/lib/highlightTermsRehype.ts](client/src/lib/highlightTermsRehype.ts) - `createHighlightPlugin(terms): Plugin<[], Root>` factory. Walks hast text nodes (NOT markdown source - that would corrupt links/code blocks); skips text inside `<code>`, `<pre>`, `<a>`. Splits matched text into `[text, mark, text, mark, ...]` and replaces in parent's children.
+- **Lookaround word-boundary** - replaced standard `\b` with `(?<![A-Za-z0-9_])(...)(?![A-Za-z0-9_])` because `\b` doesn't match terms ending in non-word chars like "C++" (the `+` is already a non-word char, so there's no "boundary"). Lookaround handles both standard names AND symbol-laden ones.
+- **Sanitize schema extended** ([client/src/components/SafeMarkdown.tsx](client/src/components/SafeMarkdown.tsx)) - `defaultSchema.tagNames` extended with `"mark"` so the sanitizer doesn't strip the highlighting tags. `Pluggable[]` type from `unified` used to type the plugin array (mutable, not `as const`, to match React-Markdown's expected shape).
 - **Wired through** [PlatformResultCard.tsx](client/src/components/citations/PlatformResultCard.tsx) (new `highlightTerms` prop) and [ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx) + [HistoryTab.tsx](client/src/components/citations/HistoryTab.tsx) (each calls `useBrandSelection()` to derive `highlightTerms = [selectedBrand.name, ...nameVariations]` then passes down).
-- **6 unit tests** at [tests/unit/highlightTermsRehype.test.ts](tests/unit/highlightTermsRehype.test.ts) — case-insensitive word-boundary matching, code/link skipping, regex char escaping (C++), longest-first multi-term preference, empty terms no-op, 50-term cap.
+- **6 unit tests** at [tests/unit/highlightTermsRehype.test.ts](tests/unit/highlightTermsRehype.test.ts) - case-insensitive word-boundary matching, code/link skipping, regex char escaping (C++), longest-first multi-term preference, empty terms no-op, 50-term cap.
 
 ### 19.2 "Cited mentions" snippet strip
 
-- **`extractSnippet` helper** at [client/src/lib/extractSnippet.ts](client/src/lib/extractSnippet.ts) — `extractSnippet(text, terms, radius = 200): string`. Returns ±radius chars around the FIRST matching term across all candidates; "…" boundaries when truncated; longest-first term preference; returns leading 2\*radius chars + "…" when no match. Pure function, 6 unit tests.
-- **`CitedMentionsStrip` component** at [client/src/components/citations/CitedMentionsStrip.tsx](client/src/components/citations/CitedMentionsStrip.tsx) — horizontal scrollable strip of cards rendered above the per-platform stats card when `totalCited > 0`. Each card: platform pill, truncated prompt, snippet (extracted on the fly from `fullResponse` if available, falling back to saved `citationContext`).
-- **Wired into [ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx)** — flattens `results.byPrompt[].platforms[]` into a `CitedMention[]` filtered to `isCited && (fullResponse || snippet)`.
+- **`extractSnippet` helper** at [client/src/lib/extractSnippet.ts](client/src/lib/extractSnippet.ts) - `extractSnippet(text, terms, radius = 200): string`. Returns ±radius chars around the FIRST matching term across all candidates; "…" boundaries when truncated; longest-first term preference; returns leading 2\*radius chars + "…" when no match. Pure function, 6 unit tests.
+- **`CitedMentionsStrip` component** at [client/src/components/citations/CitedMentionsStrip.tsx](client/src/components/citations/CitedMentionsStrip.tsx) - horizontal scrollable strip of cards rendered above the per-platform stats card when `totalCited > 0`. Each card: platform pill, truncated prompt, snippet (extracted on the fly from `fullResponse` if available, falling back to saved `citationContext`).
+- **Wired into [ResultsTab.tsx](client/src/components/citations/ResultsTab.tsx)** - flattens `results.byPrompt[].platforms[]` into a `CitedMention[]` filtered to `isCited && (fullResponse || snippet)`.
 
-### 19.3 Source URL extraction — schema + extractor + UI
+### 19.3 Source URL extraction - schema + extractor + UI
 
-- **Migration `0047_geo_rankings_cited_urls.sql`** — `ALTER TABLE geo_rankings ADD COLUMN IF NOT EXISTS cited_urls TEXT[]`. Backward-compatible (nullable, existing rows stay null).
-- **Drizzle schema** ([shared/schema.ts](shared/schema.ts)) — `citedUrls: text("cited_urls").array()` added to `geoRankings`.
-- **`extractCitedUrls` server helper** at [server/lib/urlExtractor.ts](server/lib/urlExtractor.ts) — pure function. Captures both markdown links `[text](url)` and plain URLs via single regex; strips trailing punctuation (NOT `?` since URLs commonly end with query strings); validates http/https + hostname-with-dot; dedupe-case-insensitive on hostname + exact on path/search; cap 20 URLs × 2048 chars each. 8 unit tests.
-- **Perplexity structured-citations capture** ([server/citationChecker.ts](server/citationChecker.ts)) — discovered during the Task 6 investigation that Perplexity (via OpenRouter) returns a top-level `citations: string[]` field that we were dropping. Now defensively read via `(chatResponse as any).citations`, threaded through `runOne`'s `attemptFetch` helper, and merged with text-extracted URLs at the `createGeoRanking` site (single dedupe + cap pass via the same `extractCitedUrls` call). Other platforms' `structuredCitations: []` collapses to text-only behavior.
-- **Cited-URLs pill list** rendered in [PlatformResultCard.tsx](client/src/components/citations/PlatformResultCard.tsx) below the SafeMarkdown content when `result.citedUrls?.length > 0`. Each pill is an `<a target="_blank" rel="noopener noreferrer">` with `hostname` as the visible label and full URL in `title`. The `rel="noopener noreferrer"` is critical — these URLs come from external AI output and must not be allowed to script the parent window or leak referrer.
+- **Migration `0047_geo_rankings_cited_urls.sql`** - `ALTER TABLE geo_rankings ADD COLUMN IF NOT EXISTS cited_urls TEXT[]`. Backward-compatible (nullable, existing rows stay null).
+- **Drizzle schema** ([shared/schema.ts](shared/schema.ts)) - `citedUrls: text("cited_urls").array()` added to `geoRankings`.
+- **`extractCitedUrls` server helper** at [server/lib/urlExtractor.ts](server/lib/urlExtractor.ts) - pure function. Captures both markdown links `[text](url)` and plain URLs via single regex; strips trailing punctuation (NOT `?` since URLs commonly end with query strings); validates http/https + hostname-with-dot; dedupe-case-insensitive on hostname + exact on path/search; cap 20 URLs × 2048 chars each. 8 unit tests.
+- **Perplexity structured-citations capture** ([server/citationChecker.ts](server/citationChecker.ts)) - discovered during the Task 6 investigation that Perplexity (via OpenRouter) returns a top-level `citations: string[]` field that we were dropping. Now defensively read via `(chatResponse as any).citations`, threaded through `runOne`'s `attemptFetch` helper, and merged with text-extracted URLs at the `createGeoRanking` site (single dedupe + cap pass via the same `extractCitedUrls` call). Other platforms' `structuredCitations: []` collapses to text-only behavior.
+- **Cited-URLs pill list** rendered in [PlatformResultCard.tsx](client/src/components/citations/PlatformResultCard.tsx) below the SafeMarkdown content when `result.citedUrls?.length > 0`. Each pill is an `<a target="_blank" rel="noopener noreferrer">` with `hostname` as the visible label and full URL in `title`. The `rel="noopener noreferrer"` is critical - these URLs come from external AI output and must not be allowed to script the parent window or leak referrer.
 
 ### 19.4 Files
 
@@ -2598,25 +2598,25 @@ Self-contained to the citations pages. Directly answers Ben's literal complaint 
 
 ### 19.6 Out of scope (for follow-ups)
 
-- Backfilling `cited_urls` for pre-migration rows — only new citation runs from this point onward populate the column. Old rows render without the pill list section.
-- Pulling page titles (only hostnames render in pills) — would require a separate fetch per URL, expensive.
-- Filtering URL list to "authoritative" sources — every URL the LLM cited is rendered; quality scoring is separate.
-- "Click strip card → scroll-to-accordion-row" interaction — `CitedMentionsStrip` supports the `onClick` prop but it's left unwired in `ResultsTab` for now.
+- Backfilling `cited_urls` for pre-migration rows - only new citation runs from this point onward populate the column. Old rows render without the pill list section.
+- Pulling page titles (only hostnames render in pills) - would require a separate fetch per URL, expensive.
+- Filtering URL list to "authoritative" sources - every URL the LLM cited is rendered; quality scoring is separate.
+- "Click strip card → scroll-to-accordion-row" interaction - `CitedMentionsStrip` supports the `onClick` prop but it's left unwired in `ResultsTab` for now.
 
 ---
 
-## Wave 20 — Phase 4: Recommendations Engine (A6)
+## Wave 20 - Phase 4: Recommendations Engine (A6)
 
 **Status:** Complete
 **Date:** 2026-05-04
 
 ### 20.1 What was built
 
-**Pure rules engine** at [server/lib/recommendationsEngine.ts](server/lib/recommendationsEngine.ts) — `getRecommendations(state: RecommendationState): Recommendation[]`. 11 deterministic rules (P0/P1/P2), output capped at 5, P0 first. Zero side effects, zero LLM cost per pageview.
+**Pure rules engine** at [server/lib/recommendationsEngine.ts](server/lib/recommendationsEngine.ts) - `getRecommendations(state: RecommendationState): Recommendation[]`. 11 deterministic rules (P0/P1/P2), output capped at 5, P0 first. Zero side effects, zero LLM cost per pageview.
 
-**Endpoint** `GET /api/brands/:brandId/recommendations` added to [server/routes/dashboard.ts](server/routes/dashboard.ts) — loads 6 data points via `Promise.all`, calls engine, returns `{ success: true, data: recommendations }`. Typical latency 50–100 ms.
+**Endpoint** `GET /api/brands/:brandId/recommendations` added to [server/routes/dashboard.ts](server/routes/dashboard.ts) - loads 6 data points via `Promise.all`, calls engine, returns `{ success: true, data: recommendations }`. Typical latency 50–100 ms.
 
-**`RecommendationsPanel` component** at [client/src/components/dashboard/RecommendationsPanel.tsx](client/src/components/dashboard/RecommendationsPanel.tsx) — P0 cards (red accent, not dismissible), P1 cards (amber, 7-day soft-hide), P2 cards (subtle, dismissible). Dismiss state keyed by `venturecite-recs-dismissed:${user.id}`.
+**`RecommendationsPanel` component** at [client/src/components/dashboard/RecommendationsPanel.tsx](client/src/components/dashboard/RecommendationsPanel.tsx) - P0 cards (red accent, not dismissible), P1 cards (amber, 7-day soft-hide), P2 cards (subtle, dismissible). Dismiss state keyed by `venturecite-recs-dismissed:${user.id}`.
 
 **Mounted** in [client/src/pages/home.tsx](client/src/pages/home.tsx) below `OnboardingProgressRing` and `ResultsTimeline`.
 
@@ -2654,18 +2654,18 @@ type Recommendation = {
 
 ---
 
-## Wave 21 — Phase 5: Chatbot / Education Assistant (A1)
+## Wave 21 - Phase 5: Chatbot / Education Assistant (A1)
 
 **Status:** Complete
 **Date:** 2026-05-04
 
 ### 21.1 What was built (3 PRs)
 
-**PR 5.1 — Production baseline:** Migration, schema, OpenRouter client, knowledge base, budget system, storage layer, `POST /api/assistant/chat` endpoint (JSON response), `EducationAssistant` floating bubble, daily cron prune step.
+**PR 5.1 - Production baseline:** Migration, schema, OpenRouter client, knowledge base, budget system, storage layer, `POST /api/assistant/chat` endpoint (JSON response), `EducationAssistant` floating bubble, daily cron prune step.
 
-**PR 5.2 — SSE streaming:** Endpoint converted to Server-Sent Events (heartbeat every 15s, `req.on("close")` abort handling). Client uses `fetch + ReadableStream + TextDecoder`. Partial content persisted on stream abort. Validation/budget errors stay as JSON 4xx (before `flushHeaders()`).
+**PR 5.2 - SSE streaming:** Endpoint converted to Server-Sent Events (heartbeat every 15s, `req.on("close")` abort handling). Client uses `fetch + ReadableStream + TextDecoder`. Partial content persisted on stream abort. Validation/budget errors stay as JSON 4xx (before `flushHeaders()`).
 
-**PR 5.3 — Brand-aware context:** When `brandId` in request body, brand summary loaded in parallel with history and injected as a second system message AFTER the cached `SYSTEM_PROMPT` (preserves Anthropic prompt cache). Cache-control on index 0 only.
+**PR 5.3 - Brand-aware context:** When `brandId` in request body, brand summary loaded in parallel with history and injected as a second system message AFTER the cached `SYSTEM_PROMPT` (preserves Anthropic prompt cache). Cache-control on index 0 only.
 
 ### 21.2 New persistence
 
@@ -2685,7 +2685,7 @@ type Recommendation = {
 ### 21.4 Key design decisions
 
 - OpenAI SDK pointed at OpenRouter (`baseURL: "https://openrouter.ai/api/v1"`), model `anthropic/claude-sonnet-4.5`
-- System prompt (~3,500 tokens) uses `cache_control: { type: "ephemeral" }` — 90% discount on cache hits
+- System prompt (~3,500 tokens) uses `cache_control: { type: "ephemeral" }` - 90% discount on cache hits
 - Last 10 messages only (bounds context, prevents runaway cost)
 - Persist user message BEFORE OpenRouter call (preserves message on timeout)
 - 1 retry on 5xx/429 from OpenRouter (1s backoff)
@@ -2724,32 +2724,32 @@ type Recommendation = {
 
 ---
 
-## Wave 22 — Phase 6: Empty / Skeleton / Error States (C1+C2+C3)
+## Wave 22 - Phase 6: Empty / Skeleton / Error States (C1+C2+C3)
 
 **Status:** Complete
 **Date:** 2026-05-04
 
 ### 22.1 What was built (2 PRs)
 
-**PR 6.1 — Shared infrastructure + top 5 pages:**
+**PR 6.1 - Shared infrastructure + top 5 pages:**
 Three new shared components, then applied to `/dashboard`, `/citations`, `/articles`, `/content`, `/brands`.
 
-**PR 6.2 — Remaining 23 pages:**
+**PR 6.2 - Remaining 23 pages:**
 Mechanical sweep: `agent-dashboard`, `agent-run`, `ai-intelligence`, `ai-traffic`, `ai-visibility`, `analytics-integrations`, `brand-fact-sheet`, `client-reports`, `community-engagement`, `competitors`, `crawler-check`, `faq-manager`, `geo-analytics`, `geo-opportunities`, `geo-rankings`, `geo-signals`, `geo-tools`, `keyword-research`, `outreach`, `publication-intelligence`, `revenue-analytics`, `settings`, `welcome`.
 
 ### 22.2 New shared components
 
-**[client/src/components/ui/empty-state.tsx](client/src/components/ui/empty-state.tsx)** — `EmptyState` — card with optional icon, title, description, primary action, secondary action. Consistent center-aligned layout matching existing `EmptyResultsHero` style.
+**[client/src/components/ui/empty-state.tsx](client/src/components/ui/empty-state.tsx)** - `EmptyState` - card with optional icon, title, description, primary action, secondary action. Consistent center-aligned layout matching existing `EmptyResultsHero` style.
 
-**[client/src/components/ui/error-state.tsx](client/src/components/ui/error-state.tsx)** — `ErrorState` — card with red-tinted icon, title, description, retry button (spins while `isRetrying`). `onRetry` is mandatory — forces every caller to wire refetch.
+**[client/src/components/ui/error-state.tsx](client/src/components/ui/error-state.tsx)** - `ErrorState` - card with red-tinted icon, title, description, retry button (spins while `isRetrying`). `onRetry` is mandatory - forces every caller to wire refetch.
 
-**[client/src/lib/queryStates.ts](client/src/lib/queryStates.ts)** — `renderQueryState<T>()` — centralises the `isLoading → isError → isEmpty → data` branch pattern for future use.
+**[client/src/lib/queryStates.ts](client/src/lib/queryStates.ts)** - `renderQueryState<T>()` - centralises the `isLoading → isError → isEmpty → data` branch pattern for future use.
 
 ### 22.3 Pattern applied per page
 
 1. Destructure `isError`, `isRefetching`, `refetch` from existing `useQuery` calls.
 2. Add `<ErrorState>` with `onRetry` wired to `refetch` and contextual title.
-3. Replace inline empty cards with `<EmptyState>` — copy ported verbatim, CTAs preserved.
+3. Replace inline empty cards with `<EmptyState>` - copy ported verbatim, CTAs preserved.
 
 Conservative skips (queries in subcomponents, mutation-driven flows, static pages with bespoke error UX): `ai-intelligence`, `ai-visibility`, `analytics-integrations`, `crawler-check`, `geo-signals`, `publication-intelligence`, `welcome`.
 
@@ -2770,7 +2770,7 @@ Conservative skips (queries in subcomponents, mutation-driven flows, static page
 
 ---
 
-## Wave 23 — Phase 5 v2: Chatbot Multi-Thread Redesign + Anti-Hallucination
+## Wave 23 - Phase 5 v2: Chatbot Multi-Thread Redesign + Anti-Hallucination
 
 **Goal:** Make the AI Tutor production-ready: separate chat threads (ChatGPT-style), branded UI, accurate persona, no hallucinated UI labels or stats.
 
@@ -2784,11 +2784,11 @@ This wave fixed all of it end-to-end: data model, server API, client architectur
 
 ### 23.2 Auth bug fix (precursor)
 
-Before redesign, the chatbot was returning 401 on every send. Root cause: `EducationAssistant.tsx` used raw `fetch()` with `credentials: "include"` instead of attaching the Supabase JWT via `Authorization: Bearer` header. Per `CLAUDE.md`, this app authenticates via JWT — no cookies. Replaced with `getAccessToken()` + manual Bearer attachment (can't use `apiRequest()` because it consumes the response body, breaking SSE streaming).
+Before redesign, the chatbot was returning 401 on every send. Root cause: `EducationAssistant.tsx` used raw `fetch()` with `credentials: "include"` instead of attaching the Supabase JWT via `Authorization: Bearer` header. Per `CLAUDE.md`, this app authenticates via JWT - no cookies. Replaced with `getAccessToken()` + manual Bearer attachment (can't use `apiRequest()` because it consumes the response body, breaking SSE streaming).
 
 ### 23.3 Data model
 
-**[migrations/0049_chatbot_threads.sql](migrations/0049_chatbot_threads.sql)** — additive, idempotent:
+**[migrations/0049_chatbot_threads.sql](migrations/0049_chatbot_threads.sql)** - additive, idempotent:
 
 ```sql
 CREATE TABLE chatbot_threads (
@@ -2812,7 +2812,7 @@ Soft-delete via `archived_at`. Nightly prune (extended in `pruneChatbotMessages`
 
 ### 23.4 Server API (six endpoints)
 
-**[server/routes/assistant.ts](server/routes/assistant.ts)** — fully rewritten:
+**[server/routes/assistant.ts](server/routes/assistant.ts)** - fully rewritten:
 
 | Method   | Path                                  | Purpose                                                |
 | -------- | ------------------------------------- | ------------------------------------------------------ |
@@ -2821,9 +2821,9 @@ Soft-delete via `archived_at`. Nightly prune (extended in `pruneChatbotMessages`
 | `GET`    | `/api/assistant/threads/:id/messages` | Transcript of one thread.                              |
 | `DELETE` | `/api/assistant/threads/:id`          | Soft-archive (sets `archived_at = now()`).             |
 | `POST`   | `/api/assistant/threads/:id/restore`  | Un-archive (clears `archived_at`).                     |
-| `POST`   | `/api/assistant/chat`                 | SSE chat — now requires `threadId` in body.            |
+| `POST`   | `/api/assistant/chat`                 | SSE chat - now requires `threadId` in body.            |
 
-All endpoints behind `isAuthenticated`. Thread endpoints enforce ownership via new `requireChatbotThread(id, userId)` helper in [server/lib/ownership.ts](server/lib/ownership.ts) — returns 404 (not 403) on miss per the project's anti-enumeration policy.
+All endpoints behind `isAuthenticated`. Thread endpoints enforce ownership via new `requireChatbotThread(id, userId)` helper in [server/lib/ownership.ts](server/lib/ownership.ts) - returns 404 (not 403) on miss per the project's anti-enumeration policy.
 
 **Auto-titling:** when a chat send hits a thread whose title is still `"New chat"`, the server sets the title to `truncate(firstUserMessage, 60)`. Free, deterministic, no second LLM call. Future upgrade: swap to a 1-call summarizer for nicer titles.
 
@@ -2833,7 +2833,7 @@ All endpoints behind `isAuthenticated`. Thread endpoints enforce ownership via n
 
 ### 23.5 Storage layer
 
-**[server/databaseStorage.ts](server/databaseStorage.ts)** — eight new methods on `IStorage`:
+**[server/databaseStorage.ts](server/databaseStorage.ts)** - eight new methods on `IStorage`:
 
 ```ts
 listChatbotThreads(userId, limit=50): Promise<Array<ChatbotThread & {messageCount: number}>>
@@ -2846,30 +2846,30 @@ touchChatbotThread(threadId): Promise<void>
 getChatbotThreadMessages(threadId, limit=200): Promise<ChatbotMessage[]>
 ```
 
-`insertChatbotMessage()` signature now requires `threadId`. `getChatbotHistory(userId)` deleted — chat handler reads thread-scoped history via `getChatbotThreadMessages(threadId, 11)`. This means past sessions in _other_ threads no longer bleed into the current prompt — fixed the "bot greets twice because it sees old hi" bug observed in v1.
+`insertChatbotMessage()` signature now requires `threadId`. `getChatbotHistory(userId)` deleted - chat handler reads thread-scoped history via `getChatbotThreadMessages(threadId, 11)`. This means past sessions in _other_ threads no longer bleed into the current prompt - fixed the "bot greets twice because it sees old hi" bug observed in v1.
 
 ### 23.6 Client architecture
 
-**New hook [client/src/hooks/useChatbot.ts](client/src/hooks/useChatbot.ts)** — single source of truth for chatbot data layer. Owns:
+**New hook [client/src/hooks/useChatbot.ts](client/src/hooks/useChatbot.ts)** - single source of truth for chatbot data layer. Owns:
 
 - `threads` list (TanStack Query, key `["/api/assistant/threads"]`).
 - `activeThreadId` + auto-selects most recent thread on first open.
 - `messages` for the active thread (TanStack Query, key `["/api/assistant/threads", id, "messages"]`).
-- `send(text)` — handles thread auto-creation if none active, attaches Bearer JWT, streams SSE deltas with `AbortController` cancellation.
-- `stop()` — aborts in-flight stream.
-- `regenerate()` — drops last assistant message, resends last user message.
+- `send(text)` - handles thread auto-creation if none active, attaches Bearer JWT, streams SSE deltas with `AbortController` cancellation.
+- `stop()` - aborts in-flight stream.
+- `regenerate()` - drops last assistant message, resends last user message.
 - `newChat()` / `archiveThread` / `restoreThread` mutations with cache invalidation.
-- `brandSwitchNotice` — surfaces when user changes app-level brand mid-thread.
+- `brandSwitchNotice` - surfaces when user changes app-level brand mid-thread.
 
 **New components under [client/src/components/chatbot/](client/src/components/chatbot/):**
 
-- **`MessageBubble.tsx`** — user (right-aligned, primary tint) vs assistant (left-aligned, bot avatar, prose markdown). Hover-revealed Copy + Regenerate actions on assistant bubbles. Streaming cursor (`▍`) at end of in-flight response.
-- **`WelcomeState.tsx`** — branded greeting card + 2×2 starter grid (Concepts / How-to / Troubleshoot / Strategy).
-- **`HistoryView.tsx`** — past conversations list. Each row: title + relative time + message count. Active thread marked with check icon. Hover-revealed archive button. 5s undo toast on archive.
+- **`MessageBubble.tsx`** - user (right-aligned, primary tint) vs assistant (left-aligned, bot avatar, prose markdown). Hover-revealed Copy + Regenerate actions on assistant bubbles. Streaming cursor (`▍`) at end of in-flight response.
+- **`WelcomeState.tsx`** - branded greeting card + 2×2 starter grid (Concepts / How-to / Troubleshoot / Strategy).
+- **`HistoryView.tsx`** - past conversations list. Each row: title + relative time + message count. Active thread marked with check icon. Hover-revealed archive button. 5s undo toast on archive.
 
-**Shell [client/src/components/EducationAssistant.tsx](client/src/components/EducationAssistant.tsx)** — Sheet + view switcher (`thread` ↔ `history`) + header with active-thread chip + brand chip + ⋮ menu (New chat / Conversation history / Archive this chat). Composer is auto-grow textarea with char counter, Send button morphs into Stop button while streaming. Enter to send, Shift+Enter for newline.
+**Shell [client/src/components/EducationAssistant.tsx](client/src/components/EducationAssistant.tsx)** - Sheet + view switcher (`thread` ↔ `history`) + header with active-thread chip + brand chip + ⋮ menu (New chat / Conversation history / Archive this chat). Composer is auto-grow textarea with char counter, Send button morphs into Stop button while streaming. Enter to send, Shift+Enter for newline.
 
-**LocalStorage cache dropped.** Server is the source of truth — multi-device safer, no sync conflicts.
+**LocalStorage cache dropped.** Server is the source of truth - multi-device safer, no sync conflicts.
 
 ### 23.7 UI/UX flows
 
@@ -2883,15 +2883,15 @@ getChatbotThreadMessages(threadId, limit=200): Promise<ChatbotMessage[]>
 
 **E. Archive:** trash icon on row → `DELETE /threads/:id` → animates out → 5s undo toast. Click Undo → `POST /threads/:id/restore`.
 
-**F. Brand switch:** if user changes app-level brand AND active thread has messages under a different `brandId`, hook detaches the thread (so next send creates a fresh one under the new brand) and shows a sparkle-tinted notice in the panel: _"Brand changed — your next message will start a new chat."_ Empty/just-created threads aren't disturbed.
+**F. Brand switch:** if user changes app-level brand AND active thread has messages under a different `brandId`, hook detaches the thread (so next send creates a fresh one under the new brand) and shows a sparkle-tinted notice in the panel: _"Brand changed - your next message will start a new chat."_ Empty/just-created threads aren't disturbed.
 
 ### 23.8 Persona + anti-hallucination work
 
-**[server/lib/chatbotKnowledge.ts](server/lib/chatbotKnowledge.ts)** — system prompt rewritten over the course of the wave to fix three classes of bug surfaced during user testing:
+**[server/lib/chatbotKnowledge.ts](server/lib/chatbotKnowledge.ts)** - system prompt rewritten over the course of the wave to fix three classes of bug surfaced during user testing:
 
-**Bug class 1 — Greeting on real questions.** Bot was greeting on "How do I get started?" because the v1 first-message rule was loose. Tightened to a strict whitelist of bare openers ("hi", "hello", "help", "who are you" etc.). Anything else, including "how do I get started", must answer directly. Even if past history shows greetings were given, the bot must not repeat one on a non-opener message.
+**Bug class 1 - Greeting on real questions.** Bot was greeting on "How do I get started?" because the v1 first-message rule was loose. Tightened to a strict whitelist of bare openers ("hi", "hello", "help", "who are you" etc.). Anything else, including "how do I get started", must answer directly. Even if past history shows greetings were given, the bot must not repeat one on a non-opener message.
 
-**Bug class 2 — Fabricated UI.** Bot invented buttons ("Edit Fact Sheet"), modals ("Add Question dialog"), and step-by-step click sequences that don't exist in the current UI. Fix: explicit `# Anti-hallucination rule (CRITICAL)` section forbidding invention of:
+**Bug class 2 - Fabricated UI.** Bot invented buttons ("Edit Fact Sheet"), modals ("Add Question dialog"), and step-by-step click sequences that don't exist in the current UI. Fix: explicit `# Anti-hallucination rule (CRITICAL)` section forbidding invention of:
 
 - Button labels, link text, CTA copy
 - Section/tab/modal/accordion titles
@@ -2899,9 +2899,9 @@ getChatbotThreadMessages(threadId, limit=200): Promise<ChatbotMessage[]>
 - Brand stats (transaction volume, customer count, founding year, HQ) unless in the brand context block
 - Specific feature flows not described in the prompt itself
 
-Replacement guidance: describe outcomes at the page level ("Open the FAQ Manager and add the Q&As your customers ask"), never click sequences. If asked for exact buttons: "I can point you to the right page — the current UI is best seen by opening it."
+Replacement guidance: describe outcomes at the page level ("Open the FAQ Manager and add the Q&As your customers ask"), never click sequences. If asked for exact buttons: "I can point you to the right page - the current UI is best seen by opening it."
 
-**Bug class 3 — Page-list drift.** v1's page list was wrong on multiple fronts: AI Visibility was described as a "fact-sheet/FAQ/schema checklist" (it's actually per-engine optimization steps), several real sidebar items (Keywords, Reports, Opportunities, GEO Tools, Crawler Check) were missing, and a fictional "Settings" entry was hallucinated into the list. Fix: cross-checked against [client/src/components/Sidebar.tsx](client/src/components/Sidebar.tsx) verbatim. The prompt's `# VentureCite sidebar — exhaustive page list` now matches the real 18-item sidebar exactly. Each entry has an accurate one-line description. Account/billing settings are explicitly noted as living in a user-menu dropdown, not the sidebar.
+**Bug class 3 - Page-list drift.** v1's page list was wrong on multiple fronts: AI Visibility was described as a "fact-sheet/FAQ/schema checklist" (it's actually per-engine optimization steps), several real sidebar items (Keywords, Reports, Opportunities, GEO Tools, Crawler Check) were missing, and a fictional "Settings" entry was hallucinated into the list. Fix: cross-checked against [client/src/components/Sidebar.tsx](client/src/components/Sidebar.tsx) verbatim. The prompt's `# VentureCite sidebar - exhaustive page list` now matches the real 18-item sidebar exactly. Each entry has an accurate one-line description. Account/billing settings are explicitly noted as living in a user-menu dropdown, not the sidebar.
 
 **Removed unverifiable specifics:** no more "20%+ citation rate target", no more rigid "Week 1 / Week 2 / Week 4" timeline, no more "5–10 articles, 10–20 prompts" rigid counts. Reframed as directional principles tuned to user situation.
 
@@ -2909,7 +2909,7 @@ Replacement guidance: describe outcomes at the page level ("Open the FAQ Manager
 
 | File                                                                             | Status  | Coverage                                                                                                                     |
 | -------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| [tests/unit/chatbotThreads.test.ts](tests/unit/chatbotThreads.test.ts)           | NEW     | 6 tests — list/create/messages/archive/restore + 404 on bad UUID + ownership                                                 |
+| [tests/unit/chatbotThreads.test.ts](tests/unit/chatbotThreads.test.ts)           | NEW     | 6 tests - list/create/messages/archive/restore + 404 on bad UUID + ownership                                                 |
 | [tests/unit/assistantChat.test.ts](tests/unit/assistantChat.test.ts)             | UPDATED | All requests now pass `threadId`; new ownership + storage mocks added                                                        |
 | [tests/unit/EducationAssistant.test.tsx](tests/unit/EducationAssistant.test.tsx) | UPDATED | Welcome flow, thread creation on first send, budget exceeded card, auto-load most recent thread, Stop button while streaming |
 
@@ -2919,27 +2919,27 @@ Final: **294/294 tests pass. Typecheck clean.**
 
 **Server:**
 
-- [migrations/0049_chatbot_threads.sql](migrations/0049_chatbot_threads.sql) — NEW
-- [shared/schema.ts](shared/schema.ts) — `chatbotThreads` table + `threadId` FK on `chatbotMessages`
-- [server/storage.ts](server/storage.ts) — `IStorage` thread interface
-- [server/databaseStorage.ts](server/databaseStorage.ts) — 8 new methods, `pruneChatbotMessages` extended
-- [server/lib/ownership.ts](server/lib/ownership.ts) — `requireChatbotThread`
-- [server/routes/assistant.ts](server/routes/assistant.ts) — full rewrite with 6 endpoints
-- [server/lib/chatbotKnowledge.ts](server/lib/chatbotKnowledge.ts) — system prompt rewritten
+- [migrations/0049_chatbot_threads.sql](migrations/0049_chatbot_threads.sql) - NEW
+- [shared/schema.ts](shared/schema.ts) - `chatbotThreads` table + `threadId` FK on `chatbotMessages`
+- [server/storage.ts](server/storage.ts) - `IStorage` thread interface
+- [server/databaseStorage.ts](server/databaseStorage.ts) - 8 new methods, `pruneChatbotMessages` extended
+- [server/lib/ownership.ts](server/lib/ownership.ts) - `requireChatbotThread`
+- [server/routes/assistant.ts](server/routes/assistant.ts) - full rewrite with 6 endpoints
+- [server/lib/chatbotKnowledge.ts](server/lib/chatbotKnowledge.ts) - system prompt rewritten
 
 **Client:**
 
-- [client/src/hooks/useChatbot.ts](client/src/hooks/useChatbot.ts) — NEW
-- [client/src/components/chatbot/MessageBubble.tsx](client/src/components/chatbot/MessageBubble.tsx) — NEW
-- [client/src/components/chatbot/WelcomeState.tsx](client/src/components/chatbot/WelcomeState.tsx) — NEW
-- [client/src/components/chatbot/HistoryView.tsx](client/src/components/chatbot/HistoryView.tsx) — NEW
-- [client/src/components/EducationAssistant.tsx](client/src/components/EducationAssistant.tsx) — full rewrite as shell
+- [client/src/hooks/useChatbot.ts](client/src/hooks/useChatbot.ts) - NEW
+- [client/src/components/chatbot/MessageBubble.tsx](client/src/components/chatbot/MessageBubble.tsx) - NEW
+- [client/src/components/chatbot/WelcomeState.tsx](client/src/components/chatbot/WelcomeState.tsx) - NEW
+- [client/src/components/chatbot/HistoryView.tsx](client/src/components/chatbot/HistoryView.tsx) - NEW
+- [client/src/components/EducationAssistant.tsx](client/src/components/EducationAssistant.tsx) - full rewrite as shell
 
 **Tests:**
 
-- [tests/unit/chatbotThreads.test.ts](tests/unit/chatbotThreads.test.ts) — NEW
-- [tests/unit/assistantChat.test.ts](tests/unit/assistantChat.test.ts) — updated
-- [tests/unit/EducationAssistant.test.tsx](tests/unit/EducationAssistant.test.tsx) — updated
+- [tests/unit/chatbotThreads.test.ts](tests/unit/chatbotThreads.test.ts) - NEW
+- [tests/unit/assistantChat.test.ts](tests/unit/assistantChat.test.ts) - updated
+- [tests/unit/EducationAssistant.test.tsx](tests/unit/EducationAssistant.test.tsx) - updated
 
 ### 23.11 Production characteristics
 
@@ -2961,17 +2961,17 @@ Final: **294/294 tests pass. Typecheck clean.**
 
 ---
 
-## Track 24 — Mentions Tab post-rebuild fixes (2026-05-05)
+## Track 24 - Mentions Tab post-rebuild fixes (2026-05-05)
 
 **Goal:** Stabilise the rebuilt Mentions feature after first round of real-user testing. Address Reddit query failures, Quora bot-blocking, broken UI controls, removal of half-working features, and a cross-machine clock-skew bug that made every relative timestamp display "about 6 hours ago".
 
 **Status:** Complete
 
-### 24.1 Reddit — HTTP 414 fix and per-variation looping
+### 24.1 Reddit - HTTP 414 fix and per-variation looping
 
-**Problem.** Public-path Reddit search returned `414 URI Too Long` for any brand with two or more name variations. The query string concatenated all variations into one Lucene expression — `(title:"X" OR selftext:"X" OR title:"Y" OR selftext:"Y" ...)` — which after URL-encoding exceeded Reddit's ~2 KB cap on `/search.json`. RSS fallback hit the same limit. Result: `reddit: { found: 0, failed: true, reason: "414 (public + rss both blocked)" }` for every multi-variation brand on the unauthenticated path.
+**Problem.** Public-path Reddit search returned `414 URI Too Long` for any brand with two or more name variations. The query string concatenated all variations into one Lucene expression - `(title:"X" OR selftext:"X" OR title:"Y" OR selftext:"Y" ...)` - which after URL-encoding exceeded Reddit's ~2 KB cap on `/search.json`. RSS fallback hit the same limit. Result: `reddit: { found: 0, failed: true, reason: "414 (public + rss both blocked)" }` for every multi-variation brand on the unauthenticated path.
 
-**Fix.** Split the public path into one HTTP request per variation, preserving field-scoped Lucene syntax (`(title:"<variation>" OR selftext:"<variation>")`) — short, precise, and well under the URL limit. Stop iterating as soon as any variation returns matching mentions (no point spending more requests when we already have data). Hard cap at 100 mentions per scan as a safety net.
+**Fix.** Split the public path into one HTTP request per variation, preserving field-scoped Lucene syntax (`(title:"<variation>" OR selftext:"<variation>")`) - short, precise, and well under the URL limit. Stop iterating as soon as any variation returns matching mentions (no point spending more requests when we already have data). Hard cap at 100 mentions per scan as a safety net.
 
 | File                                 | Change                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2979,22 +2979,22 @@ Final: **294/294 tests pass. Typecheck clean.**
 
 **OAuth path unchanged.** The OAuth host (`oauth.reddit.com`) accepts longer queries, and credentials avoid the IP-banning that motivated the fallback chain in the first place.
 
-### 24.2 Quora — removed from the Mentions feature
+### 24.2 Quora - removed from the Mentions feature
 
-**Problem.** Cloudflare blocks unauthenticated headless Chromium at the WAF layer (`pageTitle: "Just a moment..."` / `"Performing security verification"`). On the rare requests that get through, Quora serves the logged-out landing page with a "Sign in to continue" overlay instead of search results. Diagnostic logging (`quora.variation_diagnostics`) confirmed `rawLinks: 0` across both bot-challenge and login-wall paths — there is nothing to scrape without an authenticated session, which is fragile (cookies expire) and arguably ToS-violating.
+**Problem.** Cloudflare blocks unauthenticated headless Chromium at the WAF layer (`pageTitle: "Just a moment..."` / `"Performing security verification"`). On the rare requests that get through, Quora serves the logged-out landing page with a "Sign in to continue" overlay instead of search results. Diagnostic logging (`quora.variation_diagnostics`) confirmed `rawLinks: 0` across both bot-challenge and login-wall paths - there is nothing to scrape without an authenticated session, which is fragile (cookies expire) and arguably ToS-violating.
 
 **Decision.** Remove Quora from the Mentions feature surface. Reddit + HN cover the bulk of brand-discussion volume; spending engineering time fighting Cloudflare to recover a low-yield third source is not worth it.
 
 | File                                                   | Change                                                                                                                                                             |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `server/lib/mentionScanner.ts`                         | Removed `quora` from `ScanReport.perSource`, removed Quora dispatch block, removed Quora from totals aggregation. Removed `normalizeEngagement` import (see 24.3). |
-| `client/src/components/geo-tools/ScanStatusPanel.tsx`  | Dropped `quora` from `SOURCES` array and `SOURCE_LABELS`. Updated 3-fail banner copy to "Reddit/HN paused — check status below."                                   |
+| `client/src/components/geo-tools/ScanStatusPanel.tsx`  | Dropped `quora` from `SOURCES` array and `SOURCE_LABELS`. Updated 3-fail banner copy to "Reddit/HN paused - check status below."                                   |
 | `client/src/components/geo-tools/MentionsFilters.tsx`  | Removed Quora platform filter option.                                                                                                                              |
 | `client/src/components/geo-tools/AddMentionDialog.tsx` | Removed Quora from manual-add platform dropdown and helper text.                                                                                                   |
 
-**Intentionally not removed.** The DB column `MentionPlatform` type union still includes `"quora"` — historical mention rows in the DB still resolve. The orphaned `server/lib/sources/quoraSource.ts`, `tests/unit/quoraSource.test.ts`, and Quora references elsewhere in the codebase (citation checker, recommendation engine, glossary) are inert for the Mentions feature and unrelated to brand-mention scanning. Safe to delete in a separate cleanup pass.
+**Intentionally not removed.** The DB column `MentionPlatform` type union still includes `"quora"` - historical mention rows in the DB still resolve. The orphaned `server/lib/sources/quoraSource.ts`, `tests/unit/quoraSource.test.ts`, and Quora references elsewhere in the codebase (citation checker, recommendation engine, glossary) are inert for the Mentions feature and unrelated to brand-mention scanning. Safe to delete in a separate cleanup pass.
 
-### 24.3 Engagement score — removed from the Mentions UI
+### 24.3 Engagement score - removed from the Mentions UI
 
 **Problem.** The 0–100 engagement score (Reddit: `log10(ups + comments * 2 + 1) * 25`, HN similar, Quora null) added complexity without delivering insight. Users could not act on it and the value distribution was bimodal (lots of zeros, a few high outliers).
 
@@ -3006,7 +3006,7 @@ Final: **294/294 tests pass. Typecheck clean.**
 | `client/src/components/geo-tools/MentionCard.tsx`        | Removed `EngagementDisplay` from desktop and mobile layouts.                                                                          |
 | `client/src/components/geo-tools/MentionDetailSheet.tsx` | Removed engagement metadata row (both normalized and raw paths).                                                                      |
 
-### 24.4 Universal clock-skew fix — server-anchored relative time
+### 24.4 Universal clock-skew fix - server-anchored relative time
 
 **Problem.** Every mention card and the "Last scan" panel displayed "about 6 hours ago" the moment they were inserted, even on a fresh scan. Investigation traced the issue across three independent layers:
 
@@ -3019,7 +3019,7 @@ Final: **294/294 tests pass. Typecheck clean.**
 - Added `pgTypes.setTypeParser(1114, val => new Date(val + "Z"))` in `server/db.ts` to force UTC parsing of timestamp columns. Helps for new reads but doesn't fix DB-host clock drift.
 - Switched `createScanJob` and `tryInsertBrandMention` to write `createdAt` / `discoveredAt` from `new Date()` on the Node side instead of relying on Postgres `defaultNow()`. Helps when the Node clock is correct but breaks if Node and DB disagree.
 
-**Final fix — server-anchored age in the response.** The only stable measurement is "how long ago did **this** server perceive this event," which cancels out skew between machines. On every Mentions API response that carries a user-visible relative timestamp, the server attaches `<field>AgeSeconds` computed as `Date.now() - row.timestamp.getTime()` on the request handler. The client renders relative-time labels from `ageSeconds` directly — `new Date()` anchoring on the browser is no longer in the codepath.
+**Final fix - server-anchored age in the response.** The only stable measurement is "how long ago did **this** server perceive this event," which cancels out skew between machines. On every Mentions API response that carries a user-visible relative timestamp, the server attaches `<field>AgeSeconds` computed as `Date.now() - row.timestamp.getTime()` on the request handler. The client renders relative-time labels from `ageSeconds` directly - `new Date()` anchoring on the browser is no longer in the codepath.
 
 | File                                                  | Change                                                                                                                                                                                                                                                                                                |
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -3029,11 +3029,11 @@ Final: **294/294 tests pass. Typecheck clean.**
 | `client/src/components/geo-tools/MentionCard.tsx`     | Added `formatAgeSeconds()` helper. Reads `discoveredAtAgeSeconds` from the row and renders via that helper. Falls back to `formatDistanceToNow` if the field is absent.                                                                                                                               |
 | `client/src/components/geo-tools/ScanStatusPanel.tsx` | Same `formatAgeSeconds()` helper. "Last scan" line now reads `completedAtAgeSeconds ?? createdAtAgeSeconds` from the scan job.                                                                                                                                                                        |
 
-**Why this is universal.** The browser's `Date.now()` is no longer used for relative time, the DB clock is no longer used for relative time, and the only clock that matters is the server's own — which has been working fine for every other feature. Absolute date displays (the detail sheet's "Mentioned: 28 April 2026") still pass through the original ISO string, so dates render normally.
+**Why this is universal.** The browser's `Date.now()` is no longer used for relative time, the DB clock is no longer used for relative time, and the only clock that matters is the server's own - which has been working fine for every other feature. Absolute date displays (the detail sheet's "Mentioned: 28 April 2026") still pass through the original ISO string, so dates render normally.
 
-### 24.5 Daily auto-scan toggle — wrong endpoint
+### 24.5 Daily auto-scan toggle - wrong endpoint
 
-**Problem.** Toggling "Daily auto-scan" did nothing. The switch flipped briefly then reverted. `handleToggleMonitor` was PATCHing `/api/brands/:brandId` with `{ monitorMentions: enabled }`, but the brands route does not accept that field — silent no-op. The local cache was also not invalidated, so the UI kept showing the old (false) value even if the write had succeeded.
+**Problem.** Toggling "Daily auto-scan" did nothing. The switch flipped briefly then reverted. `handleToggleMonitor` was PATCHing `/api/brands/:brandId` with `{ monitorMentions: enabled }`, but the brands route does not accept that field - silent no-op. The local cache was also not invalidated, so the UI kept showing the old (false) value even if the write had succeeded.
 
 **Fix.**
 
@@ -3041,9 +3041,9 @@ Final: **294/294 tests pass. Typecheck clean.**
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `client/src/components/geo-tools/MentionsTab.tsx` | Toggle now PATCHes the dedicated `/api/brand-mentions/brands/:brandId/monitor-mentions` endpoint with `{ enabled }`. Added `useQueryClient()` and `await queryClient.invalidateQueries({ queryKey: ["/api/brands"] })` after the write so the cached brand row re-fetches and the switch reflects the new state. |
 
-### 24.6 "+ Add variation" — no-op handler
+### 24.6 "+ Add variation" - no-op handler
 
-**Problem.** The "+ add variation" link inside the Searching-for line on the Scan Status panel did nothing. The `onAddVariation` prop was wired to `() => { /* lives in the brand settings page */ }` — a stub.
+**Problem.** The "+ add variation" link inside the Searching-for line on the Scan Status panel did nothing. The `onAddVariation` prop was wired to `() => { /* lives in the brand settings page */ }` - a stub.
 
 **Fix.**
 
@@ -3051,7 +3051,7 @@ Final: **294/294 tests pass. Typecheck clean.**
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `client/src/components/geo-tools/MentionsTab.tsx` | `onAddVariation` now calls `setLocation("/brands")` to navigate to the brands page where the name-variations editor lives. |
 
-### 24.7 Reddit query — 100-mention cap and stop-on-hit
+### 24.7 Reddit query - 100-mention cap and stop-on-hit
 
 **Decision.** Stop iterating Reddit variations at the first one that returns mentions, and never accumulate beyond 100 mentions in a single scan. Avoids burning rate-limit tokens and keeps response times bounded.
 
@@ -3068,7 +3068,7 @@ Before the decision to drop Quora, added a `quora.variation_diagnostics` log lin
 1. **Reddit no longer 414s.** Run a manual scan on any brand with ≥ 2 name variations. `scan.complete` log line should show `reddit: { found: N, failed: false }` rather than `414`.
 2. **Quora is gone.** Mentions tab shows only Reddit and HN chips on the scan-status panel. Platform filter dropdown has only Reddit and Hacker News. Manual-add dialog has only Reddit and Hacker News.
 3. **Engagement score is gone.** Mention cards no longer show the 0/100 progress bar. Detail sheet has no Engagement row.
-4. **Relative time is correct.** Run a fresh scan. New mention cards display "just now" / "1 minute ago", not "about 6 hours ago." Inspect the API response at `/api/brand-mentions/<brandId>` — every row carries `discoveredAtAgeSeconds: <small-number>`.
+4. **Relative time is correct.** Run a fresh scan. New mention cards display "just now" / "1 minute ago", not "about 6 hours ago." Inspect the API response at `/api/brand-mentions/<brandId>` - every row carries `discoveredAtAgeSeconds: <small-number>`.
 5. **Daily auto-scan toggle persists.** Click the switch on the Scan Status panel. Page → reload → state matches what you set.
 6. **+ add variation navigates.** Click the link. Browser navigates to `/brands`.
 
@@ -3080,9 +3080,9 @@ Before the decision to drop Quora, added a `quora.variation_diagnostics` log lin
 
 ---
 
-## Track 25 — Foundations Plan 1: Faking-as-Real cleanup (2026-05-10)
+## Track 25 - Foundations Plan 1: Faking-as-Real cleanup (2026-05-10)
 
-**Goal:** Remove every UI surface that lies to the user — dead buttons, fake platform options for systems we don't actually integrate with, fabricated metrics displayed as if measured, fake progress theatre, orphan-link CTAs that 404. First of six remediation plans against the Foundations spec at [docs/superpowers/specs/2026-05-10-foundations-design.md](./superpowers/specs/2026-05-10-foundations-design.md).
+**Goal:** Remove every UI surface that lies to the user - dead buttons, fake platform options for systems we don't actually integrate with, fabricated metrics displayed as if measured, fake progress theatre, orphan-link CTAs that 404. First of six remediation plans against the Foundations spec at [docs/superpowers/specs/2026-05-10-foundations-design.md](./superpowers/specs/2026-05-10-foundations-design.md).
 
 **Status:** Complete
 
@@ -3092,19 +3092,19 @@ The Foundations audit (a per-page deep-dive recon across the entire authenticate
 
 ### 25.1 Reports page cleanup
 
-**Problem.** Three buttons on the Reports page had no `onClick` handlers — Export PDF, Share, Schedule Weekly Report — they rendered but did nothing. Header copy said "Next update in 24 hours" but no scheduled regeneration existed; data was live each load.
+**Problem.** Three buttons on the Reports page had no `onClick` handlers - Export PDF, Share, Schedule Weekly Report - they rendered but did nothing. Header copy said "Next update in 24 hours" but no scheduled regeneration existed; data was live each load.
 
 **Fix.**
 
 | File                                  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client/src/pages/client-reports.tsx` | Removed Export PDF button entirely (no CSV stand-in — export deferred). Removed Share button entirely (public-share infrastructure deferred). Replaced static Schedule button with a controlled `<Switch>` bound to the existing `weeklyReportEnabled` user preference via `PATCH /api/user/notification-preferences`. Replaced "Next update in 24 hours" copy with live "Last refreshed: Xm ago" rendered from the TanStack Query's `dataUpdatedAt` field. |
+| `client/src/pages/client-reports.tsx` | Removed Export PDF button entirely (no CSV stand-in - export deferred). Removed Share button entirely (public-share infrastructure deferred). Replaced static Schedule button with a controlled `<Switch>` bound to the existing `weeklyReportEnabled` user preference via `PATCH /api/user/notification-preferences`. Replaced "Next update in 24 hours" copy with live "Last refreshed: Xm ago" rendered from the TanStack Query's `dataUpdatedAt` field. |
 
 The existing weekly-report cron at `server/scheduler.ts:511,573` already gated on `weeklyReportEnabled`, so wiring the toggle activated the existing flow with no server change. The `setPreference` helper dual-writes both `notification_preferences` and `users.weeklyReportEnabled`.
 
 ### 25.2 Quora full purge
 
-**Problem.** Quora appeared as a supported platform across the UI (community engagement, geo-opportunities, distribute dialog) but no Quora scanner existed in `server/lib/mentionScanner.ts`. The geo-opportunities response carried a `quora` bucket driven by a hardcoded `INDUSTRY_QUORA_TOPICS` map in `server/routes/analytics.ts` — entirely fabricated content.
+**Problem.** Quora appeared as a supported platform across the UI (community engagement, geo-opportunities, distribute dialog) but no Quora scanner existed in `server/lib/mentionScanner.ts`. The geo-opportunities response carried a `quora` bucket driven by a hardcoded `INDUSTRY_QUORA_TOPICS` map in `server/routes/analytics.ts` - entirely fabricated content.
 
 **Fix.**
 
@@ -3118,21 +3118,21 @@ The existing weekly-report cron at `server/scheduler.ts:511,573` already gated o
 | `client/src/pages/glossary.tsx`                       | Stripped "Quora answers" from AEO definition and "Reddit + Quora" coverage line.                                                                                                                                                |
 | `server/lib/recommendationsEngine.ts`                 | Recommendation card title "Try Reddit/Quora outreach for AEO" → "Try Reddit outreach for AEO".                                                                                                                                  |
 
-**Intentionally kept.** `server/citationChecker.ts:182` mapping `quora.com → "community"` for source classification — harmless and orthogonal. DB enum entries in `shared/schema.ts` — historical data preservation.
+**Intentionally kept.** `server/citationChecker.ts:182` mapping `quora.com → "community"` for source classification - harmless and orthogonal. DB enum entries in `shared/schema.ts` - historical data preservation.
 
 ### 25.3 AI Visibility 404 quick-action audit
 
-**Problem.** Two `quickAction.link` values on `/ai-visibility` pointed at routes that don't exist in App.tsx — `/geo-rankings` and `/publications`. Clicking either took the user to a 404.
+**Problem.** Two `quickAction.link` values on `/ai-visibility` pointed at routes that don't exist in App.tsx - `/geo-rankings` and `/publications`. Clicking either took the user to a 404.
 
 **Fix.**
 
 | File                                 | Change                                                                                                                                                                                                                                                                      |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client/src/pages/ai-visibility.tsx` | At `~line 171`, dropped the entire `quickAction` field on the step pointing to `/publications` (no in-product equivalent yet — CTA button no longer renders). At `~line 513`, repointed `/geo-rankings` to `/citations` and relabeled "Track Rankings" → "Track Citations". |
+| `client/src/pages/ai-visibility.tsx` | At `~line 171`, dropped the entire `quickAction` field on the step pointing to `/publications` (no in-product equivalent yet - CTA button no longer renders). At `~line 513`, repointed `/geo-rankings` to `/citations` and relabeled "Track Rankings" → "Track Citations". |
 
-### 25.4 Content generation phase indicator — honest progress
+### 25.4 Content generation phase indicator - honest progress
 
-**Problem.** `server/routes/content.ts` had a `PHASE_BANDS` constant + `phaseFor()` function that rotated fake phase names ("Brainstorming themes" → "Drafting outline" → "Writing sections" → "Polishing") purely on elapsed milliseconds — no correlation to actual LLM work. There was also no way to cancel a running generation.
+**Problem.** `server/routes/content.ts` had a `PHASE_BANDS` constant + `phaseFor()` function that rotated fake phase names ("Brainstorming themes" → "Drafting outline" → "Writing sections" → "Polishing") purely on elapsed milliseconds - no correlation to actual LLM work. There was also no way to cancel a running generation.
 
 **Fix.**
 
@@ -3140,26 +3140,26 @@ The existing weekly-report cron at `server/scheduler.ts:511,573` already gated o
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/routes/content.ts`                      | Deleted `PHASE_BANDS` constant and `phaseFor` function. `computeJobStatePayload` returns `{ status, done, errorMessage, elapsedSeconds }` (was `{ phase, elapsedMs }`). Added `POST /api/content/:articleId/cancel` route with ownership check via `requireArticle` (404 on miss, anti-enumeration). Cancellation refunds quota for previously-pending jobs and flips article back to draft. |
 | `client/src/pages/content.tsx`                  | Replaced fake phase label ("Brainstorming themes") with honest `Generating ({elapsedSeconds}s)`. Added Cancel button + `cancelMutation` hitting the new endpoint.                                                                                                                                                                                                                            |
-| `tests/unit/contentCancel.test.ts`              | **New** — 2 tests: happy-path cancel flips the job row to `cancelled` and article to draft; non-owned article returns 404 (anti-enumeration).                                                                                                                                                                                                                                                |
+| `tests/unit/contentCancel.test.ts`              | **New** - 2 tests: happy-path cancel flips the job row to `cancelled` and article to draft; non-owned article returns 404 (anti-enumeration).                                                                                                                                                                                                                                                |
 | `tests/unit/contentGenerationResponses.test.ts` | Updated state-response shape assertion to expect `elapsedSeconds` instead of `phase`/`elapsedMs`.                                                                                                                                                                                                                                                                                            |
 
 The worker (`server/contentGenerationWorker.ts`) already re-reads job status at each `/advance` slice boundary (lines 284-298) and exits when status flips to anything other than `pending`/`running`, so setting `status = 'cancelled'` takes effect within ~7 seconds without modifying the worker.
 
 ### 25.5 Keyword Research provenance
 
-**Problem.** Keyword Research displayed AI-fabricated numbers (search volume, difficulty, opportunity score, AI citation potential) as if they were measured. Vercel Hobby + no-external-services constraints rule out paid sources (DataForSEO / Ahrefs / Semrush) — honest labeling is the right shippable answer until paid-tier infrastructure lands.
+**Problem.** Keyword Research displayed AI-fabricated numbers (search volume, difficulty, opportunity score, AI citation potential) as if they were measured. Vercel Hobby + no-external-services constraints rule out paid sources (DataForSEO / Ahrefs / Semrush) - honest labeling is the right shippable answer until paid-tier infrastructure lands.
 
 **Fix.**
 
 | File                                              | Change                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `migrations/0052_keyword_research_provenance.sql` | **New** — `ALTER TABLE keyword_research ADD COLUMN provenance TEXT NOT NULL DEFAULT 'ai-estimate'` + index on the column.                                                                                                                                                                                |
+| `migrations/0052_keyword_research_provenance.sql` | **New** - `ALTER TABLE keyword_research ADD COLUMN provenance TEXT NOT NULL DEFAULT 'ai-estimate'` + index on the column.                                                                                                                                                                                |
 | `shared/schema.ts`                                | Added `provenance: text("provenance").default("ai-estimate").notNull()` to `keywordResearch` table.                                                                                                                                                                                                      |
 | `server/routes/content.ts`                        | Insert path at `/api/keyword-research/discover` explicitly sets `provenance: "ai-estimate"`.                                                                                                                                                                                                             |
 | `client/src/pages/keyword-research.tsx`           | Added top-of-table `<Alert>` banner with `<Sparkles>` icon: "These figures are AI-estimated, not measured. Real search-volume integration is planned." Wrapped each numeric metric (Opportunity Score, AI Citation Potential, Search Volume, Difficulty) in a `<Tooltip>` with the same disclosure copy. |
-| `tests/unit/keywordResearchProvenance.test.ts`    | **New** — 3 tests: Drizzle column exists, Zod insert schema tolerates `provenance`, end-to-end behavioral test mocking `storage.createKeywordResearch` and asserting the route passes `provenance: "ai-estimate"` in the persisted payload.                                                              |
+| `tests/unit/keywordResearchProvenance.test.ts`    | **New** - 3 tests: Drizzle column exists, Zod insert schema tolerates `provenance`, end-to-end behavioral test mocking `storage.createKeywordResearch` and asserting the route passes `provenance: "ai-estimate"` in the persisted payload.                                                              |
 
-### 25.6 AI_PLATFORMS split — 9 → 5
+### 25.6 AI_PLATFORMS split - 9 → 5
 
 **Problem.** `shared/constants.ts` exposed `AI_PLATFORMS` with 10 entries. `client/src/pages/geo-analytics.tsx` advertised "9 AI platforms" coverage. In reality `server/citationChecker.ts:42-48` only ran 5 engines: ChatGPT, Claude, Perplexity, Gemini, DeepSeek.
 
@@ -3172,17 +3172,17 @@ The worker (`server/contentGenerationWorker.ts`) already re-reads job status at 
 
 ### 25.7 Per-platform icons on Competitors
 
-**Problem.** `client/src/pages/competitors.tsx:~496` rendered `<SiOpenai />` for every platform row — Claude, Gemini, Perplexity, DeepSeek all visually showed OpenAI's logo.
+**Problem.** `client/src/pages/competitors.tsx:~496` rendered `<SiOpenai />` for every platform row - Claude, Gemini, Perplexity, DeepSeek all visually showed OpenAI's logo.
 
 **Fix.**
 
 | File                               | Change                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client/src/pages/competitors.tsx` | Added a `platformIcon` map keyed by lowercase platform name: `chatgpt → SiOpenai`, `claude → SiClaude`, `perplexity → SiPerplexity`, `gemini → SiGooglegemini`, `deepseek → Brain` (lucide fallback — no brand glyph available in the installed `react-icons` version). Unknown keys fall back to `Brain`. The unconditional `<SiOpenai />` row render became `<Icon className="..." />` with `Icon` resolved from the map. |
+| `client/src/pages/competitors.tsx` | Added a `platformIcon` map keyed by lowercase platform name: `chatgpt → SiOpenai`, `claude → SiClaude`, `perplexity → SiPerplexity`, `gemini → SiGooglegemini`, `deepseek → Brain` (lucide fallback - no brand glyph available in the installed `react-icons` version). Unknown keys fall back to `Brain`. The unconditional `<SiOpenai />` row render became `<Icon className="..." />` with `Icon` resolved from the map. |
 
 ### 25.8 Competitors Snapshot dialog deletion
 
-**Problem.** A "Snapshot" dialog at `competitors.tsx:~768-828` (triggered by a `<Plus />` icon in row actions ~line 651-655) asked the user to **type in a citation count manually** — pure fabricated-data entry contradicting the automated mining everywhere else.
+**Problem.** A "Snapshot" dialog at `competitors.tsx:~768-828` (triggered by a `<Plus />` icon in row actions ~line 651-655) asked the user to **type in a citation count manually** - pure fabricated-data entry contradicting the automated mining everywhere else.
 
 **Fix.**
 
@@ -3191,11 +3191,11 @@ The worker (`server/contentGenerationWorker.ts`) already re-reads job status at 
 | `client/src/pages/competitors.tsx` | Deleted the entire snapshot `<Dialog>` block, the `isSnapshotDialogOpen` / `selectedCompetitor` / `newSnapshot` state hooks, the `createSnapshotMutation`, and the `<Plus />` trigger button. |
 | `server/routes/publications.ts`    | Deleted `POST` and `GET` `/api/competitors/:id/snapshots` route handlers (no remaining client consumers). Removed unused `insertCompetitorCitationSnapshotSchema` import.                     |
 
-**DAO methods preserved.** `createCompetitorCitationSnapshot` / `getCompetitorCitationSnapshots` in `databaseStorage.ts` and `server/storage.ts` stay — still used by `server/citationChecker.ts:1184` to record real scan snapshots automatically. Only the manual-entry path was the lie.
+**DAO methods preserved.** `createCompetitorCitationSnapshot` / `getCompetitorCitationSnapshots` in `databaseStorage.ts` and `server/storage.ts` stay - still used by `server/citationChecker.ts:1184` to record real scan snapshots automatically. Only the manual-entry path was the lie.
 
 ### 25.9 FAQ Manager JSON-LD viewer chrome
 
-**Problem.** The JSON-LD preview on the FAQ Manager Schema tab used `bg-slate-900` + `text-green-400` — a dark "terminal" aesthetic that broke the canonical light workspace.
+**Problem.** The JSON-LD preview on the FAQ Manager Schema tab used `bg-slate-900` + `text-green-400` - a dark "terminal" aesthetic that broke the canonical light workspace.
 
 **Fix.**
 
@@ -3218,41 +3218,41 @@ The worker (`server/contentGenerationWorker.ts`) already re-reads job status at 
 
 ### 25.11 Citations schedule menu removal
 
-**Problem.** `/citations` exposed a Schedule tab letting users configure scan cadence (weekly / monthly / off). Per user decision (2026-05-10) this is a product decision, not a user setting — citation scans run weekly for every active brand.
+**Problem.** `/citations` exposed a Schedule tab letting users configure scan cadence (weekly / monthly / off). Per user decision (2026-05-10) this is a product decision, not a user setting - citation scans run weekly for every active brand.
 
 **Fix.**
 
 | File                                              | Change                                                                                                                                                                                                                                              |
 | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `client/src/pages/citations.tsx`                  | Removed `ScheduleTab` import. Schedule tab entry retained in the tab list (preserves `usePersistedState` keys) but now renders a `<Card>` with the static line "Citation scans run weekly for every brand."                                         |
-| `client/src/components/citations/ScheduleTab.tsx` | **Deleted** — sole consumer was the citations page.                                                                                                                                                                                                 |
-| `server/scheduler.ts`                             | Added exported `selectBrandsForCitationScan()` — queries every non-soft-deleted brand with no cadence-flag filter. `runAutoCitationJob` uses this selector. `isBrandDueForCitation()` rewritten to only enforce the "≥6 days since last run" floor. |
+| `client/src/components/citations/ScheduleTab.tsx` | **Deleted** - sole consumer was the citations page.                                                                                                                                                                                                 |
+| `server/scheduler.ts`                             | Added exported `selectBrandsForCitationScan()` - queries every non-soft-deleted brand with no cadence-flag filter. `runAutoCitationJob` uses this selector. `isBrandDueForCitation()` rewritten to only enforce the "≥6 days since last run" floor. |
 | `server/routes/prompts.ts`                        | Deleted the `PATCH /api/brands/:brandId/citation-schedule` route handler.                                                                                                                                                                           |
-| `tests/unit/citationCronUnconditional.test.ts`    | **New** — asserts the WHERE clause built by `selectBrandsForCitationScan()` contains only `isNull(deleted_at)` with zero `and()` composition and zero `ne(autoCitationSchedule, ...)` gate.                                                         |
+| `tests/unit/citationCronUnconditional.test.ts`    | **New** - asserts the WHERE clause built by `selectBrandsForCitationScan()` contains only `isNull(deleted_at)` with zero `and()` composition and zero `ne(autoCitationSchedule, ...)` gate.                                                         |
 
 **Dormant columns kept.** `autoCitationSchedule`, `autoCitationDay`, `autoCitationHour`, `autoCitationActive` on `brands` are preserved per spec (no destructive schema change).
 
 ### 25.12 AI Intelligence Alerts removal
 
-**Problem.** Per user decision, the Alerts surface on `/ai-intelligence` is gone — the feature wasn't shipping value.
+**Problem.** Per user decision, the Alerts surface on `/ai-intelligence` is gone - the feature wasn't shipping value.
 
 **Fix.**
 
 | File                                               | Change                                                                                                                                                                                               |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `client/src/pages/ai-intelligence.tsx`             | Removed `AlertsTab` import, `MessageSquare` icon import, the `<TabsTrigger value="alerts">`, and the corresponding `<TabsContent>`. Tabs grid `grid-cols-6` → `grid-cols-5`.                         |
-| `client/src/components/intelligence/AlertsTab.tsx` | **Deleted** — ~398 lines, sole consumer of the alerts surface.                                                                                                                                       |
+| `client/src/components/intelligence/AlertsTab.tsx` | **Deleted** - ~398 lines, sole consumer of the alerts surface.                                                                                                                                       |
 | `server/routes/intelligence.ts`                    | Removed `requireAlertSetting` + `aiLimitMiddleware` imports. Deleted ~255 lines: `GET/POST/PATCH/DELETE /api/alert-settings`, `GET /api/alert-history/:brandId`, `POST /api/alerts/test/:settingId`. |
 | `server/routes.ts`                                 | Removed unused `requireAlertSetting` import.                                                                                                                                                         |
 | `client/src/tours/pages/ai-intelligence.tour.ts`   | "Six lenses … alerts" → "Five lenses …".                                                                                                                                                             |
-| `server/lib/ownership.ts`                          | Follow-up: deleted the orphan `requireAlertSetting` ownership helper — zero callers after route removal.                                                                                             |
+| `server/lib/ownership.ts`                          | Follow-up: deleted the orphan `requireAlertSetting` ownership helper - zero callers after route removal.                                                                                             |
 
-**DB tables intact.** `alerts`, `alertSettings`, `alertHistory` table definitions in `shared/schema.ts` and their DAO methods stay — no destructive schema change. Drop deferred to a later migration once we're sure no other path reads them.
+**DB tables intact.** `alerts`, `alertSettings`, `alertHistory` table definitions in `shared/schema.ts` and their DAO methods stay - no destructive schema change. Drop deferred to a later migration once we're sure no other path reads them.
 
 ### How to verify
 
 1. **Reports page.** No Export PDF or Share buttons. "Last refreshed: Xm ago" updates on refresh. Weekly toggle reflects pref and persists across reloads.
-2. **No Quora anywhere.** Community Engagement, Geo Opportunities, Distribute Dialog — no Quora option in any dropdown or tab.
+2. **No Quora anywhere.** Community Engagement, Geo Opportunities, Distribute Dialog - no Quora option in any dropdown or tab.
 3. **AI Visibility quick-actions.** Every quick-action button lands on a real page; no 404s.
 4. **Content generation honest.** Status reads `Generating (Ns)` not "Drafting outline". Cancel button flips the job to `cancelled`.
 5. **Keyword Research labeled.** "AI-estimated, not measured" banner present; tooltips on every metric.
@@ -3266,16 +3266,16 @@ The worker (`server/contentGenerationWorker.ts`) already re-reads job status at 
 
 ### Pass criteria
 
-- [x] `npm run check` — clean (tsc + tour-target verification, 26 targets)
+- [x] `npm run check` - clean (tsc + tour-target verification, 26 targets)
 - [x] New tests pass: `contentCancel`, `keywordResearchProvenance`, `citationCronUnconditional`
 - [x] No raw "Quora" / "Discord" / "Slack" / "forum" platform references in user-facing UI
 - [x] Migration `0052_keyword_research_provenance.sql` applies cleanly on boot
 
 ---
 
-## Track 26 — Foundations Plan 2: Design system enforcement + primitives (2026-05-10)
+## Track 26 - Foundations Plan 2: Design system enforcement + primitives (2026-05-10)
 
-**Goal:** Stop the design-token divergence across the authenticated app. Tokens in [client/src/index.css](./client/src/index.css) and [.impeccable/design.json](./.impeccable/design.json) were already correct (vermillion primary, cool off-white background, JetBrains Mono / Inter, chart-1..5 ramp, shadow tiers) — but pages bypassed them at scale. Plan 2 enforces the tokens, ships six canonical primitive components, and lands the three Plan 1 leftovers (Status-Dot adoption on 4px-stripe rows).
+**Goal:** Stop the design-token divergence across the authenticated app. Tokens in [client/src/index.css](./client/src/index.css) and [.impeccable/design.json](./.impeccable/design.json) were already correct (vermillion primary, cool off-white background, JetBrains Mono / Inter, chart-1..5 ramp, shadow tiers) - but pages bypassed them at scale. Plan 2 enforces the tokens, ships six canonical primitive components, and lands the three Plan 1 leftovers (Status-Dot adoption on 4px-stripe rows).
 
 **Status:** Complete
 
@@ -3291,47 +3291,47 @@ A baseline audit found:
 - KPI numerics rendered in `text-3xl font-semibold` everywhere instead of `font-mono tabular-nums`.
 - `truncate` used on description paragraphs (silently cuts copy) where `line-clamp-2` was required.
 
-### 26.1 Wave A — Six foundations primitives
+### 26.1 Wave A - Six foundations primitives
 
 | File                                                 | Change                                                                                                                                                                                              |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client/src/components/foundations/StatusDot.tsx`    | **New** — 8px filled dot. Tones: `success` (`bg-chart-4`), `warn` (`bg-chart-3`), `fail` (`bg-destructive`), `neutral` (`bg-muted-foreground`), `pending` (`bg-muted-foreground/40 animate-pulse`). |
-| `client/src/components/foundations/RouteSpinner.tsx` | **New** — Full-route loading spinner. `border-primary border-t-transparent` ring, centered, `role="status"`, screen-reader label.                                                                   |
-| `client/src/components/foundations/EmptyState.tsx`   | **New** — Canonical empty-state card. Optional Lucide icon + title + body (`line-clamp-3`) + optional CTA.                                                                                          |
-| `client/src/components/foundations/Section.tsx`      | **New** — Page section wrapper. Title + description (`line-clamp-2`) + optional meta-row slot + optional action slot.                                                                               |
-| `client/src/components/foundations/KPITile.tsx`      | **New** — Canonical KPI card. `font-mono tabular-nums` number, muted-foreground label, optional delta with tone (`up` → `text-chart-4`, `down` → `text-destructive`).                               |
-| `client/src/components/foundations/index.ts`         | **New** — Barrel export.                                                                                                                                                                            |
+| `client/src/components/foundations/StatusDot.tsx`    | **New** - 8px filled dot. Tones: `success` (`bg-chart-4`), `warn` (`bg-chart-3`), `fail` (`bg-destructive`), `neutral` (`bg-muted-foreground`), `pending` (`bg-muted-foreground/40 animate-pulse`). |
+| `client/src/components/foundations/RouteSpinner.tsx` | **New** - Full-route loading spinner. `border-primary border-t-transparent` ring, centered, `role="status"`, screen-reader label.                                                                   |
+| `client/src/components/foundations/EmptyState.tsx`   | **New** - Canonical empty-state card. Optional Lucide icon + title + body (`line-clamp-3`) + optional CTA.                                                                                          |
+| `client/src/components/foundations/Section.tsx`      | **New** - Page section wrapper. Title + description (`line-clamp-2`) + optional meta-row slot + optional action slot.                                                                               |
+| `client/src/components/foundations/KPITile.tsx`      | **New** - Canonical KPI card. `font-mono tabular-nums` number, muted-foreground label, optional delta with tone (`up` → `text-chart-4`, `down` → `text-destructive`).                               |
+| `client/src/components/foundations/index.ts`         | **New** - Barrel export.                                                                                                                                                                            |
 | `client/src/App.tsx`                                 | Replaced 5 violet route-loading spinners with `<RouteSpinner />`. Removed the now-duplicate local `RouteSpinner` function that previously rendered violet chrome.                                   |
 
 **Skeleton primitive not duplicated.** `client/src/components/ui/skeleton.tsx` (shadcn) already exists; Plan 2 reuses it rather than shipping a second.
 
-### 26.2 Wave B — Page sweeps
+### 26.2 Wave B - Page sweeps
 
 Twenty-two page files swept against a canonical token map. Each sweep replaced raw Tailwind palette (`bg-stone-*`, `text-violet-*`, `text-emerald-*`, etc.) with design tokens (`bg-background`, `text-primary`, `text-chart-4`, etc.), retired ambient `shadow-sm` on at-rest cards (per design.json "Flat-At-Rest"), converted `truncate` on description text to `line-clamp-2`, and removed every `bg-gradient-*` on authenticated routes.
 
 **Files swept:**
 
-- `client/src/pages/register.tsx`, `login.tsx`, `forgot-password.tsx`, `reset-password.tsx`, `welcome.tsx` (auth flow — 38 swaps total)
-- `client/src/pages/home.tsx` (dashboard — 10 chart hex → `CHART_COLORS = [hsl(var(--chart-1..5))]` array; 4 ambient shadows demoted; pending dots `bg-amber-500` → `bg-chart-3`; success badges `bg-emerald-500/10 text-emerald-400` → `bg-chart-4/10 text-chart-4`)
+- `client/src/pages/register.tsx`, `login.tsx`, `forgot-password.tsx`, `reset-password.tsx`, `welcome.tsx` (auth flow - 38 swaps total)
+- `client/src/pages/home.tsx` (dashboard - 10 chart hex → `CHART_COLORS = [hsl(var(--chart-1..5))]` array; 4 ambient shadows demoted; pending dots `bg-amber-500` → `bg-chart-3`; success badges `bg-emerald-500/10 text-emerald-400` → `bg-chart-4/10 text-chart-4`)
 - `client/src/pages/brand-fact-sheet.tsx` (9 violet → 0: 6 to `text-primary`, 1 to `border-primary`, 2 decorative cards demoted to `bg-muted/50 border-border`; dropped dark-mode violet variants since tokens auto-adapt)
 - `client/src/pages/citations.tsx` (`bg-red-600 hover:bg-red-700` primary CTA → `bg-primary hover:bg-primary/90`; active tab `border-red-500` → `border-primary`)
 - `client/src/pages/geo-analytics.tsx` (4 gradient cards → flat `bg-card border border-border` or `bg-muted`; ~16 palette swaps; `font-mono tabular-nums` on visibility-score, share-of-voice, and all four KPI tile numbers)
 - `client/src/pages/competitors.tsx` (Crown / Award / Medal / Trophy / TrendingUp icon colors mapped from yellow/gray/orange to `text-chart-3` and `text-chart-4`; `font-mono tabular-nums` on leaderboard citation count)
-- `client/src/pages/community-engagement.tsx` (~17 swaps — status/platform color maps to `bg-muted` + chart tokens; 4 stat cards adopted `<KPITile>`; Discover empty state adopted `<EmptyState>`)
-- `client/src/pages/geo-opportunities.tsx` (~8 swaps — two amber callout cards to `border-border bg-muted` + `text-chart-3`; Medium/Wikipedia neutral grays converted; recognizable third-party brand colors for Reddit/HN/YouTube/LinkedIn/PH intentionally kept as platform identifiers)
+- `client/src/pages/community-engagement.tsx` (~17 swaps - status/platform color maps to `bg-muted` + chart tokens; 4 stat cards adopted `<KPITile>`; Discover empty state adopted `<EmptyState>`)
+- `client/src/pages/geo-opportunities.tsx` (~8 swaps - two amber callout cards to `border-border bg-muted` + `text-chart-3`; Medium/Wikipedia neutral grays converted; recognizable third-party brand colors for Reddit/HN/YouTube/LinkedIn/PH intentionally kept as platform identifiers)
 - `client/src/pages/articles.tsx` (StatusBadge colors → `bg-muted text-chart-3` / `text-destructive`)
 - `client/src/pages/keyword-research.tsx` (score-color thresholds → `text-chart-4` / `text-chart-3` / `text-destructive`; two `bg-red-600` buttons → default `bg-primary`)
-- `client/src/pages/geo-signals.tsx` (~30 swaps — pipeline 48px stage badges kept full size with token swap rather than restructured to 8px StatusDot, per "don't restructure JSX" rule)
-- `client/src/pages/geo-tools.tsx` (4px `border-l-4 border-l-purple-500` listicle row → 1px `border-l border-border` + `<StatusDot tone="neutral">` at row start — **landing Plan 1 §4.5 item o**)
-- `client/src/pages/faq-manager.tsx` (4px colored left-borders → 1px hairline + score-driven `<StatusDot>` per FAQ item — **landing Plan 1 §4.5 item p**; gradient CTA `bg-linear-to-r from-purple-600 to-blue-600` → `bg-primary`; 3 inline hex score values → chart tokens)
-- `client/src/pages/crawler-check.tsx` (~11 swaps — status icon helpers, badge variants, summary cards to chart tokens)
+- `client/src/pages/geo-signals.tsx` (~30 swaps - pipeline 48px stage badges kept full size with token swap rather than restructured to 8px StatusDot, per "don't restructure JSX" rule)
+- `client/src/pages/geo-tools.tsx` (4px `border-l-4 border-l-purple-500` listicle row → 1px `border-l border-border` + `<StatusDot tone="neutral">` at row start - **landing Plan 1 §4.5 item o**)
+- `client/src/pages/faq-manager.tsx` (4px colored left-borders → 1px hairline + score-driven `<StatusDot>` per FAQ item - **landing Plan 1 §4.5 item p**; gradient CTA `bg-linear-to-r from-purple-600 to-blue-600` → `bg-primary`; 3 inline hex score values → chart tokens)
+- `client/src/pages/crawler-check.tsx` (~11 swaps - status icon helpers, badge variants, summary cards to chart tokens)
 - `client/src/pages/client-reports.tsx` (7 swaps including violet icons → primary, green-500 success dots → `bg-chart-4`, error badge `bg-red-500/20 text-red-400` → `bg-destructive/20 text-destructive`)
 - `client/src/pages/brands.tsx` (2 `truncate` description-style → `line-clamp-2` with `break-all` for long URLs)
 - `client/src/pages/settings.tsx` (delete-account section demoted from `border-destructive/40` → `border-border`; destructive intent now communicated solely by the `<Button variant="destructive">` CTA)
 
 **Pages with zero changes** (already token-clean from Plan 1 work or prior hygiene): `ai-intelligence.tsx`, `ai-visibility.tsx`, `content.tsx`, `glossary.tsx`, `privacy.tsx`.
 
-**Pages intentionally NOT swept** (out of scope): landing page (`landing.tsx`, `landing.css`, `text-gradient-red` utility) — separate marketing concern. Orphan pages (`outreach.tsx`, `ai-traffic.tsx`, `agent-dashboard.tsx`, etc.) — left alone per user decision.
+**Pages intentionally NOT swept** (out of scope): landing page (`landing.tsx`, `landing.css`, `text-gradient-red` utility) - separate marketing concern. Orphan pages (`outreach.tsx`, `ai-traffic.tsx`, `agent-dashboard.tsx`, etc.) - left alone per user decision.
 
 ### 26.3 Out of scope deferrals on home.tsx (Plan 6 territory)
 
@@ -3364,18 +3364,18 @@ Plan 2 applied tokens only on home.tsx. The following items were intentionally N
 
 ---
 
-## Track 27 — Foundations Plan 3: Sidebar IA + Settings expansion (2026-05-12)
+## Track 27 - Foundations Plan 3: Sidebar IA + Settings expansion (2026-05-12)
 
-**Goal:** Re-enable Account Settings, remove the vermillion left-stripe that competed with primary CTAs, and turn the Settings page into something a real customer can use — Billing via Stripe portal, Profile editor, Password change, Integrations panel.
+**Goal:** Re-enable Account Settings, remove the vermillion left-stripe that competed with primary CTAs, and turn the Settings page into something a real customer can use - Billing via Stripe portal, Profile editor, Password change, Integrations panel.
 
-**Status:** Complete (with subsequent label revert — see 27.6)
+**Status:** Complete (with subsequent label revert - see 27.6)
 
 ### 27.1 Sidebar IA fixes
 
 **Problem.**
 
-1. Account Settings dropdown item rendered with `disabled` — `/settings` route worked but had no entry point.
-2. Active nav items rendered an absolute 4px vermillion (`bg-primary`) left-stripe in addition to the dark-slate fill — explicitly forbidden by design.json and competed for accent budget.
+1. Account Settings dropdown item rendered with `disabled` - `/settings` route worked but had no entry point.
+2. Active nav items rendered an absolute 4px vermillion (`bg-primary`) left-stripe in addition to the dark-slate fill - explicitly forbidden by design.json and competed for accent budget.
 3. Six nav labels were ambiguous to a non-technical founder.
 
 **Fix.**
@@ -3389,17 +3389,17 @@ Plan 2 applied tokens only on home.tsx. The following items were intentionally N
 | File                                      | Change                                                                                                                                                                                                                                                                                                                                            |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/routes/billing.ts`                | Added `POST /api/billing/portal-session`. Looks up `dbUser.stripeCustomerId`; returns 400 with "No billing account on file. Subscribe to a plan first." if absent. Otherwise creates `stripe.billingPortal.sessions.create({ customer, return_url: `${APP_URL}/settings` })` and returns `{ success: true, url }`. 502 + log on Stripe SDK error. |
-| `tests/unit/billingPortalSession.test.ts` | **New** — 3 tests: 200 + url for user with `stripeCustomerId`, 400 for user without, 401 for unauthenticated.                                                                                                                                                                                                                                     |
+| `tests/unit/billingPortalSession.test.ts` | **New** - 3 tests: 200 + url for user with `stripeCustomerId`, 400 for user without, 401 for unauthenticated.                                                                                                                                                                                                                                     |
 
 ### 27.3 User profile + password routes
 
 | File                                      | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `migrations/0053_user_profile_fields.sql` | **New** — `ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT` (firstName / lastName already existed).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `migrations/0053_user_profile_fields.sql` | **New** - `ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT` (firstName / lastName already existed).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `shared/schema.ts`                        | Added `timezone: text("timezone")` to `users`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `server/routes/userAccount.ts`            | Added `PATCH /api/user/profile` — Zod schema accepts optional `firstName / lastName / timezone`; validates timezone against `Intl.supportedValuesOf("timeZone")`. Empty / whitespace-only firstName/lastName treated as "do not update" so the client cannot wipe a profile. Added `POST /api/user/password` — Zod schema requires `currentPassword` + `newPassword ≥ 8 chars`. Re-authenticates via `supabaseAdmin.auth.signInWithPassword` (matches existing login pattern). On success, calls `supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword })` and revokes other sessions via `supabaseAdmin.auth.admin.signOut(bearerToken, "others")` wrapped in try/catch. Audit-logged. |
-| `tests/unit/userProfileUpdate.test.ts`    | **New** — 3 tests: valid PATCH succeeds and persists; partial body accepted; invalid timezone returns 400.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `tests/unit/userPasswordChange.test.ts`   | **New** — 4 tests: valid change calls `updateUserById` and `signOut`; wrong currentPassword returns 401; newPassword < 8 chars returns 400; password change still 200s if `signOut` rejects.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `server/routes/userAccount.ts`            | Added `PATCH /api/user/profile` - Zod schema accepts optional `firstName / lastName / timezone`; validates timezone against `Intl.supportedValuesOf("timeZone")`. Empty / whitespace-only firstName/lastName treated as "do not update" so the client cannot wipe a profile. Added `POST /api/user/password` - Zod schema requires `currentPassword` + `newPassword ≥ 8 chars`. Re-authenticates via `supabaseAdmin.auth.signInWithPassword` (matches existing login pattern). On success, calls `supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword })` and revokes other sessions via `supabaseAdmin.auth.admin.signOut(bearerToken, "others")` wrapped in try/catch. Audit-logged. |
+| `tests/unit/userProfileUpdate.test.ts`    | **New** - 3 tests: valid PATCH succeeds and persists; partial body accepted; invalid timezone returns 400.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `tests/unit/userPasswordChange.test.ts`   | **New** - 4 tests: valid change calls `updateUserById` and `signOut`; wrong currentPassword returns 401; newPassword < 8 chars returns 400; password change still 200s if `signOut` rejects.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 **Routes mount automatically.** Both `setupBillingRoutes(app)` and `setupUserAccountRoutes(app)` were already wired in `server/routes.ts:184,204`.
 
@@ -3407,9 +3407,9 @@ Plan 2 applied tokens only on home.tsx. The following items were intentionally N
 
 | File                            | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client/src/pages/settings.tsx` | Added four new Cards above the existing sections, in order: **Profile** (firstName / lastName / timezone Select sourced from `Intl.supportedValuesOf("timeZone")`), **Change password** (current / new / confirm with client-side validation), **Billing** (button bounces to `POST /api/billing/portal-session` then `window.location.href = url`), **Integrations** (Buffer tile with live connection status). Slack / Webhooks placeholder tiles initially included but removed per user decision (see 27.8) — only Buffer remains. The pre-existing trivial Profile `<section>` (just email display) was removed since the new ProfileSection subsumes it. |
+| `client/src/pages/settings.tsx` | Added four new Cards above the existing sections, in order: **Profile** (firstName / lastName / timezone Select sourced from `Intl.supportedValuesOf("timeZone")`), **Change password** (current / new / confirm with client-side validation), **Billing** (button bounces to `POST /api/billing/portal-session` then `window.location.href = url`), **Integrations** (Buffer tile with live connection status). Slack / Webhooks placeholder tiles initially included but removed per user decision (see 27.8) - only Buffer remains. The pre-existing trivial Profile `<section>` (just email display) was removed since the new ProfileSection subsumes it. |
 
-### 27.5 publicUserShape — include profile fields
+### 27.5 publicUserShape - include profile fields
 
 | File             | Change                                                                                                                                                                                                     |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -3429,7 +3429,7 @@ Plan 2 applied tokens only on home.tsx. The following items were intentionally N
 
 ### 27.8 Slack / Webhooks placeholders removed
 
-**Decision.** Initial Integrations Card included disabled "Coming soon" tiles for Slack and Webhooks. Per user, both removed — only Buffer remains.
+**Decision.** Initial Integrations Card included disabled "Coming soon" tiles for Slack and Webhooks. Per user, both removed - only Buffer remains.
 
 ### How to verify
 
@@ -3444,14 +3444,14 @@ Plan 2 applied tokens only on home.tsx. The following items were intentionally N
 
 ### Pass criteria
 
-- [x] `npm run check` — clean, tour-targets 26/26
+- [x] `npm run check` - clean, tour-targets 26/26
 - [x] 10 tests pass across `userProfileUpdate` (3), `userPasswordChange` (4), `billingPortalSession` (3)
 - [x] Migration `0053_user_profile_fields.sql` applies cleanly
 - [x] No raw palette violations introduced to `settings.tsx`
 
 ---
 
-## Track 28 — Settings page bug audit + remediation (2026-05-12)
+## Track 28 - Settings page bug audit + remediation (2026-05-12)
 
 **Goal:** Audit and fix every bug on the expanded Settings page. After Track 27 shipped, real-user testing surfaced "the settings page is full of bugs, nothing is properly working." This track is the end-to-end fix pass.
 
@@ -3461,13 +3461,13 @@ Plan 2 applied tokens only on home.tsx. The following items were intentionally N
 
 A read-only auditor agent inspected `settings.tsx`, `use-auth.ts`, `queryClient.ts`, `userAccount.ts`, `billing.ts`, `buffer.ts`, and the three new test files from Track 27. The audit catalogued 17 bugs grouped into 5 critical/high (root causes), 7 medium (data integrity / latency), and 5 low (cosmetic / minor).
 
-Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes (#3 invalidation race; #5 timezone Select edge case). 2 needed no work — verified OK on inspection (#9 portal POST without body; #15 notification preferences contract).
+Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes (#3 invalidation race; #5 timezone Select edge case). 2 needed no work - verified OK on inspection (#9 portal POST without body; #15 notification preferences contract).
 
-### 28.1 Bug #1 + Bug #2 — `/api/auth/me` shape collision; missing `timezone` type
+### 28.1 Bug #1 + Bug #2 - `/api/auth/me` shape collision; missing `timezone` type
 
 **Symptom.** Profile fields always rendered empty regardless of saved values. Email showed "(no email)". Save still worked because the mutation read local state, but the form never reflected persisted values.
 
-**Root cause.** `client/src/hooks/use-auth.ts` registered a queryFn on `["/api/auth/me"]` that stored the **unwrapped user** object. `ProfileSection` in `settings.tsx` did its OWN `useQuery<{ success, user }>` on the same key, expecting the envelope shape — so `meData?.user` was always `undefined` because the cache held the user directly. The same `User` interface was missing `timezone` even though `publicUserShape` returned it.
+**Root cause.** `client/src/hooks/use-auth.ts` registered a queryFn on `["/api/auth/me"]` that stored the **unwrapped user** object. `ProfileSection` in `settings.tsx` did its OWN `useQuery<{ success, user }>` on the same key, expecting the envelope shape - so `meData?.user` was always `undefined` because the cache held the user directly. The same `User` interface was missing `timezone` even though `publicUserShape` returned it.
 
 **Fix.**
 
@@ -3476,9 +3476,9 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 | `client/src/hooks/use-auth.ts`  | Added `timezone?: string \| null` to the `User` interface.                                                                                                                                                                                                              |
 | `client/src/pages/settings.tsx` | Removed the duplicate `useQuery<AuthMeResponse>` and the `AuthMeResponse` type from `ProfileSection`. Now reads `user` from `useAuth()` directly. The seed `useEffect` for firstName/lastName/timezone works because the cached user has the correct (unwrapped) shape. |
 
-### 28.2 Bug #4 — Empty-string profile fields wiped the profile
+### 28.2 Bug #4 - Empty-string profile fields wiped the profile
 
-**Symptom.** Client always sent all three fields (`{ firstName, lastName, timezone }`). With Bug #1 active, the form rendered empty inputs and saving sent three empty strings — wiping the user's stored name on every save.
+**Symptom.** Client always sent all three fields (`{ firstName, lastName, timezone }`). With Bug #1 active, the form rendered empty inputs and saving sent three empty strings - wiping the user's stored name on every save.
 
 **Fix.**
 
@@ -3486,22 +3486,22 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/routes/userAccount.ts` | `PATCH /api/user/profile` now builds an `updates` object only including non-empty trimmed fields. Empty / whitespace-only firstName / lastName are skipped instead of written. If the resulting patch is empty, returns `{ success: true, noChange: true }` with HTTP 200 and skips the DB write. Timezone validation against `Intl.supportedValuesOf("timeZone")` preserved. |
 
-### 28.3 Bug #6 — Password re-auth used a Vite client-side env var on the server
+### 28.3 Bug #6 - Password re-auth used a Vite client-side env var on the server
 
-**Symptom.** Password change always returned 401 "Current password incorrect" in production — even on correct passwords.
+**Symptom.** Password change always returned 401 "Current password incorrect" in production - even on correct passwords.
 
-**Root cause.** The original implementation constructed a fresh user-context Supabase client inline with `createClient(process.env.SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? "")`. The `VITE_` prefix is a Vite client-side convention — the server has no special handling. In production where `.env.example` only defines `VITE_SUPABASE_ANON_KEY`, the server fell through to `SUPABASE_ANON_KEY ?? ""` and produced a Supabase client with an empty anon key. Every `signInWithPassword` call failed with an auth error.
+**Root cause.** The original implementation constructed a fresh user-context Supabase client inline with `createClient(process.env.SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? "")`. The `VITE_` prefix is a Vite client-side convention - the server has no special handling. In production where `.env.example` only defines `VITE_SUPABASE_ANON_KEY`, the server fell through to `SUPABASE_ANON_KEY ?? ""` and produced a Supabase client with an empty anon key. Every `signInWithPassword` call failed with an auth error.
 
 **Fix.**
 
 | File                                    | Change                                                                                                                                                                                                                                                                                                                                                                             |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/routes/userAccount.ts`          | Replaced the fresh-client construction with `supabaseAdmin.auth.signInWithPassword({ email: user.email, password: currentPassword })` — same pattern `server/auth.ts:342` uses for the regular login route. The service-role-keyed admin client supports password verification in current Supabase versions. No env-var fallback chain. No `@supabase/supabase-js` dynamic import. |
+| `server/routes/userAccount.ts`          | Replaced the fresh-client construction with `supabaseAdmin.auth.signInWithPassword({ email: user.email, password: currentPassword })` - same pattern `server/auth.ts:342` uses for the regular login route. The service-role-keyed admin client supports password verification in current Supabase versions. No env-var fallback chain. No `@supabase/supabase-js` dynamic import. |
 | `tests/unit/userPasswordChange.test.ts` | Removed the unused `vi.mock("@supabase/supabase-js", ...)` block. Updated the `supabaseAdmin` mock so `auth.signInWithPassword` points to a stub the tests control. All 4 cases still pass.                                                                                                                                                                                        |
 
-### 28.4 Bug #8 — Zod validation errors rendered as `[object Object]`
+### 28.4 Bug #8 - Zod validation errors rendered as `[object Object]`
 
-**Root cause.** Both routes returned `{ error: parsed.error.flatten() }` — `flatten()` returns an object, which the client toast tried to render as a string.
+**Root cause.** Both routes returned `{ error: parsed.error.flatten() }` - `flatten()` returns an object, which the client toast tried to render as a string.
 
 **Fix.**
 
@@ -3509,7 +3509,7 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/routes/userAccount.ts` | Both profile and password routes now build human-readable error strings: `parsed.error.errors.map(e => `${e.path.join(".")}: ${e.message}`).join("; ")`. Response shape is `{ success: false, error: <string> }`. |
 
-### 28.5 Bug #10 — Billing section had no plan state
+### 28.5 Bug #10 - Billing section had no plan state
 
 **Fix.**
 
@@ -3517,9 +3517,9 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `client/src/pages/settings.tsx` | `BillingSection` reads `useAuth().user?.accessTier` and renders "Current plan: <accessTier>" (falls back to "free") above the Manage billing button. |
 
-### 28.6 Bug #11 / #12 / #16 — `apiRequest` already throws on non-2xx; dead error branches; `"<status>: ..."` toast prefix
+### 28.6 Bug #11 / #12 / #16 - `apiRequest` already throws on non-2xx; dead error branches; `"<status>: ..."` toast prefix
 
-**Root cause.** `apiRequest` in `queryClient.ts` calls `throwIfResNotOk(res)` before returning, throwing an `ApiError` with `message = "<status>: <body-text>"`. So every `if (!res.ok || json.success === false)` check after `apiRequest` was dead code — non-2xx responses already threw. Cleanup needed: surface `err.body.error` (the structured JSON error field) instead of `err.message` (the status-prefixed string).
+**Root cause.** `apiRequest` in `queryClient.ts` calls `throwIfResNotOk(res)` before returning, throwing an `ApiError` with `message = "<status>: <body-text>"`. So every `if (!res.ok || json.success === false)` check after `apiRequest` was dead code - non-2xx responses already threw. Cleanup needed: surface `err.body.error` (the structured JSON error field) instead of `err.message` (the status-prefixed string).
 
 **Fix.**
 
@@ -3527,25 +3527,25 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------- |
 | `client/src/pages/settings.tsx` | Added `getApiErrorMessage(err: unknown, fallback: string)` helper at module scope. Prefers `(err as ApiError).body.error`, else strips the leading `\d+:\s*` prefix from `err.message`, else returns the fallback. Applied across `updateProfile`, `changePassword`, `openPortal`, `deleteMutation`, `exportMutation` onError handlers. Removed all dead `if (!res.ok |     | json.success === false)` branches in mutationFns. |
 
-### 28.7 Bug #12 — Buffer query crashed instead of returning "Not connected"
+### 28.7 Bug #12 - Buffer query crashed instead of returning "Not connected"
 
-**Fix.** Buffer status query rewritten to use raw `fetch` (not `apiRequest`, since the former throws on non-2xx). On any failure — network error, 5xx, parse error — returns `{ connected: false }` so the section renders cleanly.
+**Fix.** Buffer status query rewritten to use raw `fetch` (not `apiRequest`, since the former throws on non-2xx). On any failure - network error, 5xx, parse error - returns `{ connected: false }` so the section renders cleanly.
 
-### 28.8 Bug #13 — Buffer status endpoint added
+### 28.8 Bug #13 - Buffer status endpoint added
 
-**Symptom.** Settings page load took 500ms-2s+ because `/api/buffer/profiles` fans out to Buffer's GraphQL API per organization to list channels — just to render "Connected" / "Not connected".
+**Symptom.** Settings page load took 500ms-2s+ because `/api/buffer/profiles` fans out to Buffer's GraphQL API per organization to list channels - just to render "Connected" / "Not connected".
 
 **Fix.**
 
 | File                                                     | Change                                                                                                                                                                                                                                                                      |
 | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/routes/buffer.ts`                                | **New** `GET /api/buffer/status` — single-column inline DB read on `users.bufferAccessToken` (no decrypt, no external Buffer call). Returns `{ success: true, connected: boolean }`. On any DB error, logs `logger.warn` and returns `{ success: true, connected: false }`. |
+| `server/routes/buffer.ts`                                | **New** `GET /api/buffer/status` - single-column inline DB read on `users.bufferAccessToken` (no decrypt, no external Buffer call). Returns `{ success: true, connected: boolean }`. On any DB error, logs `logger.warn` and returns `{ success: true, connected: false }`. |
 | `client/src/pages/settings.tsx`                          | `IntegrationsSection`'s Buffer query switched from `/api/buffer/profiles` to `/api/buffer/status`. Buffer tile now renders in < 50 ms.                                                                                                                                      |
 | `client/src/components/articles/BufferConnectDialog.tsx` | Invalidates BOTH `["/api/buffer/profiles"]` (existing) AND `["/api/buffer/status"]` (new) on connect / disconnect.                                                                                                                                                          |
 
 `/api/buffer/profiles` left intact for other consumers that legitimately need the channel list.
 
-### 28.9 Bug #14 — Buffer Connect button was hardcoded `disabled`
+### 28.9 Bug #14 - Buffer Connect button was hardcoded `disabled`
 
 **Fix.**
 
@@ -3553,16 +3553,16 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `client/src/pages/settings.tsx` | Replaced the hardcoded-disabled button with `<BufferConnectDialog connected={Boolean(buffer?.connected)} />`. The dialog handles both Connect (token entry) and Disconnect flows and (per 28.8) invalidates `["/api/buffer/status"]` so the Settings tile refreshes immediately. |
 
-### 28.10 Bug #7 — Other sessions stayed logged in after password change
+### 28.10 Bug #7 - Other sessions stayed logged in after password change
 
 **Fix.**
 
 | File                                    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/routes/userAccount.ts`          | After successful `updateUserById`, extracts the bearer token from `req.headers.authorization` (case-insensitive `Bearer ` strip) and calls `supabaseAdmin.auth.admin.signOut(jwt, "others")` (signature verified against `@supabase/auth-js/dist/main/GoTrueAdminApi.d.ts:54`). Wrapped in try/catch with `logger.warn` — revocation failure doesn't fail the password-change request. Skipped if bearer header is missing (every authenticated request carries one upstream of `isAuthenticated`). |
+| `server/routes/userAccount.ts`          | After successful `updateUserById`, extracts the bearer token from `req.headers.authorization` (case-insensitive `Bearer ` strip) and calls `supabaseAdmin.auth.admin.signOut(jwt, "others")` (signature verified against `@supabase/auth-js/dist/main/GoTrueAdminApi.d.ts:54`). Wrapped in try/catch with `logger.warn` - revocation failure doesn't fail the password-change request. Skipped if bearer header is missing (every authenticated request carries one upstream of `isAuthenticated`). |
 | `tests/unit/userPasswordChange.test.ts` | Added `signOut` stub on `supabaseAdmin.auth.admin`. Test injects `Authorization: Bearer test-jwt-token`, asserts `signOut` called with `("test-jwt-token", "others")`. Additional case verifies request still returns 200 when `signOut` rejects.                                                                                                                                                                                                                                                   |
 
-### 28.11 Bug #17 — Export 429 client copy diverged from server message
+### 28.11 Bug #17 - Export 429 client copy diverged from server message
 
 **Fix.**
 
@@ -3572,17 +3572,17 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 
 ### 28.12 Bugs verified OK (no work needed)
 
-- **#9** — `apiRequest("POST", url)` with no body works fine; Express handles missing-body POSTs cleanly.
-- **#15** — Notification preferences `useQuery({ queryKey: [...] })` with no queryFn relies on the project's `defaultQueryFn` set in `queryClient.ts:120`. Verified present.
+- **#9** - `apiRequest("POST", url)` with no body works fine; Express handles missing-body POSTs cleanly.
+- **#15** - Notification preferences `useQuery({ queryKey: [...] })` with no queryFn relies on the project's `defaultQueryFn` set in `queryClient.ts:120`. Verified present.
 
 ### 28.13 Bugs implicitly resolved
 
-- **#3** — Profile cache invalidation race after save. Resolved by #1.
-- **#5** — Timezone Select rendering blank. Resolved by #1.
+- **#3** - Profile cache invalidation race after save. Resolved by #1.
+- **#5** - Timezone Select rendering blank. Resolved by #1.
 
 ### 28.14 Deferred
 
-- The `User.accessTier` field is used for the plan label. No subscription detail (next renewal, price) is shown — Stripe owns that surface via the customer portal.
+- The `User.accessTier` field is used for the plan label. No subscription detail (next renewal, price) is shown - Stripe owns that surface via the customer portal.
 - `supabaseAdmin.auth.admin.signOut(..., "global")` would log the user out everywhere including the current device. Chose `"others"` to preserve the current session, matching common UX expectations. Swap to `"global"` if security policy ever requires forced re-login after every password change.
 
 ### How to verify
@@ -3600,7 +3600,7 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 
 ### Pass criteria
 
-- [x] `npm run check` — clean, tour-targets 26/26
+- [x] `npm run check` - clean, tour-targets 26/26
 - [x] 10 tests pass: `userProfileUpdate` (3), `userPasswordChange` (4, includes signOut), `billingPortalSession` (3)
 - [x] No `[object Object]` toasts
 - [x] No `"<status>: ..."` toast prefixes anywhere on the Settings page
@@ -3608,20 +3608,20 @@ Of those 17: 13 fixed in this track. 2 resolved implicitly by Bug #1 / #2 fixes 
 
 ---
 
-## Track 29 — Foundations Plan 4: Bridges + Email verification + AI disclosure (2026-05-12)
+## Track 29 - Foundations Plan 4: Bridges + Email verification + AI disclosure (2026-05-12)
 
 **Goal:** Close three independent gaps the Foundations spec calls out: two dead bridges in user flows (welcome → fact scrape, keyword research → content), missing email verification on signup, and missing AI-generation disclosure on articles.
 
-**Status:** Complete (with substantial follow-up audit + production-readiness remediation — see Track 30)
+**Status:** Complete (with substantial follow-up audit + production-readiness remediation - see Track 30)
 
 ### Background
 
 Three small product gaps from the Foundations spec §4.6 / §4.8 / §4.9:
 
 1. **Welcome path didn't fire fact-scrape.** Users who finished onboarding via `/welcome` landed on `/brand-fact-sheet` and polled every 3s for 2 minutes for facts that never arrived. The fact-scrape was wired to `POST /api/brands` and `POST /api/brands/from-website` but not to `POST /api/onboarding/confirm`.
-2. **Keyword Research → Content link was dead.** Clicking "Generate Content" on a keyword built `/content?keyword=...&industry=...&type=...&brandId=...` but `content.tsx` didn't parse any of those params — user landed on a blank draft.
+2. **Keyword Research → Content link was dead.** Clicking "Generate Content" on a keyword built `/content?keyword=...&industry=...&type=...&brandId=...` but `content.tsx` didn't parse any of those params - user landed on a blank draft.
 3. **No email verification.** `server/auth.ts` called `createUser({ email_confirm: true })`, skipping Supabase's email confirmation flow entirely. Anyone could register with anyone's email and be instantly logged in. No welcome email either.
-4. **No AI disclosure.** Generated articles carried no indicator that they were AI-written — both an FTC compliance gap and a trust-break for a product whose value prop is "AI-cited."
+4. **No AI disclosure.** Generated articles carried no indicator that they were AI-written - both an FTC compliance gap and a trust-break for a product whose value prop is "AI-cited."
 
 ### 29.1 Welcome → fact-scrape bridge
 
@@ -3631,7 +3631,7 @@ Three small product gaps from the Foundations spec §4.6 / §4.8 / §4.9:
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `server/routes/onboarding.ts` | In the `/confirm` handler, immediately after `runOnboardingAutopilot(...)` returns, queue a fire-and-forget `scrapeBrandFacts(brand.id)` call wrapped in `.catch(...)` for `logger.warn`. Initially used `setImmediate` (changed to `waitUntil` in Track 30 for serverless compatibility). |
 
-`runOnboardingAutopilot` does NOT internally call `scrapeBrandFacts` (verified) — no double-fire. `scrapeBrandFacts` is idempotent (dedupes via existing brandFacts keys at `factExtractor.ts:267-272`) — safe to call from multiple paths.
+`runOnboardingAutopilot` does NOT internally call `scrapeBrandFacts` (verified) - no double-fire. `scrapeBrandFacts` is idempotent (dedupes via existing brandFacts keys at `factExtractor.ts:267-272`) - safe to call from multiple paths.
 
 ### 29.2 Keyword research → Content URL handoff
 
@@ -3641,7 +3641,7 @@ Three small product gaps from the Foundations spec §4.6 / §4.8 / §4.9:
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `client/src/pages/content.tsx` | Imported `useSearch` from wouter. Parsed `keyword / industry / type / brandId` URL params into a `seedParams` memo (returns `null` when no params present). Bootstrap effect: when `seedParams` is non-null AND no `articleId` in the route, POSTs `/api/articles/draft` with `brandId` (validated server-side against the user's brands), `industry`, `keywords: [keyword]`, `contentType: type`. The draft-hydration effect at content.tsx:250-263 then copies the fresh draft into form state. After `setLocation('/content/:id', { replace: true })` the URL params naturally drop off, so a refresh won't re-seed. In-progress drafts loaded via `/content/:id` are never touched. |
 
-**Security check.** `POST /api/articles/draft` already calls `requireBrand(brandId, user.id)` (`server/routes/articles.ts:106`) plus the global `enforceBrandOwnership` middleware. URL-tampered `brandId` (e.g., `?brandId=someone-elses-uuid`) is rejected — verified during audit.
+**Security check.** `POST /api/articles/draft` already calls `requireBrand(brandId, user.id)` (`server/routes/articles.ts:106`) plus the global `enforceBrandOwnership` middleware. URL-tampered `brandId` (e.g., `?brandId=someone-elses-uuid`) is rejected - verified during audit.
 
 ### 29.3 Email verification flow
 
@@ -3650,15 +3650,15 @@ Three small product gaps from the Foundations spec §4.6 / §4.8 / §4.9:
 | File                                     | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/auth.ts`                         | Flipped `createUser({ email_confirm: false })` (was `true`). Register handler returns `{ success: true, requiresVerification: true, email }` instead of issuing a session. Added `POST /api/auth/resend-verification` (mounted on `PUBLIC_API_ROUTES`). Two-layer rate limit: 60-second min gap per `${ip}:${email.toLowerCase().trim()}` via an in-memory `Map<string, number>` (returns 429), wrapped by `express-rate-limit` 3/hour per (IP, email). Calls `supabaseAdmin.auth.resend({ type: "signup", email })`. Anti-enumeration: always returns success for non-rate-limited paths regardless of whether the email exists or is already verified. Welcome-email trigger added to the login handler: when `dbUser.lastLoginAt === null`, dispatch `sendWelcomeEmail`. Initially used `setImmediate` (changed to `waitUntil` in Track 30). |
-| `server/lib/welcomeEmail.ts`             | **New.** Wraps the existing Resend client (matches the `emailService.ts` pattern of `new Resend(RESEND_API_KEY)`). Reuses `RESEND_FROM_ADDRESS` and `APP_URL` env vars — no new env required. Initial implementation: HTML body only (plain-text fallback + HTML-escape added in Track 30).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `migrations/0054_user_last_login_at.sql` | **New.** `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP`. Backfilled `last_login_at = NOW()` for every existing row so legacy accounts don't receive an unsolicited welcome email on next login. (Note: this column was repurposed in Track 30 — see 30.7.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `server/lib/welcomeEmail.ts`             | **New.** Wraps the existing Resend client (matches the `emailService.ts` pattern of `new Resend(RESEND_API_KEY)`). Reuses `RESEND_FROM_ADDRESS` and `APP_URL` env vars - no new env required. Initial implementation: HTML body only (plain-text fallback + HTML-escape added in Track 30).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `migrations/0054_user_last_login_at.sql` | **New.** `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP`. Backfilled `last_login_at = NOW()` for every existing row so legacy accounts don't receive an unsolicited welcome email on next login. (Note: this column was repurposed in Track 30 - see 30.7.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `shared/schema.ts`                       | Added `lastLoginAt: timestamp("last_login_at")` to `users`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `client/src/pages/verify-email.tsx`      | **New.** "Check your email" landing page. Reads recipient email from `sessionStorage["venturecite:pending-verify-email"]` (set by register on submit). 60-second client-side cooldown timer + resend button hitting `POST /api/auth/resend-verification`. (sessionStorage-fallback + manual-email-input added in Track 30.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `client/src/pages/register.tsx`          | `onSuccess` branches on `requiresVerification`: sets the sessionStorage key, navigates to `/verify-email`. Legacy session-issuing path retained for backward compatibility with any unverified-flow accounts that might bypass the new gate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `client/src/App.tsx`                     | Registered `/verify-email` route OUTSIDE the auth gate (users haven't verified, so they don't have a valid session).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `tests/unit/emailVerification.test.ts`   | **New.** 4 cases (later updated in Track 30 to handle the atomic welcome gate + waitUntil + email_verified mirror): register returns `{ requiresVerification: true }` and never calls `signInWithPassword`; resend rate-limited (60-second second-call returns 429); welcome email fires once on first verified login (`lastLoginAt: null` → `lastLoginAt: NOW()`); welcome email does NOT fire on subsequent login.                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
-**Existing user impact.** The `email_confirm: false` flip only affects NEW signups going through our `createUser` admin call. Existing Supabase auth users keep their `auth.users.email_confirmed_at` value — typically `NOT NULL` for accounts created when the flag was `true`. Supabase always refuses login for unverified users regardless of our flag. No existing user gets retroactively locked out. The `last_login_at` backfill ensures none of them get an unsolicited welcome email on next login.
+**Existing user impact.** The `email_confirm: false` flip only affects NEW signups going through our `createUser` admin call. Existing Supabase auth users keep their `auth.users.email_confirmed_at` value - typically `NOT NULL` for accounts created when the flag was `true`. Supabase always refuses login for unverified users regardless of our flag. No existing user gets retroactively locked out. The `last_login_at` backfill ensures none of them get an unsolicited welcome email on next login.
 
 ### 29.4 AI disclosure
 
@@ -3666,9 +3666,9 @@ Three small product gaps from the Foundations spec §4.6 / §4.8 / §4.9:
 
 | File                                                  | Change                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `migrations/0055_articles_ai_generated.sql`           | **New** (number bumped from 0054 to 0055 after a collision with the email-verification migration). `ALTER TABLE articles ADD COLUMN IF NOT EXISTS ai_generated BOOLEAN NOT NULL DEFAULT false`. Backfill `UPDATE articles SET ai_generated = true WHERE id IN (SELECT DISTINCT article_id FROM content_generation_jobs WHERE article_id IS NOT NULL)` — every article tied to a generation job marked as AI-generated. |
+| `migrations/0055_articles_ai_generated.sql`           | **New** (number bumped from 0054 to 0055 after a collision with the email-verification migration). `ALTER TABLE articles ADD COLUMN IF NOT EXISTS ai_generated BOOLEAN NOT NULL DEFAULT false`. Backfill `UPDATE articles SET ai_generated = true WHERE id IN (SELECT DISTINCT article_id FROM content_generation_jobs WHERE article_id IS NOT NULL)` - every article tied to a generation job marked as AI-generated. |
 | `shared/schema.ts`                                    | Added `aiGenerated: boolean("ai_generated").notNull().default(false)` to `articles`.                                                                                                                                                                                                                                                                                                                                   |
-| `server/databaseStorage.ts`                           | `setArticleReady` now `.set({ ..., aiGenerated: true })` — the SOLE worker path that flips the flag. `setArticleFailed`, `setArticleDraft`, `setArticleGeneratingFromDraft`, and manual `createArticle` (from `POST /api/articles`) all leave it alone — so the default `false` applies to user-authored articles. Verified during audit: no false positives possible.                                                 |
+| `server/databaseStorage.ts`                           | `setArticleReady` now `.set({ ..., aiGenerated: true })` - the SOLE worker path that flips the flag. `setArticleFailed`, `setArticleDraft`, `setArticleGeneratingFromDraft`, and manual `createArticle` (from `POST /api/articles`) all leave it alone - so the default `false` applies to user-authored articles. Verified during audit: no false positives possible.                                                 |
 | `client/src/components/AIGeneratedPill.tsx`           | **New.** `<span>` pill with `<Sparkles />` icon + "AI-generated" text in muted chrome (`bg-muted text-muted-foreground`). `aria-label="AI-generated content"`, icon `aria-hidden`.                                                                                                                                                                                                                                     |
 | `client/src/pages/articles.tsx`                       | Pill rendered next to `<StatusBadge>` in the row title row, gated on `article.aiGenerated`. DistributeDialog invoked from this page now receives `aiGenerated` prop.                                                                                                                                                                                                                                                   |
 | `client/src/components/articles/ViewEditDialog.tsx`   | Pill rendered inside `<DialogTitle>`, gated on `article.aiGenerated`.                                                                                                                                                                                                                                                                                                                                                  |
@@ -3676,7 +3676,7 @@ Three small product gaps from the Foundations spec §4.6 / §4.8 / §4.9:
 | `client/src/pages/content.tsx`                        | Pill rendered inside ReadyEditor `<CardTitle>`, gated on `article.aiGenerated`.                                                                                                                                                                                                                                                                                                                                        |
 | `tests/unit/articlesAIGenerated.test.ts`              | **New.** 2 cases: simulating the worker completing a job asserts the updated article row has `aiGenerated: true`; manual `POST /api/articles` keeps `aiGenerated: false`.                                                                                                                                                                                                                                              |
 
-**API response shape.** `GET /api/articles` returns Drizzle rows directly (no field-picking transformer) — `aiGenerated` is included automatically. Verified during audit.
+**API response shape.** `GET /api/articles` returns Drizzle rows directly (no field-picking transformer) - `aiGenerated` is included automatically. Verified during audit.
 
 ### How to verify (initial state, before Track 30 hardening)
 
@@ -3684,11 +3684,11 @@ Three small product gaps from the Foundations spec §4.6 / §4.8 / §4.9:
 2. **Keyword → Content seeds the draft.** `/keyword-research` → click "Generate Content" on a row → `/content` form lands populated with the keyword + industry + type, attached to the right brand.
 3. **New signup requires verification.** Register with a new email → land on `/verify-email`; Supabase sends a confirmation link; clicking it confirms the account; user can now log in.
 4. **Welcome email.** First successful login after verification triggers a welcome email via Resend.
-5. **AI pill on AI-generated articles only.** Articles list / view / distribute / content ready-state — pill appears on rows where `aiGenerated = true`; not on manually-created articles.
+5. **AI pill on AI-generated articles only.** Articles list / view / distribute / content ready-state - pill appears on rows where `aiGenerated = true`; not on manually-created articles.
 
 ### Pass criteria (initial)
 
-- [x] `npm run check` — clean, tour-targets 26/26
+- [x] `npm run check` - clean, tour-targets 26/26
 - [x] 6 new tests pass: `emailVerification` (4), `articlesAIGenerated` (2)
 - [x] Migration collision resolved (0054 user_last_login_at, 0055 articles_ai_generated)
 
@@ -3696,7 +3696,7 @@ Three small product gaps from the Foundations spec §4.6 / §4.8 / §4.9:
 
 ---
 
-## Track 30 — Plan 4 audit + production-readiness remediation (2026-05-12)
+## Track 30 - Plan 4 audit + production-readiness remediation (2026-05-12)
 
 **Goal:** Audit every Plan 4 surface and make it production-ready against real users and industry standards.
 
@@ -3716,9 +3716,9 @@ The audit catalogued 28+ findings across 4 categories:
 
 Of those, 14 were fixed in this track. The rest were either implicitly resolved by the fixes, intentionally deferred with documentation, or `verified-OK` non-bugs.
 
-### 30.1 BUGs #27 + #28 — `setImmediate` doesn't reliably execute on Vercel (CRITICAL)
+### 30.1 BUGs #27 + #28 - `setImmediate` doesn't reliably execute on Vercel (CRITICAL)
 
-**Symptom.** `setImmediate(() => fn().catch(...))` in a request handler may be killed when the Vercel function instance suspends right after `res.json(...)`. Both the welcome-email dispatch AND the welcome-path fact-scrape — the exact things Plan 4 was meant to ship — could silently drop in production.
+**Symptom.** `setImmediate(() => fn().catch(...))` in a request handler may be killed when the Vercel function instance suspends right after `res.json(...)`. Both the welcome-email dispatch AND the welcome-path fact-scrape - the exact things Plan 4 was meant to ship - could silently drop in production.
 
 **Root cause.** Serverless functions don't guarantee post-response execution unless work is explicitly tied to `waitUntil` from `@vercel/functions`. The codebase already imports `waitUntil` elsewhere (`server/auth.ts:86-87` area) for exactly this reason; Plan 4's initial implementation didn't follow the existing pattern.
 
@@ -3729,13 +3729,13 @@ Of those, 14 were fixed in this track. The rest were either implicitly resolved 
 | `server/auth.ts`              | Welcome-email dispatch in the login handler swapped from `setImmediate(() => sendWelcomeEmail(...).catch(...))` to `waitUntil(sendWelcomeEmail(...).catch((err) => { logger.warn(...); captureAndFlush(err, ...); }))`. |
 | `server/routes/onboarding.ts` | Welcome-path fact-scrape dispatch swapped to `waitUntil(scrapeBrandFacts(brand.id).catch((err) => { logger.warn(...); captureAndFlush(err, ...); }))`. Static `waitUntil` + Sentry imports added at top.                |
 
-Without these swaps, both background tasks would silently never run on Vercel — neither the user nor any log surface would indicate the failure.
+Without these swaps, both background tasks would silently never run on Vercel - neither the user nor any log surface would indicate the failure.
 
-### 30.2 BUG #1 — Race on first-login welcome email (HIGH)
+### 30.2 BUG #1 - Race on first-login welcome email (HIGH)
 
 **Symptom.** Two concurrent logins from the same user (page open in two tabs, double-clicked Login button, etc.) both observe `lastLoginAt === null` at JavaScript level. Both branches send welcome emails. User receives two welcome emails.
 
-**Root cause.** The original gate read `lastLoginAt`, set a JS flag, then later updated the DB row — a classic read-then-write race.
+**Root cause.** The original gate read `lastLoginAt`, set a JS flag, then later updated the DB row - a classic read-then-write race.
 
 **Fix.** Atomic conditional UPDATE. The "winner" is the request whose `UPDATE ... WHERE welcomed_at IS NULL RETURNING id` actually returns a row.
 
@@ -3743,9 +3743,9 @@ Without these swaps, both background tasks would silently never run on Vercel �
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/auth.ts` (login handler) | Refactored welcome-email gate to: `const updated = await db.update(users).set({ welcomedAt: new Date(), lastLoginAt: new Date() }).where(and(eq(users.id, user.id), isNull(users.welcomedAt))).returning({ id: users.id });`. Only when `updated.length > 0` does the welcome email fire. Race losers fall through to a plain `db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id))` so their `lastLoginAt` still updates correctly. Cuts the welcome from two queries to one in the winner case. |
 
-The atomic gate uses the new `welcomed_at` column (see 30.7) — `lastLoginAt` recovers its true "last login" semantics independently.
+The atomic gate uses the new `welcomed_at` column (see 30.7) - `lastLoginAt` recovers its true "last login" semantics independently.
 
-### 30.3 BUG #2 — `public.users.email_verified` mirror never updates after verification (HIGH security/observability)
+### 30.3 BUG #2 - `public.users.email_verified` mirror never updates after verification (HIGH security/observability)
 
 **Symptom.** Our `public.users.email_verified` column is set by the `handle_new_user` DB trigger from `migrations/0001_auth_sync.sql`. That trigger fires on `INSERT` into `auth.users` but does NOT fire on `UPDATE OF email_confirmed_at`. So after a user clicks the Supabase verification link, `auth.users.email_confirmed_at` is set, but our mirror stays at `0` forever. Anything in the app reading `public.users.email_verified` for analytics or feature-gating sees stale data.
 
@@ -3753,9 +3753,9 @@ The atomic gate uses the new `welcomed_at` column (see 30.7) — `lastLoginAt` r
 
 | File             | Change                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/auth.ts` | After `signInWithPassword` succeeds, if `data.user.email_confirmed_at` is set and `dbUser.emailVerified !== 1`, syncs the mirror to `1`. Runs every login but no-ops after the first sync. Acceptable that the mirror may be stale between verification and the user's first post-verification login — the real verification gate is Supabase's own `email_confirmed_at`, which is consulted via signInWithPassword. |
+| `server/auth.ts` | After `signInWithPassword` succeeds, if `data.user.email_confirmed_at` is set and `dbUser.emailVerified !== 1`, syncs the mirror to `1`. Runs every login but no-ops after the first sync. Acceptable that the mirror may be stale between verification and the user's first post-verification login - the real verification gate is Supabase's own `email_confirmed_at`, which is consulted via signInWithPassword. |
 
-### 30.4 BUG #6 — Resend rate-limit `Map` grew unbounded (MEDIUM DoS)
+### 30.4 BUG #6 - Resend rate-limit `Map` grew unbounded (MEDIUM DoS)
 
 **Symptom.** Every distinct `${ip}:${email}` registered or attempted to resend adds an entry. After a few thousand registrations the map grows to thousands of stale entries; in a long-running process this is a slow memory leak.
 
@@ -3763,14 +3763,14 @@ The atomic gate uses the new `welcomed_at` column (see 30.7) — `lastLoginAt` r
 
 | File             | Change                                                                                                                                                                                                                                                                                                  |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/auth.ts` | Added `evictStaleResendEntries(now)` function. Iterates the rate-limit `Map` (via `forEach` — TS lib target doesn't allow `for...of`) and deletes entries older than 1 hour. Called at the top of every resend handler invocation. Email key was already `.toLowerCase().trim()` normalized — verified. |
+| `server/auth.ts` | Added `evictStaleResendEntries(now)` function. Iterates the rate-limit `Map` (via `forEach` - TS lib target doesn't allow `for...of`) and deletes entries older than 1 hour. Called at the top of every resend handler invocation. Email key was already `.toLowerCase().trim()` normalized - verified. |
 
-### 30.5 BUGs #7 + #8 — Plain-text fallback + HTML-escape in welcome email (MEDIUM industry standard + HIGH security)
+### 30.5 BUGs #7 + #8 - Plain-text fallback + HTML-escape in welcome email (MEDIUM industry standard + HIGH security)
 
 **Symptom.**
 
 - Resend supports `html` + `text` parts; we only sent `html`. Plain-text fallback improves spam-filter scores and supports email clients that prefer text.
-- `firstName` was interpolated into the HTML body without escaping. A user registered with firstName `<script>` or `<img onerror=...>` would have those characters in an email signed by our DKIM. Even if mail clients strip scripts, malformed HTML from a brand domain is a trust signal — and outbound mail carrying attacker-controlled HTML is a brand-damage vector.
+- `firstName` was interpolated into the HTML body without escaping. A user registered with firstName `<script>` or `<img onerror=...>` would have those characters in an email signed by our DKIM. Even if mail clients strip scripts, malformed HTML from a brand domain is a trust signal - and outbound mail carrying attacker-controlled HTML is a brand-damage vector.
 
 **Fix.**
 
@@ -3778,17 +3778,17 @@ The atomic gate uses the new `welcomed_at` column (see 30.7) — `lastLoginAt` r
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/lib/welcomeEmail.ts` | Added local `escapeHtml()` helper. HTML body uses `safeFirstName` (escaped); plain-text body uses raw firstName (no escape needed in text). Added a `text` field to the `resend.emails.send({ ... })` payload with a plain-text version of the welcome content. |
 
-### 30.6 BUG #10 — No Sentry capture / no flush on background-task failure (MEDIUM observability)
+### 30.6 BUG #10 - No Sentry capture / no flush on background-task failure (MEDIUM observability)
 
-**Symptom.** When the welcome email or fact-scrape failed, only `logger.warn` was called. Pino warns are file logs — no alerting signal. Worse: any Sentry capture inside a `waitUntil` block may not complete its outbound HTTP request before the Vercel function suspends.
+**Symptom.** When the welcome email or fact-scrape failed, only `logger.warn` was called. Pino warns are file logs - no alerting signal. Worse: any Sentry capture inside a `waitUntil` block may not complete its outbound HTTP request before the Vercel function suspends.
 
 **Fix.**
 
 | File                                             | Change                                                                                                                                                                                                                                                                                                                                                          |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/auth.ts` + `server/routes/onboarding.ts` | Background catch handlers now call `captureAndFlush(err, { tags: { source: "welcome-email" } })` (or `source: "welcome-fact-scrape"`) — the existing `server/lib/sentryReport.ts` helper that schedules its own `waitUntil(Sentry.flush(2000))` so the capture survives serverless suspension. Both catch handlers `logger.warn` first, then `captureAndFlush`. |
+| `server/auth.ts` + `server/routes/onboarding.ts` | Background catch handlers now call `captureAndFlush(err, { tags: { source: "welcome-email" } })` (or `source: "welcome-fact-scrape"`) - the existing `server/lib/sentryReport.ts` helper that schedules its own `waitUntil(Sentry.flush(2000))` so the capture survives serverless suspension. Both catch handlers `logger.warn` first, then `captureAndFlush`. |
 
-### 30.7 BUG #13 — `lastLoginAt` was semantically misleading after migration backfill (LOW debt, fixed cleanly)
+### 30.7 BUG #13 - `lastLoginAt` was semantically misleading after migration backfill (LOW debt, fixed cleanly)
 
 **Symptom.** The Plan 4 migration backfilled all existing users to `lastLoginAt = NOW()` so they wouldn't receive an unsolicited welcome email on their next login. But the column is named `lastLoginAt`, implying it tracks actual "last time this user logged in." Analytics / "last seen" / engagement tracking consumers would see wrong data for every existing user until they logged in again.
 
@@ -3801,27 +3801,27 @@ The atomic gate uses the new `welcomed_at` column (see 30.7) — `lastLoginAt` r
 | `server/auth.ts`                       | Welcome-email gate now keys off `welcomed_at IS NULL` (set in the same atomic UPDATE from 30.2). `lastLoginAt` updates independently on every login.                                                                                                                                     |
 | `tests/unit/emailVerification.test.ts` | Test mocks updated: `makeDbUser` defaults `welcomedAt: null`; Drizzle update-chain mock supports `.returning()` + the conditional `isNull(welcomedAt)` gate semantics (winner returns `[{ id }]`, loser returns `[]`). Both welcome-email tests now seed/inspect `welcomedAt` correctly. |
 
-### 30.8 BUG #12 — Supabase verification redirect URL not configured (HIGH UX, partially fixable in code)
+### 30.8 BUG #12 - Supabase verification redirect URL not configured (HIGH UX, partially fixable in code)
 
-**Symptom.** When Supabase sends the verification email after register, the confirmation link redirects to whatever's configured as the Supabase project's "Site URL." Without code-level configuration, that defaults to `http://localhost:3000` or the project's first registered redirect — not necessarily `${APP_URL}/login?verified=1`.
+**Symptom.** When Supabase sends the verification email after register, the confirmation link redirects to whatever's configured as the Supabase project's "Site URL." Without code-level configuration, that defaults to `http://localhost:3000` or the project's first registered redirect - not necessarily `${APP_URL}/login?verified=1`.
 
-**Fix (partial — Supabase SDK limitation).**
+**Fix (partial - Supabase SDK limitation).**
 
 | File             | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `server/auth.ts` | The `POST /api/auth/resend-verification` handler now passes `options: { emailRedirectTo: \`${APP_URL}/login?verified=1\` }`to`supabaseAdmin.auth.resend({ type: "signup", email, options: ... })`. Verified the resend SDK signature supports this. **For `supabaseAdmin.auth.admin.createUser`, the installed `@supabase/auth-js` `AdminUserAttributes`type (verified against`node_modules/@supabase/auth-js/dist/main/lib/types.d.ts:403`) has no `emailRedirectTo`/`redirectTo`field**, so the INITIAL registration confirmation link inherits the Supabase project's Site URL. Documented in`.env.example`near`APP_URL` so operators set Site URL correctly in the Supabase Dashboard. |
 
-A complete fix would require migrating registration from `supabaseAdmin.auth.admin.createUser` to client-side `supabase.auth.signUp({ options: { emailRedirectTo } })`. That's a real refactor (changes the security model — `signUp` is browser-callable; would need re-architecting how we hash & verify passwords pre-Supabase). Documented as a known limitation; the Dashboard Site URL workaround is acceptable for now.
+A complete fix would require migrating registration from `supabaseAdmin.auth.admin.createUser` to client-side `supabase.auth.signUp({ options: { emailRedirectTo } })`. That's a real refactor (changes the security model - `signUp` is browser-callable; would need re-architecting how we hash & verify passwords pre-Supabase). Documented as a known limitation; the Dashboard Site URL workaround is acceptable for now.
 
 **Client-side companion fix.**
 
 | File                         | Change                                                                                                                                                                                                                                                                                                               |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client/src/pages/login.tsx` | On mount, parses `?verified=1` from the URL. Renders a one-time success banner: "Email verified. Please sign in to continue." (using design tokens `border-chart-4/40 bg-chart-4/10 text-chart-4` with `<CheckCircle2>` icon). Strips the param via `window.history.replaceState` after read — refresh won't replay. |
+| `client/src/pages/login.tsx` | On mount, parses `?verified=1` from the URL. Renders a one-time success banner: "Email verified. Please sign in to continue." (using design tokens `border-chart-4/40 bg-chart-4/10 text-chart-4` with `<CheckCircle2>` icon). Strips the param via `window.history.replaceState` after read - refresh won't replay. |
 
-### 30.9 BUG #14 — Supabase email-confirm setting documentation (HIGH operations)
+### 30.9 BUG #14 - Supabase email-confirm setting documentation (HIGH operations)
 
-**Symptom.** Our `email_confirm: false` flag tells Supabase admin createUser to NOT auto-confirm. But Supabase ALSO has a project-level "Enable email confirmations" toggle. If that's OFF in the Dashboard, Supabase auto-confirms every new signup regardless of what our code says — the entire verification gate becomes moot.
+**Symptom.** Our `email_confirm: false` flag tells Supabase admin createUser to NOT auto-confirm. But Supabase ALSO has a project-level "Enable email confirmations" toggle. If that's OFF in the Dashboard, Supabase auto-confirms every new signup regardless of what our code says - the entire verification gate becomes moot.
 
 **Fix (documentation + boot warning).**
 
@@ -3830,12 +3830,12 @@ A complete fix would require migrating registration from `supabaseAdmin.auth.adm
 | `server/index.ts` | Boot-time `logger.info(...)` reminding operators to verify "Confirm email = ON" in Supabase Dashboard → Authentication → Email Templates, plus correct Site URL configuration.                                                              |
 | `.env.example`    | Expanded the `APP_URL` documentation block with Supabase Dashboard prerequisites: Confirm-email toggle on, Site URL set to `${APP_URL}` so confirmation links redirect correctly. No new env variable required (`APP_URL` already existed). |
 
-### 30.10 BUG #11 — `/verify-email` sessionStorage fallback (MEDIUM UX)
+### 30.10 BUG #11 - `/verify-email` sessionStorage fallback (MEDIUM UX)
 
 **Symptom.** The verify-email page reads the recipient email from `sessionStorage["venturecite:pending-verify-email"]`. Three failure modes:
 
-1. **Safari private mode** — sessionStorage may throw or return null.
-2. **User closes the tab and returns later** — sessionStorage is cleared per-tab.
+1. **Safari private mode** - sessionStorage may throw or return null.
+2. **User closes the tab and returns later** - sessionStorage is cleared per-tab.
 3. **User navigates directly to `/verify-email`** without going through register.
 
 In any of these the page rendered with no email, no resend possible.
@@ -3850,19 +3850,19 @@ In any of these the page rendered with no email, no resend possible.
 
 - **Brand ownership on keyword→content draft creation.** `POST /api/articles/draft` calls `requireBrand(brandId, user.id)` plus the global `enforceBrandOwnership` middleware. URL-tampered `?brandId=someone-elses-uuid` is rejected.
 - **`aiGenerated` flag exclusivity.** Only `setArticleReady` flips it true. `setArticleFailed`, `setArticleDraft`, `setArticleGeneratingFromDraft`, and manual `createArticle` from `POST /api/articles` leave it false. No false positives possible.
-- **API GET handlers do not strip `aiGenerated`.** No response transformer applied to article reads — client receives the boolean correctly.
+- **API GET handlers do not strip `aiGenerated`.** No response transformer applied to article reads - client receives the boolean correctly.
 - **`scrapeBrandFacts` idempotency.** Existing dedup logic in factExtractor handles double-call from the welcome-path bridge safely.
 - **`runOnboardingAutopilot` does not internally call `scrapeBrandFacts`.** No double-fire from the welcome-path addition.
 - **`/verify-email` route mounted outside the auth gate.** Users hitting it without a valid session can render the page.
-- **`POST /api/auth/resend-verification` added to `PUBLIC_API_ROUTES`** (server/auth.ts:165) — unauthenticated callers can resend.
+- **`POST /api/auth/resend-verification` added to `PUBLIC_API_ROUTES`** (server/auth.ts:165) - unauthenticated callers can resend.
 - **Email normalization is consistent.** `.toLowerCase().trim()` applied uniformly across register, login, resend.
 - **CSRF.** Auth endpoints rely on Bearer tokens (no cookies → no ambient credential → no CSRF surface). For public auth routes (`/api/auth/register`, `/login`, `/resend-verification`), CSRF doesn't apply.
-- **Migration sequence.** 0054 (last_login_at), 0055 (articles_ai_generated), 0056 (welcomed_at) — all independent and idempotent (`IF NOT EXISTS`).
+- **Migration sequence.** 0054 (last_login_at), 0055 (articles_ai_generated), 0056 (welcomed_at) - all independent and idempotent (`IF NOT EXISTS`).
 - **No new dependencies introduced.** `Resend`, `@vercel/functions`, Sentry helpers all already in `package.json`.
 - **Pill accessibility.** `aria-label="AI-generated content"`, Sparkles icon `aria-hidden`.
 - **Anti-enumeration on resend.** Same response shape for registered / unregistered / already-verified emails. Supabase `auth.resend` silently no-ops on the server side.
-- **Email-key normalization in rate-limit Map** uses `.toLowerCase().trim()` — different casings share the same bucket.
-- **`captureAndFlush` is safe inside an existing `waitUntil` block** — internally schedules its own `waitUntil(Sentry.flush(2000))`.
+- **Email-key normalization in rate-limit Map** uses `.toLowerCase().trim()` - different casings share the same bucket.
+- **`captureAndFlush` is safe inside an existing `waitUntil` block** - internally schedules its own `waitUntil(Sentry.flush(2000))`.
 
 ### 30.12 Documented limitations (not coded)
 
@@ -3873,19 +3873,19 @@ In any of these the page rendered with no email, no resend possible.
 
 1. **Background tasks survive serverless suspension.** Onboarding confirm fires fact-scrape via `waitUntil`; first verified login fires welcome email via `waitUntil`. Both should complete on Vercel deployments without dropping. Verify via Sentry tags (`source: "welcome-email"`, `source: "welcome-fact-scrape"`) on any failure.
 2. **Double-login → single welcome.** Open register/verify-email in two tabs and trigger first login from both. Only ONE welcome email should arrive (verified via the atomic UPDATE returning a row in one request, empty array in the other).
-3. **`public.users.email_verified` self-heals.** After a user verifies and logs in once, their mirror row should read `email_verified = 1`. Before that login, the mirror may still be `0` — acceptable.
+3. **`public.users.email_verified` self-heals.** After a user verifies and logs in once, their mirror row should read `email_verified = 1`. Before that login, the mirror may still be `0` - acceptable.
 4. **Welcome email is multipart.** Inspect a delivered welcome email's source; both `text/plain` and `text/html` parts present.
 5. **firstName XSS-safe.** Register with firstName `<script>alert(1)</script>`. The welcome email body should show literal `<script>alert(1)</script>` text (HTML-escaped), not execute.
 6. **Resend Map bounded.** After many resend calls, memory usage stays flat (entries older than 1 hour evicted automatically).
-7. **Verify URL redirects to login.** Trigger a resend; clicking the Supabase email link should land on `${APP_URL}/login?verified=1` — the banner ("Email verified. Please sign in.") renders, URL param strips after first read.
+7. **Verify URL redirects to login.** Trigger a resend; clicking the Supabase email link should land on `${APP_URL}/login?verified=1` - the banner ("Email verified. Please sign in.") renders, URL param strips after first read.
 8. **Verify-email page survives sessionStorage loss.** Open register in one tab, complete it, then open `/verify-email` in a fresh tab (no sessionStorage). The fallback `<Input>` should render; typing email + clicking Resend should hit the endpoint.
 9. **`welcomedAt` and `lastLoginAt` are independent.** Existing users have both set to the migration timestamp. New users on first login: both stamped. Subsequent logins: only `lastLoginAt` updates. Welcome email fires exactly once.
 
 ### Pass criteria
 
-- [x] `npm run check` — clean, tour-targets 26/26
+- [x] `npm run check` - clean, tour-targets 26/26
 - [x] 6 tests pass: `emailVerification` (4, updated for waitUntil + welcomedAt + email_verified mirror), `articlesAIGenerated` (2)
-- [x] No `setImmediate` for background work in any Plan 4 path — all swapped to `waitUntil`
+- [x] No `setImmediate` for background work in any Plan 4 path - all swapped to `waitUntil`
 - [x] No XSS-able HTML interpolation in `welcomeEmail.ts`
 - [x] Resend rate-limit Map bounded
 - [x] Atomic welcome-email gate via SQL conditional UPDATE
@@ -3895,7 +3895,7 @@ In any of these the page rendered with no email, no resend possible.
 
 ---
 
-## Track 31 — Plan 5: Recommendation engine persistence (§4.11) (2026-05-12)
+## Track 31 - Plan 5: Recommendation engine persistence (§4.11) (2026-05-12)
 
 **Goal:** Silence the two false-positive recommendation rules (`#8 rerun-geo-signals`, `#9 complete-visibility-checklist`) by replacing the hardcoded `null / 0` inputs in `server/routes/dashboard.ts:574-579` with reads from real persistence tables. No new rules. No engine changes. Pure plumbing.
 
@@ -3912,75 +3912,75 @@ visibilityChecklistCompleted: 0,          // rule #9 always fires (0 / 4 = 0%)
 visibilityChecklistTotal: 4,              // wrong; real total is 57
 ```
 
-Dismissals had a 7-day TTL, so the recs reappeared forever. `visibility_progress` (migration 0008) was already half-wired client + server + storage — only the dashboard read was missing. `geo_signal_runs` did not exist.
+Dismissals had a 7-day TTL, so the recs reappeared forever. `visibility_progress` (migration 0008) was already half-wired client + server + storage - only the dashboard read was missing. `geo_signal_runs` did not exist.
 
-### 31.1 Task 1 — `geo_signal_runs` table + storage methods
+### 31.1 Task 1 - `geo_signal_runs` table + storage methods
 
 | File                                  | Change                                                                                                                                                                                                                                                                                                                       |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `migrations/0057_geo_signal_runs.sql` | NEW. `id, brand_id (FK CASCADE), article_id (FK SET NULL), ran_at DEFAULT NOW(), overall_score INTEGER, payload JSONB`. Index `(brand_id, ran_at DESC)` supports the `MAX(ran_at)` query on dashboard read. `gen_random_uuid()` works without `CREATE EXTENSION pgcrypto` on PG 13+ — matches the rest of the codebase.      |
+| `migrations/0057_geo_signal_runs.sql` | NEW. `id, brand_id (FK CASCADE), article_id (FK SET NULL), ran_at DEFAULT NOW(), overall_score INTEGER, payload JSONB`. Index `(brand_id, ran_at DESC)` supports the `MAX(ran_at)` query on dashboard read. `gen_random_uuid()` works without `CREATE EXTENSION pgcrypto` on PG 13+ - matches the rest of the codebase.      |
 | `shared/schema.ts`                    | Added `geoSignalRuns` Drizzle table, `insertGeoSignalRunSchema`, `GeoSignalRun`, `InsertGeoSignalRun` types after the `visibilityProgress` block. `integer` and `jsonb` already imported. Index declared as `.on(table.brandId, table.ranAt.desc())` matching the SQL (drift-free).                                          |
 | `server/storage.ts`                   | `IStorage` interface gained `recordGeoSignalRun(run): Promise<GeoSignalRun>` and `getLastGeoSignalRunAt(brandId): Promise<Date \| null>`.                                                                                                                                                                                    |
-| `server/databaseStorage.ts`           | Implementations after `unsetVisibilityStep`. `getLastGeoSignalRunAt` normalizes the timestamp via `new Date(row.ranAt as string \| Date)` — matches the codebase convention at `databaseStorage.ts:2456,2709,2868,3647` and prevents `TypeError: .getTime is not a function` when pg returns the timestamp as an ISO string. |
+| `server/databaseStorage.ts`           | Implementations after `unsetVisibilityStep`. `getLastGeoSignalRunAt` normalizes the timestamp via `new Date(row.ranAt as string \| Date)` - matches the codebase convention at `databaseStorage.ts:2456,2709,2868,3647` and prevents `TypeError: .getTime is not a function` when pg returns the timestamp as an ISO string. |
 | `tests/unit/geoSignalRuns.test.ts`    | NEW, 3 cases: insert returns row; `getLastGeoSignalRunAt` returns null when no runs; returns the most recent `ranAt` for the brand.                                                                                                                                                                                          |
 
-### 31.2 Task 2 — Persist a row on every successful `POST /api/geo-signals/analyze`
+### 31.2 Task 2 - Persist a row on every successful `POST /api/geo-signals/analyze`
 
 | File                                              | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/routes/geoSignals.ts`                     | `POST /api/geo-signals/analyze` now pulls optional `brandId` and `articleId` from the request body. If `brandId` is a non-empty string, calls `requireBrand(brandId, user.id)` from `server/lib/ownership.ts` (same helper used at line 605 of the same file by the sibling `optimize-chunks` handler). On `OwnershipError`, returns 404 — anti-enumeration policy. After `computeSignals(...)` succeeds, calls `storage.recordGeoSignalRun({ brandId: brand.id, articleId, overallScore: Math.round(result.overallScore), payload })`. |
-| `client/src/pages/geo-signals.tsx`                | `analyzeSignalsMutation` type extended with `articleId?: string`. The mutate call in `handleAnalyzeArticle` now passes `articleId: selectedArticle.id` alongside the existing `brandId`. Back-compat preserved: ad-hoc analyze (no selected article/brand) still works — server skips the insert when `brandId` is absent.                                                                                                                                                                                                              |
+| `server/routes/geoSignals.ts`                     | `POST /api/geo-signals/analyze` now pulls optional `brandId` and `articleId` from the request body. If `brandId` is a non-empty string, calls `requireBrand(brandId, user.id)` from `server/lib/ownership.ts` (same helper used at line 605 of the same file by the sibling `optimize-chunks` handler). On `OwnershipError`, returns 404 - anti-enumeration policy. After `computeSignals(...)` succeeds, calls `storage.recordGeoSignalRun({ brandId: brand.id, articleId, overallScore: Math.round(result.overallScore), payload })`. |
+| `client/src/pages/geo-signals.tsx`                | `analyzeSignalsMutation` type extended with `articleId?: string`. The mutate call in `handleAnalyzeArticle` now passes `articleId: selectedArticle.id` alongside the existing `brandId`. Back-compat preserved: ad-hoc analyze (no selected article/brand) still works - server skips the insert when `brandId` is absent.                                                                                                                                                                                                              |
 | `tests/unit/geoSignalsAnalyzePersistence.test.ts` | NEW, 3 cases: inserts row when user owns the brand; does NOT insert when `brandId` is omitted (response still 200 with signals); 404 + no insert when `brandId` belongs to a different user.                                                                                                                                                                                                                                                                                                                                            |
 
-### 31.3 Task 3 — Wire `dashboard.ts` to read both persistence sources
+### 31.3 Task 3 - Wire `dashboard.ts` to read both persistence sources
 
 | File                                               | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `shared/constants.ts`                              | NEW export `VISIBILITY_CHECKLIST_TOTAL = 57`. Manually counted from `client/src/pages/ai-visibility.tsx`'s `aiEngines` array: chatgpt 9 + claude 7 + perplexity 7 + google-ai 8 + gemini 7 + grok 7 + manus 7 + deepseek 5 = 57. The spec said "53" — used the actual code count per the "don't trust .md files" rule. Comment in `constants.ts` reminds future editors to keep in sync with `aiEngines`.                                                                                                                  |
+| `shared/constants.ts`                              | NEW export `VISIBILITY_CHECKLIST_TOTAL = 57`. Manually counted from `client/src/pages/ai-visibility.tsx`'s `aiEngines` array: chatgpt 9 + claude 7 + perplexity 7 + google-ai 8 + gemini 7 + grok 7 + manus 7 + deepseek 5 = 57. The spec said "53" - used the actual code count per the "don't trust .md files" rule. Comment in `constants.ts` reminds future editors to keep in sync with `aiEngines`.                                                                                                                  |
 | `server/routes/dashboard.ts`                       | Recommendation handler around lines 540-590: `Promise.all` expanded to also fetch `storage.getVisibilityProgress(brandId)` and `storage.getLastGeoSignalRunAt(brandId)`. The `state` object's three hardcoded literals replaced: `lastSignalsScanAt: null` → `lastSignalsScanAt`; `visibilityChecklistCompleted: 0` → `visibilityChecklistCompleted: visibilityRows.length`; `visibilityChecklistTotal: 4` → `visibilityChecklistTotal: VISIBILITY_CHECKLIST_TOTAL`. Defensive-null comments deleted (they were now lies). |
 | `tests/unit/dashboardRecommendationInputs.test.ts` | NEW, 5 cases: plumbs through `lastSignalsScanAt`; passes null when no runs exist; passes `visibilityRows.length` as completed and `VISIBILITY_CHECKLIST_TOTAL` as total; rule #8 does NOT fire when last scan was 1 day ago; rule #9 does NOT fire when 30/57 (>50%) checklist items complete. P0 prerequisites mocked in (industry, articles, prompts, citation runs, ≥20% citation rate, ≥1 FAQ) so P1 rules can surface.                                                                                                |
 
-### 31.4 Production-readiness audit — 7 bugs fixed in same track
+### 31.4 Production-readiness audit - 7 bugs fixed in same track
 
 After Tasks 1–3 landed, a thorough audit found 7 real bugs ranging from CRITICAL runtime crashes to LOW data-integrity gaps. All fixed inline; no separate track.
 
-#### 31.4.1 CRITICAL — Timestamp normalization
+#### 31.4.1 CRITICAL - Timestamp normalization
 
 **Symptom.** `recommendationsEngine.ts:166,174` calls `state.lastSignalsScanAt.getTime()`. node-postgres returns timestamps as either Date or string depending on driver configuration. If it returns a string in production, `.getTime()` throws `TypeError: .getTime is not a function` and the dashboard recommendation endpoint returns 500.
 
 **Fix.** `server/databaseStorage.ts` `getLastGeoSignalRunAt` returns `row?.ranAt ? new Date(row.ranAt as string | Date) : null`. Matches the codebase convention used pervasively elsewhere.
 
-#### 31.4.2 HIGH — Drizzle index `.desc()` drift
+#### 31.4.2 HIGH - Drizzle index `.desc()` drift
 
-**Symptom.** Migration SQL declared `ON geo_signal_runs(brand_id, ran_at DESC)` but Drizzle schema's `.on(table.brandId, table.ranAt)` defaulted to ASC. If anyone ever runs `drizzle-kit push` to regenerate, the index would silently be re-created as ASC. PG B-tree can scan ASC backwards for DESC queries so the bug was performance-invisible — but schema/SQL drift is a maintenance hazard.
+**Symptom.** Migration SQL declared `ON geo_signal_runs(brand_id, ran_at DESC)` but Drizzle schema's `.on(table.brandId, table.ranAt)` defaulted to ASC. If anyone ever runs `drizzle-kit push` to regenerate, the index would silently be re-created as ASC. PG B-tree can scan ASC backwards for DESC queries so the bug was performance-invisible - but schema/SQL drift is a maintenance hazard.
 
 **Fix.** `shared/schema.ts` changed to `.on(table.brandId, table.ranAt.desc())`, matching the `.updatedAt.desc()` pattern at `shared/schema.ts:2046,2069`.
 
-#### 31.4.3 HIGH — Persistence failure must not fail the user request
+#### 31.4.3 HIGH - Persistence failure must not fail the user request
 
-**Symptom.** If `recordGeoSignalRun` threw (DB down, FK violation, JSON serialization issue), the outer catch at `geoSignals.ts:588` returned a generic 500 "Failed to analyze signals" — discarding the computed signals the user actually wanted. The persistence is bookkeeping; the analyze RESULT is what the user paid the compute cost for.
+**Symptom.** If `recordGeoSignalRun` threw (DB down, FK violation, JSON serialization issue), the outer catch at `geoSignals.ts:588` returned a generic 500 "Failed to analyze signals" - discarding the computed signals the user actually wanted. The persistence is bookkeeping; the analyze RESULT is what the user paid the compute cost for.
 
 **Fix.** `server/routes/geoSignals.ts` wraps ONLY the `storage.recordGeoSignalRun(...)` call in its own try/catch: `logger.warn({ err, brandId }, "geo-signals/analyze persistence failed")` + `captureAndFlush(err, { tags: { source: "geoSignals.ts:recordGeoSignalRun" } })`. The response is always 200 with signals. `OwnershipError` from `requireBrand` still bubbles to the outer catch (must still 404 on cross-tenant).
 
-#### 31.4.4 HIGH — `OwnershipError` from `requireUser` was swallowed as 500
+#### 31.4.4 HIGH - `OwnershipError` from `requireUser` was swallowed as 500
 
-**Symptom.** If `requireUser(req)` threw `OwnershipError` (auth failed), the outer catch at `geoSignals.ts:588` converted it to a generic 500 instead of 401. Same bug exists in sibling handlers in the file — but newly relevant because the audit caught it.
+**Symptom.** If `requireUser(req)` threw `OwnershipError` (auth failed), the outer catch at `geoSignals.ts:588` converted it to a generic 500 instead of 401. Same bug exists in sibling handlers in the file - but newly relevant because the audit caught it.
 
 **Fix.** Outer catch now has `if (err instanceof OwnershipError) return res.status(err.status).json(...)` at the top. Translates correctly: 401 for missing auth, 404 for cross-tenant brand. Generic 500 only for unexpected errors.
 
-#### 31.4.5 HIGH — `requireBrand` moved BEFORE `computeSignals` (fail-fast)
+#### 31.4.5 HIGH - `requireBrand` moved BEFORE `computeSignals` (fail-fast)
 
 **Symptom.** Foreign-brand requests paid the full embedding + scoring cost before getting their 404. Wasted compute, slow rejection, slight timing side-channel.
 
 **Fix.** `server/routes/geoSignals.ts` analyze handler: `const brand = await requireBrand(brandId, user.id)` runs BEFORE `computeSignals(...)` when `brandId` is supplied. The insert uses `brand.id`.
 
-#### 31.4.6 MEDIUM — Payload size cap
+#### 31.4.6 MEDIUM - Payload size cap
 
-**Symptom.** JSONB `payload` includes `signals[].recommendations[]` — strings derived from user-supplied `targetQuery` and content. With `MAX_CONTENT_LENGTH = 40_000` and large queries, a single row could approach tens of KB. Multiplied by spammy analyze calls, table growth is unbounded.
+**Symptom.** JSONB `payload` includes `signals[].recommendations[]` - strings derived from user-supplied `targetQuery` and content. With `MAX_CONTENT_LENGTH = 40_000` and large queries, a single row could approach tens of KB. Multiplied by spammy analyze calls, table growth is unbounded.
 
 **Fix.** Before insert, if `JSON.stringify(payload).length > 32_000`, log a warning and truncate each signal's `recommendations[]` to the first 3 entries while keeping the rest of the payload intact. Row stays useful, growth is bounded.
 
-#### 31.4.7 LOW — `articleId` cross-brand integrity
+#### 31.4.7 LOW - `articleId` cross-brand integrity
 
 **Symptom.** A user could pass `brandId: A, articleId: B` where article B belongs to a different brand the user also owns. The FK doesn't catch it (article B exists, user owns it). Result: misattributed analytics rows.
 
@@ -3991,7 +3991,7 @@ After Tasks 1–3 landed, a thorough audit found 7 real bugs ranging from CRITIC
 - **`gen_random_uuid()` without `pgcrypto`.** Works on PG 13+ (now in core). Matches every other migration in the repo.
 - **`VISIBILITY_CHECKLIST_TOTAL = 57` correctness.** Counted 67 `id:` matches in `ai-visibility.tsx`, minus 2 interface field declarations, minus 8 engine ids = 57. Step ids are engine-prefixed (`chatgpt-1`, `claude-1`) so no cross-engine collisions. The `(brandId, engineId, stepId)` UNIQUE constraint in `visibility_progress` (migration 0008) prevents `getVisibilityProgress(brandId).length` from ever exceeding 57.
 - **FK cascade safety.** `brand_id ON DELETE CASCADE` (rows die with brand); `article_id ON DELETE SET NULL` matches Drizzle's `onDelete: "set null"`.
-- **`desc` import in `databaseStorage.ts`** — already at line 4.
+- **`desc` import in `databaseStorage.ts`** - already at line 4.
 - **Test isolation.** All three new test files use `beforeEach` with `vi.clearAllMocks() / mockReset()`. No cross-test pollution.
 - **`Math.round(result.overallScore)` safety.** `computeSignals` clamps `overallScore` to a finite integer-range number via `Math.max(0, Math.min(100, ...))`. NaN cannot reach the rounding.
 - **Tour-target audit.** 26/26 targets present and unchanged. No tour-targeted elements modified.
@@ -3999,7 +3999,7 @@ After Tasks 1–3 landed, a thorough audit found 7 real bugs ranging from CRITIC
 - **Backwards compatibility.** Existing callers that don't send `brandId` still receive `200 { success: true, data: { signals, ... } }`. Only the new `if (brandId)` branch persists.
 - **Migration 0057 lex order.** 0057 sorts after 0056_user_welcomed_at.sql. Index name unique across the schema.
 - **`visibility_progress` row count == completed-step count.** Unique constraint `(brand_id, engine_id, step_id)` guarantees no duplicates. `COUNT(*)` is the right read.
-- **`storage.getVisibilityProgress`, `setVisibilityStep`, `unsetVisibilityStep`** — pre-existing, already wired through `server/routes/prompts.ts` and consumed by `client/src/pages/ai-visibility.tsx`. No changes needed.
+- **`storage.getVisibilityProgress`, `setVisibilityStep`, `unsetVisibilityStep`** - pre-existing, already wired through `server/routes/prompts.ts` and consumed by `client/src/pages/ai-visibility.tsx`. No changes needed.
 
 ### How to verify
 
@@ -4021,8 +4021,8 @@ After Tasks 1–3 landed, a thorough audit found 7 real bugs ranging from CRITIC
 - [x] `server/routes/dashboard.ts` reads from `getVisibilityProgress` + `getLastGeoSignalRunAt`. No `lastSignalsScanAt: null` literal remains. No `visibilityChecklistCompleted: 0`. No `visibilityChecklistTotal: 4`.
 - [x] `shared/constants.ts` exports `VISIBILITY_CHECKLIST_TOTAL = 57`.
 - [x] 11 new tests pass: `geoSignalRuns` (3), `geoSignalsAnalyzePersistence` (3), `dashboardRecommendationInputs` (5).
-- [x] `npm run check` — 0 errors, tour-targets 26/26.
-- [x] Full suite at documented baseline only (sourceHealth, redditSource, ssrf, citationCronUnconditional, tour integration/e2e) — no Plan 5 regressions.
+- [x] `npm run check` - 0 errors, tour-targets 26/26.
+- [x] Full suite at documented baseline only (sourceHealth, redditSource, ssrf, citationCronUnconditional, tour integration/e2e) - no Plan 5 regressions.
 
 ### Documented limitations
 
@@ -4031,13 +4031,13 @@ After Tasks 1–3 landed, a thorough audit found 7 real bugs ranging from CRITIC
 
 ---
 
-## Track 32 — Plan 6: Day-0 alarm rule (§4.4) + Onboarding stack consolidation (§4.7) (2026-05-12)
+## Track 32 - Plan 6: Day-0 alarm rule (§4.4) + Onboarding stack consolidation (§4.7) (2026-05-12)
 
 **Goal:** Stop the dashboard from rendering five red-toned "your brand is broken" panels on a brand-new account before any citation run completes, and collapse the six concurrent onboarding-guidance surfaces down to one canonical spine (`<RecommendationsPanel>`).
 
 **Status:** Complete (3 implementation tasks + 1 production-readiness audit fixing 10 bugs + 1 pre-existing Reddit wiring bug surfaced by user testing).
 
-### 32.1 §4.4 Pre-Data State — `hasMeasured` gate
+### 32.1 §4.4 Pre-Data State - `hasMeasured` gate
 
 **Symptom (pre-fix).** A brand-new user signed up, clicked Dashboard, and immediately saw five destructive-red panels: "No Reddit presence found," "Recognition: Unknown," "Underexposed," `Absent` tags on prompt categories, red borders on every AI platform card. The product accused the user's brand of failure _before any citation run had completed_. design.json's "Operator's Console" north star ("Numbers come before conclusions") was inverted.
 
@@ -4064,7 +4064,7 @@ Every destructive surface gates on `hasMeasured`. Pre-data state shows neutral c
 | `PlatformRankingCard.tsx`                            | New `hasMeasured` prop; cards render `border-border bg-muted/30` + "Pending" pill + "Pending" rank text instead of destructive chrome when no citation data yet AND not measured.                                                                                                                                                                         |
 | `RecommendationsPanel.tsx:28-32`                     | `PRIORITY_STYLES.P0` lost `border-red-500/30 bg-red-500/5`. All priorities now use neutral chrome (`border-border bg-card` for P0/P2, `border-border bg-muted/30` for P1). P0 rows gain a `<StatusDot tone="warn">` glyph before the priority label, and the CTA is a real `<Button>` (brand accent on the action, not the card).                         |
 
-### 32.2 §4.4 Autopilot Retry — server route + Retry button on banner
+### 32.2 §4.4 Autopilot Retry - server route + Retry button on banner
 
 **Symptom.** When onboarding autopilot failed, the orange banner showed an error message and a dismiss X. No way for the user to retry; only path was email support.
 
@@ -4085,72 +4085,72 @@ Every destructive surface gates on `hasMeasured`. Pre-data state shows neutral c
 
 | File                                       | Change                                                                                                                                                                                                                                                                                                                |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `client/src/pages/home.tsx`                | `<OnboardingProgressRing>` mount + import removed. `<ResultsTimeline />` → `<ResultsTimeline compact />`. `<RecommendationsPanel>` wrapped in `<div data-tour-id="dashboard.recommendations">`. Component files (`OnboardingProgressRing.tsx`, `ResultsTimeline.tsx`) stay on disk per spec — no destructive cleanup. |
+| `client/src/pages/home.tsx`                | `<OnboardingProgressRing>` mount + import removed. `<ResultsTimeline />` → `<ResultsTimeline compact />`. `<RecommendationsPanel>` wrapped in `<div data-tour-id="dashboard.recommendations">`. Component files (`OnboardingProgressRing.tsx`, `ResultsTimeline.tsx`) stay on disk per spec - no destructive cleanup. |
 | `ResultsTimeline.tsx`                      | New `compact?: boolean` prop. When true, renders a single-line caption sourcing label + description from `MILESTONES[currentMilestoneIndex(ageDays)]` (single source of truth). Default `compact={false}` keeps the existing full-card path intact for any future caller.                                             |
 | `SidebarOnboarding.tsx`                    | Auto-opening first-login `useEffect` deleted. Unused `autoOpenReady` state, its init `useEffect`, `SEEN_KEY_PREFIX` constant, and now-unused `useEffect`/`useAuth` imports cleaned up. Widget on-click open still works.                                                                                              |
-| `client/src/tours/pages/dashboard.tour.ts` | `progress-ring` step retargeted from `dashboard.progressRing` (removed) to `dashboard.recommendations` (now wraps the spine). New copy: "What to do next — These are your highest-leverage next actions. Required items can't be dismissed." 26/26 tour targets preserved.                                            |
+| `client/src/tours/pages/dashboard.tour.ts` | `progress-ring` step retargeted from `dashboard.progressRing` (removed) to `dashboard.recommendations` (now wraps the spine). New copy: "What to do next - These are your highest-leverage next actions. Required items can't be dismissed." 26/26 tour targets preserved.                                            |
 
-### 32.4 Production-readiness audit — 10 bugs fixed in same track
+### 32.4 Production-readiness audit - 10 bugs fixed in same track
 
 After Tasks 32.1–32.3 landed, a paranoid audit found 10 real bugs. All fixed inline.
 
-#### 32.4.1 CRITICAL — Autopilot status response envelope mismatch (PRE-EXISTING, surfaced by Plan 6)
+#### 32.4.1 CRITICAL - Autopilot status response envelope mismatch (PRE-EXISTING, surfaced by Plan 6)
 
 **Symptom.** `GET /api/onboarding/autopilot-status/:brandId` returned a flat shape `{ success, status, step, progress, error, startedAt, completedAt }` but `home.tsx` read `autopilotData?.data` expecting an envelope. `autopilot` was ALWAYS `undefined`. Consequence with Plan 6 changes: `hasMeasured` collapsed to `(totalChecks > 0 && lastScanAt != null)` (the autopilot guards never fired), the failed-autopilot banner never rendered, the Retry button was unreachable through the UI, and the completion toast never fired. Entire §4.4 gating was inert.
 
-**Fix.** `server/routes/onboarding.ts:518-528` now returns the canonical `{ success: true, data: { status, step, progress, error, startedAt, completedAt } }`. Grep across `client/`, `server/`, `tests/` confirmed `home.tsx` is the only consumer — no other surface had to change.
+**Fix.** `server/routes/onboarding.ts:518-528` now returns the canonical `{ success: true, data: { status, step, progress, error, startedAt, completedAt } }`. Grep across `client/`, `server/`, `tests/` confirmed `home.tsx` is the only consumer - no other surface had to change.
 
-#### 32.4.2 CRITICAL — Race condition + premature 200 on retry
+#### 32.4.2 CRITICAL - Race condition + premature 200 on retry
 
-**Symptom.** Two simultaneous Retry clicks both passed the 409 check (status was still "failed" at moment of read), both fired `runOnboardingAutopilot` → double OpenAI calls + double citation runs. Worse: the route returned 200 BEFORE `runOnboardingAutopilot` flipped the status row from "failed" to "pending", so the client's immediate refetch still saw "failed" — the banner stayed visible and the user clicked Retry again.
+**Symptom.** Two simultaneous Retry clicks both passed the 409 check (status was still "failed" at moment of read), both fired `runOnboardingAutopilot` → double OpenAI calls + double citation runs. Worse: the route returned 200 BEFORE `runOnboardingAutopilot` flipped the status row from "failed" to "pending", so the client's immediate refetch still saw "failed" - the banner stayed visible and the user clicked Retry again.
 
-**Fix.** Atomic SQL compare-and-swap. New storage method `transitionAutopilotFromFailedToPending` does `UPDATE brands SET autopilot_status='pending', autopilot_error=NULL WHERE id=? AND autopilot_status='failed' RETURNING id`. The route calls this AFTER `requireBrand` ownership; on `length === 0` (the CAS lost), returns 409. Only after the CAS succeeds does it fire `waitUntil(runOnboardingAutopilot(...))`. Two parallel calls: only one wins; the other gets 409. Client's immediate refetch sees `"pending"` — banner morphs to "in progress", Retry disappears.
+**Fix.** Atomic SQL compare-and-swap. New storage method `transitionAutopilotFromFailedToPending` does `UPDATE brands SET autopilot_status='pending', autopilot_error=NULL WHERE id=? AND autopilot_status='failed' RETURNING id`. The route calls this AFTER `requireBrand` ownership; on `length === 0` (the CAS lost), returns 409. Only after the CAS succeeds does it fire `waitUntil(runOnboardingAutopilot(...))`. Two parallel calls: only one wins; the other gets 409. Client's immediate refetch sees `"pending"` - banner morphs to "in progress", Retry disappears.
 
-#### 32.4.3 HIGH — `hasMeasured` was wrong proxy for Reddit scan completion
+#### 32.4.3 HIGH - `hasMeasured` was wrong proxy for Reddit scan completion
 
-**Symptom.** Reddit cron runs Mondays only (`server/scheduler.ts` `MENTION_SCAN_CRON = "0 9 * * 1"`). A brand created on a Tuesday with completed autopilot satisfies `hasMeasured = true` but won't have its first Reddit scan for up to 7 days. The destructive Reddit panel was firing on brands that hadn't actually been measured on Reddit yet — exactly what §4.4 was supposed to prevent.
+**Symptom.** Reddit cron runs Mondays only (`server/scheduler.ts` `MENTION_SCAN_CRON = "0 9 * * 1"`). A brand created on a Tuesday with completed autopilot satisfies `hasMeasured = true` but won't have its first Reddit scan for up to 7 days. The destructive Reddit panel was firing on brands that hadn't actually been measured on Reddit yet - exactly what §4.4 was supposed to prevent.
 
 **Fix.** `home.tsx` derives `hasRedditScan = redditMentions.isFetched && !redditMentions.isError`. `<RedditVisibility>` receives `hasMeasured={hasMeasured && hasRedditScan}` so the destructive paint waits on Reddit-specific evidence, not citation-run evidence.
 
-#### 32.4.4 HIGH — No rate limit on autopilot retry
+#### 32.4.4 HIGH - No rate limit on autopilot retry
 
 **Symptom.** Each retry fires `generateBrandPrompts` (OpenAI) + a full citation run across 5 AI platforms. Without limiting, a buggy or malicious client can spam costs.
 
 **Fix.** `aiLimitMiddleware` (the same middleware used by `/api/onboarding/scrape-stream`) applied to `/api/onboarding/autopilot-retry`.
 
-#### 32.4.5 HIGH — Stale snippet bleed-through on PlatformRankingCard
+#### 32.4.5 HIGH - Stale snippet bleed-through on PlatformRankingCard
 
 **Symptom.** When `!hasMeasured && !found`, the card showed "Pending" pill + "Pending" rank but still rendered the `latestSnippet` italic block underneath if a prior run wrote one. Header said one thing; body contradicted.
 
-**Fix.** `PlatformRankingCard.tsx:73` — snippet block gated on `hasMeasured && platform.latestSnippet`.
+**Fix.** `PlatformRankingCard.tsx:73` - snippet block gated on `hasMeasured && platform.latestSnippet`.
 
-#### 32.4.6 HIGH — ResultsTimeline compact label off-by-one
+#### 32.4.6 HIGH - ResultsTimeline compact label off-by-one
 
-**Symptom.** Compact mode computed `Math.floor(ageDays / 7) + 1` for the week label but the `MILESTONES` boundaries differ (Week 1 starts at day 7, Week 2–3 at day 14, Week 4+ at day 28). At `ageDays = 7`, the compact label said "Week 2" while `current.description` belonged to "Week 1" — two different milestones in the same sentence.
+**Symptom.** Compact mode computed `Math.floor(ageDays / 7) + 1` for the week label but the `MILESTONES` boundaries differ (Week 1 starts at day 7, Week 2–3 at day 14, Week 4+ at day 28). At `ageDays = 7`, the compact label said "Week 2" while `current.description` belonged to "Week 1" - two different milestones in the same sentence.
 
 **Fix.** `ResultsTimeline.tsx:80-87` uses `MILESTONES[currentMilestoneIndex(ageDays)].label` directly. Single source of truth.
 
-#### 32.4.7 HIGH — `<Button asChild><Link>` fragility in RecommendationsPanel
+#### 32.4.7 HIGH - `<Button asChild><Link>` fragility in RecommendationsPanel
 
 **Symptom.** Radix Slot's child cloning pattern interacted oddly with wouter's `<Link>` in some edge cases. Existing codebase pattern at `empty-state.tsx:39-41` used a different approach.
 
-**Fix.** `RecommendationsPanel.tsx:191-194` swapped to `<Link href={...} asChild><Button size="sm">{rec.ctaLabel} →</Button></Link>` — Link is the slot wrapper, Button is the child. Wouter v3 supports `asChild`; SPA navigation now works reliably.
+**Fix.** `RecommendationsPanel.tsx:191-194` swapped to `<Link href={...} asChild><Button size="sm">{rec.ctaLabel} →</Button></Link>` - Link is the slot wrapper, Button is the child. Wouter v3 supports `asChild`; SPA navigation now works reliably.
 
-#### 32.4.8 MEDIUM — No error gate on hero query
+#### 32.4.8 MEDIUM - No error gate on hero query
 
 **Symptom.** When `hero.isError`, `heroData` was undefined → `hasMeasured = false` → dashboard rendered Day-0 "waiting" copy even though the real problem was a 500. Misleading; impeded incident triage.
 
-**Fix.** `home.tsx:608-615` renders `<Alert variant="destructive">` "Couldn't load dashboard data — please refresh." above the recommendations when `hero.isError`. Other dashboard surfaces still render — failure is visible without blanking the page.
+**Fix.** `home.tsx:608-615` renders `<Alert variant="destructive">` "Couldn't load dashboard data - please refresh." above the recommendations when `hero.isError`. Other dashboard surfaces still render - failure is visible without blanking the page.
 
-#### 32.4.9 MEDIUM — Telemetry on retry usage
+#### 32.4.9 MEDIUM - Telemetry on retry usage
 
 **Fix.** `logger.info({ brandId, userId, prevStatus, prevError }, "autopilot retry triggered")` after the CAS succeeds. Enables product-side visibility into how often autopilot fails badly enough to need user-initiated retry.
 
-#### 32.4.10 MEDIUM — Tests didn't assert `waitUntil` invocation
+#### 32.4.10 MEDIUM - Tests didn't assert `waitUntil` invocation
 
 **Fix.** `tests/unit/autopilotRetry.test.ts` now asserts `expect(stubs.waitUntil).toHaveBeenCalledTimes(1)` on the success path. Regression guard against anyone refactoring out the Vercel-suspension protection.
 
-### 32.5 BONUS BUG — Dashboard Reddit count always 0 (PRE-EXISTING, surfaced by user testing)
+### 32.5 BONUS BUG - Dashboard Reddit count always 0 (PRE-EXISTING, surfaced by user testing)
 
 **Symptom.** User reported: "Dashboard says 0 Reddit mentions everywhere but the mentions tab shows lots of Reddit data for the same brand." Plan 6 audit had not caught it because the audit scope was Plan 6's new code; the bug lived in pre-existing wiring that Plan 6's neutral-chrome work made more obvious.
 
@@ -4171,14 +4171,14 @@ After Tasks 32.1–32.3 landed, a paranoid audit found 10 real bugs. All fixed i
 
 ### 32.6 Items VERIFIED OK during the audit (no fix needed)
 
-- **`autopilot.status === "idle"` not gating `hasMeasured`.** Correct intent: "idle" means no autopilot record exists for this brand — citation runs may have been triggered manually. Test at `tests/unit/dashboardPreDataState.test.ts` documents this case.
-- **TanStack 3s autopilot poll re-computing `hasMeasured`.** Desired behavior — `hasMeasured` flips automatically when autopilot completes.
+- **`autopilot.status === "idle"` not gating `hasMeasured`.** Correct intent: "idle" means no autopilot record exists for this brand - citation runs may have been triggered manually. Test at `tests/unit/dashboardPreDataState.test.ts` documents this case.
+- **TanStack 3s autopilot poll re-computing `hasMeasured`.** Desired behavior - `hasMeasured` flips automatically when autopilot completes.
 - **`SEEN_KEY_PREFIX` removal.** Grep confirmed no remaining references in `client/src/` or `server/`. Orphan localStorage keys for existing users are acceptable.
 - **`OnboardingProgressRing.tsx` left in tree.** Not mounted anywhere on disk verified by grep; dead code is harmless per spec.
 - **`waitUntil` import.** `@vercel/functions` already in `package.json`; locally it's a no-op shim. Correct.
 - **`OwnershipError.status`.** Confirmed at `server/lib/ownership.ts:8-14`; route correctly uses `err.status` returning 401 for missing user, 404 for missing brand.
 - **`heroData?.lastScanAt != null`.** Loose `!= null` intentional (catches both null and undefined). `lastScanAt` is a real `timestamp` column, can't be empty string.
-- **`<RedditVisibility>` URL regex.** `m.sourceUrl` is `notNull`; the case-insensitive `reddit\.com/r/` regex matches `old.reddit.com/r/...` substrings; `redd.it/...` short links yield no subreddit (acceptable — they don't carry one).
+- **`<RedditVisibility>` URL regex.** `m.sourceUrl` is `notNull`; the case-insensitive `reddit\.com/r/` regex matches `old.reddit.com/r/...` substrings; `redd.it/...` short links yield no subreddit (acceptable - they don't carry one).
 - **`<Link href asChild><Button>` pattern.** Wouter v3 supports `asChild`; SPA navigation verified by mirroring `empty-state.tsx:39-41`.
 - **Migrations.** Plan 6 added no migrations.
 
@@ -4187,7 +4187,7 @@ After Tasks 32.1–32.3 landed, a paranoid audit found 10 real bugs. All fixed i
 1. **Brand-new account.** Sign up, complete `/welcome`, land on `/dashboard` while autopilot is still running. Confirm NO destructive red panels. Sentiment grid shows a single neutral placeholder. Gaps section says "Gaps will appear after your first citation scan." Reddit panel says "Reddit scan runs weekly."
 2. **Autopilot fails.** Force-fail the autopilot (or just observe naturally when an LLM call fails). Failed banner appears with a Retry button. Click it: spinner → toast "Retry started" → banner morphs to "in progress" within 2-3s (CAS flipped the status before the response returned). Click Retry a second time during retry: 409 (CAS rejects), destructive toast "Couldn't restart autopilot."
 3. **First citation run completes.** Banner disappears. `hasMeasured` flips. Recognition tile appears with real "Known"/"Unknown" status. Other surfaces shift to measured chrome.
-4. **Mentions tab → dashboard sync.** Open the mentions tab, kick off a Reddit scan. Once scan completes, navigate to `/dashboard` (or stay there — `useCitationLiveRefresh` ticks). Reddit tile count matches mentions-tab count. Subreddits count is right.
+4. **Mentions tab → dashboard sync.** Open the mentions tab, kick off a Reddit scan. Once scan completes, navigate to `/dashboard` (or stay there - `useCitationLiveRefresh` ticks). Reddit tile count matches mentions-tab count. Subreddits count is right.
 5. **Hero query fails.** Stop the server mid-session. `/dashboard` shows a destructive `<Alert>` "Couldn't load dashboard data" but doesn't blank.
 6. **Onboarding dialog.** Sign up as a fresh user on a fresh browser profile. The `SidebarOnboarding` dialog does NOT auto-open. Click the widget → dialog opens as expected.
 7. **Tour.** Take the dashboard tour. Step 2 (formerly "Onboarding progress") highlights the recommendations spine with the new "What to do next" copy.
@@ -4206,10 +4206,10 @@ After Tasks 32.1–32.3 landed, a paranoid audit found 10 real bugs. All fixed i
 - [x] Tour `dashboard.progressRing` → `dashboard.recommendations`. 26/26 targets preserved.
 - [x] Server `autopilot-status` returns canonical `{ success, data }` envelope.
 - [x] Dashboard reads `redditMentions.data.rows` (not `.data.data`). Real Reddit counts appear.
-- [x] Dashboard `redditMentions` query key unified with `useMentions.ts` array key shape — invalidation propagates.
+- [x] Dashboard `redditMentions` query key unified with `useMentions.ts` array key shape - invalidation propagates.
 - [x] 9 new tests pass: `dashboardPreDataState` (5), `autopilotRetry` (4).
 - [x] `npm run check` clean. 26/26 tour targets.
-- [x] Full suite at documented baseline only (sourceHealth, redditSource, ssrf, citationCronUnconditional, tour integration/e2e) — no Plan 6 regressions.
+- [x] Full suite at documented baseline only (sourceHealth, redditSource, ssrf, citationCronUnconditional, tour integration/e2e) - no Plan 6 regressions.
 
 ### Documented limitations
 
@@ -4219,7 +4219,7 @@ After Tasks 32.1–32.3 landed, a paranoid audit found 10 real bugs. All fixed i
 
 ---
 
-## Track 33 — Foundations Plans 1–6 cross-cutting production-readiness audit (2026-05-12)
+## Track 33 - Foundations Plans 1–6 cross-cutting production-readiness audit (2026-05-12)
 
 **Goal:** After Plans 1–6 landed, run a paranoid cross-cutting audit across all six plans' surfaces to catch pre-existing wiring bugs AND remaining spec-criteria stragglers. Find issues before customers do.
 
@@ -4227,13 +4227,13 @@ After Tasks 32.1–32.3 landed, a paranoid audit found 10 real bugs. All fixed i
 
 ### Background
 
-A user found a pre-existing dashboard wiring bug (Reddit count always 0) that none of the Plan-1-through-6 audits had caught — because each Plan's audit scoped to new code, and the broken wiring lived in code those plans didn't touch but whose symptoms they made more visible. Three parallel auditors were dispatched to find similar bugs across the entire Foundations surface area:
+A user found a pre-existing dashboard wiring bug (Reddit count always 0) that none of the Plan-1-through-6 audits had caught - because each Plan's audit scoped to new code, and the broken wiring lived in code those plans didn't touch but whose symptoms they made more visible. Three parallel auditors were dispatched to find similar bugs across the entire Foundations surface area:
 
-1. **Cross-cutting bug hunter** — same bug class as the Reddit one, plus race conditions, ownership gaps, response-shape mismatches, type drift, removed-feature leftovers, tour engine integrity, localStorage hygiene.
-2. **Spec coverage auditor** — verify every Success Criteria checkbox in the Foundations spec §6 against actual code.
-3. **Constraint auditor** — Vercel Hobby compliance, no new external services, function timeouts, no Redis/queueing/headless browsers.
+1. **Cross-cutting bug hunter** - same bug class as the Reddit one, plus race conditions, ownership gaps, response-shape mismatches, type drift, removed-feature leftovers, tour engine integrity, localStorage hygiene.
+2. **Spec coverage auditor** - verify every Success Criteria checkbox in the Foundations spec §6 against actual code.
+3. **Constraint auditor** - Vercel Hobby compliance, no new external services, function timeouts, no Redis/queueing/headless browsers.
 
-### 33.1 CRITICAL — TourOrchestrator mentions response shape mismatch (PRE-EXISTING)
+### 33.1 CRITICAL - TourOrchestrator mentions response shape mismatch (PRE-EXISTING)
 
 **Symptom.** Same bug class as the Reddit dashboard one. `client/src/tours/engine/TourOrchestrator.tsx:47-66` typed the mentions query as `{ data: unknown[] }` and read `mentions?.data?.length`. But `GET /api/brand-mentions/:brandId` returns `{ rows, nextCursor, stats }`. Tour eligibility counts ALWAYS treated the brand as having 0 mentions → any tour nudge gated on mention count (e.g., `first-mention-clicked.nudge.ts`) silently failed forever in production.
 
@@ -4244,7 +4244,7 @@ A user found a pre-existing dashboard wiring bug (Reddit count always 0) that no
 - Query key migrated to canonical array `["/api/brand-mentions", brandId]` matching `useMentions.ts:59` so prefix invalidation propagates.
 - Explicit `queryFn` since the array key can't be auto-resolved to a URL.
 
-### 33.2 HIGH — `server/routes/brands.ts` setImmediate regression
+### 33.2 HIGH - `server/routes/brands.ts` setImmediate regression
 
 **Symptom.** Plan 4's audit (Track 30) retired `setImmediate` everywhere it found it because Vercel may suspend the function instance immediately after `res.json()`, dropping queued tasks. But `server/routes/brands.ts` had FOUR `setImmediate` callsites the Plan 4 sweep missed:
 
@@ -4272,13 +4272,13 @@ waitUntil(
 
 Imports added: `waitUntil` from `@vercel/functions` (line 42 of brands.ts). `captureAndFlush` and `logger` already imported.
 
-### 33.3 MEDIUM — verify Vercel maxDuration for inline autopilot
+### 33.3 MEDIUM - verify Vercel maxDuration for inline autopilot
 
-**Concern raised.** `POST /api/onboarding/confirm` calls `runOnboardingAutopilot(brandId, userId, { deadlineMs: Date.now() + 50_000 })` inline (awaited, not via `waitUntil`). Vercel Hobby's default function timeout is 10s — a 50s inline autopilot would 504.
+**Concern raised.** `POST /api/onboarding/confirm` calls `runOnboardingAutopilot(brandId, userId, { deadlineMs: Date.now() + 50_000 })` inline (awaited, not via `waitUntil`). Vercel Hobby's default function timeout is 10s - a 50s inline autopilot would 504.
 
 **Verification.** Read `vercel.json` at repo root. **Already set:** `functions: { "api/index.ts": { "maxDuration": 60 } }`. All `/api/*` paths rewrite to `/api/index` per the `rewrites` config. The 50s inline deadline is correctly bounded under the 60s function ceiling. **No fix required.**
 
-### 33.4 Spec stragglers — design system enforcement
+### 33.4 Spec stragglers - design system enforcement
 
 The Foundations spec §6 Success Criteria called for zero `border-violet-*`, `bg-red-{600,700}` on primary CTAs, and `bg-gradient-to-*` on authenticated routes. Plan 2 swept most of this but several stragglers remained:
 
@@ -4292,7 +4292,7 @@ The Foundations spec §6 Success Criteria called for zero `border-violet-*`, `bg
 
 **Grep audits after fixes:**
 
-- `border-violet-|bg-violet-|text-violet-` in `client/src` (excluding landing): 1 remaining match in `analytics-integrations.tsx:387` — orphan page, out of Foundations scope.
+- `border-violet-|bg-violet-|text-violet-` in `client/src` (excluding landing): 1 remaining match in `analytics-integrations.tsx:387` - orphan page, out of Foundations scope.
 - `bg-red-(600|700)` in `client/src`: 0 matches.
 - `bg-gradient-to-` in `client/src/pages` (excluding landing): 0 matches.
 
@@ -4300,30 +4300,30 @@ The Foundations spec §6 Success Criteria called for zero `border-violet-*`, `bg
 
 The audits checked 31 categories. The following all came back clean:
 
-- **Response shape contracts** — dashboard hero, rankings, gap-matrix, entity-strength, citation-trend, recommendations, leaderboard, autopilot-status all read what the server emits. Only Reddit and TourOrchestrator (above) were broken.
-- **`waitUntil(...)` argument types** — all wrap a Promise (not a function), all chain `.catch` with `captureAndFlush`.
-- **`captureAndFlush(err, ctx)` signature** — every call site uses the correct `(err, ctx)` shape. No curried-form errors.
-- **Welcome email atomic gate** (`auth.ts:425-431`) — correctly uses `WHERE welcomed_at IS NULL` in a conditional UPDATE with RETURNING. Race-safe.
-- **Autopilot retry CAS** (`databaseStorage.ts:340-351`) — correctly conditions on `autopilot_status = 'failed'` in WHERE. Race-safe.
-- **Migrations 0052–0057** — all use `IF NOT EXISTS` for column / table / index additions. No destructive ops. FK in 0057 uses correct `ON DELETE CASCADE` (brand) and `ON DELETE SET NULL` (article). Schema ↔ migration alignment verified.
-- **Schema ↔ storage method type alignment** — `welcomedAt`, `lastLoginAt`, `timezone`, `aiGenerated`, `provenance`, `geoSignalRuns` all read/write consistently.
-- **Ownership / anti-enumeration** — every new route from Plans 3-6 (`/api/user/profile`, `/api/user/password`, `/api/buffer/status`, `/api/billing/portal-session`, `/api/auth/resend-verification`, `/api/geo-signals/analyze`, `/api/onboarding/autopilot-retry`) verified to call `requireUser` + `requireBrand` where applicable, return 404 (not 403) on cross-tenant misses, and rate-limit cost-sensitive endpoints.
-- **Tour `data-tour-id` ↔ tour-step `target` cross-reference** — 27 tour step targets vs 31 DOM markers. All step targets resolve. No broken silent no-ops.
-- **localStorage logout sweep** — `clearAllVentureCiteStorage` covers every `venturecite-` prefixed key (RecommendationsPanel dismissals, OnboardingProgressRing dismissals, draftStore, analytics-integrations, ai-visibility, etc.).
-- **Removed-feature orphans** — no Quora references in client. Server has incidental string matches in `citationChecker.ts:182` and `databaseStorage.ts` (legacy categorization regex, harmless, not user-visible). No `alerts` table reads in routes (one legacy `/alerts/:brandId` endpoint exists but is dead-code). No `PHASE_BANDS`/`phaseFor` references in code. `weeklyReportEnabled` correctly wired in client-reports.tsx:128.
-- **`aiGenerated` exclusivity** — only set true in `setArticleReady` (worker path). Manual `createArticle` from `POST /api/articles`, `setArticleFailed`, `setArticleDraft`, `setArticleGeneratingFromDraft` all leave it false.
-- **Constraint compliance** — no new dependencies in `package.json`. No new external HTTP services. No Redis. No headless browser. No third-party PDF generator. All cost-sensitive routes rate-limited. Function timeouts bounded under `maxDuration: 60`.
-- **`useState`-managed `<Skeleton>`-style loaders** — replaced with single `<RouteSpinner />` per Plan 2; remaining `<Loader2 animate-spin>` instances are correctly bound to button-submit / modal-internal states only (per design.json's "cards never show spinners; cards show skeletons" rule).
+- **Response shape contracts** - dashboard hero, rankings, gap-matrix, entity-strength, citation-trend, recommendations, leaderboard, autopilot-status all read what the server emits. Only Reddit and TourOrchestrator (above) were broken.
+- **`waitUntil(...)` argument types** - all wrap a Promise (not a function), all chain `.catch` with `captureAndFlush`.
+- **`captureAndFlush(err, ctx)` signature** - every call site uses the correct `(err, ctx)` shape. No curried-form errors.
+- **Welcome email atomic gate** (`auth.ts:425-431`) - correctly uses `WHERE welcomed_at IS NULL` in a conditional UPDATE with RETURNING. Race-safe.
+- **Autopilot retry CAS** (`databaseStorage.ts:340-351`) - correctly conditions on `autopilot_status = 'failed'` in WHERE. Race-safe.
+- **Migrations 0052–0057** - all use `IF NOT EXISTS` for column / table / index additions. No destructive ops. FK in 0057 uses correct `ON DELETE CASCADE` (brand) and `ON DELETE SET NULL` (article). Schema ↔ migration alignment verified.
+- **Schema ↔ storage method type alignment** - `welcomedAt`, `lastLoginAt`, `timezone`, `aiGenerated`, `provenance`, `geoSignalRuns` all read/write consistently.
+- **Ownership / anti-enumeration** - every new route from Plans 3-6 (`/api/user/profile`, `/api/user/password`, `/api/buffer/status`, `/api/billing/portal-session`, `/api/auth/resend-verification`, `/api/geo-signals/analyze`, `/api/onboarding/autopilot-retry`) verified to call `requireUser` + `requireBrand` where applicable, return 404 (not 403) on cross-tenant misses, and rate-limit cost-sensitive endpoints.
+- **Tour `data-tour-id` ↔ tour-step `target` cross-reference** - 27 tour step targets vs 31 DOM markers. All step targets resolve. No broken silent no-ops.
+- **localStorage logout sweep** - `clearAllVentureCiteStorage` covers every `venturecite-` prefixed key (RecommendationsPanel dismissals, OnboardingProgressRing dismissals, draftStore, analytics-integrations, ai-visibility, etc.).
+- **Removed-feature orphans** - no Quora references in client. Server has incidental string matches in `citationChecker.ts:182` and `databaseStorage.ts` (legacy categorization regex, harmless, not user-visible). No `alerts` table reads in routes (one legacy `/alerts/:brandId` endpoint exists but is dead-code). No `PHASE_BANDS`/`phaseFor` references in code. `weeklyReportEnabled` correctly wired in client-reports.tsx:128.
+- **`aiGenerated` exclusivity** - only set true in `setArticleReady` (worker path). Manual `createArticle` from `POST /api/articles`, `setArticleFailed`, `setArticleDraft`, `setArticleGeneratingFromDraft` all leave it false.
+- **Constraint compliance** - no new dependencies in `package.json`. No new external HTTP services. No Redis. No headless browser. No third-party PDF generator. All cost-sensitive routes rate-limited. Function timeouts bounded under `maxDuration: 60`.
+- **`useState`-managed `<Skeleton>`-style loaders** - replaced with single `<RouteSpinner />` per Plan 2; remaining `<Loader2 animate-spin>` instances are correctly bound to button-submit / modal-internal states only (per design.json's "cards never show spinners; cards show skeletons" rule).
 
 ### 33.6 Spec criteria deferred (would need their own track)
 
 The Foundations spec §4.1 mandated `<KPITile>`, `<Section>`, `<EmptyState>`, `<StatusDot>` foundations primitives "used in at least 4 pages each." Current adoption:
 
-- `<StatusDot>` — used in `<RecommendationsPanel>` P0 rows + `community-engagement.tsx` + 2 others = ≥4 ✅
-- `<EmptyState>` — used in `<RecommendationsPanel>`, `verify-email.tsx`, `articles.tsx`, `citations.tsx` = ≥4 ✅
-- `<RouteSpinner>` — used in `App.tsx` route transitions (5 instances) ✅
-- `<Section>` — 0 pages adopted ❌
-- `<KPITile>` — 1 page adopted (community-engagement) ❌
+- `<StatusDot>` - used in `<RecommendationsPanel>` P0 rows + `community-engagement.tsx` + 2 others = ≥4 ✅
+- `<EmptyState>` - used in `<RecommendationsPanel>`, `verify-email.tsx`, `articles.tsx`, `citations.tsx` = ≥4 ✅
+- `<RouteSpinner>` - used in `App.tsx` route transitions (5 instances) ✅
+- `<Section>` - 0 pages adopted ❌
+- `<KPITile>` - 1 page adopted (community-engagement) ❌
 
 The remaining adoption sweep (homepage hero, geo-analytics tabs, ai-intelligence dashboards, faq-manager KPI cards, citations Results) is a multi-page refactor. Best landed as a dedicated Plan 7 or a pre-launch polish track. Documented here so it's not forgotten.
 
@@ -4344,7 +4344,7 @@ The remaining adoption sweep (homepage hero, geo-analytics tabs, ai-intelligence
 - [x] No `bg-red-{600,700}` primary CTAs anywhere.
 - [x] No `bg-gradient-to-*` on authenticated routes.
 - [x] `npm run check` clean. 26/26 tour targets.
-- [x] Full suite at documented baseline only — no new regressions.
+- [x] Full suite at documented baseline only - no new regressions.
 - [x] No new dependencies introduced.
 
 ### Open questions raised by the fix agent (user's call)
@@ -4354,13 +4354,13 @@ The remaining adoption sweep (homepage hero, geo-analytics tabs, ai-intelligence
 
 ### Documented limitations
 
-- **`<KPITile>` and `<Section>` adoption** is still 1/0 pages instead of ≥4. Out of Track 33 scope — needs a dedicated polish track.
+- **`<KPITile>` and `<Section>` adoption** is still 1/0 pages instead of ≥4. Out of Track 33 scope - needs a dedicated polish track.
 - **`OnboardingProgressRing.tsx`, `ResultsTimeline.tsx` (default mode)** remain on disk per Plan 6 spec. Dead code is harmless; future cleanup track can delete.
 - **Legacy `/api/brand-mentions/alerts/:brandId` endpoint** in `server/routes/mentions.ts` is dead code (not consumed by any client) but still authenticated. Returns the legacy `{ data: rows }` envelope. Low risk; flagged for cleanup.
 
 ---
 
-## Track 34 — Orphan-page cleanup + dead-code purge (2026-05-15 → 2026-05-16)
+## Track 34 - Orphan-page cleanup + dead-code purge (2026-05-15 → 2026-05-16)
 
 **Goal:** Reduce VentureCite from 27 routed-or-orphan pages to 18 routed pages by deleting 8 orphan page files (pages on disk but not in `App.tsx`), then recursively remove every endpoint, storage method, ownership helper, schema table, and infrastructure subsystem that becomes dead as a result. Leave the codebase with zero references to deleted concepts (modulo historical docs).
 
@@ -4372,24 +4372,24 @@ Brainstorm phase surfaced an IA problem: 18 sidebar destinations was too many, w
 
 Grep against `App.tsx` route list vs `client/src/pages/*.tsx` identified 9 orphan files. `pricing.tsx` retained on user instruction (future marketing page). The other 8: `publication-intelligence`, `analytics-integrations`, `outreach`, `revenue-analytics`, `agent-dashboard`, `agent-run`, `geo-rankings`, `ai-traffic`.
 
-### Tier 1 — Client pages + server routes + ownership helpers
+### Tier 1 - Client pages + server routes + ownership helpers
 
 | Deletion                                        | Detail                                                                                                                                                                                                                                 |
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 8 client pages                                  | `agent-dashboard.tsx`, `agent-run.tsx`, `ai-traffic.tsx`, `analytics-integrations.tsx`, `geo-rankings.tsx`, `outreach.tsx`, `publication-intelligence.tsx`, `revenue-analytics.tsx`                                                    |
-| 2 server route files                            | `server/routes/agent.ts` (919 lines — exposed `/api/agent-tasks/*`, `/api/outreach-*`, `/api/publication-targets/*`, `/api/outreach-emails/*`, `/api/automation-*`); `server/routes/revenue.ts` (173 lines — exposed `/api/revenue/*`) |
+| 2 server route files                            | `server/routes/agent.ts` (919 lines - exposed `/api/agent-tasks/*`, `/api/outreach-*`, `/api/publication-targets/*`, `/api/outreach-emails/*`, `/api/automation-*`); `server/routes/revenue.ts` (173 lines - exposed `/api/revenue/*`) |
 | 5 ownership helpers                             | `requireAgentTask`, `requireOutreachCampaign`, `requireAutomationRule`, `requirePublicationTarget`, `requireOutreachEmail` stripped from `server/lib/ownership.ts`; also removed from import block in `server/routes.ts`               |
 | 7 `pageExplainers` entries                      | Removed `geoRankings`, `outreach`, `publicationIntelligence`, `aiTraffic`, `analyticsIntegrations`, `revenueAnalytics`, `agentDashboard` from `client/src/lib/pageExplainers.ts`                                                       |
 | `setupAgentRoutes` + `setupRevenueRoutes` calls | Removed from `registerRoutes` in `server/routes.ts`                                                                                                                                                                                    |
 
 **Verified no client code calls** `/api/agent-tasks`, `/api/outreach-*`, `/api/publication-targets`, `/api/automation-*`, `/api/revenue` (grep returned zero hits across `client/`).
 
-### Tier 1.5 — Dead workflow subsystem
+### Tier 1.5 - Dead workflow subsystem
 
 The orphan-analysis subagent initially flagged `server/lib/workflowEngine.ts` and the entire workflow stack as orphan-only, but a follow-up grep proved otherwise:
 
-- `server/auth.ts:11` — `maybeTickActiveRunsForUser` fires on every authenticated request
-- `server/scheduler.ts:565` — Monday 06:00 UTC cron starts `weekly_catchup` workflow for every brand with `weeklyReportEnabled=1`
+- `server/auth.ts:11` - `maybeTickActiveRunsForUser` fires on every authenticated request
+- `server/scheduler.ts:565` - Monday 06:00 UTC cron starts `weekly_catchup` workflow for every brand with `weeklyReportEnabled=1`
 
 So `workflowEngine`, `weeklyCatchupWorkflow`, `weeklyDigestEmitter`, and the `agent_tasks` queue remain live. **Two of the three registered workflows were dead, however.**
 
@@ -4399,11 +4399,11 @@ So `workflowEngine`, `weeklyCatchupWorkflow`, `weeklyDigestEmitter`, and the `ag
 | `server/lib/workflows/fixLosingArticle.ts` (242 lines)           | `startRun("fix_losing_article", ...)` never called anywhere                                                                                                                        |
 | `server/lib/workflows/registry.ts` shrunk to single export       | Only `weeklyCatchupWorkflow` survives                                                                                                                                              |
 | `weeklyCatchup.spawn_remediations` step (~36 lines)              | Created `hallucination_remediation` agent_tasks whose executor lived in the deleted agent-dashboard; rows piled up unexecuted each Monday                                          |
-| 5 of 6 task-type handlers in `agentTaskExecutor.ts` (~628 lines) | Only `prompt_test` survives — used by `weeklyCatchup.citation_check` step. Removed: `content_generation`, `outreach`, `source_analysis`, `hallucination_remediation`, `seo_update` |
+| 5 of 6 task-type handlers in `agentTaskExecutor.ts` (~628 lines) | Only `prompt_test` survives - used by `weeklyCatchup.citation_check` step. Removed: `content_generation`, `outreach`, `source_analysis`, `hallucination_remediation`, `seo_update` |
 | 5 of 6 Zod schemas in `agentTaskSchemas.ts` (~62 lines)          | Matching schemas removed; kept `promptTestInputSchema`                                                                                                                             |
 | `OUTREACH_EMAIL_TRANSITIONS` FSM in `statusTransitions.ts`       | Table is dropped; FSM has no consumers                                                                                                                                             |
 
-### Tier 2A — First schema drop (migration 0068)
+### Tier 2A - First schema drop (migration 0068)
 
 `migrations/0068_drop_orphan_tables.sql` drops 5 tables whose every reader/writer was deleted in Tier 1:
 
@@ -4417,7 +4417,7 @@ DROP TABLE automation_executions CASCADE;
 
 Schema source: 5 `pgTable` definitions + 5 `insertSchema` exports + 10 type exports stripped from `shared/schema.ts` (−211 lines).
 
-### Tier 2B — Orphan routes still mounted (migration 0069)
+### Tier 2B - Orphan routes still mounted (migration 0069)
 
 Five more tables had no frontend caller but still had live route handlers in `intelligence.ts` and `publications.ts`. Deeper sweep:
 
@@ -4442,15 +4442,15 @@ DROP TABLE publication_metrics CASCADE;
 
 Schema source: 5 more pgTables + 5 insert schemas + 8 type exports stripped (−368 lines).
 
-### Tier 2C — Shopify webhook leftovers + workflow_approvals (migration 0070)
+### Tier 2C - Shopify webhook leftovers + workflow_approvals (migration 0070)
 
 | Deletion                                       | Detail                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/lib/shopifyWebhook.ts`                 | HMAC verify util — no live callers after route deletion                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `server/lib/shopifyWebhook.ts`                 | HMAC verify util - no live callers after route deletion                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `tests/unit/shopifyWebhook.test.ts`            | Test was the only thing keeping the util alive                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `SHOPIFY_WEBHOOK_SECRET` env var               | Removed from `server/env.ts` and `.env.example`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `aiCommerceSessions` pgTable + storage methods | `createCommerceSession`, `getCommerceSessions` — no live callers (fed the deleted ai-traffic click-through tracker)                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 4 dead `agent_tasks` storage methods           | `getAgentTasks` (list), `getAgentTaskStats`, `getNextQueuedTask`, `deleteAgentTask` — only callers were the deleted `/api/agent-tasks/*` routes                                                                                                                                                                                                                                                                                                                                                                                 |
+| `aiCommerceSessions` pgTable + storage methods | `createCommerceSession`, `getCommerceSessions` - no live callers (fed the deleted ai-traffic click-through tracker)                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 4 dead `agent_tasks` storage methods           | `getAgentTasks` (list), `getAgentTaskStats`, `getNextQueuedTask`, `deleteAgentTask` - only callers were the deleted `/api/agent-tasks/*` routes                                                                                                                                                                                                                                                                                                                                                                                 |
 | `workflow_approvals` subsystem (~195 lines)    | The approval gate machinery in `workflowEngine.ts` was wired throughout (synthetic-step gate, task-based gate, `awaiting_approval` status branch, exported `respondToApproval` function, `buildApprovalSummary` step field, `requiresApproval` step field), but **no live workflow step had `requiresApproval: true`**. Subsystem ran zero rows. Removed in full from `workflowEngine.ts`, `workflowStorage.ts`, and schema. The 5 `requiresApproval: false` lines in weeklyCatchup steps also removed (field no longer exists) |
 
 `migrations/0070_drop_shopify_webhook_events.sql`:
@@ -4461,7 +4461,7 @@ DROP TABLE ai_commerce_sessions CASCADE;
 DROP TABLE workflow_approvals CASCADE;
 ```
 
-### Tier 2D — agent_tasks column + CHECK tightening (migration 0071)
+### Tier 2D - agent_tasks column + CHECK tightening (migration 0071)
 
 `migrations/0071_agent_tasks_cleanup.sql`:
 
@@ -4473,36 +4473,36 @@ DROP TABLE workflow_approvals CASCADE;
 
 **Critical fix:** the migration initially failed in dev with `check constraint "agent_tasks_artifact_type_check" of relation "agent_tasks" is violated by some row` because existing dev rows had the legacy values. Migration runner wraps each file in `BEGIN ... COMMIT` (`migrationRunner.ts:54-61`), so the failed 0071 rolled back cleanly. Re-authored to `UPDATE ... SET NULL` first, then `ALTER`. Idempotent on both fresh DBs (UPDATE affects 0 rows) and dev DBs with legacy data.
 
-Also rewrote `workflowEngine.ts:345`: `triggeredBy: "automation_rule"` (hardcoded dead value) → `triggeredBy: run.triggeredBy` (correctly inherits parent workflow's trigger source — `"cron"` for Monday catch-up, `"manual"` for user-kicked, `"chained"` for nested).
+Also rewrote `workflowEngine.ts:345`: `triggeredBy: "automation_rule"` (hardcoded dead value) → `triggeredBy: run.triggeredBy` (correctly inherits parent workflow's trigger source - `"cron"` for Monday catch-up, `"manual"` for user-kicked, `"chained"` for nested).
 
-### Final sweep — adjacent dead code
+### Final sweep - adjacent dead code
 
 After the four tiers, one more grep + read pass surfaced:
 
 | Removal                                   | File                                                                                                                             |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `_internal` and `priorOutputsOf` exports  | `server/lib/workflowEngine.ts` bottom — comments marked "Unused helper exports for tests / future use." Confirmed zero importers |
-| `void isEmailConfigured;` no-op statement | `server/lib/workflows/weeklyCatchup.ts:223` — leftover from previously deleted email-send logic                                  |
-| `isEmailConfigured` import                | `weeklyCatchup.ts` — became unused after the no-op was removed                                                                   |
-| `and` from `drizzle-orm` import           | `workflowEngine.ts:1` — became unused after `_internal` removal                                                                  |
+| `_internal` and `priorOutputsOf` exports  | `server/lib/workflowEngine.ts` bottom - comments marked "Unused helper exports for tests / future use." Confirmed zero importers |
+| `void isEmailConfigured;` no-op statement | `server/lib/workflows/weeklyCatchup.ts:223` - leftover from previously deleted email-send logic                                  |
+| `isEmailConfigured` import                | `weeklyCatchup.ts` - became unused after the no-op was removed                                                                   |
+| `and` from `drizzle-orm` import           | `workflowEngine.ts:1` - became unused after `_internal` removal                                                                  |
 
-### features.md — code-verified feature reference
+### features.md - code-verified feature reference
 
-Created `features.md` at repo root: **5,502 lines, 363 KB**. Documents every metric, calculation, API endpoint, server handler, and side-effect for all 18 routed destinations. Built by 5 parallel `general-purpose` agents (one per page group) using `Read`/`Grep` only — no claims sourced from prior `.md` files per the trust-rule. Notable findings the docs surfaced:
+Created `features.md` at repo root: **5,502 lines, 363 KB**. Documents every metric, calculation, API endpoint, server handler, and side-effect for all 18 routed destinations. Built by 5 parallel `general-purpose` agents (one per page group) using `Read`/`Grep` only - no claims sourced from prior `.md` files per the trust-rule. Notable findings the docs surfaced:
 
 - Reports page promises PDF/PPTX export but only ships a `weeklyReportEnabled` toggle mutation
 - Community is entirely LLM-driven (no real Reddit/HN scraping for discovery despite labeling)
 - Citation Quality uses two different scoring weight schemes (Phase 1 vs Phase 2 paths in `analytics.ts`)
 - Opportunities double-counts Reddit citations into the third-party bucket
 - GEO Analytics' "What These Metrics Mean" copy doesn't match the server formula
-- AI Visibility (correction to prior brainstorm) is an **engine-by-engine onboarding checklist**, not a duplicate measurement page — belongs in Setup, not Visibility
+- AI Visibility (correction to prior brainstorm) is an **engine-by-engine onboarding checklist**, not a duplicate measurement page - belongs in Setup, not Visibility
 
 ### Verification
 
 | Check                                        | Result                                                                                                                                                        |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run check` (tsc + tour-target verifier) | Clean across every tier                                                                                                                                       |
-| `npm test`                                   | 132 passed; 5 pre-existing failures (4 tour integration tests need `DATABASE_URL`, 1 `citationCronUnconditional` timeout) — identical to pre-cleanup baseline |
+| `npm test`                                   | 132 passed; 5 pre-existing failures (4 tour integration tests need `DATABASE_URL`, 1 `citationCronUnconditional` timeout) - identical to pre-cleanup baseline |
 | `npm run lint` on touched files              | Zero new errors; pre-existing warnings unchanged                                                                                                              |
 | Boot via `npm run dev`                       | Migrations 0068 → 0070 applied successfully on dev DB; 0071 initially failed on legacy CHECK rows, fixed with backfill, applied cleanly                       |
 
@@ -4528,20 +4528,20 @@ Created `features.md` at repo root: **5,502 lines, 363 KB**. Documents every met
 ### Intentionally retained (judgment calls)
 
 - **Historical phase docs** (`docs/phase1_completion.md`, `docs/phase2_goals.md`, this file) still reference deleted concepts. Per the trust-rule, these are append-only records, not load-bearing for the live codebase.
-- **`weeklyCatchupWorkflow` + entire workflow engine** — drives the Monday digest email which goes to every user with `weeklyReportEnabled=1`. Real user-visible feature.
-- **`agent_tasks` table** — workflow engine queues `prompt_test` tasks here.
-- **`workflow_runs` table** — workflow engine's primary state.
+- **`weeklyCatchupWorkflow` + entire workflow engine** - drives the Monday digest email which goes to every user with `weeklyReportEnabled=1`. Real user-visible feature.
+- **`agent_tasks` table** - workflow engine queues `prompt_test` tasks here.
+- **`workflow_runs` table** - workflow engine's primary state.
 
 ### Open follow-ups
 
-None blocking. The codebase is consistent — no orphan references to deleted concepts (verified by terminal-grep across all `.ts`/`.tsx`/`.sql`/`.example` files, excluding `migrations/` and `docs/`).
+None blocking. The codebase is consistent - no orphan references to deleted concepts (verified by terminal-grep across all `.ts`/`.tsx`/`.sql`/`.example` files, excluding `migrations/` and `docs/`).
 
 ### How to verify (Track 34)
 
-1. **Grep sweep.** Run `grep -rln "outreachCampaigns\|automationRules\|aiSources\|aiTrafficSessions\|publicationTargets\|purchaseEvents\|aiCommerceSessions\|shopifyWebhookEvents\|workflowApprovals\|requireAiSource\|requireOutreach\|processShopify\|SHOPIFY_WEBHOOK" ./client ./server ./shared` — should return zero hits.
-2. **Boot the dev server.** `npm run dev` — migrations 0068 → 0071 should apply on first run with no errors.
-3. **Trigger weekly catchup manually.** From an admin context, fire `startRun("weekly_catchup", brandId, userId, {}, "manual")` — confirm the four surviving steps (citation_check → delta_calc → hallucination_scan → compose_digest → send_digest_email) complete and the weekly digest email lands.
+1. **Grep sweep.** Run `grep -rln "outreachCampaigns\|automationRules\|aiSources\|aiTrafficSessions\|publicationTargets\|purchaseEvents\|aiCommerceSessions\|shopifyWebhookEvents\|workflowApprovals\|requireAiSource\|requireOutreach\|processShopify\|SHOPIFY_WEBHOOK" ./client ./server ./shared` - should return zero hits.
+2. **Boot the dev server.** `npm run dev` - migrations 0068 → 0071 should apply on first run with no errors.
+3. **Trigger weekly catchup manually.** From an admin context, fire `startRun("weekly_catchup", brandId, userId, {}, "manual")` - confirm the four surviving steps (citation_check → delta_calc → hallucination_scan → compose_digest → send_digest_email) complete and the weekly digest email lands.
 4. **Confirm no broken routes.** Login → navigate every sidebar destination in turn. No 404s, no "Failed to load" toasts. (`features.md` documents the expected behavior of each.)
-5. **Sidebar destination count.** Inspect `client/src/components/Sidebar.tsx` — should be 18 destinations across 5 groups (Setup, Create, Measure, Grow, Optimize).
+5. **Sidebar destination count.** Inspect `client/src/components/Sidebar.tsx` - should be 18 destinations across 5 groups (Setup, Create, Measure, Grow, Optimize).
 
 ---

@@ -24,7 +24,7 @@ const MAX_BRANDS_PER_USER = Number(process.env.WEEKLY_MAX_BRANDS_PER_USER || 3);
 
 // Advisory-lock keys for jobs that were previously unguarded. Kept in the
 // same 9100xx int8 namespace as lockKeys in ./lib/advisoryLock, but declared
-// locally so that shared constant map stays untouched. Cast to LockKey — the
+// locally so that shared constant map stays untouched. Cast to LockKey - the
 // pg key only needs to be a stable, distinct integer per job so overlapping
 // scheduler instances no-op the second concurrent invocation.
 const schedulerLockKeys = {
@@ -94,7 +94,7 @@ async function runWeeklyReportJobImpl(): Promise<{ sent: number; skipped: number
       for (const brand of userBrands) {
         const storedPrompts = await storage.getBrandPromptsByBrandId(brand.id);
         if (storedPrompts.length === 0) {
-          // No prompts generated yet for this brand — surface that in the report.
+          // No prompts generated yet for this brand - surface that in the report.
           brandReports.push({
             name: brand.name,
             totalChecks: 0,
@@ -175,14 +175,14 @@ async function runWeeklyReportJobImpl(): Promise<{ sent: number; skipped: number
     }
   }
 
-  logger.info({ sent, skipped }, `weekly report job done — sent ${sent}, skipped ${skipped}`);
+  logger.info({ sent, skipped }, `weekly report job done - sent ${sent}, skipped ${skipped}`);
   return { sent, skipped };
 }
 
 // Per-brand auto-citation: in production this fires from the daily
 // Vercel cron (server/routes/cron.ts → runAutoCitationJob with a
 // deadline). Locally, initScheduler runs it on this hourly cron so dev
-// behaviour matches prod. Wave 9.5: hour-of-day gate removed — see
+// behaviour matches prod. Wave 9.5: hour-of-day gate removed - see
 // isBrandDueForCitation.
 const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 * * * *";
 
@@ -205,7 +205,7 @@ export async function selectBrandsForCitationScan() {
 }
 
 export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
-  // Window is 45min against an hourly cadence — a genuine hourly tick still
+  // Window is 45min against an hourly cadence - a genuine hourly tick still
   // runs; a second trigger in the same hour does not.
   await withJobDebounce("auto-citation", DEBOUNCE_WINDOWS["auto-citation"], () =>
     withAdvisoryLock(schedulerLockKeys.autoCitation, "auto-citation-job", () =>
@@ -236,13 +236,13 @@ async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
     if (!isBrandDueForCitation(brand)) continue;
 
     try {
-      // Skip brands that never seeded tracked prompts — weekly cron should
+      // Skip brands that never seeded tracked prompts - weekly cron should
       // not auto-create the initial 10; that's a user-initiated action.
       const tracked = await storage.getBrandPromptsByBrandId(brand.id, { status: "tracked" });
       if (tracked.length === 0) {
         logger.info(
           { brandId: brand.id, name: brand.name },
-          "brand has no tracked prompts — skipping weekly run",
+          "brand has no tracked prompts - skipping weekly run",
         );
         continue;
       }
@@ -259,8 +259,8 @@ async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
         );
       }
 
-      // Step 3: Wave 9 — update lastAutoCitationAt + status so ScheduleTab
-      // can render "Last run 3d ago — succeeded" vs "failed". Pre-Wave-9
+      // Step 3: Wave 9 - update lastAutoCitationAt + status so ScheduleTab
+      // can render "Last run 3d ago - succeeded" vs "failed". Pre-Wave-9
       // schema columns (lastAutoCitationStatus) are nullable so this is
       // safe on rolling deploys before the migration applies.
       await db
@@ -285,7 +285,7 @@ async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
           })
           .where(eq(schema.brands.id, brand.id));
       } catch {
-        // ignore — Sentry capture below covers operational visibility.
+        // ignore - Sentry capture below covers operational visibility.
       }
       logger.error({ err, brandId: brand.id }, "auto-citation failed for brand");
       captureAndFlush(err, {
@@ -296,7 +296,7 @@ async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
   }
   logger.info(
     { ranCount, deferred },
-    `auto-citation job complete — ${ranCount} brands checked${deferred > 0 ? ` (${deferred} deferred to next cron)` : ""}`,
+    `auto-citation job complete - ${ranCount} brands checked${deferred > 0 ? ` (${deferred} deferred to next cron)` : ""}`,
   );
 }
 
@@ -307,7 +307,7 @@ const MENTION_SCAN_CRON = process.env.MENTION_SCAN_CRON || "0 9 * * 1"; // Monda
 const LISTICLE_SCAN_CRON = process.env.LISTICLE_SCAN_CRON || "0 11 * * 1"; // Monday 11 AM UTC
 // Every per-brand iteration accepts a deadline so the daily orchestrator
 // can bail out cleanly before the function timeout. Brands that didn't
-// get processed today get retried tomorrow — natural backoff via the
+// get processed today get retried tomorrow - natural backoff via the
 // per-brand "lastXxxAt" timestamps the callers already stamp. Without a
 // deadline (local dev cron) the loop runs to completion.
 type RunForEveryBrandOptions = {
@@ -333,7 +333,7 @@ async function runForEveryBrand(
       bailedAt = b.id;
       logger.info(
         { job: label, processed, total: brands.length },
-        `${label}: deadline hit — remaining brands deferred to next cron run`,
+        `${label}: deadline hit - remaining brands deferred to next cron run`,
       );
       break;
     }
@@ -351,14 +351,14 @@ async function runForEveryBrand(
   }
   logger.info(
     { job: label, ok, processed, total: brands.length },
-    `${label} job complete — ${ok}/${processed} processed (${brands.length} total)`,
+    `${label} job complete - ${ok}/${processed} processed (${brands.length} total)`,
   );
   return { ok, total: brands.length, processed, bailedAt };
 }
 
 // Each job body is wrapped in a pg advisory lock so overlapping scheduler
 // instances (container-restart overlap, accidental HA) skip instead of
-// double-running — which otherwise inflates competitor/snapshot counts
+// double-running - which otherwise inflates competitor/snapshot counts
 // and racks up LLM spend.
 export async function runCompetitorDiscoveryJob(deadlineMs?: number): Promise<void> {
   await withAdvisoryLock(lockKeys.competitorDiscovery, "competitor-discovery", () =>
@@ -384,13 +384,13 @@ async function runMentionScanJobLocked(deadlineMs?: number): Promise<boolean> {
     let processed = 0;
     for (const b of brands) {
       // Checked per brand, matching runForEveryBrand. A single brand's scan
-      // can still overrun the deadline — the orchestrator's budget is a
-      // best-effort cap, not a hard kill — but it stops the job walking the
+      // can still overrun the deadline - the orchestrator's budget is a
+      // best-effort cap, not a hard kill - but it stops the job walking the
       // whole list and starving every step queued behind it.
       if (deadlineMs !== undefined && Date.now() > deadlineMs) {
         logger.info(
           { job: "mention-scan", processed, total: brands.length },
-          "mention-scan: deadline hit — remaining brands deferred to the next run",
+          "mention-scan: deadline hit - remaining brands deferred to the next run",
         );
         return false;
       }
@@ -427,7 +427,7 @@ export async function runListicleScanJob(deadlineMs?: number): Promise<void> {
 }
 // Spec 2 §4.11: serial-failure alerting.
 // Daily at 11 UTC, find brands whose last 3 `triggered_by='cron_refresh'` runs
-// in the past 90 days all have `status='failed'` — fire Sentry alert +
+// in the past 90 days all have `status='failed'` - fire Sentry alert +
 // structured log. Customer email notification deferred to v1.5.
 export async function detectFactScrapeFailureRate(): Promise<{ alerted: number }> {
   let alerted = 0;
@@ -517,7 +517,7 @@ async function runAccountPurgeJobImpl(): Promise<{ purged: number; failed: numbe
   for (const user of due) {
     try {
       // Drop the Supabase auth row first. If this fails we keep the
-      // public.users row so the next cron tick retries — better than a
+      // public.users row so the next cron tick retries - better than a
       // partial-purge state where the app row is gone but the user can
       // still sign in.
       const { error: supaErr } = await supabaseAdmin.auth.admin.deleteUser(user.id);
@@ -579,7 +579,7 @@ async function runBrandPurgeJobImpl(): Promise<{ purged: number; failed: number 
       // Wave 7: drafts are now articles with status='draft' and brand_id has
       // ON DELETE CASCADE, so the explicit cleanup is no longer needed.
       // Tour state lives in users.onboarding_state JSONB (no FK cascade),
-      // so it must be cleared explicitly — this path bypasses deleteBrand.
+      // so it must be cleared explicitly - this path bypasses deleteBrand.
       await storage.clearTourStateForBrand(brand.id);
       await db.delete(schema.brands).where(eq(schema.brands.id, brand.id));
 
@@ -608,7 +608,7 @@ async function runBrandPurgeJobImpl(): Promise<{ purged: number; failed: number 
 
 // Kicks off one `weekly_catchup` workflow run per eligible brand. The
 // users table has `weeklyReportEnabled` (the column is the weekly-digest
-// opt-in proxy — a dedicated `weeklyDigest` column does not exist). If
+// opt-in proxy - a dedicated `weeklyDigest` column does not exist). If
 // that behavior ever diverges, add a distinct column + filter here.
 // Iterate USERS (not brands) so the digest is per-user, and guard against
 // firing a second weekly_catchup for a brand that still has a non-terminal
@@ -663,7 +663,7 @@ async function runWeeklyCatchupKickoffImpl(): Promise<{
           skipped += 1;
           logger.info(
             { brandId: b.id, userId: u.id },
-            "weekly_catchup skipped — existing non-terminal run",
+            "weekly_catchup skipped - existing non-terminal run",
           );
           continue;
         }
@@ -683,11 +683,11 @@ async function runWeeklyCatchupKickoffImpl(): Promise<{
 }
 
 // Aggregator: formerly a 5-min cron. Dropped for serverless compat.
-// Replaced by lazy-eval — the workflow engine calls
+// Replaced by lazy-eval - the workflow engine calls
 // tryEmitWeeklyDigestForUser whenever a weekly_catchup run reaches
 // terminal status, which is exactly when the digest could become sendable.
 // This function remains callable as a fallback (e.g. from the daily cron
-// orchestrator or admin tooling) — it sweeps every eligible user.
+// orchestrator or admin tooling) - it sweeps every eligible user.
 export async function runWeeklyDigestAggregator(): Promise<{ sent: number; pending: number }> {
   let sent = 0;
   let pending = 0;
@@ -735,7 +735,7 @@ export function initScheduler(): void {
     logger.info({ cron: BRAND_PURGE_CRON }, "brand purge job scheduled");
   }
 
-  // Daily tour events cleanup — retain 90 days.
+  // Daily tour events cleanup - retain 90 days.
   const TOUR_EVENTS_CLEANUP_CRON = process.env.TOUR_EVENTS_CLEANUP_CRON || "0 2 * * *";
   if (cron.validate(TOUR_EVENTS_CLEANUP_CRON)) {
     cron.schedule(
@@ -745,13 +745,13 @@ export function initScheduler(): void {
     logger.info({ cron: TOUR_EVENTS_CLEANUP_CRON }, "tour events cleanup scheduled");
   }
 
-  // Auto-citation cron — always active, no RESEND_API_KEY needed.
+  // Auto-citation cron - always active, no RESEND_API_KEY needed.
   if (cron.validate(AUTO_CITATION_CRON)) {
     cron.schedule(AUTO_CITATION_CRON, cronCrashGuard("auto-citation", runAutoCitationJob));
     logger.info({ cron: AUTO_CITATION_CRON }, "auto-citation job scheduled");
   }
 
-  // Phase 2 automation crons — run independent of email config.
+  // Phase 2 automation crons - run independent of email config.
   if (cron.validate(COMPETITOR_DISCOVERY_CRON)) {
     cron.schedule(
       COMPETITOR_DISCOVERY_CRON,
@@ -767,7 +767,7 @@ export function initScheduler(): void {
     cron.schedule(LISTICLE_SCAN_CRON, cronCrashGuard("listicle-scan", runListicleScanJob));
     logger.info({ cron: LISTICLE_SCAN_CRON }, "listicle scan scheduled");
   }
-  // Spec 2 §4.11: serial-failure alerting — daily at 11 UTC.
+  // Spec 2 §4.11: serial-failure alerting - daily at 11 UTC.
   const DETECT_FACT_SCRAPE_FAILURE_CRON =
     process.env.DETECT_FACT_SCRAPE_FAILURE_CRON || "0 11 * * *";
   if (cron.validate(DETECT_FACT_SCRAPE_FAILURE_CRON)) {
@@ -781,12 +781,12 @@ export function initScheduler(): void {
     );
   }
 
-  // Workflow tick — formerly a 30s global cron, dropped for serverless
+  // Workflow tick - formerly a 30s global cron, dropped for serverless
   // compatibility. Now driven lazily by the auth middleware via
   // maybeTickActiveRunsForUser (fire-and-forget on every authenticated
   // request). See server/auth.ts and server/lib/workflowEngine.ts.
 
-  // Weekly catch-up workflow kickoff — Monday 06:00 UTC. Independent of
+  // Weekly catch-up workflow kickoff - Monday 06:00 UTC. Independent of
   // the weekly-report Resend gate below: the workflow's digest-send step
   // checks email config internally. The 30s workflow-tick drives the
   // actual execution of each run it enqueues.
@@ -799,15 +799,15 @@ export function initScheduler(): void {
     logger.info({ cron: WEEKLY_CATCHUP_CRON }, "weekly catchup kickoff scheduled");
   }
 
-  // Weekly digest aggregator — formerly a 5-min cron, dropped for
+  // Weekly digest aggregator - formerly a 5-min cron, dropped for
   // serverless compat. Replaced by lazy-eval in workflowEngine.advanceRun
   // (fires tryEmitWeeklyDigestForUser when a weekly_catchup run reaches
   // terminal status). The runWeeklyDigestAggregator function remains
   // exported as a fallback for the daily cron orchestrator.
 
-  // Weekly email report — only if Resend is configured.
+  // Weekly email report - only if Resend is configured.
   if (!isEmailConfigured()) {
-    logger.info("RESEND_API_KEY not set — weekly email reports disabled");
+    logger.info("RESEND_API_KEY not set - weekly email reports disabled");
     return;
   }
   if (!cron.validate(WEEKLY_CRON)) {

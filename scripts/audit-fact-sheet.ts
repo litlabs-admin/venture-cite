@@ -90,7 +90,7 @@ function bytes(n: number) {
   return `${(n / (1024 * 1024)).toFixed(2)}MB`;
 }
 
-// The fetcher used by sitemap discovery — supports byte caps.
+// The fetcher used by sitemap discovery - supports byte caps.
 const sitemapFetcher = async (
   url: string,
   opts?: { maxBytes?: number },
@@ -227,7 +227,7 @@ async function auditPage(
     result.durationMs = Date.now() - start;
     return result;
   }
-  // Canonical redirect is now informational only — we extract content
+  // Canonical redirect is now informational only - we extract content
   // anyway and just record the canonical URL. Mirrors the prod fix in
   // sourceStatic.ts.
   const canonicalRedirect = detectCanonicalRedirect(res.text, pageUrl);
@@ -304,7 +304,7 @@ async function auditPage(
 }
 
 async function auditSite(brandName: string, brandUrl: string): Promise<SiteReport> {
-  box(`${brandName} — ${brandUrl}`);
+  box(`${brandName} - ${brandUrl}`);
   const obs: string[] = [];
 
   // Step 1: sitemap discovery
@@ -319,7 +319,7 @@ async function auditSite(brandName: string, brandUrl: string): Promise<SiteRepor
   }
 
   if (sitemapUrls.length === 0) {
-    obs.push("Sitemap discovery returned 0 URLs — falls back to homepage only.");
+    obs.push("Sitemap discovery returned 0 URLs - falls back to homepage only.");
   }
 
   // Check if it's a sitemap INDEX (those have <sitemap> wrappers around <loc>)
@@ -333,7 +333,7 @@ async function auditSite(brandName: string, brandUrl: string): Promise<SiteRepor
       const hasSitemapIndex = /<sitemap[\s>]/i.test(probe.text);
       if (hasSitemapIndex) {
         obs.push(
-          "sitemap.xml is a SITEMAP-INDEX (lists other sitemaps) — current parser only extracts <loc>; no recursion into nested sitemaps.",
+          "sitemap.xml is a SITEMAP-INDEX (lists other sitemaps) - current parser only extracts <loc>; no recursion into nested sitemaps.",
         );
       }
     }
@@ -366,7 +366,7 @@ async function auditSite(brandName: string, brandUrl: string): Promise<SiteRepor
     const skipLine = pageReport.skipReason ? ` (${pageReport.skipReason})` : "";
     const llmLine =
       pageReport.factCount !== undefined
-        ? ` — ${pageReport.factCount} facts${pageReport.llmRepairUsed ? " [repaired]" : ""}`
+        ? ` - ${pageReport.factCount} facts${pageReport.llmRepairUsed ? " [repaired]" : ""}`
         : "";
     console.log(
       `   • ${pageReport.url}\n     status=${pageReport.status}${skipLine} http=${pageReport.statusCode} bytes=${bytes(pageReport.bytes)} body=${pageReport.bodyTextLength}ch hydr=${pageReport.hadHydration} rsc=${pageReport.hadRsc} ld+json=${pageReport.hasStructuredData}${llmLine} (${pageReport.durationMs}ms)`,
@@ -391,7 +391,7 @@ async function auditSite(brandName: string, brandUrl: string): Promise<SiteRepor
   }
   if (skipCounts.get("skipped_hollow_shell")) {
     obs.push(
-      `${skipCounts.get("skipped_hollow_shell")} page(s) flagged as hollow-shell — pure-CSR SPA with no structured data or hydration markers. This site may need a different fetch strategy (Playwright / Puppeteer).`,
+      `${skipCounts.get("skipped_hollow_shell")} page(s) flagged as hollow-shell - pure-CSR SPA with no structured data or hydration markers. This site may need a different fetch strategy (Playwright / Puppeteer).`,
     );
   }
   if (skipCounts.get("skipped_waf")) {
@@ -401,7 +401,7 @@ async function auditSite(brandName: string, brandUrl: string): Promise<SiteRepor
   }
   if (skipCounts.get("skipped_canonical")) {
     obs.push(
-      `${skipCounts.get("skipped_canonical")} page(s) returned a canonical redirect away from the request URL. Production code does NOT re-queue the canonical target — it just drops the page entirely.`,
+      `${skipCounts.get("skipped_canonical")} page(s) returned a canonical redirect away from the request URL. Production code does NOT re-queue the canonical target - it just drops the page entirely.`,
     );
   }
   if (LLM_ENABLED) {

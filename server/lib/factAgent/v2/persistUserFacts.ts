@@ -1,7 +1,7 @@
 // Persist user-source facts (from /user-enrich). Replaces all existing
 // source='user' rows for this brand in a single transaction so the latest
 // onboarding-derived fact set is always authoritative. Does NOT touch
-// source='user_manual' rows — those are user-edited overrides that survive
+// source='user_manual' rows - those are user-edited overrides that survive
 // every re-run.
 import { db } from "../../../db";
 import { and, eq } from "drizzle-orm";
@@ -39,7 +39,7 @@ export async function persistUserFacts(
       if (facts.length === 0) return { inserted: 0 };
 
       // v2: subcategory is derived server-side from (domain, factKey)
-      // — the LLM no longer picks it, so we compute it here.
+      // - the LLM no longer picks it, so we compute it here.
       const rows = facts.map((f) => ({
         brandId: args.brandId,
         domain: f.domain,

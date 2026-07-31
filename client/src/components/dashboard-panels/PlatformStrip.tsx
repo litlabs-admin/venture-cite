@@ -13,7 +13,7 @@ import type { PlatformRank } from "./useDashboardData";
 // an accent call-to-action. Cells with no data get the "No data yet" variant.
 //
 // ONLY platforms we actually query get a cell. Grok, Meta AI and Google AI
-// used to occupy three greyed-out cells rendering `–` "not queried yet" —
+// used to occupy three greyed-out cells rendering `–` "not queried yet" -
 // a fifth of the strip spent advertising engines that produce no data and
 // that the user cannot enable. The reference's 8-wide grid is not a reason
 // to ship three dead columns.
@@ -28,11 +28,11 @@ const LOGOS: Record<string, string> = {
 // One line per engine, shown in the hover card. Same register as the
 // reference's ("Anthropic's Claude - known for safety and helpfulness").
 const BLURB: Record<string, string> = {
-  ChatGPT: "OpenAI's ChatGPT — the most widely used AI assistant",
-  Claude: "Anthropic's Claude — known for safety and helpfulness",
-  Perplexity: "Perplexity AI — answer engine with citations",
-  Gemini: "Google's Gemini — search-grounded assistant",
-  DeepSeek: "DeepSeek — open-weight reasoning models",
+  ChatGPT: "OpenAI's ChatGPT - the most widely used AI assistant",
+  Claude: "Anthropic's Claude - known for safety and helpfulness",
+  Perplexity: "Perplexity AI - answer engine with citations",
+  Gemini: "Google's Gemini - search-grounded assistant",
+  DeepSeek: "DeepSeek - open-weight reasoning models",
 };
 
 // DeepSeek ships no logo asset, so it falls back to a monogram rather than a

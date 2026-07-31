@@ -36,7 +36,7 @@ create unique index if not exists articles_brand_slug_idx
   on public.articles (brand_id, slug);
 
 -- articles needs brand_id NOT NULL going forward. Only flip if no null rows
--- exist (safety net — all rows should already have brand_id after routes.ts
+-- exist (safety net - all rows should already have brand_id after routes.ts
 -- allowlist fix).
 do $$
 begin
@@ -116,7 +116,7 @@ begin
   end loop;
 exception when others then
   -- If any individual cascade swap fails (e.g. the target table doesn't
-  -- exist yet), log and move on — the next boot will retry.
+  -- exist yet), log and move on - the next boot will retry.
   raise notice 'cascade swap failed: %', sqlerrm;
 end $$;
 

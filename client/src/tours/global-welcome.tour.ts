@@ -1,8 +1,8 @@
 // client/src/tours/global-welcome.tour.ts
 //
 // One-time orientation for new users, auto-fired on the Dashboard
-// (/, /dashboard). Walks the workflow spine in narrative order — Setup
-// → Monitor → Diagnose → Act → Report — independent of the sidebar's
+// (/, /dashboard). Walks the workflow spine in narrative order - Setup
+// → Monitor → Diagnose → Act → Report - independent of the sidebar's
 // alphabetical render order. Each spine-stage step targets its literal
 // nav.<stage> wrapper (see client/src/components/Sidebar.tsx).
 //
@@ -23,7 +23,7 @@ export const globalWelcomeTour: TourConfig = {
         "VentureCite measures and improves how AI engines (ChatGPT, Claude, Perplexity, Gemini) cite your brand. A quick 60-second tour of the five-stage workflow?",
     },
     // Narrow viewports only. The five nav.* steps below target the desktop
-    // sidebar, which is `hidden lg:flex` — under 1024px they resolve to
+    // sidebar, which is `hidden lg:flex` - under 1024px they resolve to
     // nothing and drop out, which left this tour as a single anchorless
     // paragraph. This step is the mutually-exclusive counterpart: its anchor
     // is `lg:hidden`, so exactly one of the two paths ever renders, and the
@@ -41,15 +41,15 @@ export const globalWelcomeTour: TourConfig = {
       id: "sidebar-setup",
       target: "nav.setup",
       attachTo: "right-start",
-      title: "1. Set up — the kernel",
+      title: "1. Set up - the kernel",
       content:
-        "Start here. Add your brand and build a Fact Sheet — the canonical record of what's verifiably true. Every measurement and generated artifact is grounded in it.",
+        "Start here. Add your brand and build a Fact Sheet - the canonical record of what's verifiably true. Every measurement and generated artifact is grounded in it.",
     },
     {
       id: "sidebar-monitor",
       target: "nav.monitor",
       attachTo: "right-start",
-      title: "2. Monitor — where you stand",
+      title: "2. Monitor - where you stand",
       content:
         "Track how AI engines cite you: citation runs across every platform, competitor share-of-voice, and brand mentions, all in one canvas.",
     },
@@ -57,25 +57,25 @@ export const globalWelcomeTour: TourConfig = {
       id: "sidebar-diagnose",
       target: "nav.diagnose",
       attachTo: "right-start",
-      title: "3. Diagnose — what's wrong",
+      title: "3. Diagnose - what's wrong",
       content:
-        "When something looks off, Diagnose shows you why — hallucinations (claims that contradict your facts), technical signals, and AI crawler permissions.",
+        "When something looks off, Diagnose shows you why - hallucinations (claims that contradict your facts), technical signals, and AI crawler permissions.",
     },
     {
       id: "sidebar-act",
       target: "nav.act",
       attachTo: "right-start",
-      title: "4. Act — fix the gaps",
+      title: "4. Act - fix the gaps",
       content:
-        "Close the gaps. Generate citation-ready articles, FAQs, GEO assets, and community outreach — every artifact grounded in your fact sheet.",
+        "Close the gaps. Generate citation-ready articles, FAQs, GEO assets, and community outreach - every artifact grounded in your fact sheet.",
     },
     {
       id: "sidebar-report",
       target: "nav.report",
       attachTo: "right-start",
-      title: "5. Report — prove the impact",
+      title: "5. Report - prove the impact",
       content:
-        "A board-ready summary of where you stand, the gaps you've closed, and how the trend is moving. Measured signals only — no fabricated numbers.",
+        "A board-ready summary of where you stand, the gaps you've closed, and how the trend is moving. Measured signals only - no fabricated numbers.",
     },
     {
       id: "brand-selector",

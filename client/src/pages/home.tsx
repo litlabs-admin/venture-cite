@@ -18,7 +18,7 @@ import { BottomRow } from "@/components/dashboard-panels/BottomRow";
 //
 // LAYOUT CONTRACT: this page draws its own hairlines and owns its horizontal
 // padding, edge to edge. AppShell gives the Dashboard an unpadded canvas
-// (see AppShell's `fullBleed` branch) — do not wrap it in a padded container
+// (see AppShell's `fullBleed` branch) - do not wrap it in a padded container
 // or every row's border stops short of the viewport edge.
 //
 // Row order, top to bottom:
@@ -36,9 +36,9 @@ import { BottomRow } from "@/components/dashboard-panels/BottomRow";
 // fixture.
 //
 // "AI Traffic" and "Conversations" used to occupy row 7 and two KPI tiles.
-// Both were permanent empty states — they need a Google Analytics connection
+// Both were permanent empty states - they need a Google Analytics connection
 // and AI-crawler tracking on the customer's domain respectively, neither of
-// which this product has — so a third of the dashboard asked you to connect
+// which this product has - so a third of the dashboard asked you to connect
 // something that cannot be connected. They were replaced with hallucination
 // severity and "best of" listicle presence: both already measured for every brand,
 // both previously surfaced nowhere on this page. `Rank` is the one remaining
@@ -83,7 +83,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-vc-page">
-      {/* data-tour-id values are literal build-gate targets — scripts/
+      {/* data-tour-id values are literal build-gate targets - scripts/
           verify-tour-targets.ts greps for these exact strings and fails the
           build if a registered tour step has nothing to point at. */}
       <div data-tour-id="dashboard.stats">

@@ -49,7 +49,7 @@ export async function runOnboardingAutopilot(
     // (resume-in-flight-autopilots) plus the fact-scrape-backstop drive
     // the run to completion, and the next autopilot resume re-checks
     // here and advances. 'generating_prompts'/'running_citations' mean a
-    // prior invocation already cleared Phase 0 — skip it.
+    // prior invocation already cleared Phase 0 - skip it.
     if (status !== "generating_prompts" && status !== "running_citations") {
       const factSheetReady = await storage.getLastCompletedScrapeRunAt(brandId);
       if (!factSheetReady) {
@@ -98,7 +98,7 @@ export async function runOnboardingAutopilot(
         if (!nowReady) {
           logger.info(
             { brandId, userId },
-            "onboardingAutopilot: fact sheet not complete yet — will resume next cron tick",
+            "onboardingAutopilot: fact sheet not complete yet - will resume next cron tick",
           );
           return;
         }
@@ -121,7 +121,7 @@ export async function runOnboardingAutopilot(
 
       // Discover competitors BEFORE prompt generation so the first prompt set
       // can build grounded "alternatives to <competitor>" comparison questions
-      // (that's where citations happen). Best-effort — never block onboarding.
+      // (that's where citations happen). Best-effort - never block onboarding.
       try {
         await discoverCompetitors(brandId);
       } catch (err) {
@@ -157,7 +157,7 @@ export async function runOnboardingAutopilot(
     const citationResult = await runBrandPrompts(brandId, undefined, {
       triggeredBy: "auto_onboarding",
       deadlineMs: options.deadlineMs,
-      // Resume mode is safe to set unconditionally — for a fresh
+      // Resume mode is safe to set unconditionally - for a fresh
       // citation run there are no existing rankings to skip.
       resume: true,
       onProgress: async (checked, total) => {
@@ -179,7 +179,7 @@ export async function runOnboardingAutopilot(
     if (!citationResult.done) {
       logger.info(
         { brandId, userId },
-        "onboardingAutopilot: citation slice incomplete — will resume next cron tick",
+        "onboardingAutopilot: citation slice incomplete - will resume next cron tick",
       );
       return;
     }
@@ -205,7 +205,7 @@ export async function runOnboardingAutopilot(
 // Resume any autopilots that were in-flight when the prior process
 // stopped. Locally this fires on boot via setImmediate (best-effort,
 // fire-and-forget). On Vercel it's invoked from the daily cron with a
-// deadline so the function returns before the platform timeout — the
+// deadline so the function returns before the platform timeout - the
 // next cron tick picks up whichever autopilots didn't finish today.
 export async function resumeInFlightAutopilots(deadlineMs?: number): Promise<void> {
   try {
@@ -221,7 +221,7 @@ export async function resumeInFlightAutopilots(deadlineMs?: number): Promise<voi
       if (deadlineMs !== undefined && Date.now() > deadlineMs) {
         logger.info(
           { resumedSoFar: resumedCount, total: list.length },
-          "onboardingAutopilot: resume deadline hit — remainder deferred",
+          "onboardingAutopilot: resume deadline hit - remainder deferred",
         );
         break;
       }

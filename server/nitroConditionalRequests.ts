@@ -43,7 +43,7 @@ const plugin: NitroAppPlugin = (nitro) => {
       try {
         event.req.headers.delete(header);
       } catch {
-        // Some runtimes expose immutable request headers. Nothing to do —
+        // Some runtimes expose immutable request headers. Nothing to do -
         // the endpoint still works for non-conditional requests, which is
         // the same position as before this plugin existed.
       }

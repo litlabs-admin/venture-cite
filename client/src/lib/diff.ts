@@ -5,7 +5,7 @@
 // editors and revision history pages.
 //
 // Implementation note: this is the textbook O(n*m) DP. For typical article
-// lengths (~2000 lines max) it's plenty fast — well under 5ms even on a
+// lengths (~2000 lines max) it's plenty fast - well under 5ms even on a
 // 5kLOC vs 5kLOC compare. If we ever need to diff much larger inputs we'd
 // switch to Myers/patience.
 
@@ -73,7 +73,7 @@ export function diffLines(a: string, b: string): DiffLine[] {
 }
 
 /**
- * Quick stats about a diff — handy for "32 added, 14 removed" callouts.
+ * Quick stats about a diff - handy for "32 added, 14 removed" callouts.
  */
 export function diffStats(lines: DiffLine[]): { added: number; removed: number; equal: number } {
   let added = 0;

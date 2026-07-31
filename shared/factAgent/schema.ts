@@ -45,7 +45,7 @@ export type ValueType = (typeof VALUE_TYPES)[number];
 //
 // Curated against the four production audit sites (Adyen, Samsung,
 // Notion, VenturePR) so every fact those brands actually surface has a
-// home here. Resist the temptation to widen this — a single key per
+// home here. Resist the temptation to widen this - a single key per
 // logical fact is the whole point. If a new fact recurs in the wild,
 // add it here (bump CURRENT_SCHEMA_VERSION) rather than letting the LLM
 // invent.
@@ -53,17 +53,17 @@ export type ValueType = (typeof VALUE_TYPES)[number];
 // redundant keys that caused the LLM to extract the same fact twice
 // under different names. The duplicates we removed:
 //
-//   identity.foundedDate    — overlapped foundedYear. Kept foundedYear
+//   identity.foundedDate    - overlapped foundedYear. Kept foundedYear
 //                             (more specific to brand-fact use case)
-//   identity.founderNames   — overlapped team.founders. Kept team.founders
-//                             (correct domain — founders ARE team)
-//   identity.category       — overlapped identity.industry. Kept industry
-//   operations.address      — overlapped operations.headquarters. Kept
+//   identity.founderNames   - overlapped team.founders. Kept team.founders
+//                             (correct domain - founders ARE team)
+//   identity.category       - overlapped identity.industry. Kept industry
+//   operations.address      - overlapped operations.headquarters. Kept
 //                             headquarters (one canonical location key)
 //   operations.city,
 //   operations.stateRegion,
 //   operations.postalCode,
-//   operations.country      — duplicated contact.* equivalents. Kept the
+//   operations.country      - duplicated contact.* equivalents. Kept the
 //                             contact.* versions since address details
 //                             are part of the contact record.
 //
@@ -312,7 +312,7 @@ export type AlternativeEntry = z.infer<typeof AlternativeEntrySchema>;
 
 export const ValuePayloadSchema = z
   .object({
-    // Existing v1 fields — kept for back-compat. New writes don't need
+    // Existing v1 fields - kept for back-compat. New writes don't need
     // them; legacy reads continue to work.
     n: z.number().optional(),
     items: z.array(z.string()).optional(),
@@ -329,7 +329,7 @@ export type ValuePayload = z.infer<typeof ValuePayloadSchema>;
 
 // ── Single extracted fact (per-page LLM output) ──────────────────────
 //
-// Subcategory is NOT in the LLM-facing schema — it's derived from
+// Subcategory is NOT in the LLM-facing schema - it's derived from
 // (domain, factKey) on the server. This is what closes the
 // "same fact, different subcategory" duplicate-row bug.
 export const FactSchema = z.object({
@@ -382,7 +382,7 @@ export function buildFactsJsonSchema(): Record<string, unknown> {
   //   - String/number constraints (`maxLength`, `minimum`, etc.) are
   //     fine but the field itself must still be required+nullable
   // The previous shape used `{anyOf:[{ type:"object", ...}, {type:"null"}]}`
-  // for valuePayload — strict mode rejected the inner object because
+  // for valuePayload - strict mode rejected the inner object because
   // its optional properties weren't all in `required`. Now we always
   // emit the full object with every field present-and-nullable.
   return {

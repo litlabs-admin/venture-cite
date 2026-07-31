@@ -26,7 +26,7 @@ export function usePersistedState<T>(
         try {
           localStorage.setItem(key, JSON.stringify(next));
         } catch {
-          // Storage full or unavailable — silently ignore
+          // Storage full or unavailable - silently ignore
         }
         return next;
       });

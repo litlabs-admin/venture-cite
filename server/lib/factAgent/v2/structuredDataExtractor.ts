@@ -5,10 +5,10 @@
 // schema.org Organization / Corporation / WebSite / LocalBusiness
 // markup in their homepage HTML. That markup is:
 //
-//   - Deterministic — no LLM hallucination risk
-//   - Free — no API cost
-//   - Fast — pure string + JSON parsing
-//   - Authoritative — the brand WROTE these facts about themselves
+//   - Deterministic - no LLM hallucination risk
+//   - Free - no API cost
+//   - Fast - pure string + JSON parsing
+//   - Authoritative - the brand WROTE these facts about themselves
 //
 // We map every supported schema.org property to our controlled-vocab
 // Fact shape and emit facts with confidence 1.0. The LLM stage then
@@ -256,7 +256,7 @@ function extractOrgFacts(node: Node, sourceUrl: string): Fact[] {
     if (yr) out.push(buildFact("identity", "foundedYear", yr, sourceUrl, fd));
   }
 
-  // industry / naics / category — map to identity.industry.
+  // industry / naics / category - map to identity.industry.
   const industry = asString(node.industry) ?? asString(node.naics) ?? asString(node.category);
   if (industry) out.push(buildFact("identity", "industry", industry, sourceUrl, industry));
 
@@ -314,7 +314,7 @@ function extractOrgFacts(node: Node, sourceUrl: string): Fact[] {
     out.push(buildArrayFact("credentials", "awards", awards, sourceUrl, awards.join(", ")));
   }
 
-  // tickerSymbol — Corporation-specific.
+  // tickerSymbol - Corporation-specific.
   const ticker = asString(node.tickerSymbol);
   if (ticker) {
     out.push(buildFact("identity", "publicTradingSymbol", ticker, sourceUrl, ticker));
@@ -366,7 +366,7 @@ export function extractStructuredFacts(html: string, sourceUrl: string): Fact[] 
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Malformed block — skip silently.
+      // Malformed block - skip silently.
       continue;
     }
     const iter = walkNodes(parsed);
@@ -382,7 +382,7 @@ export function extractStructuredFacts(html: string, sourceUrl: string): Fact[] 
     }
   }
   // Dedup within the response (same fact may appear in @graph + nested):
-  // collapse by (domain, factKey, factValue) — the LLM-stage consolidator
+  // collapse by (domain, factKey, factValue) - the LLM-stage consolidator
   // will merge across sources anyway.
   const seen = new Set<string>();
   const out: Fact[] = [];

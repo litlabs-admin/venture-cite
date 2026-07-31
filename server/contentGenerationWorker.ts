@@ -2,12 +2,12 @@
 //
 // Vercel migration / Wave 9.5: the prior Chat Completions streaming
 // worker was replaced by runArticleSlice(jobId, deadline), invoked by:
-//   - POST /api/content-jobs/:jobId/advance — user-driven, ~8s budget
-//   - the daily cron orchestrator's drain step — server-driven, longer
+//   - POST /api/content-jobs/:jobId/advance - user-driven, ~8s budget
+//   - the daily cron orchestrator's drain step - server-driven, longer
 //     budget
 //
 // First call kicks off an OpenAI Responses run with `background: true,
-// store: true` — the work runs on OpenAI's infrastructure, decoupled
+// store: true` - the work runs on OpenAI's infrastructure, decoupled
 // from our 60s function ceiling. The response_id is persisted on the
 // job. Subsequent /advance calls poll openai.responses.retrieve() and
 // finalize the article when status="completed". Single LLM call per
@@ -47,7 +47,7 @@ export type GenerationPayload = {
   industry: string;
   type: string;
   brandId?: string;
-  articleId: string; // Wave 7: required — the draft article the job will fill
+  articleId: string; // Wave 7: required - the draft article the job will fill
   targetCustomers?: string;
   geography?: string;
   contentStyle?: "b2b" | "b2c";
@@ -90,12 +90,12 @@ async function runJobToCompletionOrDeadline(
   } = payload;
 
   if (!articleId) {
-    throw new Error("Job is missing articleId — cannot fill draft");
+    throw new Error("Job is missing articleId - cannot fill draft");
   }
 
   // Legacy job migration: pre-Responses code wrote partial tokens to
   // stream_buffer. Those jobs cannot be cleanly resumed with the new
-  // model — the original Chat Completions stream is gone, and the only
+  // model - the original Chat Completions stream is gone, and the only
   // way forward is to fail the job so the user retries. We mark the
   // error with name="TimeoutError" so classifyError() returns "timeout",
   // which refundArticleQuota treats as refundable (the failure is on
@@ -105,7 +105,7 @@ async function runJobToCompletionOrDeadline(
     .openaiResponseId;
   if (!existingResponseId && existingBuffer.length > 0) {
     const err: Error & { name?: string } = new Error(
-      "legacy in-flight job from a prior deploy — please retry generation",
+      "legacy in-flight job from a prior deploy - please retry generation",
     );
     err.name = "TimeoutError";
     throw err;
@@ -152,7 +152,7 @@ async function runJobToCompletionOrDeadline(
   if (response.status === "completed") {
     const finalContent = extractResponseText(response as Parameters<typeof extractResponseText>[0]);
     if (!finalContent) {
-      // Refundable — empty output is a model anomaly, not user input.
+      // Refundable - empty output is a model anomaly, not user input.
       const err: Error & { name?: string } = new Error(
         "OpenAI Responses run completed with empty output",
       );
@@ -171,7 +171,7 @@ async function runJobToCompletionOrDeadline(
     }
 
     const headingMatch = finalContent.match(/^#\s+(.+)$/m);
-    const title = headingMatch?.[1]?.trim() || `${keywords} — ${industry}`;
+    const title = headingMatch?.[1]?.trim() || `${keywords} - ${industry}`;
     await storage.setArticleReady(articleId, finalContent, title);
     await storage.createRevision({
       articleId,
@@ -197,14 +197,14 @@ async function runJobToCompletionOrDeadline(
 
   if (response.status === "incomplete") {
     // Incomplete means the run was truncated (e.g. max_output_tokens
-    // hit). Refundable — user should retry with adjusted scope.
+    // hit). Refundable - user should retry with adjusted scope.
     const reason = response.incomplete_details?.reason ?? "incomplete";
     const err: Error & { name?: string } = new Error(`OpenAI Responses run incomplete: ${reason}`);
     err.name = "TimeoutError";
     throw err;
   }
 
-  // queued | in_progress — still running, return deadline-style outcome
+  // queued | in_progress - still running, return deadline-style outcome
   // so the caller treats this slice as "more work to do."
   return { kind: "deadline", partialContent: "" };
 }
@@ -250,8 +250,8 @@ function buildContentPrompt(args: {
 
   const isB2C = contentStyle === "b2c";
   const styleDirective = isB2C
-    ? `\n\nSTYLE: B2C — warm, conversational, benefit-first, second-person, lifestyle framing. No jargon.`
-    : `\n\nSTYLE: B2B — professional, data-driven, ROI-focused, industry terminology, business impact framing.`;
+    ? `\n\nSTYLE: B2C - warm, conversational, benefit-first, second-person, lifestyle framing. No jargon.`
+    : `\n\nSTYLE: B2B - professional, data-driven, ROI-focused, industry terminology, business impact framing.`;
 
   const systemPreamble = `You are an expert content strategist specializing in GEO (Generative Engine Optimization). Create authoritative, well-structured markdown content that AI platforms like ChatGPT, Claude, and Perplexity would cite as a reliable source. Always include: clear intro, multiple sections with H2/H3 headings, practical examples, FAQ with 4-6 questions, strong conclusion.\n\n`;
   const userPart = `Write a ${promptType} about "${keywords}" for the ${industry} industry.${brandContext}${audienceContext}${styleDirective}\n\nUse markdown (# title, ## sections, ### subsections). Include an FAQ section.`;
@@ -381,7 +381,7 @@ export async function runArticleSlice(jobId: string, deadlineMs: number): Promis
     return { done: true, status: "cancelled" };
   }
 
-  // Deadline hit — leave job in 'running'; next /advance resumes.
+  // Deadline hit - leave job in 'running'; next /advance resumes.
   return { done: false, status: "running" };
 }
 

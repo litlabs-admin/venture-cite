@@ -6,7 +6,7 @@
 --   every Analyze click, NEVER read. The Inspector / weeklySummary /
 --   recommendations engine only read overallScore and ranAt.
 --
---   schema_audits.additional_types (text[]): redundant — the same data
+--   schema_audits.additional_types (text[]): redundant - the same data
 --   is duplicated inside schemas.additionalTypes (jsonb). Both write
 --   paths populate it; the read path falls back to the jsonb copy
 --   anyway, so dropping the sidecar array doesn't break any consumer.

@@ -236,7 +236,7 @@ export async function scanBrandListicles(brandId: string): Promise<ScanReport> {
 
     try {
       // Wave 9.4: ON CONFLICT DO NOTHING via the storage helper. Returns
-      // null when the unique index (brand_id, lower(url)) collides — i.e.
+      // null when the unique index (brand_id, lower(url)) collides - i.e.
       // the same URL was inserted between our pre-dedupe read and now,
       // which can happen on concurrent scans.
       const inserted = await storage.tryInsertListicle({

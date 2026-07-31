@@ -3,7 +3,7 @@
 // any future palette tweak only needs to happen here now.
 //
 // Platform identity is CATEGORICAL data, so it uses the chart series ramp
-// rather than raw Tailwind hues — the ramp is themed, and these badges no
+// rather than raw Tailwind hues - the ramp is themed, and these badges no
 // longer drift from the rest of the UI. Hue assignment is stable and roughly
 // tracks each platform's own brand colour where the ramp allows.
 //

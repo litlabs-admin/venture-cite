@@ -1,6 +1,6 @@
 // Hits real Postgres (despite living under tests/unit/). Loads dotenv before
 // importing server/db so DATABASE_URL is available when the pool initializes.
-// Global setup intentionally doesn't load dotenv — see tests/setup.ts.
+// Global setup intentionally doesn't load dotenv - see tests/setup.ts.
 import "dotenv/config";
 import { describe, it, expect, beforeEach } from "vitest";
 import { storage } from "../../server/storage";
@@ -9,7 +9,7 @@ import { sql } from "drizzle-orm";
 
 async function clear() {
   // Scoped to THIS file's own key prefix. It used to be an unscoped
-  // `DELETE FROM fact_scrape_cache`, which emptied the whole table — including
+  // `DELETE FROM fact_scrape_cache`, which emptied the whole table - including
   // the 'lifecycle-test:%' rows tests/unit/v2LifecycleStorage.test.ts inserts
   // and then counts. Vitest runs those two files in parallel threads against
   // one real database, so whichever lost the race failed. That made roughly
@@ -27,7 +27,7 @@ describe("storage.factScrapeCache", () => {
     `);
     const brand = (brandRow as unknown as { rows: Array<{ id: string }> }).rows[0];
     if (!brand) {
-      return; // No brands in test DB — skip rather than fail.
+      return; // No brands in test DB - skip rather than fail.
     }
 
     await storage.upsertFactScrapeCache({

@@ -1,4 +1,4 @@
-// Coverage for POST /api/assistant/chat (Phase 5 — A1).
+// Coverage for POST /api/assistant/chat (Phase 5 - A1).
 //
 // Express app is built with the assistant router only; auth and
 // ownership are mocked to inject a fake user. Storage, budget,

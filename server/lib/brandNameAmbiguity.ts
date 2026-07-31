@@ -1,11 +1,11 @@
 // Wave 9.4: warn users when their brand name is ambiguous (a common
 // English word, a country, a major existing brand, etc.). The scanner
-// will still run — common-word brands aren't blocked — but the toast
+// will still run - common-word brands aren't blocked - but the toast
 // surfaces the warning so the user knows to add nameVariations to
 // reduce false positives downstream.
 
 const COMMON_WORD_NAMES = new Set([
-  // Common English words used as brand names — generates noise.
+  // Common English words used as brand names - generates noise.
   "apple",
   "amazon",
   "amazon's",
@@ -102,7 +102,7 @@ export function brandNameAmbiguityScore(name: string | null | undefined): number
   const trimmed = String(name).trim().toLowerCase();
   if (!trimmed) return 0;
   if (COMMON_WORD_NAMES.has(trimmed)) return 2;
-  // Single-word, all-lowercase, very short common-letter combos — likely
+  // Single-word, all-lowercase, very short common-letter combos - likely
   // ambiguous. "ace", "tab", "pop" etc.
   if (trimmed.length <= 3 && /^[a-z]+$/.test(trimmed)) return 1;
   return 0;

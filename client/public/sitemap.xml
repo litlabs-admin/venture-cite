@@ -4,7 +4,7 @@
 
   These are the only routes whose content exists in the served HTML. The rest
   of the app sits under the pathless `_app` layout, which carries `ssr: false`
-  (src/routes/_app.tsx) because it is auth-gated — listing one of those would
+  (src/routes/_app.tsx) because it is auth-gated - listing one of those would
   advertise a page that crawlers receive empty.
 
   Keep in sync with the top-level route files in src/routes/*.tsx.

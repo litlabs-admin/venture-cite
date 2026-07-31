@@ -49,7 +49,7 @@ vi.mock("../../server/lib/routesShared", () => ({
   sendError: (res: any, _err: unknown, msg: string) => {
     res.status(500).json({ success: false, error: msg });
   },
-  // Pass-through wrapper — production version forwards thrown errors
+  // Pass-through wrapper - production version forwards thrown errors
   // to next(); tests don't exercise the unhandled-rejection path.
   asyncHandler: (fn: any) => fn,
 }));
@@ -223,7 +223,7 @@ describe("buffer connect endpoint", () => {
   });
 
   it("POST /api/buffer/connect returns 502 buffer_unreachable when GraphQL succeeds but data.account is missing", async () => {
-    // 200 OK with no data — treat as buffer_unreachable, not silent success.
+    // 200 OK with no data - treat as buffer_unreachable, not silent success.
     fetchStub.mockResolvedValueOnce({
       ok: true,
       status: 200,

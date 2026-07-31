@@ -50,7 +50,7 @@ export function extractStructuredData(html: string): StructuredDataResult {
       const parsed = JSON.parse(raw);
       parts.push(`JSON-LD: ${JSON.stringify(parsed)}`);
     } catch {
-      // Drop malformed entries silently — they're not extractable signal.
+      // Drop malformed entries silently - they're not extractable signal.
     }
   }
 

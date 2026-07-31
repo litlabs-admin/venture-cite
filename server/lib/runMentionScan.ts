@@ -1,4 +1,4 @@
-// runMentionScan — Task 14 (Mentions Rebuild)
+// runMentionScan - Task 14 (Mentions Rebuild)
 //
 // Orchestrates a single scan-job run: reads the job row, guards idempotency,
 // transitions status (queued → running → complete | failed), and delegates
@@ -17,7 +17,7 @@ export async function runMentionScan(scanId: string): Promise<void> {
   // 1. Read the scan_jobs row.
   const job = await storage.getScanJob(scanId);
   if (!job) {
-    logger.warn({ scanId }, "scan.run.not_found — scan job missing, skipping");
+    logger.warn({ scanId }, "scan.run.not_found - scan job missing, skipping");
     return;
   }
 
@@ -65,6 +65,6 @@ export async function runMentionScan(scanId: string): Promise<void> {
     });
 
     logger.error({ err, scanId }, "scan.run.failed");
-    // Do NOT re-throw — callers detach the promise.
+    // Do NOT re-throw - callers detach the promise.
   }
 }

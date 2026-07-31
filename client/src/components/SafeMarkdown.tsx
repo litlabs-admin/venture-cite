@@ -4,7 +4,7 @@ import type { Pluggable } from "unified";
 
 // Extend the sanitize schema to allow <mark> (the highlight tag inserted
 // by createHighlightPlugin). Everything else follows the GitHub schema
-// defaults — same security posture, just one extra allowed tag.
+// defaults - same security posture, just one extra allowed tag.
 const schema = {
   ...defaultSchema,
   tagNames: [...(defaultSchema.tagNames ?? []), "mark"],

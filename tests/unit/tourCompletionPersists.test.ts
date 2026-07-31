@@ -7,7 +7,7 @@
 // whose DOM target is absent are silently dropped. With a tail step missing,
 // no RENDERED step ever satisfied `index === config.steps.length - 1`, so the
 // last visible step showed "Next" instead of "Done", Shepherd completed
-// itself, and `onComplete` — the sole caller of markCompleted — never ran.
+// itself, and `onComplete` - the sole caller of markCompleted - never ran.
 // Nothing was written, and the tour reappeared on every single page load.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -101,7 +101,7 @@ describe("tour completion persists when a tail step's target is missing", () => 
     runTour({ config: tourWithMissingTailStep, ctx, mode: "auto", buffer, onComplete: vi.fn() });
     await flush();
 
-    // Skip is for "I don't want the REST of this" — meaningless when the
+    // Skip is for "I don't want the REST of this" - meaningless when the
     // step in front of you is the last one. Previously it appeared here
     // because the count came from config, not from what rendered.
     expect(clickButton("Skip")).toBe(false);
@@ -140,7 +140,7 @@ describe("tour completion persists when every step renders", () => {
 
 // Shepherd funnels the Skip button, "Don't show again", the X icon and Esc
 // through a single `cancel` event. Each ending must persist exactly one
-// outcome — never two, never none.
+// outcome - never two, never none.
 describe("every terminal path settles exactly once", () => {
   const twoStep = {
     ...tourWithMissingTailStep,
@@ -158,7 +158,7 @@ describe("every terminal path settles exactly once", () => {
   });
 
   it("persists a skip when the tour is dismissed with the X icon", async () => {
-    // Previously X/Esc persisted NOTHING — the dominant ending in production
+    // Previously X/Esc persisted NOTHING - the dominant ending in production
     // (82 abandons vs 6 completions) and the reason the tour came back on
     // every single page load.
     anchor("test.present");
@@ -245,7 +245,7 @@ describe("every terminal path settles exactly once", () => {
   it("releases the slot when no step could render at all", async () => {
     const h = handlers();
     const onNoShow = vi.fn();
-    // Neither anchor added — nothing resolves.
+    // Neither anchor added - nothing resolves.
     runTour({
       config: {
         ...twoStep,
@@ -321,7 +321,7 @@ describe("missing anchors do not delay the tour additively", () => {
   it("resolves every step concurrently, so N dead anchors cost one timeout", async () => {
     // Found live: on a sub-1024px viewport the welcome tour has six anchors
     // that can never resolve. Sequential waits made the 3s timeouts additive
-    // and the first panel took ~20s to paint. Production agrees — the
+    // and the first panel took ~20s to paint. Production agrees - the
     // tour_step_target_missing events are ~4s apart.
     const TIMEOUT = 120;
     const dead = Array.from({ length: 5 }, (_, i) => ({

@@ -1,6 +1,6 @@
 // Wave 8: matcher is the authority for `isCited`. The citation judge can
 // still run for enrichment (rank / relevance), but cannot flip the verdict.
-// These tests cover the legacy `checkForCitation` path — the main Wave A
+// These tests cover the legacy `checkForCitation` path - the main Wave A
 // path inside `runBrandPrompts` is integration-tested separately because it
 // touches real DB + storage layers.
 
@@ -24,7 +24,7 @@ vi.mock("../../server/lib/aiLogger", () => ({
   attachAiLogger: vi.fn(),
 }));
 
-// Stub the budget helper too — it's invoked by runBrandPrompts (not by
+// Stub the budget helper too - it's invoked by runBrandPrompts (not by
 // checkForCitation directly) but the import chain pulls it in.
 vi.mock("../../server/lib/llmBudget", () => ({
   assertWithinBudget: vi.fn().mockResolvedValue(undefined),
@@ -40,7 +40,7 @@ beforeEach(() => {
   judgeMock.mockReset();
 });
 
-describe("checkForCitation — matcher authority", () => {
+describe("checkForCitation - matcher authority", () => {
   it("matcher says no → judge never called → isCited=false", async () => {
     // Brand "Notion" requires a signal-word for the ambiguity gate, so a
     // bare "Notion" reference WITHOUT context shouldn't match. Using a
@@ -124,7 +124,7 @@ describe("checkForCitation — matcher authority", () => {
       reasoning: "named",
     });
     const result = await checkForCitation("I have a notion that this won't work.", "Notion", []);
-    // Ambiguity gate triggers — "notion" without a signal word like
+    // Ambiguity gate triggers - "notion" without a signal word like
     // "platform"/"app"/"company" nearby doesn't match. Judge isn't called.
     expect(result.isCited).toBe(false);
     expect(judgeMock).not.toHaveBeenCalled();

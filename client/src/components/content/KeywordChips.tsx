@@ -41,7 +41,7 @@ export default function KeywordChips({
 
   const commit = () => {
     if (!draft.trim()) return;
-    // Allow pasting "a, b, c" — split into multiple chips at once.
+    // Allow pasting "a, b, c" - split into multiple chips at once.
     const parts = draft.split(",").map(normalize).filter(Boolean);
     let next = value;
     for (const p of parts) next = dedupePush(next, p);
@@ -54,7 +54,7 @@ export default function KeywordChips({
       e.preventDefault();
       commit();
     } else if (e.key === "Backspace" && draft === "" && value.length > 0) {
-      // Backspace on empty input pops the last chip — standard chip-input UX.
+      // Backspace on empty input pops the last chip - standard chip-input UX.
       e.preventDefault();
       onChange(value.slice(0, -1));
     }

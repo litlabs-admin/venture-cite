@@ -10,7 +10,7 @@ describe("isTransientError", () => {
     expect(isTransientError(new Error("Request failed with status 422"))).toBe(false);
   });
 
-  it("classifies 401 / 403 as permanent (auth issues — retrying won't help)", () => {
+  it("classifies 401 / 403 as permanent (auth issues - retrying won't help)", () => {
     expect(isTransientError(new Error("401 Unauthorized"))).toBe(false);
     expect(isTransientError(new Error("403 Forbidden"))).toBe(false);
   });

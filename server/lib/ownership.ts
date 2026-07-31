@@ -27,7 +27,7 @@ export function requireUser(req: Request): {
 // Every entity in the system is owned by a user either directly (brands,
 // citations) or through a brand (everything else). These helpers run one query
 // that joins the entity to its owning brand where necessary and returns the
-// row only if the requesting user owns it. On any miss — 404, never 403 — to
+// row only if the requesting user owns it. On any miss - 404, never 403 - to
 // avoid leaking whether the id exists.
 
 export async function requireBrand(id: string, userId: string) {
@@ -153,7 +153,7 @@ export async function requireChatbotThread(id: string, userId: string) {
 }
 
 // Citation runs are brand-owned. Resolve the run and confirm the caller owns
-// its brand — used so routes that take a `:runId` sibling to a validated
+// its brand - used so routes that take a `:runId` sibling to a validated
 // `:brandId` can't be pointed at another tenant's run (BOLA). 404 on miss.
 export async function requireCitationRun(id: string, userId: string) {
   const [row] = await db
@@ -195,7 +195,7 @@ export async function getUserBrandIds(userId: string): Promise<Set<string>> {
 }
 
 // Utility to pluck a whitelisted set of fields from an untrusted body. Never
-// spread req.body straight into a storage call — use this.
+// spread req.body straight into a storage call - use this.
 export function pickFields<T extends Record<string, any>>(
   body: unknown,
   allowed: readonly (keyof T)[],
@@ -210,7 +210,7 @@ export function pickFields<T extends Record<string, any>>(
   return out;
 }
 
-// requireMentionOwnership — resolves the mention row only when the caller owns
+// requireMentionOwnership - resolves the mention row only when the caller owns
 // the brand it belongs to. Returns the mention row or null (never throws).
 // 404 on cross-tenant per anti-enumeration policy.
 export async function requireMentionOwnership(

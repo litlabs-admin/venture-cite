@@ -39,7 +39,7 @@ describe("verifyResendWebhook", () => {
     const id = "msg_01HY";
     const ts = nowSec();
     const goodSig = sign(id, ts, body);
-    // Attacker-supplied "wrong" signature, plus the real one — should still pass.
+    // Attacker-supplied "wrong" signature, plus the real one - should still pass.
     const combined = `v1,AAAAAA== ${goodSig}`;
     expect(
       verifyResendWebhook({

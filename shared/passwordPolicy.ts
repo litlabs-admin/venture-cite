@@ -2,18 +2,18 @@
 // client (registration + reset-password UIs) and the server (registration +
 // change-password routes) so the rules cannot drift across the trust
 // boundary. Before this module the rules were duplicated in two client files
-// and the server enforced only a length check — a direct API caller could
+// and the server enforced only a length check - a direct API caller could
 // set a weaker password than the UI allowed.
 //
 // Three things enforce passwords in this app and they must agree:
-//   1. This module — the ONLY strength check on the registration path
+//   1. This module - the ONLY strength check on the registration path
 //      (admin.createUser bypasses GoTrue's rules, supabase/auth#1959), plus a
 //      belt-and-suspenders check on the server change-password route.
-//   2. GoTrue's configured policy — the platform-level enforcement for the
+//   2. GoTrue's configured policy - the platform-level enforcement for the
 //      reset-password and change-password paths. Set password_min_length +
 //      password_required_characters via the Management API to match these
 //      rules so a client-bypassing direct API call is still rejected.
-//   3. Leaked-password (HIBP) — enforced separately because it needs a
+//   3. Leaked-password (HIBP) - enforced separately because it needs a
 //      network call: server-side at registration (server/lib/leakedPassword.ts)
 //      and by GoTrue elsewhere.
 //
@@ -31,13 +31,13 @@ export interface PasswordRule {
 }
 
 // The positive requirements rendered as a live checklist in the UI. Wording
-// and order are load-bearing — the client shows these labels verbatim.
+// and order are load-bearing - the client shows these labels verbatim.
 //
 // These four rules map EXACTLY onto GoTrue's `password_required_characters`
 // preset "abcdefghijklmnopqrstuvwxyz:ABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789"
 // (lowercase : uppercase : digits) plus password_min_length = 8. Keep them in
 // sync: registration enforces this module, while reset-password and
-// change-password are enforced by GoTrue against that preset — so all three
+// change-password are enforced by GoTrue against that preset - so all three
 // paths accept and reject identical passwords. Changing a rule here without
 // updating the GoTrue config (or vice-versa) re-introduces drift.
 export const PASSWORD_RULES: readonly PasswordRule[] = [
@@ -57,7 +57,7 @@ export function passwordByteLength(pw: string): number {
 
 export type PasswordValidation = { ok: true } | { ok: false; error: string };
 
-// Full strength validation (NOT the HIBP check — that's an async network call,
+// Full strength validation (NOT the HIBP check - that's an async network call,
 // see isPasswordLeaked). Returns the first failure with a user-actionable
 // message, suitable to return straight to the client.
 export function validatePassword(pw: unknown): PasswordValidation {

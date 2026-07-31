@@ -4,7 +4,7 @@ import { CheckIcon, FileCodeCornerIcon, RefreshCwIcon } from "./icons";
 
 // Syntax-highlighting color spans used inside the diff lines below.
 // Punctuation/tags use the grey-ramp classes, attribute names use the plain
-// tertiary class, and string values use text-vc-success-ink — added lines are
+// tertiary class, and string values use text-vc-success-ink - added lines are
 // additions, so their string literals read as the same --success family as the
 // diff's own added-line rail below, not the legacy brand green.
 const GRAY_400 = "text-gray-400";
@@ -124,7 +124,7 @@ const rows: DiffRow[] = [
   },
 ];
 
-// Row 03 "Improve" mockup — a fake code-diff/IDE panel, verbatim structure
+// Row 03 "Improve" mockup - a fake code-diff/IDE panel, verbatim structure
 // from _reference/index.html 2288-2373. Per the simplify-choreography rule
 // the many individually-delayed line fades are collapsed into the ONE
 // outer reveal already applied by the caller (index.html:2286, 700ms
@@ -132,7 +132,7 @@ const rows: DiffRow[] = [
 //
 // AMBIGUITY: the two checkmark icons (file-tab status pill + footer row)
 // are captured opacity:0/scale(0.7) in source alongside a still-visible
-// pulsing accent dot and the label "Applying"/"Applying changes…" — this
+// pulsing accent dot and the label "Applying"/"Applying changes…" - this
 // reads as an independent looping "applying" status simulation (not the
 // page's scroll-reveal system), so it is reproduced in that same captured
 // state: pulsing dot visible, checkmark hidden, per the settled-snapshot

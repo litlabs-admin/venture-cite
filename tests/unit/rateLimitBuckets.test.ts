@@ -111,7 +111,7 @@ describe("rateLimitBuckets", () => {
   it("acquireOrWait with maxWaitMs=0 still attempts an acquire (regression: was returning false unconditionally)", async () => {
     // Pre-2026-05-27 bug: `while (elapsed < 0)` never ran, so tryAcquire
     // was never called and the function returned false on the FIRST
-    // click — manual-discovery handlers all pass 0 here.
+    // click - manual-discovery handlers all pass 0 here.
     const ok = await acquireOrWait("reddit", "zero-wait-scope", 0);
     expect(ok).toBe(true);
   });
@@ -124,7 +124,7 @@ describe("rateLimitBuckets", () => {
 
   it("self-heals stuck-at-zero rows after enough wall time has passed", async () => {
     // Seed a row that looks "stuck": tokens=0 and last_refill_at way in the
-    // past — enough time has elapsed for the bucket to be FULL but tokens
+    // past - enough time has elapsed for the bucket to be FULL but tokens
     // never recovered. Models the symptom users see after a prior
     // mid-deploy crash or a broken UPDATE that persisted bad state.
     const longAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
@@ -135,7 +135,7 @@ describe("rateLimitBuckets", () => {
   });
 
   it("self-heals rows with future last_refill_at (clock-skew corruption)", async () => {
-    // Seed a row whose last_refill_at is IN THE FUTURE — clock skew or a
+    // Seed a row whose last_refill_at is IN THE FUTURE - clock skew or a
     // prior bug. Old applyRefill would treat elapsedSec<0 as "no refill"
     // and the bucket stayed stuck at 0 forever. Self-heal snaps to
     // capacity.

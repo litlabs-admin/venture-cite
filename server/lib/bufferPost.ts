@@ -35,7 +35,7 @@ export async function postToBuffer(
   // Default to `mode: addToQueue`: Buffer drops the post into the
   // next available slot in the user's per-channel posting schedule
   // (configured in Buffer's web app at /account/posting-schedule).
-  // We do NOT pick the time — that's the entire point of queue mode.
+  // We do NOT pick the time - that's the entire point of queue mode.
   // If the user has no schedule for the channel, the post will sit in
   // their queue until they configure one. Callers can pass `scheduledAt`
   // to override with a specific time (`mode: customScheduled`).
@@ -75,8 +75,7 @@ export async function postToBuffer(
   let body: {
     data?: {
       createPost?:
-        | { post: { id: string; text: string; dueAt: string | null } }
-        | { message: string };
+        { post: { id: string; text: string; dueAt: string | null } } | { message: string };
     };
     errors?: Array<{ message: string; extensions?: { code?: string } }>;
   };
@@ -89,7 +88,7 @@ export async function postToBuffer(
   // Top-level GraphQL `errors[]` means Buffer reached us, parsed the
   // request, and rejected it (validation, auth, or schema mismatch).
   // Surface the upstream message instead of pretending the network was
-  // unreachable — the user can act on "mode 'now' not allowed" or
+  // unreachable - the user can act on "mode 'now' not allowed" or
   // "Variable $input got invalid value" but not on a generic 502.
   if (body.errors?.[0]) {
     const message = body.errors.map((e) => e.message).join("; ");

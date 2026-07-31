@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // The page renders router Links indirectly via dashboard-panel primitives and
-// reads brand selection from a hook — stub both so this test is about payload
+// reads brand selection from a hook - stub both so this test is about payload
 // handling and rendering, not navigation or brand-list plumbing.
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, ...rest }: { children?: React.ReactNode }) => <a {...rest}>{children}</a>,
@@ -50,7 +50,7 @@ const fullyScored = {
   history: [40, 50, 55, 62.2],
 };
 
-describe("PerceptionPage — fully scored", () => {
+describe("PerceptionPage - fully scored", () => {
   it("renders the headline as an integer and axes with one decimal", () => {
     renderWithData(fullyScored);
 
@@ -83,7 +83,7 @@ describe("PerceptionPage — fully scored", () => {
   });
 });
 
-describe("PerceptionPage — null axes", () => {
+describe("PerceptionPage - null axes", () => {
   it("skips null axes instead of rendering them as 0", () => {
     renderWithData({
       ...fullyScored,
@@ -106,7 +106,7 @@ describe("PerceptionPage — null axes", () => {
   });
 });
 
-describe("PerceptionPage — never scored", () => {
+describe("PerceptionPage - never scored", () => {
   it("renders the empty state with no error", () => {
     renderWithData(null);
     expect(screen.getByText(/never been scored/)).toBeTruthy();
@@ -114,7 +114,7 @@ describe("PerceptionPage — never scored", () => {
   });
 });
 
-describe("PerceptionPage — single history point", () => {
+describe("PerceptionPage - single history point", () => {
   it("shows the tracking-started copy instead of a chart", () => {
     renderWithData({ ...fullyScored, history: [62.2] });
     expect(screen.getByText(/Tracking started/)).toBeTruthy();
@@ -129,7 +129,7 @@ describe("PerceptionPage — single history point", () => {
   });
 });
 
-describe("PerceptionPage — hero rank/vs-average", () => {
+describe("PerceptionPage - hero rank/vs-average", () => {
   it("renders Rank and Vs Average as NoValue with explanatory captions", () => {
     renderWithData(fullyScored);
     expect(screen.getByText("No cross-account ranking data")).toBeTruthy();
@@ -137,7 +137,7 @@ describe("PerceptionPage — hero rank/vs-average", () => {
   });
 });
 
-describe("PerceptionPage — AI model breakdown", () => {
+describe("PerceptionPage - AI model breakdown", () => {
   it("shows an empty state with no platform data", () => {
     renderWithData(fullyScored, []);
     expect(screen.getByText(/No platform-level citation data yet/)).toBeTruthy();
@@ -168,7 +168,7 @@ describe("PerceptionPage — AI model breakdown", () => {
   });
 });
 
-describe("PerceptionPage — partial payload does not throw", () => {
+describe("PerceptionPage - partial payload does not throw", () => {
   it("renders without throwing when praised/questioned/history are missing", () => {
     const partial = {
       trust: 60,

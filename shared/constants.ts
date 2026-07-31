@@ -7,10 +7,10 @@
 
 // ---------------------------------------------------------------------------
 // AI platforms tracked for citation / visibility analytics.
-// Split into ACTIVE (platforms we actually query via the citation runner — see
+// Split into ACTIVE (platforms we actually query via the citation runner - see
 // server/citationChecker.ts DEFAULT_CITATION_PLATFORMS) and PLANNED (platforms
 // we surface in UI scaffolding but don't yet produce data for). Do not claim
-// "9 platforms" anywhere user-facing — only ACTIVE produces data.
+// "9 platforms" anywhere user-facing - only ACTIVE produces data.
 // ---------------------------------------------------------------------------
 export const AI_PLATFORMS_ACTIVE = [
   "ChatGPT",
@@ -34,10 +34,9 @@ export const AI_PLATFORMS_PLANNED = [
 export const AI_PLATFORMS = AI_PLATFORMS_ACTIVE;
 
 export type AiPlatform =
-  | (typeof AI_PLATFORMS_ACTIVE)[number]
-  | (typeof AI_PLATFORMS_PLANNED)[number];
+  (typeof AI_PLATFORMS_ACTIVE)[number] | (typeof AI_PLATFORMS_PLANNED)[number];
 
-// Legacy alias retained — same set as AI_PLATFORMS_ACTIVE.
+// Legacy alias retained - same set as AI_PLATFORMS_ACTIVE.
 export const AI_PLATFORMS_CORE = AI_PLATFORMS_ACTIVE;
 
 // ---------------------------------------------------------------------------
@@ -79,6 +78,6 @@ export const CONTENT_LIMITS = {
 // `client/src/pages/ai-visibility.tsx`. Surfaced server-side as the
 // denominator of the "AI Visibility checklist progress" recommendation
 // input (rule #9 `complete-visibility-checklist`). Keep this in lockstep
-// with that file — if you add/remove a step there, update this number.
+// with that file - if you add/remove a step there, update this number.
 // ---------------------------------------------------------------------------
 export const VISIBILITY_CHECKLIST_TOTAL = 57;

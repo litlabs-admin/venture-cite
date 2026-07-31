@@ -5,14 +5,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // Token format:   <base64url(payload)>.<base64url(signature)>
 // Payload bytes:  `${userId}|${list}`  (utf-8)
 //
-// Why no timestamp? Unsubscribe links live in inboxes forever — a user
+// Why no timestamp? Unsubscribe links live in inboxes forever - a user
 // who unsubscribes from an email two years old still expects it to work.
 // Replay isn't a security concern: re-clicking the link just re-applies
 // "unsubscribed", which is idempotent.
 //
 // HMAC key: EMAIL_UNSUBSCRIBE_SECRET. Falls back to SESSION_SECRET if
 // unset (so deployments without a dedicated key still work). If neither
-// is set, signToken/verifyToken throw — explicit failure beats silently
+// is set, signToken/verifyToken throw - explicit failure beats silently
 // signing with a weak key.
 
 const SEPARATOR = ".";

@@ -23,7 +23,7 @@
 // This suite deliberately never lets react-hook-form's handleSubmit reach
 // its onSubmit callback (brands.tsx:315-321, which calls
 // createMutation.mutate -> POST /api/brands): every scenario either submits
-// with an invalid field (blocked client-side — react-hook-form only invokes
+// with an invalid field (blocked client-side - react-hook-form only invokes
 // onSubmit once the resolver reports no errors, so an invalid submit makes
 // no network call) or fills the form validly and stops short of clicking
 // submit. See the task brief: this shared test account's brand list is
@@ -39,7 +39,7 @@ test.describe("Brand form client-side validation", () => {
     // The product tour auto-fires per browser session and its Shepherd
     // overlay swallows pointer events, so the click below times out with a
     // message that looks like a selector problem but is not. Whether it
-    // fires here depends on shared account state and test order — this spec
+    // fires here depends on shared account state and test order - this spec
     // passes in isolation and fails in a full run without this.
     await dismissTourIfPresent(page);
     // Opens the manual-entry dialog and calls form.reset() (brands.tsx:462-467),
@@ -52,7 +52,7 @@ test.describe("Brand form client-side validation", () => {
     page,
   }) => {
     // Every field starts empty. Clicking submit runs the resolver against
-    // the whole schema — this is the exact call whose promise a broken
+    // the whole schema - this is the exact call whose promise a broken
     // zod4/@hookform-resolvers@3.10 pairing would silently reject, leaving
     // no FormMessage rendered and no createMutation call either way.
     await page.getByTestId("button-save-brand").click();
@@ -76,14 +76,14 @@ test.describe("Brand form client-side validation", () => {
 
     const websiteError = page.getByText("Enter a valid http(s) URL", { exact: true });
     await expect(websiteError).toBeVisible();
-    // Only the website field should be invalid — proves this is a targeted
+    // Only the website field should be invalid - proves this is a targeted
     // refine failure on the field we broke, not a blanket "form is empty"
     // state that would pass this assertion for the wrong reason.
     await expect(page.getByText("Brand name is required", { exact: true })).not.toBeVisible();
 
     // Correct the field. react-hook-form's default reValidateMode is
     // "onChange": once a field already has an error, typing a new value
-    // re-runs the resolver for that field without needing another submit —
+    // re-runs the resolver for that field without needing another submit -
     // deliberately avoided here since a second full-form submit with an
     // otherwise-valid form WOULD call the create-brand mutation.
     await page.getByTestId("input-website").fill("https://example.com");
@@ -101,7 +101,7 @@ test.describe("Brand form client-side validation", () => {
 
     const saveButton = page.getByTestId("button-save-brand");
     // Proves the control itself is not blocked/disabled once the required
-    // fields carry valid values — the last mile before a real submit, which
+    // fields carry valid values - the last mile before a real submit, which
     // this suite intentionally never triggers (see file header: submitting
     // here would create a real brand in the shared account).
     await expect(saveButton).toBeEnabled();

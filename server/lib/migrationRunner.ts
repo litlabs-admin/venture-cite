@@ -10,7 +10,7 @@ import path from "path";
 import { pool } from "../db";
 import { logger } from "./logger";
 
-const APPLY_LOCK_KEY = 0x564d_4944; // "VMID" — distinct from app-level locks
+const APPLY_LOCK_KEY = 0x564d_4944; // "VMID" - distinct from app-level locks
 
 export async function applyMigrations(): Promise<void> {
   const dir = path.resolve(process.cwd(), "migrations");
@@ -19,14 +19,14 @@ export async function applyMigrations(): Promise<void> {
     files = (await fs.readdir(dir)).filter((f) => f.endsWith(".sql")).sort();
   } catch (err: unknown) {
     if ((err as { code?: string }).code === "ENOENT") {
-      logger.info("applyMigrations: no migrations directory — skipping");
+      logger.info("applyMigrations: no migrations directory - skipping");
       return;
     }
     throw err;
   }
 
   // Hold a session-level advisory lock for the whole apply pass. If another
-  // build/boot is already mid-apply, we block until they're done — which is
+  // build/boot is already mid-apply, we block until they're done - which is
   // safe because applyMigrations is idempotent.
   const lockClient = await pool.connect();
   try {

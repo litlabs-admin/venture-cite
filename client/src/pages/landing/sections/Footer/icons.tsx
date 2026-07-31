@@ -1,7 +1,7 @@
 // Local copies of the exact icon paths seen rendered in index.html's footer
 // (lines 3627-3769): a chevron-up on the "Free Tools" trigger, an earth
 // glyph + check on the language switcher, and the LinkedIn brand mark.
-// Follows the same convention as components/sections/Nav/icons.tsx — paths
+// Follows the same convention as components/sections/Nav/icons.tsx - paths
 // reproduced verbatim, the source's non-visual "lucide lucide-*" identifier
 // classes dropped.
 type IconProps = { size?: number; className?: string };
@@ -17,7 +17,7 @@ const strokeBase = {
   "aria-hidden": true,
 };
 
-// index.html:3647 / :3695 — the "Free Tools" button's trailing chevron.
+// index.html:3647 / :3695 - the "Free Tools" button's trailing chevron.
 export function ChevronUpIcon({ size = 12, className }: IconProps) {
   return (
     <svg {...strokeBase} width={size} height={size} className={className}>
@@ -26,7 +26,7 @@ export function ChevronUpIcon({ size = 12, className }: IconProps) {
   );
 }
 
-// index.html:3757 — lucide-earth, the language switcher's globe glyph.
+// index.html:3757 - lucide-earth, the language switcher's globe glyph.
 export function EarthIcon({ size = 15, className }: IconProps) {
   return (
     <svg {...strokeBase} width={size} height={size} className={className}>
@@ -38,7 +38,7 @@ export function EarthIcon({ size = 15, className }: IconProps) {
   );
 }
 
-// index.html:3759 — lucide-check, marks the current language.
+// index.html:3759 - lucide-check, marks the current language.
 export function CheckIcon({ size = 14, className }: IconProps) {
   return (
     <svg {...strokeBase} width={size} height={size} className={className}>
@@ -47,7 +47,7 @@ export function CheckIcon({ size = 14, className }: IconProps) {
   );
 }
 
-// index.html:3684 — LinkedIn brand mark, filled not stroked.
+// index.html:3684 - LinkedIn brand mark, filled not stroked.
 export function LinkedInIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="currentColor" viewBox="0 0 24 24">

@@ -8,7 +8,7 @@ describe("extractStructuredData", () => {
   it("pulls title, description, og:*, twitter:*, and JSON-LD", () => {
     const html = `
       <html><head>
-        <title>Acme — AI tools</title>
+        <title>Acme - AI tools</title>
         <meta name="description" content="Acme builds AI." />
         <meta property="og:title" content="Acme OG" />
         <meta property="og:description" content="OG desc" />
@@ -16,7 +16,7 @@ describe("extractStructuredData", () => {
         <script type="application/ld+json">{"@type":"Organization","name":"Acme"}</script>
       </head><body></body></html>`;
     const out = extractStructuredData(html);
-    expect(out.text).toContain("Title: Acme — AI tools");
+    expect(out.text).toContain("Title: Acme - AI tools");
     expect(out.text).toContain("description: Acme builds AI.");
     expect(out.text).toContain("og:title: Acme OG");
     expect(out.text).toContain("twitter:site: @acme");

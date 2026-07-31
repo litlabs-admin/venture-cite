@@ -76,7 +76,7 @@ export default function PromptsTab({
 
   const { data: suggestionsData } = usePromptSuggestions(selectedBrandId);
   const suggestions = suggestionsData?.data ?? [];
-  // The table renders archived rows too, greyed with their toggle off — the
+  // The table renders archived rows too, greyed with their toggle off - the
   // `prompts` prop from the page is tracked-only, which would make a row
   // switched off disappear with no way to switch it back on.
   const { data: allPromptsData } = useAllPrompts(selectedBrandId);
@@ -150,7 +150,7 @@ export default function PromptsTab({
         : { title: failTitle, description: d.error, variant: "destructive" },
     );
 
-  // Opening a prompt is a navigation, not a side panel — the detail view has
+  // Opening a prompt is a navigation, not a side panel - the detail view has
   // its own page (see client/src/pages/prompt-detail.tsx), matching the
   // reference. The inspector is left for surfaces that genuinely drill down
   // without leaving the list.
@@ -207,7 +207,7 @@ export default function PromptsTab({
         const skipped = texts.length - accepted.length;
         toast({
           title: `Added ${accepted.length} prompt${accepted.length === 1 ? "" : "s"}`,
-          description: skipped > 0 ? `${skipped} skipped — tracked set is full.` : undefined,
+          description: skipped > 0 ? `${skipped} skipped - tracked set is full.` : undefined,
         });
       });
   }
@@ -281,7 +281,7 @@ export default function PromptsTab({
         <p className="flex-1 text-caption leading-snug text-vc-secondary">
           Prompts are the questions people ask AI. The same set is re-checked on every run, so
           scores stay comparable week to week
-          {promptsAgeLabel ? ` — seeded ${promptsAgeLabel}` : ""}.
+          {promptsAgeLabel ? ` - seeded ${promptsAgeLabel}` : ""}.
         </p>
         <button
           type="button"
@@ -344,7 +344,7 @@ export default function PromptsTab({
         onExport={exportCsv}
       />
 
-      {/* Duplicate — opens prefilled so the copy can be varied before saving */}
+      {/* Duplicate - opens prefilled so the copy can be varied before saving */}
       <Dialog
         open={!!duplicating}
         onOpenChange={(o) => {
@@ -355,7 +355,7 @@ export default function PromptsTab({
           <DialogHeader>
             <DialogTitle>Duplicate prompt</DialogTitle>
             <DialogDescription>
-              Vary the wording before saving — an exact copy is rejected, since two identical
+              Vary the wording before saving - an exact copy is rejected, since two identical
               prompts double the run cost and split one prompt&apos;s results across two rows.
             </DialogDescription>
           </DialogHeader>
@@ -413,7 +413,7 @@ export default function PromptsTab({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reset confirm — destructive, so it stays behind an explicit checkbox */}
+      {/* Reset confirm - destructive, so it stays behind an explicit checkbox */}
       <AlertDialog
         open={resetOpen}
         onOpenChange={(o) => {
@@ -529,7 +529,7 @@ export default function PromptsTab({
         </DialogContent>
       </Dialog>
 
-      {/* Accept a suggestion — add when there's room, replace at the cap */}
+      {/* Accept a suggestion - add when there's room, replace at the cap */}
       <Dialog open={!!accepting} onOpenChange={(o) => !o && setAccepting(null)}>
         <DialogContent>
           <DialogHeader>
@@ -542,7 +542,7 @@ export default function PromptsTab({
               {prompts.length < TRACKED_CAP
                 ? `You have ${TRACKED_CAP - prompts.length} open slot${
                     TRACKED_CAP - prompts.length === 1 ? "" : "s"
-                  } — accepting just adds it. Future runs will include it.`
+                  } - accepting just adds it. Future runs will include it.`
                 : `Your tracked set is at the cap of ${TRACKED_CAP}. Pick an existing prompt to archive so this one can take its slot.`}
             </DialogDescription>
           </DialogHeader>

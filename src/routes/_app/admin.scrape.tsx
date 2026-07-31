@@ -6,6 +6,6 @@ import { AuthenticatedRoute } from "../-shared/routeGates";
 const AdminScrapeRuns = lazy(() => import("@/pages/admin-scrape-runs"));
 
 export const Route = createFileRoute("/_app/admin/scrape")({
-  head: () => ({ meta: [{ title: "Recent scrapes — admin" }] }),
+  head: () => ({ meta: [{ title: "Recent scrapes - admin" }] }),
   component: () => <AuthenticatedRoute component={AdminScrapeRuns} />,
 });

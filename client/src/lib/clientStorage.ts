@@ -8,7 +8,7 @@
 // convention.
 //
 // Supabase manages its own auth-token key (`sb-<project>-auth-token`) and
-// clears it via `supabase.auth.signOut()` — we don't touch it here.
+// clears it via `supabase.auth.signOut()` - we don't touch it here.
 
 const LEGACY_UNPREFIXED_KEYS = ["hasSeenOnboarding", "completedGuideSteps"];
 
@@ -16,7 +16,7 @@ const VENTURECITE_PREFIX = "venturecite-";
 
 export function clearAllVentureCiteStorage(): void {
   try {
-    // Snapshot keys first — mutating localStorage while iterating shifts
+    // Snapshot keys first - mutating localStorage while iterating shifts
     // indices and skips entries.
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -32,6 +32,6 @@ export function clearAllVentureCiteStorage(): void {
       localStorage.removeItem(key);
     }
   } catch {
-    // Storage access can throw in private mode or when full — best-effort.
+    // Storage access can throw in private mode or when full - best-effort.
   }
 }

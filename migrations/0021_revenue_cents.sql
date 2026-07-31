@@ -4,7 +4,7 @@
 -- floating-point error fast (every fifth-and-tenth cent value is
 -- inexact in IEEE 754). Postgres `numeric(10,2)` is exact at rest, but
 -- the moment it crosses into JS via the pg driver it becomes a string,
--- and every analytics rollup converts back to Number — losing precision
+-- and every analytics rollup converts back to Number - losing precision
 -- on every sum.
 --
 -- Storing cents as bigint sidesteps the whole problem: Postgres sums
@@ -24,7 +24,7 @@ update public.purchase_events
 set revenue_cents = (revenue * 100)::bigint
 where revenue_cents is null and revenue is not null;
 
--- Same treatment for ai_commerce_sessions.conversion_value (also money) —
+-- Same treatment for ai_commerce_sessions.conversion_value (also money) -
 -- but only if the legacy numeric column exists. In some environments the
 -- table never had a conversion_value column (it was planned but never
 -- landed), so we add the _cents column unconditionally and only backfill

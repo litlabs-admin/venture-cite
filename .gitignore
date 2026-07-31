@@ -10,12 +10,12 @@ out
 server/public
 *.tsbuildinfo
 # Nitro's own build output (TanStack Start). Lands under client/ today
-# because Nitro resolves it relative to Vite's `root`, not the repo root —
+# because Nitro resolves it relative to Vite's `root`, not the repo root -
 # see the Phase 2 Task 2 report for why that's a live, unresolved conflict
 # with the existing `build.outDir: dist/public` convention.
 .output/
 
-# ─── Environment variables — NEVER commit ───────────────────────
+# ─── Environment variables - NEVER commit ───────────────────────
 .env
 .env.*
 !.env.example
@@ -25,7 +25,7 @@ log.txt
 *.log
 logs/
 
-# ─── Documentation / notes — kept local, never pushed ──────────
+# ─── Documentation / notes - kept local, never pushed ──────────
 *.md
 !README.md
 !docs/privacy-policy.md
@@ -33,7 +33,7 @@ logs/
 !docs/phase1_completion.md
 !docs/phase2_goals.md
 !docs/phase2_completion.md
-# Operational, not notes — needed by anyone deploying this.
+# Operational, not notes - needed by anyone deploying this.
 !docs/deploy-runbook.md
 
 # ─── Editor / IDE ────────────────────────────────────────────────
@@ -71,13 +71,13 @@ coverage/
 .next/
 .vercel/
 
-# ─── Playwright e2e output — includes .auth/state.json, a real ──
+# ─── Playwright e2e output - includes .auth/state.json, a real ──
 # ─── session token; must never be committed ─────────────────────
 test-results/
 playwright-report/
 blob-report/
 
-# ─── Playwright shared e2e auth state — playwright/.auth/state.json ────
+# ─── Playwright shared e2e auth state - playwright/.auth/state.json ────
 # ─── holds a real Supabase session token; must never be committed ──────
 playwright/.auth/
 

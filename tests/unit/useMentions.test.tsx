@@ -193,7 +193,7 @@ describe("useMentions", () => {
 
     // Assert on the real navigate() call. setFilter passes `search` as an
     // UPDATER function (so unrelated params like brandId survive), which is
-    // why this invokes the updater and checks what it actually produces —
+    // why this invokes the updater and checks what it actually produces -
     // a shallow toHaveBeenCalledWith could not see through the closure.
     expect(navigateMock).toHaveBeenCalledWith(
       expect.objectContaining({ replace: true, search: expect.any(Function) }),
@@ -202,7 +202,7 @@ describe("useMentions", () => {
       search: (prev: Record<string, unknown>) => Record<string, unknown>;
     };
     expect(call.search({})).toEqual({ status: "new" });
-    // Unrelated params must be preserved, not clobbered — dropping brandId
+    // Unrelated params must be preserved, not clobbered - dropping brandId
     // here would silently reset the user's brand selection.
     expect(call.search({ brandId: "b1" })).toEqual({ brandId: "b1", status: "new" });
   });
@@ -319,7 +319,7 @@ describe("useMentions", () => {
 
     await waitFor(() => expect(result.current.mentions).toHaveLength(2));
 
-    // Trigger delete (does NOT await — we want to inspect mid-flight)
+    // Trigger delete (does NOT await - we want to inspect mid-flight)
     act(() => {
       result.current.deleteMention("m1");
     });

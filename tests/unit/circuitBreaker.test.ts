@@ -81,7 +81,7 @@ describe("CircuitBreaker", () => {
 
   it("ignores 4xx (client) errors when counting failures", async () => {
     const cb = new CircuitBreaker(baseOpts);
-    // Each is a permanent client error — should NOT count toward the threshold.
+    // Each is a permanent client error - should NOT count toward the threshold.
     for (let i = 0; i < 5; i++) {
       await expect(
         cb.run(async () => Promise.reject(new Error("422 Unprocessable"))),
@@ -97,7 +97,7 @@ describe("CircuitBreaker", () => {
     await expect(cb.run(async () => Promise.reject(new Error("500")))).rejects.toThrow();
     expect(cb.failureCount()).toBe(2);
 
-    // Move past the window — those failures should age out.
+    // Move past the window - those failures should age out.
     vi.advanceTimersByTime(61_000);
     expect(cb.failureCount()).toBe(0);
 

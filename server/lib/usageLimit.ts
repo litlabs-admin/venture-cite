@@ -5,7 +5,7 @@
 //   2. enqueue / create
 //   3. UPDATE count = count + 1
 // Two concurrent requests both see "4 of 5", both pass step 1, both
-// create at step 2 — user gets 6 of 5.
+// create at step 2 - user gets 6 of 5.
 //
 // The fix here:
 //   BEGIN
@@ -25,7 +25,7 @@ import { usageLimits } from "@shared/schema";
 import type { Tier } from "./llmPricing";
 
 // Type alias for the parameter Drizzle passes to a transaction callback.
-// Same shape as `db` for our purposes — supports `.insert`, `.update`,
+// Same shape as `db` for our purposes - supports `.insert`, `.update`,
 // `.execute`, etc. Extracting it from the function-type lets us avoid
 // importing the entire generic Drizzle PgTransaction signature.
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -60,7 +60,7 @@ function firstRow<T>(result: unknown): T | undefined {
 // `work` throws.
 //
 // IMPORTANT: usage is incremented at enqueue time, not at job-completion
-// time. Failed jobs still consume quota — that's the cost of preventing
+// time. Failed jobs still consume quota - that's the cost of preventing
 // runaway parallel enqueues from over-spending the cap. Acceptable
 // trade-off for pre-launch.
 export async function withArticleQuota<T>(
@@ -88,7 +88,7 @@ export async function withArticleQuota<T>(
         );
       }
     } else {
-      // Unlimited tier — still take the lock so increment ordering stays
+      // Unlimited tier - still take the lock so increment ordering stays
       // sane if the caller's work depends on serialization.
       await tx.execute(sql`select id from public.users where id = ${userId} for update`);
     }
@@ -112,7 +112,7 @@ export async function withArticleQuota<T>(
 // Idempotent: gated on `content_generation_jobs.refunded_at IS NULL`. The
 // caller passes the classified errorKind; the helper itself only refunds for
 // kinds we judge "infra error or user-cancel". 'budget' and 'invalid_input'
-// are *not* refunded — those are real terminal failures the user caused.
+// are *not* refunded - those are real terminal failures the user caused.
 const REFUNDABLE_ERROR_KINDS = new Set([
   "openai_429",
   "openai_5xx",
@@ -169,7 +169,7 @@ export async function refundArticleQuota(
   });
 }
 
-// Brand quota — counts rows in public.brands rather than reading a
+// Brand quota - counts rows in public.brands rather than reading a
 // per-user counter (the existing brands_used column drifts because of
 // soft deletes and FK cascades). Same FOR UPDATE row-lock pattern.
 export async function withBrandQuota<T>(
@@ -198,7 +198,7 @@ export async function withBrandQuota<T>(
         throw new UsageLimitError(
           "brands",
           limits.maxBrands,
-          `Brand limit reached — your ${tier} plan allows ${limits.maxBrands}. Delete an existing brand or upgrade for more.`,
+          `Brand limit reached - your ${tier} plan allows ${limits.maxBrands}. Delete an existing brand or upgrade for more.`,
         );
       }
     }

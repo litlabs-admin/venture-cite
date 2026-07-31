@@ -8,7 +8,7 @@
 //      aiGenerated, so user-authored articles stay at the column default
 //      (false) and render no pill.
 //
-// Strategy mirrors tests/unit/mentionsStorage.test.ts — mock server/db with
+// Strategy mirrors tests/unit/mentionsStorage.test.ts - mock server/db with
 // a Drizzle-chain proxy that captures the .set() / .values() payload so we
 // can assert on the actual columns the DAO writes.
 
@@ -100,7 +100,7 @@ describe("setArticleReady (worker completion path)", () => {
 });
 
 describe("createArticle (manual POST /api/articles path)", () => {
-  it("does not flip aiGenerated — manual creates stay at the column default (false)", async () => {
+  it("does not flip aiGenerated - manual creates stay at the column default (false)", async () => {
     const row = {
       id: "article-2",
       brandId: "brand-1",

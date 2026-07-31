@@ -1,4 +1,4 @@
--- 0085 — two independent hardening changes.
+-- 0085 - two independent hardening changes.
 
 -- 1) Dedicated dedup stamp for the weekly DIGEST. It previously shared
 --    last_weekly_report_sent_at with the Sunday visibility-report job, so
@@ -11,13 +11,13 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_weekly_digest_sent_at TIMESTAMP;
 --    rows. The unlocked kickoff-inline run can race the cron drain and both
 --    write the same cell; the run aggregate then double-counts, corrupting
 --    total_checks / citation_rate. competitor_geo_rankings already has this
---    guard (migration 0027) — this brings the primary table in line.
+--    guard (migration 0027) - this brings the primary table in line.
 
 --    Pre-dedup existing duplicates first (a unique index can't be created
 --    while duplicates exist): keep the most-recently-checked row per triple.
 --    Partial to rows where both keys are non-null (the FKs are ON DELETE SET
 --    NULL, so detached legacy rows can have NULLs and are intentionally left
---    alone — NULLs are distinct under a unique index anyway).
+--    alone - NULLs are distinct under a unique index anyway).
 DELETE FROM geo_rankings gr
 USING (
   SELECT id,

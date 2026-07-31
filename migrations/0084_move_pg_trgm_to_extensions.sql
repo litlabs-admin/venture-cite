@@ -14,7 +14,7 @@
 --     pg_trgm as best-effort, so it may be absent on some environments).
 --   * The faq_items trigram GIN index (0042) depends on gin_trgm_ops by
 --     OID, and that operator class is a member of the extension, so it
---     relocates with the extension automatically — no index rebuild, no
+--     relocates with the extension automatically - no index rebuild, no
 --     downtime, the index keeps working.
 --   * The one runtime caller (databaseStorage.findSimilarFaqQuestion) is
 --     schema-qualified to `extensions.similarity(...)` in app code, so it

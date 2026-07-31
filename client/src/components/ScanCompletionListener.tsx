@@ -8,7 +8,7 @@ import { apiRequest } from "@/lib/queryClient";
 import type { ScanJob } from "@shared/schema";
 
 /**
- * ScanCompletionListener — mounts once inside the authenticated tree; renders
+ * ScanCompletionListener - mounts once inside the authenticated tree; renders
  * nothing. Polls /api/brand-mentions/scans/active every 5 s whenever there is
  * at least one active scan in flight, then fires a toast when a scan finishes.
  *
@@ -78,7 +78,7 @@ export function ScanCompletionListener() {
             queryClient.invalidateQueries({ queryKey: ["/api/brand-mentions"] });
           })
           .catch(() => {
-            /* swallow — network blip; next poll will retry if still relevant */
+            /* swallow - network blip; next poll will retry if still relevant */
           });
       }
     }

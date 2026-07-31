@@ -36,13 +36,13 @@ import { BrandLogo } from "@/components/BrandLogo";
 //
 // Each spine stage carries a literal data-tour-id wrapper (nav.setup,
 // nav.monitor, nav.diagnose, nav.act, nav.report) referenced by
-// global-welcome.tour.ts. They must stay literal strings — the build gate
+// global-welcome.tour.ts. They must stay literal strings - the build gate
 // scripts/verify-tour-targets.ts statically greps `data-tour-id="…"` and
 // fails the build if a registered target has no literal match in source.
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-/** The fixed set of top-level spine destinations this nav renders — kept as
+/** The fixed set of top-level spine destinations this nav renders - kept as
  *  a literal union (not `string`) so every `<Link to={href}>` below stays
  *  type-checked against the generated route tree. */
 type SpineHref = "/" | "/setup" | "/monitor" | "/diagnose" | "/act" | "/report";
@@ -62,7 +62,7 @@ function NavItem({
 }) {
   // Measured nav-item spec: 12px text, px-2 py-2, rounded-sm, 150ms colors,
   // 16px icon, accent-subtle fill + accent text when active. No pill, no
-  // heavy weight — the active state is a tint, not a slab.
+  // heavy weight - the active state is a tint, not a slab.
   return (
     <Link to={href} onClick={onNavigate}>
       <div
@@ -106,11 +106,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-vc-surface">
-      {/* Brand row — 56px, matching the context bar's height exactly so the
+      {/* Brand row - 56px, matching the context bar's height exactly so the
           two hairlines meet in one unbroken line across the viewport. */}
       <div className="relative flex h-[56px] shrink-0 items-center border-b border-vc-default px-2.5">
         {/* Mark + wordmark. The image carries no accessible name of its own
-            (alt=""), so the adjacent text supplies it — no aria-label needed. */}
+            (alt=""), so the adjacent text supplies it - no aria-label needed. */}
         <Link
           to="/"
           onClick={onNavigate}
@@ -122,7 +122,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </Link>
       </div>
 
-      {/* Spine nav. Rendered in workflow order — the sequence a user
+      {/* Spine nav. Rendered in workflow order - the sequence a user
           actually moves through. Unrolled so the five spine-stage tour
           targets can carry literal data-tour-id strings the build gate
           can grep. */}

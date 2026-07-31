@@ -178,7 +178,7 @@ export default function Brands() {
         setWebsiteUrl("");
         if (data.analysisQuality === "partial") {
           toast({
-            title: "Brand created — analysis incomplete",
+            title: "Brand created - analysis incomplete",
             description: `We created "${data.data.name}" but couldn't fully analyze the website. Please edit the brand details to fill in the gaps.`,
             variant: "destructive",
           });
@@ -490,7 +490,7 @@ export default function Brands() {
           ) : isError ? (
             <ErrorState
               title="Couldn't load your brands"
-              description="We hit a problem fetching your brand list. The issue has been logged — please try again."
+              description="We hit a problem fetching your brand list. The issue has been logged - please try again."
               onRetry={() => refetch()}
               isRetrying={isRefetching}
             />

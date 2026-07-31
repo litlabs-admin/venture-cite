@@ -11,7 +11,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 
 // ─── Prompt detail ───────────────────────────────────────────────────────────
-// Its own page, not a sidebar — matching the reference, where clicking a
+// Its own page, not a sidebar - matching the reference, where clicking a
 // prompt navigates to /prompts/p/:id. Route: /prompts/$promptId.
 //
 // Measured spec:
@@ -50,7 +50,7 @@ function Dash() {
   return <span className="tabular-nums text-vc-hover">–</span>;
 }
 
-/** Score-over-time chart. Plain SVG — the series is a handful of points and
+/** Score-over-time chart. Plain SVG - the series is a handful of points and
  *  a charting library would be more code than the path. */
 function ScoreChart({ series }: { series: { at: string; score: number }[] }) {
   if (series.length < 2) {
@@ -128,7 +128,7 @@ function ScoreChart({ series }: { series: { at: string; score: number }[] }) {
       />
       {pts.map((p) => (
         <circle key={p.at} cx={p.x} cy={p.y} r="2.5" fill="var(--brand-accent)">
-          <title>{`${fmt(p.at)} — ${p.score}`}</title>
+          <title>{`${fmt(p.at)} - ${p.score}`}</title>
         </circle>
       ))}
       <text
@@ -378,7 +378,7 @@ export default function PromptDetailPage() {
                 </div>
               </div>
 
-              {/* No search-volume source exists — a dash, never a number. */}
+              {/* No search-volume source exists - a dash, never a number. */}
               <div className="flex flex-col gap-1.5 border-l border-vc-subtle pl-6 pr-6">
                 <span className="text-label text-vc-text-muted">Volume</span>
                 <div className="flex items-baseline gap-1">

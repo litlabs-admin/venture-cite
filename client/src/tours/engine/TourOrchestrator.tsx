@@ -82,7 +82,7 @@ function useCounts(brandId: string | null): CountsResp {
   const articleCount = articles?.data?.length ?? 0;
   // Memoised on the scalar counts. A fresh object literal every render made
   // `counts` a new identity every render, which re-ran all three effects
-  // below on every render — including the preview effect, which rebuilt the
+  // below on every render - including the preview effect, which rebuilt the
   // admin's previewed tour from scratch each time.
   return useMemo(
     () => ({
@@ -90,7 +90,7 @@ function useCounts(brandId: string | null): CountsResp {
       mentions: mentionCount,
       // No cheap client-side citations-count source exists; the spine's
       // activation pipeline runs citations server-side. Honest 0 means
-      // "not measured here", not "zero citations" — and no tour auto-fires
+      // "not measured here", not "zero citations" - and no tour auto-fires
       // on this value (the always-true empty-citations nudge was removed).
       citations: 0,
       articles: articleCount,
@@ -178,7 +178,7 @@ export function TourOrchestrator() {
     if (activeRef.current) return; // StrictMode guard
     // Wait for the persisted state to land. useTourState yields `{}` while
     // /api/tours/state is in flight, and an empty state looks exactly like
-    // "never seen this tour" — so every page load re-fired tours the user
+    // "never seen this tour" - so every page load re-fired tours the user
     // had already completed, skipped or suppressed. The intro step has no
     // DOM target, so it painted instantly, well before the real state
     // arrived to say it shouldn't have. Completion was being written
@@ -186,7 +186,7 @@ export function TourOrchestrator() {
     //
     // Measured on admin@venturecite.com (2026-07-30): state held
     // `global: { v: 2, skippedAt: 2026-07-29T19:18 }` and the tour still
-    // auto-fired 7 times the next day — 133 fires against 6 completions
+    // auto-fired 7 times the next day - 133 fires against 6 completions
     // and 21 skips lifetime.
     if (!stateReady) return;
 
@@ -238,7 +238,7 @@ export function TourOrchestrator() {
           onNoShow: () => {
             // Anchor wasn't on this page, so nothing showed. Persist
             // nothing and release the per-session guard so this tour is
-            // re-evaluated on the next route/state change — it fires
+            // re-evaluated on the next route/state change - it fires
             // properly once the user reaches the page that has the
             // anchor, instead of being silently consumed here.
             firedThisSessionRef.current.delete(guardKey);

@@ -50,7 +50,7 @@ describe("core competitor rows", () => {
   const rows = buildCoreCompetitorRows(LIVE, CITES);
   const byName = (n: string) => rows.find((r) => r.name === n);
 
-  it("shows only core competitors — no products, publishers, or the brand itself", () => {
+  it("shows only core competitors - no products, publishers, or the brand itself", () => {
     expect(rows.map((r) => r.name).sort()).toEqual(["Amazon", "Spotify"]);
     for (const dropped of ["iPhone", "S Pen", "Samsung Galaxy Tab", "CNET", "Leica", "Apple"]) {
       expect(byName(dropped)).toBeUndefined();
@@ -70,7 +70,7 @@ describe("core competitor rows", () => {
 
   it("never credits a mined row's citations to a same-domain publisher", () => {
     // Leica is stored with domain cnet.com. Attributing on domain instead of
-    // name would hand its 7 citations to CNET — and CNET is not core anyway.
+    // name would hand its 7 citations to CNET - and CNET is not core anyway.
     expect(byName("CNET")).toBeUndefined();
     expect(rows.reduce((s, r) => s + r.totalCitations, 0)).toBe(20);
   });
@@ -113,7 +113,7 @@ describe("leaderboard row merging", () => {
     const samsung = out.filter((r) => /samsung/i.test(r.name));
     expect(samsung).toHaveLength(1);
     expect(samsung[0].totalCitations).toBe(5);
-    // Shorter label wins — the legal-suffix form is the noisier one.
+    // Shorter label wins - the legal-suffix form is the noisier one.
     expect(samsung[0].name).toBe("Samsung");
     expect(samsung[0].platformBreakdown).toEqual({ chatgpt: 3, perplexity: 2 });
   });

@@ -7,7 +7,7 @@
 //
 // signature input is HMAC-SHA256 of `${svix_id}.${svix_timestamp}.${body}`
 // keyed with the webhook secret. Resend prefixes the secret with "whsec_"
-// — strip that and base64-decode before HMAC. We accept the request if
+// - strip that and base64-decode before HMAC. We accept the request if
 // any of the listed signatures matches.
 //
 // Replay protection: reject if svix-timestamp is older than ±5 minutes

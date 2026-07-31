@@ -24,7 +24,7 @@ describe("passesBrandPresenceGate", () => {
 
   it("does not match unrelated text (audit A1 regression)", () => {
     const r = passesBrandPresenceGate({ title: "Apollo space program", selftext: "" }, ["Apollo"]);
-    expect(r.matched).toBe(true); // Apollo IS present — gate is a literal includes
+    expect(r.matched).toBe(true); // Apollo IS present - gate is a literal includes
     const r2 = passesBrandPresenceGate({ title: "rocket history", selftext: "" }, ["Apollo"]);
     expect(r2.matched).toBe(false);
   });

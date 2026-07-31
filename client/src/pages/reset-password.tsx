@@ -141,7 +141,7 @@ export default function ResetPassword() {
 
   return (
     // Title/robots moved to src/routes/_app/reset-password.tsx's `head()`
-    // — metadata belongs to the route, not this component.
+    // - metadata belongs to the route, not this component.
     <PanelPage className="flex items-center justify-center p-4">
       <PanelRow cols={1} last className="w-full max-w-md">
         <Panel width="wide" border="last">

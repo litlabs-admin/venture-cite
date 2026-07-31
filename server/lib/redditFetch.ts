@@ -3,7 +3,7 @@ import { logger } from "./logger";
 // ─── Reddit fetch ────────────────────────────────────────────────────────────
 // Unauthenticated only. This file replaces redditOAuth.ts, whose token
 // exchange, credential check and authenticated fetch were removed along with
-// the scanner's OAuth path — the mention scanner is unauthenticated by design
+// the scanner's OAuth path - the mention scanner is unauthenticated by design
 // and carries no Reddit credentials.
 //
 // Reddit aggressively rate-limits and blocks datacenter IPs on these public

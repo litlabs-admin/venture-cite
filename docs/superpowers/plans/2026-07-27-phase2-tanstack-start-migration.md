@@ -1,4 +1,4 @@
-# Phase 2 — TanStack Start Migration Implementation Plan
+# Phase 2 - TanStack Start Migration Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
@@ -11,14 +11,14 @@
 ## Global Constraints
 
 - 🚫 **RUN NO GIT COMMANDS.** The user commits. Each task ends by reporting a suggested commit message.
-- **The gate after every task** — run `npm test` and `npm run test:e2e` as _separate_ commands, never chained (they share a database):
-  - `npm run check` — clean
-  - `npm run lint` — **0 errors** (~830 warnings expected; watch errors only)
-  - `npm test` — **904 passed / 1 failed** (`v2UrlTierScoring.test.ts` is deliberately red)
-  - `npm run test:e2e` — **67 passed / 2 skipped / 0 failed**
-- **Fix the code, not the test.** The one sanctioned exception is Task 11, where `raw-html.spec.ts` assertions _must_ flip — and that flip is the proof SSR works.
+- **The gate after every task** - run `npm test` and `npm run test:e2e` as _separate_ commands, never chained (they share a database):
+  - `npm run check` - clean
+  - `npm run lint` - **0 errors** (~830 warnings expected; watch errors only)
+  - `npm test` - **904 passed / 1 failed** (`v2UrlTierScoring.test.ts` is deliberately red)
+  - `npm run test:e2e` - **67 passed / 2 skipped / 0 failed**
+- **Fix the code, not the test.** The one sanctioned exception is Task 11, where `raw-html.spec.ts` assertions _must_ flip - and that flip is the proof SSR works.
 - Known-flaky under parallel load: `v2SearchLlmSmoke`, `citationCronUnconditional`, `llmConcurrency`, `v2Lifecycle*`. Re-run a file alone before calling it a regression; **if it fails alone too, investigate rather than re-running.**
-- Free port 5000 and warm the dev server before an e2e run — a cold Vite optimise pass can exceed the 60s setup budget.
+- Free port 5000 and warm the dev server before an e2e run - a cold Vite optimise pass can exceed the 60s setup budget.
 - **No type suppressions.** Phase 1 completed 16 tasks with zero `any`/`as any`/`@ts-ignore`. Hold it.
 - Never print secrets.
 
@@ -28,8 +28,8 @@
 
 Two research passes fed this plan. Read them before starting:
 
-- `scratchpad/p2/tanstack-api-research.md` — API shapes with code
-- `scratchpad/p2/migration-surface-inventory.md` — the exhaustive surface
+- `scratchpad/p2/tanstack-api-research.md` - API shapes with code
+- `scratchpad/p2/migration-surface-inventory.md` - the exhaustive surface
 
 Key facts, verified:
 
@@ -37,61 +37,61 @@ Key facts, verified:
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | Version              | `1.168.32` is the `latest` dist-tag, **no prerelease suffix**; last six releases stable. Checked against the npm registry, not release notes. |
 | Client-only routes   | `createFileRoute({ ssr: false })`. Set on a **parent layout**, children inherit and cannot loosen it.                                         |
-| Express mount        | **NOT `fromNodeMiddleware`** — that is stale. Current: `srvx/node`'s `toFetchHandler(expressApp)` into a splat server route.                  |
+| Express mount        | **NOT `fromNodeMiddleware`** - that is stale. Current: `srvx/node`'s `toFetchHandler(expressApp)` into a splat server route.                  |
 | Dual host            | One `vite.config.ts`; Nitro auto-detects Vercel at build time, else defaults to `node-server` for Render.                                     |
 | Surface              | 33 wouter files · 20 helmet files · 36 routes + 1 catch-all · 2 SSR-breaking root causes                                                      |
-| `react-helmet-async` | **Delete, do not port.** React 19 hoists metadata natively — proven in this codebase when `data-rh` stopped appearing.                        |
+| `react-helmet-async` | **Delete, do not port.** React 19 hoists metadata natively - proven in this codebase when `data-rh` stopped appearing.                        |
 
-### ✅ API details — RESOLVED by the Task 1 spike, with live evidence
+### ✅ API details - RESOLVED by the Task 1 spike, with live evidence
 
 Full output in `scratchpad/p2/api-unknowns-resolved.md`. Settled empirically against a real scratch app, not from docs.
 
-**1. Splat param key — both work.** `src/routes/$.tsx` → `createFileRoute('/$')`. A live request to `/foo/bar/baz` returned `{"_splat":"foo/bar/baz","*":"foo/bar/baz"}` — both keys populated with the same value. Prefer `_splat`; it is the documented modern form.
+**1. Splat param key - both work.** `src/routes/$.tsx` → `createFileRoute('/$')`. A live request to `/foo/bar/baz` returned `{"_splat":"foo/bar/baz","*":"foo/bar/baz"}` - both keys populated with the same value. Prefer `_splat`; it is the documented modern form.
 
-**2. Express mount — no first-party adapter.** `@tanstack/react-start`'s `exports` map has **no** `./node` or `./express` subpath (verified against the installed package). `srvx` is currently only a **transitive** dependency via `@tanstack/start-plugin-core` / `start-server-core` / `nitro` — it works today through npm hoisting, which is fragile. **Add `srvx` as a direct pinned dependency in Task 2.**
+**2. Express mount - no first-party adapter.** `@tanstack/react-start`'s `exports` map has **no** `./node` or `./express` subpath (verified against the installed package). `srvx` is currently only a **transitive** dependency via `@tanstack/start-plugin-core` / `start-server-core` / `nitro` - it works today through npm hoisting, which is fragile. **Add `srvx` as a direct pinned dependency in Task 2.**
 
-`toFetchHandler(expressApp)` in `src/routes/api/$.ts` was proven working: a GET returned 200 with JSON, and — critically — **`express.raw()` bodies arrived as real Buffers with matching length**. Stripe and Resend webhook signature verification therefore survives the mount.
+`toFetchHandler(expressApp)` in `src/routes/api/$.ts` was proven working: a GET returned 200 with JSON, and - critically - **`express.raw()` bodies arrived as real Buffers with matching length**. Stripe and Resend webhook signature verification therefore survives the mount.
 
 > ⚠️ **`toFetchHandler` is marked `@experimental` in srvx's own JSDoc.** It is load-bearing for the entire "keep Express whole" design. It works today; treat a breaking change in it as a real risk and pin `srvx` accordingly.
 
-**3. Preset — `nitro({ preset })`, from a separate plugin.** It is a **sibling Vite plugin imported from `nitro/vite`**, not an option on Start's plugin — confirmed by reading `node_modules/nitro/dist/vite.d.mts`, and by the absence of any `preset` reference in `@tanstack/start-plugin-core`'s types.
+**3. Preset - `nitro({ preset })`, from a separate plugin.** It is a **sibling Vite plugin imported from `nitro/vite`**, not an option on Start's plugin - confirmed by reading `node_modules/nitro/dist/vite.d.mts`, and by the absence of any `preset` reference in `@tanstack/start-plugin-core`'s types.
 
 Dual-host auto-detection **proven with real builds**: no preset + no env → `preset: node-server`; no preset + `VERCEL=1` → `preset: vercel` with `.vercel/output` emitted. One config genuinely targets both.
 
-**4. `ssr: false` cascade — confirmed live.** A parent layout with `ssr: false` and a child route produced **no marker in the initial HTML**, while a sibling control route with normal SSR did. The design's central mechanism works as assumed.
+**4. `ssr: false` cascade - confirmed live.** A parent layout with `ssr: false` and a child route produced **no marker in the initial HTML**, while a sibling control route with normal SSR did. The design's central mechanism works as assumed.
 
 ### Still open, and honestly so
 
-- Whether Nitro has a dedicated Render preset or Render simply runs the `node-server` fallback. Not checked — Phase 3's problem.
+- Whether Nitro has a dedicated Render preset or Render simply runs the `node-server` fallback. Not checked - Phase 3's problem.
 - No real deployment was performed; Vercel detection was proven by local env simulation only.
 - RSC-mode export conditions were not exercised. This migration does not use RSC.
 
 ---
 
-## 🔴 REVISED AFTER TASK 2 — the migration cannot be incremental
+## 🔴 REVISED AFTER TASK 2 - the migration cannot be incremental
 
 Task 2 scaffolded Start successfully and left the existing app working, but proved that **Start and wouter cannot both serve routes from one dev server**. There is no configuration where both work:
 
-- With Vite's `root: client` (the current setup), Nitro's SSR-entry auto-detection does not find Start's entry, so **Start's SSR silently no-ops** — it serves the static `client/index.html` with HTTP 200 and the wrong content. Silent, not an error.
-- Adding `nitro({ rootDir: <repo root> })` makes Start's SSR genuinely work — confirmed with real SSR output — but Nitro's dev routing then **intercepts every request**, 404ing every wouter route Start does not yet know.
+- With Vite's `root: client` (the current setup), Nitro's SSR-entry auto-detection does not find Start's entry, so **Start's SSR silently no-ops** - it serves the static `client/index.html` with HTTP 200 and the wrong content. Silent, not an error.
+- Adding `nitro({ rootDir: <repo root> })` makes Start's SSR genuinely work - confirmed with real SSR output - but Nitro's dev routing then **intercepts every request**, 404ing every wouter route Start does not yet know.
 
 Task 2 shipped **without** `rootDir`, protecting the existing app.
 
 **Consequence: the routing switch is atomic.** The original Tasks 4–7 assumed routes could migrate a few at a time with a green gate between each. They cannot. Those four tasks collapse into **one task that migrates every route and flips the entry point in a single change**, during which the gate is legitimately red.
 
-That is consistent with the big-bang branch strategy already chosen, but it changes how the work is verified: there is no green-gate checkpoint inside the switch, so the checkpoint is the **route table** — every path in `App.tsx` accounted for — and the gate only returns at the end.
+That is consistent with the big-bang branch strategy already chosen, but it changes how the work is verified: there is no green-gate checkpoint inside the switch, so the checkpoint is the **route table** - every path in `App.tsx` accounted for - and the gate only returns at the end.
 
-**Also found:** an isolated `vite build` writes client output to `client/.output/public`, not the configured `dist/public`. That breaks production `serveStatic()` and **none of the three gate commands catch it** — only a real build does. Fix it as part of the switch.
+**Also found:** an isolated `vite build` writes client output to `client/.output/public`, not the configured `dist/public`. That breaks production `serveStatic()` and **none of the three gate commands catch it** - only a real build does. Fix it as part of the switch.
 
-### Pre-stable dependencies — know what this rests on
+### Pre-stable dependencies - know what this rests on
 
 |                                  |                                                                 |
 | -------------------------------- | --------------------------------------------------------------- |
 | `@tanstack/react-start@1.168.32` | **Stable.** `latest` dist-tag, no prerelease suffix.            |
-| `nitro@3.0.260610-beta`          | **Beta — and that IS `latest`.** Nitro 3 has no stable channel. |
+| `nitro@3.0.260610-beta`          | **Beta - and that IS `latest`.** Nitro 3 has no stable channel. |
 | `srvx`'s `toFetchHandler`        | **`@experimental`** per its own JSDoc.                          |
 
-Start itself is stable; its server and deployment layer is not. Both pre-stable pieces are exactly the ones carrying "keep Express whole" and "deploy to Render and Vercel from one config". They work today — the spike proved both, including raw-body webhooks. But if either breaks, the fallback is rewriting 24 Express route modules as Start server routes, which is the work this design exists to avoid.
+Start itself is stable; its server and deployment layer is not. Both pre-stable pieces are exactly the ones carrying "keep Express whole" and "deploy to Render and Vercel from one config". They work today - the spike proved both, including raw-body webhooks. But if either breaks, the fallback is rewriting 24 Express route modules as Start server routes, which is the work this design exists to avoid.
 
 Not a reason to stop. A reason to pin exact versions and not upgrade them casually.
 
@@ -99,15 +99,15 @@ Not a reason to stop. A reason to pin exact versions and not upgrade them casual
 
 ## 🔴 The design decision this plan makes: splitting `/`
 
-`/` is currently auth-conditional — `HomePage()` renders `<Landing/>` when logged out and `<FirstRunGate component={Home}/>` when logged in, **at the same URL**. That cannot survive a per-route SSR flag: the landing must server-render, the dashboard must not.
+`/` is currently auth-conditional - `HomePage()` renders `<Landing/>` when logged out and `<FirstRunGate component={Home}/>` when logged in, **at the same URL**. That cannot survive a per-route SSR flag: the landing must server-render, the dashboard must not.
 
 Worse, the auth gates call `window.location.href = "/login"` **in the render body**, not an effect. Today that is masked because `useAuth()`'s query is always loading on first render. Under SSR with a resolving loader, it throws server-side.
 
-**Decision: `/` becomes the public landing page only, server-rendered.** Authenticated users are redirected to `/dashboard` — a route that already exists and already renders `Home`.
+**Decision: `/` becomes the public landing page only, server-rendered.** Authenticated users are redirected to `/dashboard` - a route that already exists and already renders `Home`.
 
 The redirect happens **client-side, after hydration**, so the server never needs to know who the user is and the auth code stays untouched. A logged-in user hitting `/` sees the landing for a moment and then lands on the dashboard.
 
-**This is a real, user-visible behaviour change** and the only one in this plan. The alternative — keeping `/` auth-conditional — forces either server-side auth (rewriting the code we deliberately protected) or giving up SSR on the highest-value page. Flag it to the user before Task 4 if they have not already agreed.
+**This is a real, user-visible behaviour change** and the only one in this plan. The alternative - keeping `/` auth-conditional - forces either server-side auth (rewriting the code we deliberately protected) or giving up SSR on the highest-value page. Flag it to the user before Task 4 if they have not already agreed.
 
 ---
 
@@ -116,7 +116,7 @@ The redirect happens **client-side, after hydration**, so the server never needs
 ```
 src/routes/
   __root.tsx              providers: QueryClient, Theme, Tooltip, Toaster, ErrorBoundary
-  index.tsx               landing — SSR
+  index.tsx               landing - SSR
   privacy.tsx             SSR
   glossary.tsx            SSR
   login.tsx  register.tsx  forgot-password.tsx  reset-password.tsx  verify-email.tsx
@@ -137,7 +137,7 @@ src/routes/
 
 ### Task 1: Close the three API unknowns
 
-**Files:** none — this is a spike.
+**Files:** none - this is a spike.
 
 - [ ] **Step 1: Install into a scratch directory, not the repo**
 
@@ -151,7 +151,7 @@ Create a throwaway TanStack Start app outside this worktree and inspect the real
 
 - [ ] **Step 3: Report**
 
-Write the three answers with evidence to `scratchpad/p2/api-unknowns-resolved.md`. If any cannot be settled, say so plainly — an honest unknown is better than a guess that fails in Task 3.
+Write the three answers with evidence to `scratchpad/p2/api-unknowns-resolved.md`. If any cannot be settled, say so plainly - an honest unknown is better than a guess that fails in Task 3.
 
 ---
 
@@ -170,11 +170,11 @@ npm install -D @tanstack/router-plugin@1.168.23
 
 - [ ] **Step 2: Wire the Vite plugin**
 
-Add the Start/Nitro plugin to `vite.config.ts`, composing with the existing `@vitejs/plugin-react` and `@tailwindcss/vite`. **Keep `css: { postcss: {} }`** — this worktree is nested inside the main checkout and Vite's config search walks up into the parent repo's stale PostCSS config without it.
+Add the Start/Nitro plugin to `vite.config.ts`, composing with the existing `@vitejs/plugin-react` and `@tailwindcss/vite`. **Keep `css: { postcss: {} }`** - this worktree is nested inside the main checkout and Vite's config search walks up into the parent repo's stale PostCSS config without it.
 
 - [ ] **Step 3: Root route with the existing providers**
 
-`__root.tsx` mounts what `App.tsx` currently mounts: `QueryClientProvider`, `ThemeProvider`, `TooltipProvider`, `Toaster`, `ErrorBoundary`. **Drop `HelmetProvider`** — React 19 hoists metadata natively.
+`__root.tsx` mounts what `App.tsx` currently mounts: `QueryClientProvider`, `ThemeProvider`, `TooltipProvider`, `Toaster`, `ErrorBoundary`. **Drop `HelmetProvider`** - React 19 hoists metadata natively.
 
 - [ ] **Step 4: Verify it boots** with one trivial route, then run the full gate. The existing app must be unaffected.
 
@@ -192,9 +192,9 @@ Add the Start/Nitro plugin to `vite.config.ts`, composing with the existing `@vi
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5000/api/brands
 ```
 
-Expect `401` unauthenticated — proving Express is reached and its auth middleware ran, not a 404 from the router.
+Expect `401` unauthenticated - proving Express is reached and its auth middleware ran, not a 404 from the router.
 
-- [ ] **Step 3: Verify raw-body webhooks specifically.** `server/app.ts:143-241` mounts Stripe and Resend webhooks with `express.raw()` before `express.json()` and checks `Buffer.isBuffer(req.body)`. An adapter that pre-parses the body silently breaks signature verification — and **no test covers this**. Confirm by hand that a POST with a raw body arrives as a Buffer.
+- [ ] **Step 3: Verify raw-body webhooks specifically.** `server/app.ts:143-241` mounts Stripe and Resend webhooks with `express.raw()` before `express.json()` and checks `Buffer.isBuffer(req.body)`. An adapter that pre-parses the body silently breaks signature verification - and **no test covers this**. Confirm by hand that a POST with a raw body arrives as a Buffer.
 
 - [ ] **Step 4: Full gate.**
 
@@ -218,9 +218,9 @@ This is the task the whole migration exists for.
 curl -s http://localhost:5000/privacy | grep -c "This Privacy Policy describes how VentureCite"
 ```
 
-Expect `1`. Today it is `0` — that string only appears after JavaScript runs. **This single check is the migration's reason for existing.** Repeat for `/` and `/glossary` using the strings named in `tests/e2e/raw-html.spec.ts`.
+Expect `1`. Today it is `0` - that string only appears after JavaScript runs. **This single check is the migration's reason for existing.** Repeat for `/` and `/glossary` using the strings named in `tests/e2e/raw-html.spec.ts`.
 
-- [ ] **Step 5: Full gate.** `raw-html.spec.ts` will now FAIL — that is correct and expected; Task 11 flips it. Note the failure and proceed.
+- [ ] **Step 5: Full gate.** `raw-html.spec.ts` will now FAIL - that is correct and expected; Task 11 flips it. Note the failure and proceed.
 
 ---
 
@@ -228,7 +228,7 @@ Expect `1`. Today it is `0` — that string only appears after JavaScript runs. 
 
 **Files:** Create `src/routes/login.tsx`, `register.tsx`, `forgot-password.tsx`, `reset-password.tsx`, `verify-email.tsx`
 
-- [ ] Port each, preserving `data-testid` attributes exactly — the e2e suite selects on them.
+- [ ] Port each, preserving `data-testid` attributes exactly - the e2e suite selects on them.
 - [ ] `login.tsx` must still land on `/` after success (`login.tsx:62`), or the whole suite's auth helper breaks.
 - [ ] Preserve `<meta name="robots" content="noindex">` on all five.
 - [ ] Full gate.
@@ -239,13 +239,13 @@ Expect `1`. Today it is `0` — that string only appears after JavaScript runs. 
 
 **Files:** Create `src/routes/_app.tsx` and its children
 
-- [ ] **Step 1: `_app.tsx` carries `ssr: false`.** This is the cascade point — every route beneath inherits client-only rendering. Get this right and the SSR hazards in `use-persisted-state.ts` and the auth gates become irrelevant.
+- [ ] **Step 1: `_app.tsx` carries `ssr: false`.** This is the cascade point - every route beneath inherits client-only rendering. Get this right and the SSR hazards in `use-persisted-state.ts` and the auth gates become irrelevant.
 
-- [ ] **Step 2: Move the auth guard out of the render body.** The current gates call `window.location.href = "/login"` during render. Convert to a router `beforeLoad` redirect or an effect. Even under `ssr: false` this is worth fixing — a side effect during render is a React correctness problem, not only an SSR one.
+- [ ] **Step 2: Move the auth guard out of the render body.** The current gates call `window.location.href = "/login"` during render. Convert to a router `beforeLoad` redirect or an effect. Even under `ssr: false` this is worth fixing - a side effect during render is a React correctness problem, not only an SSR one.
 
-- [ ] **Step 3: Port the routes** — dashboard, the five spine pages, content, articles, brands, keyword-research, settings, welcome, admin. `welcome` renders **without** `AppShell`; preserve that (`welcome-brand.spec.ts` asserts `main#main-content` has count 0 there).
+- [ ] **Step 3: Port the routes** - dashboard, the five spine pages, content, articles, brands, keyword-research, settings, welcome, admin. `welcome` renders **without** `AppShell`; preserve that (`welcome-brand.spec.ts` asserts `main#main-content` has count 0 there).
 
-- [ ] **Step 4: Preserve the URL-as-state contract.** `?tab=`, `?brandId=`, `?edit=`, `?mention=` and the mention filters are all written with `replace: true`. TanStack Router's typed search params are an upgrade here, but the _behaviour_ must match — `url-state.spec.ts` asserts a single `goBack()` skips past three tab changes.
+- [ ] **Step 4: Preserve the URL-as-state contract.** `?tab=`, `?brandId=`, `?edit=`, `?mention=` and the mention filters are all written with `replace: true`. TanStack Router's typed search params are an upgrade here, but the _behaviour_ must match - `url-state.spec.ts` asserts a single `goBack()` skips past three tab changes.
 
 - [ ] **Step 5: Full gate.**
 
@@ -256,7 +256,7 @@ Expect `1`. Today it is `0` — that string only appears after JavaScript runs. 
 **Files:** Create the retired-path routes
 
 - [ ] Port all 12, preserving existing query params and injecting `?tab=`. `legacy-redirects.spec.ts` covers every one.
-- [ ] **`/ai-intelligence` currently redirects to a tab that does not exist** (`share-of-answer` was removed from `monitor.tsx`), so `SpineShell` silently falls back to `overview`. The spec asserts the real fallback. Either preserve that behaviour or repoint the redirect and update the spec — but decide deliberately and say which.
+- [ ] **`/ai-intelligence` currently redirects to a tab that does not exist** (`share-of-answer` was removed from `monitor.tsx`), so `SpineShell` silently falls back to `overview`. The spec asserts the real fallback. Either preserve that behaviour or repoint the redirect and update the spec - but decide deliberately and say which.
 - [ ] Full gate.
 
 ---
@@ -277,7 +277,7 @@ Expect `1`. Today it is `0` — that string only appears after JavaScript runs. 
 **Files:** 20 files + `client/src/lib/dedupeStaticMeta.ts` + `client/index.html`
 
 - [ ] Remove the package and every import. Verified: every usage is plain `<title>` / `<meta name="robots|description">`, all of which React 19 hoists natively.
-- [ ] **`dedupeStaticMeta.ts` can go too** — it exists only because Helmet _appended_ rather than replaced. Verify that React 19 alone produces exactly one description per page before deleting, then remove the `data-static-fallback` marker from `index.html`.
+- [ ] **`dedupeStaticMeta.ts` can go too** - it exists only because Helmet _appended_ rather than replaced. Verify that React 19 alone produces exactly one description per page before deleting, then remove the `data-static-fallback` marker from `index.html`.
 - [ ] `public-pages.spec.ts` and `auth-signup.spec.ts` assert on exact meta content, not `data-rh`, so they should pass unchanged. If they do not, the metadata genuinely regressed.
 - [ ] Full gate.
 
@@ -287,10 +287,10 @@ Expect `1`. Today it is `0` — that string only appears after JavaScript runs. 
 
 **Files:** `server/vite.ts`
 
-- [ ] Remove `setupVite`'s SPA fallback, `KNOWN_ROUTES`, and `isKnownRoute`. Start owns routing now and knows its own routes — the hand-maintained allowlist that drifted in both directions stops existing.
+- [ ] Remove `setupVite`'s SPA fallback, `KNOWN_ROUTES`, and `isKnownRoute`. Start owns routing now and knows its own routes - the hand-maintained allowlist that drifted in both directions stops existing.
 - [ ] For the record: it currently has **9** phantom entries (`/pricing`, `/article/:id`, `/geo-rankings`, `/revenue-analytics`, `/publications`, `/agent`, `/outreach`, `/ai-traffic`, `/analytics-integrations`) and 0 gaps. An earlier commit message said eight; nine is correct.
 - [ ] **Verify status codes still behave**: real routes 200, unknown paths 404. `raw-html.spec.ts` and `public-pages.spec.ts` both assert this.
-- [ ] Decide `pricing.tsx`'s fate — a fully-built page routed nowhere. Either wire it up or delete it; `billing.spec.ts` currently pins its 404.
+- [ ] Decide `pricing.tsx`'s fate - a fully-built page routed nowhere. Either wire it up or delete it; `billing.spec.ts` currently pins its 404.
 - [ ] Full gate.
 
 ---
@@ -304,7 +304,7 @@ This is the task that proves the migration worked.
 - [ ] The spec currently asserts page-specific content is **absent** from raw HTML, with a header explaining that those assertions must invert once SSR lands. Invert them: assert the content is now **present**.
 - [ ] **Falsification required.** Temporarily break SSR for one route (or assert content that genuinely is not rendered) and confirm the test fails. A flipped assertion that cannot fail proves nothing.
 - [ ] Update the file header to describe post-migration reality.
-- [ ] Full gate — now expecting **67 passed** again, with raw-html green in its new direction.
+- [ ] Full gate - now expecting **67 passed** again, with raw-html green in its new direction.
 
 ---
 
@@ -320,7 +320,7 @@ This is the task that proves the migration worked.
 
 - [ ] `curl` on `/`, `/privacy`, `/glossary` returns page content in the raw HTML.
 - [ ] Every gated route is client-only via the `_app` cascade; auth code unchanged.
-- [ ] Express serves `/api/*`, `/webhooks/*`, `/health` — webhook raw bodies verified by hand.
+- [ ] Express serves `/api/*`, `/webhooks/*`, `/health` - webhook raw bodies verified by hand.
 - [ ] wouter, react-helmet-async, `KNOWN_ROUTES` and the SPA fallback are gone.
 - [ ] All four gate commands green, e2e at 67 with raw-html flipped and falsification-tested.
 - [ ] Baseline recorded.

@@ -7,16 +7,16 @@
 -- verification scheduling.
 --
 -- Columns added:
---   user_overridden          — once true, no scrape can overwrite this
+--   user_overridden          - once true, no scrape can overwrite this
 --                              row's factValue. The merge logic in
 --                              persistFacts respects this flag.
---   verification_attempts    — count of re-verification attempts (used
+--   verification_attempts    - count of re-verification attempts (used
 --                              by the cron to back off on facts whose
 --                              source URL repeatedly fails).
---   last_verification_at     — when the re-verification cron last
+--   last_verification_at     - when the re-verification cron last
 --                              processed this row (NULL = never re-
 --                              verified after initial scrape).
---   verification_status      — one of: never, verified, drift_detected,
+--   verification_status      - one of: never, verified, drift_detected,
 --                              source_unreachable, manual_only.
 --
 -- Backward compatibility:

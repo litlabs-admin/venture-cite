@@ -38,7 +38,7 @@ import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
 import { logger } from "../lib/logger";
 
 // ─────────────────────────────────────────────────────────────────────────
-// FAQ generation handler — registered at module-load.
+// FAQ generation handler - registered at module-load.
 //
 // Server pattern: POST /api/faqs/generate/:brandId enqueues an OpenAI
 // Responses background job and returns 202 + jobId. The client polls
@@ -169,7 +169,7 @@ async function syncTrackedContentUrl(
       normalizedUrl: normalized,
     });
   } else if (publishedUrl === null || publishedUrl === "") {
-    // Explicit unpublish — drop the tracking row.
+    // Explicit unpublish - drop the tracking row.
     await storage.deleteTrackedContentUrlBySource(sourceType, sourceId);
   }
 }
@@ -196,7 +196,7 @@ export function setupContentTypesRoutes(app: Express): void {
   ] as const;
   const LISTICLE_OUTREACH_STATUSES = new Set(["new", "contacted", "won", "dropped"]);
 
-  // Get listicles for a brand — :brandId app.param checks ownership.
+  // Get listicles for a brand - :brandId app.param checks ownership.
   app.get(
     "/api/listicles/:brandId",
     asyncHandler(async (req, res) => {
@@ -233,7 +233,7 @@ export function setupContentTypesRoutes(app: Express): void {
     }),
   );
 
-  // Create a listicle — brandId must belong to caller. Wave 9.4: use
+  // Create a listicle - brandId must belong to caller. Wave 9.4: use
   // tryInsertListicle so the unique (brand_id, lower(url)) index is the
   // arbiter; manual entry returns 409 if the URL is already tracked.
   app.post(
@@ -262,7 +262,7 @@ export function setupContentTypesRoutes(app: Express): void {
     }),
   );
 
-  // Update a listicle — ownership required.
+  // Update a listicle - ownership required.
   app.patch(
     "/api/listicles/:id",
     asyncHandler(async (req, res) => {
@@ -274,7 +274,7 @@ export function setupContentTypesRoutes(app: Express): void {
           await requireBrand(update.brandId, user.id);
         }
         // Wave 9.4: validate outreach status transitions. Categorical
-        // column, not a strict state machine — users can correct mistakes
+        // column, not a strict state machine - users can correct mistakes
         // by moving back to any prior state.
         if (update.outreachStatus !== undefined) {
           if (!LISTICLE_OUTREACH_STATUSES.has(update.outreachStatus)) {
@@ -290,7 +290,7 @@ export function setupContentTypesRoutes(app: Express): void {
     }),
   );
 
-  // Delete a listicle — ownership required.
+  // Delete a listicle - ownership required.
   app.delete(
     "/api/listicles/:id",
     asyncHandler(async (req, res) => {
@@ -351,7 +351,7 @@ export function setupContentTypesRoutes(app: Express): void {
         }
 
         const { scanBrandListicles } = await import("../lib/listicleScanner");
-        // Wave 9.4: full ScanReport — includes reverified/lostInclusion +
+        // Wave 9.4: full ScanReport - includes reverified/lostInclusion +
         // multi-line failure list so the toast can surface partial failures.
         const report = await scanBrandListicles(brand.id);
         const listicles = await storage.getListicles(brand.id);
@@ -371,7 +371,7 @@ export function setupContentTypesRoutes(app: Express): void {
             tips: [
               "Listicles where you're not yet listed are outreach targets",
               "Focus on listicles from high-domain-authority publications",
-              "Re-scan weekly — new listicles appear regularly in active categories",
+              "Re-scan weekly - new listicles appear regularly in active categories",
             ],
           },
         });
@@ -409,7 +409,7 @@ export function setupContentTypesRoutes(app: Express): void {
     "metadata",
   ] as const;
 
-  // Create Wikipedia mention — brandId must belong to caller. Wave 9.4:
+  // Create Wikipedia mention - brandId must belong to caller. Wave 9.4:
   // tryInsert so manual-add surfaces a 409 instead of duplicating.
   app.post(
     "/api/wikipedia",
@@ -440,7 +440,7 @@ export function setupContentTypesRoutes(app: Express): void {
     }),
   );
 
-  // Scan for Wikipedia opportunities — real MediaWiki API + LLM classification.
+  // Scan for Wikipedia opportunities - real MediaWiki API + LLM classification.
   app.post(
     "/api/wikipedia/scan/:brandId",
     asyncHandler(async (req, res) => {
@@ -560,7 +560,7 @@ export function setupContentTypesRoutes(app: Express): void {
     }),
   );
 
-  // Create BOFU content — brandId ownership required.
+  // Create BOFU content - brandId ownership required.
   app.post(
     "/api/bofu-content",
     asyncHandler(async (req, res) => {
@@ -584,7 +584,7 @@ export function setupContentTypesRoutes(app: Express): void {
     }),
   );
 
-  // Update BOFU content — ownership required.
+  // Update BOFU content - ownership required.
   app.patch(
     "/api/bofu-content/:id",
     asyncHandler(async (req, res) => {
@@ -615,7 +615,7 @@ export function setupContentTypesRoutes(app: Express): void {
     }),
   );
 
-  // Delete BOFU content — ownership required.
+  // Delete BOFU content - ownership required.
   app.delete(
     "/api/bofu-content/:id",
     asyncHandler(async (req, res) => {
@@ -634,7 +634,7 @@ export function setupContentTypesRoutes(app: Express): void {
     }),
   );
 
-  // Generate BOFU content using AI — ownership required.
+  // Generate BOFU content using AI - ownership required.
   app.post(
     "/api/bofu-content/generate",
     aiLimitMiddleware,
@@ -647,7 +647,7 @@ export function setupContentTypesRoutes(app: Express): void {
         }
         await requireBrand(brandId, user.id);
 
-        // Wave 9.4: load full grounding context — fact sheet + ALL
+        // Wave 9.4: load full grounding context - fact sheet + ALL
         // tracked competitors (was: comparedWith[0] only). The fact-sheet
         // block + per-competitor verified data goes into the prompt so
         // the LLM stops inventing comparison features.
@@ -761,7 +761,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
           status: "draft",
           // aiScore left null on generate; populated only when an actual
           // scoring step runs (e.g. via PATCH from the optimizer). The
-          // previous hard-coded 85 was misleading — users read it as a
+          // previous hard-coded 85 was misleading - users read it as a
           // real quality signal.
         });
 
@@ -834,7 +834,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
     }),
   );
 
-  // Create FAQ — brandId ownership required.
+  // Create FAQ - brandId ownership required.
   app.post(
     "/api/faqs",
     asyncHandler(async (req, res) => {
@@ -861,7 +861,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
     }),
   );
 
-  // Update FAQ — ownership required.
+  // Update FAQ - ownership required.
   app.patch(
     "/api/faqs/:id",
     asyncHandler(async (req, res) => {
@@ -903,7 +903,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
     }),
   );
 
-  // Delete FAQ — ownership required.
+  // Delete FAQ - ownership required.
   app.delete(
     "/api/faqs/:id",
     asyncHandler(async (req, res) => {
@@ -920,7 +920,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
     }),
   );
 
-  // Optimize a single FAQ for AI citation — ownership required.
+  // Optimize a single FAQ for AI citation - ownership required.
   app.post(
     "/api/faqs/:id/optimize",
     aiLimitMiddleware,
@@ -963,7 +963,7 @@ Return JSON:
   "optimizationTips": ["What was improved", "Additional suggestions"]
 }
 
-Return ONLY valid JSON. Do not include an aiSurfaceScore field — it is computed deterministically server-side.`;
+Return ONLY valid JSON. Do not include an aiSurfaceScore field - it is computed deterministically server-side.`;
 
         const response = await openai.chat.completions.create({
           model: MODELS.misc,
@@ -1061,7 +1061,7 @@ Return a JSON object of this exact shape:
   ]
 }
 
-Return ONLY the JSON object (no prose, no markdown fences). Do NOT include any aiSurfaceScore field — it is computed server-side from a deterministic heuristic.`;
+Return ONLY the JSON object (no prose, no markdown fences). Do NOT include any aiSurfaceScore field - it is computed server-side from a deterministic heuristic.`;
 
         // Vercel-Hobby-safe: enqueue an OpenAI Responses background
         // job. Kickoff returns instantly with a jobId. The handler
@@ -1083,7 +1083,7 @@ Return ONLY the JSON object (no prose, no markdown fences). Do NOT include any a
             jobId: job.jobId,
             status: job.status,
             pollUrl: `/api/llm-jobs/${job.jobId}`,
-            message: "Generating FAQs — usually 10-25s.",
+            message: "Generating FAQs - usually 10-25s.",
           });
         } catch (aiErr: unknown) {
           const e = aiErr as { status?: number; name?: string };
@@ -1147,7 +1147,7 @@ Return ONLY the JSON object (no prose, no markdown fences). Do NOT include any a
         const { brand, facts } = ctx;
         const factsBlock = renderFactsBlock(facts);
 
-        const prompt = `You are drafting a Wikipedia mention for the brand "${brand.name}" on the page "${mention.pageTitle}". Wikipedia requires neutral point of view (NPOV) — no marketing language, no superlatives, no claims that aren't backed by a citation.
+        const prompt = `You are drafting a Wikipedia mention for the brand "${brand.name}" on the page "${mention.pageTitle}". Wikipedia requires neutral point of view (NPOV) - no marketing language, no superlatives, no claims that aren't backed by a citation.
 
 Brand context:
 ${factsBlock || `- ${brand.name} (${brand.industry || "unspecified industry"})`}
@@ -1176,7 +1176,7 @@ Return ONLY the draft text, no preamble.`;
           data: {
             draft,
             notes: [
-              "Wikipedia requires reliable, independent sources — replace the parenthetical citation hint with a real reference URL before submitting.",
+              "Wikipedia requires reliable, independent sources - replace the parenthetical citation hint with a real reference URL before submitting.",
               "Verify your brand meets Wikipedia's WP:NOTABILITY guideline before adding a mention.",
               "Disclose any conflict of interest on the article's talk page (WP:COI).",
             ],

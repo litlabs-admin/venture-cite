@@ -10,7 +10,7 @@
 // Boot side-effects (migrations, scheduler, autopilot resume, Stripe
 // setup) are kicked from server/index.ts on local dev, and from the Nitro
 // startup plugin (server/nitroBoot.ts, registered in vite.config.ts) in
-// built production — see that file for why it's safe for both to exist
+// built production - see that file for why it's safe for both to exist
 // without double-running. On Vercel the daily cron orchestrator
 // (/api/cron/daily-orchestrator) handles the equivalents instead, because
 // Vercel is serverless and neither of the above two "runs once on a
@@ -20,7 +20,7 @@ import "dotenv/config";
 import "./env";
 // Sentry must be imported before any module that throws or makes network
 // calls so its instrumentation is active for the whole process. No-op if
-// SENTRY_DSN isn't set. Side-effect import — we don't reference the
+// SENTRY_DSN isn't set. Side-effect import - we don't reference the
 // `Sentry` symbol from this file directly.
 import "./instrument";
 import express, { type Request, type Response, type NextFunction } from "express";
@@ -147,7 +147,7 @@ app.use((req, res, next) => {
   return next();
 });
 
-// ─── Webhook handlers (raw body — must run BEFORE express.json) ───
+// ─── Webhook handlers (raw body - must run BEFORE express.json) ───
 
 app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const signature = req.headers["stripe-signature"];
@@ -158,7 +158,7 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
     const sig = Array.isArray(signature) ? signature[0] : signature;
     if (!Buffer.isBuffer(req.body)) {
       // Fires if Vercel pre-parsed the body before Express saw the
-      // stream — would mean signature verification can never succeed.
+      // stream - would mean signature verification can never succeed.
       // Log loudly so it surfaces on first deploy.
       logger.error(
         { bodyType: typeof req.body },
@@ -326,7 +326,7 @@ export function prepareApp(): Promise<Server> {
 
     // ─── Terminal 404 for /api/* and /webhooks/* (Phase 2 Task 7) ───
     //
-    // srvx's toFetchHandler (src/server/expressBridge.ts — the bridge the
+    // srvx's toFetchHandler (src/server/expressBridge.ts - the bridge the
     // Nitro/TanStack Start server routes at src/routes/api/$.ts and
     // src/routes/webhooks/$.ts use to reach this Express app) turns
     // Express's own unmatched-route fallthrough into an EMPTY-BODY 200
@@ -338,8 +338,8 @@ export function prepareApp(): Promise<Server> {
     // URL hitting an unmatched path would get back a 200 and the provider
     // would mark the event delivered while it was silently dropped.
     //
-    // Registering explicit, real Express handlers here — rather than
-    // relying on Express's own implicit default 404 — guarantees a genuine
+    // Registering explicit, real Express handlers here - rather than
+    // relying on Express's own implicit default 404 - guarantees a genuine
     // non-2xx status and JSON body reach the client through EITHER entry
     // point (server/index.ts's direct app.listen, or the Nitro/srvx
     // bridge), the same way every other real JSON-returning route here
@@ -355,7 +355,7 @@ export function prepareApp(): Promise<Server> {
       res.status(404).json({ success: false, error: "Not Found" });
     });
 
-    // Global error handler — appended last so all earlier routes can
+    // Global error handler - appended last so all earlier routes can
     // throw and have it normalize the response shape.
     app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;

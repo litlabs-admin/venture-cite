@@ -1,7 +1,7 @@
 // Server-side onboarding state (Wave 4.7).
 //
 // Single endpoint that merges keys into users.onboarding_state. The
-// allowlist below defines the only fields that the client can write —
+// allowlist below defines the only fields that the client can write -
 // arbitrary keys are silently dropped. Add new flags here as we
 // introduce them; that keeps the column from accumulating dead /
 // abusive data.
@@ -60,7 +60,7 @@ export function setupOnboardingRoutes(app: Express) {
           return res.status(400).json({ success: false, error: "Body must be a JSON object." });
         }
 
-        // Filter to allowlisted keys. Anything else is silently ignored —
+        // Filter to allowlisted keys. Anything else is silently ignored -
         // the client gets a 200 either way so a slightly out-of-date client
         // doesn't fail outright when the server has tightened the allowlist.
         const patch: Record<string, unknown> = {};
@@ -71,7 +71,7 @@ export function setupOnboardingRoutes(app: Express) {
         }
 
         if (Object.keys(patch).length === 0) {
-          // Nothing to write but caller did supply something — surface it
+          // Nothing to write but caller did supply something - surface it
           // as 400 so a client typo doesn't silently no-op forever.
           return res.status(400).json({
             success: false,
@@ -244,7 +244,7 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
           sseWrite(res, {
             type: "log",
             icon: "retry",
-            message: "Thin results — trying sitemap…",
+            message: "Thin results - trying sitemap…",
           });
           let sitemapText = "";
           try {
@@ -301,7 +301,7 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
           sseWrite(res, {
             type: "log",
             icon: "brain",
-            message: "Still thin — asking the model what it knows…",
+            message: "Still thin - asking the model what it knows…",
           });
           const fallback = await callBrandLLM(
             `What do you know about the domain ${domain}? Return the usual JSON shape.`,
@@ -436,9 +436,9 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
         }
 
         // Kick off the full activation pipeline server-side and return
-        // immediately. The autopilot runs the phases IN ORDER —
+        // immediately. The autopilot runs the phases IN ORDER -
         // FactSheet kernel (Phase 0) → prompts grounded in that kernel →
-        // web-grounded citations — and is resumable: whatever doesn't
+        // web-grounded citations - and is resumable: whatever doesn't
         // finish within the deadline is driven to completion by the
         // daily cron (resumeInFlightAutopilots) + the fact-scrape
         // backstop. The fact scrape is no longer client-driven; the
@@ -472,7 +472,7 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
         const brand = await requireBrand(brandId, user.id);
         // Atomic compare-and-swap: only transition the row when its
         // current status is still "failed". Two simultaneous retries
-        // race here — only one wins; the loser gets 409. This also
+        // race here - only one wins; the loser gets 409. This also
         // flips the row to "pending" BEFORE we return 200, so the
         // client's immediate refetch sees the in-progress state
         // instead of the stale "failed" banner.

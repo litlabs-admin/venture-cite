@@ -9,7 +9,7 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 // ---------------------------------------------------------------------------
-// Mock acquireOrWait — controls the rate-limit gate
+// Mock acquireOrWait - controls the rate-limit gate
 // ---------------------------------------------------------------------------
 const mockAcquireOrWait = vi.fn<() => Promise<boolean>>();
 vi.mock("../../server/lib/rateLimitBuckets", () => ({
@@ -69,7 +69,7 @@ describe("scanHackerNewsSource", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Endpoint URL — must use /search_by_date
+  // Endpoint URL - must use /search_by_date
   // -------------------------------------------------------------------------
   it("uses /search_by_date endpoint (not /search)", async () => {
     mockFetch.mockResolvedValue(makeOkResponse({ hits: [] }));
@@ -86,11 +86,11 @@ describe("scanHackerNewsSource", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Happy path — uses the fixture
+  // Happy path - uses the fixture
   // -------------------------------------------------------------------------
   it("returns expected mentions from fixture (matched story + matched comment; unmatched filtered out)", async () => {
     // Search fixture has stories that won't trigger comment expansion (no matching story hits
-    // that need expansion for this basic test — the comment hit is a direct search comment)
+    // that need expansion for this basic test - the comment hit is a direct search comment)
     setupFetchRouter(fixtureData, { id: 0, children: [] });
 
     const result = await scanHackerNewsSource({
@@ -102,7 +102,7 @@ describe("scanHackerNewsSource", () => {
     expect(result.failed).toBeUndefined();
 
     // Fixture: objectID 12345 (story matches), objectID 67890 (comment matches),
-    //          objectID 99999 (story — no variation present), objectID 11111 (empty story_text, title has no match)
+    //          objectID 99999 (story - no variation present), objectID 11111 (empty story_text, title has no match)
     const mentions = result.mentions;
     // At least the 2 direct-search mentions; comment expansion may add more
     const directMentions = mentions.filter(
@@ -145,7 +145,7 @@ describe("scanHackerNewsSource", () => {
     });
 
     // The story title contains "Linear"; the comment body contains "linear app"
-    // passesBrandPresenceGate picks longest match first — both should record something meaningful
+    // passesBrandPresenceGate picks longest match first - both should record something meaningful
     for (const m of mentions) {
       expect(["Linear", "linear app"]).toContain(m.matchedVariation);
     }
@@ -359,7 +359,7 @@ describe("scanHackerNewsSource", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Comment-tree expansion — new tests
+  // Comment-tree expansion - new tests
   // -------------------------------------------------------------------------
 
   it("expands comment trees for matched stories and adds comment mentions with correct fields", async () => {
@@ -447,7 +447,7 @@ describe("scanHackerNewsSource", () => {
       brandId: "brand-abc",
     });
 
-    // No overall failure — the scan succeeded
+    // No overall failure - the scan succeeded
     expect(result.failed).toBeUndefined();
     // Direct story mention is still returned
     const storyMention = result.mentions.find(
@@ -506,7 +506,7 @@ describe("scanHackerNewsSource", () => {
     expect(treeMentions).toHaveLength(0);
   });
 
-  it("respects 10-story comment-expansion cap — calls /items/:id at most 10 times", async () => {
+  it("respects 10-story comment-expansion cap - calls /items/:id at most 10 times", async () => {
     // 15 story hits, all matching
     const hits = Array.from({ length: 15 }, (_, i) => ({
       objectID: String(1000 + i),

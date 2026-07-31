@@ -7,7 +7,7 @@ export type Tier = "free" | "beta" | "pro" | "enterprise" | "admin";
 
 // Daily token cap per tier. -1 = unlimited.
 //
-// 2026-05-27: token budget intentionally disabled across all tiers — the
+// 2026-05-27: token budget intentionally disabled across all tiers - the
 // `if (cap < 0) return;` short-circuit in assertWithinBudget() makes the
 // enforcement a no-op while keeping recordSpend() writing api_costs rows
 // for analytics. CHATBOT_MESSAGES_PER_HOUR (below) still applies as a
@@ -22,7 +22,7 @@ export const DAILY_TOKEN_CAP: Record<Tier, number> = {
 };
 
 // Per-user chatbot token cap per day. -1 = unlimited.
-// Disabled 2026-05-27 alongside DAILY_TOKEN_CAP — see note above.
+// Disabled 2026-05-27 alongside DAILY_TOKEN_CAP - see note above.
 export const CHATBOT_DAILY_TOKEN_CAP: Record<Tier, number> = {
   free: -1,
   beta: -1,
@@ -42,7 +42,7 @@ export const CHATBOT_MESSAGES_PER_HOUR: Record<Tier, number> = {
 };
 
 // Rough cents-per-1k-tokens (input / output). Used for est_cost_cents
-// in the api_costs row — analytics-only, not part of the cap. Update
+// in the api_costs row - analytics-only, not part of the cap. Update
 // when prices change; missing models get a generic fallback.
 const PRICING_PER_1K_TOKENS_CENTS: Record<string, { in: number; out: number }> = {
   // OpenAI 2025-04 prices, in cents
@@ -55,13 +55,13 @@ const PRICING_PER_1K_TOKENS_CENTS: Record<string, { in: number; out: number }> =
   "claude-3-haiku": { in: 0.025, out: 0.125 },
   "claude-sonnet-4.5": { in: 0.3, out: 1.5 },
   "anthropic/claude-sonnet-4.5": { in: 0.3, out: 1.5 },
-  // Citation engines — token rates verified 2026-05-18 against the
+  // Citation engines - token rates verified 2026-05-18 against the
   // OpenRouter model pages. The web-search server-tool request fee
   // (~$0.005/req) is separate, not token-priced here (analytics-only).
   "anthropic/claude-haiku-4.5": { in: 0.1, out: 0.5 }, // $1 / $5 per 1M
   "google/gemini-2.5-flash-lite": { in: 0.01, out: 0.04 }, // $0.10 / $0.40 per 1M
   "perplexity/sonar": { in: 0.1, out: 0.1 }, // $1 / $1 per 1M (+ search fee)
-  // DeepSeek slug verified 2026-05-28 — live variant is the `-exp` one.
+  // DeepSeek slug verified 2026-05-28 - live variant is the `-exp` one.
   "deepseek/deepseek-v3.2-exp": { in: 0.027, out: 0.041 }, // $0.27 / $0.41 per 1M (OpenRouter card)
   // Keep the non-exp key as a fallback so analytics records that
   // pre-dated the fix still cost-estimate sensibly via the

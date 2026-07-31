@@ -48,7 +48,7 @@ export function classifyServiceKey(key: string): KeyVerdict {
   return {
     kind: "unknown",
     reason:
-      "SUPABASE_SERVICE_ROLE_KEY is an unrecognized format — could not confirm it is a " +
+      "SUPABASE_SERVICE_ROLE_KEY is an unrecognized format - could not confirm it is a " +
       "service_role key. If privileged operations fail with RLS errors, verify this key.",
   };
 }

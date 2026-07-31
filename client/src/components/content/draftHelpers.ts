@@ -3,7 +3,7 @@
 
 import type { Article } from "@shared/schema";
 
-// Anything in {draft, generating, failed} is "unfinished" — it shows up in
+// Anything in {draft, generating, failed} is "unfinished" - it shows up in
 // the Recent Drafts dropdown rather than the Articles list.
 export type DraftableArticle = Article;
 

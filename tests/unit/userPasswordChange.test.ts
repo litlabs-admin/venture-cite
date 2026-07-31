@@ -1,4 +1,4 @@
-// Coverage for POST /api/user/password — Settings page password
+// Coverage for POST /api/user/password - Settings page password
 // change with re-auth + Supabase Admin update (Foundations Plan 3,
 // Task 2).
 
@@ -48,7 +48,7 @@ vi.mock("../../server/supabase", () => ({
 }));
 
 // Re-auth now happens on the dedicated supabaseAuth client (server/lib/
-// supabaseAuth.ts), NOT supabaseAdmin — see server/routes/userAccount.ts.
+// supabaseAuth.ts), NOT supabaseAdmin - see server/routes/userAccount.ts.
 // Mock the real module (which otherwise constructs a real supabase-js
 // client from SUPABASE_URL and would attempt a genuine network call).
 vi.mock("../../server/lib/supabaseAuth", () => ({

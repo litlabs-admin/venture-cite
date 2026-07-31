@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 type DeltaType = "new" | "changed" | "removed";
 
 // Chart tokens (--chart-*) belong to data visualisation. These are lifecycle
-// states, not measurements, and "new" is not a good/bad outcome — so the only
+// states, not measurements, and "new" is not a good/bad outcome - so the only
 // one that keeps a semantic colour is "removed", where the destructive hue is
 // telling the user something actually went away.
 const LABELS: Record<DeltaType, { emoji: string; text: string; classes: string }> = {

@@ -1,11 +1,11 @@
 // GET /api/dashboard/cited-urls/:brandId
 //
-// This endpoint answers "which sources cited my brand?" — it feeds the
+// This endpoint answers "which sources cited my brand?" - it feeds the
 // dashboard's Citations panel (headline count + Top sources) and the Report
 // page's CitedUrlsCard.
 //
 // It used to read `citedUrls`, which the schema defines as "list of all URLs
-// the LLM cited in its response" — the entire bibliography of every answer the
+// the LLM cited in its response" - the entire bibliography of every answer the
 // brand happened to appear in. `citingOutletUrl` is the matcher-derived source
 // that actually referenced the brand. Measured on the live Apple brand: 168
 // cited rankings carried 962 raw URLs across `citedUrls` (226 after dedupe)
@@ -116,7 +116,7 @@ describe("GET /api/dashboard/cited-urls/:brandId", () => {
     stubs.getGeoRankingsByBrandPromptIds.mockResolvedValue([
       ranking({
         citingOutletUrl: "https://cnet.com/best-phones",
-        // The rest of that answer's bibliography — unrelated to the brand.
+        // The rest of that answer's bibliography - unrelated to the brand.
         citedUrls: [
           "https://cnet.com/best-phones",
           "https://youtube.com/watch?v=x",

@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 // HONESTY RULE: a field is `null` when the backend cannot measure it. Panels
 // render `–` for null and never substitute 0. The three metrics with no
 // backing source at all (site health, perception, AI traffic/conversations)
-// have no query here — their panels are empty states by construction.
+// have no query here - their panels are empty states by construction.
 
 export interface HeroData {
   visibilityScore: number;
@@ -40,13 +40,13 @@ export interface LeaderRow {
  * The single ordering of the competitive set.
  *
  * The KPI strip's "Rank" tile and the Rankings panel are the same claim shown
- * twice, so they must not each sort for themselves — the tile used to show a
+ * twice, so they must not each sort for themselves - the tile used to show a
  * permanent `–` (it was specced as a cross-account global rank that no index
  * exists for) while the panel said "You: #1 of 14 tracked" directly beneath
  * it. Both now read from here.
  *
  * `ownRank` is null when the brand has no leaderboard row at all, which is
- * "not measured" — the tile renders `–`, never a fabricated position.
+ * "not measured" - the tile renders `–`, never a fabricated position.
  */
 export function rankLeaderboard(rows: LeaderRow[]): {
   sorted: LeaderRow[];
@@ -84,7 +84,7 @@ export interface PromptRow {
   prompt: string;
   platforms: { platform: string; isCited: boolean }[];
 }
-// Competitor gap matrix — moved here when the Monitor "Overview" tab was
+// Competitor gap matrix - moved here when the Monitor "Overview" tab was
 // retired. /api/dashboard/gap-matrix has no other consumer, so the panel is
 // the only reason it exists.
 export type GapCell = "yes" | "no" | "partial" | "unknown";
@@ -112,7 +112,7 @@ export interface Listicle {
   sourcePublication: string | null;
   listPosition: number | null;
   totalListItems: number | null;
-  isIncluded: number; // 0 | 1 — integer column, not a boolean
+  isIncluded: number; // 0 | 1 - integer column, not a boolean
   lastChecked: string;
 }
 export interface CitedUrl {
@@ -122,7 +122,7 @@ export interface CitedUrl {
   citedAt: string;
 }
 
-/** GET /api/dashboard/site-health/:brandId — citation readiness.
+/** GET /api/dashboard/site-health/:brandId - citation readiness.
  *
  *  Mirrors the reference's Site Health panel, which is NOT a robots.txt check:
  *  it is a composite of whether AI systems can DISCOVER the site (robots.txt /
@@ -131,21 +131,21 @@ export interface CitedUrl {
  *  vs failed). Issue counts are real rows from the last crawl, never invented
  *  severities.
  *
- *  `score` is null — never 0 — when there is nothing to measure at all. 0 is a
+ *  `score` is null - never 0 - when there is nothing to measure at all. 0 is a
  *  real and terrible score (undiscoverable, blocked, unfetchable) and has to
  *  stay distinguishable from "not measured". */
 export interface SiteHealth {
   website: string | null;
   checkedAt: string;
   score: number | null;
-  /** True only for the deadline-timeout placeholder — the real compute is
+  /** True only for the deadline-timeout placeholder - the real compute is
    *  still running in the background and will populate the cache for the
    *  NEXT load. `score` is always null when this is true; discovery/crawler
    *  fields are unmeasured (null/zero), never a real reading. Panels must
    *  render a "Measuring…" state, never a score or zeroes, while this is
    *  true. */
   pending?: boolean;
-  /** boolean | null per file — null means UNKNOWN (the probe timed out, hit
+  /** boolean | null per file - null means UNKNOWN (the probe timed out, hit
    *  a 429, or errored), NOT "confirmed absent". A confirmed 4xx is `false`;
    *  a confirmed 2xx-with-body is `true`. */
   discovery: {
@@ -165,7 +165,7 @@ export interface SiteHealth {
   crawl: {
     pagesCrawled: number | null;
     pagesFailed: number | null;
-    /** Sitemap URL count — the SITE's size, distinct from `pagesCrawled`
+    /** Sitemap URL count - the SITE's size, distinct from `pagesCrawled`
      *  (the cost-bounded fact-extraction sample). Null when the sitemap
      *  could not be fetched/parsed; fall back to `pagesCrawled` for the
      *  "N pages" chip in that case. */
@@ -178,7 +178,7 @@ export interface SiteHealth {
   issues: { critical: number; high: number; medium: number; low: number; total: number };
 }
 
-/** GET /api/dashboard/perception/:brandId — the newest scored run, or null if
+/** GET /api/dashboard/perception/:brandId - the newest scored run, or null if
  *  the brand has never been scored.
  *
  *  Every axis is independently nullable: a judge that could not assess an axis
@@ -205,7 +205,7 @@ export interface Perception {
 
 /** Distribution of LLM-judged tone across the same 7-day mention window the
  *  Mentions KPI counts. Shown beneath the perception axes as the always-on
- *  signal — tone is measured continuously, perception only when a run is
+ *  signal - tone is measured continuously, perception only when a run is
  *  triggered. */
 export interface MentionTone {
   positive: number;
@@ -300,10 +300,10 @@ export function useDashboardData(brandId: string) {
     enabled,
   });
   // `stats.total` on this endpoint is all-time, so the 7-day figure comes from
-  // counting the windowed rows. `truncated` is surfaced rather than hidden —
+  // counting the windowed rows. `truncated` is surfaced rather than hidden -
   // a capped count is shown as "200+", never as a precise number it isn't.
   const mentionsFrom = useMemo(() => new Date(Date.now() - SEVEN_DAYS_MS).toISOString(), []);
-  // `stats.bySentiment` rides along on this SAME response — the endpoint already
+  // `stats.bySentiment` rides along on this SAME response - the endpoint already
   // computes it, so the Perception panel costs no extra request. It counts only
   // rows whose sentiment came from the real LLM judge (`sentiment_source='llm'`);
   // rows tagged `fallback`/`capped` are placeholder neutrals and are excluded
@@ -325,7 +325,7 @@ export function useDashboardData(brandId: string) {
   // Without this, a brand nobody has scanned is indistinguishable from one
   // scanned with nothing found: the list query returns `rows: []` either way
   // and the KPI tile rendered a confident `0 · last 7 days`. That is the
-  // "a dash is never a zero" rule inverted — the tile claimed a measurement
+  // "a dash is never a zero" rule inverted - the tile claimed a measurement
   // that had never been taken.
   //
   // The mention scan is opt-in (brands.monitor_mentions gates the weekly cron)
@@ -338,14 +338,14 @@ export function useDashboardData(brandId: string) {
 
   // Site health = AI-crawler access, read from robots.txt. Server-side cached
   // (6h TTL) so rendering the dashboard never triggers an outbound fetch, and
-  // deliberately NOT behind the AI rate limiter — viewing a dashboard must not
+  // deliberately NOT behind the AI rate limiter - viewing a dashboard must not
   // consume the user's AI quota.
   const siteHealth = useQuery<{ success: boolean; data: SiteHealth }>({
     queryKey: [`/api/dashboard/site-health/${brandId}`],
     enabled,
   });
 
-  // Newest persisted perception run. Read-only and LLM-free — scoring happens
+  // Newest persisted perception run. Read-only and LLM-free - scoring happens
   // behind POST .../run, which is rate-limited; rendering a dashboard must
   // never trigger a judge call. `data` is null until a brand has been scored.
   const perception = useQuery<{ success: boolean; data: Perception | null }>({
@@ -375,7 +375,7 @@ export function useDashboardData(brandId: string) {
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [history.data]);
 
-  // Top citing domains, aggregated client-side — the API returns raw cited
+  // Top citing domains, aggregated client-side - the API returns raw cited
   // URLs with no domain rollup.
   const topSources = useMemo(() => {
     const items = citedUrls.data?.data?.items ?? [];

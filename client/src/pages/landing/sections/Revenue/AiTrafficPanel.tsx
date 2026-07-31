@@ -2,7 +2,7 @@ import { TrendingUpIcon } from "./icons";
 
 const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 
-// Verbatim from index.html 2880-3023 — every one of the 48 hourly bars was
+// Verbatim from index.html 2880-3023 - every one of the 48 hourly bars was
 // captured mid pre-animation with style="height: 0%" and no recoverable
 // target height anywhere in the markup (unlike other panels on this page
 // where percentages ARE baked into the DOM). This array is a DECORATIVE
@@ -19,13 +19,13 @@ const BAR_HEIGHTS_PERCENT = [
 
 // Confirmed real detail (index.html 2881-3022): the first 40 bars fill at a
 // tinted opacity and only the last 8 (the most recent ~8 of 48 hours) switch
-// to full opacity — not an even half/half split. Per the visual-richness
+// to full opacity - not an even half/half split. Per the visual-richness
 // pass this whole histogram is a single blue family (pale accent through to
 // full-saturation accent + glow at "Now") rather than neutral grey; emphasis
 // is carried by both opacity and the gradient/glow on the recent tail.
 const SOLID_FROM_INDEX = 40;
 
-// Recent Pages rows — fully recoverable verbatim from index.html 3031-3054.
+// Recent Pages rows - fully recoverable verbatim from index.html 3031-3054.
 const RECENT_PAGES = [
   { alt: "ChatGPT", src: "/venturecite/images/ai-logos/chatgpt.svg", path: "/pricing", time: "2m" },
   {
@@ -45,7 +45,7 @@ const RECENT_PAGES = [
   },
 ];
 
-// AI Traffic · Last 48h panel — the left half of the two-panel mockup
+// AI Traffic · Last 48h panel - the left half of the two-panel mockup
 // (index.html 2866-3057). Per the disclosed choreography-simplification
 // rule, the dozens of individually-delayed bars/rows in the source are
 // rendered settled here, gated by one `isVisible` per panel/list rather

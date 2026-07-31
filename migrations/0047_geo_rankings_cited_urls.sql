@@ -4,7 +4,7 @@
 -- style); previously we were dropping all but the first one.
 --
 -- TEXT[] is bounded application-side at 20 URLs per response (paranoid
--- cap — real responses cite 0–10).
+-- cap - real responses cite 0–10).
 --
 -- Backward-compatible: column is nullable, existing rows stay null.
 -- The UI guards with `result.citedUrls?.length > 0` so old rows render

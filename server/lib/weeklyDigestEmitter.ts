@@ -45,7 +45,7 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
       id: schema.users.id,
       email: schema.users.email,
       firstName: schema.users.firstName,
-      // Digest dedup/window uses its OWN stamp, not the report's — sharing
+      // Digest dedup/window uses its OWN stamp, not the report's - sharing
       // lastWeeklyReportSentAt meant the Sunday report permanently suppressed
       // this digest (and corrupted the "alerts since last digest" window).
       lastWeeklyDigestSentAt: schema.users.lastWeeklyDigestSentAt,
@@ -124,11 +124,9 @@ export async function tryEmitWeeklyDigestForUser(userId: string): Promise<Digest
         output?: unknown;
       }> | null) ?? [];
     const compose = states.find((s) => s.key === "compose_digest")?.output as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     const delta = states.find((s) => s.key === "delta_calc")?.output as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
 
     let alerts: string[] = [];
     try {

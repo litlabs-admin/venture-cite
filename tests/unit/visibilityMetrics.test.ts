@@ -6,7 +6,7 @@ import {
   computeVisibilityScore,
 } from "../../server/lib/visibilityMetrics";
 
-describe("visibilityMetrics — canonical citation rate", () => {
+describe("visibilityMetrics - canonical citation rate", () => {
   describe("citationRateFraction", () => {
     it("returns 0 when there were no checks (no division by zero)", () => {
       expect(citationRateFraction(0, 0)).toBe(0);
@@ -35,7 +35,7 @@ describe("visibilityMetrics — canonical citation rate", () => {
       expect(citationRatePct(1, 8)).toBe(13); // 12.5 → 13 (Math.round)
     });
 
-    it("is exactly Math.round(fraction * 100) — behaviour-preserving for migrated call sites", () => {
+    it("is exactly Math.round(fraction * 100) - behaviour-preserving for migrated call sites", () => {
       for (const [c, t] of [
         [0, 0],
         [7, 0],
@@ -68,7 +68,7 @@ describe("visibilityMetrics — canonical citation rate", () => {
 
     it("treats avgRank <= 0 as 'no rank data' → NEUTRAL blend (factor 0.5), not best-case", () => {
       // rate 1, authority measured 0, no rank data: 70 * 1 * ((1+0.5)/2) + 0
-      // = 70 * 0.75 = 52.5 → 53. (Was 70 under the old best-case factor 1 —
+      // = 70 * 0.75 = 52.5 → 53. (Was 70 under the old best-case factor 1 -
       // the bug where a brand with NO rank data outscored one cited at rank 5.)
       expect(computeVisibilityScore(4, 4, 0, 0)).toBe(53);
       expect(computeVisibilityScore(4, 4, -5, 0)).toBe(53);

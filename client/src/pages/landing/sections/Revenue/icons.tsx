@@ -4,7 +4,7 @@
 // components/sections/Nav/icons.tsx.
 type IconProps = { size?: number; className?: string };
 
-// Verbatim from index.html 2873-2874 / 3062 — xmlns + aria-hidden + the
+// Verbatim from index.html 2873-2874 / 3062 - xmlns + aria-hidden + the
 // "lucide lucide-trending-up" class are present on the source's svg.
 export function TrendingUpIcon({ size = 11, className }: IconProps) {
   return (
@@ -27,7 +27,7 @@ export function TrendingUpIcon({ size = 11, className }: IconProps) {
   );
 }
 
-// Verbatim from index.html 3119-3122 — note this instance of the icon has
+// Verbatim from index.html 3119-3122 - note this instance of the icon has
 // no xmlns/aria-hidden attributes in the source (unlike TrendingUpIcon
 // above), sized purely via the w-3 h-3 Tailwind classes rather than
 // width/height attributes. Reproduced as found.

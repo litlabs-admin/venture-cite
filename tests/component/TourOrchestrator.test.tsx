@@ -9,7 +9,7 @@ import { emptyTourState, wildcardSuppressedTourState } from "../fixtures/tourSta
 vi.mock("shepherd.js", () => ({
   default: {
     // vitest 4 calls this with `new` (Shepherd.Tour is instantiated via
-    // `new`), so the implementation must be a real function — arrow
+    // `new`), so the implementation must be a real function - arrow
     // functions cannot be constructor-called and would throw.
     Tour: vi.fn(function () {
       return {
@@ -41,7 +41,7 @@ vi.mock("../../client/src/hooks/use-brand-selection", () => ({
   useBrandSelection: () => ({ selectedBrandId: "b1", selectedBrand: { name: "Brand A" } }),
 }));
 
-// Partial mock — the module also exports createFileRoute and the route-tree
+// Partial mock - the module also exports createFileRoute and the route-tree
 // machinery, so the whole module must not be replaced.
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),

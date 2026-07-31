@@ -4,14 +4,14 @@
 // Next.js" / "Built on WordPress" label. Best-effort only: any fetch/parse
 // failure degrades to null, never throws, and never adds a per-render
 // network round-trip (the caller runs this inside the same 6-hour cached
-// path as the discovery/robots checks — see server/routes/dashboard.ts).
+// path as the discovery/robots checks - see server/routes/dashboard.ts).
 //
 // Fetches via the SAME SSRF-safe primitive as server/lib/crawlerAccess.ts
-// (safeFetchTextWithLockedIp — the underlying fetch behind safeFetchText,
+// (safeFetchTextWithLockedIp - the underlying fetch behind safeFetchText,
 // with the same maxBytes/timeout conventions), but we also need response
 // HEADERS (x-powered-by, x-generator, x-wix-request-id), which plain
 // safeFetchText does not expose. NEVER use bare fetch() on a user-supplied
-// URL — always go through this SSRF-checked path.
+// URL - always go through this SSRF-checked path.
 //
 // ── Signature table, NOT a vendored fingerprint DB ──────────────────────
 // This is a small, hand-curated table of markers we have personally
@@ -49,7 +49,7 @@ export interface TechSignature {
 }
 
 export const SIGNATURES: TechSignature[] = [
-  // ══════════════════════ priority 200 — first-party build output ═══════
+  // ══════════════════════ priority 200 - first-party build output ═══════
   {
     name: "Next.js",
     category: "framework",
@@ -121,7 +121,7 @@ export const SIGNATURES: TechSignature[] = [
     category: "docs",
     // Bare "vitepress" REMOVED from html: it matched any page that merely
     // writes the word (a blog post, a docs index). The generator tag is the
-    // authoritative signal — vitepress.dev ships
+    // authoritative signal - vitepress.dev ships
     // <meta name="generator" content="vitepress v2.0.0-alpha.18">.
     html: ["/assets/vp-"],
     generator: ["vitepress"],
@@ -165,7 +165,7 @@ export const SIGNATURES: TechSignature[] = [
     priority: 200,
   },
 
-  // ══════════════════════ priority 100 — strong platform markers ═════════
+  // ══════════════════════ priority 100 - strong platform markers ═════════
   {
     // Evaluated BEFORE the generic WordPress entry: "/wp-content/plugins/woocommerce"
     // also contains the WordPress marker "/wp-content/", and the more
@@ -301,8 +301,8 @@ export const SIGNATURES: TechSignature[] = [
     name: "Shopify",
     category: "ecommerce",
     // `Shopify.theme` / `myshopify.com` are definitive (only a Shopify
-    // storefront defines/serves them). `cdn.shopify.com` alone is weaker —
-    // any site can embed a Shopify buy-button or merch widget from it — but
+    // storefront defines/serves them). `cdn.shopify.com` alone is weaker -
+    // any site can embed a Shopify buy-button or merch widget from it - but
     // it is still evaluated at this tier because nothing below outranks it
     // except the first-party site-builder markers above (Framer, Wix,
     // Squarespace, Webflow), which is the property the regression test
@@ -647,7 +647,7 @@ export const SIGNATURES: TechSignature[] = [
     priority: 100,
   },
 
-  // ══════════════════════ priority 50 — embeddable / third-party ════════
+  // ══════════════════════ priority 50 - embeddable / third-party ════════
   {
     name: "HubSpot",
     category: "docs",
@@ -663,7 +663,7 @@ export const SIGNATURES: TechSignature[] = [
     priority: 50,
   },
 
-  // ══════════════════════ priority 10 — generic libraries ════════════════
+  // ══════════════════════ priority 10 - generic libraries ════════════════
   {
     name: "Vue",
     category: "framework",
@@ -679,7 +679,7 @@ export const SIGNATURES: TechSignature[] = [
 ];
 
 /**
- * Pure signature matcher — no network I/O, fully unit-testable.
+ * Pure signature matcher - no network I/O, fully unit-testable.
  *
  * The table is evaluated in priority order (200 -> 10, stable within a
  * band), so unmistakable first-party build output always beats a generic
@@ -725,7 +725,7 @@ export function detectFromSignals(params: {
 
 /**
  * Fetch a website's homepage (SSRF-safe) and detect its platform. Never
- * throws — any failure (fetch error, invalid URL, timeout) resolves to
+ * throws - any failure (fetch error, invalid URL, timeout) resolves to
  * null.
  */
 export async function detectPlatform(website: string): Promise<string | null> {
@@ -734,7 +734,7 @@ export async function detectPlatform(website: string): Promise<string | null> {
     // truncateOnLimit: every signature we look for lives in <head> or the
     // first few KB of body (measured: wixstatic at byte 2753,
     // framerusercontent at byte 600). Real homepages are far bigger than the
-    // cap — wix.com is 3.1 MB, framer.com 2.3 MB — and throwing on those made
+    // cap - wix.com is 3.1 MB, framer.com 2.3 MB - and throwing on those made
     // "big site" indistinguishable from "unknown stack". Read the first 1 MB
     // and match on that; memory stays bounded exactly as before.
     const origin = new URL(url).origin;
@@ -746,7 +746,7 @@ export async function detectPlatform(website: string): Promise<string | null> {
         headers: { "User-Agent": "GEO-Platform-Checker/1.0" },
       }),
     );
-    // A 4xx/5xx body is an error page, not the site — detecting "WordPress"
+    // A 4xx/5xx body is an error page, not the site - detecting "WordPress"
     // off someone's 404 template would be worse than admitting we don't know.
     if (status < 200 || status >= 300) return null;
     // Non-HTML (a JSON API root, a PDF) carries no framework signature.

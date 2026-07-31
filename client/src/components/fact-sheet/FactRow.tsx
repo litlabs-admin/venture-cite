@@ -11,7 +11,7 @@ import { safeExternalHref } from "@/lib/urlSafety";
 // v2 provenance: every scraped fact carries the list of pages that
 // contributed to it (sources) and any disagreeing values seen on other
 // pages (alternatives). v1 rows (no sources/alternatives) render
-// unchanged — fields are optional.
+// unchanged - fields are optional.
 export type FactSourceEntry = {
   url: string;
   excerpt: string;
@@ -111,7 +111,7 @@ export function FactRow({
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">
             {/* fact.subcategory is already the human label derived from
-                factKey (subcategoryFor in shared/factAgent/schema.ts) — e.g.
+                factKey (subcategoryFor in shared/factAgent/schema.ts) - e.g.
                 factKey "tagline" -> subcategory "Tagline". A second element
                 spelling out the raw factKey stated the row's name twice;
                 keep it available on hover instead. */}

@@ -32,7 +32,7 @@ describe("makeBrandNameFilter", () => {
   });
 
   it("does NOT reject on raw product/category terms (products are excluded by design)", () => {
-    // brand.products = ["WidgetPro"] is intentionally ignored — real product
+    // brand.products = ["WidgetPro"] is intentionally ignored - real product
     // arrays hold generic category words that would nuke legitimate prompts.
     expect(namesBrand("best WidgetPro-style tools for teams")).toBe(false);
   });

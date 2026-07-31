@@ -15,7 +15,7 @@ interface RunOptions {
   mode: TourMode;
   buffer: EventBuffer;
   // Persistence callbacks. Fired at most once per run, and ONLY in "auto"
-  // mode — a manual replay from the "?" button must never rewrite state.
+  // mode - a manual replay from the "?" button must never rewrite state.
   onComplete?: () => void;
   onSkipForever?: () => void;
   onSkip?: () => void;
@@ -25,7 +25,7 @@ interface RunOptions {
   // re-fire when the user reaches the page whose anchor exists.
   onNoShow?: () => void;
   // Lifecycle, not persistence: fires exactly once when the run ends for
-  // ANY reason — completed, skipped, suppressed, X/Esc, no-show, or a
+  // ANY reason - completed, skipped, suppressed, X/Esc, no-show, or a
   // programmatic cancel. The orchestrator clears its activeRef here.
   // Previously nothing cleared activeRef on an X/Esc dismiss, so one
   // dismissed tour blocked every other tour for the rest of the session.
@@ -102,17 +102,17 @@ export function runTour(opts: RunOptions): RunningTour {
   let stepEnterAt = Date.now();
   let cancelled = false;
   // Steps that actually rendered (target found). If this stays 0 the
-  // tour showed nothing — see onNoShow handling below.
+  // tour showed nothing - see onNoShow handling below.
   let builtCount = 0;
   // Programmatic cancels from the orchestrator (e.g. brand-switch)
-  // should NOT mark the tour skipped — they're internal navigation,
+  // should NOT mark the tour skipped - they're internal navigation,
   // not user intent. The orchestrator's RunningTour.cancel(reason)
   // sets this before tearing the tour down.
   let cancelReason: string | null = null;
   // Set by the "Done" button so the `complete` handler knows the run reached
   // its end through the UI. Shepherd also completes itself if next() is
   // called on the final step, so persistence hangs off the event, not off
-  // the button — a completion must never be able to escape unpersisted.
+  // the button - a completion must never be able to escape unpersisted.
   let completedStepId: string | null = null;
   // What the user pressed, read by the single `cancel` handler. Shepherd
   // funnels the Skip button, the "Don't show again" button, the X icon and
@@ -135,7 +135,7 @@ export function runTour(opts: RunOptions): RunningTour {
     baseEvent({ eventType: mode === "manual" ? "tour_manual_replayed" : "tour_auto_fired" }),
   );
 
-  // Resolve a step's anchor. Returns null when the target isn't on screen —
+  // Resolve a step's anchor. Returns null when the target isn't on screen -
   // that step is dropped and does NOT count toward the rendered sequence.
   const resolveStep = async (step: TourStep, index: number) => {
     if (!step.target) return { step, attachTo: undefined };
@@ -156,8 +156,8 @@ export function runTour(opts: RunOptions): RunningTour {
   // config.steps. They used to be config positions, which meant that when a
   // tail step's target was missing no rendered step ever satisfied
   // `index === config.steps.length - 1`: the final visible step showed "Next",
-  // Shepherd completed itself, and `onComplete` — the only caller of
-  // markCompleted — never ran. The tour then re-fired on every page load
+  // Shepherd completed itself, and `onComplete` - the only caller of
+  // markCompleted - never ran. The tour then re-fired on every page load
   // forever, because nothing was ever persisted.
   const addStep = (
     step: TourStep,
@@ -246,7 +246,7 @@ export function runTour(opts: RunOptions): RunningTour {
     // waitTimeoutMs (3s) for its anchor, and sequential waits made those
     // timeouts additive: the welcome tour on a sub-1024px viewport has six
     // anchors that can never appear, so the user sat looking at nothing for
-    // ~18s before the first panel painted. Measured in production — the
+    // ~18s before the first panel painted. Measured in production - the
     // tour_step_target_missing events land ~4s apart and the first
     // tour_step_viewed follows 27s after tour_auto_fired.
     //
@@ -259,7 +259,7 @@ export function runTour(opts: RunOptions): RunningTour {
     builtCount = resolved.length;
     resolved.forEach((r, i) => addStep(r.step, r.attachTo, i, resolved.length));
     if (builtCount === 0) {
-      // Every step's target was missing — nothing rendered. Don't
+      // Every step's target was missing - nothing rendered. Don't
       // persist completion/skip (that would consume a one-step nudge
       // permanently) and don't emit completed/abandoned. Hand back to
       // the orchestrator so the same tour can re-fire once the user is
@@ -288,7 +288,7 @@ export function runTour(opts: RunOptions): RunningTour {
   tour.on("cancel", () => {
     // The Skip button, the "Don't show again" button, the X icon and Esc
     // all arrive here. `intent` says which; null means X or Esc.
-    if (cancelled || cancelReason) return; // programmatic — handled below
+    if (cancelled || cancelReason) return; // programmatic - handled below
 
     if (intent === "suppress") {
       settle(persistable ? onSkipForever : undefined);
@@ -301,8 +301,8 @@ export function runTour(opts: RunOptions): RunningTour {
 
     // X / Esc. This used to persist NOTHING, on the reasoning that an
     // accidental X shouldn't kill a tour forever. In production it was by
-    // far the most common ending — 82 abandons against 6 completions on
-    // the account that reported this — and every one of them meant the
+    // far the most common ending - 82 abandons against 6 completions on
+    // the account that reported this - and every one of them meant the
     // tour returned on the next page load. Closing a tour IS a decision;
     // it is recorded as a skip, and the "?" in the page header replays
     // any tour on demand, so nothing is actually lost.

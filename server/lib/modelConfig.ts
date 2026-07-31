@@ -1,4 +1,4 @@
-// Central model registry — edit model names here and every call site picks
+// Central model registry - edit model names here and every call site picks
 // them up. Keep the keys grouped by feature page so it's obvious where each
 // value is used.
 //
@@ -24,11 +24,11 @@ export const MODELS = {
   brandAutofill: OPENAI_MINI_SNAPSHOT,
 
   // ── AI Keyword Research (keyword-research page) ───────────────────
-  // /api/keyword-research/discover — generates 12–15 scored keywords.
+  // /api/keyword-research/discover - generates 12–15 scored keywords.
   keywordResearch: OPENAI_MINI_SNAPSHOT,
-  // /api/keyword-suggestions — inline autosuggest on the content page.
+  // /api/keyword-suggestions - inline autosuggest on the content page.
   keywordSuggestions: OPENAI_MINI_SNAPSHOT,
-  // /api/popular-topics — trending topics on the content page.
+  // /api/popular-topics - trending topics on the content page.
   popularTopics: OPENAI_MINI_SNAPSHOT,
 
   // ── AI Content Generation (content page) ──────────────────────────
@@ -40,12 +40,12 @@ export const MODELS = {
   contentAnalyze: OPENAI_MINI_SNAPSHOT,
 
   // ── Track AI Citations (citations page) ───────────────────────────
-  // Prompt portfolio generator — 10 strategic questions per brand.
+  // Prompt portfolio generator - 10 strategic questions per brand.
   brandPromptGeneration: OPENAI_MINI_SNAPSHOT,
-  // ChatGPT citation check — direct OpenAI client.
+  // ChatGPT citation check - direct OpenAI client.
   citationChatGPT: OPENAI_MINI_SNAPSHOT,
   // The remaining four platforms go through OpenRouter. Slugs verified
-  // against https://openrouter.ai/api/v1/models on 2026-04-16 — edit here
+  // against https://openrouter.ai/api/v1/models on 2026-04-16 - edit here
   // if OpenRouter renames or deprecates any of them.
   citationClaude: "anthropic/claude-haiku-4.5",
   citationGemini: "google/gemini-2.5-flash-lite",
@@ -53,7 +53,7 @@ export const MODELS = {
   // 2026-05-28: corrected from `deepseek/deepseek-v3.2` (404s) to the
   // actual live slug `deepseek/deepseek-v3.2-exp` confirmed against
   // https://openrouter.ai/deepseek/deepseek-v3.2-exp. The `-exp` suffix
-  // matters — DeepSeek's V3.2 line ships only as the experimental
+  // matters - DeepSeek's V3.2 line ships only as the experimental
   // variant. The 404 was being eaten by the circuit breaker as a 4xx
   // (non-infra) failure, so the DeepSeek column on the citations page
   // had been silently returning is_cited=false for every prompt.
@@ -85,12 +85,12 @@ export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 //     `plugins:[{id:"web", max_results:5}]` extension on the OpenAI-compatible
 //     chat-completions request. (Per https://openrouter.ai/docs/guides/features/plugins/web-search
 //     the supported forms are the `:online` model suffix or the `plugins`
-//     array — there is no `openrouter:web_search` tool type. The prior
+//     array - there is no `openrouter:web_search` tool type. The prior
 //     code mistakenly built a fake `tools` entry which OpenRouter
 //     silently ignored, so these engines were running against stale
 //     training data.) OpenRouter runs the search server-side in one
 //     round-trip and returns url_citation annotations on
-//     `choices[].message.annotations` — no client-side tool-call handling.
+//     `choices[].message.annotations` - no client-side tool-call handling.
 //   - Perplexity `sonar` is natively web-grounded; no plugin needed.
 // pricingModel == model (token cost only). The web-search request fee
 // (~$0.005/req via Exa) is not token-priced (analytics-only). If a slug

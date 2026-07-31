@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { breachCountFromRange } from "../server/lib/leakedPassword";
 
-// Network-free check of the HIBP range parser — the security-relevant logic.
+// Network-free check of the HIBP range parser - the security-relevant logic.
 // The live fetch in isPasswordLeaked is fail-open and not unit-tested here.
 const sha1Upper = (s: string) => createHash("sha1").update(s, "utf8").digest("hex").toUpperCase();
 

@@ -8,7 +8,7 @@ import type { Page } from "@playwright/test";
  * (`.shepherd-modal-overlay-container`) swallows pointer events. Any spec that
  * clicks something on a page the tour targets will time out with
  * "<path> from <svg class='shepherd-modal-overlay-container'> subtree
- * intercepts pointer events" — which reads like a broken selector but is not.
+ * intercepts pointer events" - which reads like a broken selector but is not.
  *
  * This is a cross-test ordering hazard, not a per-spec bug: each Playwright
  * test gets a fresh context, so the orchestrator's per-session guard
@@ -16,7 +16,7 @@ import type { Page } from "@playwright/test";
  * server state shared by every test on the same account.
  *
  * Escape is a deliberate SOFT dismiss. Per shepherdAdapter.ts, Escape and the
- * X icon do NOT persist a skip — only the explicit "Skip"/"Don't show again"
+ * X icon do NOT persist a skip - only the explicit "Skip"/"Don't show again"
  * buttons do. So this unblocks the current page without mutating shared
  * account state and silently narrowing what tours.spec.ts can still observe.
  */
@@ -27,7 +27,7 @@ export async function dismissTourIfPresent(page: Page, appearWindowMs = 6_000): 
 
   // Wait for it to APPEAR rather than sampling once. The orchestrator fires
   // after its brand/tour-state/counts queries resolve, so a check taken
-  // immediately after page.goto() reliably runs too early and sees nothing —
+  // immediately after page.goto() reliably runs too early and sees nothing -
   // the tour then opens a moment later, mid-click. That is exactly how this
   // helper failed on its first version.
   try {
@@ -40,7 +40,7 @@ export async function dismissTourIfPresent(page: Page, appearWindowMs = 6_000): 
 
   // Escape is a deliberate SOFT dismiss (see the doc comment above): it does
   // not persist a skip, so this cannot narrow what tours.spec.ts observes.
-  // Loop because a step can re-render or advance between attempts — the
+  // Loop because a step can re-render or advance between attempts - the
   // observed failure showed the overlay's clip path changing between retries.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.keyboard.press("Escape");
@@ -48,7 +48,7 @@ export async function dismissTourIfPresent(page: Page, appearWindowMs = 6_000): 
       await visible.first().waitFor({ state: "hidden", timeout: 3_000 });
       return;
     } catch {
-      // Still up — try again.
+      // Still up - try again.
     }
   }
 

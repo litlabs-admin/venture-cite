@@ -26,7 +26,7 @@ describe("pageGuards", () => {
 
   describe("isSoft404", () => {
     // 2026-05-28 (pageGuards.ts): isSoft404 now requires >= 2
-    // NOT_FOUND_PATTERNS hits, not 1 — a single hit (e.g. the word "not"
+    // NOT_FOUND_PATTERNS hits, not 1 - a single hit (e.g. the word "not"
     // in unrelated copy) was flagging legitimate sparse pages as soft
     // 404s. These fixtures need two distinct markers to match the
     // tightened rule.

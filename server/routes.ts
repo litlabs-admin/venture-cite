@@ -1,7 +1,7 @@
 // routes.ts hosts the few cross-cutting routes (usage, user preferences,
 // waitlist, beta validation) plus the registry of per-domain setup
 // functions. Wave 5.1 split most route logic out into ./routes/*.ts
-// modules — anything specific to a domain (brands, content, FAQs, etc.)
+// modules - anything specific to a domain (brands, content, FAQs, etc.)
 // belongs there, not here. Only imports actually referenced in this file
 // remain; the dead imports from the pre-extraction era were removed
 // 2026-05-28 during the LLM-jobs cleanup pass.
@@ -85,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(requireAuthForApi);
 
   // Daily cron orchestrator (Vercel migration). Self-authenticated via
-  // CRON_SECRET — registered in PUBLIC_API_ROUTES so requireAuthForApi
+  // CRON_SECRET - registered in PUBLIC_API_ROUTES so requireAuthForApi
   // doesn't gate it.
   setupCronRoutes(app);
 
@@ -99,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupOnboardingRoutes(app);
   setupTourRoutes(app);
 
-  // Logo/favicon image proxy — so scraped external images pass CSP.
+  // Logo/favicon image proxy - so scraped external images pass CSP.
   setupLogoProxyRoutes(app);
 
   // Brand CRUD (Wave 5.1: extracted from this file).
@@ -154,14 +154,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         });
       } catch (error) {
-        // Catch-all around storage.getUserUsage (DB query) — use the
+        // Catch-all around storage.getUserUsage (DB query) - use the
         // shared sendError helper so the client never sees error.message.
         sendError(res, error, "Failed to fetch usage data");
       }
     }),
   );
 
-  // User preferences — notification toggles, Buffer connection status
+  // User preferences - notification toggles, Buffer connection status
   app.patch(
     "/api/user/preferences",
     asyncHandler(async (req, res) => {
@@ -257,7 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // (Pre-Wave-5.1 `checkUsageLimit` helper lived here. Callers now use
   // ./lib/usageLimit.withArticleQuota directly; the helper is gone.)
 
-  // Beta invite code validation — redeems for the current authenticated user.
+  // Beta invite code validation - redeems for the current authenticated user.
   // userId is NEVER taken from request body (was an IDOR vulnerability).
   app.post(
     "/api/beta/validate",
@@ -281,7 +281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ success: true, accessTier: inviteCode.accessTier });
       } catch (error) {
         // Catch-all around storage.useBetaInviteCode / updateUserStripeInfo
-        // (DB queries) — sendError keeps error.message out of the response.
+        // (DB queries) - sendError keeps error.message out of the response.
         sendError(res, error, "Failed to validate invite code");
       }
     }),
@@ -316,7 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         res.json({ success: true, data: inviteCode });
       } catch (error) {
-        // Catch-all around storage.createBetaInviteCode (DB insert) —
+        // Catch-all around storage.createBetaInviteCode (DB insert) -
         // sendError keeps error.message out of the response.
         sendError(res, error, "Failed to create invite code");
       }
@@ -332,14 +332,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const codes = await storage.getAllBetaInviteCodes();
         res.json({ success: true, data: codes });
       } catch (error) {
-        // Catch-all around storage.getAllBetaInviteCodes (DB query) —
+        // Catch-all around storage.getAllBetaInviteCodes (DB query) -
         // sendError keeps error.message out of the response.
         sendError(res, error, "Failed to fetch invite codes");
       }
     }),
   );
 
-  // Get dashboard analytics — scoped to the authenticated user. Aggregates
+  // Get dashboard analytics - scoped to the authenticated user. Aggregates
   // across brands they own so one logged-in user cannot see another's data.
   app.get(
     "/api/dashboard",
@@ -347,7 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const user = requireUser(req);
         const allBrands = await storage.getBrandsByUserId(user.id);
-        // Optional ?brandId= filter — when provided, every metric below is
+        // Optional ?brandId= filter - when provided, every metric below is
         // scoped to that single brand. Without it, metrics aggregate across
         // every brand the user owns (legacy behaviour).
         const brandIdFilter = typeof req.query.brandId === "string" ? req.query.brandId : "";
@@ -403,7 +403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }),
   );
 
-  // Onboarding status for new user checklist — scoped to the caller.
+  // Onboarding status for new user checklist - scoped to the caller.
   app.get(
     "/api/onboarding-status",
     asyncHandler(async (req, res) => {
@@ -415,7 +415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const articles = allArticles.filter((a) => a.brandId && brandIds.has(a.brandId));
         const citations = await storage.getCitationsByUserId(user.id);
 
-        // Also count any cited geo_rankings — the automated Phase 1 flow
+        // Also count any cited geo_rankings - the automated Phase 1 flow
         // writes there instead of the legacy `citations` table, so without
         // this check users who've run prompt checks would never see the
         // "Track your first citation" step flip to done.
@@ -430,7 +430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const rankings = await storage.getGeoRankingsByBrandPromptIds(promptIds);
             citedRankingsCount = rankings.filter((r) => r.isCited === 1).length;
           }
-          // Count citation runs across all brands — completing the step
+          // Count citation runs across all brands - completing the step
           // when the user *runs* their first check, not only when something
           // is actually cited.
           const runsByBrand = await Promise.all(
@@ -439,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           citationRunsCount = runsByBrand.reduce((acc, rs) => acc + rs.length, 0);
         }
 
-        // Server-side onboarding flags — persisted on the users row so they
+        // Server-side onboarding flags - persisted on the users row so they
         // sync across browsers/devices (localStorage doesn't).
         const userRow = await storage.getUser(user.id);
 
@@ -468,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Mark the "View the AI Visibility Guide" onboarding step as complete
-  // server-side. Idempotent — first call stamps the timestamp, subsequent
+  // server-side. Idempotent - first call stamps the timestamp, subsequent
   // calls are no-ops. Synced across devices via the users table.
   app.post(
     "/api/onboarding/visibility-visited",
@@ -493,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // The /api/platform-metrics endpoint was deleted along with the
-  // outreach/agent dashboard pages — no frontend caller remained.
+  // outreach/agent dashboard pages - no frontend caller remained.
 
   // Wave 5.1 domain splits: the rest of the routes live in per-domain
   // files under ./routes. Each mounts its own handlers; middleware above

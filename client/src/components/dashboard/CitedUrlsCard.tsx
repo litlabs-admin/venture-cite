@@ -29,7 +29,7 @@ type View = "page" | "prompt";
 function safeHttpHref(url: string): string | null {
   let candidate = url.trim();
   if (!candidate) return null;
-  // Bare domains like "example.com/page" have no scheme — assume https.
+  // Bare domains like "example.com/page" have no scheme - assume https.
   if (!/^[a-z][a-z0-9+.-]*:/i.test(candidate)) {
     candidate = `https://${candidate}`;
   }
@@ -75,7 +75,7 @@ function UrlLink({ url }: { url: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      // `flex` (not inline-flex) so the anchor fills — and is bound by — the
+      // `flex` (not inline-flex) so the anchor fills - and is bound by - the
       // min-w-0 column; otherwise it shrink-wraps to the full URL and overflows
       // onto the platform chips. The inner span then truncates to fit.
       className="flex min-w-0 items-center gap-1 text-vc-accent hover:underline"
@@ -137,7 +137,7 @@ function newer(a: string, b: string): string {
 // Shows which pages AI engines cited for this brand, sourced from the already
 // stored geo_rankings.cited_urls[]. Reused on the Monitor Overview and Reports.
 // The flat endpoint rows (one per platform×prompt×url) are aggregated here into
-// a "By page" view (default — which pages get cited most) or a "By prompt" view
+// a "By page" view (default - which pages get cited most) or a "By prompt" view
 // (what each prompt surfaced), each row expandable for the detail.
 export default function CitedUrlsCard({
   brandId,
@@ -151,7 +151,7 @@ export default function CitedUrlsCard({
   /**
    * Whether the "Show all N" control is offered. Report owns the full list, so
    * Overview mounts this as a capped preview with `expandable={false}` and
-   * links out instead — otherwise the preview could expand to the same 115
+   * links out instead - otherwise the preview could expand to the same 115
    * rows the Report page exists to hold, which is the duplication this split
    * was meant to remove.
    */

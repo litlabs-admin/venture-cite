@@ -15,7 +15,7 @@ import { routeTree } from "./routeTree.gen";
  * router. They are typed by hand, bookmarked, mailed out in recommendation
  * CTAs, and asserted on by the E2E suite. Under the default serializer an
  * externally-authored `?brandId=42` parses to the NUMBER 42 while an
- * app-authored one parses to the STRING "42" — the same URL yielding two
+ * app-authored one parses to the STRING "42" - the same URL yielding two
  * different types depending on who wrote it, which is precisely the class of
  * bug that only shows up in production via a shared link.
  *

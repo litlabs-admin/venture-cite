@@ -12,7 +12,7 @@ const { storageMock, openaiMock } = vi.hoisted(() => ({
 
 vi.mock("../../server/storage", () => ({ storage: storageMock }));
 // vitest 4 calls this with `new` (the OpenAI client is instantiated via
-// `new`), so the implementation must be a real function — arrow functions
+// `new`), so the implementation must be a real function - arrow functions
 // cannot be constructor-called and would throw.
 vi.mock("openai", () => ({
   default: vi.fn().mockImplementation(function () {
@@ -69,7 +69,7 @@ describe("judgeSentimentBatch", () => {
     expect(out["k1"]).toEqual({ sentiment: "neutral", sentimentScore: 0, source: "fallback" });
   });
 
-  it("respects daily cap — over-cap entries get source 'capped'", async () => {
+  it("respects daily cap - over-cap entries get source 'capped'", async () => {
     storageMock.getCachedSentiment.mockResolvedValue(undefined);
     const inputs = Array.from({ length: 5 }, (_, i) => ({ key: `k${i}`, text: `t${i}` }));
     // remaining=2 means only 2 of 5 should go to OpenAI

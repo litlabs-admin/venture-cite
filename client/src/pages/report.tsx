@@ -81,10 +81,10 @@ function DeltaChip({ delta }: { delta: number }) {
   const Icon = delta > 0 ? ArrowUp : delta < 0 ? ArrowDown : Minus;
   // An improvement renders neutral: the arrow already says which way it went,
   // so colour would be a second encoding of the same fact. It used to be
-  // bg-chart-4 (violet) mislabelled as "design-system green" in chartTheme —
+  // bg-chart-4 (violet) mislabelled as "design-system green" in chartTheme -
   // see the note there. A decline keeps destructive, because that is the one
   // case where the direction alone under-states it. Rendered as plain
-  // colored text — no pill background, no border, no padding.
+  // colored text - no pill background, no border, no padding.
   const cls = delta > 0 ? "text-vc-primary" : delta < 0 ? "text-destructive" : "text-vc-tertiary";
   return (
     <span className={`inline-flex items-center gap-1 text-data font-mono font-medium ${cls}`}>
@@ -191,7 +191,7 @@ export default function Report() {
 
   return (
     <PanelPage className="reveal in-view">
-      {/* Print action — not part of the printed page. */}
+      {/* Print action - not part of the printed page. */}
       <div className="flex justify-end border-b border-vc-default px-8 py-4 print:hidden">
         <Button variant="outline" size="sm" onClick={() => window.print()}>
           <Printer className="mr-2 h-4 w-4" />

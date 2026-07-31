@@ -15,7 +15,7 @@ export const firstBrandCreatedNudge: TourConfig = {
       id: "next",
       target: "brands.firstRow",
       attachTo: "bottom",
-      title: "Brand created — what's next?",
+      title: "Brand created - what's next?",
       content:
         "Open the brand to add name variations, then connect AI engines under AI Visibility.",
     },

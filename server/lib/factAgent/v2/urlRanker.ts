@@ -16,19 +16,19 @@
 //
 // Why this is structurally better than the regex approach:
 //
-//   - Adaptive — a brand whose About page lives at /our-company
+//   - Adaptive - a brand whose About page lives at /our-company
 //     doesn't need a regex update; the LLM sees the candidate plus
 //     anchor text and ranks it appropriately
-//   - Multi-signal — anchor text, region, depth, words in URL all
+//   - Multi-signal - anchor text, region, depth, words in URL all
 //     contribute to the score
-//   - Cheap — one LLM call per scrape (~$0.001 with gpt-4o-mini)
+//   - Cheap - one LLM call per scrape (~$0.001 with gpt-4o-mini)
 //     replaces ~250 lines of regex
-//   - Explainable — the ranker returns a reason per URL, surfaced in
+//   - Explainable - the ranker returns a reason per URL, surfaced in
 //     the inspector for debugging
 //
 // Safety:
 //   - Strict JSON Schema response so the model can't return junk
-//   - Hard timeout (15 s) — if the call hangs we fall back to the
+//   - Hard timeout (15 s) - if the call hangs we fall back to the
 //     existing regex tier scorer
 //   - Sandboxed by setUrlRanker() so tests can mock without a real
 //     OpenAI key
@@ -39,7 +39,7 @@ import { logger } from "../../logger";
 
 export interface UrlCandidate {
   url: string;
-  /** Where we found this URL — informs the ranker's weighting. */
+  /** Where we found this URL - informs the ranker's weighting. */
   source: "sitemap" | "nav" | "header" | "footer" | "jsonld";
   /** Anchor text or similar label. Empty when not known. */
   label?: string;
@@ -111,7 +111,7 @@ CRITERIA (in order of weight):
 EXCEPTIONS:
 - For a brand whose product IS its identity (Notion, Linear), the product page can be 9.
 - For a brand at root /about (any path style), that always scores 10.
-- Use the anchor text — a link labelled "Our Story" scores like /about even if the URL is /heritage.
+- Use the anchor text - a link labelled "Our Story" scores like /about even if the URL is /heritage.
 - For a brand with regulatory facts (banks, fintech, healthcare), the /compliance or /trust pages can be 8.
 
 If a URL is obviously useless (privacy policy, cookie policy, status page, individual blog post), score 0 and the consumer drops it.`;
@@ -183,7 +183,7 @@ export async function rankUrls(
     const score = typeof o.score === "number" ? Math.max(0, Math.min(10, o.score)) : null;
     const reason = typeof o.reason === "string" ? o.reason.slice(0, 200) : "";
     if (!url || score === null) continue;
-    // Only accept URLs that were actually in our candidate set — guard
+    // Only accept URLs that were actually in our candidate set - guard
     // against hallucinated URLs the LLM invents.
     if (!candidateSet.has(url)) continue;
     validRanked.push({ url, score, reason });

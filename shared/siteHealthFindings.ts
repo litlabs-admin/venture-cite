@@ -2,10 +2,10 @@
 // Pure, framework-free derivation of "what to fix" rows from a site-health
 // snapshot + its per-page crawl rows. Lives in shared/ (not server/lib or
 // client/src) so both the API route and the /site-health page compute the
-// SAME numbers from the SAME rules — no duplicated, driftable math.
+// SAME numbers from the SAME rules - no duplicated, driftable math.
 //
 // Point values are NOT invented: they mirror the real weights in
-// scoreSiteHealth() (server/routes/dashboard.ts) —
+// scoreSiteHealth() (server/routes/dashboard.ts) -
 //   discovery:      robots.txt = 10, sitemap.xml = 15, llms.txt = 10
 //   crawler access:  up to 35, scaled by blocked/total
 //   crawl success:   up to 30, scaled by the failing/thin share of pages
@@ -14,7 +14,7 @@
 // in scoreSiteHealth, so they surface as advisory (0-pt) findings rather than
 // an invented weight.
 //
-// HONESTY: returns [] when there is no crawl at all — a site that's never
+// HONESTY: returns [] when there is no crawl at all - a site that's never
 // been crawled has nothing to "fix next", it needs a first crawl.
 
 export type SiteHealthFindingCategory =
@@ -29,14 +29,14 @@ export interface SiteHealthFinding {
    *  affected. 0 for advisory-only findings that carry no scoring weight. */
   points: number;
   affectedUrls: string[];
-  /** True for findings that are good practice but score 0 points — never
+  /** True for findings that are good practice but score 0 points - never
    *  faked as if they carried real weight. */
   advisory?: boolean;
 }
 
 export interface SiteHealthFindingsHealth {
   crawl: { pagesCrawled: number | null; pagesFailed: number | null };
-  // boolean | null — null means UNKNOWN (probe timed out / 429 / errored),
+  // boolean | null - null means UNKNOWN (probe timed out / 429 / errored),
   // not "confirmed absent". Only a confirmed-false file should surface as a
   // "missing X" finding; an unmeasured file has nothing actionable to say.
   discovery: {
@@ -146,7 +146,7 @@ export function computeSiteHealthFindings(
         category: "CONTENT QUALITY",
         title: `${thin.length} page${thin.length === 1 ? "" : "s"} with no extractable content`,
         description:
-          "These pages loaded successfully but yielded zero facts — often a sign of content rendered client-side, which non-JS AI crawlers never see.",
+          "These pages loaded successfully but yielded zero facts - often a sign of content rendered client-side, which non-JS AI crawlers never see.",
         points,
         affectedUrls: thin.map((p) => p.url),
       });
@@ -159,7 +159,7 @@ export function computeSiteHealthFindings(
       category: "CONTENT STRUCTURE",
       title: "Add an mcp.json file",
       description:
-        "mcp.json lets MCP-aware AI agents discover the tools/actions your site exposes. Not scored — a forward-looking signal, not a citation-readiness weight.",
+        "mcp.json lets MCP-aware AI agents discover the tools/actions your site exposes. Not scored - a forward-looking signal, not a citation-readiness weight.",
       points: 0,
       affectedUrls: [],
       advisory: true,
@@ -171,7 +171,7 @@ export function computeSiteHealthFindings(
       category: "CONTENT STRUCTURE",
       title: "Add a security.txt file",
       description:
-        "security.txt is a best-practice disclosure file. Not scored — it has no bearing on AI citation readiness.",
+        "security.txt is a best-practice disclosure file. Not scored - it has no bearing on AI citation readiness.",
       points: 0,
       affectedUrls: [],
       advisory: true,

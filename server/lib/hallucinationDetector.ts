@@ -48,7 +48,7 @@ export interface DetectionSummary {
  * judge finds.
  *
  * Dedup is handled at the DB level via the unique index on
- * (brand_id, ai_platform, md5(claimed_statement)) — createBrandHallucination
+ * (brand_id, ai_platform, md5(claimed_statement)) - createBrandHallucination
  * upserts so concurrent runs can't insert duplicates. Each hallucination
  * row carries the originating ranking_id / citing_outlet_url so the user
  * can trace it back to where ChatGPT/Perplexity said it.
@@ -63,18 +63,18 @@ export async function detectHallucinationsForRun(
   rankings: GeoRanking[],
 ): Promise<DetectionSummary> {
   if (!process.env.OPENAI_API_KEY) {
-    logger.warn({ brandId }, "hallucinationDetector: OPENAI_API_KEY missing — skipping");
+    logger.warn({ brandId }, "hallucinationDetector: OPENAI_API_KEY missing - skipping");
     return { inserted: 0, skipped: true, skipReason: "insufficient_facts", factCount: 0 };
   }
   const factSheet = await storage.getBrandFacts(brandId).catch((err) => {
-    logger.warn({ err, brandId }, "hallucinationDetector: getBrandFacts threw — treating as empty");
+    logger.warn({ err, brandId }, "hallucinationDetector: getBrandFacts threw - treating as empty");
     return [] as BrandFactSheet[];
   });
   const activeFacts = factSheet.filter((f) => f.isActive !== 0);
   if (activeFacts.length < MIN_FACT_SHEET_ROWS) {
     logger.info(
       { brandId, factCount: activeFacts.length, min: MIN_FACT_SHEET_ROWS },
-      "hallucinationDetector: skipping — fact sheet too small",
+      "hallucinationDetector: skipping - fact sheet too small",
     );
     return {
       inserted: 0,
@@ -105,7 +105,7 @@ export async function detectHallucinationsForRun(
   // Wave 8: `isCited` is matcher-authoritative (citationChecker.ts writes
   // isCited only when the universal matcher confirms the brand name appears
   // in the response). So fact-checking only runs on responses that genuinely
-  // mention the brand — analyzer hallucinations that previously slipped
+  // mention the brand - analyzer hallucinations that previously slipped
   // through can no longer cause spurious hallucination flags.
   const citedRankings = rankings.filter((r) => r.isCited === 1 && r.citationContext);
   if (citedRankings.length === 0) {
@@ -218,10 +218,10 @@ HARD RULES:
 - Flag ONLY direct factual contradictions (year mismatch, wrong HQ, wrong founder/CEO, wrong pricing, wrong product feature, wrong headcount).
 
 Severity scale:
-- "critical" — identity-level error (wrong founder, wrong HQ country, wrong core product)
-- "high" — material factual error (wrong pricing tier, wrong launch year, wrong acquisition status)
-- "medium" — misleading claim that could mislead a buyer
-- "low" — minor imprecision (off by one year, rounded number)
+- "critical" - identity-level error (wrong founder, wrong HQ country, wrong core product)
+- "high" - material factual error (wrong pricing tier, wrong launch year, wrong acquisition status)
+- "medium" - misleading claim that could mislead a buyer
+- "low" - minor imprecision (off by one year, rounded number)
 
 Return JSON exactly in this shape:
 {"hallucinations": [{"claimedStatement": string, "contradictingFact": string, "severity": "low"|"medium"|"high"|"critical", "category": string}]}
@@ -268,7 +268,7 @@ ${responseText}
  * Re-verification pass. After a citation run completes, look at existing
  * hallucinations that are still open (pending / in_progress). If none of
  * this run's ranking responses contain the claimedStatement any more,
- * auto-flip the status to "verified" — the user's remediation worked (or
+ * auto-flip the status to "verified" - the user's remediation worked (or
  * the model stopped hallucinating, same outcome).
  *
  * Best-effort; tolerates per-row failures.
@@ -319,7 +319,7 @@ export async function reverifyHallucinationsForRun(
         } as any);
         verified += 1;
       } catch {
-        /* illegal transition or DB error — skip */
+        /* illegal transition or DB error - skip */
       }
     }
   }

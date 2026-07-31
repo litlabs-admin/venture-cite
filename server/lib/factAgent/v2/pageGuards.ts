@@ -21,7 +21,7 @@ export function isWafBlocked(
 }
 
 /** Detect Cloudflare/SPA 200-with-not-found-content "soft 404". Only
- *  triggers when hydration is absent — if hydration exists, trust the
+ *  triggers when hydration is absent - if hydration exists, trust the
  *  page.
  *
  *  2026-05-28: tightened the length cap from 600 to 300 chars and
@@ -80,7 +80,7 @@ export function isNonHtml(contentType: string | null | undefined): boolean {
   return true;
 }
 
-/** Strip only tracking params (utm_*, fbclid, gclid, etc.) and fragments —
+/** Strip only tracking params (utm_*, fbclid, gclid, etc.) and fragments -
  *  but preserve the hostname as-is (no www-stripping). Used to compare
  *  canonical tags against the request URL: www.example.com and example.com
  *  may serve different content so we must respect that distinction here. */
@@ -108,7 +108,7 @@ function stripTrackingOnly(raw: string): string {
 
 /** Detect `<link rel="canonical">` pointing somewhere other than the request URL.
  *  Tracking params are stripped before comparison, but hostname differences
- *  (including www vs apex) are preserved — they may serve different content. */
+ *  (including www vs apex) are preserved - they may serve different content. */
 export function detectCanonicalRedirect(html: string, requestUrl: string): string | null {
   const m =
     /<link\b[^>]*rel\s*=\s*["']canonical["'][^>]*href\s*=\s*["']([^"']+)["']/i.exec(html) ??

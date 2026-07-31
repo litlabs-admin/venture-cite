@@ -14,13 +14,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 //   dividers      1px --color-vc-default, drawn by the section, not the panel
 //
 // Colors use the `vc-*` utilities (index.css @theme) whose values are the
-// reference's own tokens — #3b5bf6 accent, warm-stone gray ramp. They are
+// reference's own tokens - #3b5bf6 accent, warm-stone gray ramp. They are
 // literal, not theme-derived, so this surface renders identically regardless
 // of the app's light/dark preference.
 
 // ─── Destinations ────────────────────────────────────────────────────────────
 // Every tile, panel header and row in the reference dashboard is a link to a
-// specific place — nothing is decorative. These are the equivalents in this
+// specific place - nothing is decorative. These are the equivalents in this
 // app's route tree (spine stages + tab search params), declared once so a
 // panel never hand-rolls a path.
 //
@@ -120,7 +120,7 @@ export function PanelHeader({
   );
 }
 
-/** Signed delta. Accent when up, rose when down, muted dash when unknown —
+/** Signed delta. Accent when up, rose when down, muted dash when unknown -
  *  never a fabricated 0. */
 export function Delta({
   value,
@@ -149,7 +149,7 @@ export function Delta({
 }
 
 /** The em-dash we render wherever a metric genuinely has no measurement.
- *  Deliberately distinct from a zero — "not measured" is not "measured zero". */
+ *  Deliberately distinct from a zero - "not measured" is not "measured zero". */
 export function NoValue({ className = "" }: { className?: string }) {
   return (
     <span className={`tabular-nums text-vc-hover ${className}`} title="Not measured yet">
@@ -193,7 +193,7 @@ export function PanelEmptyState({
   );
 }
 
-/** The `ⓘ` beside a KPI label. Hovering explains what the metric measures —
+/** The `ⓘ` beside a KPI label. Hovering explains what the metric measures -
  *  in the reference this is a real hover card, not a native `title`, so the
  *  copy is readable and styled with the rest of the surface. */
 export function InfoDot({ children }: { children: React.ReactNode }) {
@@ -243,7 +243,7 @@ export function HoverCard({
   );
 }
 
-/** Skeleton bar in the dashboard's register — no shimmer, just a quiet block
+/** Skeleton bar in the dashboard's register - no shimmer, just a quiet block
  *  at the exact height of the text it replaces. */
 export function Bar({ w = "w-16", h = "h-4" }: { w?: string; h?: string }) {
   return <span className={`inline-block rounded-sm bg-vc-muted ${w} ${h}`} aria-hidden />;

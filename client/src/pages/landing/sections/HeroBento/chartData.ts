@@ -9,14 +9,14 @@
 // arrays; re-run extraction against a fresh index.html instead.
 //
 // VISUAL-POLISH EXCEPTION: CHART_GRADIENTS below, plus NIKE_END_X/Y,
-// CHART_PLOT, and COMPETITOR_STROKES, are NOT byte-extracted — they are the
+// CHART_PLOT, and COMPETITOR_STROKES, are NOT byte-extracted - they are the
 // hero surface-polish pass's replacement gradient/marker treatment (see the
 // scoped exception comment in client/src/pages/landing/styles.css). A
 // re-extraction pass must not blow these away; re-apply this block after
 // re-running extraction.
 //
 // CHART_* below is the "Visibility over time" line+area chart (30D window,
-// the settled/active tab in source): three series — Nike (solid area+line,
+// the settled/active tab in source): three series - Nike (solid area+line,
 // stroke var(--accent), fill url(#hbBrandGrad)), Adidas (dashed line), New
 // Balance (dashed line). viewBox is 794x254, matching source's
 // recharts-surface.
@@ -102,7 +102,7 @@ export const CHART_GRADIENTS: ChartGradient[] = [
   },
 ];
 
-/** Terminal point of NIKE_STROKE_LINE_D — the "now" datum. */
+/** Terminal point of NIKE_STROKE_LINE_D - the "now" datum. */
 export const NIKE_END_X = 782;
 export const NIKE_END_Y = 42.396;
 /** Plot rect, matching #hbChartClip. */

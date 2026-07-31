@@ -3,7 +3,7 @@
 // Exposes the user-facing types registry + read/write helpers backed
 // by the notification_preferences table. The weekly_report type also
 // dual-writes users.weekly_report_enabled so the existing scheduler
-// and unsubscribe route don't need to change — they stay in sync as
+// and unsubscribe route don't need to change - they stay in sync as
 // long as every write goes through setPreference().
 //
 // Add a new user-facing notification by appending to NOTIFICATION_TYPES.
@@ -44,7 +44,7 @@ export async function getPreferences(
 
   return NOTIFICATION_TYPES.map((meta) => ({
     type: meta.key,
-    // Default to enabled when no row exists — matches the table default.
+    // Default to enabled when no row exists - matches the table default.
     emailEnabled: byType.get(meta.key) ?? true,
     meta,
   }));

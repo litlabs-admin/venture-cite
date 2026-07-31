@@ -14,7 +14,7 @@ const TabsList = React.forwardRef<
     className={cn(
       // Segmented control, matching the dashboard's own range switcher
       // (command-center/VisibilityChart) and the sidebar's active nav item:
-      // hairline container on white, active item is an accent TINT — not the
+      // hairline container on white, active item is an accent TINT - not the
       // stock shadcn gray trough with a white drop-shadowed chip.
       "inline-flex h-8 items-center justify-center rounded border border-vc-default bg-vc-surface p-0.5 text-vc-secondary",
       className,

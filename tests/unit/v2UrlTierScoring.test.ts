@@ -40,7 +40,7 @@ describe("scoreUrl", () => {
   // brands (Zapier, Make) integrations ARE the product" (see the
   // TIER_3 comment block). Verified: scoreUrl("/integrations/slack")
   // === 0 (untiered, included if room remains), matching that
-  // documented intent — this used to be asserted as tier 3 above,
+  // documented intent - this used to be asserted as tier 3 above,
   // which was stale.
   it("Tier 0: individual /integrations/<vendor> pages are untiered, not dropped", () => {
     expect(scoreUrl("https://x.com/integrations/slack")).toBe(0);
@@ -53,7 +53,7 @@ describe("scoreUrl", () => {
 
   // Regression: LOCALE_PREFIX used to match any 2-3 letter segment, so short
   // paths parsed as language codes, got stripped to "/", and "/" matches
-  // TIER_1's empty alternative — scoring them as the HOMEPAGE. That gave
+  // TIER_1's empty alternative - scoring them as the HOMEPAGE. That gave
   // /api, /faq, /seo and friends top scraping priority and pushed real
   // brand-identity pages out of the 10-URL budget. The language subtag is
   // now validated against the ISO 639-1 set.
@@ -72,7 +72,7 @@ describe("scoreUrl", () => {
     });
   });
 
-  // The counterpart to the above — the fix must not break real locales.
+  // The counterpart to the above - the fix must not break real locales.
   describe("real locale prefixes still strip", () => {
     it("bare ISO 639-1 code is the locale homepage", () => {
       expect(scoreUrl("https://x.com/en")).toBe(1);

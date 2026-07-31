@@ -61,7 +61,7 @@ type InternalQuickActionPath =
   | "/citations";
 
 // quickAction targets are either an in-app route (rendered with TanStack's
-// typed <Link>) or an external/mailto URL (rendered as a plain <a> — see the
+// typed <Link>) or an external/mailto URL (rendered as a plain <a> - see the
 // Phase 2 migration contract: router Links must never carry external URLs).
 type QuickAction = { label: string; to: InternalQuickActionPath } | { label: string; href: string };
 
@@ -826,7 +826,7 @@ export default function AIVisibility() {
   const queryClient = useQueryClient();
 
   // Mark the AI Visibility Guide as visited server-side on mount so the
-  // onboarding step syncs across browsers/devices. Best-effort — failures
+  // onboarding step syncs across browsers/devices. Best-effort - failures
   // don't block the page. Also keep the localStorage key for back-compat.
   useEffect(() => {
     localStorage.setItem("venturecite-visibility-visited", "true");
@@ -901,7 +901,7 @@ export default function AIVisibility() {
     }
     const engineSteps = completedSteps[engineId] || [];
     const isCompleting = !engineSteps.includes(stepId);
-    // Optimistic update — server call follows.
+    // Optimistic update - server call follows.
     setCompletedSteps((prev) => {
       const cur = prev[engineId] || [];
       const next = isCompleting ? [...cur, stepId] : cur.filter((id) => id !== stepId);
@@ -930,7 +930,7 @@ export default function AIVisibility() {
 
   // Two visually distinct treatments: High Priority is solid (bg-foreground)
   // since it's the tier that should draw the eye. Medium and Low share one
-  // muted treatment (variant="secondary") — they were previously two
+  // muted treatment (variant="secondary") - they were previously two
   // near-identical near-invisible styles that didn't actually distinguish
   // from each other; the step title's own priority label still tells them
   // apart, the styling no longer pretends to.

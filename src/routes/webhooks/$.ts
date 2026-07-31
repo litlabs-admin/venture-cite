@@ -1,4 +1,4 @@
-// Phase 2 Task 3 — forwards every /webhooks/* request into the existing
+// Phase 2 Task 3 - forwards every /webhooks/* request into the existing
 // Express app (server/app.ts), unmodified. See src/routes/api/$.ts for the
 // shared rationale (splat routes are scoped to their own directory, so
 // /api/*, /webhooks/*, and /health each need their own route file).

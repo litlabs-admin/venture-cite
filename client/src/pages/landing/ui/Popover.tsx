@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 
 // Generic popover/tooltip primitive. Verified against
-// assets/Popover-DarEciA7.js: NOT built on Radix or Floating UI — this is a
+// assets/Popover-DarEciA7.js: NOT built on Radix or Floating UI - this is a
 // from-scratch reimplementation of that same approach: manual positioning
 // via getBoundingClientRect(), a bottom<->top collision flip against an 8px
 // viewport gutter, and a default 8px offset from the anchor. The mount/

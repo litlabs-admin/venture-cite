@@ -1,4 +1,4 @@
-// Coverage for POST /api/billing/portal-session — Stripe customer
+// Coverage for POST /api/billing/portal-session - Stripe customer
 // portal session URL endpoint used by the expanded Settings page
 // (Foundations Plan 3, Task 2).
 

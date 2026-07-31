@@ -22,7 +22,7 @@ export function getStripeClient(): Stripe {
   return new Stripe(getStripeKey(), { apiVersion: STRIPE_API_VERSION });
 }
 
-// Alias — some routes import this name
+// Alias - some routes import this name
 export async function getUncachableStripeClient(): Promise<Stripe> {
   return getStripeClient();
 }

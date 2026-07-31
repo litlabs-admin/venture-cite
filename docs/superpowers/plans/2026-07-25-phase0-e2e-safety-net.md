@@ -1,4 +1,4 @@
-# Phase 0 — E2E Safety Net Implementation Plan
+# Phase 0 - E2E Safety Net Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -20,17 +20,17 @@
 > of every task.
 
 - Design spec: `docs/superpowers/specs/2026-07-25-tanstack-start-migration-design.md`.
-- **Do not modify application source in this phase.** In scope: `tests/`, `playwright.config.ts`, `.env`, `.env.example`, `package.json` (scripts **and** test-only devDependencies), and `package-lock.json` as a consequence of installing them. If a test cannot pass without an app change, stop and report — that is a finding, not a licence to edit.
+- **Do not modify application source in this phase.** In scope: `tests/`, `playwright.config.ts`, `.env`, `.env.example`, `package.json` (scripts **and** test-only devDependencies), and `package-lock.json` as a consequence of installing them. If a test cannot pass without an app change, stop and report - that is a finding, not a licence to edit.
   - _Amended during Task 1:_ `@playwright/test` turned out to be undeclared in `package.json` entirely, and `node_modules` was empty. Installing it is a prerequisite for every task in this phase, so test-only dependency additions are in scope. Application dependencies are still out of scope.
 - **Do not commit `.env`.** It is gitignored (`.gitignore:15`). Credentials are read from environment variables only, never hardcoded in spec files.
 - App runs on **port 5000** (`server/index.ts:53`). Dev command is `npm run dev`.
 - `data-testid` attributes exist **only** when `NODE_ENV !== "production"` (`vite.config.ts:29-33`). Tests must run against `npm run dev`.
-- Test account: `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` from `.env`. Confirmed throwaway — tests may create and delete records freely.
+- Test account: `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` from `.env`. Confirmed throwaway - tests may create and delete records freely.
 - 🔑 **Authentication is shared, not per-test.** The login endpoint rate-limits at
   **10 attempts per (IP, email) per 15 minutes** (`server/auth.ts`) and returns
   HTTP 429 beyond that. Task 6b introduced a `storageState` setup project that
   logs in **once** for the whole run.
-  **Every spec from Task 7 onward must NOT call `login()` in `beforeEach`** —
+  **Every spec from Task 7 onward must NOT call `login()` in `beforeEach`** -
   the context arrives already authenticated. Task snippets below that still show
   `test.beforeEach(async ({ page }) => { await login(page); })` are superseded:
   delete that hook and rely on the shared state. The only exceptions are
@@ -46,19 +46,19 @@
 
 | File                                 | Responsibility                                                   |
 | ------------------------------------ | ---------------------------------------------------------------- |
-| `playwright.config.ts`               | Modify — correct baseURL, add webServer, sane timeouts           |
-| `tests/e2e/support/selectors.ts`     | Create — single source of truth for every selector used by specs |
-| `tests/e2e/support/auth.ts`          | Create — login/logout helpers and the authenticated fixture      |
-| `tests/e2e/public-pages.spec.ts`     | Create — landing, privacy, glossary, 404 (unauthenticated)       |
-| `tests/e2e/auth-login.spec.ts`       | Create — login success, failure, logout                          |
-| `tests/e2e/auth-signup.spec.ts`      | Create — registration and password reset entry points            |
-| `tests/e2e/spine-navigation.spec.ts` | Create — the five spine pages and their `?tab=` deep links       |
-| `tests/e2e/legacy-redirects.spec.ts` | Create — all 11 retired paths still land correctly               |
-| `tests/e2e/url-state.spec.ts`        | Create — `?brandId=`, `?tab=`, `?edit=` survive reload           |
-| `tests/e2e/settings-theme.spec.ts`   | Create — settings page and theme persistence                     |
-| `tests/e2e/billing.spec.ts`          | Create — pricing page and checkout session creation              |
-| `tests/e2e/tours.spec.ts`            | Modify — repair the broken `/dashboard` assertion                |
-| `package.json`                       | Modify — add `test:e2e:headed` and `test:e2e:report` scripts     |
+| `playwright.config.ts`               | Modify - correct baseURL, add webServer, sane timeouts           |
+| `tests/e2e/support/selectors.ts`     | Create - single source of truth for every selector used by specs |
+| `tests/e2e/support/auth.ts`          | Create - login/logout helpers and the authenticated fixture      |
+| `tests/e2e/public-pages.spec.ts`     | Create - landing, privacy, glossary, 404 (unauthenticated)       |
+| `tests/e2e/auth-login.spec.ts`       | Create - login success, failure, logout                          |
+| `tests/e2e/auth-signup.spec.ts`      | Create - registration and password reset entry points            |
+| `tests/e2e/spine-navigation.spec.ts` | Create - the five spine pages and their `?tab=` deep links       |
+| `tests/e2e/legacy-redirects.spec.ts` | Create - all 11 retired paths still land correctly               |
+| `tests/e2e/url-state.spec.ts`        | Create - `?brandId=`, `?tab=`, `?edit=` survive reload           |
+| `tests/e2e/settings-theme.spec.ts`   | Create - settings page and theme persistence                     |
+| `tests/e2e/billing.spec.ts`          | Create - pricing page and checkout session creation              |
+| `tests/e2e/tours.spec.ts`            | Modify - repair the broken `/dashboard` assertion                |
+| `package.json`                       | Modify - add `test:e2e:headed` and `test:e2e:report` scripts     |
 
 ---
 
@@ -89,7 +89,7 @@ E2E_TEST_PASSWORD=Admin123
 Append to `.env.example`:
 
 ```
-# Playwright end-to-end tests. Must be a throwaway account — the suite
+# Playwright end-to-end tests. Must be a throwaway account - the suite
 # creates and deletes records under it. Never point this at a real user.
 E2E_TEST_EMAIL=
 E2E_TEST_PASSWORD=
@@ -103,7 +103,7 @@ Replace the entire file with:
 // playwright.config.ts
 import { defineConfig, devices } from "@playwright/test";
 
-// The app listens on PORT (default 5000 — see server/index.ts:53).
+// The app listens on PORT (default 5000 - see server/index.ts:53).
 // NOTE: data-testid attributes are stripped when NODE_ENV=production
 // (vite.config.ts:29-33), so e2e MUST run against the dev server.
 const PORT = process.env.PORT || "5000";
@@ -145,13 +145,13 @@ Run: `npx playwright test --list`
 Expected: lists the existing `tours.spec.ts` tests without a config error.
 
 Then run: `npx playwright test tests/e2e/tours.spec.ts --reporter=list`
-Expected: the suite **runs** (tests may fail — `tours.spec.ts` is known broken and is repaired in Task 12). The point of this step is that the web server boots and the browser reaches `http://localhost:5000`, not that assertions pass. If you see `ECONNREFUSED` or a webServer timeout, the harness is still wrong — fix before proceeding.
+Expected: the suite **runs** (tests may fail - `tours.spec.ts` is known broken and is repaired in Task 12). The point of this step is that the web server boots and the browser reaches `http://localhost:5000`, not that assertions pass. If you see `ECONNREFUSED` or a webServer timeout, the harness is still wrong - fix before proceeding.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add playwright.config.ts .env.example
-git commit -m "test: repair playwright harness — correct port, add webServer"
+git commit -m "test: repair playwright harness - correct port, add webServer"
 ```
 
 Note: `.env` is intentionally not staged; it is gitignored.
@@ -169,10 +169,10 @@ Note: `.env` is intentionally not staged; it is gitignored.
 
 - Consumes: the harness from Task 1.
 - Produces:
-  - `SEL` — a frozen object of selector strings, imported by every spec.
-  - `login(page: Page): Promise<void>` — logs in and waits for the dashboard.
-  - `logout(page: Page): Promise<void>` — logs out and waits for `/login`.
-  - `expectAuthenticated(page: Page): Promise<void>` — asserts the app shell is present.
+  - `SEL` - a frozen object of selector strings, imported by every spec.
+  - `login(page: Page): Promise<void>` - logs in and waits for the dashboard.
+  - `logout(page: Page): Promise<void>` - logs out and waits for `/login`.
+  - `expectAuthenticated(page: Page): Promise<void>` - asserts the app shell is present.
 
 - [ ] **Step 1: Create the selector module**
 
@@ -185,7 +185,7 @@ Create `tests/e2e/support/selectors.ts`:
 // If a selector here stops matching, fix it HERE, not in individual specs.
 
 export const SEL = Object.freeze({
-  // Auth pages — verified present in client/src/pages/login.tsx and register.tsx
+  // Auth pages - verified present in client/src/pages/login.tsx and register.tsx
   emailInput: '[data-testid="input-email"]',
   passwordInput: '[data-testid="input-password"]',
   loginButton: '[data-testid="button-login"]',
@@ -198,7 +198,7 @@ export const SEL = Object.freeze({
   loginLink: '[data-testid="link-login"]',
   backHomeLink: '[data-testid="link-back-home"]',
 
-  // App shell — role-based, resilient to markup changes
+  // App shell - role-based, resilient to markup changes
   sidebar: 'nav, [data-testid="sidebar"]',
   appMain: "main",
 }) satisfies Record<string, string>;
@@ -225,7 +225,7 @@ if (!TEST_EMAIL || !TEST_PASSWORD) {
 
 /**
  * Logs in and waits until the authenticated app has rendered.
- * NOTE: login.tsx:62 redirects to "/" — NOT "/dashboard". Asserting on
+ * NOTE: login.tsx:62 redirects to "/" - NOT "/dashboard". Asserting on
  * /dashboard is the bug that made the original tours.spec.ts unrunnable.
  */
 export async function login(page: Page): Promise<void> {
@@ -268,7 +268,7 @@ test("probe: login helper works", async ({ page }) => {
 ```
 
 Run: `npx playwright test tests/e2e/_probe.spec.ts --reporter=list`
-Expected: **PASS**. If it fails on a selector, correct `selectors.ts` — do not weaken the assertion. If it fails because the account has no brands and gets redirected to `/welcome`, note that and adjust `expectAuthenticated` to accept `/welcome` as a valid authenticated destination.
+Expected: **PASS**. If it fails on a selector, correct `selectors.ts` - do not weaken the assertion. If it fails because the account has no brands and gets redirected to `/welcome`, note that and adjust `expectAuthenticated` to accept `/welcome` as a valid authenticated destination.
 
 - [ ] **Step 4: Delete the probe**
 
@@ -290,7 +290,7 @@ git commit -m "test: add e2e selector and auth support modules"
 **Why this exists:** Task 6 discovered the login endpoint rate-limits at
 **10 attempts per (IP, email) per 15 minutes** (`server/auth.ts`), returning
 HTTP 429. The `beforeEach(login)` pattern used throughout this plan exhausts
-that after ~6 logins, so running the full suite — which Task 13 requires —
+that after ~6 logins, so running the full suite - which Task 13 requires -
 fails on rate limiting rather than on real defects.
 
 **Fix:** adopt Playwright's standard `storageState` pattern. A setup project
@@ -298,8 +298,8 @@ logs in **once**, saves the authenticated browser storage to a file, and every
 other spec reuses it. Supabase persists its session in `localStorage`, which
 `storageState` captures, so this works without touching application code.
 
-`auth-login.spec.ts` keeps performing real logins — it is the spec that tests
-logging in — but must run without the shared state and stay within budget.
+`auth-login.spec.ts` keeps performing real logins - it is the spec that tests
+logging in - but must run without the shared state and stay within budget.
 
 **Files:**
 
@@ -376,7 +376,7 @@ test.describe("Public pages (unauthenticated)", () => {
 Run: `npx playwright test tests/e2e/public-pages.spec.ts --reporter=list`
 Expected: **PASS** on all five tests.
 
-If the landing or privacy title assertions fail, read the `<Helmet>` block in `client/src/pages/landing/index.tsx` and `client/src/pages/privacy.tsx` and correct the expected pattern to match what the app actually emits. The app is the source of truth — do not change application code.
+If the landing or privacy title assertions fail, read the `<Helmet>` block in `client/src/pages/landing/index.tsx` and `client/src/pages/privacy.tsx` and correct the expected pattern to match what the app actually emits. The app is the source of truth - do not change application code.
 
 - [ ] **Step 3: Commit**
 
@@ -469,7 +469,7 @@ git commit -m "test: cover login, logout and auth gating e2e"
 - Consumes: `SEL` from Task 2.
 - Produces: nothing consumed by later tasks.
 
-This deliberately does **not** complete a registration — that would create real users and send real email on every run. It verifies the forms render, validate, and are reachable, which is what the migration could break.
+This deliberately does **not** complete a registration - that would create real users and send real email on every run. It verifies the forms render, validate, and are reachable, which is what the migration could break.
 
 - [ ] **Step 1: Write the spec**
 
@@ -608,7 +608,7 @@ test.describe("Workflow spine navigation", () => {
 - [ ] **Step 2: Run the spec**
 
 Run: `npx playwright test tests/e2e/spine-navigation.spec.ts --reporter=list`
-Expected: **PASS**. If a `?tab=` value is rejected and falls back to the page's default tab, correct the value in `SPINE_TABS` to match the actual tab config in `client/src/pages/<page>.tsx` — the test must encode real behaviour, not aspirational behaviour.
+Expected: **PASS**. If a `?tab=` value is rejected and falls back to the page's default tab, correct the value in `SPINE_TABS` to match the actual tab config in `client/src/pages/<page>.tsx` - the test must encode real behaviour, not aspirational behaviour.
 
 - [ ] **Step 3: Commit**
 
@@ -772,7 +772,7 @@ test.describe("URL as application state", () => {
 - [ ] **Step 2: Run the spec**
 
 Run: `npx playwright test tests/e2e/url-state.spec.ts --reporter=list`
-Expected: **PASS** (the first test may report as skipped if the account has no brand selected — that is acceptable).
+Expected: **PASS** (the first test may report as skipped if the account has no brand selected - that is acceptable).
 
 - [ ] **Step 3: Commit**
 
@@ -861,7 +861,7 @@ git commit -m "test: cover settings page and theme persistence e2e"
 - Consumes: `login` from Task 2.
 - Produces: nothing consumed by later tasks.
 
-Checkout is server-driven: `POST /api/stripe/checkout` returns a hosted Checkout URL and the client sets `window.location.href`. The test stops at the redirect boundary — it never completes a purchase.
+Checkout is server-driven: `POST /api/stripe/checkout` returns a hosted Checkout URL and the client sets `window.location.href`. The test stops at the redirect boundary - it never completes a purchase.
 
 - [ ] **Step 1: Verify Stripe is in test mode before writing anything**
 
@@ -929,7 +929,7 @@ test.describe("Billing", () => {
 - [ ] **Step 3: Run the spec**
 
 Run: `npx playwright test tests/e2e/billing.spec.ts --reporter=list`
-Expected: **PASS**. If the checkout POST returns 5xx, that is a genuine pre-existing bug — record it and report, do not weaken the assertion.
+Expected: **PASS**. If the checkout POST returns 5xx, that is a genuine pre-existing bug - record it and report, do not weaken the assertion.
 
 - [ ] **Step 4: Commit**
 
@@ -1046,7 +1046,7 @@ Replace `await page.goto("/citations")` with `await page.goto("/monitor?tab=cita
 
 - [ ] **Step 4: Remove the meaningless assertion**
 
-Delete the final test `"tab close mid-tour records abandoned event via beacon"` in its entirety — it ends with `expect(true).toBe(true)` and verifies nothing. Its stated verification requires a test API endpoint that does not exist.
+Delete the final test `"tab close mid-tour records abandoned event via beacon"` in its entirety - it ends with `expect(true).toBe(true)` and verifies nothing. Its stated verification requires a test API endpoint that does not exist.
 
 - [ ] **Step 5: Run the spec**
 
@@ -1057,7 +1057,7 @@ Expected: all tests **PASS**, or all **SKIPPED** if `VITE_TOUR_ENGINE_ENABLED` i
 
 ```bash
 git add tests/e2e/tours.spec.ts
-git commit -m "test: repair tours e2e — correct login target, selectors and paths"
+git commit -m "test: repair tours e2e - correct login target, selectors and paths"
 ```
 
 ---
@@ -1110,7 +1110,7 @@ E2E_BASE_URL=https://your-host npm run test:e2e
 ## Requirements
 
 - `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` in `.env`. Must be a throwaway
-  account — the suite creates and deletes records under it.
+  account - the suite creates and deletes records under it.
 - Stripe in **test mode**. `billing.spec.ts` refuses to run against live keys.
 - Must run against a **dev** build. `data-testid` attributes are stripped when
   `NODE_ENV=production` (`vite.config.ts`).

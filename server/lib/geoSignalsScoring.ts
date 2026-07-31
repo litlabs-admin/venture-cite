@@ -1,6 +1,6 @@
 // GEO Signals scoring primitives (Wave 1.1).
 //
-// Pure helpers — no DB access, no Express. Imported by
+// Pure helpers - no DB access, no Express. Imported by
 // server/routes/geoSignals.ts to compose the real 6-signal scorecard.
 
 import { createHash } from "crypto";
@@ -111,7 +111,7 @@ function cacheSet(key: string, v: number[]): void {
 // Module-level counters for telemetry. Reported to logs every
 // EMBED_REPORT_INTERVAL_MS so the operator can spot cache-hit
 // regressions and embedding-spend spikes. Per-instance, but that's
-// acceptable for a coarse signal — Sentry/Datadog can aggregate.
+// acceptable for a coarse signal - Sentry/Datadog can aggregate.
 const embedStats = {
   totalCalls: 0,
   totalInputs: 0,
@@ -123,7 +123,7 @@ const embedStats = {
 };
 const EMBED_REPORT_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 // text-embedding-3-small is $0.02 / 1M tokens. We approximate tokens as
-// ceil(chars / 4) — close enough for spend telemetry. The output dim
+// ceil(chars / 4) - close enough for spend telemetry. The output dim
 // doesn't matter for billing.
 const EMBED_PRICE_PER_M_TOKENS_CENTS = 2;
 
@@ -202,7 +202,7 @@ export async function embedBatch(texts: string[]): Promise<number[][]> {
   return result.map((r) => r ?? []);
 }
 
-/** Test-only / debug accessor — returns a snapshot of the current
+/** Test-only / debug accessor - returns a snapshot of the current
  *  embedding-call stats. Lets the operator inspector show live
  *  cache-hit rate without grep-ing logs. */
 export function getEmbedStats(): Readonly<typeof embedStats> {
@@ -226,7 +226,7 @@ export function detectBylines(content: string): { found: boolean; authors: strin
     /\bAuthor\s*[:-]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/g,
     /\bWritten\s+by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/g,
     /(?:^|[\n\r>.\s])By\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b/g,
-    /(?:^|\n)\s*[-—–]{1,2}\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\s*$/gm,
+    /(?:^|\n)\s*[--–]{1,2}\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\s*$/gm,
   ];
 
   const badSuffixes = /(ing|ed|ly|tion|ment)$/i;
@@ -277,7 +277,7 @@ export function detectCitations(
       if (own && (h === own || h.endsWith("." + own))) self++;
       else external++;
     } catch {
-      external++; // malformed URL — count it; we'd rather over-credit than crash.
+      external++; // malformed URL - count it; we'd rather over-credit than crash.
     }
   }
   return { urls: all, count: external, selfLinkCount: self };
@@ -297,7 +297,7 @@ function normaliseDomain(d: string | null | undefined): string | null {
   }
 }
 
-/** Unified bucketizer — single source of truth for score → status across
+/** Unified bucketizer - single source of truth for score → status across
  *  every signal, the overall scorecard, and the pipeline-simulation
  *  stages. Replaces three inconsistent threshold systems that disagreed
  *  with each other (one used 0.85/0.6/0.3, one used 0.75/0.5/0.25, one
@@ -313,7 +313,7 @@ export function bucketize(ratio: number): SignalStatus {
 
 /** Strip control characters / newlines and trim. Used to sanitise
  *  user-controlled fields (brand.name, brand.industry) before they're
- *  interpolated into an LLM prompt — closes the self-prompt-injection
+ *  interpolated into an LLM prompt - closes the self-prompt-injection
  *  hole in /optimize-chunks. */
 export function sanitisePromptField(s: string | null | undefined, maxLen = 120): string {
   if (!s) return "";

@@ -4,10 +4,10 @@ import { cn } from "@/lib/utils";
 /**
  * A generic, shape-matched loading placeholder for a content region whose
  * surrounding layout (sidebar, header, tab strip) is already rendered but
- * whose body is unknown at this call site — e.g. a Suspense boundary inside
+ * whose body is unknown at this call site - e.g. a Suspense boundary inside
  * SpineShell's tab content, or inside AppShell's main region. Not meant for
  * whole-page transitions where no layout has rendered yet (those should keep
- * RouteSpinner instead — see routeGates.tsx). Roughly approximates a title +
+ * RouteSpinner instead - see routeGates.tsx). Roughly approximates a title +
  * a row of stat cards + a body block, which fits most dashboard-shaped pages
  * without pretending to know their exact contents.
  */

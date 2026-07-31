@@ -42,7 +42,7 @@ describe("safeFetchTextWithLockedIp", () => {
     const out = await safeFetchTextWithLockedIp("https://example.com/about");
     expect(out.status).toBe(200);
     expect(out.text).toBe("hi");
-    // We no longer rewrite the URL to the IP — that broke TLS SNI / cert
+    // We no longer rewrite the URL to the IP - that broke TLS SNI / cert
     // verification. The original hostname is preserved so the TLS stack
     // can validate the cert chain. The SSRF guarantee comes from the
     // upfront assertSafeUrl resolve+validate, not from IP pinning.

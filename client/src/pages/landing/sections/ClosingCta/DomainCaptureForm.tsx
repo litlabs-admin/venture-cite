@@ -3,7 +3,7 @@ import { useState } from "react";
 // Local copies of the exact lucide-react icon paths seen rendered in
 // _reference/index.html for this form (globe, arrow-right). Not imported
 // from components/sections/Nav/icons.tsx to avoid any cross-agent edit race
-// on that file while Nav/Hero may be worked on concurrently — duplication
+// on that file while Nav/Hero may be worked on concurrently - duplication
 // here is intentional and safe for a form this small.
 function GlobeIcon({ className }: { className?: string }) {
   return (
@@ -49,17 +49,17 @@ function ArrowRightIcon({ className }: { className?: string }) {
 }
 
 // Static domain-capture form for the Closing CTA (#landing-closing-domain).
-// Unlike Hero's form this one is NOT A/B tested — no useExperiment, no
+// Unlike Hero's form this one is NOT A/B tested - no useExperiment, no
 // data-* variant wiring, just a plain static "Get started" CTA label per
 // the task brief. The submit button's disabled state in the source snapshot
 // (disabled="" with value="") is real form-validation behavior (empty
 // input -> disabled submit), not an animation start state, so it's wired
 // here as live logic rather than rendered as a permanently-disabled button.
 // VentureCite has no live domain-capture backend yet, so submission simply
-// routes to /register — same destination as every other CTA on this page.
+// routes to /register - same destination as every other CTA on this page.
 //
-// This is the page's terminal conversion CTA — the same job Hero's form does
-// at the top of the page — so it gets the solid --accent tier rather than the
+// This is the page's terminal conversion CTA - the same job Hero's form does
+// at the top of the page - so it gets the solid --accent tier rather than the
 // accent-subtle ghost used for secondary actions.
 export function DomainCaptureForm() {
   const [domain, setDomain] = useState("");

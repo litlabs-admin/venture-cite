@@ -1,5 +1,5 @@
 // Verbatim data extracted from _reference/index.html lines 3410-3592
-// (Learn/Research section). Short/simple values only — see chartData.ts for
+// (Learn/Research section). Short/simple values only - see chartData.ts for
 // the large hand-built SVG chart path data, which was extracted
 // programmatically instead of transcribed here.
 
@@ -62,7 +62,7 @@ export interface DataTileData {
 // dataset the competitor runs, with live counts (9.3K/313K/4.1K/11.5K).
 // VentureCite has no such public dataset, so the counts are gone and the
 // titles/descriptions/hrefs now point at real VentureCite capabilities and
-// routes instead — layout fields (iconSlug/borderClassName/delayMs)
+// routes instead - layout fields (iconSlug/borderClassName/delayMs)
 // untouched.
 export const dataTiles: DataTileData[] = [
   {
@@ -106,7 +106,7 @@ export interface ChartYAxisLabel {
   delayMs: number;
 }
 
-// left:0; width:30px; transition: opacity 700ms ease <delay>ms — source-verbatim.
+// left:0; width:30px; transition: opacity 700ms ease <delay>ms - source-verbatim.
 export const chartYAxisLabels: ChartYAxisLabel[] = [
   { label: "30K", top: 145, delayMs: 200 },
   { label: "61K", top: 100, delayMs: 260 },
@@ -121,11 +121,11 @@ export interface ChartCallout {
 }
 
 // left:968px; transform translateY(-50%) translateX(-6px -> 0); opacity 0 -> 1;
-// transition: opacity/transform 480ms ease, both delayed 1000ms — identical
+// transition: opacity/transform 480ms ease, both delayed 1000ms - identical
 // delay for all four in source despite differing end-dot delays (940-1120ms).
 // The `top` values are a deliberate decluttering ladder for the three
 // closely-clustered series (Perplexity/Claude/Gemini), NOT each series' exact
-// end-of-line y — ChatGPT's top matches its end-dot exactly since it's far
+// end-of-line y - ChatGPT's top matches its end-dot exactly since it's far
 // from the cluster. Reproduced as literally given in source.
 export const chartCallouts: ChartCallout[] = [
   { name: "Perplexity", logoSrc: "/venturecite/images/ai-logos/perplexity.svg", top: 194 },

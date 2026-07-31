@@ -16,11 +16,11 @@ export interface ScanReport {
   found: number;
   /** Newly persisted rows. */
   inserted: number;
-  /** Candidates that hit a unique-index conflict — "you already had it". */
+  /** Candidates that hit a unique-index conflict - "you already had it". */
   skippedDuplicate: number;
   /** Candidates the scanner intentionally skipped (irrelevant, too short, etc). */
   skippedFiltered: number;
-  /** Per-failure details — rate limits, fetch errors, parse failures. */
+  /** Per-failure details - rate limits, fetch errors, parse failures. */
   failed: ScanFailure[];
   /** Wave 9.4: re-verification phase only (listicles). */
   reverified?: number;

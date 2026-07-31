@@ -1,18 +1,18 @@
 // Money helpers (Wave 4.1).
 //
 // Storage: integer cents in *_cents columns (bigint in Postgres,
-// `number` in JS — safe up to 2^53 = ~$90 trillion).
+// `number` in JS - safe up to 2^53 = ~$90 trillion).
 //
 // Why a shared module: client + server both need to format / parse the
 // same way, so the helpers live under shared/ and import nothing from
 // either side.
 //
 // Edge cases handled:
-//   - "$19.99" / "19.99" / "19" / "  19.99 " — all parse to 1999.
-//   - "19.999" — rounds to nearest cent (1999/2000) per banker's-style
+//   - "$19.99" / "19.99" / "19" / "  19.99 " - all parse to 1999.
+//   - "19.999" - rounds to nearest cent (1999/2000) per banker's-style
 //     half-to-even via Math.round (which is half-away-from-zero, but
 //     that's the more intuitive behavior for money).
-//   - "" / "abc" / null / undefined — returns null, never NaN.
+//   - "" / "abc" / null / undefined - returns null, never NaN.
 
 const NON_NUMERIC = /[^0-9.\-]/g;
 

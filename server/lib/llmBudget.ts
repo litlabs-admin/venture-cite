@@ -2,7 +2,7 @@
 //
 // Pure pricing math (caps, cost estimation, error class) lives in
 // llmPricing.ts so unit tests can import without booting the database
-// — this module's `db.execute` import would otherwise pull in pg.Pool.
+// - this module's `db.execute` import would otherwise pull in pg.Pool.
 //
 // Each LLM call site does:
 //   await assertWithinBudget(userId, tier);   // throws if at cap

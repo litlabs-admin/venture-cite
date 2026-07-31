@@ -1,4 +1,4 @@
-// Listicles panel summary — replaced the "Conversations" placeholder, and now
+// Listicles panel summary - replaced the "Conversations" placeholder, and now
 // sits in the dashboard's bottom row beside Citations and Hallucinations.
 //
 // Two things here are easy to get wrong, and both would show a confidently
@@ -6,7 +6,7 @@
 //
 //  1. `is_included` is an INTEGER column (0/1), not a boolean. Testing it for
 //     truthiness instead of `=== 1` counts every scanned roundup as one you
-//     appear in — for the Apple brand that turns a real 17 into 22.
+//     appear in - for the Apple brand that turns a real 17 into 22.
 //  2. `list_position` is nullable. Averaging with missing positions treated as
 //     0 drags the average toward an impossibly good rank.
 
@@ -45,7 +45,7 @@ describe("summariseListicles", () => {
       row({ isIncluded: 1, listPosition: 2 }),
       row({ isIncluded: 1, listPosition: null }),
     ];
-    // (1 + 2) / 2 = 1.5 — NOT (1 + 2 + 0) / 3 = 1.
+    // (1 + 2) / 2 = 1.5 - NOT (1 + 2 + 0) / 3 = 1.
     expect(summariseListicles(rows).avgPosition).toBe(1.5);
   });
 

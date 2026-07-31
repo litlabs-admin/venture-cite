@@ -73,7 +73,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   // Cross-tab sync. Storage events don't fire in the same tab, so this
-  // only handles "other tab updated" — no infinite-loop risk.
+  // only handles "other tab updated" - no infinite-loop risk.
   useEffect(() => {
     return subscribeToStorageTheme((next) => {
       setThemeState(next);
@@ -92,7 +92,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 }
 
 /** Hook for any descendant of ThemeProvider. Throws (loudly, in dev) if
- *  used outside the provider — keeps misuse from silently no-oping. */
+ *  used outside the provider - keeps misuse from silently no-oping. */
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) {

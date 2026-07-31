@@ -5,7 +5,7 @@ import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel"
 
 export default function NotFound() {
   return (
-    // Title/robots moved to src/routes/_app/$.tsx's `head()` — metadata
+    // Title/robots moved to src/routes/_app/$.tsx's `head()` - metadata
     // belongs to the route, not this component.
     <PanelPage className="flex items-center justify-center p-4">
       <PanelRow cols={1} last className="w-full max-w-md mx-4">

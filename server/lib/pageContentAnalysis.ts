@@ -1,4 +1,4 @@
-// Per-page CONTENT findings — pure, framework-free analysis of a single
+// Per-page CONTENT findings - pure, framework-free analysis of a single
 // page's raw HTML. No LLM, no network, no DB. Reuses the same extractors
 // the rest of the codebase already trusts instead of re-parsing HTML with
 // a second, drift-prone regex set:
@@ -7,7 +7,7 @@
 //   - parseJsonLdFromHtml / collectSchemaNodes (JSON-LD @type extraction)
 //   - stripToBodyText (tag-stripped visible text, for the text/HTML ratio)
 //
-// HONESTY: this module never claims content is "JavaScript-rendered" — a
+// HONESTY: this module never claims content is "JavaScript-rendered" - a
 // plain HTTP fetch sees pre-JS HTML, so `thinContent`/`lowTextRatio` can
 // only say "little text in the raw HTML we fetched", not diagnose the
 // cause. See docs/optimize-perception-reference.md for why a true
@@ -40,7 +40,7 @@ export interface PageContentFlags {
 const ANSWER_FORMAT_TYPES = new Set(["FAQPage", "HowTo", "QAPage"]);
 
 /** Extracts a single whitelisted meta value (e.g. "description", "og:title")
- *  from extractStructuredData's flattened "key: value" text lines — avoids
+ *  from extractStructuredData's flattened "key: value" text lines - avoids
  *  re-running the meta regex a second time. */
 function metaValue(structuredText: string, key: string): string | null {
   const re = new RegExp(`^${key}:\\s*(.*)$`, "im");
@@ -93,7 +93,7 @@ export function fleschReadingEase(text: string): number | null {
 
 /** Heuristic syllable counter: counts vowel-group runs, drops a trailing
  *  silent "e", and floors at 1 syllable per word. Standard textbook
- *  approximation — not phonetically perfect, but consistent and cheap. */
+ *  approximation - not phonetically perfect, but consistent and cheap. */
 function countSyllables(word: string): number {
   const w = word.toLowerCase().replace(/[^a-z]/g, "");
   if (!w) return 0;

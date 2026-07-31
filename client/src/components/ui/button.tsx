@@ -11,12 +11,12 @@ const buttonVariants = cva(
   // `disabled:bg-muted` + `disabled:text-(--fg-disabled)` carry no accent
   // hue in either theme, and beat every variant's own bg-*/text-* utility
   // because the `:disabled` pseudo-class selector outranks a plain class
-  // selector on CSS specificity — no !important needed.
+  // selector on CSS specificity - no !important needed.
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-caption font-medium ring-offset-background transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:bg-muted disabled:text-(--fg-disabled) [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        // Rests as a tint, goes solid only on :hover — matches the
+        // Rests as a tint, goes solid only on :hover - matches the
         // reference's .btn-primary exactly (color:accent/bg:accent-subtle at
         // rest, color:surface/bg:accent on hover), confirmed from its
         // compiled CSS. A saturated filled button should only ever appear
@@ -27,10 +27,10 @@ const buttonVariants = cva(
         // matched pair: overriding only the background repaints the fill solid
         // and leaves the label accent-blue, giving blue-on-blue text that is
         // completely unreadable. Five call sites had done exactly this. This
-        // variant is already the primary treatment — just use it.
+        // variant is already the primary treatment - just use it.
         default:
           "bg-(--brand-accent-subtle) text-(--brand-accent) hover:bg-primary hover:text-primary-foreground",
-        // Mirrors .btn-danger: never goes fully solid, even on hover — rest
+        // Mirrors .btn-danger: never goes fully solid, even on hover - rest
         // is neutral (bordered, white), hover moves to a subtle red tint.
         destructive:
           "border border-input bg-background text-destructive hover:bg-destructive-subtle hover:text-destructive",

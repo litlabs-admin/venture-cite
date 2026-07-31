@@ -12,7 +12,7 @@
 // COLOR, DEVIATED FROM SOURCE: the original per-vendor brand hexes (green
 // ChatGPT, teal Perplexity, etc.) put the legacy green/teal family back on the
 // page. Per the visual-richness pass this chart uses a single blue-shade
-// family instead of the page's default neutral-grey chart ramp — matching the
+// family instead of the page's default neutral-grey chart ramp - matching the
 // mostly-blue illustration treatment set by the Hero section. ChatGPT, the
 // leading series, carries the full-saturation --accent; the other three step
 // down through progressively lighter/less-saturated blue tints (larger dot +
@@ -55,7 +55,7 @@ export interface ChartEndDot {
 }
 
 // 4-stop opacity ramp (not a flat 2-stop fade) so each area reads as a soft
-// volumetric fill rather than a printed block — same technique as
+// volumetric fill rather than a printed block - same technique as
 // HeroBento's VisibilityChartPanel gradient.
 const AREA_GRADIENT_STOPS: ChartGradientStop[] = [
   { offset: "0%", opacity: 0.28 },

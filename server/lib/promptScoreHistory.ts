@@ -1,4 +1,4 @@
-// Per-prompt score history — the SCORE / Δ / sparkline columns on the prompts
+// Per-prompt score history - the SCORE / Δ / sparkline columns on the prompts
 // table.
 //
 // A prompt's score for one run is the share of that run's platform checks that
@@ -27,11 +27,11 @@ export type PromptScoreEntry = {
   /** Mean rank across cited placements in the latest run, or null when the
    *  brand was not ranked at all. */
   rank: number | null;
-  /** Change in mean rank vs the previous run. POSITIVE MEANS WORSE — rank 3
+  /** Change in mean rank vs the previous run. POSITIVE MEANS WORSE - rank 3
    *  slipping to rank 7 is +4. Null when there is nothing to compare. */
   rankDelta: number | null;
   /** Latest rank per model, and how it moved since the previous run.
-   *  `isNew` marks a model that placed for the first time — the detail
+   *  `isNew` marks a model that placed for the first time - the detail
    *  page shows "new" there rather than a meaningless delta. */
   byPlatform: Array<{
     platform: string;

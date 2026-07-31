@@ -8,7 +8,7 @@
 // to pick from.
 //
 // Heuristics for what counts as "nav-relevant":
-//   - Inside <nav>, <header>, <footer> (HTML5 semantic markers — most
+//   - Inside <nav>, <header>, <footer> (HTML5 semantic markers - most
 //     modern sites use these correctly)
 //   - OR inside elements with class/id matching /nav|menu|header|footer/i
 //     (works for older / hand-rolled sites)
@@ -18,7 +18,7 @@
 //   - Not a file URL (no .xml, .json, .pdf, etc.)
 //   - Not a hash/mailto/tel: URL
 //
-// We cap at 50 unique URLs — beyond that is noise.
+// We cap at 50 unique URLs - beyond that is noise.
 
 const MAX_NAV_URLS = 50;
 const MAX_PATH_DEPTH = 3;

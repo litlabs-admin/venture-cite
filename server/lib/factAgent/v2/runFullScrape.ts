@@ -64,7 +64,7 @@ import { LLM_CALL_TIMEOUT_MS } from "./vercelBudget";
 
 // Build provider clients lazily; same pattern as factSheetV2.ts. A
 // missing OPENROUTER_API_KEY just disables the Claude fallback rather
-// than crashing — single-provider extraction still works.
+// than crashing - single-provider extraction still works.
 //
 // v2 (2026-05-28): both providers now honour `prompt.responseFormat`
 // when present. OpenAI gets it as a real json_schema response_format
@@ -112,7 +112,7 @@ function buildOpenrouterClaudeProvider(): ProviderClient | null {
     maxRetries: 0,
   });
   return {
-    // "anthropic" is the slot bucket in llm_concurrency_slots — sized for
+    // "anthropic" is the slot bucket in llm_concurrency_slots - sized for
     // Claude-family concurrent calls. Egress is via OpenRouter, but the
     // model is Claude so we account for it under that bucket.
     name: "anthropic",
@@ -139,7 +139,7 @@ function buildOpenrouterClaudeProvider(): ProviderClient | null {
 
 // Runs the full v2 pipeline for one brand inside a per-brand advisory
 // lock. Returns { ran:false } when another holder (manual re-scrape /
-// cron / concurrent activation) owns the lock — the caller should treat
+// cron / concurrent activation) owns the lock - the caller should treat
 // that as "in progress elsewhere", not an error.
 export async function runFullScrapeForBrand(
   brand: FullScrapeBrandInput,
@@ -175,7 +175,7 @@ export async function runFullScrapeForBrand(
       // 2026-05-28 (Phase 2): if FACT_AGENT_LLM_URL_RANKER is set,
       // use the hybrid discovery (sitemap + nav graph + LLM ranking)
       // instead of the regex tier scorer. When unset, the legacy
-      // regex path runs — preserving existing behaviour as the
+      // regex path runs - preserving existing behaviour as the
       // default until the hybrid path is validated against the
       // benchmark.
       let selectedUrls: string[] = [];
@@ -198,7 +198,7 @@ export async function runFullScrapeForBrand(
           const rankerOpenai = new OpenAI({
             apiKey: process.env.OPENAI_API_KEY,
             // Tier-aware: the ranker is the FIRST LLM call so it should
-            // be the most conservative — if it stalls, the rest of the
+            // be the most conservative - if it stalls, the rest of the
             // pipeline gets squeezed. LLM_CALL_TIMEOUT_MS is ~6.3s on
             // Hobby / 25s on Pro.
             timeout: LLM_CALL_TIMEOUT_MS,
@@ -315,7 +315,7 @@ export async function runFullScrapeForBrand(
           safeFetchTextWithLockedIp(url, {}),
         );
 
-        // 5. Static-pages source — bounded concurrency, respects deadline.
+        // 5. Static-pages source - bounded concurrency, respects deadline.
         const queue: Array<() => Promise<void>> = pageRows.map((p) => async () => {
           const startedAt = Date.now();
           try {
@@ -394,7 +394,7 @@ export async function runFullScrapeForBrand(
         // pages) the old code would have just kept burning. We poll the
         // current spend every page and bail the queue if the cap is hit.
         // Cap-hit aborts the remaining queue but lets in-flight pages
-        // finish naturally — they've already paid the LLM call cost.
+        // finish naturally - they've already paid the LLM call cost.
         let costCapHit = false;
         const isOverCostCap = async (): Promise<boolean> => {
           if (costCapHit) return true;
@@ -452,12 +452,12 @@ export async function runFullScrapeForBrand(
         for (let i = 0; i < PER_PAGE_CONCURRENCY; i++) runners.push(next());
         await Promise.all(runners);
 
-        // 6a. Wikidata enrichment — opt-out via FACT_AGENT_WIKIDATA_ENABLED=false.
+        // 6a. Wikidata enrichment - opt-out via FACT_AGENT_WIKIDATA_ENABLED=false.
         // For any brand with a public Wikidata entry (most established
         // companies) we get verified founding date, HQ, CEO, employee
         // count, industry, ticker, and parent company at no LLM cost.
         // Two HTTP requests, ~0.5-2s typical, totally additive (facts
-        // merge through persistFacts with confidence 0.95 — same
+        // merge through persistFacts with confidence 0.95 - same
         // consolidation machinery handles agreements + disputes).
         if (process.env.FACT_AGENT_WIKIDATA_ENABLED !== "false") {
           const wdStart = Date.now();
@@ -578,13 +578,13 @@ export async function runFullScrapeForBrand(
           logger.warn({ err, runId: activeRunId }, "runFullScrape: user-enrich failed");
         }
 
-        // 8. Aggregate — computes terminal status, reconciles conflicts,
+        // 8. Aggregate - computes terminal status, reconciles conflicts,
         //    bumps last_verified, writes run.completed_at.
         //
         // 2026-05-28 SAFETY NET: if runAggregate throws BEFORE writing the
         // terminal status (reconciliation tx fails, log read fails, etc.),
         // the run stays in 'extracting' / 'pending' forever and the SSE
-        // stream + frontend polling never see a terminal state — that's
+        // stream + frontend polling never see a terminal state - that's
         // exactly the "infinite loop on Adyen" symptom. Force a terminal
         // status as the absolute last act of this lock holder so a run
         // can NEVER end alive.
@@ -628,7 +628,7 @@ export async function runFullScrapeForBrand(
             // after retryCount=10. Log loud.
             logger.error(
               { err: terminalErr, runId: activeRunId },
-              "runFullScrape: CRITICAL — could not write terminal status. Backstop will recover.",
+              "runFullScrape: CRITICAL - could not write terminal status. Backstop will recover.",
             );
           }
         } else {
@@ -675,10 +675,10 @@ export async function runFullScrapeForBrand(
         } catch (writeErr) {
           logger.error(
             { err: writeErr, runId: activeRunId },
-            "runFullScrape: CRITICAL — could not write terminal status after callback error. Backstop will recover.",
+            "runFullScrape: CRITICAL - could not write terminal status after callback error. Backstop will recover.",
           );
         }
-        // Don't rethrow — we want the lock to release cleanly and the
+        // Don't rethrow - we want the lock to release cleanly and the
         // caller's response to be the (already-failed) run row.
       } finally {
         // Belt-and-suspenders: drain ANY events that landed before/

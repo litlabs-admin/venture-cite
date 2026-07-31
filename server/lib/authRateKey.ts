@@ -10,7 +10,7 @@ import { ipKeyGenerator } from "express-rate-limit";
 //
 // The IP component is normalized through express-rate-limit's
 // `ipKeyGenerator` helper (required as of v8) so IPv6 addresses are
-// collapsed to a /56 subnet instead of keyed per-address — otherwise an
+// collapsed to a /56 subnet instead of keyed per-address - otherwise an
 // attacker can trivially rotate through billions of addresses in their
 // own /64 to bypass the limit. IPv4 addresses pass through unchanged.
 export function authRateKey(req: Request): string {

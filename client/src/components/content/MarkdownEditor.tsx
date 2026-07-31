@@ -7,7 +7,7 @@ import SafeMarkdown from "@/components/SafeMarkdown";
 // editor; right pane is the live SafeMarkdown render. Word + character
 // counts hang in a small toolbar above.
 //
-// Read-only mode (`editable={false}`) is used when streaming a generation —
+// Read-only mode (`editable={false}`) is used when streaming a generation -
 // the worker is appending to the buffer; editing it would race.
 
 interface MarkdownEditorProps {
@@ -17,7 +17,7 @@ interface MarkdownEditorProps {
   className?: string;
   placeholder?: string;
   minHeight?: number;
-  // Optional callback for when the user blurs the textarea — useful for
+  // Optional callback for when the user blurs the textarea - useful for
   // explicit-save flows on top of auto-save.
   onBlur?: () => void;
 }
@@ -25,7 +25,7 @@ interface MarkdownEditorProps {
 function countWords(text: string): number {
   if (!text) return 0;
   // Strip markdown punctuation roughly so headings and links don't inflate
-  // the count. This is intentionally heuristic — no need to be perfect.
+  // the count. This is intentionally heuristic - no need to be perfect.
   const stripped = text
     .replace(/```[\s\S]*?```/g, " ") // code blocks
     .replace(/`[^`]*`/g, " ")

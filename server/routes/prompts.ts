@@ -30,7 +30,7 @@ export function setupPromptsRoutes(app: Express): void {
   // ============ BRAND-LEVEL CITATION PROMPT PORTFOLIO ============
 
   // Seed the initial 10 tracked prompts for a brand. Refuses if tracked
-  // prompts already exist — callers must use /reset for a destructive redo.
+  // prompts already exist - callers must use /reset for a destructive redo.
   app.post(
     "/api/brand-prompts/:brandId/generate",
     aiLimitMiddleware,
@@ -64,7 +64,7 @@ export function setupPromptsRoutes(app: Express): void {
   );
 
   // Reset: archive every tracked prompt + suggestion, then seed a fresh 10.
-  // Destructive — requires { confirm: true } in the body.
+  // Destructive - requires { confirm: true } in the body.
   app.post(
     "/api/brand-prompts/:brandId/reset",
     aiLimitMiddleware,
@@ -133,7 +133,7 @@ export function setupPromptsRoutes(app: Express): void {
   //     a tracked prompt to archive in the new prompt's place.
   // Wave 9.1: previously the route hard-required replaceTrackedId, which
   // forced users to nuke an existing prompt even after deleting one to
-  // make room. Bad UX — the dialog now adapts based on whether there's
+  // make room. Bad UX - the dialog now adapts based on whether there's
   // an open slot.
   const TRACKED_PROMPTS_CAP = 10;
   app.post(
@@ -159,7 +159,7 @@ export function setupPromptsRoutes(app: Express): void {
         const trackedCount = all.filter((p) => p.status === "tracked").length;
 
         if (replaceTrackedId) {
-          // Replace path — must point at a real tracked prompt on this brand.
+          // Replace path - must point at a real tracked prompt on this brand.
           const tracked = all.find((p) => p.id === replaceTrackedId && p.status === "tracked");
           if (!tracked) {
             return res
@@ -170,7 +170,7 @@ export function setupPromptsRoutes(app: Express): void {
           return res.json({ success: true, data: { mode: "replaced" } });
         }
 
-        // Add path — only valid when there's an open slot.
+        // Add path - only valid when there's an open slot.
         if (trackedCount >= TRACKED_PROMPTS_CAP) {
           return res.status(409).json({
             success: false,
@@ -210,7 +210,7 @@ export function setupPromptsRoutes(app: Express): void {
 
   // Create one prompt by hand. Until now prompts could only arrive via AI
   // generation or by accepting a suggestion, so "Add a prompt" in the UI had
-  // nothing to call. Subject to the same tracked cap as accept-suggestion —
+  // nothing to call. Subject to the same tracked cap as accept-suggestion -
   // the cap is a product rule about how many prompts a weekly run covers, not
   // a property of where the prompt came from.
   app.post(
@@ -305,8 +305,8 @@ export function setupPromptsRoutes(app: Express): void {
         }
 
         const all = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
-        // A status change has to reach archived rows too — that is the whole
-        // point of switching one back on — so only the text edit is
+        // A status change has to reach archived rows too - that is the whole
+        // point of switching one back on - so only the text edit is
         // tracked-only.
         const row = all.find(
           (p) =>
@@ -360,7 +360,7 @@ export function setupPromptsRoutes(app: Express): void {
         if (trackedCount <= 1) {
           return res.status(400).json({
             success: false,
-            error: "Keep at least one tracked prompt — accept a suggestion first",
+            error: "Keep at least one tracked prompt - accept a suggestion first",
           });
         }
         await storage.archiveBrandPrompt(row.id);
@@ -371,13 +371,13 @@ export function setupPromptsRoutes(app: Express): void {
     }),
   );
 
-  // Per-prompt score history — powers the SCORE, Δ and 7-day sparkline
+  // Per-prompt score history - powers the SCORE, Δ and 7-day sparkline
   // columns in the prompts table. Bucketing lives in
   // server/lib/promptScoreHistory.ts so it can be tested without a database.
   //
   // The join is on `brandPromptId`. The older /run/:runId/details endpoint
   // joins on prompt TEXT, which silently loses history whenever a prompt is
-  // edited — this one does not, at the cost of ignoring rows written before
+  // edited - this one does not, at the cost of ignoring rows written before
   // brandPromptId was populated.
   app.get(
     "/api/brand-prompts/:brandId/prompt-history",
@@ -399,7 +399,7 @@ export function setupPromptsRoutes(app: Express): void {
   // List the stored prompts for a brand.
   //
   // Defaults to tracked-only, which is what every existing caller expects.
-  // `?status=all` additionally returns archived rows — the prompts table needs
+  // `?status=all` additionally returns archived rows - the prompts table needs
   // them so a prompt switched OFF stays visible and can be switched back on.
   // Without this the toggle is a one-way door: the row disappears on the next
   // refetch and nothing can reach it again.
@@ -424,7 +424,7 @@ export function setupPromptsRoutes(app: Express): void {
     }),
   );
 
-  // AI Visibility Checklist progress — server-side persistence so it
+  // AI Visibility Checklist progress - server-side persistence so it
   // survives device switches and browser data clears.
   app.get(
     "/api/visibility-progress/:brandId",
@@ -492,7 +492,7 @@ export function setupPromptsRoutes(app: Express): void {
   // and return the runId. The client tracks completion via the
   // /citation-runs/state polling channel and drives any remainder via
   // /advance. The partial unique index from migration 0035 guarantees
-  // only one in-flight run per brand — duplicate kickoffs (two tabs
+  // only one in-flight run per brand - duplicate kickoffs (two tabs
   // racing) get 409 with the existing runId so the UI joins it.
   app.post(
     "/api/brand-prompts/:brandId/run",
@@ -525,7 +525,7 @@ export function setupPromptsRoutes(app: Express): void {
         // Wave 9.2: reject empty platforms array. Previously the kickoff
         // would happily create a run, do zero AI calls, and finalize as
         // status='failed' with an "All platform calls failed" error
-        // message — a phantom failed row in History for nothing. The
+        // message - a phantom failed row in History for nothing. The
         // dedup index would also block legitimate retries until the
         // phantom finalized.
         if (platforms.length === 0) {
@@ -552,17 +552,17 @@ export function setupPromptsRoutes(app: Express): void {
         if (!result.ok) {
           return res.status(500).json({
             success: false,
-            error: "Couldn't start run — please try again.",
+            error: "Couldn't start run - please try again.",
           });
         }
         // Server-side drive: progress the run without requiring an open
-        // browser tab. Additive — the client /citation-runs/state +
+        // browser tab. Additive - the client /citation-runs/state +
         // /advance loop still runs as the fast path when a tab is open
         // (Vercel Hobby has no frequent cron). advanceCitationRun holds a
         // per-run advisory lock internally, so server + client slices
         // can't double-process the same pairs. Whatever doesn't finish in
         // this function's window is resumed by the daily cron's
-        // drainPendingCitationRuns — a tab is no longer REQUIRED.
+        // drainPendingCitationRuns - a tab is no longer REQUIRED.
         const driveRunId = result.runId;
         const driveDeadlineMs = Date.now() + 50_000;
         waitUntil(
@@ -597,7 +597,7 @@ export function setupPromptsRoutes(app: Express): void {
   // the schema as dormant fields.
 
   // Aggregated results for a brand's prompt runs.
-  // Citation run history — returns all runs for the trend chart, newest first.
+  // Citation run history - returns all runs for the trend chart, newest first.
   app.get(
     "/api/brand-prompts/:brandId/history",
     asyncHandler(async (req, res) => {
@@ -722,7 +722,7 @@ export function setupPromptsRoutes(app: Express): void {
         const user = requireUser(req);
         try {
           await requireBrand(req.params.brandId, user.id);
-          // `:runId` is a sibling param — verify the run belongs to the
+          // `:runId` is a sibling param - verify the run belongs to the
           // caller's brand, or a user could drive another tenant's run
           // (cross-tenant mutation + LLM cost). 404 on miss.
           const run = await requireCitationRun(req.params.runId, user.id);
@@ -752,14 +752,14 @@ export function setupPromptsRoutes(app: Express): void {
     }),
   );
 
-  // Drill-down into a specific citation run — returns per-prompt × per-platform results.
+  // Drill-down into a specific citation run - returns per-prompt × per-platform results.
   app.get(
     "/api/brand-prompts/:brandId/run/:runId/details",
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
         const brand = await requireBrand(req.params.brandId, user.id);
-        // `:runId` is a sibling param — confirm the run belongs to this brand
+        // `:runId` is a sibling param - confirm the run belongs to this brand
         // before returning its rows (which include raw LLM responses).
         const run = await requireCitationRun(req.params.runId, user.id);
         if (run.brandId !== brand.id) {
@@ -776,7 +776,7 @@ export function setupPromptsRoutes(app: Express): void {
         const allPrompts = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
         const orderIndexByText = new Map<string, number>();
         for (const p of allPrompts) {
-          // First match wins — if a brand has two prompts with the same
+          // First match wins - if a brand has two prompts with the same
           // text (rare but possible), we use the lowest orderIndex.
           if (!orderIndexByText.has(p.prompt)) {
             orderIndexByText.set(p.prompt, p.orderIndex);
@@ -849,7 +849,7 @@ export function setupPromptsRoutes(app: Express): void {
   const RE_DETECT_COOLDOWN_MS = 60_000;
 
   // Re-run detection across every stored surface (geo_rankings, listicles,
-  // wikipedia_mentions) using the shared matcher — no AI calls. Picks up
+  // wikipedia_mentions) using the shared matcher - no AI calls. Picks up
   // new name variations added since the original run so historical rows
   // stay aligned with the current detector. Rank stays null on rows that
   // flip to cited here (the rank signal came from the original LLM pass).
@@ -874,7 +874,7 @@ export function setupPromptsRoutes(app: Express): void {
 
         // Wave 9.1: re-detect intentionally does NOT write a citation_runs
         // row. An earlier pass added one to fire the live banner, but
-        // History is meant to be a record of fresh AI runs — re-detect
+        // History is meant to be a record of fresh AI runs - re-detect
         // re-evaluates *existing* responses and adds nothing new to the
         // story. The completion toast is enough; no banner needed for an
         // operation that finishes in <2s and makes no AI calls.
@@ -961,7 +961,7 @@ export function setupPromptsRoutes(app: Express): void {
         // --- listicles ---
         const listicles = await storage.getListicles(brand.id).catch(() => [] as any[]);
         for (const l of listicles) {
-          // No raw page text is persisted — use title + stored item names as the
+          // No raw page text is persisted - use title + stored item names as the
           // searchable surface. Accurate for the common case where listicle
           // items contain the brand name.
           const searchText = [l.title ?? "", ...((l.competitorsMentioned ?? []) as string[])].join(

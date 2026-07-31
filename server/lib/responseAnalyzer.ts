@@ -10,7 +10,7 @@ import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 // Merged extract+judge analyzer. One call per AI-chatbot response returns
 // every brand mentioned plus cited/rank/relevance/context/citedUrls, replacing
 // the N+1 per-entity judge loop (brand judge + one judge per competitor +
-// separate auto-discovery pass). See plan file: tidy-wandering-gem.md — Wave A.
+// separate auto-discovery pass). See plan file: tidy-wandering-gem.md - Wave A.
 //
 // Cost: one gpt-4o-mini call per response (~$0.0003 with typical inputs).
 // A full citation run with 30 prompts × 5 platforms = 150 analyzer calls.
@@ -57,7 +57,7 @@ export interface AnalyzedResponse {
   brands: BrandAnalysis[];
   tracked: {
     // name-key of tracked entity → matched brand analysis (or null if not
-    // surfaced by the analyzer — treated as not cited)
+    // surfaced by the analyzer - treated as not cited)
     [entityId: string]: BrandAnalysis | null;
   };
   untracked: BrandAnalysis[]; // candidates for auto-discovery
@@ -72,7 +72,7 @@ function buildEntityBlock(trackedEntities: TrackedEntity[]): string {
       if (e.industry) parts.push(`industry: ${e.industry}`);
       if (e.description) parts.push(`desc: ${e.description.slice(0, 160)}`);
       if (e.aliases?.length) parts.push(`aliases: ${e.aliases.join(", ")}`);
-      return parts.join(" — ");
+      return parts.join(" - ");
     })
     .join("\n");
 }
@@ -96,7 +96,7 @@ Return JSON ONLY in this exact shape:
   }
 }
 
-Include every brand you detect — the user will match against their tracked set and treat extras as auto-discovery candidates.`;
+Include every brand you detect - the user will match against their tracked set and treat extras as auto-discovery candidates.`;
 
 /**
  * Run a single merged extract+judge analysis call on one response. Returns
@@ -104,7 +104,7 @@ Include every brand you detect — the user will match against their tracked set
  * to its BrandAnalysis (or null if not surfaced), and `untracked` lists
  * every analyzer-returned brand that didn't match a tracked entity.
  *
- * Fail-closed: on any LLM or parse error, returns empty analysis — callers
+ * Fail-closed: on any LLM or parse error, returns empty analysis - callers
  * treat this as "no citations detected" rather than propagating the error.
  */
 export async function analyzeResponse(params: {
@@ -120,7 +120,7 @@ export async function analyzeResponse(params: {
 
   if (!responseText || responseText.length < 40) return emptyResult;
   if (!process.env.OPENAI_API_KEY) {
-    logger.warn("responseAnalyzer: OPENAI_API_KEY missing — skipping analysis");
+    logger.warn("responseAnalyzer: OPENAI_API_KEY missing - skipping analysis");
     return emptyResult;
   }
 
@@ -128,7 +128,7 @@ export async function analyzeResponse(params: {
     responseText.length > MAX_RESPONSE_CHARS
       ? responseText.slice(0, MAX_RESPONSE_CHARS)
       : responseText;
-  const userMsg = `Tracked entities (the user's brand and their competitors — treat these with priority but also surface any OTHER brands you find):
+  const userMsg = `Tracked entities (the user's brand and their competitors - treat these with priority but also surface any OTHER brands you find):
 ${buildEntityBlock(trackedEntities)}
 
 Response text:
@@ -217,7 +217,7 @@ Respond with JSON only.`;
 /**
  * Derive a sentiment label from the judge's relevance score. Mirrors the
  * rule used by the brand_mentions writer (see citationChecker.ts). Null for
- * not-cited rows — sentiment is only meaningful when the brand appeared.
+ * not-cited rows - sentiment is only meaningful when the brand appeared.
  */
 export function deriveSentiment(
   relevance: number | null,

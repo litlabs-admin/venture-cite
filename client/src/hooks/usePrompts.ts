@@ -5,7 +5,7 @@
 // Before this file, citations.tsx, PromptsTab.tsx, ResultsTab.tsx,
 // HistoryTab.tsx and geo-signals.tsx each hand-rolled their own useQuery /
 // useMutation calls against these endpoints, with query keys that didn't
-// match each other — e.g. citations.tsx used
+// match each other - e.g. citations.tsx used
 // `[`/api/brand-prompts/${brandId}`]` (template-string) while geo-signals.tsx
 // used `["/api/brand-prompts", brandId]` (array) for the SAME endpoint, so
 // TanStack Query never deduped the two and the page double-fetched. Every
@@ -19,7 +19,7 @@ import type { BrandPrompt } from "@shared/schema";
 // ============ Query key factory ============
 //
 // Every hook below builds its queryKey exclusively from these factories, and
-// every mutation's invalidateQueries calls reference the same factories —
+// every mutation's invalidateQueries calls reference the same factories -
 // so a rename/reshape here can't silently desync a consumer from the cache.
 export const promptKeys = {
   list: (brandId: string | null | undefined) => ["/api/brand-prompts", brandId] as const,
@@ -28,7 +28,7 @@ export const promptKeys = {
   listAll: (brandId: string | null | undefined) => ["/api/brand-prompts", brandId, "all"] as const,
   suggestions: (brandId: string | null | undefined) =>
     ["/api/brand-prompts", brandId, "suggestions"] as const,
-  // No `opts` (or an empty `since`) returns the bare 3-element prefix — used
+  // No `opts` (or an empty `since`) returns the bare 3-element prefix - used
   // for broad `invalidateQueries` calls that should catch every `since`
   // variant of this brand's results query (TanStack matches by prefix).
   // A concrete `since` appends the params segment, matching exactly what
@@ -110,7 +110,7 @@ export type PromptGeneration = {
 };
 
 /** One prompt's score over recent runs. `score`/`delta` are null when there
- *  is nothing to measure — a prompt that has never run, or has run once so no
+ *  is nothing to measure - a prompt that has never run, or has run once so no
  *  change exists yet. Null is not zero and must render as a dash. */
 export type PromptScoreHistory = {
   promptId: string;
@@ -244,7 +244,7 @@ export function usePromptScoreHistory(brandId: string | null | undefined) {
 
 // Everything that can go stale after any prompt-set mutation (generate,
 // reset, edit, archive, accept/dismiss suggestion). Results/history/run
-// details are NOT invalidated here — they depend on citation runs, not the
+// details are NOT invalidated here - they depend on citation runs, not the
 // prompt set itself, and are invalidated separately by the mutations that
 // actually change them (run, re-detect-all).
 function invalidatePromptSet(brandId: string | null | undefined) {
@@ -370,7 +370,7 @@ export function useEditPrompt(brandId: string | null | undefined) {
       }
     },
     onSuccess: (data) => {
-      // Always invalidate (even on data.success === false — server returned
+      // Always invalidate (even on data.success === false - server returned
       // 200 with an error payload) so an optimistic write never sticks.
       invalidatePromptSet(brandId);
       void data;
@@ -408,7 +408,7 @@ export function useCreatePrompt(brandId: string | null | undefined) {
 }
 
 /** The row's ON toggle: tracked ⇄ archived. Optimistic, because the dot is
- *  the feedback — a round-trip delay there reads as an unresponsive control. */
+ *  the feedback - a round-trip delay there reads as an unresponsive control. */
 export function useSetPromptStatus(brandId: string | null | undefined) {
   return useMutation({
     mutationFn: async ({

@@ -39,7 +39,7 @@ vi.mock("../../server/storage", () => ({
     getFaqItems: stubs.getFaqItems,
     getVisibilityProgress: stubs.getVisibilityProgress,
     getLastGeoSignalSummary: stubs.getLastGeoSignalSummary,
-    // Unused-but-imported by the dashboard module — stub permissively
+    // Unused-but-imported by the dashboard module - stub permissively
     // so module init doesn't blow up.
     getMetricsHistory: vi.fn(),
     getGeoRankingsByBrandPromptIds: vi.fn(),
@@ -143,7 +143,7 @@ const app = buildApp();
  *
  * Baseline: brand has industry, 5 articles, 10 prompts, 1 completed citation
  * run at 50% citation rate (>= LOW_CITATION_RATE 0.2), 1 FAQ (so rule #7
- * stays off), no competitors / community posts (P2 rules — won't crowd P1).
+ * stays off), no competitors / community posts (P2 rules - won't crowd P1).
  */
 function applyBaselineMocks() {
   stubs.getBrandById.mockResolvedValue({
@@ -217,7 +217,7 @@ describe("GET /api/brands/:brandId/recommendations state assembly", () => {
       (x) => x.id === "complete-visibility-checklist",
     );
     expect(rec).toBeDefined();
-    // Title surfaces the live numerator/denominator — the cheapest way
+    // Title surfaces the live numerator/denominator - the cheapest way
     // to assert the constant is actually the one in use.
     expect(rec!.title).toContain(`3/${VISIBILITY_CHECKLIST_TOTAL}`);
   });
@@ -251,7 +251,7 @@ describe("GET /api/brands/:brandId/recommendations state assembly", () => {
   });
 
   it("rule #9 does NOT fire when > 50% of the checklist is complete", async () => {
-    // 30 / 57 > 50% — rule #9 must drop out.
+    // 30 / 57 > 50% - rule #9 must drop out.
     const completedRows = Array.from({ length: 30 }, (_, i) => ({ id: `v-${i}` }));
     stubs.getVisibilityProgress.mockResolvedValue(completedRows);
     // Keep last-scan recent too so the response isn't dominated by rule #8.

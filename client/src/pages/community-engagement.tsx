@@ -80,7 +80,7 @@ const platformIcons: Record<string, ReactElement> = {
 
 // Platform and lifecycle-status chips both route through Badge's own
 // "neutral" variant (transparent bg, muted-foreground text) instead of
-// hand-rolled bg-muted/bg-secondary classNames — same visual result, but
+// hand-rolled bg-muted/bg-secondary classNames - same visual result, but
 // now the token lives in one place (badge.tsx) instead of being redeclared
 // per page. Status has no good/bad axis, so it stays neutral throughout;
 // the label carries the meaning, not the colour.
@@ -201,7 +201,7 @@ export default function CommunityEngagement() {
   // moved card is visible. Plain updatePostMutation only changes status.
   // We send postedAt as an ISO string; the server coerces it to a Date
   // before handing to Drizzle (timestamp columns need a Date object, not
-  // a string — see server/routes/community.ts PATCH handler).
+  // a string - see server/routes/community.ts PATCH handler).
   const markPostedMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("PATCH", `/api/community-posts/${id}`, {
@@ -297,7 +297,7 @@ export default function CommunityEngagement() {
 
   return (
     // Only ever rendered client-side, as a lazy tab inside
-    // client/src/pages/act.tsx (no route of its own) — title/meta removed
+    // client/src/pages/act.tsx (no route of its own) - title/meta removed
     // per this task's blanket rule; /act falls back to root defaults.
     <PanelPage>
       <PanelRow cols={1}>

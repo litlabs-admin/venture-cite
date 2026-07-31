@@ -3,7 +3,7 @@
 // The app authenticates via a Supabase JWT carried as an `Authorization:
 // Bearer` header populated client-side from localStorage
 // (client/src/lib/authStore.ts's getAccessToken(), consumed by
-// client/src/lib/queryClient.ts's apiRequest()) — NOT a cookie. The cached
+// client/src/lib/queryClient.ts's apiRequest()) - NOT a cookie. The cached
 // storageState has 0 cookies; forwarding page.context().cookies() as a
 // Cookie header sends an empty header and never authenticates the request.
 // Extract the real bearer token out of localStorage instead.
@@ -23,7 +23,7 @@ export async function getBearerToken(page: Page): Promise<string> {
           const parsed = JSON.parse(window.localStorage.getItem(key) ?? "");
           return parsed?.access_token ?? parsed?.currentSession?.access_token ?? null;
         } catch {
-          // Not the session entry (or malformed) — keep looking.
+          // Not the session entry (or malformed) - keep looking.
         }
       }
     }
@@ -31,7 +31,7 @@ export async function getBearerToken(page: Page): Promise<string> {
   });
   if (!token) {
     throw new Error(
-      "No Supabase access token found in localStorage — is the shared storageState valid?",
+      "No Supabase access token found in localStorage - is the shared storageState valid?",
     );
   }
   return token;

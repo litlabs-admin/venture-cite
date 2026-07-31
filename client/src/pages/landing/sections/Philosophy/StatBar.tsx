@@ -10,7 +10,7 @@ const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 // telemetry and presenting them as ours would be a lie. VentureCite is
 // pre-launch and has no comparable figures, so each tile shows a capability
 // label only. With no number to animate, useCountUp is deliberately not
-// imported here — reinstate it if/when real metrics exist.
+// imported here - reinstate it if/when real metrics exist.
 const stats = [
   { label: "Every major engine", delayMs: 0 },
   { label: "Why they get picked", delayMs: 50 },

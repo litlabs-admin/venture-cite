@@ -21,10 +21,10 @@ export interface LlmJobPollResult {
 }
 
 export interface PollOptions {
-  /** Initial wait before the first poll (default 800ms — let the
+  /** Initial wait before the first poll (default 800ms - let the
    *  OpenAI run get past kickoff). */
   initialDelayMs?: number;
-  /** Min poll interval — increases with each consecutive 'running'
+  /** Min poll interval - increases with each consecutive 'running'
    *  response, capped at maxPollIntervalMs. */
   minPollIntervalMs?: number;
   /** Max poll interval to avoid hammering the server when the job
@@ -66,7 +66,7 @@ export async function pollLlmJob(jobId: string, opts: PollOptions = {}): Promise
     if (Date.now() - startedAt > timeoutMs) {
       throw new Error(
         `LLM job ${jobId} did not complete within ${Math.round(timeoutMs / 1000)}s. ` +
-          `The cron will finish it in the background — refresh later to see the result.`,
+          `The cron will finish it in the background - refresh later to see the result.`,
       );
     }
 
@@ -75,7 +75,7 @@ export async function pollLlmJob(jobId: string, opts: PollOptions = {}): Promise
       const response = await apiRequest("GET", `/api/llm-jobs/${jobId}`);
       poll = await response.json();
     } catch (err) {
-      // Transient network failures shouldn't abort — back off and retry.
+      // Transient network failures shouldn't abort - back off and retry.
       await sleep(Math.min(maxInterval, interval * 1.5));
       interval = Math.min(maxInterval, interval * 1.5);
       continue;
@@ -97,7 +97,7 @@ export async function pollLlmJob(jobId: string, opts: PollOptions = {}): Promise
       throw err;
     }
 
-    // pending | running — wait and retry. Linear back-off keeps the
+    // pending | running - wait and retry. Linear back-off keeps the
     // first few polls snappy while easing pressure on long jobs.
     await sleep(interval);
     interval = Math.min(maxInterval, interval + 400);

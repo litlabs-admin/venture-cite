@@ -79,13 +79,13 @@ function allowedTransitions(current: string): MentionStatus[] {
 }
 
 // ---------------------------------------------------------------------------
-// Platform icon — lucide-only (react-icons is in the allowed import list for
+// Platform icon - lucide-only (react-icons is in the allowed import list for
 // the geo-tools page but not for new leaf components per spec §3.1 imports).
 // ---------------------------------------------------------------------------
 function PlatformIcon({ platform, className }: { platform: string; className?: string }) {
   switch (platform.toLowerCase()) {
     // Neither Reddit nor Hacker News has a lucide brand mark. These used to
-    // share one glyph and were told apart only by orange-500 vs orange-700 —
+    // share one glyph and were told apart only by orange-500 vs orange-700 -
     // indistinguishable at 16px, and colour-only encoding besides. Distinct
     // shapes carry the difference now. No aria-label here: the wrapping span
     // already announces platformLabel(), so labelling the icon too would
@@ -113,7 +113,7 @@ function platformLabel(platform: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Sentiment badge — color-blind safe (icon + color).
+// Sentiment badge - color-blind safe (icon + color).
 // ---------------------------------------------------------------------------
 function SentimentBadge({ sentiment }: { sentiment: string | null | undefined }) {
   switch (sentiment) {
@@ -214,7 +214,7 @@ export default function MentionCard({
     platformLabel(mention.platform),
     "mention:",
     title,
-    `— ${mention.sentiment ?? "neutral"} sentiment,`,
+    `- ${mention.sentiment ?? "neutral"} sentiment,`,
     `status: ${MENTION_STATUS_DISPLAY[mention.status]?.label ?? mention.status},`,
     `discovered ${relativeDate}`,
   ].join(" ");
@@ -292,7 +292,7 @@ export default function MentionCard({
             {relativeDate}
           </span>
 
-          {/* Actions menu — stopPropagation so click doesn't open the sheet */}
+          {/* Actions menu - stopPropagation so click doesn't open the sheet */}
           <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
             <ActionsMenu
               mention={mention}
@@ -349,7 +349,7 @@ export default function MentionCard({
       </div>
 
       {/* ------------------------------------------------------------------ */}
-      {/* "Why matched" hint — shown below both layouts when data is present  */}
+      {/* "Why matched" hint - shown below both layouts when data is present  */}
       {/* ------------------------------------------------------------------ */}
       {mention.matchedVariation && mention.matchedField && (
         <div className="border-t px-3 pb-2 pt-1.5 sm:px-4">
@@ -412,7 +412,7 @@ function ActionsMenu({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {/* Change status submenu — only rendered when transitions exist */}
+        {/* Change status submenu - only rendered when transitions exist */}
         {transitions.length > 0 && (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Change status</DropdownMenuSubTrigger>

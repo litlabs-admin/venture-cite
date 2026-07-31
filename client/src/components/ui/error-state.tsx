@@ -16,7 +16,7 @@ export interface ErrorStateProps {
 // destructive tone comes from the icon/text colour, not a bordered box.
 export function ErrorState({
   title = "Something went wrong",
-  description = "We couldn't load this section. The issue has been logged — please try again.",
+  description = "We couldn't load this section. The issue has been logged - please try again.",
   onRetry,
   retryLabel = "Retry",
   isRetrying = false,

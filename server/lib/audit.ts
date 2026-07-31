@@ -7,8 +7,8 @@ import { captureAndFlush } from "./sentryReport";
 // Sensitive-operation audit log.
 //
 // Two ergonomic shapes:
-//   - logAudit(req, params)         — fire-and-forget after the op
-//   - withAudit(req, params, fn)    — wraps an async op; only logs on success
+//   - logAudit(req, params)         - fire-and-forget after the op
+//   - withAudit(req, params, fn)    - wraps an async op; only logs on success
 //
 // Failure mode: audit logging NEVER throws to the caller. A failure to
 // write the audit row is logged + reported to Sentry but does not roll
@@ -61,7 +61,7 @@ export async function logAudit(req: Request, params: AuditParams): Promise<void>
       userAgent: extractUserAgent(req),
     });
   } catch (err) {
-    // Don't throw — audit failure shouldn't fail the underlying request.
+    // Don't throw - audit failure shouldn't fail the underlying request.
     logger.error({ err, action: params.action }, "audit: failed to write log row");
     captureAndFlush(err, { tags: { source: "audit-log" } });
   }

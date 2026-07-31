@@ -107,7 +107,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 };
 
 // Assert that `brandId` belongs to the current user, or respond 404.
-// Returns `true` when the check passed (or was skipped — no brandId), and
+// Returns `true` when the check passed (or was skipped - no brandId), and
 // `false` when the response has already been sent.
 async function checkBrandOwnership(
   brandId: unknown,
@@ -182,27 +182,27 @@ const PUBLIC_API_ROUTES = new Set<string>([
   "POST /api/auth/resend-verification",
   "POST /api/waitlist",
   "POST /api/stripe/webhook",
-  // Resend bounce/complaint webhook — signed via Svix, registered in
+  // Resend bounce/complaint webhook - signed via Svix, registered in
   // server/index.ts with raw body parser.
   "POST /api/webhooks/resend",
   // Unsubscribe is HMAC-token-authenticated (not session); mail clients
   // POST here without any cookie/bearer per RFC 8058.
   "POST /api/unsubscribe",
   "GET /api/unsubscribe",
-  // Image proxy — loaded by <img> tags, which can't send bearer tokens.
+  // Image proxy - loaded by <img> tags, which can't send bearer tokens.
   // Endpoint itself is hardened (SSRF-safe, image-only responses).
   "GET /api/logo-proxy",
-  // Daily cron orchestrator — self-auths via CRON_SECRET (Vercel migration).
+  // Daily cron orchestrator - self-auths via CRON_SECRET (Vercel migration).
   "POST /api/cron/daily-orchestrator",
   // Public pricing catalogue. /pricing is a marketing page served to logged-
   // OUT visitors, so gating these two made it fall back to the hardcoded
-  // defaultPlans — which carry no priceId, so the subscribe button dead-ended
+  // defaultPlans - which carry no priceId, so the subscribe button dead-ended
   // in a "Products not configured yet" toast for every prospect.
   //
   // Neither leaks anything: /products returns product names, descriptions and
   // prices already printed on the page, and the publishable key is designed to
   // ship to browsers (it is in VITE_STRIPE_PUBLISHABLE_KEY, i.e. compiled into
-  // the client bundle regardless). POST /api/stripe/checkout stays gated — you
+  // the client bundle regardless). POST /api/stripe/checkout stays gated - you
   // still need an account before you can be charged.
   "GET /api/stripe/products",
   "GET /api/stripe/publishable-key",
@@ -216,7 +216,7 @@ export const requireAuthForApi: RequestHandler = (req, res, next) => {
 };
 
 // Populates req.user if a valid Bearer token is present; otherwise silently
-// continues. Used as a global middleware — the real gatekeeper is
+// continues. Used as a global middleware - the real gatekeeper is
 // requireAuthForApi below, which enforces auth on every non-public /api/*.
 export const attachUserIfPresent: RequestHandler = async (req, _res, next) => {
   const header = req.headers.authorization;
@@ -275,7 +275,7 @@ const registerRateLimit = rateLimit({
 
 // Forgot password: 3 per (IP, email) per hour. The endpoint always
 // returns the same response regardless of account existence (anti-
-// enumeration), but each successful trigger sends a real email — so
+// enumeration), but each successful trigger sends a real email - so
 // without a limit the endpoint is an inbox-bombing vector for any
 // attacker who can guess valid email addresses.
 const forgotPasswordRateLimit = rateLimit({
@@ -301,7 +301,7 @@ const resetPasswordRateLimit = rateLimit({
 // Resend verification: 3 per (IP, email) per hour, mirroring the
 // forgot-password limit. Each trigger sends a real email, so without a
 // limit the endpoint is an inbox-bombing vector. The 60-second min gap
-// is enforced separately via the in-memory map below — keeps the UI
+// is enforced separately via the in-memory map below - keeps the UI
 // "resend" button from spamming Supabase if a user mashes it.
 const resendVerificationRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -319,7 +319,7 @@ const resendVerificationRateLimit = rateLimit({
 const resendVerificationLastSentAt = new Map<string, number>();
 const RESEND_MIN_GAP_MS = 60_000;
 // Plan 4 audit (BUG #6): the per-(IP, email) Map was growing unbounded.
-// Evict entries older than 1 hour on every check — at that point the
+// Evict entries older than 1 hour on every check - at that point the
 // express-rate-limit cap (3/hour) has also rolled over so the entry is
 // useless. O(n) per call, but bounded by however many requests came in
 // in the last hour.
@@ -334,7 +334,7 @@ function evictStaleResendEntries(now: number): void {
 }
 
 // Test-only: clear the in-memory map between unit tests. Not exported in
-// the public API surface — tests import it directly.
+// the public API surface - tests import it directly.
 export function __resetResendVerificationStateForTests(): void {
   resendVerificationLastSentAt.clear();
 }
@@ -347,7 +347,7 @@ export function setupAuth(app: Express) {
       if (!email || !password) {
         return res.status(400).json({ success: false, error: "Email and password are required" });
       }
-      // Server-side strength enforcement (the trust boundary — the client
+      // Server-side strength enforcement (the trust boundary - the client
       // checklist is bypassable). Same shared policy the UI renders, so the
       // two can't drift. admin.createUser below does NOT enforce these rules.
       const pwCheck = validatePassword(password);
@@ -362,7 +362,7 @@ export function setupAuth(app: Express) {
       const appUrl = process.env.APP_URL || "http://localhost:5000";
       const emailRedirectTo = `${appUrl}/login?verified=1`;
 
-      // admin.createUser is an admin *provisioning* API — it does NOT
+      // admin.createUser is an admin *provisioning* API - it does NOT
       // send the signup confirmation email (only the public signUp() or
       // an explicit resend/generateLink does). So the verification email
       // must be sent explicitly here; without it the user lands on
@@ -406,7 +406,7 @@ export function setupAuth(app: Express) {
       }
 
       // Plan 4 Task 3: require email verification before the account can
-      // be used. No session is issued in this response — the client
+      // be used. No session is issued in this response - the client
       // routes to /verify-email and waits for the confirmation link.
       const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email: normalizedEmail,
@@ -438,12 +438,12 @@ export function setupAuth(app: Express) {
           await sendSignupEmail();
           logger.info(
             { email: normalizedEmail },
-            "auth: register on existing unverified account — resent verification",
+            "auth: register on existing unverified account - resent verification",
           );
           return res.json({ success: true, requiresVerification: true, email: normalizedEmail });
         }
 
-        // Genuine failure — log it (the old code returned this only to
+        // Genuine failure - log it (the old code returned this only to
         // the client and never logged it, so production 400s had no
         // diagnosable reason).
         logger.warn({ err: createErr, email: normalizedEmail }, "auth: register createUser failed");
@@ -463,7 +463,7 @@ export function setupAuth(app: Express) {
     } catch (error: any) {
       // Catch-all: can surface DB/driver errors (e.g. from db.update calls
       // above), not just Supabase auth errors. Never echo error.message to
-      // the client — log/Sentry retain the detail.
+      // the client - log/Sentry retain the detail.
       logger.error({ err: error }, "auth: register failed");
       captureAndFlush(error, { tags: { source: "auth.ts:register" } });
       res.status(500).json({ success: false, error: "Registration failed" });
@@ -477,7 +477,7 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ success: false, error: "Email and password are required" });
       }
 
-      // Credential check on the dedicated auth client, NOT supabaseAdmin —
+      // Credential check on the dedicated auth client, NOT supabaseAdmin -
       // signInWithPassword would otherwise overwrite the admin client's
       // Authorization header with this user's JWT and break server-side
       // Storage uploads with RLS errors. See server/lib/supabaseAuth.ts.
@@ -497,12 +497,12 @@ export function setupAuth(app: Express) {
 
       // Plan 4 audit (BUG #2): the `auth.users → public.users` mirror
       // trigger in migration 0001 fires on `after insert or update of
-      // email` only — NOT on update of `email_confirmed_at`. So after a
+      // email` only - NOT on update of `email_confirmed_at`. So after a
       // user clicks the Supabase verification link, our
       // `public.users.email_verified` mirror stays at 0 forever. Sync
       // it here on every successful login: if Supabase reports a
       // confirmed email and our mirror disagrees, flip it. Idempotent
-      // and cheap — usually a no-op after the first post-verify login.
+      // and cheap - usually a no-op after the first post-verify login.
       if (data.user.email_confirmed_at && dbUser.emailVerified !== 1) {
         try {
           await db.update(users).set({ emailVerified: 1 }).where(eq(users.id, dbUser.id));
@@ -525,7 +525,7 @@ export function setupAuth(app: Express) {
 
       // Welcome email: fires exactly once on the user's first successful
       // login. Plan 4 audit (BUG #13) introduced `welcomedAt` as the
-      // dedicated gate — NULL means "welcome email not yet sent".
+      // dedicated gate - NULL means "welcome email not yet sent".
       // Existing rows backfilled to NOW() in migration 0056 so we don't
       // spam pre-existing accounts.
       //
@@ -533,7 +533,7 @@ export function setupAuth(app: Express) {
       // (double-click, two tabs) could both observe welcomedAt === null
       // and both fire the email. The atomic conditional UPDATE below
       // returns the row only when this request actually flipped the
-      // column from NULL — i.e. won the race. The loser sees zero rows
+      // column from NULL - i.e. won the race. The loser sees zero rows
       // returned and skips the dispatch.
       const now = new Date();
       let wonFirstLoginRace = false;
@@ -563,7 +563,7 @@ export function setupAuth(app: Express) {
         const recipientFirstName = dbUser.firstName;
         if (recipientEmail) {
           // Plan 4 audit (BUG #27): setImmediate is unreliable on Vercel
-          // serverless — the function can suspend immediately after
+          // serverless - the function can suspend immediately after
           // res.json() and drop the queued work. waitUntil keeps the
           // function alive past the response. Locally it's a no-op
           // shim so the promise just runs in the background.
@@ -588,7 +588,7 @@ export function setupAuth(app: Express) {
     } catch (error: any) {
       // Catch-all: wraps supabaseAuth.signInWithPassword + loadPublicUser
       // (a DB query), so this can surface driver errors. Previously had no
-      // logging at all — add it so the detail isn't simply discarded now
+      // logging at all - add it so the detail isn't simply discarded now
       // that error.message is no longer echoed to the client.
       logger.error({ err: error }, "auth: login failed");
       res.status(401).json({ success: false, error: "Login failed" });
@@ -687,7 +687,7 @@ export function setupAuth(app: Express) {
       // Supabase's auth.resend() resends a pending signup confirmation.
       // It silently no-ops for nonexistent accounts (and for accounts
       // that are already verified), which is exactly the
-      // non-enumerating behavior we want — we don't have to branch on
+      // non-enumerating behavior we want - we don't have to branch on
       // the result, just log and return success either way.
       const { error } = await supabaseAdmin.auth.resend({
         type: "signup",

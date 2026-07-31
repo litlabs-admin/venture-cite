@@ -16,7 +16,7 @@ npm install
 
 # 2. Copy env template and fill in real values
 cp .env.example .env
-# Edit .env — at minimum: DATABASE_URL, SUPABASE_*, STRIPE_*, OPENAI_API_KEY
+# Edit .env - at minimum: DATABASE_URL, SUPABASE_*, STRIPE_*, OPENAI_API_KEY
 
 # 3. Run dev server (client + server in one process via Vite middleware)
 npm run dev
@@ -61,7 +61,7 @@ Detailed architecture in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | `npm run test:coverage` | Vitest with coverage report                                     |
 | `npm run db:push`       | Sync Drizzle schema to DB                                       |
 
-CI runs `check` + `lint` + `format:check` + `test` on every PR — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+CI runs `check` + `lint` + `format:check` + `test` on every PR - see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
@@ -94,14 +94,14 @@ See [`.env.example`](.env.example) for the full list with comments. Server boot 
 
 Critical ones:
 
-- `DATABASE_URL` — Supabase pooled Postgres connection string
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — server-side admin client
-- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — client-side public auth
+- `DATABASE_URL` - Supabase pooled Postgres connection string
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` - server-side admin client
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` - client-side public auth
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `VITE_STRIPE_PUBLISHABLE_KEY`
 - `OPENAI_API_KEY`
-- `OPENROUTER_API_KEY` (optional — citation features fall back gracefully)
-- `RESEND_API_KEY` (optional — weekly emails skip if unset)
-- `SENTRY_DSN`, `VITE_SENTRY_DSN` (optional — error tracking is no-op without)
+- `OPENROUTER_API_KEY` (optional - citation features fall back gracefully)
+- `RESEND_API_KEY` (optional - weekly emails skip if unset)
+- `SENTRY_DSN`, `VITE_SENTRY_DSN` (optional - error tracking is no-op without)
 
 ---
 
@@ -116,4 +116,4 @@ Critical ones:
 
 ## Contributing
 
-This is currently a single-author repository. Code review and pair contributions are welcome — open a PR against `main`. CI must be green to merge.
+This is currently a single-author repository. Code review and pair contributions are welcome - open a PR against `main`. CI must be green to merge.

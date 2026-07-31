@@ -16,7 +16,7 @@
 -- uniqueness of auth.users.email. This trigger only fires AFTER GoTrue
 -- has already inserted NEW into auth.users, which means no other live
 -- auth user holds NEW.email. Therefore any public.users row with
--- NEW.email and a different id has no backing auth user — it is
+-- NEW.email and a different id has no backing auth user - it is
 -- definitively orphaned (its account is unreachable; it cannot log in).
 -- Deleting it only ever removes dead data, never an active account, and
 -- is the same outcome the soft-delete purge cron would eventually reach.
@@ -36,7 +36,7 @@ as $$
 begin
   -- Reclaim a stale email left by a previously-deleted auth user so the
   -- UNIQUE(email) constraint can't abort the auth.users insert. See the
-  -- safety invariant in this migration's header — this only ever deletes
+  -- safety invariant in this migration's header - this only ever deletes
   -- orphaned rows (no live auth user can hold NEW.email at this point).
   delete from public.users
   where email = new.email

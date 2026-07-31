@@ -1,7 +1,7 @@
 // One-shot migration: encrypt any plaintext Buffer access tokens that
 // pre-date the at-rest encryption rollout (Wave 1.3).
 //
-// Idempotent — already-encrypted rows are detected by their `enc:v1:`
+// Idempotent - already-encrypted rows are detected by their `enc:v1:`
 // prefix and skipped, so running this twice is a no-op.
 //
 // Usage:
@@ -43,7 +43,7 @@ async function main() {
     const ciphertext = encryptToken(row.token);
     await db.update(users).set({ bufferAccessToken: ciphertext }).where(eq(users.id, row.id));
     encrypted += 1;
-    // No PII in this log line — user id only.
+    // No PII in this log line - user id only.
     process.stdout.write(`encrypted user=${row.id}\n`);
   }
 

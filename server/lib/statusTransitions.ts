@@ -1,6 +1,6 @@
 // Guarded state transitions for tables that carry a `status` or
 // `remediation_status` column. Callers must go through assertTransition()
-// before UPDATE-ing the status — this prevents illegal transitions
+// before UPDATE-ing the status - this prevents illegal transitions
 // (e.g. flipping in_progress back to queued, re-resolving a resolved row).
 
 export class InvalidStateTransitionError extends Error {
@@ -29,7 +29,7 @@ const AGENT_TASK_TRANSITIONS: TransitionMap = {
 const HALLUCINATION_REMEDIATION_TRANSITIONS: TransitionMap = {
   // Direct pending → resolved is allowed: the UI's "Mark as resolved"
   // button is a one-click flow (the user fixed the page, the hallucination
-  // is no longer reproducible — no need to first toggle "in_progress").
+  // is no longer reproducible - no need to first toggle "in_progress").
   pending: ["in_progress", "resolved", "dismissed"],
   in_progress: ["resolved", "dismissed"],
   resolved: ["verified", "in_progress"], // re-open if the hallucination reappears

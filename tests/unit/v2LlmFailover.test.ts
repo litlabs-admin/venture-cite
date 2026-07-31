@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock the slot library — we test failover logic, not the bucket.
+// Mock the slot library - we test failover logic, not the bucket.
 vi.mock("../../server/lib/llmConcurrency", () => ({
   withSlot: vi.fn(
     async (_provider: string, _runId: string | undefined, fn: () => Promise<unknown>) => fn(),

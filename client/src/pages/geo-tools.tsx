@@ -1,6 +1,6 @@
-// GEO Assets — Listicles, Wikipedia, and BOFU content (the citation-asset
+// GEO Assets - Listicles, Wikipedia, and BOFU content (the citation-asset
 // surfaces). FAQ management lives in the canonical FAQ editor (faq-manager,
-// /act?tab=faq) and brand mentions live in Community/Monitor — those tabs
+// /act?tab=faq) and brand mentions live in Community/Monitor - those tabs
 // were removed here to end the duplication.
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -81,11 +81,11 @@ const LISTICLE_STATUS_DISPLAY: Record<
   { label: string; variant: "neutral" | "warning" | "positive"; icon?: boolean }
 > = {
   new: { label: "New", variant: "neutral" },
-  // "Contacted" is in-progress, not a positive outcome yet — warning tint
+  // "Contacted" is in-progress, not a positive outcome yet - warning tint
   // (amber) reads as "pending action" without claiming success. Previously
   // used chart-1 (the accent green), which is reserved for actions only.
   contacted: { label: "Contacted", variant: "warning" },
-  // "Won" is a neutral badge + check icon, not green/chart-4 — green is
+  // "Won" is a neutral badge + check icon, not green/chart-4 - green is
   // reserved for actions, not outcomes.
   won: {
     label: "Won",
@@ -236,7 +236,7 @@ export default function GeoTools() {
   const [bofuType, setBofuType] = useState<string>("comparison");
   const [bofuCompetitors, setBofuCompetitors] = useState<string[]>([]);
   const [bofuKeyword, setBofuKeyword] = useState("");
-  // Wave 9.4: BOFU full-content sheet — replaces the prior 500-char preview.
+  // Wave 9.4: BOFU full-content sheet - replaces the prior 500-char preview.
   const [activeBofu, setActiveBofu] = useState<BofuContent | null>(null);
   const [bofuSheetOpen, setBofuSheetOpen] = useState(false);
   // Wave 9.4: manual-add dialogs.
@@ -254,7 +254,7 @@ export default function GeoTools() {
   // display the current status regardless.
   const [listicleStatusFilter, setListicleStatusFilter] = useState<string>("all");
 
-  // Listicle queries — server returns { success, data: Listicle[] }
+  // Listicle queries - server returns { success, data: Listicle[] }
   const {
     data: listiclesData,
     isLoading: listiclesLoading,
@@ -284,8 +284,8 @@ export default function GeoTools() {
       return body;
     },
     onSuccess: (data: any) => {
-      // Wave 9.4: surface the full ScanReport — Found / Inserted /
-      // Duplicates / Failed — rather than a single misleading number.
+      // Wave 9.4: surface the full ScanReport - Found / Inserted /
+      // Duplicates / Failed - rather than a single misleading number.
       const r = data.data?.report ?? {};
       const summary = formatReportLines({
         Found: r.found ?? 0,
@@ -315,7 +315,7 @@ export default function GeoTools() {
       }),
   });
 
-  // Wikipedia queries — read mentions directly from storage
+  // Wikipedia queries - read mentions directly from storage
   const { data: wikipediaData } = useQuery<{ success: boolean; data: WikipediaMention[] }>({
     queryKey: ["/api/wikipedia", selectedBrandId],
     queryFn: async () => {
@@ -407,7 +407,7 @@ export default function GeoTools() {
     onSuccess: () => {
       toast({
         title: "BOFU content saved!",
-        description: "View and edit it under the BOFU Content tab — saved to this brand's library.",
+        description: "View and edit it under the BOFU Content tab - saved to this brand's library.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/bofu-content"] });
     },
@@ -537,7 +537,7 @@ export default function GeoTools() {
 
   return (
     // Only ever rendered client-side, as a lazy tab inside
-    // client/src/pages/act.tsx (no route of its own) — title/meta removed
+    // client/src/pages/act.tsx (no route of its own) - title/meta removed
     // per this task's blanket rule; /act falls back to root defaults.
     // (Fragment kept: BofuContentSheet/dialogs below are siblings of the
     // main <div>, not children of it.)
@@ -1133,7 +1133,7 @@ export default function GeoTools() {
                                         {content.publishedUrl}
                                       </span>
                                     ) : (
-                                      <span>Draft — not yet published</span>
+                                      <span>Draft - not yet published</span>
                                     )}
                                   </p>
                                 </div>
@@ -1212,7 +1212,7 @@ export default function GeoTools() {
         pending={addWikipediaMutation.isPending}
       />
 
-      {/* Wave 9.4: Wikipedia draft viewer. Read-only — copy + close. */}
+      {/* Wave 9.4: Wikipedia draft viewer. Read-only - copy + close. */}
       <Dialog
         open={!!wikiDraft}
         onOpenChange={(o) => {
@@ -1262,7 +1262,7 @@ export default function GeoTools() {
 }
 
 // ============================================================
-// Wave 9.4: Manual-entry dialogs. Each is intentionally minimal —
+// Wave 9.4: Manual-entry dialogs. Each is intentionally minimal -
 // just the fields the schema requires + a couple of useful optionals.
 // Server-side validates ownership and returns 409 on duplicate URL.
 // ============================================================

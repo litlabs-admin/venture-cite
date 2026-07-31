@@ -4,7 +4,7 @@
 //
 // The previous implementation upserted by (brandId, domain, subcategory,
 // factKey) with the partial unique index from migration 0059. That
-// gave us cross-page dedup at the row level — but the UPDATE clause
+// gave us cross-page dedup at the row level - but the UPDATE clause
 // just overwrote factValue / sourceUrl / sourceExcerpt with the most
 // recent page's data, silently dropping the first N-1 pages'
 // provenance. With the v2 controlled-vocabulary contract, all four
@@ -36,7 +36,7 @@ import {
   type ValuePayload,
 } from "@shared/factAgent/schema";
 
-/** Internal shape persistFacts needs — extends Fact with the
+/** Internal shape persistFacts needs - extends Fact with the
  *  server-derived subcategory and a non-optional sourceUrl. */
 interface FactToPersist extends Fact {
   subcategory: string;
@@ -64,7 +64,7 @@ function sourceEntryFor(f: FactToPersist): SourceEntry {
 
 /** Merge a new source into a sorted, deduped sources array. Same URL
  *  collapses (highest-confidence wins, longer excerpt wins on tie).
- *  Caps at MAX_SOURCES_PER_FACT — older / lower-confidence entries
+ *  Caps at MAX_SOURCES_PER_FACT - older / lower-confidence entries
  *  fall off the tail. */
 function mergeSources(existing: SourceEntry[], incoming: SourceEntry): SourceEntry[] {
   const byUrl = new Map<string, SourceEntry>();
@@ -166,7 +166,7 @@ export async function persistFacts(
     try {
       // Look up the existing scraped row for this (brandId, domain,
       // subcategory, factKey). The partial unique index guarantees at
-      // most one. Dismissed rows are intentionally excluded — a prior
+      // most one. Dismissed rows are intentionally excluded - a prior
       // dismissal means the user already rejected this fact, so we
       // skip rather than reviving it.
       const existingRows = await db
@@ -194,7 +194,7 @@ export async function persistFacts(
 
       const existing = existingRows[0];
 
-      // Prior dismissal — respect the user's intent and skip entirely.
+      // Prior dismissal - respect the user's intent and skip entirely.
       if (existing?.dismissedAt) continue;
 
       // 2026-05-28 Phase 4: user_overridden facts are off-limits to
@@ -234,7 +234,7 @@ export async function persistFacts(
 
       if (!existing) {
         // First time we see this (domain, subcategory, factKey) for
-        // this brand — straight INSERT with a single-source payload.
+        // this brand - straight INSERT with a single-source payload.
         const valuePayload: ValuePayload = {
           ...(f.valuePayload ?? {}),
           sources: [incomingSource],
@@ -281,7 +281,7 @@ export async function persistFacts(
       const incomingValueNorm = normalizeValue(f.factValue);
 
       if (existingValueNorm === incomingValueNorm) {
-        // (a) Same value — just add the source.
+        // (a) Same value - just add the source.
         const mergedSources = mergeSources(existingSources, incomingSource);
         const newPayload: ValuePayload = {
           ...existingPayload,

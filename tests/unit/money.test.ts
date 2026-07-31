@@ -46,7 +46,7 @@ describe("dollarsToCents", () => {
   });
 
   it("avoids the float-precision trap on common values", () => {
-    // 0.1 + 0.2 = 0.30000000000000004 — naive parsing loses a cent.
+    // 0.1 + 0.2 = 0.30000000000000004 - naive parsing loses a cent.
     // Math.round(0.30000000000000004 * 100) = 30, so we get it right.
     expect(dollarsToCents("0.30")).toBe(30);
     // Sum many $0.10 values exactly via cents arithmetic. 1000 × 10

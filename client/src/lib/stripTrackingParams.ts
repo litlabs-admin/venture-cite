@@ -1,4 +1,4 @@
-// AI engines quote URLs verbatim, tracking params and all — "?utm_source=chatgpt.com"
+// AI engines quote URLs verbatim, tracking params and all - "?utm_source=chatgpt.com"
 // is routinely embedded in the text they return. Rendering those unmodified both
 // looks unpolished and silently carries tracking identifiers into the user's
 // browser when they click through.
@@ -7,7 +7,7 @@
 // (the Overview "how AI describes you" block, PlatformRankingCard and
 // VerbatimResponseCard) and byte-identical copies drift.
 //
-// The key list mirrors `server/lib/factAgent/canonicalize.ts` — if you add one
+// The key list mirrors `server/lib/factAgent/canonicalize.ts` - if you add one
 // there, add it here too. They are deliberately separate because this one runs
 // on model output in the browser and that one canonicalises crawled URLs on the
 // server; sharing a module across that boundary would drag server code into the
@@ -24,7 +24,7 @@ function isTrackingParam(key: string): boolean {
  * Removes tracking parameters from every URL found in a block of text, leaving
  * the surrounding prose untouched.
  *
- * Anything that does not parse as a URL is returned unchanged — model output is
+ * Anything that does not parse as a URL is returned unchanged - model output is
  * not trustworthy input, and a malformed link should render as-written rather
  * than disappear.
  */

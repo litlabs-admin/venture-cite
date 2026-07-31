@@ -23,7 +23,7 @@
 //   - The SPARQL endpoint is rate-limited globally; we add a UA so
 //     they can identify us if abuse alerts fire.
 //   - We retry once on 5xx, then give up. Wikidata being down is not
-//     a fatal error for a scrape — it just means no enrichment.
+//     a fatal error for a scrape - it just means no enrichment.
 //   - Entity IDs occasionally change (Q-numbers shift during merges);
 //     we always re-lookup, never cache the ID.
 
@@ -211,7 +211,7 @@ function parseYear(s: string): string | null {
   return /^\d{4}$/.test(yr) ? yr : null;
 }
 
-// Property mappings — Wikidata property -> our Fact emitter.
+// Property mappings - Wikidata property -> our Fact emitter.
 const ENTITY_PROPS = [
   "P112", // founder
   "P159", // headquarters location
@@ -269,7 +269,7 @@ export async function fetchWikidataFacts(brandUrl: string): Promise<{
   const labels = await resolveLabels(itemRefs);
   const labelFor = (id: string): string | null => labels.get(id) ?? null;
 
-  // P571 (inception / founding date) — usually a Wikibase time value.
+  // P571 (inception / founding date) - usually a Wikibase time value.
   const foundingClaim = claims.P571?.[0];
   if (foundingClaim) {
     const v = asString(claimValue(foundingClaim));
@@ -279,7 +279,7 @@ export async function fetchWikidataFacts(brandUrl: string): Promise<{
     }
   }
 
-  // P112 (founder) — one or more Person items.
+  // P112 (founder) - one or more Person items.
   const founderNames: string[] = [];
   for (const c of claims.P112 ?? []) {
     const v = claimValue(c);
@@ -350,7 +350,7 @@ export async function fetchWikidataFacts(brandUrl: string): Promise<{
     facts.push(buildFact("identity", "industry", industries.join(", "), ctx));
   }
 
-  // P1128 (employees) — Quantity value.
+  // P1128 (employees) - Quantity value.
   const employeesClaim = claims.P1128?.[0];
   if (employeesClaim) {
     const v = claimValue(employeesClaim);
@@ -363,7 +363,7 @@ export async function fetchWikidataFacts(brandUrl: string): Promise<{
     }
   }
 
-  // P249 (ticker symbol) — typically string value.
+  // P249 (ticker symbol) - typically string value.
   const tickerClaim = claims.P249?.[0];
   if (tickerClaim) {
     const v = asString(claimValue(tickerClaim));

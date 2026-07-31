@@ -7,7 +7,7 @@ const TERMS_CAP = 50;
 /** Returns a rehype plugin that walks hast text nodes and wraps
  *  case-insensitive, word-boundary matches in <mark>. Skips text
  *  inside <code>, <pre>, or <a> elements (matches inside links or
- *  code blocks would corrupt the rendered output). Pure function —
+ *  code blocks would corrupt the rendered output). Pure function -
  *  factory pattern lets the same instance be reused across renders. */
 export function createHighlightPlugin(terms: string[]): Plugin<[], Root> {
   // Cap term count to bound regex compile cost. Real brands have <10
@@ -15,12 +15,12 @@ export function createHighlightPlugin(terms: string[]): Plugin<[], Root> {
   const cappedTerms = terms.slice(0, TERMS_CAP).filter((t) => t && t.trim().length > 0);
 
   if (cappedTerms.length === 0) {
-    // No-op plugin — return early so the default plugin shape is preserved.
+    // No-op plugin - return early so the default plugin shape is preserved.
     return () => () => {};
   }
 
   // Sort longest-first so "Stripe Inc" matches before "Stripe" when both
-  // are in the term list. RegExp alternation is greedy left-to-right —
+  // are in the term list. RegExp alternation is greedy left-to-right -
   // longest-first is the simplest way to prefer the longer match.
   const sorted = [...cappedTerms].sort((a, b) => b.length - a.length);
 
@@ -43,7 +43,7 @@ export function createHighlightPlugin(terms: string[]): Plugin<[], Root> {
 
       // Skip text inside elements where highlighting would corrupt
       // semantics: <code>, <pre>, <a>. Walk up the parent chain isn't
-      // available in unist-util-visit's signature directly — we rely
+      // available in unist-util-visit's signature directly - we rely
       // on the immediate parent being one of these (rehype trees from
       // markdown have flat text-in-element structure, no nested
       // text-in-text). For safety, also skip if parent's tagName is one
@@ -53,7 +53,7 @@ export function createHighlightPlugin(terms: string[]): Plugin<[], Root> {
         if (tag === "code" || tag === "pre" || tag === "a") return;
       }
 
-      // Skip if the text doesn't contain any matches — common case.
+      // Skip if the text doesn't contain any matches - common case.
       if (!pattern.test(node.value)) {
         pattern.lastIndex = 0; // reset stateful regex
         return;

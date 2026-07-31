@@ -10,7 +10,7 @@ import { chartCallouts, chartYAxisLabels } from "./data";
 // draw-in/fade-in transitions the source captured mid-flight.
 //
 // Visual-richness pass: wrapped in an elevated tile and given the same SVG
-// depth vocabulary as HeroBento's VisibilityChartPanel — 4-stop area
+// depth vocabulary as HeroBento's VisibilityChartPanel - 4-stop area
 // gradients (from chartData.ts), a blurred glow duplicate under ChatGPT's
 // crisp stroke (the chart's one leading/accent series), an edge-fade mask so
 // the area fills don't look chopped at x=40/x=958, and two-layer halo end
@@ -88,7 +88,7 @@ export function AiSearchAreaChart({ isVisible }: { isVisible: boolean }) {
                   />
                 ))}
               </g>
-              {/* Soft glow duplicate under ChatGPT's crisp line — the chart's
+              {/* Soft glow duplicate under ChatGPT's crisp line - the chart's
                   one leading/accent series (see chartData.ts). */}
               {leadingStroke && (
                 <path

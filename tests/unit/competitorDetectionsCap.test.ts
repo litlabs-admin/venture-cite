@@ -41,7 +41,7 @@ describe("competitorDetections cap", () => {
   it("stops adding NEW competitors once cap is reached, fires onCapHit per dropped attempt", () => {
     // The helper itself fires onCapHit on EVERY rejected insert. The caller
     // (runBrandPrompts) is responsible for deduplicating to one log line per
-    // run via its own `competitorDetectionsCapWarned` boolean — keeps the
+    // run via its own `competitorDetectionsCapWarned` boolean - keeps the
     // helper a pure function with no internal state.
     const map = new Map<string, Map<string, number>>();
     const onCapHit = vi.fn();
@@ -53,7 +53,7 @@ describe("competitorDetections cap", () => {
     expect(map.size).toBe(5000);
     expect(onCapHit).not.toHaveBeenCalled();
 
-    // 100 more new competitors — all rejected, onCapHit fires per attempt.
+    // 100 more new competitors - all rejected, onCapHit fires per attempt.
     for (let i = 5000; i < 5100; i++) {
       addCompetitorDetection(map, `comp-${i}`, "ChatGPT", 1, onCapHit);
     }

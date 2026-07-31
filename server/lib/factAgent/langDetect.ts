@@ -1,13 +1,13 @@
 // Spec 2 §4.2 Phase 2 step 4: cheap language detection. Two paths:
-//   1. <html lang="..."> attribute — authoritative, return the 2-letter
+//   1. <html lang="..."> attribute - authoritative, return the 2-letter
 //      language portion (drops region: en-US -> en).
-//   2. Unicode-script heuristic on first 1000 chars of stripped text —
+//   2. Unicode-script heuristic on first 1000 chars of stripped text -
 //      picks the dominant script and maps it to a representative language.
 //
 // We don't ship a real language detector (CLD / franc) because the only
 // downstream use is "is this page in one of plan.expectedLanguages". A
 // false positive on cross-script pages (German with Cyrillic loanwords)
-// is harmless — the page still extracts.
+// is harmless - the page still extracts.
 
 export function detectLanguage(html: string): string {
   const attr = /<html[^>]*\blang\s*=\s*["']?([A-Za-z-]{2,})/i.exec(html);

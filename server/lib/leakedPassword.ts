@@ -1,8 +1,8 @@
 // Leaked-password (HaveIBeenPwned) check for the registration path.
 //
 // Why this exists: registration provisions accounts via
-// supabase.auth.admin.createUser (server/auth.ts), which — unlike public
-// signUp() and admin.updateUserById — does NOT run GoTrue's configured
+// supabase.auth.admin.createUser (server/auth.ts), which - unlike public
+// signUp() and admin.updateUserById - does NOT run GoTrue's configured
 // leaked-password / strength rules (supabase/auth#1959). So enabling
 // Supabase's leaked-password protection covers password reset and the
 // in-app change-password flow but leaves signup unprotected. This closes
@@ -16,7 +16,7 @@
 //
 // Availability: fail-OPEN. A HIBP outage must never block every signup, so
 // an unreachable / slow / non-2xx response is logged and treated as "not
-// leaked" — the same posture GoTrue takes when HIBP is unreachable.
+// leaked" - the same posture GoTrue takes when HIBP is unreachable.
 
 import { createHash } from "node:crypto";
 import { logger } from "./logger";
@@ -54,12 +54,12 @@ export async function isPasswordLeaked(password: string): Promise<boolean> {
       signal: ac.signal,
     });
     if (!res.ok) {
-      logger.warn({ status: res.status }, "hibp: range lookup non-ok — failing open");
+      logger.warn({ status: res.status }, "hibp: range lookup non-ok - failing open");
       return false;
     }
     return breachCountFromRange(sha1Upper, await res.text()) > 0;
   } catch (err) {
-    logger.warn({ err }, "hibp: range lookup failed — failing open");
+    logger.warn({ err }, "hibp: range lookup failed - failing open");
     return false;
   } finally {
     clearTimeout(timer);

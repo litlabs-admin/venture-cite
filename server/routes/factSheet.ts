@@ -1,6 +1,6 @@
-// Spec 2: Brand Fact Sheet redesign — run lifecycle + SSE + diff endpoints.
+// Spec 2: Brand Fact Sheet redesign - run lifecycle + SSE + diff endpoints.
 //
-// REST surface (Batch L1 — Tasks 1-5 only):
+// REST surface (Batch L1 - Tasks 1-5 only):
 //   POST   /api/brand-fact-sheet/runs                          create scrape run
 //   GET    /api/brand-fact-sheet/runs/:runId                   read run + per-page state
 //   POST   /api/brand-fact-sheet/runs/:runId/cancel            transition to 'cancelled' (CAS)
@@ -68,7 +68,7 @@ export function setupFactSheetRoutes(app: Express): void {
   // ────────────────────────────────────────────────────────────────────────
   // UI audit #10: GET /api/brand-fact-sheet/runs/latest-completed?brandId=...
   //
-  // `GET /runs` above is capped at (at most) 50 rows and defaults to 10 —
+  // `GET /runs` above is capped at (at most) 50 rows and defaults to 10 -
   // it exists to drive the run-history UI, not to answer "when did the
   // last successful scrape finish?" A brand with several consecutive
   // failed/cancelled runs can push every completed run off that page,
@@ -191,8 +191,8 @@ export function setupFactSheetRoutes(app: Express): void {
   // ────────────────────────────────────────────────────────────────────────
   // Task 6: GET /api/brand-fact-sheet/runs/:runId/stream (SSE)
   // ────────────────────────────────────────────────────────────────────────
-  // SSE handler — mirrors server/routes/assistant.ts:293-312 (the correct
-  // reference). DO NOT mirror server/routes/onboarding.ts:104-355 — that handler
+  // SSE handler - mirrors server/routes/assistant.ts:293-312 (the correct
+  // reference). DO NOT mirror server/routes/onboarding.ts:104-355 - that handler
   // is older and lacks: (a) 15s heartbeat (proxies time out at 30s+),
   // (b) req.on("close") abort handling (leaks setIntervals on disconnect),
   // (c) per-instance safety (uses an in-memory dedupe Map that breaks across
@@ -588,7 +588,7 @@ export function setupFactSheetRoutes(app: Express): void {
   //
   // Spec 2 §5.4 + §4.9: surface the brand's monthly fact-scrape spend so the
   // UI can render "$X.XX of $5.00 used this month". If no cap row exists for
-  // the current month yet, return defaults — lazy creation lives in the
+  // the current month yet, return defaults - lazy creation lives in the
   // first run-insert path, not here.
   // ────────────────────────────────────────────────────────────────────────
   const costStatusQuerySchema = z.object({
@@ -685,7 +685,7 @@ function sseWrite(res: Response, event: string, data: unknown): void {
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   } catch {
-    // Write after end — ignore.
+    // Write after end - ignore.
   }
 }
 

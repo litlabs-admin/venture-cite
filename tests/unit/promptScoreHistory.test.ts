@@ -47,7 +47,7 @@ describe("buildPromptScoreHistory", () => {
     const [ran, never] = buildPromptScoreHistory(["p1", "p2"], rows);
 
     expect(ran.score).toBe(100);
-    // One observation is a position, not a trend — must not report 0.
+    // One observation is a position, not a trend - must not report 0.
     expect(ran.delta).toBeNull();
 
     expect(never.score).toBeNull();

@@ -9,7 +9,7 @@ import { useDashboardData } from "./useDashboardData";
 // Share is NOT reproduced: this app has no share-link capability at all (no
 // tokens, no public report routes), and a menu whose items cannot work is
 // worse than an absent one. Export and Reports are both backed by something
-// real — a CSV built from the data already on screen, the existing print
+// real - a CSV built from the data already on screen, the existing print
 // stylesheet, and the /report route.
 //
 // Button chrome is the measured reference spec: h-8, px-2.5, rounded, 1px
@@ -38,7 +38,7 @@ function download(name: string, body: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Close on outside click and on Escape — a dropdown that only closes by
+/** Close on outside click and on Escape - a dropdown that only closes by
  *  re-clicking its trigger is a trap for keyboard users. */
 function useDismiss(open: boolean, close: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -68,7 +68,7 @@ export function HeaderActions({ brandId, brandName }: { brandId: string; brandNa
 
   function exportCsv() {
     const rows: (string | number | null)[][] = [
-      ["VentureCite — Dashboard export"],
+      ["VentureCite - Dashboard export"],
       ["Brand", brandName],
       ["Generated", new Date().toISOString()],
       [],

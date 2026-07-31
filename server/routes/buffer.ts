@@ -1,4 +1,4 @@
-// Buffer (social publishing) integration routes — bring-your-own-key.
+// Buffer (social publishing) integration routes - bring-your-own-key.
 //
 // Buffer's classic v1 REST API (api.bufferapp.com/1/) was retired in
 // favor of a single GraphQL endpoint at https://api.buffer.com. Users
@@ -8,10 +8,10 @@
 // tokenCipher. No OAuth, no client_id, no callback URL.
 //
 // Routes:
-//   POST   /api/buffer/connect       — validate + persist a user-supplied key
-//   GET    /api/buffer/profiles      — list connected channels (formerly profiles)
-//   POST   /api/buffer/post          — schedule one post on one channel
-//   DELETE /api/buffer/connection    — clear the stored key
+//   POST   /api/buffer/connect       - validate + persist a user-supplied key
+//   GET    /api/buffer/profiles      - list connected channels (formerly profiles)
+//   POST   /api/buffer/post          - schedule one post on one channel
+//   DELETE /api/buffer/connection    - clear the stored key
 
 import type { Express } from "express";
 import { eq } from "drizzle-orm";

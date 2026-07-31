@@ -6,17 +6,17 @@ import TrendsTab from "@/components/intelligence/TrendsTab";
 import MentionsTab from "@/components/geo-tools/MentionsTab";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 
-// "Where do I stand?" — the canonical analytics + citation-run home.
+// "Where do I stand?" - the canonical analytics + citation-run home.
 // The Overview tab was retired: every panel on it either duplicated the
 // Command Center dashboard (home.tsx) or moved there. Citations is now the
 // default tab.
 // Trends is the analytical half of the dissolved ai-intelligence page (its
-// Competitors tab is dropped — competitors.tsx is the single canonical
+// Competitors tab is dropped - competitors.tsx is the single canonical
 // competitor view, embedded here as the Competitors tab; its Share-of-Answer
-// tab was removed because the prompt_portfolio table is dead — the server
+// tab was removed because the prompt_portfolio table is dead - the server
 // synthesized the numbers, so the surface could not be defended).
 // Mentions is the detected brand-mention scanner (Reddit / Hacker News /
-// manual adds) — distinct from /act › Community (authored outreach).
+// manual adds) - distinct from /act › Community (authored outreach).
 const Citations = lazy(() => import("@/pages/citations"));
 const Competitors = lazy(() => import("@/pages/competitors"));
 

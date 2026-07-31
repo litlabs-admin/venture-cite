@@ -29,7 +29,7 @@ vi.mock("../../server/lib/ownership", async () => {
   return {
     ...actual,
     requireBrand: stubs.requireBrand,
-    // Keep requireUser real — it just reads req.user.
+    // Keep requireUser real - it just reads req.user.
   };
 });
 
@@ -50,7 +50,7 @@ vi.mock("../../server/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-// Keep routesShared light — the route only uses asyncHandler + MAX_CONTENT_LENGTH
+// Keep routesShared light - the route only uses asyncHandler + MAX_CONTENT_LENGTH
 // + openai (unused on this path). Mock the openai construction so it doesn't
 // require an API key at import time.
 vi.mock("../../server/lib/routesShared", async () => {
@@ -69,7 +69,7 @@ vi.mock("../../server/lib/routesShared", async () => {
   };
 });
 
-// computeSignals lives in the route file itself — intercept by stubbing the
+// computeSignals lives in the route file itself - intercept by stubbing the
 // scoring deps it uses so it returns deterministic numbers without OpenAI.
 vi.mock("../../server/lib/geoSignalsScoring", () => ({
   embedBatch: vi.fn(async () => [
@@ -78,7 +78,7 @@ vi.mock("../../server/lib/geoSignalsScoring", () => ({
   ]),
   cosineSimilarity: vi.fn(() => 1),
   stopwordFilterQuery: vi.fn((q: string) => q.split(/\s+/).filter(Boolean)),
-  // Real shapes — the route reads .found, .count, .matches, .headings
+  // Real shapes - the route reads .found, .count, .matches, .headings
   // etc. from each return value, so empty arrays caused 500s when the
   // 2026-05-28 audit added bucketize/sanitisePromptField + threaded
   // ownDomain into detectCitations.
@@ -102,7 +102,7 @@ vi.mock("../../server/lib/geoSignalsScoring", () => ({
   sanitisePromptField: vi.fn((s: string | null | undefined) => (s ?? "").trim().slice(0, 120)),
 }));
 
-// db — analyze handler itself doesn't touch db directly, but importing the
+// db - analyze handler itself doesn't touch db directly, but importing the
 // route file pulls in the module graph (schema, etc). Stub minimally.
 vi.mock("../../server/db", () => ({
   db: {
@@ -219,7 +219,7 @@ describe("POST /api/geo-signals/analyze persistence", () => {
     expect(typeof payload.overallScore === "number" || payload.overallScore === null).toBe(true);
     // 2026-05-28: the heavy `payload` jsonb column was dropped in
     // migration 0080. Persistence is now just (brandId, articleId,
-    // overallScore) — Pulse + Inspector are the only readers and
+    // overallScore) - Pulse + Inspector are the only readers and
     // neither needs the per-signal recommendations breakdown.
     expect(payload).not.toHaveProperty("payload");
   });

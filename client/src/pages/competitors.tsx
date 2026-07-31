@@ -81,7 +81,7 @@ export default function CompetitorsPage() {
   });
 
   // Poll the competitors list for up to 2 minutes after the user creates
-  // their first brand — async discovery runs server-side on brand-create
+  // their first brand - async discovery runs server-side on brand-create
   // and the UI has no other signal when it finishes.
   const selectedBrandAgeMs = selectedBrand?.createdAt
     ? Date.now() - new Date(selectedBrand.createdAt).getTime()
@@ -202,7 +202,7 @@ export default function CompetitorsPage() {
     },
   });
 
-  // Permanent tombstone — cron won't re-insert this competitor if it comes
+  // Permanent tombstone - cron won't re-insert this competitor if it comes
   // back up in LLM inference or citation mining. Use when the competitor
   // is a false positive (generic word, fictional company, etc.).
   const ignoreCompetitorMutation = useMutation({
@@ -315,7 +315,7 @@ export default function CompetitorsPage() {
 
   return (
     // Only ever rendered client-side, as a lazy tab inside
-    // client/src/pages/monitor.tsx (no route of its own) — title/meta
+    // client/src/pages/monitor.tsx (no route of its own) - title/meta
     // removed per this task's blanket rule; /monitor falls back to root
     // defaults.
     <PanelPage>
@@ -544,7 +544,7 @@ export default function CompetitorsPage() {
             }
           >
             <p className="mb-4 text-data text-vc-tertiary">
-              {competitors.length} competitor{competitors.length !== 1 ? "s" : ""} being tracked —
+              {competitors.length} competitor{competitors.length !== 1 ? "s" : ""} being tracked -
               the leaderboard above adds your brand as its own row.
             </p>
             {competitorsIsError ? (
@@ -643,7 +643,7 @@ export default function CompetitorsPage() {
       )}
 
       {/* Platform Breakdown moved into its own full-width row beneath the
-          leaderboard/tracked-competitors row — the panel grammar's rows are
+          leaderboard/tracked-competitors row - the panel grammar's rows are
           full-bleed horizontal bands, so the original two-cards-stacked-in-
           one-column layout is flattened into two rows rather than forced
           into a single cell. */}

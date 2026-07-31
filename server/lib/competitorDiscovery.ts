@@ -71,11 +71,11 @@ function buildFactDigest(
 /**
  * Discover competitors for a brand from two sources:
  *   1. OpenAI inference from the brand profile (cheap baseline)
- *   2. Citation-context mining — extract brand names that AI engines mention
+ *   2. Citation-context mining - extract brand names that AI engines mention
  *      alongside the user's brand in real citation results
  *
  * Dedup is handled at the DB level via the unique index on
- * (brand_id, lower(name), lower(coalesce(domain,''))) — createCompetitor
+ * (brand_id, lower(name), lower(coalesce(domain,''))) - createCompetitor
  * upserts, so there's no race window between parallel callers. Ignored /
  * soft-deleted rows stay tombstoned (lastSeenAt bumps, no revive).
  *
@@ -84,15 +84,15 @@ function buildFactDigest(
 export async function discoverCompetitors(brandId: string): Promise<number> {
   const brand = await storage.getBrandById(brandId);
   if (!brand) {
-    logger.warn({ brandId }, "competitorDiscovery: brand not found — skipping");
+    logger.warn({ brandId }, "competitorDiscovery: brand not found - skipping");
     return 0;
   }
   if ((brand as any).deletedAt) {
-    logger.info({ brandId }, "competitorDiscovery: brand is soft-deleted — skipping");
+    logger.info({ brandId }, "competitorDiscovery: brand is soft-deleted - skipping");
     return 0;
   }
   if (!process.env.OPENAI_API_KEY) {
-    logger.warn({ brandId }, "competitorDiscovery: OPENAI_API_KEY missing — skipping");
+    logger.warn({ brandId }, "competitorDiscovery: OPENAI_API_KEY missing - skipping");
     return 0;
   }
 
@@ -105,7 +105,7 @@ export async function discoverCompetitors(brandId: string): Promise<number> {
 
   // Brand fact sheet sharpens substitutability judgement: a verified
   // positioning / product / audience fact lets the model reject lookalikes
-  // that share a category but not a buyer. Best-effort — discovery still
+  // that share a category but not a buyer. Best-effort - discovery still
   // runs on the profile alone if the sheet is empty or unavailable.
   let factDigest = "";
   try {
@@ -113,7 +113,7 @@ export async function discoverCompetitors(brandId: string): Promise<number> {
   } catch (err) {
     logger.warn(
       { err, brandId },
-      "competitorDiscovery: fact-sheet load failed — using profile only",
+      "competitorDiscovery: fact-sheet load failed - using profile only",
     );
   }
 

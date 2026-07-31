@@ -1,7 +1,7 @@
 // Single source of truth for spine-stage tab labels so the AppShell
 // context-bar title (shellTitleFor) and the per-stage SpineShell tab strips
 // cannot drift apart. The labels here MUST match the tab arrays in
-// pages/{monitor,diagnose,act,setup}.tsx — those files keep their own arrays
+// pages/{monitor,diagnose,act,setup}.tsx - those files keep their own arrays
 // because they also carry the lucide icon + lazy Component per tab, which
 // don't belong in this pure-data module.
 
@@ -33,7 +33,7 @@ export const SPINE_STAGES: SpineStage[] = [
       hallucinations: "Hallucinations",
       signals: "Signals",
       crawler: "Crawler",
-      // No "issues" entry — diagnose.tsx's own header comment records that
+      // No "issues" entry - diagnose.tsx's own header comment records that
       // tab as retired, and its tabs array no longer declares it. This entry
       // used to exist here and violated the file-header guarantee above.
     },

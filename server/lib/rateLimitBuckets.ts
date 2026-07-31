@@ -31,19 +31,19 @@ const CONFIGS: Record<string, BucketConfig> = {
   // Manual-add: 10 per user per minute (1 token per 6 seconds).
   "manual-add": { capacity: 10, refillPerSec: 10 / 60 },
   // 2026-05-27: split the legacy `manual-discovery` bucket into one
-  // bucket PER feature. The shared bucket had capacity 3 — touching any 3
+  // bucket PER feature. The shared bucket had capacity 3 - touching any 3
   // of {Listicles, Wikipedia, FAQ generate, Keyword discover} in a brand
   // session within 4 minutes rate-limited ALL four, which the user
   // experienced as "broken." Per-feature buckets isolate the cost of
   // each action: hit the FAQ limit and the others remain available.
   // Capacity 10, refill 1 / 20 s ≈ 3 per minute steady state with a 10-
-  // burst headroom — enough for a power user to run several scans in a
+  // burst headroom - enough for a power user to run several scans in a
   // row but still capped against runaway re-clicks.
   "discover-listicles": { capacity: 10, refillPerSec: 1 / 20 },
   "scan-wikipedia": { capacity: 10, refillPerSec: 1 / 20 },
   "generate-faqs": { capacity: 10, refillPerSec: 1 / 20 },
   "discover-keywords": { capacity: 10, refillPerSec: 1 / 20 },
-  // Kept for backwards compatibility — anywhere still passing
+  // Kept for backwards compatibility - anywhere still passing
   // "manual-discovery" gets the same generous shape as the per-feature
   // buckets above. Should be removable after a grep confirms no callers.
   "manual-discovery": { capacity: 10, refillPerSec: 1 / 20 },
@@ -52,9 +52,9 @@ const CONFIGS: Record<string, BucketConfig> = {
 function applyRefill(tokens: number, lastRefill: Date, cfg: BucketConfig, now: number): number {
   const elapsedSec = (now - lastRefill.getTime()) / 1000;
   // 2026-05-28: self-heal clock-skew corruption. If `last_refill_at` is in
-  // the FUTURE (negative elapsed) — which happens when the DB and the app
+  // the FUTURE (negative elapsed) - which happens when the DB and the app
   // server clocks are skewed, or when a previous bug persisted a bad
-  // timestamp — the old code returned `tokens` unchanged. A row stuck at
+  // timestamp - the old code returned `tokens` unchanged. A row stuck at
   // tokens=0 with a future last_refill_at would stay stuck FOREVER (the
   // refill curve never advances). Treat negative elapsed as "clock skew /
   // bad state" and reset the bucket to full capacity.
@@ -138,7 +138,7 @@ export async function tryAcquire(provider: string, scopeId: string): Promise<boo
     try {
       await client.query("ROLLBACK");
     } catch {
-      // ignore — original error is what matters
+      // ignore - original error is what matters
     }
     logger.warn({ err, provider, scopeId }, "rateLimit: tryAcquire failed");
     // Fail-open on infrastructure errors: better to over-call upstream
@@ -155,9 +155,9 @@ export async function tryAcquire(provider: string, scopeId: string): Promise<boo
  *
  * 2026-05-27: callers passing `maxWaitMs=0` (the "try once, don't wait"
  * pattern used by every manual-discovery handler) were getting `false`
- * unconditionally — the `while (elapsed < maxWaitMs)` loop body never
+ * unconditionally - the `while (elapsed < maxWaitMs)` loop body never
  * executed when maxWaitMs was 0, so `tryAcquire` was never called and
- * the bucket state never changed. Users saw "rate limited — try again
+ * the bucket state never changed. Users saw "rate limited - try again
  * in ~0s" on the first click of Listicles/Wikipedia/Keywords/FAQ since
  * the routes were written. Fix: always attempt one acquire BEFORE
  * entering the wait loop, so maxWaitMs=0 cleanly means "no waiting,
@@ -184,7 +184,7 @@ export async function acquireOrWait(
 
 /**
  * Estimate seconds until at least one token will be available. Reads the
- * persisted bucket state and applies the refill curve in JS — does NOT
+ * persisted bucket state and applies the refill curve in JS - does NOT
  * mutate the row.
  */
 export async function secondsUntilAvailable(provider: string, scopeId: string): Promise<number> {

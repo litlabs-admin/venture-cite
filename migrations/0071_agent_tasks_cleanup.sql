@@ -7,7 +7,7 @@
 --     artifact_id pointers are dangling anyway. We keep the agent_task row
 --     itself (audit/history) but clear the link.
 --
--- (2) Drop `automation_rule_id` — referenced the now-dropped automation_rules
+-- (2) Drop `automation_rule_id` - referenced the now-dropped automation_rules
 --     table. Already nullable, unused after the automation subsystem removal.
 --
 -- (3) Replace the legacy `artifact_type` CHECK constraint (from 0026) with a

@@ -10,12 +10,12 @@ import { withOriginLimit } from "./originConcurrency";
 
 // Known AI crawler user agents. Each entry carries a `category` so the
 // UI can group by vendor ("OpenAI (3 bots)") instead of rendering 15 flat
-// rows. Keep this list current — deprecated names (Claude-Web,
+// rows. Keep this list current - deprecated names (Claude-Web,
 // anthropic-ai, old Applebot labels) mislead users into thinking a bot
 // is blocked when the real bot is allowed under its new name.
 //
 // Note: `facebookexternalhit` is link-preview scraping, NOT AI training
-// — deliberately excluded. Meta's AI crawler is `meta-externalagent`.
+// - deliberately excluded. Meta's AI crawler is `meta-externalagent`.
 // purpose tag orthogonal to vendor category:
 //   training → crawled to build the next model weights
 //   search   → crawled to index for the vendor's AI search product
@@ -37,7 +37,7 @@ export const AI_CRAWLERS: Array<{
     platform: "OpenAI (training)",
     category: "OpenAI",
     purpose: "training",
-    description: "OpenAI's main training crawler — gathers content for ChatGPT and future models.",
+    description: "OpenAI's main training crawler - gathers content for ChatGPT and future models.",
   },
   {
     name: "ChatGPT-User",
@@ -100,7 +100,7 @@ export const AI_CRAWLERS: Array<{
     category: "Perplexity",
     purpose: "search",
     description:
-      "Perplexity's indexing crawler — the retrieval side that builds Perplexity's answer index.",
+      "Perplexity's indexing crawler - the retrieval side that builds Perplexity's answer index.",
   },
   {
     name: "Perplexity-User",
@@ -129,7 +129,7 @@ export const AI_CRAWLERS: Array<{
     category: "Google",
     purpose: "training",
     description:
-      "Google's AI training toggle — independent from search crawling. Block this alone to keep content out of Gemini training while staying in Google Search.",
+      "Google's AI training toggle - independent from search crawling. Block this alone to keep content out of Gemini training while staying in Google Search.",
   },
 
   // ── Microsoft ──
@@ -150,7 +150,7 @@ export const AI_CRAWLERS: Array<{
     category: "Meta",
     purpose: "training",
     description:
-      "Meta's AI training crawler. (facebookexternalhit is link-preview scraping, not AI training — deliberately not checked.)",
+      "Meta's AI training crawler. (facebookexternalhit is link-preview scraping, not AI training - deliberately not checked.)",
   },
   {
     name: "FacebookBot",
@@ -187,7 +187,7 @@ export const AI_CRAWLERS: Array<{
     category: "Apple",
     purpose: "training",
     description:
-      "Apple's AI training toggle — block this alone to keep content out of Apple Intelligence training while staying in Siri/Spotlight.",
+      "Apple's AI training toggle - block this alone to keep content out of Apple Intelligence training while staying in Siri/Spotlight.",
   },
 
   // ── Common Crawl ──
@@ -198,7 +198,7 @@ export const AI_CRAWLERS: Array<{
     category: "Common Crawl",
     purpose: "training",
     description:
-      "Common Crawl open dataset — feeds many LLMs' pretraining data (GPT-3, LLaMA, and more).",
+      "Common Crawl open dataset - feeds many LLMs' pretraining data (GPT-3, LLaMA, and more).",
   },
 ];
 
@@ -219,7 +219,7 @@ export function parseRobotsTxt(
 
   // robots.txt semantics (per RFC 9309 / Google spec):
   //   Disallow: /       → block the entire site
-  //   Disallow:         → empty value means NOTHING disallowed — allow all
+  //   Disallow:         → empty value means NOTHING disallowed - allow all
   //   Disallow: /admin  → block only /admin
   //   Allow: /          → explicit allow-all
   // The previous parser defaulted empty Disallow to "/", which flipped
@@ -286,7 +286,7 @@ function isCrawlerBlocked(
         reason: `Explicitly allowed via "User-agent: ${crawlerAgent}"`,
       };
     }
-    // Specific block exists but only disallows narrower paths — the
+    // Specific block exists but only disallows narrower paths - the
     // crawler can still access the root. Treat as allowed.
     return {
       blocked: false,
@@ -294,7 +294,7 @@ function isCrawlerBlocked(
     };
   }
 
-  // No specific block — fall back to wildcard.
+  // No specific block - fall back to wildcard.
   if (wildcardBlock) {
     const hasDisallowAll = wildcardBlock.rules.some((r) => r.type === "disallow" && r.path === "/");
     const hasAllowAll = wildcardBlock.rules.some((r) => r.type === "allow" && r.path === "/");
@@ -306,7 +306,7 @@ function isCrawlerBlocked(
     }
   }
 
-  return { blocked: false, reason: "No blocking rules found — crawler allowed by default" };
+  return { blocked: false, reason: "No blocking rules found - crawler allowed by default" };
 }
 
 export type CrawlerResult = (typeof AI_CRAWLERS)[number] & {
@@ -397,7 +397,7 @@ export async function fetchRobots(website: string): Promise<{
     } else if (status === 404) {
       robotsTxtExists = false;
     } else {
-      // Includes 429 (rate-limited) and 5xx — both are "we don't know",
+      // Includes 429 (rate-limited) and 5xx - both are "we don't know",
       // never "the site blocks everyone" (that would be a real robots.txt
       // saying so, not us getting throttled).
       fetchError = `HTTP ${status}`;
@@ -419,11 +419,11 @@ export async function fetchRobots(website: string): Promise<{
 //
 // TRI-STATE, not boolean. A timeout, a 429, a DNS failure, a 5xx, or any
 // thrown error is indistinguishable from a genuine 404 if both collapse to
-// `false` — that conflation is exactly what made a rate-limited/slow file
+// `false` - that conflation is exactly what made a rate-limited/slow file
 // score as "missing" instead of "we don't know". So each flag is:
 //   true  = confirmed present (2xx + non-empty body)
 //   false = confirmed absent (an explicit 4xx other than 429)
-//   null  = UNKNOWN — timeout, network error, 429, 5xx, or any throw.
+//   null  = UNKNOWN - timeout, network error, 429, 5xx, or any throw.
 // scoreSiteHealth excludes `null` entries from both earned and attainable
 // points; the UI renders them as a distinct dash/muted state, not a failure.
 export async function fetchDiscovery(website: string): Promise<{
@@ -445,30 +445,30 @@ export async function fetchDiscovery(website: string): Promise<{
           headers: { "User-Agent": "GEO-Platform-Checker/1.0" },
         }),
       );
-      // 429 is "we got throttled", never "confirmed absent" — check before
+      // 429 is "we got throttled", never "confirmed absent" - check before
       // the general 4xx bucket below (429 IS a 4xx status).
       if (status === 429) return null;
       if (status >= 200 && status < 300) return text.trim().length > 0;
       if (status >= 400 && status < 500) return false; // explicit "not found"
       return null; // 3xx, 5xx, or anything else we can't call a measurement
     } catch {
-      return null; // timeout / DNS / TLS / network error — unknown, not absent
+      return null; // timeout / DNS / TLS / network error - unknown, not absent
     }
   };
 
   const robotsPresence = async (): Promise<boolean | null> => {
     const r = await fetchRobots(website);
     // fetchError covers network failure AND any non-2xx/404 status (429,
-    // 5xx, etc — see fetchRobots above), so it maps directly to "unknown".
+    // 5xx, etc - see fetchRobots above), so it maps directly to "unknown".
     if (r.fetchError) return null;
     return r.robotsTxtExists && r.content.trim().length > 0;
   };
 
   // The reference checks FIVE discovery files: robots.txt, sitemap.xml,
-  // llms.txt, mcp.json and security.txt (the last two render as "—" when
-  // absent rather than as a failure — they are emerging conventions, not
+  // llms.txt, mcp.json and security.txt (the last two render as "-" when
+  // absent rather than as a failure - they are emerging conventions, not
   // requirements). All five are probed concurrently (bounded to 2-at-a-time
-  // per origin via withOriginLimit — five parallel requests at once is not
+  // per origin via withOriginLimit - five parallel requests at once is not
   // being a good citizen of someone else's server); any failure resolves to
   // `null` (unknown), never an exception and never a silent "absent".
   const [robotsResult, sitemapResult, llmsResult, mcpResult, securityResult] =

@@ -64,7 +64,7 @@ export default function Login() {
   };
 
   return (
-    // Title/robots moved to src/routes/_app/login.tsx's `head()` —
+    // Title/robots moved to src/routes/_app/login.tsx's `head()` -
     // metadata belongs to the route, not this component.
     <PanelPage className="flex items-center justify-center p-4">
       <PanelRow cols={1} last className="w-full max-w-md">

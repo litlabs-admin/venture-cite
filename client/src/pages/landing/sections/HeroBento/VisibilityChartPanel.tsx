@@ -132,7 +132,7 @@ export function VisibilityChartPanel() {
               ))}
             </g>
 
-            {/* 2. Competitors — below Nike, masked so they recede at the
+            {/* 2. Competitors - below Nike, masked so they recede at the
                    historic (left) end. Unified onto one cool-grey ramp. */}
             <g clipPath="url(#hbChartClip)" mask="url(#hbFade)">
               <path
@@ -194,7 +194,7 @@ export function VisibilityChartPanel() {
               strokeDasharray="2 3"
             />
 
-            {/* 5. Endpoint marker — deliberately outside #hbChartClip: the
+            {/* 5. Endpoint marker - deliberately outside #hbChartClip: the
                    clip's right edge is x=782, exactly the marker centre,
                    which would slice every halo in half. Max reach x=791 is
                    still inside the 794 viewBox. */}
@@ -212,7 +212,7 @@ export function VisibilityChartPanel() {
               />
             </g>
 
-            {/* 6. Value callout — the endpoint's own score, not new copy.
+            {/* 6. Value callout - the endpoint's own score, not new copy.
                    Hidden below 1024px via .hb-callout's media query. */}
             <g className="hb-pop hb-callout">
               <rect x={752} y={18} width={30} height={18} rx={5} fill="url(#hbCalloutGrad)" />

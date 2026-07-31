@@ -7,7 +7,7 @@ import {
   type TrackedEntity,
 } from "../../server/lib/brandMatcher";
 
-// Default test brand uses a clearly-unambiguous name ("Acme Widgets" — not
+// Default test brand uses a clearly-unambiguous name ("Acme Widgets" - not
 // in English dictionary, not in AMBIGUOUS_WORDS). Tests for the ambiguous
 // gate use real ambiguous names like "Notion" or "PR" with a dedicated
 // describe block that exercises the signal-word requirement.
@@ -20,7 +20,7 @@ const makeBrand = (overrides: Partial<TrackedEntity> = {}): TrackedEntity => ({
   ...overrides,
 });
 
-describe("matchEntity — name variants", () => {
+describe("matchEntity - name variants", () => {
   it("matches the brand name whole-word", () => {
     const r = matchEntity("Acme Widgets is great for builders.", makeBrand());
     expect(r.matched).toBe(true);
@@ -74,7 +74,7 @@ describe("matchEntity — name variants", () => {
   });
 
   it("does not match multi-word variant when words are separated by commas", () => {
-    // "Acme Industries" shouldn't match "Acme, an industries" — words are interrupted.
+    // "Acme Industries" shouldn't match "Acme, an industries" - words are interrupted.
     const r = matchEntity(
       "Acme, an industries outfit",
       makeBrand({ nameVariations: ["Acme Industries"] }),
@@ -100,7 +100,7 @@ describe("matchEntity — name variants", () => {
   });
 });
 
-describe("matchEntity — ambiguous short / common-word variants", () => {
+describe("matchEntity - ambiguous short / common-word variants", () => {
   it("short variant (≤3 chars) requires a signal word nearby", () => {
     const brand = makeBrand({ name: "PR", nameVariations: ["PR"] });
     const r = matchEntity("PR is a company founded in 2017.", brand);
@@ -128,12 +128,12 @@ describe("matchEntity — ambiguous short / common-word variants", () => {
 
   it("'venture' requires a signal word even inside natural prose", () => {
     const brand = makeBrand({ name: "Venture", nameVariations: ["Venture"] });
-    const r = matchEntity("the adventure was fun — a new venture begins", brand);
+    const r = matchEntity("the adventure was fun - a new venture begins", brand);
     expect(r.matched).toBe(false);
   });
 });
 
-describe("matchEntity — domain variants", () => {
+describe("matchEntity - domain variants", () => {
   it("matches the bare domain inside a URL with subdomain prefix", () => {
     const brand = makeBrand({ website: "https://acme.com" });
     const r = matchEntity("Check https://docs.acme.com/abc for details", brand);
@@ -168,7 +168,7 @@ describe("matchEntity — domain variants", () => {
   });
 });
 
-describe("matchEntity — edge cases", () => {
+describe("matchEntity - edge cases", () => {
   it("empty variant list returns not-matched", () => {
     const brand: TrackedEntity = {
       id: "x",

@@ -77,7 +77,7 @@ export default function VerifyEmail() {
   const canResend = isValidEmail && cooldown === 0 && !resendMutation.isPending;
 
   return (
-    // Title/robots moved to src/routes/_app/verify-email.tsx's `head()` —
+    // Title/robots moved to src/routes/_app/verify-email.tsx's `head()` -
     // metadata belongs to the route, not this component.
     <PanelPage className="flex items-center justify-center p-4">
       <PanelRow cols={1} last className="w-full max-w-md">

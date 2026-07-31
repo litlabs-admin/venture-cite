@@ -2,7 +2,7 @@
 --
 -- Without this, a user clicking "Run Check" from two tabs within the
 -- 8-second poll window of useActiveCitationRuns can start two parallel
--- runs that interleave writes to geo_rankings — duplicating cost and
+-- runs that interleave writes to geo_rankings - duplicating cost and
 -- producing inconsistent aggregates. The button-disable on `hasActive`
 -- is best-effort UX; this index is the real guard.
 

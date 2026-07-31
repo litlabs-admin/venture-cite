@@ -3,8 +3,8 @@
 // Extracted from server/routes.ts as part of the per-domain split.
 // Publication-intelligence routes were removed (Tier 2B orphan cleanup).
 // Includes:
-//   POST /api/competitors/discover/:brandId   — manual competitor discovery
-//   GET  /robots.txt                          — AI crawler allow-list
+//   POST /api/competitors/discover/:brandId   - manual competitor discovery
+//   GET  /robots.txt                          - AI crawler allow-list
 //   GET  /sitemap.xml
 //   GET  /api/competitors/leaderboard
 //   GET  /api/competitors
@@ -20,7 +20,7 @@ import { requireUser, requireBrand, requireCompetitor, getUserBrandIds } from ".
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
 
 export function setupPublicationsRoutes(app: Express): void {
-  // Manual triggers for weekly automations — useful for dev/testing and for
+  // Manual triggers for weekly automations - useful for dev/testing and for
   // a "Run now" button on the UI. All require ownership.
   app.post(
     "/api/competitors/discover/:brandId",
@@ -42,7 +42,7 @@ export function setupPublicationsRoutes(app: Express): void {
     }),
   );
 
-  // `POST /api/brand-facts/scrape/:brandId` removed in Spec 2 §4.10 — replaced
+  // `POST /api/brand-facts/scrape/:brandId` removed in Spec 2 §4.10 - replaced
   // by the slice-resumable `POST /api/brand-fact-sheet/runs` (server/routes/factSheet.ts).
   // Plan 2.4 rewires the frontend Re-scrape button to the new endpoint.
 
@@ -55,17 +55,17 @@ export function setupPublicationsRoutes(app: Express): void {
   // Express app is only bridged at /api/*, /webhooks/* and /health, so the
   // static files always won. The handlers only ever ran under `npm run dev`,
   // which meant dev and production served DIFFERENT robots.txt and
-  // sitemap.xml — the dev copies also still listed routes that no longer
+  // sitemap.xml - the dev copies also still listed routes that no longer
   // exist (/geo-rankings, /revenue-analytics, /publications, /agent,
   // /outreach, /ai-traffic, /analytics-integrations).
   //
   // client/public/{robots.txt,sitemap.xml} are now the single source of
-  // truth, with canonical production URLs — host-derived URLs made preview
+  // truth, with canonical production URLs - host-derived URLs made preview
   // deployments advertise their own hostnames to crawlers.
 
   // ========== COMPETITOR TRACKING API ROUTES ==========
 
-  // Competitor leaderboard — requires a brandId owned by the caller.
+  // Competitor leaderboard - requires a brandId owned by the caller.
   // Optional ?windowDays=30 controls the time window (default 30).
   app.get(
     "/api/competitors/leaderboard",
@@ -119,7 +119,7 @@ export function setupPublicationsRoutes(app: Express): void {
     }),
   );
 
-  // List competitors — body/query brandId is checked by enforceBrandOwnership.
+  // List competitors - body/query brandId is checked by enforceBrandOwnership.
   // When no brandId, restrict to brands the user owns.
   app.get(
     "/api/competitors",
@@ -142,7 +142,7 @@ export function setupPublicationsRoutes(app: Express): void {
     }),
   );
 
-  // Create a competitor — brandId must belong to caller.
+  // Create a competitor - brandId must belong to caller.
   app.post(
     "/api/competitors",
     asyncHandler(async (req, res) => {
@@ -172,7 +172,7 @@ export function setupPublicationsRoutes(app: Express): void {
           domain,
           discoveredBy: "manual",
           // A competitor the user adds by hand is, by definition, part of
-          // their curated core set — not the broader discovered pool. Relevance
+          // their curated core set - not the broader discovered pool. Relevance
           // is a discovery-only signal, so a client-supplied score is dropped.
           tier: "core",
           relevanceScore: null,
@@ -184,7 +184,7 @@ export function setupPublicationsRoutes(app: Express): void {
     }),
   );
 
-  // Partial update — used by the edit dialog on the competitors page.
+  // Partial update - used by the edit dialog on the competitors page.
   // Whitelist of editable fields lives here; any other body keys are ignored.
   app.patch(
     "/api/competitors/:id",
@@ -256,7 +256,7 @@ export function setupPublicationsRoutes(app: Express): void {
     }),
   );
 
-  // Get competitor by id — ownership via brand.
+  // Get competitor by id - ownership via brand.
   app.get(
     "/api/competitors/:id",
     asyncHandler(async (req, res) => {
@@ -270,7 +270,7 @@ export function setupPublicationsRoutes(app: Express): void {
     }),
   );
 
-  // Delete competitor — soft-delete. The row stays in the DB so historical
+  // Delete competitor - soft-delete. The row stays in the DB so historical
   // leaderboard snapshots remain meaningful; the cron can still re-discover
   // the competitor unless the user also calls /ignore.
   app.delete(
@@ -309,7 +309,7 @@ export function setupPublicationsRoutes(app: Express): void {
     }),
   );
 
-  // Get latest citations for a competitor — ownership required.
+  // Get latest citations for a competitor - ownership required.
   app.get(
     "/api/competitors/:id/latest-citations",
     asyncHandler(async (req, res) => {

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-/* Variable-weight Inter + JetBrains Mono load once, in src/routes/__root.tsx —
+/* Variable-weight Inter + JetBrains Mono load once, in src/routes/__root.tsx -
    this file used to load a second, static-weight copy from a different URL
    on every page. Don't re-add an @import here. */
 
@@ -65,10 +65,10 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Neutral ramp — WARM STONE, and deliberately so. Measured off the live
+  /* Neutral ramp - WARM STONE, and deliberately so. Measured off the live
      reference PRODUCT (computed styles on its /dashboard): ink rgb(28,25,23),
      secondary rgb(87,83,78), tertiary rgb(120,113,108), label rgb(168,162,158),
-     hairline rgb(231,229,228) — i.e. Tailwind stone 900/600/500/400/200.
+     hairline rgb(231,229,228) - i.e. Tailwind stone 900/600/500/400/200.
 
      Do not "correct" these to the cool #16171b/#5a5c63/#8b8d96 TDS values:
      those come from the reference's MARKETING stylesheet, which is a
@@ -77,7 +77,7 @@
      whole app resolves ONE ramp. */
   /* THEME-DERIVED, NOT LITERAL.
      These were hard-coded hex, which meant 972 `vc-*` utility uses across 62
-     files rendered light-mode colours under `.dark` — a dark page inside a
+     files rendered light-mode colours under `.dark` - a dark page inside a
      white chrome frame (app root, sidebar, context bar). The values below are
      the SAME ones in light: every pair was verified identical before the
      swap (primary #1c1917 = --fg-primary, default #e7e5e4 = --border-default,
@@ -91,7 +91,7 @@
   --color-vc-primary: var(--fg-primary);
   --color-vc-secondary: var(--fg-secondary);
   --color-vc-tertiary: var(--fg-tertiary);
-  /* One step lighter than `tertiary` — panel eyebrows and de-emphasized meta
+  /* One step lighter than `tertiary` - panel eyebrows and de-emphasized meta
      text. Without it those labels render a full step too dark. Light
      #a8a29e is exactly --fg-disabled, and dark's own disabled step
      (oklch 0.42) is the equivalent dimming against a dark canvas. */
@@ -105,7 +105,7 @@
   --color-vc-faint: var(--border-strong);
   --color-vc-accent: var(--brand-accent);
   --color-vc-accent-subtle: var(--brand-accent-subtle);
-  /* Light's vc-accent-hover was #2e49d4 — the FILL, not --brand-accent-hover
+  /* Light's vc-accent-hover was #2e49d4 - the FILL, not --brand-accent-hover
      (#2743c9). Mapped to the value it actually had. */
   --color-vc-accent-hover: var(--brand-accent-fill);
   /* NOT --positive: that is #0e7490 (cyan-700) and this was #0891b2
@@ -125,7 +125,7 @@
   --color-vc-danger-ink: #c81f37;
   /* Marketing's dark button tier. `.vc-home` declares --ink/--ink-fill and a
      `--color-ink-fill` alias, but a --color-* declared inside a SCOPED
-     selector does not make Tailwind emit the utility — theme keys have to be
+     selector does not make Tailwind emit the utility - theme keys have to be
      here, in @theme. Registering them lets the nav CTA use `bg-ink-fill` /
      `hover:bg-ink` instead of arbitrary `bg-[var(--ink-fill)]`, and .vc-home
      still rebinds the values. */
@@ -136,7 +136,7 @@
   --shadow-vc-card: 0 1px 3px 0 #0000000a;
   --shadow-vc-overlay: 0 4px 16px -4px #00000014;
 
-  /* Elevation scale — moved here from :root/@layer utilities, where Tailwind
+  /* Elevation scale - moved here from :root/@layer utilities, where Tailwind
      v4's resolver never saw it (shadow-sm/md/lg were silently falling back to
      Tailwind's stock black shadows). Values unchanged, just relocated. */
   --shadow-2xs: 0px 1px 2px 0px oklch(0.2019 0.0163 273.9 / 0.03);
@@ -158,22 +158,22 @@
 
   /* Named type scale, ported from Trakkr's own compiled @theme block
      (verified via document.styleSheets against the live site) rather than
-     invented — each name is a UI role, not a t-shirt size. Tailwind
+     invented - each name is a UI role, not a t-shirt size. Tailwind
      auto-generates a text-* utility per key. */
-  /* ROLE MAP — measured off the live reference product across 7 pages
+  /* ROLE MAP - measured off the live reference product across 7 pages
      (~1,200 text nodes). 91% of its text is 10–13px; it has nothing at
      15/16/18px and never goes bolder than 600.
 
-       label   10  600, uppercase, .5px tracking — eyebrows
-       data    11  400 — dense meta, ranks, deltas, table numerics
-       caption 12  400/500 — DEFAULT body + every control (buttons, inputs,
+       label   10  600, uppercase, .5px tracking - eyebrows
+       data    11  400 - dense meta, ranks, deltas, table numerics
+       caption 12  400/500 - DEFAULT body + every control (buttons, inputs,
                              menu items, tabs, table cells)
-       body    13  400, 600 for inline figures — prose / primary content
-       ui      14  500/600 — section headings ONLY, not body
-       page    20  600 — the one page title
-       metric/stat 24/28 600 — hero figures
+       body    13  400, 600 for inline figures - prose / primary content
+       ui      14  500/600 - section headings ONLY, not body
+       page    20  600 - the one page title
+       metric/stat 24/28 600 - hero figures
 
-     Line-height is a flat 1.5 at every size on the reference — measured,
+     Line-height is a flat 1.5 at every size on the reference - measured,
      not chosen. Declared explicitly because Tailwind gives a bare @theme
      font-size key NO line-height, so these would otherwise fall back to
      `normal` (~1.2) and read cramped next to the stock text-sm/xs they
@@ -343,7 +343,7 @@
 }
 
 @utility reveal {
-  /* Quiet reveal — DESIGN.md easing/duration, 6px settle (was 24px/0.8s
+  /* Quiet reveal - DESIGN.md easing/duration, 6px settle (was 24px/0.8s
      editorial). prefers-reduced-motion → opacity only, no movement. */
   opacity: 0;
   transform: translateY(6px);
@@ -393,7 +393,7 @@
 }
 
 @utility tnum {
-  /* Tabular numerics — apply to any figure that updates so it doesn't
+  /* Tabular numerics - apply to any figure that updates so it doesn't
      shimmy (mandatory on live numbers). Matches TDS's .tds-mono, which
      deliberately inherits the body face and only switches on tabular
      figures: Inter's tnum set aligns without the width/colour shift of
@@ -428,7 +428,7 @@
 }
 
 @utility shimmer-sweep {
-  /* Skeleton loading sweep — a highlight passed over a solid base fill via an
+  /* Skeleton loading sweep - a highlight passed over a solid base fill via an
      ::after pseudo-element, matching Trakkr's .skeleton-shimmer recipe
      exactly (verified from their compiled CSS): 1.5s ease-in-out infinite.
      Distinct from shimmer-bg above, which is the landing-only gradient. */
@@ -460,7 +460,7 @@
 
 @utility checkmark-draw {
   /* Draw-in checkmark for a status-check/progress step flipping from
-     pending to done — matches Trakkr's exact spec (verified from their
+     pending to done - matches Trakkr's exact spec (verified from their
      compiled CSS): stroke-dasharray 24, dashoffset animates 24 -> 0 over
      0.3s ease-out. Apply to the <path>/<polyline> of a check glyph (e.g.
      lucide's CheckCircle path), not the wrapping icon container. */
@@ -492,27 +492,27 @@
    FOUC blocker in index.html + lib/theme.ts). It is the Trakkr "TDS" system,
    transcribed from trakkr.ai/_reference/assets/theme-CQDk0Xff.css: white
    canvas, recessed #f1f3f6 surfaces, cool-neutral ink ramp (hue ~273), and a
-   blue #3b5bf6 accent. It is border-first — depth comes from 1px rules, not
+   blue #3b5bf6 accent. It is border-first - depth comes from 1px rules, not
    shadows. Every light value below carries its TDS source hex in a comment;
    they should stay greppable against that file.
 
-   DARK has no Trakkr source to transcribe — TDS ships no dark variant at all
+   DARK has no Trakkr source to transcribe - TDS ships no dark variant at all
    (confirmed by a zero-match search of trakkr.ai's compiled CSS for any
    .dark-scoped rule), so dark's neutral/status palette (cool zinc, hue ~285)
    is this app's own design, not a transcription. Its accent WAS updated to
-   match light's green (previously indigo, hue 278) — see the .dark block
+   match light's green (previously indigo, hue 278) - see the .dark block
    below for the measured values; this line used to say "old indigo accent"
    after that change already happened and had gone stale.
 
    OKLCH throughout, except pure white (TDS's canvas really is #ffffff).
    positive/warning/negative are FUNCTIONAL-ONLY (status/destructive), never
-   brand or decoration — required for usability, used sparingly. NOTE: under
+   brand or decoration - required for usability, used sparingly. NOTE: under
    The brand accent is blue and --positive is cyan: deliberately separate, so
    own choice and it does collide with the rule above; flagged, not resolved.
    ─────────────────────────────────────────────────────────────────────── */
 
   :root {
-    /* Primitives — LIGHT (Trakkr TDS). White canvas AND white cards; the
+    /* Primitives - LIGHT (Trakkr TDS). White canvas AND white cards; the
      recessed step (--tds-inset) is what muted/sidebar use, so separation
      comes from borders rather than from stacking tones. */
     /* WARM STONE, measured off the live reference PRODUCT (computed styles
@@ -521,21 +521,21 @@
        4 rgb(168,162,158); hairline rgb(231,229,228) on white surfaces.
 
        These were previously the cool TDS values (#16171b / #5a5c63 / #e9eaee)
-       transcribed from the reference's MARKETING stylesheet — a different
+       transcribed from the reference's MARKETING stylesheet - a different
        surface with a different ramp. That left the app cool and the dashboard
        (vc-*) warm, two grays side by side. Both now resolve stone. */
-    --bg-base: oklch(1 0 0); /* #ffffff — page background */
-    --bg-surface-1: #f5f5f4; /* stone-100 — muted / sidebar inset */
-    --bg-surface-2: oklch(1 0 0); /* #ffffff — cards */
-    --bg-surface-3: oklch(1 0 0); /* #ffffff — popovers / elevated */
-    --border-subtle: #f5f5f4; /* stone-100 — divider */
-    --border-default: #e7e5e4; /* stone-200 — the product's hairline */
+    --bg-base: oklch(1 0 0); /* #ffffff - page background */
+    --bg-surface-1: #f5f5f4; /* stone-100 - muted / sidebar inset */
+    --bg-surface-2: oklch(1 0 0); /* #ffffff - cards */
+    --bg-surface-3: oklch(1 0 0); /* #ffffff - popovers / elevated */
+    --border-subtle: #f5f5f4; /* stone-100 - divider */
+    --border-default: #e7e5e4; /* stone-200 - the product's hairline */
     --border-strong: #d6d3d1; /* stone-300 */
-    --fg-primary: #1c1917; /* stone-900 — ink */
+    --fg-primary: #1c1917; /* stone-900 - ink */
     --fg-secondary: #57534e; /* stone-600 */
     --fg-tertiary: #78716c; /* stone-500 */
     --fg-disabled: #a8a29e; /* stone-400 */
-    /* Primary accent — brand blue #3b5bf6.
+    /* Primary accent - brand blue #3b5bf6.
      Same two-value split as before: the flat accent carries borders,
      text-on-white, focus rings and the chart lead; anything with a white
      LABEL fills with --brand-accent-fill (#2e49d4, 5.9:1 on white) so the
@@ -551,7 +551,7 @@
     --brand-accent-fg: oklch(1 0 0); /* white label on the accent fill */
     --brand-accent-subtle: #eef2fe;
     /* Raw R/G/B channel triplet (space-separated, no rgb() wrapper) for
-     rgba(var(--brand-accent-rgb), α) — CSS rgba() needs raw channels, not an
+     rgba(var(--brand-accent-rgb), α) - CSS rgba() needs raw channels, not an
      oklch/hex var, and this is the only place in the app that needs
      continuous (non-token-stepped) opacity over the brand colour: the
      competitor gap matrix's cell fill, whose α scales with the cell's
@@ -560,13 +560,13 @@
     --brand-accent-rgb: 59 91 246;
     /* Functional status. TDS ships pos + neg only; --warning is derived from
      --tds-s3, its one warm hue. */
-    --positive: #0e7490; /* cyan-700 — positive, but never mistakable for the blue accent */
+    --positive: #0e7490; /* cyan-700 - positive, but never mistakable for the blue accent */
     /* One step brighter than --positive. Backs `vc-success`, which the
        dashboard uses for success TEXT rather than fills. */
     --success-accent: #0891b2; /* cyan-600 */
     /* NOT amber. The reference product ships no amber/orange in its UI at
-       all — its whole status vocabulary is neutral + accent + positive +
-       negative — and this app's brand accent is blue, so a warm amber tier
+       all - its whole status vocabulary is neutral + accent + positive +
+       negative - and this app's brand accent is blue, so a warm amber tier
        was the single loudest off-palette colour on screen (65 badge
        instances on /diagnose alone).
 
@@ -580,7 +580,7 @@
     --negative: oklch(0.5954 0.1829 27.3); /* --tds-neg #d6453d */
     /* Weak status tints, for badge/callout backgrounds. This project is on
      Tailwind v4, where an opacity modifier on a bare var() colour (e.g.
-     `bg-destructive/10`) works fine via color-mix() — the "v3 can't do this"
+     `bg-destructive/10`) works fine via color-mix() - the "v3 can't do this"
      rationale that used to justify these as separate tokens was stale (the
      codebase already relies on the same opacity-modifier behaviour
      elsewhere: error-state.tsx, button.tsx, table.tsx). Kept as explicit
@@ -590,7 +590,7 @@
     --negative-subtle: oklch(0.9563 0.0186 21.6); /* --tds-neg-weak #fdeceb */
     --warning-subtle: var(--brand-accent-subtle);
     /* Stable cool near-white for text on saturated status fills
-     (destructive/positive/negative). Theme-agnostic — NOT redefined. */
+     (destructive/positive/negative). Theme-agnostic - NOT redefined. */
     --color-on-strong: oklch(0.99 0.003 285);
 
     /* Motion (DESIGN.md) */
@@ -616,7 +616,7 @@
     --card-foreground: var(--fg-primary);
     --popover: var(--bg-surface-3);
     --popover-foreground: var(--fg-primary);
-    /* The FILL, not the flat brand green — it carries white label text at
+    /* The FILL, not the flat brand green - it carries white label text at
      5.29:1 where --brand-accent manages only 3.86:1. See the accent block. */
     --primary: var(--brand-accent-fill);
     --primary-foreground: var(--brand-accent-fg);
@@ -626,7 +626,7 @@
     --muted-foreground: var(--fg-tertiary);
     /* shadcn `accent` is the NEUTRAL hover/selected surface, not the brand
      colour. Brand colour is `--primary` (← --brand-accent-fill above, not the
-     flat --brand-accent — see the accent block's contrast note). With white
+     flat --brand-accent - see the accent block's contrast note). With white
      cards, the hover/selected surface is the slate muted step so it stays
      visible on white (surface-2 would be invisible card-on-card). */
     --accent: var(--bg-surface-1);
@@ -636,11 +636,11 @@
     --border: var(--border-default);
     /* Controls carry the SAME hairline as panels. Was --border-strong
        (#d6d3d1), which drew every input/select a step darker than every
-       other edge on the page — 67 of them on /diagnose alone. Measured on
+       other edge on the page - 67 of them on /diagnose alone. Measured on
        the reference: its inputs and buttons are #e7e5e4, identical to its
        panel borders. One hairline, everywhere. */
     --input: var(--border-default);
-    /* Focus ring uses the TINT, not the flat accent — matches Trakkr's own
+    /* Focus ring uses the TINT, not the flat accent - matches Trakkr's own
        .input:focus (box-shadow ring in --color-accent-subtle) and .btn's
        focus-visible ring, both confirmed from their compiled CSS. A
        full-strength ring is one saturated shape too many next to a tinted
@@ -676,9 +676,9 @@
   }
 
   .dark {
-    /* Redefine ONLY the theme-varying primitives — the shadcn mappings in
+    /* Redefine ONLY the theme-varying primitives - the shadcn mappings in
      :root reference these and follow automatically. */
-    /* Dark is a peer theme, NOT the default — light is (see the :root header
+    /* Dark is a peer theme, NOT the default - light is (see the :root header
      above and lib/theme.ts's FALLBACK_THEME). The stored preference defaults
      to "system", so this block renders whenever the OS is dark.
 
@@ -686,7 +686,7 @@
      four hundred lines up. That was not harmless: it sent a colour audit to
      the wrong conclusion about which palette users actually see.
 
-     Sophisticated zinc near-black (NOT pure black — that reads as an
+     Sophisticated zinc near-black (NOT pure black - that reads as an
      undesigned void), crisp near-white text at very high contrast. */
     --bg-base: oklch(0.165 0.003 285);
     --bg-surface-1: oklch(0.195 0.004 285);
@@ -699,13 +699,13 @@
     --fg-secondary: oklch(0.72 0.005 285);
     --fg-tertiary: oklch(0.55 0.006 285);
     --fg-disabled: oklch(0.42 0.005 285);
-    /* ACCENT — same hue as light, one step lighter, chroma held as high as
+    /* ACCENT - same hue as light, one step lighter, chroma held as high as
      sRGB allows. Measured in OKLCH, not eyeballed:
 
        light #3b5bf6   L 0.548  C 0.233  H 268.3
        dark  #5c81fe   L 0.640  C 0.190  H 268.3
 
-     The previous dark accent was #7f9bff (L 0.712, C 0.149) — the same hue
+     The previous dark accent was #7f9bff (L 0.712, C 0.149) - the same hue
      but with 36% of the chroma discarded, which read as a different, washed
      out blue. It was also over-delivering contrast at 7.38:1 against the
      canvas when the AA floor is 4.5, so the desaturation bought nothing.
@@ -725,7 +725,7 @@
      uses white. That is deliberate, not a leftover.
 
      (The note this replaces described a green palette at hue 170 that exists
-     in neither theme — it documented a ramp that had already been removed.)
+     in neither theme - it documented a ramp that had already been removed.)
 
      Must be redeclared: --primary points at --brand-accent-fill, so without
      these lines dark would inherit :root's light-tuned blue. */
@@ -735,7 +735,7 @@
     --brand-accent-press: #4a6cef;
     --brand-accent-fg: oklch(0.165 0.003 285);
     --brand-accent-subtle: oklch(0.64 0.19 268.3 / 0.16);
-    /* Raw triplet for the fill above (#5c81fe) — see :root's
+    /* Raw triplet for the fill above (#5c81fe) - see :root's
      --brand-accent-rgb note. The gap-matrix heatmap reads this directly. */
     --brand-accent-rgb: 92 129 254;
     --positive: #22d3ee;
@@ -746,7 +746,7 @@
     --negative: oklch(0.66 0.18 25);
     /* Dark's weak tints are alpha over the dark canvas rather than pale
      pastels, which would glare. Kept as explicit tokens for parity with
-     light's set (see light block's note — the v3 opacity-modifier
+     light's set (see light block's note - the v3 opacity-modifier
      limitation this used to cite doesn't apply on v4). */
     --positive-subtle: oklch(0.79 0.13 210 / 0.16);
     --warning-subtle: var(--brand-accent-subtle);
@@ -771,7 +771,7 @@
 /* Print: the /report one-pager must be legible on white regardless of the
    on-screen theme. Re-declare the light primitive token values under .dark
    for print only; the shadcn semantic vars reference these and follow.
-   Keep this block in sync with :root above — if it drifts, printed reports
+   Keep this block in sync with :root above - if it drifts, printed reports
    silently come out in a different palette than the screen. */
 @media print {
   .dark {

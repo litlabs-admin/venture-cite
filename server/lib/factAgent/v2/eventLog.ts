@@ -1,6 +1,6 @@
 // Telemetry writer for the fact-sheet pipeline.
 //
-// Every callable here is FIRE-AND-FORGET — emitEvent never throws and
+// Every callable here is FIRE-AND-FORGET - emitEvent never throws and
 // never blocks the caller meaningfully. Events accumulate in an in-
 // process buffer and flush every FLUSH_INTERVAL_MS, when the buffer
 // hits FLUSH_BATCH_SIZE, or on explicit flushNow() (called at scrape
@@ -27,7 +27,7 @@
 //   - LLM prompts/responses (size + cost). The inspector can re-fetch
 //     these from a separate prompt-cache table later (phase 2 deliverable).
 
-// NOTE: `db` is imported lazily inside flush() — that keeps unit tests
+// NOTE: `db` is imported lazily inside flush() - that keeps unit tests
 // for sourceStatic / runFullScrape / reverifyFact from needing a live
 // DATABASE_URL just to call emitEvent() (which is fire-and-forget and
 // the buffer can drain into a no-op without breaking tests).
@@ -106,7 +106,7 @@ class EventBuffer {
         this.droppedDueToBackpressure = 0;
       }
     } catch (err) {
-      // Don't put events back in the buffer — that would amplify the
+      // Don't put events back in the buffer - that would amplify the
       // problem during DB outages. Log and move on. Operators can spot
       // the gap by comparing event counts vs scrape counts.
       logger.warn({ err, batchSize: toWrite.length }, "eventLog: flush failed (events lost)");
@@ -133,7 +133,7 @@ class EventBuffer {
     if (this.buffer.length > 0) {
       logger.warn(
         { buffered: this.buffer.length },
-        "eventLog: drain exceeded iteration cap — some events not persisted",
+        "eventLog: drain exceeded iteration cap - some events not persisted",
       );
     }
   }

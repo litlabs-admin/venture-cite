@@ -12,7 +12,7 @@ import { TourOrchestrator } from "@/tours/engine/TourOrchestrator";
 // in as a side-effect import from client/src/main.tsx, which sat at the root
 // of a SEPARATE Vite module graph (the classic index.html-rooted SPA bundle).
 // Phase 2 Task 6a's entry-point flip makes THIS file (src/routes/__root.tsx)
-// the true root of every request's document — Start/Nitro's manifest-based
+// the true root of every request's document - Start/Nitro's manifest-based
 // per-route CSS injection (HeadContent's manifestCssTags) only picks up
 // stylesheets reachable from a matched route's own module graph, and nothing
 // under src/routes/ previously imported it. Without this import, Start's own
@@ -26,15 +26,15 @@ import "@/index.css";
 // > QueryClientProvider (reusing the existing queryClient singleton) >
 // TooltipProvider > Toaster > ScanCompletionListener > TourOrchestrator >
 // page content (Outlet, in place of App.tsx's <Router/>). HelmetProvider is
-// NOT ported — react-helmet-async is being removed project-wide; all
+// NOT ported - react-helmet-async is being removed project-wide; all
 // <title>/<meta> now comes from TanStack Router's `head()` route option
 // (this route's default below, overridden per-page by src/routes/index.tsx,
-// privacy.tsx, glossary.tsx, and a handful of _app/** routes — see the
+// privacy.tsx, glossary.tsx, and a handful of _app/** routes - see the
 // comment on `head()` below for why the plain-JSX/React-19-hoisting
 // approach was replaced).
 //
 // SSR-SAFETY NOTE for whoever runs the final gate: __root.tsx renders on the
-// server for EVERY route (SSR'd or not — only children below ssr:false
+// server for EVERY route (SSR'd or not - only children below ssr:false
 // layouts skip SSR, not the root itself), so ScanCompletionListener and
 // TourOrchestrator both run server-side on every request.
 // ScanCompletionListener.tsx is client/src/components/** (a sibling task's
@@ -42,10 +42,10 @@ import "@/index.css";
 // scope (client/src/tours/**) and was migrated here off
 // "@/lib/router-compat" onto "@tanstack/react-router"'s own useRouterState
 // (Phase 2 Task 7). Both are SSR-safe as of this session: neither imports
-// "wouter" directly anywhere in the tree — wouter's own useLocation has no
+// "wouter" directly anywhere in the tree - wouter's own useLocation has no
 // ssrPath configured in this codebase and crashes SSR with "location is not
 // defined" the same way glossary.tsx's wouter <Link> did before Task 4 fixed
-// it (see that task's report) — and useRouterState reads router state that
+// it (see that task's report) - and useRouterState reads router state that
 // is always populated during SSR, not browser globals. Their other hooks
 // (useAuth, useBrandSelection, useTourState, usePersistedState) were also
 // read end to end and found SSR-safe: no top-level window/document/
@@ -54,11 +54,11 @@ import "@/index.css";
 // becomes a hard SSR crash on all 40 routes, not just the affected page.
 export const Route = createRootRoute({
   // Site-wide metadata defaults. This is the ONLY mechanism that renders
-  // <title>/<meta>/<link> for this app — TanStack Router's `head()`,
+  // <title>/<meta>/<link> for this app - TanStack Router's `head()`,
   // rendered exactly once via <HeadContent /> below. There used to be a
   // SECOND mechanism: a raw-JSX block of the same tags rendered directly
   // in RootDocument's <head>, on the theory that "React dedupes by
-  // tag+key". That claim was false — React 19 hoists every <title>/<meta>
+  // tag+key". That claim was false - React 19 hoists every <title>/<meta>
   // it finds into <head> and does NOT deduplicate them, so every route
   // shipped two <title> tags and two <meta name="description"> tags (the
   // raw-JSX default plus whatever a page component or, now, a route's own
@@ -66,7 +66,7 @@ export const Route = createRootRoute({
   // `/privacy` showed 2x each. The block is gone; `head()` is it. Route
   // `head()` results merge across the matched route tree (root → leaf) by
   // `name`/`property`, with the deepest match's value winning per
-  // attribute — see node_modules/@tanstack/react-router's
+  // attribute - see node_modules/@tanstack/react-router's
   // headContentUtils.ts. So a page-specific `head()` (src/routes/index.tsx,
   // privacy.tsx, glossary.tsx, and the handful of `_app/**` routes that
   // need their own title) can override any of these defaults without a
@@ -75,7 +75,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1.0, maximum-scale=1" },
-      { title: "VentureCite — Get recommended by AI engines" },
+      { title: "VentureCite - Get recommended by AI engines" },
       {
         name: "description",
         content:
@@ -84,7 +84,7 @@ export const Route = createRootRoute({
       { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1" },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "VentureCite" },
-      { property: "og:title", content: "VentureCite — Get recommended by AI engines" },
+      { property: "og:title", content: "VentureCite - Get recommended by AI engines" },
       {
         property: "og:description",
         content:
@@ -93,7 +93,7 @@ export const Route = createRootRoute({
       { property: "og:url", content: "https://venturecite.com/" },
       { property: "og:image", content: "https://venturecite.com/favicon.png" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "VentureCite — Get recommended by AI engines" },
+      { name: "twitter:title", content: "VentureCite - Get recommended by AI engines" },
       {
         name: "twitter:description",
         content:
@@ -114,16 +114,16 @@ export const Route = createRootRoute({
       },
     ],
     // `head().scripts` renders into <HeadContent/> (via `match.headScripts`)
-    // — NOT the body-end `<Scripts/>` used for router hydration — so both
+    // - NOT the body-end `<Scripts/>` used for router hydration - so both
     // of these land in <head>, same position they occupied as raw JSX
     // before. Verified against node_modules/@tanstack/react-router's
     // route.d.ts (`head` return type: `scripts?: AnyRouteMatch['headScripts']`)
     // and Matches.d.ts (`headScripts?: Array<JSX.IntrinsicElements['script']>`)
-    // — AND against the actual runtime (Asset.tsx's `Script` component):
+    // - AND against the actual runtime (Asset.tsx's `Script` component):
     // it reads inline script content off `children` as a plain string, not
     // `dangerouslySetInnerHTML` (a first attempt using
-    // `dangerouslySetInnerHTML` silently rendered nothing — `typeof
-    // children === "string"` was false — caught by re-curling the built
+    // `dangerouslySetInnerHTML` silently rendered nothing - `typeof
+    // children === "string"` was false - caught by re-curling the built
     // server and finding neither script in the response body).
     scripts: [
       {
@@ -157,13 +157,13 @@ function RootComponent() {
 
 // FOUC blocker: apply the right theme class to <html> BEFORE any CSS loads
 // or React mounts. Copied verbatim from the inline <script> that used to
-// live in client/index.html's <head> (see git history) — that document is
+// live in client/index.html's <head> (see git history) - that document is
 // no longer served once Start owns routing (its own SSR document, rendered
 // from this file, replaces client/index.html entirely; confirmed by reading
 // @tanstack/react-start-server's renderRouterToStream/StartServer pipeline,
 // which has no step that reads or merges client/index.html). Mirrors the
 // logic in client/src/lib/theme.ts; kept as a plain string here for the same
-// reason it was a plain <script> before — it must run synchronously, before
+// reason it was a plain <script> before - it must run synchronously, before
 // hydration, so it cannot be a React-managed side effect.
 const THEME_FOUC_SCRIPT = `
 (function () {
@@ -172,7 +172,7 @@ const THEME_FOUC_SCRIPT = `
     try {
       stored = window.localStorage.getItem("vc-theme-v1");
     } catch (e) {
-      /* private mode — fall through to system */
+      /* private mode - fall through to system */
     }
     var resolved;
     if (stored === "light" || stored === "dark") {
@@ -200,7 +200,7 @@ const THEME_FOUC_SCRIPT = `
 `;
 
 // Structured data AI answer engines ingest to describe the product. Copied
-// verbatim from client/index.html — see THEME_FOUC_SCRIPT's comment above
+// verbatim from client/index.html - see THEME_FOUC_SCRIPT's comment above
 // for why it moved here instead of staying in that file.
 const SOFTWARE_APPLICATION_JSON_LD = {
   "@context": "https://schema.org",
@@ -216,13 +216,13 @@ const SOFTWARE_APPLICATION_JSON_LD = {
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
     // suppressHydrationWarning because THEME_FOUC_SCRIPT below deliberately
-    // mutates this exact element before React hydrates — it adds `class="dark"`
+    // mutates this exact element before React hydrates - it adds `class="dark"`
     // and sets `style.color-scheme`. The server cannot render those: the theme
     // lives in localStorage, which SSR cannot read. React saw attributes it had
     // not emitted and logged a hydration mismatch on every single page load.
     //
-    // Suppression is scoped to this element's own attributes only — it does not
-    // extend to descendants — so a genuine mismatch anywhere inside the app is
+    // Suppression is scoped to this element's own attributes only - it does not
+    // extend to descendants - so a genuine mismatch anywhere inside the app is
     // still reported. Removing the script instead is not an option: it exists to
     // stop a flash of the wrong theme, and it has to run before first paint.
     <html lang="en" suppressHydrationWarning>
@@ -230,7 +230,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
         {/* Every <title>/<meta>/<link>/<script> tag for the document comes
             from route `head()` config (this route's default above, plus any
             page route's override) via <HeadContent/>. Nothing else renders
-            into <head> — see the comment on `head()` above for why a second,
+            into <head> - see the comment on `head()` above for why a second,
             raw-JSX mechanism used to sit here and why it was deleted. */}
         <HeadContent />
       </head>

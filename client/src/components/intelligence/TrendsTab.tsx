@@ -66,12 +66,12 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
   // Only `hallucinations` is charted: it is a real unresolved-issue count.
   // The former share_of_answer / citation_quality series were derived from
   // the dead prompt_portfolio / citation_quality tables (server-synthesized
-  // numbers) and were removed — the system cannot defend them.
+  // numbers) and were removed - the system cannot defend them.
   const getTrendChartData = () => {
     // Bucket snapshots by timestamp rounded to the minute so multiple
     // citation runs on the same day each get their own point on the chart.
     // Previous code keyed by toLocaleDateString() which collapsed every
-    // run on a given day into a single bucket — .find() took the first
+    // run on a given day into a single bucket - .find() took the first
     // row, leaving runs 2+N invisible and making the chart look stuck.
     const halData = metricsHistory.filter((m) => m.metricType === "hallucinations");
 
@@ -126,7 +126,7 @@ export default function TrendsTab({ selectedBrandId }: { selectedBrandId: string
   return (
     <PanelPage>
       {/* Toolbar: title/description + time-range select + record action.
-          Not a panel — it's the tab's controls row, same non-panel
+          Not a panel - it's the tab's controls row, same non-panel
           treatment as the citations tab bar. */}
       <div className="flex items-center justify-between px-8 py-6">
         <div>

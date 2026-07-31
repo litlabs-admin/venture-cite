@@ -9,7 +9,7 @@
 //     a few reputable news domains).
 //
 // Apex matches keep their LLM-assigned confidence. Social matches are
-// CAPPED at 0.5 — they're real but not first-hand. Off-allowlist facts
+// CAPPED at 0.5 - they're real but not first-hand. Off-allowlist facts
 // are dropped entirely.
 import type { Fact } from "@shared/factAgent/schema";
 
@@ -49,9 +49,9 @@ function registeredDomain(host: string): string {
  * Checks whether a source URL is allowed for the given brand URL.
  *
  * Returns:
- *   "apex"   — URL is on the brand's apex domain (any subdomain)
- *   "social" — URL is on the social/press allowlist
- *   false    — URL is off-allowlist or malformed
+ *   "apex"   - URL is on the brand's apex domain (any subdomain)
+ *   "social" - URL is on the social/press allowlist
+ *   false    - URL is off-allowlist or malformed
  */
 export function isAllowedSourceUrl(
   url: string | undefined,

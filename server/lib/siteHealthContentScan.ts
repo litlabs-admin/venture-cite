@@ -5,7 +5,7 @@
 //
 // Never throws: a failed page is skipped, not fatal. Bounded concurrency
 // mirrors the worker-pool pattern already used by runFullScrape.ts
-// (PER_PAGE_CONCURRENCY workers pulling from a shared queue) — there is
+// (PER_PAGE_CONCURRENCY workers pulling from a shared queue) - there is
 // no p-limit dependency in this repo, and this module does not add one.
 
 import { safeFetchTextWithLockedIp } from "./ssrf";
@@ -63,7 +63,7 @@ interface FindingDef {
 }
 
 // All 0-pt / advisory: these are per-page CONTENT observations that carry
-// no weight in scoreSiteHealth() — they must never be summed into a fake
+// no weight in scoreSiteHealth() - they must never be summed into a fake
 // score. See shared/siteHealthFindings.ts's own advisory findings
 // (mcp.json/security.txt) for the same treatment.
 const FINDING_DEFS: FindingDef[] = [
@@ -102,7 +102,7 @@ const FINDING_DEFS: FindingDef[] = [
     category: "CONTENT QUALITY",
     title: "Improve Readability",
     description:
-      "Some pages score below 50 on the Flesch Reading Ease scale — dense, hard-to-parse prose that's less likely to be lifted cleanly into an AI answer.",
+      "Some pages score below 50 on the Flesch Reading Ease scale - dense, hard-to-parse prose that's less likely to be lifted cleanly into an AI answer.",
     test: (f) => f.hardToRead,
   },
   {
@@ -110,7 +110,7 @@ const FINDING_DEFS: FindingDef[] = [
     category: "CONTENT STRUCTURE",
     title: "Add Structured Answer Formats",
     description:
-      "No FAQPage, HowTo, or QAPage JSON-LD found — these schema types are what AI systems most directly lift into direct-answer results.",
+      "No FAQPage, HowTo, or QAPage JSON-LD found - these schema types are what AI systems most directly lift into direct-answer results.",
     test: (f) => f.jsonLdAnswerFormatMissing,
   },
   {
@@ -118,7 +118,7 @@ const FINDING_DEFS: FindingDef[] = [
     category: "CONTENT QUALITY",
     title: "Add FAQ Content",
     description:
-      "No visible question-and-answer pattern detected (definition lists, Q:/A: markers, or question-style headings) — a common source of AI-citable snippets.",
+      "No visible question-and-answer pattern detected (definition lists, Q:/A: markers, or question-style headings) - a common source of AI-citable snippets.",
     test: (f) => f.faqContentMissing,
   },
   {
@@ -126,7 +126,7 @@ const FINDING_DEFS: FindingDef[] = [
     category: "CONTENT QUALITY",
     title: "Improve Content Density",
     description:
-      "Little visible text was found in the raw HTML we fetched (under 300 characters, or a very low text-to-markup ratio). This describes the raw fetch only — it does not mean the content is JavaScript-rendered; see docs/optimize-perception-reference.md.",
+      "Little visible text was found in the raw HTML we fetched (under 300 characters, or a very low text-to-markup ratio). This describes the raw fetch only - it does not mean the content is JavaScript-rendered; see docs/optimize-perception-reference.md.",
     test: (f) => f.thinContent || f.lowTextRatio,
   },
 ];

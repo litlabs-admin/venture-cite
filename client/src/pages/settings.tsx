@@ -56,7 +56,7 @@ function getApiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-// Profile — first name, last name, timezone. Initial values come from the
+// Profile - first name, last name, timezone. Initial values come from the
 // /api/auth/me query already populated by useAuth(); timezone is not in
 // that response today, so we fall back to the browser-resolved IANA zone.
 function ProfileSection() {
@@ -176,7 +176,7 @@ function ProfileSection() {
   );
 }
 
-// Appearance — light / dark / system. Persists per-browser via
+// Appearance - light / dark / system. Persists per-browser via
 // localStorage; the FOUC-blocking script in client/index.html applies the
 // chosen theme before React mounts, so this section is purely a write
 // surface. The current resolved theme is shown as a quiet inline hint
@@ -199,7 +199,7 @@ function AppearanceSection() {
   );
 }
 
-// Password change — re-authenticates by requiring the current password.
+// Password change - re-authenticates by requiring the current password.
 function PasswordSection() {
   const { toast } = useToast();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -289,7 +289,7 @@ function PasswordSection() {
   );
 }
 
-// Billing — bounces the user to a Stripe customer portal session.
+// Billing - bounces the user to a Stripe customer portal session.
 function BillingSection() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -339,10 +339,10 @@ function BillingSection() {
   );
 }
 
-// Integrations — uses /api/buffer/status as the connection-status probe.
+// Integrations - uses /api/buffer/status as the connection-status probe.
 // That endpoint is a cheap DB lookup (no fan-out to Buffer's GraphQL API),
 // so it's safe to call on every Settings mount. Uses a raw fetch so a 5xx
-// doesn't push the query into an error state — we just render "Not
+// doesn't push the query into an error state - we just render "Not
 // connected" and let the user retry via the Connect dialog.
 function IntegrationsSection() {
   const { data: buffer } = useQuery<{ connected: boolean }>({
@@ -461,7 +461,7 @@ export default function Settings() {
         title: "Account deletion scheduled",
         description: data.message ?? "You'll be signed out now.",
       });
-      // Sign out — the auth middleware will refuse the user from here on.
+      // Sign out - the auth middleware will refuse the user from here on.
       setTimeout(() => logout(), 1500);
     },
     onError: (err: unknown) => {
@@ -620,7 +620,7 @@ export default function Settings() {
             </label>
             {/* Disabled until the state actually arrives: an unloaded
                 TourState is `{}`, which renders as "off" even for a user who
-                has suppressed tours — and a click in that window writes the
+                has suppressed tours - and a click in that window writes the
                 wrong value. Same root cause as the tour re-firing bug. */}
             <Switch
               id="suppress-tours"

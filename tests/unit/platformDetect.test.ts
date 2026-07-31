@@ -134,7 +134,7 @@ describe("SIGNATURES table integrity", () => {
   // Every row is reachable: build a minimal document from the entry's own
   // first marker and confirm detectFromSignals returns that entry's name,
   // OR a higher-priority entry's name (overlap with a higher band is
-  // intentional — e.g. a Shopify cdn.shopify.com fixture that happens to
+  // intentional - e.g. a Shopify cdn.shopify.com fixture that happens to
   // also look like something else higher-priority is not a bug here, but
   // in practice each fixture below is built to be unambiguous).
   for (const sig of SIGNATURES) {

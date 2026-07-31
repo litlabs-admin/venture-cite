@@ -5,7 +5,7 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 // Hosts an intelligence child component (which needs a `selectedBrandId`
 // prop) as a zero-prop tab body for the workflow-spine shells. The
 // AppShell context bar already owns the brand selector; rendering another
-// one here was a duplicate — removed.
+// one here was a duplicate - removed.
 export function brandScoped(Child: ComponentType<{ selectedBrandId: string }>): ComponentType {
   return function BrandScoped() {
     const { selectedBrandId } = useBrandSelection();

@@ -1,7 +1,7 @@
 // Integration test: hits a real Postgres via the existing pool.
 // Requires DATABASE_URL pointing at a dev/test DB with migration 0066 applied.
 // dotenv must load BEFORE the server/db import so DATABASE_URL is set when
-// the pool initializes. Global setup intentionally doesn't load dotenv —
+// the pool initializes. Global setup intentionally doesn't load dotenv -
 // see tests/setup.ts.
 //
 // ISOLATION CONTRACT. `llm_concurrency_slots` is a globally shared token
@@ -9,13 +9,13 @@
 // database. That includes a dev server running locally and any other test
 // file executing concurrently. So this file must
 //
-//   (a) never assert on a global count — it has to scope to rows it created,
+//   (a) never assert on a global count - it has to scope to rows it created,
 //       via the run_id it passes to acquireSlot, and
 //   (b) never delete rows it did not create.
 //
 // Both rules were previously broken. Assertions read
 // `count(*) WHERE provider='openai' AND expires_at > now()` and expected 0,
-// which fails the moment anything else holds an openai slot — the observed
+// which fails the moment anything else holds an openai slot - the observed
 // failure was exactly this. And cleanup deleted every row not matching
 // 'lifecycle-test-%', which could free the live app's in-flight slots and
 // let it exceed its own concurrency cap.
@@ -64,7 +64,7 @@ async function ownCount(id: string): Promise<number> {
 
 /**
  * Fill the provider's bucket to its limit and return the slot ids we added.
- * Starts from the CURRENT occupancy rather than assuming an empty bucket —
+ * Starts from the CURRENT occupancy rather than assuming an empty bucket -
  * another actor may legitimately hold slots.
  */
 async function fillBucket(provider: "openai", id: string): Promise<string[]> {

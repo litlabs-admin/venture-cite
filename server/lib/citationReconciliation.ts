@@ -38,7 +38,7 @@ export async function reconcileOrphanCitationRuns(): Promise<void> {
     }
   } catch (err) {
     logger.error({ err }, "citation.runs.orphan_reconciliation_failed");
-    // Don't crash the boot sequence over this — worst case is the partial
+    // Don't crash the boot sequence over this - worst case is the partial
     // unique index keeps blocking new runs until manual cleanup.
   }
 }

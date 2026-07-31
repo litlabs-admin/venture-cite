@@ -11,7 +11,7 @@ import { BuiltForStrip } from "./BuiltForStrip";
 //
 // STRUCTURAL NOTE (re-verified this session by programmatically balancing
 // every <div>/</div> tag in the 2026-2425 range): the "Built for" strip is
-// a SIBLING of the bordered panel, not nested inside it — the panel div
+// a SIBLING of the bordered panel, not nested inside it - the panel div
 // ("border border-default overflow-hidden bg-white", opened line 2033)
 // closes at line 2407, one line before the strip's own wrapper opens at
 // 2408. Both share only the same outer reveal wrapper (line 2029-2032:
@@ -21,10 +21,10 @@ import { BuiltForStrip } from "./BuiltForStrip";
 //
 // Per the simplify-choreography rule, each row's text column keeps its
 // real 2-stage stagger from source (giant numeral at delay 0ms, then
-// eyebrow+heading+body+link together at delay 100ms — only 2 stages, not
+// eyebrow+heading+body+link together at delay 100ms - only 2 stages, not
 // "dozens"), while each mockup's much deeper internal choreography (30-50+
 // individually-delayed elements per card) collapses into the ONE reveal
-// its own outer wrapper documents (700ms translateY(20px) delay 150ms) —
+// its own outer wrapper documents (700ms translateY(20px) delay 150ms) -
 // implemented inside each *Mockup component.
 const EASE = scrollRevealEase;
 
@@ -98,14 +98,14 @@ export function Platform() {
               }}
             >
               <div className="border border-vc-default overflow-hidden bg-white">
-                {/* Row 01 — Track (text left, mockup right) */}
+                {/* Row 01 - Track (text left, mockup right) */}
                 <div className="border-b border-vc-default">
                   <div className="group grid grid-cols-1 lg:grid-cols-[40%_60%]">
                     <div className="lg:border-r border-vc-default">
                       <FeatureText
                         number="01"
                         eyebrow="Track"
-                        heading="Know every prompt that recommends you — and every one that names a rival"
+                        heading="Know every prompt that recommends you - and every one that names a rival"
                         body="Track who gets recommended across ChatGPT, Claude, Perplexity, Gemini, and more, on the questions your buyers actually ask. Your position, prompt by prompt."
                         isVisible={isVisible}
                       />
@@ -116,7 +116,7 @@ export function Platform() {
                   </div>
                 </div>
 
-                {/* Row 02 — Understand (mockup left, text right; order flips via order-1/order-2) */}
+                {/* Row 02 - Understand (mockup left, text right; order flips via order-1/order-2) */}
                 <div className="border-b border-vc-default">
                   <div className="group grid grid-cols-1 lg:grid-cols-[60%_40%]">
                     <div className="order-2 lg:order-1 border-t lg:border-t-0 lg:border-r border-vc-default">
@@ -134,7 +134,7 @@ export function Platform() {
                   </div>
                 </div>
 
-                {/* Row 03 — Improve (text left, mockup right; last row, no border-b) */}
+                {/* Row 03 - Improve (text left, mockup right; last row, no border-b) */}
                 <div>
                   <div className="group grid grid-cols-1 lg:grid-cols-[40%_60%]">
                     <div className="lg:border-r border-vc-default">

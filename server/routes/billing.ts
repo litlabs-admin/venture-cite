@@ -5,10 +5,10 @@
 // needs raw body access for HMAC verification.
 //
 // Routes:
-//   GET  /api/stripe/publishable-key  — frontend bootstrap
-//   GET  /api/stripe/products         — sync'd products + prices for pricing page
-//   POST /api/stripe/checkout         — create checkout session (auth-gated)
-//   POST /api/billing/portal-session  — open Stripe customer portal (auth-gated)
+//   GET  /api/stripe/publishable-key  - frontend bootstrap
+//   GET  /api/stripe/products         - sync'd products + prices for pricing page
+//   POST /api/stripe/checkout         - create checkout session (auth-gated)
+//   POST /api/billing/portal-session  - open Stripe customer portal (auth-gated)
 
 import type { Express } from "express";
 import { storage } from "../storage";
@@ -64,7 +64,7 @@ export function setupBillingRoutes(app: Express): void {
         const publishableKey = await getStripePublishableKey();
         res.json({ success: true, publishableKey });
       } catch (error: any) {
-        // Catch-all around a dynamic import + env lookup — previously had
+        // Catch-all around a dynamic import + env lookup - previously had
         // no logging and echoed error.message straight to the client.
         // Status intentionally left as the pre-existing implicit 200 (not
         // touching status semantics here).
@@ -75,7 +75,7 @@ export function setupBillingRoutes(app: Express): void {
     }),
   );
 
-  // Stripe products and prices — fetched directly from Stripe API.
+  // Stripe products and prices - fetched directly from Stripe API.
   // The dashboard's pricing page consumes the `data` array; failures
   // degrade to an empty array so the page still renders.
   app.get(
@@ -143,7 +143,7 @@ export function setupBillingRoutes(app: Express): void {
           return res.status(400).json({ success: false, error: "priceId is required" });
         }
 
-        // Validate priceId shape — Stripe price IDs always start with "price_".
+        // Validate priceId shape - Stripe price IDs always start with "price_".
         if (!priceId.startsWith("price_")) {
           return res.status(400).json({ success: false, error: "Invalid price ID format" });
         }
@@ -151,14 +151,14 @@ export function setupBillingRoutes(app: Express): void {
         const { getUncachableStripeClient } = await import("../stripeClient");
         const stripe = await getUncachableStripeClient();
 
-        // Verify the price against Stripe itself — the same source of truth
+        // Verify the price against Stripe itself - the same source of truth
         // GET /api/stripe/products renders the pricing page from.
         //
         // This used to read `stripe.prices`, a table belonging to Supabase's
         // Stripe Sync Engine that is NOT installed on this database (verified:
         // the whole `stripe` schema is absent). The query therefore threw
         // "relation does not exist" on every attempt, was swallowed by the
-        // catch below, and returned a generic 500 — i.e. checkout could never
+        // catch below, and returned a generic 500 - i.e. checkout could never
         // succeed for anyone. Validating against a sync table also risked the
         // opposite bug: a price the pricing page happily displays being
         // rejected here because the sync had lagged.
@@ -218,7 +218,7 @@ export function setupBillingRoutes(app: Express): void {
         res.json({ success: true, url: session.url });
       } catch (error: any) {
         // Catch-all around the Stripe API calls. Never echo error.message to
-        // the client — Stripe errors can carry request IDs and parameter
+        // the client - Stripe errors can carry request IDs and parameter
         // detail we don't want to surface publicly.
         logger.error({ err: error }, "stripe.checkout failed");
         captureAndFlush(error, { tags: { source: "billing.ts:137" } });

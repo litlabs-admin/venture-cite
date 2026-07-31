@@ -4,7 +4,7 @@
 // If a selector here stops matching, fix it HERE, not in individual specs.
 
 export const SEL = Object.freeze({
-  // Auth pages — verified present in client/src/pages/login.tsx and register.tsx
+  // Auth pages - verified present in client/src/pages/login.tsx and register.tsx
   emailInput: '[data-testid="input-email"]',
   passwordInput: '[data-testid="input-password"]',
   loginButton: '[data-testid="button-login"]',
@@ -17,7 +17,7 @@ export const SEL = Object.freeze({
   loginLink: '[data-testid="link-login"]',
   backHomeLink: '[data-testid="link-back-home"]',
 
-  // App shell — role-based, resilient to markup changes
+  // App shell - role-based, resilient to markup changes
   sidebar: 'nav, [data-testid="sidebar"]',
   appMain: "main",
 
@@ -25,7 +25,7 @@ export const SEL = Object.freeze({
   // HomePage() renders the logged-out marketing landing page
   // (client/src/pages/landing/index.tsx) at "/" for anonymous visitors, and
   // that page also renders a bare <main> (and a bare <nav> in its Nav
-  // section) — so a generic "main" (or "nav") selector cannot distinguish
+  // section) - so a generic "main" (or "nav") selector cannot distinguish
   // auth state at "/". AppShell (client/src/components/AppShell.tsx:180)
   // renders `<main id="main-content">` and is only ever mounted for
   // authenticated routes (AuthenticatedRoute / AuthenticatedBareRoute's
@@ -36,23 +36,23 @@ export const SEL = Object.freeze({
 
   // Identifies the /welcome page (client/src/pages/welcome.tsx). That page
   // renders via AuthenticatedBareRoute without AppShell, so it has no
-  // <main> element — use this instead of SEL.appMain there.
+  // <main> element - use this instead of SEL.appMain there.
   welcomeWebsiteInput: '[data-testid="input-website"]',
 
   // The workflow-spine tab strip itself (client/src/components/
   // SpineShell.tsx's <TabsList>, from @radix-ui/react-tabs). SpineShell
   // renders this TabsList as the first child of its <Tabs> root, before any
-  // TabsContent — so `page.locator(SEL.authenticatedMain).locator(SEL.
+  // TabsContent - so `page.locator(SEL.authenticatedMain).locator(SEL.
   // spineTabList).first()` always resolves to SpineShell's own tab bar, even
   // though some embedded pages (e.g. geo-signals.tsx under /diagnose?
   // tab=signals, geo-tools.tsx under /act?tab=geo-assets) render a SECOND,
   // nested <Tabs> of their own further down the tree. Scoping to `.first()`
   // is required: an unscoped `[role="tablist"]`/`[role="tab"]` query matches
   // both tab strips and (per Playwright strict-mode) throws on more than one
-  // match — confirmed empirically when this selector was being built.
+  // match - confirmed empirically when this selector was being built.
   spineTabList: '[role="tablist"]',
 
-  // The currently-active tab trigger — scope this under SEL.spineTabList
+  // The currently-active tab trigger - scope this under SEL.spineTabList
   // (see its comment for why unscoped is unsafe), e.g.:
   //   page.locator(SEL.authenticatedMain).locator(SEL.spineTabList).first()
   //     .locator(SEL.spineActiveTabTrigger)
@@ -62,7 +62,7 @@ export const SEL = Object.freeze({
   // a random per-mount id but the "-trigger-<value>" suffix is stable.
   // Within one tablist exactly one trigger carries data-state="active";
   // assert its `id` ends with "-trigger-<expected tab value>" to prove a
-  // specific tab — not just some tab — is actually selected.
+  // specific tab - not just some tab - is actually selected.
   spineActiveTabTrigger: '[role="tab"][data-state="active"]',
 
   // The global brand picker (client/src/components/BrandSelector.tsx) that

@@ -1,9 +1,9 @@
 // Lightweight in-process circuit breaker (Wave 3.7).
 //
 // State machine:
-//   closed   — all calls pass through; failures counted in sliding window
-//   open     — all calls fail fast with CircuitOpenError; no upstream hit
-//   half-open — one trial call allowed; success → closed, failure → open
+//   closed   - all calls pass through; failures counted in sliding window
+//   open     - all calls fail fast with CircuitOpenError; no upstream hit
+//   half-open - one trial call allowed; success → closed, failure → open
 //
 // Why DIY instead of opossum: adding a dep risks the same npm install
 // path-traversal we hit on the Vite upgrade, and the breaker primitive is
@@ -16,7 +16,7 @@
 //
 // Counting only "infrastructure" failures (network, 5xx, timeout) avoids
 // tripping on user-input errors (4xx, invalid prompt). That classifier is
-// callerSpecified — pass `isInfraFailure` to constructor or use the
+// callerSpecified - pass `isInfraFailure` to constructor or use the
 // default heuristic.
 
 import { logger } from "./logger";
@@ -36,7 +36,7 @@ export class CircuitOpenError extends Error {
   readonly retryAfterMs: number;
   constructor(name: string, retryAfterMs: number) {
     super(
-      `Circuit '${name}' is open — provider temporarily unavailable. Retry in ~${Math.ceil(retryAfterMs / 1000)}s.`,
+      `Circuit '${name}' is open - provider temporarily unavailable. Retry in ~${Math.ceil(retryAfterMs / 1000)}s.`,
     );
     this.name = "CircuitOpenError";
     this.breakerName = name;
@@ -49,7 +49,7 @@ export function isCircuitOpenError(err: unknown): err is CircuitOpenError {
 }
 
 // Default: treat anything that smells like network/5xx as infra. Skip
-// 4xx (bad request) — those are caller bugs, retrying won't help and
+// 4xx (bad request) - those are caller bugs, retrying won't help and
 // shouldn't trip the breaker.
 function defaultIsInfraFailure(err: unknown): boolean {
   if (!err) return false;
@@ -120,7 +120,7 @@ export class CircuitBreaker {
       this.failureTimestamps = [];
       logger.info({ breaker: this.opts.name }, "circuit: closed (half-open trial succeeded)");
     } else {
-      // Healthy call in closed state — reset the failure counter.
+      // Healthy call in closed state - reset the failure counter.
       // Without this, a slow trickle of failures across hours could
       // eventually accumulate to threshold even when most calls pass.
       this.pruneWindow();
@@ -155,7 +155,7 @@ export class CircuitBreaker {
   }
 }
 
-// Singleton instances — each provider tracked independently.
+// Singleton instances - each provider tracked independently.
 //
 // Tuned for "10 failures in 60s opens the circuit; stay open 30s before
 // trying again" per the audit recommendation. These thresholds should

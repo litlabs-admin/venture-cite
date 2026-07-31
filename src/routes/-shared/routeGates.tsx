@@ -9,7 +9,7 @@ import { RouteSpinner, ContentSkeleton } from "@/components/foundations";
 // Phase 2 Task 5: verbatim copies of the four small route-gate helpers that
 // used to live inline in client/src/App.tsx (AuthenticatedRoute, AuthenticatedBareRoute,
 // FirstRunGate, SpineRedirect). client/src/App.tsx has since been deleted
-// (Phase 2 Task 6a — its <Switch>/<Route> table was superseded by src/routes/
+// (Phase 2 Task 6a - its <Switch>/<Route> table was superseded by src/routes/
 // itself, and it did not export these; they were local functions). They stay
 // duplicated here rather than re-consolidated, since this file lives under
 // `-shared/`, a directory prefixed with the router plugin's default
@@ -17,15 +17,15 @@ import { RouteSpinner, ContentSkeleton } from "@/components/foundations";
 // a route.
 //
 // Every gated route in the new tree is nested under `_app.tsx`, which carries
-// `ssr: false` (see src/routes/_app.tsx) — so, exactly as before, `window` is
+// `ssr: false` (see src/routes/_app.tsx) - so, exactly as before, `window` is
 // always defined by the time these run; none of the auth-redirect-during-render
 // behavior needed to change to make this safe.
 //
 // Phase 2 Task 7: the router-compat shim (client/src/lib/router-compat.tsx)
 // is deleted project-wide, so both local helpers move onto TanStack Router's
 // own `<Navigate>` (native-api-contract.md). The blocker recorded in the
-// previous version of this comment — `<Navigate>`'s `to` resolving as
-// REQUIRED even when only `href` is given — no longer applies: neither
+// previous version of this comment - `<Navigate>`'s `to` resolving as
+// REQUIRED even when only `href` is given - no longer applies: neither
 // helper below passes `href` at all now, and FirstRunGate's target
 // ("/welcome") is a real literal route id, so `to="/welcome"` alone
 // type-checks with no `href` escape hatch needed.
@@ -34,12 +34,12 @@ import { RouteSpinner, ContentSkeleton } from "@/components/foundations";
 // each of the 12 legacy-route files that render it (competitors.tsx,
 // community.tsx, citations.tsx, brand-fact-sheet.tsx, ai-visibility.tsx,
 // ai-intelligence.tsx, geo-analytics.tsx, opportunities.tsx,
-// crawler-check.tsx, geo-tools.tsx, faq-manager.tsx, geo-signals.tsx — all
+// crawler-check.tsx, geo-tools.tsx, faq-manager.tsx, geo-signals.tsx - all
 // outside this task's file scope, so their call sites could not be edited
 // here), and a plain `to: string` cannot satisfy `<Navigate>`'s route-tree-literal
 // typing without a cast (forbidden by the contract). Grepping every call site
-// (src/routes/_app/*.tsx) shows exactly four distinct targets — "/monitor",
-// "/act", "/setup", "/diagnose" — each a real top-level route id in
+// (src/routes/_app/*.tsx) shows exactly four distinct targets - "/monitor",
+// "/act", "/setup", "/diagnose" - each a real top-level route id in
 // src/routeTree.gen.ts. `SpineTarget` below narrows `to` to that literal
 // union instead of `string`, which both satisfies `<Navigate>`'s typing with
 // zero casts and makes an unknown future target a compile error at the call
@@ -63,7 +63,7 @@ export function AuthenticatedRoute({ component: Component }: { component: Compon
     <AppShell>
       <ErrorBoundary>
         {/* AppShell (sidebar/header) is already mounted here, so the loading
-            shape is knowable at the content-region level — unlike the bare
+            shape is knowable at the content-region level - unlike the bare
             `isLoading` gate above (no layout rendered yet) and
             AuthenticatedBareRoute's Suspense below (no shell at all), both
             of which keep RouteSpinner. */}
@@ -89,7 +89,7 @@ export function AuthenticatedBareRoute({ component: Component }: { component: Co
 
   return (
     <ErrorBoundary>
-      {/* No AppShell here — this route has no chrome mounted at all yet, so
+      {/* No AppShell here - this route has no chrome mounted at all yet, so
           there's no knowable content shape to skeleton against. Keep the
           bare spinner. */}
       <Suspense fallback={<RouteSpinner />}>

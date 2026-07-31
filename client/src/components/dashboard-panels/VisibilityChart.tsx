@@ -16,7 +16,7 @@ import { PanelLabel } from "./primitives";
 // rounded border, p-0.5) so it is keyboard-operable, not a div pretending.
 //
 // The series comes from metrics_history snapshots, which are written only when
-// a citation run records metrics — so the x-axis is snapshot-dated, not daily.
+// a citation run records metrics - so the x-axis is snapshot-dated, not daily.
 // With fewer than two snapshots there is no line to draw and the panel says so
 // rather than rendering a flat placeholder.
 
@@ -143,7 +143,7 @@ export function VisibilityChart({
                   fontFamily: "JetBrains Mono, monospace",
                   fill: "var(--fg-disabled)",
                 }}
-                // Auto-fit with headroom, like the reference — a fixed 0–100
+                // Auto-fit with headroom, like the reference - a fixed 0–100
                 // axis flattens real movement into an unreadable line.
                 domain={[
                   (min: number) => Math.max(0, Math.floor((min - 5) / 5) * 5),

@@ -8,7 +8,7 @@ import { AiLogoRow } from "./AiLogoRow";
 // The hero headline is normally A/B tested by a client-side experiment
 // engine (4 variants, cookie bucketing, an inline bootstrap script reading
 // [data-landing-hero-copy="..."] spans). Per locked decision, that engine is
-// NOT ported here — this renders the single captured "brand_control" variant
+// NOT ported here - this renders the single captured "brand_control" variant
 // copy (server.variant === "brand_control" in the snapshot's bootstrap
 // payload) as static JSX text.
 //
@@ -39,9 +39,9 @@ export function Hero() {
               {/* The H1 is written for the FOUNDER reading it, not for the
                   product. A plain capability line ("Get your brand recommended
                   by AI engines") describes what we sell; it makes nobody feel
-                  anything. This names a loss they cannot currently see — a
+                  anything. This names a loss they cannot currently see - a
                   buyer being pointed at a competitor, in a room they were never
-                  in — which is the actual reason to care.
+                  in - which is the actual reason to care.
 
                   Present tense and second person ("right now", "your buyers"),
                   because the whole point is that it is happening already, not
@@ -50,7 +50,7 @@ export function Hero() {
                   Deliberately NO engine names. Listing ChatGPT, Claude and
                   Perplexity turns the promise into a feature list and dates the
                   line every time the field moves; the logo row below already
-                  names them. The break is sm+ only — forcing it on a 320px
+                  names them. The break is sm+ only - forcing it on a 320px
                   screen strands one word on its own line.
 
                   No accent-coloured full stop either: --accent is
@@ -61,7 +61,7 @@ export function Hero() {
               </h1>
 
               {/* The H1 now carries the stakes, so the subhead is purely the
-                  resolution — it answers "so what do I do about it?" and is
+                  resolution - it answers "so what do I do about it?" and is
                   the first place the product is named. It used to open by
                   restating that buyers ask AI, which the headline says. */}
               <p

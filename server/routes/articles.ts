@@ -1,27 +1,27 @@
 // Articles CRUD + revisions + distributions + geo-rankings routes.
 //
-// Wave 7: removed both /api/articles/slug/:slug routes — articles are now
+// Wave 7: removed both /api/articles/slug/:slug routes - articles are now
 // referenced by id only. The unique slug column was dropped in migration 0033.
 // Drafts are now articles with status='draft' (the legacy content_drafts
 // table is gone), so this file owns the draft creation endpoint too.
 //
 // Routes:
-//   POST   /api/articles                                — create ready article
-//   POST   /api/articles/draft                          — create draft article
-//   GET    /api/articles                                — list (status-filterable)
-//   GET    /api/articles/:id                            — single article
-//   PUT    /api/articles/:id                            — update (optimistic lock)
-//   DELETE /api/articles/:id                            — delete
-//   GET    /api/articles/:id/revisions                  — list revisions newest-first
-//   GET    /api/articles/:id/revisions/:revId           — single revision
-//   POST   /api/articles/:id/revisions/:revId/restore   — restore old revision
-//   POST   /api/distributions                           — create pending rows
-//   GET    /api/distributions/:articleId                — list distributions
-//   PATCH  /api/distribute/entry/:distributionId        — edit saved copy
-//   POST   /api/distribute/:articleId                   — AI-format to platforms
-//   POST   /api/geo-rankings                            — record a ranking observation
-//   GET    /api/geo-rankings                            — list rankings
-//   GET    /api/geo-rankings/platform/:platform         — list by AI platform
+//   POST   /api/articles                                - create ready article
+//   POST   /api/articles/draft                          - create draft article
+//   GET    /api/articles                                - list (status-filterable)
+//   GET    /api/articles/:id                            - single article
+//   PUT    /api/articles/:id                            - update (optimistic lock)
+//   DELETE /api/articles/:id                            - delete
+//   GET    /api/articles/:id/revisions                  - list revisions newest-first
+//   GET    /api/articles/:id/revisions/:revId           - single revision
+//   POST   /api/articles/:id/revisions/:revId/restore   - restore old revision
+//   POST   /api/distributions                           - create pending rows
+//   GET    /api/distributions/:articleId                - list distributions
+//   PATCH  /api/distribute/entry/:distributionId        - edit saved copy
+//   POST   /api/distribute/:articleId                   - AI-format to platforms
+//   POST   /api/geo-rankings                            - record a ranking observation
+//   GET    /api/geo-rankings                            - list rankings
+//   GET    /api/geo-rankings/platform/:platform         - list by AI platform
 
 import type { Express } from "express";
 import { storage } from "../storage";
@@ -56,7 +56,7 @@ export function setupArticlesRoutes(app: Express): void {
 
   // Create/save a ready article. brandId is verified to belong to the caller;
   // all other fields pass through the allowlist (no viewCount/citationCount).
-  // Wave 7: brandId is now required at the schema level — orphan articles
+  // Wave 7: brandId is now required at the schema level - orphan articles
   // are forbidden going forward.
   app.post(
     "/api/articles",
@@ -160,7 +160,7 @@ export function setupArticlesRoutes(app: Express): void {
     }),
   );
 
-  // Get article by ID — user must own the article's brand.
+  // Get article by ID - user must own the article's brand.
   app.get(
     "/api/articles/:id",
     asyncHandler(async (req, res) => {
@@ -174,7 +174,7 @@ export function setupArticlesRoutes(app: Express): void {
     }),
   );
 
-  // Update article — ownership-scoped, body allowlist.
+  // Update article - ownership-scoped, body allowlist.
   app.put(
     "/api/articles/:id",
     asyncHandler(async (req, res) => {
@@ -187,7 +187,7 @@ export function setupArticlesRoutes(app: Express): void {
           await requireBrand(update.brandId as string, user.id);
         }
 
-        // Wave 4.4: optimistic locking — see the brand-update handler for
+        // Wave 4.4: optimistic locking - see the brand-update handler for
         // the reasoning. Same pattern, different table.
         const expectedVersion =
           typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : null;
@@ -222,7 +222,7 @@ export function setupArticlesRoutes(app: Express): void {
     }),
   );
 
-  // Delete article — ownership-scoped. Hard-deletes today; soft-delete is
+  // Delete article - ownership-scoped. Hard-deletes today; soft-delete is
   // tracked as a follow-up (would need an articles.deleted_at column).
   // Cascade handles article_revisions + distributions + geo_rankings via FK.
   app.delete(
@@ -426,13 +426,13 @@ export function setupArticlesRoutes(app: Express): void {
         }
 
         const brand = article.brandId ? await storage.getBrandById(article.brandId) : null;
-        // 2000-char prompt cap — keeps the per-platform LLM call cheap. TODO:
+        // 2000-char prompt cap - keeps the per-platform LLM call cheap. TODO:
         // make this brand-config or per-platform if we ever want long-form
         // distribution copy.
         const articleContent = article.content?.substring(0, 2000) || article.title || "";
         const articleTitle = article.title ?? "Untitled";
 
-        // Wave 7: run platforms in parallel — each call writes to its own
+        // Wave 7: run platforms in parallel - each call writes to its own
         // distribution row, so they don't contend. ~2× faster on multi-platform.
         const results = await Promise.all(
           platforms.map(async (platform: string) => {
@@ -481,7 +481,7 @@ Hard constraint: total post must be ≤ 280 characters including hashtags. Do no
 Include:
 - A strong hook in the first sentence
 - 1–2 highly relevant hashtags
-- No preamble, no "Here's a post:" — output the post text only
+- No preamble, no "Here's a post:" - output the post text only
 ${brand ? `Brand: ${brand.companyName}` : ""}
 
 Article title: ${articleTitle}
@@ -505,7 +505,7 @@ Reminder: total length ≤ 2000 characters.`,
                 Instagram: `Convert this article into an Instagram caption.
 Hard constraints:
 - Total caption ≤ 2200 characters
-- The first 125 characters are critical — that's what shows before the "more" cut. Front-load the hook there.
+- The first 125 characters are critical - that's what shows before the "more" cut. Front-load the hook there.
 Include:
 - An attention-grabbing hook in the first 125 characters
 - Body paragraphs separated by blank lines (use line breaks, no markdown)
@@ -547,7 +547,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
                 return {
                   platform,
                   status: "failed" as const,
-                  error: "AI returned empty content — try again",
+                  error: "AI returned empty content - try again",
                 };
               }
 
@@ -601,7 +601,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
         try {
           await requireArticle(distribution.articleId, user.id);
         } catch {
-          // 404 not 403 — anti-enumeration. CLAUDE.md.
+          // 404 not 403 - anti-enumeration. CLAUDE.md.
           return res.status(404).json({ success: false, error: "not_found" });
         }
         const { channelId } = req.body ?? {};

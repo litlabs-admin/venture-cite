@@ -1,4 +1,4 @@
-// AI tutor chatbot endpoints (Phase 5 v2 — multi-thread).
+// AI tutor chatbot endpoints (Phase 5 v2 - multi-thread).
 //
 // REST surface:
 //   GET    /api/assistant/threads                    list user threads
@@ -47,7 +47,7 @@ const createThreadSchema = z.object({
 });
 
 // First-message titles use plain truncation. No second LLM call to keep cost
-// at zero per thread — we can swap to a summarizer later.
+// at zero per thread - we can swap to a summarizer later.
 function deriveThreadTitle(firstUserMessage: string): string {
   const cleaned = firstUserMessage.replace(/\s+/g, " ").trim();
   if (cleaned.length <= 60) return cleaned;
@@ -306,7 +306,7 @@ Use this context to make your answers specific to their situation. If they ask "
             try {
               res.write(": heartbeat\n\n");
             } catch {
-              // ignore — write after close
+              // ignore - write after close
             }
           }
         }, 15_000);

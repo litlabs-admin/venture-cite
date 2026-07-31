@@ -75,7 +75,7 @@ CRITICAL RULES:
 3. Confidence 1.0 only for facts that appear verbatim in a source. 0.7-0.9 for paraphrased. ≤0.5 for inferred.
 4. If you cannot find the brand or cannot verify any facts, return facts=[]. Do not invent.
 
-CONTROLLED VOCABULARY — pick factKey from this list exactly. Do not invent new keys.
+CONTROLLED VOCABULARY - pick factKey from this list exactly. Do not invent new keys.
 ${VOCAB_BLOCK}
 
 If a fact genuinely doesn't fit any of the above, use factKey="other" and put a short label in valuePayload.otherLabel.

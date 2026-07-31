@@ -1,4 +1,4 @@
-// Logo scraping utility — extracted from the v1 factExtractor.ts.
+// Logo scraping utility - extracted from the v1 factExtractor.ts.
 // Provides only the favicon/icon discovery logic; no v1 fact-pipeline
 // dependencies.
 
@@ -8,7 +8,7 @@ import { logger } from "./logger";
 // Favicon-only logo resolution. Walks every <link rel=...icon...> tag in
 // document order (covers rel="icon", rel="shortcut icon", rel="apple-touch-
 // icon", rel="apple-touch-icon-precomposed"). Falls back to /favicon.ico with
-// an existence probe. Returns a fully-qualified URL or null — no third-party
+// an existence probe. Returns a fully-qualified URL or null - no third-party
 // fallback; null is a real signal.
 export async function scrapeLogoUrl(homepageUrl: string, html: string): Promise<string | null> {
   const trace: Record<string, unknown> = { homepageUrl };
@@ -24,7 +24,7 @@ export async function scrapeLogoUrl(homepageUrl: string, html: string): Promise<
 
   // Confirms a scraped icon URL actually returns an image. Sites often list
   // <link rel=icon href=/old-name.png> that 404s, so we verify before handing
-  // it to the client — otherwise the browser <img> fails silently and the
+  // it to the client - otherwise the browser <img> fails silently and the
   // user sees no logo at all.
   const verifyIsImage = async (url: string): Promise<boolean> => {
     try {
@@ -39,7 +39,7 @@ export async function scrapeLogoUrl(homepageUrl: string, html: string): Promise<
     }
   };
 
-  // 1) <link rel=...icon...> — collect all candidates, prefer apple-touch-icon
+  // 1) <link rel=...icon...> - collect all candidates, prefer apple-touch-icon
   //    (usually 180×180 PNG, the nicest logo we can get without fetching).
   const iconCandidates: { url: string; rel: string }[] = [];
   const linkRe = /<link\b([^>]*)>/gi;
@@ -78,7 +78,7 @@ export async function scrapeLogoUrl(homepageUrl: string, html: string): Promise<
     trace.linkTagsTried = triedLinkTags;
   }
 
-  // 2) <link rel="manifest"> — web app manifest lists icons in JSON.
+  // 2) <link rel="manifest"> - web app manifest lists icons in JSON.
   const manifestMatch = html.match(/<link\b[^>]*\brel\s*=\s*["']?manifest["']?[^>]*>/i);
   if (manifestMatch) {
     const hrefMatch = manifestMatch[0].match(/\bhref\s*=\s*(?:"([^"]+)"|'([^']+)'|(\S+))/i);
@@ -110,7 +110,7 @@ export async function scrapeLogoUrl(homepageUrl: string, html: string): Promise<
     }
   }
 
-  // 3) <meta property="og:image"> — site's own social-share image.
+  // 3) <meta property="og:image"> - site's own social-share image.
   const ogMatch = html.match(/<meta\b[^>]*\bproperty\s*=\s*["']og:image["'][^>]*>/i);
   if (ogMatch) {
     const contentMatch = ogMatch[0].match(/\bcontent\s*=\s*(?:"([^"]+)"|'([^']+)'|(\S+))/i);
@@ -125,7 +125,7 @@ export async function scrapeLogoUrl(homepageUrl: string, html: string): Promise<
     }
   }
 
-  // 4) /favicon.ico probe — only accept if the response is actually an image.
+  // 4) /favicon.ico probe - only accept if the response is actually an image.
   try {
     const faviconUrl = new URL("/favicon.ico", homepageUrl).toString();
     const { status, contentType } = await safeFetchText(faviconUrl, {

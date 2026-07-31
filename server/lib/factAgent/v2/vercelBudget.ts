@@ -30,7 +30,7 @@ export const EFFECTIVE_BUDGET_MS = Math.max(2_000, FUNCTION_BUDGET_MS - SAFETY_M
 
 /** How long a single LLM call may take. On Hobby (9s effective) we
  *  give the LLM 70% of the budget so there's room for the rest of the
- *  request. On Pro we cap at 25 s — long calls beyond that signal a
+ *  request. On Pro we cap at 25 s - long calls beyond that signal a
  *  stuck request. */
 export const LLM_CALL_TIMEOUT_MS = Math.min(25_000, Math.floor(EFFECTIVE_BUDGET_MS * 0.7));
 
@@ -39,13 +39,13 @@ export const LLM_CALL_TIMEOUT_MS = Math.min(25_000, Math.floor(EFFECTIVE_BUDGET_
 export const JINA_TIMEOUT_MS = Math.min(15_000, Math.floor(EFFECTIVE_BUDGET_MS * 0.7));
 
 /** Wikidata SPARQL + entity fetch. We get away with less budget
- *  because the API is fast — 5 s is enough for 95% of requests. */
+ *  because the API is fast - 5 s is enough for 95% of requests. */
 export const WIKIDATA_TIMEOUT_MS = Math.min(8_000, Math.floor(EFFECTIVE_BUDGET_MS * 0.55));
 
 /** Static page fetch budget. Includes SSRF DNS lookup + HTTP. */
 export const PAGE_FETCH_TIMEOUT_MS = Math.min(10_000, Math.floor(EFFECTIVE_BUDGET_MS * 0.6));
 
-/** SSE slice budget — one connection's lifetime before slice_pending
+/** SSE slice budget - one connection's lifetime before slice_pending
  *  forces a reconnect. On Hobby this becomes 8 s; clients reconnect
  *  every 8 s. */
 export const SSE_SLICE_BUDGET_MS = Math.max(5_000, EFFECTIVE_BUDGET_MS - 1_000);

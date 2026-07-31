@@ -6,7 +6,7 @@ import { logger } from "./lib/logger";
 
 // Force `TIMESTAMP WITHOUT TIME ZONE` (oid 1114) to be parsed as UTC, not as
 // the Node process's local time. Without this, a DB value of "2026-05-05
-// 12:00:00" (which our app writes as `now()` — i.e. UTC) would be parsed by
+// 12:00:00" (which our app writes as `now()` - i.e. UTC) would be parsed by
 // pg as 12:00 in the server's local zone, producing a Date object that's
 // hours off. Result on the client: relative timestamps like "6 hours ago"
 // for events that just happened. Setting this once at boot fixes every
@@ -21,12 +21,12 @@ if (!process.env.DATABASE_URL) {
 //
 // 1. If DATABASE_CA_CERT_PATH is set, read the PEM and verify the server
 //    certificate chain against it. This is the strict, recommended setup
-//    for production — Supabase publishes their pooler root CA and you
+//    for production - Supabase publishes their pooler root CA and you
 //    download it once into the deploy environment.
 // 2. Else if DATABASE_SSL_REJECT_UNAUTHORIZED=true, verify against Node's
 //    default CA bundle (works for some hosted Postgres setups; usually
 //    fails for Supabase pooler).
-// 3. Else fall back to permissive TLS — the connection is still encrypted
+// 3. Else fall back to permissive TLS - the connection is still encrypted
 //    in transit but the cert chain is not verified. Acceptable for dev;
 //    a logger.warn reminder fires at boot in production so this doesn't
 //    silently persist into a real deployment.
@@ -35,19 +35,19 @@ function buildSslConfig(): PoolConfig["ssl"] {
   if (caPath) {
     try {
       const ca = fs.readFileSync(caPath, "utf8");
-      logger.info({ caPath }, "db: TLS strict — verifying chain against custom CA");
+      logger.info({ caPath }, "db: TLS strict - verifying chain against custom CA");
       return { ca, rejectUnauthorized: true };
     } catch (err) {
       logger.error(
         { err, caPath },
-        "db: DATABASE_CA_CERT_PATH set but file unreadable — refusing to start",
+        "db: DATABASE_CA_CERT_PATH set but file unreadable - refusing to start",
       );
       throw new Error(`Cannot read DATABASE_CA_CERT_PATH at ${caPath}`);
     }
   }
 
   if (process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true") {
-    logger.info("db: TLS strict — verifying against Node default CA bundle");
+    logger.info("db: TLS strict - verifying against Node default CA bundle");
     return { rejectUnauthorized: true };
   }
 
@@ -62,7 +62,7 @@ function buildSslConfig(): PoolConfig["ssl"] {
 }
 
 // On Vercel each lambda is a fresh process, so a per-lambda pool of 1 is
-// plenty — DATABASE_URL points at the Supabase transaction pooler (port
+// plenty - DATABASE_URL points at the Supabase transaction pooler (port
 // 6543) which fans out to a shared backend pool. Locally we run a single
 // long-lived process and want a normal-sized pool.
 const isServerless = !!process.env.VERCEL;

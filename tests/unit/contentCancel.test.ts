@@ -1,4 +1,4 @@
-// Coverage for POST /api/content/:articleId/cancel — article-level cancel
+// Coverage for POST /api/content/:articleId/cancel - article-level cancel
 // (Foundations Plan 1, Task 4). Verifies the route marks the active job as
 // cancelled, and returns 404 (not 403) for non-owned articles per the
 // anti-enumeration ownership convention.

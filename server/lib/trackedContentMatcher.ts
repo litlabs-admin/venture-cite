@@ -37,7 +37,7 @@ export function normalizeUrl(raw: string): string | null {
 }
 
 /**
- * Scan an LLM response (any text — analysis, citations, raw output)
+ * Scan an LLM response (any text - analysis, citations, raw output)
  * for occurrences of the brand's tracked content URLs. Matching is
  * substring-based against `normalized_url` so a bare-host citation
  * ("acme.com/x") matches a stored "acme.com/x?utm=foo" and vice versa.

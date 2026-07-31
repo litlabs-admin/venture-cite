@@ -55,7 +55,7 @@ describe("rankLeaderboard", () => {
     expect(ownRank).toBe(2);
   });
 
-  it("returns null — not 0 or 1 — when the brand has no leaderboard row", () => {
+  it("returns null - not 0 or 1 - when the brand has no leaderboard row", () => {
     // "Not measured", so the tile renders `–` rather than claiming a position.
     const { ownRank, tracked } = rankLeaderboard([row({ name: "Someone else" })]);
     expect(ownRank).toBeNull();

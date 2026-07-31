@@ -7,7 +7,7 @@
 -- one decimal digit the judge is asked to produce, while still comfortably
 -- covering the 0-100 range (4 total digits = up to 999.9, so 100.0 fits).
 --
--- Columns stay nullable — the honesty constraint from 0088 (an axis the
+-- Columns stay nullable - the honesty constraint from 0088 (an axis the
 -- judge could not assess must read NULL, never a guessed 50) is unaffected
 -- by the type change.
 --

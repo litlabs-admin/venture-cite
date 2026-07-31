@@ -26,7 +26,7 @@ const TERMS = [
     code: "AEO",
     name: "Answer Engine Optimization",
     definition:
-      "Optimizing for systems that give direct answers — Reddit threads, Wikipedia summaries, FAQ snippets — that AI engines often quote verbatim.",
+      "Optimizing for systems that give direct answers - Reddit threads, Wikipedia summaries, FAQ snippets - that AI engines often quote verbatim.",
     whyItMatters:
       "Users want answers, not link lists. Answer Engines (and AI summaries built on them) decide what gets surfaced based on signals like discussion engagement, structured FAQs, and authoritative sources. AEO captures attention before users ever reach a search results page.",
     howVentureCiteCovers: [
@@ -45,9 +45,9 @@ const TERMS = [
     code: "SEO",
     name: "Search Engine Optimization",
     definition:
-      "Traditional Google/Bing ranking — keywords, backlinks, page speed, content quality, mobile usability — the foundation that GEO and AEO build on.",
+      "Traditional Google/Bing ranking - keywords, backlinks, page speed, content quality, mobile usability - the foundation that GEO and AEO build on.",
     whyItMatters:
-      "AI engines crawl the same web SEO has always served. A site that ranks well for SEO is the same site that becomes citation-eligible for AI engines. SEO isn't dying — it's the foundation that GEO/AEO sit on top of.",
+      "AI engines crawl the same web SEO has always served. A site that ranks well for SEO is the same site that becomes citation-eligible for AI engines. SEO isn't dying - it's the foundation that GEO/AEO sit on top of.",
     howVentureCiteCovers: [
       "Crawler Check confirms AI crawlers (GPTBot, ClaudeBot, PerplexityBot) are allowed",
       "Schema markup recommendations boost both Google rich-results and AI parsability",
@@ -61,7 +61,7 @@ const TERMS = [
 ] as const;
 
 export default function GlossaryPage() {
-  // JSON-LD DefinedTermSet — gives both AI engines (deliciously meta) and
+  // JSON-LD DefinedTermSet - gives both AI engines (deliciously meta) and
   // Google's structured-data parser a clean machine-readable definition.
   const jsonLd = {
     "@context": "https://schema.org",
@@ -78,12 +78,12 @@ export default function GlossaryPage() {
 
   return (
     <PanelPage>
-      {/* Title/description moved to src/routes/glossary.tsx's `head()` —
+      {/* Title/description moved to src/routes/glossary.tsx's `head()` -
           metadata belongs to the route, not this component. The JSON-LD
           script below stays here: it's page-specific structured data, not
           a <title>/<meta> tag, and React 19 doesn't hoist a plain
           <script> the way it hoists <title>/<meta>, so it renders in place
-          in the body — out of this task's scope. */}
+          in the body - out of this task's scope. */}
       {/* JSON-LD schema for AI engines + Google rich-results */}
       <script
         type="application/ld+json"
@@ -96,14 +96,14 @@ export default function GlossaryPage() {
             GEO vs AEO vs SEO
           </h1>
           <p className="mt-3 text-ui text-vc-tertiary">
-            Three optimization disciplines for the AI-first web. They layer — they don't compete.
+            Three optimization disciplines for the AI-first web. They layer - they don't compete.
           </p>
         </Panel>
       </PanelRow>
 
       {TERMS.map((term) => (
         <PanelRow key={term.id} cols={1}>
-          <Panel width="wide" border="last" label={`${term.code} — ${term.name}`}>
+          <Panel width="wide" border="last" label={`${term.code} - ${term.name}`}>
             {/* Anchor target for in-page jumps from the term header above and
                 any external #hash links. scroll-mt-16 keeps the heading clear
                 of any sticky header that might exist later. */}
@@ -129,7 +129,7 @@ export default function GlossaryPage() {
                   {/* Plain <a>, not wouter's <Link>: wouter's Link reads the
                       default useLocation hook to compute its active state,
                       which touches the global `location` object during
-                      render — that throws under SSR (no `location` global in
+                      render - that throws under SSR (no `location` global in
                       Node) since this page renders outside any wouter
                       <Router ssrPath=...> that could supply a server
                       snapshot. These are outbound links to other top-level
@@ -154,7 +154,7 @@ export default function GlossaryPage() {
             Think of SEO as the foundation that determines whether your content can be found at all,
             AEO as the discipline of being chosen as the canonical answer in answer-engine surfaces,
             and GEO as the layer that determines whether AI assistants cite you when they're
-            generating responses for users. Doing all three well compounds — neither replaces the
+            generating responses for users. Doing all three well compounds - neither replaces the
             others.
           </p>
         </Panel>

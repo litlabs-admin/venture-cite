@@ -73,7 +73,7 @@ export function XIcon({ size = 20, className }: IconProps) {
 // (confirmed in nav-data-DcRPnYz_.js) but the tree-shaken export names
 // (single/double-letter aliases into a 304KB minified vendor-icons bundle)
 // couldn't be resolved to real icon identities. Using a generic dot instead
-// of guessing a specific icon. AMBIGUITY — swap in the real icons later.
+// of guessing a specific icon. AMBIGUITY - swap in the real icons later.
 export function PlaceholderIcon({ size = 14, className }: IconProps) {
   return (
     <svg
@@ -92,7 +92,7 @@ export function PlaceholderIcon({ size = 14, className }: IconProps) {
 // Mega-menu item icons. The original site serves illustrated PNGs from
 // /menu-icons/<slug>.png; those binaries only ever existed on Trakkr's own
 // origin and were never in the archived build, so the port shipped flat
-// gray placeholder squares. These lucide glyphs stand in for them — a
+// gray placeholder squares. These lucide glyphs stand in for them - a
 // deliberate, visible substitution, not a pixel match. Items that DO have a
 // real asset (`iconSrc`) still render it.
 const slugIcons: Record<string, LucideIcon> = {

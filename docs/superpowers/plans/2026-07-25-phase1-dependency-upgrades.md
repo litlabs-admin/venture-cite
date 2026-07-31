@@ -1,4 +1,4 @@
-# Phase 1 — Dependency Upgrades Implementation Plan
+# Phase 1 - Dependency Upgrades Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -15,20 +15,20 @@
 - 🚫 **RUN NO GIT COMMANDS.** No `add`, `commit`, `push`, `checkout`, `reset`, `stash`. The user commits manually. Each task ends by reporting a suggested commit message, never by running one.
 - 🔴 **ESLint stays at 9.x.** `eslint-plugin-react` has no ESLint-10-compatible release; ESLint 10 removed `context.getFilename()`, which its `react/display-name` rule calls, and this repo spreads `react.configs.recommended.rules` across every `client/**/*.tsx`. Upgrading would crash `npm run lint` and the husky pre-commit hook. Verified against the npm registry: `eslint-plugin-react@latest` peers cap at `eslint ^9.7`.
 - 🔴 **TypeScript goes to 6.0.3, NOT 7.** TypeScript 7 ships no compiler API and `typescript-eslint` hard-caps at `typescript <6.1.0`. 6.0.3 is the highest version that keeps type-aware linting working.
-- ⚠️ **Never chain `npm test` and `npm run test:e2e` in one command.** Both hit the same database — the vitest integration suite writes to it, and the Playwright dev server reads from it. Running them back-to-back produces spurious failures that look exactly like regressions. This was hit during Task 2: two `billing.spec.ts` tests failed in a chained run and passed 6/6 in isolation moments later. Run them as separate commands.
+- ⚠️ **Never chain `npm test` and `npm run test:e2e` in one command.** Both hit the same database - the vitest integration suite writes to it, and the Playwright dev server reads from it. Running them back-to-back produces spurious failures that look exactly like regressions. This was hit during Task 2: two `billing.spec.ts` tests failed in a chained run and passed 6/6 in isolation moments later. Run them as separate commands.
 - ⚠️ **Several tests flake under parallel load, so the unit count is a band, not a number.** Known flaky, all confirmed passing in isolation:
-  - `tests/integration/v2SearchLlmSmoke.test.ts` — calls a live LLM through OpenRouter.
-  - `tests/unit/citationCronUnconditional.test.ts` — DB-heavy, takes ~15s alone; times out under contention.
-  - `tests/integration/llmConcurrency.test.ts` and `tests/integration/v2Lifecycle*` — DB contention.
+  - `tests/integration/v2SearchLlmSmoke.test.ts` - calls a live LLM through OpenRouter.
+  - `tests/unit/citationCronUnconditional.test.ts` - DB-heavy, takes ~15s alone; times out under contention.
+  - `tests/integration/llmConcurrency.test.ts` and `tests/integration/v2Lifecycle*` - DB contention.
 
-  **Only `tests/unit/v2UrlTierScoring.test.ts` fails deterministically**, and it does so deliberately. Before treating any other failure as a regression, **re-run that file alone** — most resolve. Escalate only if it fails in isolation too.
+  **Only `tests/unit/v2UrlTierScoring.test.ts` fails deterministically**, and it does so deliberately. Before treating any other failure as a regression, **re-run that file alone** - most resolve. Escalate only if it fails in isolation too.
 
 - **The verification gate after every task** is all four of:
-  - `npm run check` — clean
-  - `npm run lint` — **0 errors**. Roughly 829 warnings are expected and non-blocking: the config deliberately grades `no-explicit-any`, `no-unescaped-entities`, `prefer-const` and others as warnings ("Track as warnings; don't gate CI"). Watch the error count, not the total.
-  - `npm test` — **146 passed / 1 failed / 1 skipped (148 files)**. The single expected failure is `tests/unit/v2UrlTierScoring.test.ts`, which correctly exposes a real application bug (see the prerequisite note). Any _second_ failure is a regression.
-  - `npm run test:e2e` — **61 passed / 2 skipped / 0 failed**
-- The e2e suite performs 2 real logins per run against a limit of 10 per (IP, email) per 15 minutes. Roughly five runs fit in a window. Exceeding it appears as `TimeoutError: page.waitForURL`, not a visible 429 — do not misdiagnose that as a regression.
+  - `npm run check` - clean
+  - `npm run lint` - **0 errors**. Roughly 829 warnings are expected and non-blocking: the config deliberately grades `no-explicit-any`, `no-unescaped-entities`, `prefer-const` and others as warnings ("Track as warnings; don't gate CI"). Watch the error count, not the total.
+  - `npm test` - **146 passed / 1 failed / 1 skipped (148 files)**. The single expected failure is `tests/unit/v2UrlTierScoring.test.ts`, which correctly exposes a real application bug (see the prerequisite note). Any _second_ failure is a regression.
+  - `npm run test:e2e` - **61 passed / 2 skipped / 0 failed**
+- The e2e suite performs 2 real logins per run against a limit of 10 per (IP, email) per 15 minutes. Roughly five runs fit in a window. Exceeding it appears as `TimeoutError: page.waitForURL`, not a visible 429 - do not misdiagnose that as a regression.
 - **If a test goes red, fix the code, not the test.** The only legitimate reason to change an assertion is a behaviour change that is intentional and reported. Two assertions are expected to need updating and are called out explicitly in Tasks 4 and 8.
 - Never print secrets. `.env` is gitignored and must stay that way.
 
@@ -38,14 +38,14 @@
 
 `eslint.config.js` had two gaps that made `npm run lint` report **2218 errors**, which would have rendered the gate above meaningless:
 
-- `.claude/**` was absent from the ignore list, even though its siblings `.agents/**` and `.codex/**` are there under a comment reading "Local vendored tool/skill caches — not project source, never lint". The directory filled with plugin files and produced 2120 `no-undef` errors.
+- `.claude/**` was absent from the ignore list, even though its siblings `.agents/**` and `.codex/**` are there under a comment reading "Local vendored tool/skill caches - not project source, never lint". The directory filled with plugin files and produced 2120 `no-undef` errors.
 - Test globals were declared for `tests/**/*.ts` and `**/*.test.ts` only, so `tests/unit/*.test.tsx` and `tests/component/*.test.tsx` received neither Node nor browser globals.
 
 Both are now fixed, taking lint to **0 errors**. Neither was caused by any dependency change; they were latent.
 
-A third gap made the `npm test` gate equally meaningless. `vitest.config.ts` included `tests/**/*.spec.ts`, and `.spec.ts` is Playwright's naming convention in this repo — so vitest was attempting to execute browser tests it cannot run. This was latent with a single e2e file and became visible when Phase 0 added nine more. `tests/e2e/**` is now excluded explicitly, which recovered 8 files.
+A third gap made the `npm test` gate equally meaningless. `vitest.config.ts` included `tests/**/*.spec.ts`, and `.spec.ts` is Playwright's naming convention in this repo - so vitest was attempting to execute browser tests it cannot run. This was latent with a single e2e file and became visible when Phase 0 added nine more. `tests/e2e/**` is now excluded explicitly, which recovered 8 files.
 
-**Unit-test baseline after that fix: 133 passed / 14 failed / 1 skipped (148 files), 876 passed / 21 failed / 3 skipped (900 tests).** The 14 remaining failures are pre-existing and unrelated to any dependency change — confirmed by downgrading and re-running. They are being classified separately into broken-test versus broken-code; until that lands, this is the number to compare against.
+**Unit-test baseline after that fix: 133 passed / 14 failed / 1 skipped (148 files), 876 passed / 21 failed / 3 skipped (900 tests).** The 14 remaining failures are pre-existing and unrelated to any dependency change - confirmed by downgrading and re-running. They are being classified separately into broken-test versus broken-code; until that lands, this is the number to compare against.
 
 ## Pre-existing state this plan assumes
 
@@ -53,7 +53,7 @@ Ten packages were already removed as dead code before this phase, which deleted 
 
 `@stripe/stripe-js`, `@stripe/react-stripe-js`, `zod-validation-error`, `react-day-picker`, `next-themes`, `embla-carousel-react`, `vaul`, `input-otp`, `react-resizable-panels`, and the `calendar.tsx` / `chart.tsx` / `draftStore.ts` / `carousel.tsx` / `drawer.tsx` / `input-otp.tsx` / `resizable.tsx` components.
 
-**Consequence:** the audit's mandatory `react-day-picker` + `date-fns` lockstep no longer applies — `react-day-picker` is gone, so `date-fns` upgrades independently and is near-drop-in.
+**Consequence:** the audit's mandatory `react-day-picker` + `date-fns` lockstep no longer applies - `react-day-picker` is gone, so `date-fns` upgrades independently and is near-drop-in.
 
 **Optional pre-step, not scheduled here.** Eight more `components/ui/*` files have zero consumers and each orphans one Radix package: `aspect-ratio`, `context-menu`, `hover-card`, `menubar`, `navigation-menu`, `radio-group`, `slider`, `toggle-group`. Radix upgrades are low-risk, so removing them buys little; do it only if you want a smaller surface. Four more (`breadcrumb`, `pagination`, `sidebar`, `table`) are unused but orphan nothing.
 
@@ -64,12 +64,12 @@ Ten packages were already removed as dead code before this phase, which deleted 
 | File                                                                                | Responsibility                                                |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `package.json` / `package-lock.json`                                                | Every task modifies these                                     |
-| `server/vite.ts`                                                                    | Task 6 — two `app.use("*")` wildcards invalid under Express 5 |
-| `server/routes/*.ts`                                                                | Task 7 — 13 `ZodError.errors` sites                           |
-| `tailwind.config.ts`, `postcss.config.js`, `client/src/index.css`, `vite.config.ts` | Task 8 — Tailwind 4 config model                              |
-| `client/src/components/intelligence/TrendsTab.tsx`                                  | Task 3 — `connectNulls` semantics                             |
-| `tests/e2e/billing.spec.ts`                                                         | Task 9 — only if Stripe changes the error shape               |
-| `tsconfig.json`                                                                     | Task 10 — explicit `target`, verify `baseUrl`                 |
+| `server/vite.ts`                                                                    | Task 6 - two `app.use("*")` wildcards invalid under Express 5 |
+| `server/routes/*.ts`                                                                | Task 7 - 13 `ZodError.errors` sites                           |
+| `tailwind.config.ts`, `postcss.config.js`, `client/src/index.css`, `vite.config.ts` | Task 8 - Tailwind 4 config model                              |
+| `client/src/components/intelligence/TrendsTab.tsx`                                  | Task 3 - `connectNulls` semantics                             |
+| `tests/e2e/billing.spec.ts`                                                         | Task 9 - only if Stripe changes the error shape               |
+| `tsconfig.json`                                                                     | Task 10 - explicit `target`, verify `baseUrl`                 |
 
 ---
 
@@ -97,10 +97,10 @@ npm install drizzle-kit@0.31.10 framer-motion@12.42.2 shepherd.js@15.2.2 date-fn
 Run: `npm run check`
 Expected: clean. `date-fns` v4 is ESM-first and this repo is already `"type": "module"`; the nine consuming files use only root-entry `format()` / `formatDistanceToNow()`, which are untouched by v3→v4.
 
-- [ ] **Step 3: Check the one real risk — shepherd.js Node engine**
+- [ ] **Step 3: Check the one real risk - shepherd.js Node engine**
 
 Run: `node --version`
-Expected: ≥ 19. shepherd.js 15 dropped Node 18. If your Node is older, stop and report — the rest of the plan assumes `^20.19.0 || >=22.12.0`.
+Expected: ≥ 19. shepherd.js 15 dropped Node 18. If your Node is older, stop and report - the rest of the plan assumes `^20.19.0 || >=22.12.0`.
 
 - [ ] **Step 4: Full gate**
 
@@ -136,7 +136,7 @@ Suggested message: `chore(deps): upgrade drizzle-kit, framer-motion, shepherd.js
 
 Its own task because **109 files** import from `lucide-react` and this is a 0.x → 1.x jump. Two changes matter: brand/trademarked icons were removed entirely, and `aria-hidden="true"` is now the default on every icon.
 
-The audit inventoried all **78 distinct icons** in use and confirmed **none** is a brand icon, so the removals do not affect you. Icon renames ship with backwards-compatible aliases, and because these are named ESM exports, any genuine removal surfaces as a build error — not a silent blank icon.
+The audit inventoried all **78 distinct icons** in use and confirmed **none** is a brand icon, so the removals do not affect you. Icon renames ship with backwards-compatible aliases, and because these are named ESM exports, any genuine removal surfaces as a build error - not a silent blank icon.
 
 - [ ] **Step 1: Upgrade**
 
@@ -144,15 +144,15 @@ The audit inventoried all **78 distinct icons** in use and confirmed **none** is
 npm install lucide-react@1.26.0
 ```
 
-- [ ] **Step 2: Typecheck — this is the real detector**
+- [ ] **Step 2: Typecheck - this is the real detector**
 
 Run: `npm run check`
 
-Expected: clean. A missing icon export fails here loudly. If one does, look up its current name in the lucide docs and rename the import — do not substitute a different icon without saying so.
+Expected: clean. A missing icon export fails here loudly. If one does, look up its current name in the lucide docs and rename the import - do not substitute a different icon without saying so.
 
 - [ ] **Step 3: Assess the accessibility default change**
 
-`aria-hidden="true"` is now applied to all icons by default. That is correct for the overwhelming majority — decorative icons beside a text label should be hidden from screen readers.
+`aria-hidden="true"` is now applied to all icons by default. That is correct for the overwhelming majority - decorative icons beside a text label should be hidden from screen readers.
 
 It is **wrong** for icon-only interactive controls, which would become unlabelled. Find them:
 
@@ -160,7 +160,7 @@ It is **wrong** for icon-only interactive controls, which would become unlabelle
 grep -rn "size=\"icon\"" client/src --include=*.tsx | head -30
 ```
 
-For each hit, confirm the control has an accessible name from something other than the icon — an `aria-label`, `sr-only` text, or a tooltip that sets one. Where it does not, add an `aria-label` to the **button**; do not set `aria-hidden={false}` on the icon, which produces a worse result for screen readers.
+For each hit, confirm the control has an accessible name from something other than the icon - an `aria-label`, `sr-only` text, or a tooltip that sets one. Where it does not, add an `aria-label` to the **button**; do not set `aria-hidden={false}` on the icon, which produces a worse result for screen readers.
 
 Report how many icon-only controls you checked and how many needed a label.
 
@@ -187,7 +187,7 @@ Suggested message: `chore(deps): upgrade lucide-react to 1.x`
 **Interfaces:**
 
 - Consumes: Task 1.
-- Produces: React 19 runtime — Tasks 3 and 5 depend on it.
+- Produces: React 19 runtime - Tasks 3 and 5 depend on it.
 
 Graded LOW by the audit. An exhaustive scan of all 272 client files found **zero** uses of anything React 19 removed: no `propTypes`, no `defaultProps` on function components, no legacy context, no string refs, no `ReactDOM.render`, no `react-test-renderer`, and no zero-argument `useRef()`. `main.tsx` already uses `createRoot`. Every remaining third-party package declares React 19 peer support.
 
@@ -197,11 +197,11 @@ Graded LOW by the audit. An exhaustive scan of all 272 client files found **zero
 npm install react@19.2.8 react-dom@19.2.8 && npm install -D @types/react@^19 @types/react-dom@^19
 ```
 
-- [ ] **Step 2: Typecheck — expect this to surface type-only changes**
+- [ ] **Step 2: Typecheck - expect this to surface type-only changes**
 
 Run: `npm run check`
 
-React 19's types changed in three ways that can surface here: `ReactElement["props"]` is `unknown` rather than `any`, ref callbacks may no longer implicitly return a value, and the global `JSX` namespace moved to `React.JSX`. If errors appear, fix them at the type level — do not add `any` or `@ts-ignore`.
+React 19's types changed in three ways that can surface here: `ReactElement["props"]` is `unknown` rather than `any`, ref callbacks may no longer implicitly return a value, and the global `JSX` namespace moved to `React.JSX`. If errors appear, fix them at the type level - do not add `any` or `@ts-ignore`.
 
 `forwardRef` is used in 40 shadcn files. It is **not** removed in React 19, only superseded. Leave those alone.
 
@@ -231,7 +231,7 @@ Suggested message: `chore(deps): upgrade to React 19`
 - Consumes: Task 2.
 - Produces: nothing later tasks depend on.
 
-Correcting a common misconception: recharts 3 does **not** require React 19 — it peers `^16.8 || ^17 || ^18 || ^19`. It is sequenced here because charts are worth verifying right after a React major, not because it is forced.
+Correcting a common misconception: recharts 3 does **not** require React 19 - it peers `^16.8 || ^17 || ^18 || ^19`. It is sequenced here because charts are worth verifying right after a React major, not because it is forced.
 
 Three files import recharts: `monitor-overview.tsx`, `citations/HistoryTab.tsx`, `intelligence/TrendsTab.tsx`. The shadcn `chart.tsx` wrapper that used to complicate this was deleted as dead code.
 
@@ -251,9 +251,9 @@ Expect possible errors from the `TooltipProps` → `TooltipContentProps` rename 
 
 `client/src/components/intelligence/TrendsTab.tsx:209` sets `connectNulls` on a `<Line>`, and its data legitimately contains `hallucinations: number | null` (nulls inserted around line 112).
 
-Recharts' 3.0 migration guide states that `connectNulls={true}` now treats `null` as `0` — but states it for `<Area>`, not `<Line>`. **Verify empirically rather than assume:** run the app, open the Trends tab, and compare the hallucinations line against the pre-upgrade behaviour. A null rendered as a dip to zero is a data-integrity misstatement, not a cosmetic change.
+Recharts' 3.0 migration guide states that `connectNulls={true}` now treats `null` as `0` - but states it for `<Area>`, not `<Line>`. **Verify empirically rather than assume:** run the app, open the Trends tab, and compare the hallucinations line against the pre-upgrade behaviour. A null rendered as a dip to zero is a data-integrity misstatement, not a cosmetic change.
 
-If it does treat nulls as zero, filter the nulls out of the series rather than setting `connectNulls={false}` — a gap is honest, a zero is not. Report which you found and what you did.
+If it does treat nulls as zero, filter the nulls out of the series rather than setting `connectNulls={false}` - a gap is honest, a zero is not. Report which you found and what you did.
 
 - [ ] **Step 4: Full gate**
 
@@ -302,11 +302,11 @@ The audit only inspected `server/instrument.ts`, `server/lib/sentryReport.ts` an
 npm install @sentry/node@10.68.0 @sentry/react@10.68.0
 ```
 
-Note: `@sentry/vite-plugin` is versioned independently and has no v6 — it was already moved to 5.4.0 in Task 1. Do not bump it further.
+Note: `@sentry/vite-plugin` is versioned independently and has no v6 - it was already moved to 5.4.0 in Task 1. Do not bump it further.
 
 - [ ] **Step 3: Check the removed init options**
 
-`enableTracing` and `autoSessionTracking` were removed, and `getCurrentHub()` / `Hub` are gone. `server/instrument.ts:17` already sets `sendDefaultPii: false` explicitly, which matches the safer v9+ default, and line 19 uses an `integrations: (defaults) => defaults` passthrough — both fine.
+`enableTracing` and `autoSessionTracking` were removed, and `getCurrentHub()` / `Hub` are gone. `server/instrument.ts:17` already sets `sendDefaultPii: false` explicitly, which matches the safer v9+ default, and line 19 uses an `integrations: (defaults) => defaults` passthrough - both fine.
 
 Run: `npm run check`
 Expected: clean, or errors only at the sites you found in Step 1.
@@ -319,17 +319,17 @@ npm run check && npm run lint && npm test && npm run test:e2e
 
 Expected: all clean; e2e 61/2/0.
 
-- [ ] **Step 5: Verify errors still reach Sentry — ⚠️ USER ACTION, not verifiable locally**
+- [ ] **Step 5: Verify errors still reach Sentry - ⚠️ USER ACTION, not verifiable locally**
 
-> **`SENTRY_DSN` and `VITE_SENTRY_DSN` are not set in `.env`.** Per `server/instrument.ts`, error capture is a **no-op** without them. So no local check can confirm reporting works — an agent claiming otherwise is claiming something it cannot know.
+> **`SENTRY_DSN` and `VITE_SENTRY_DSN` are not set in `.env`.** Per `server/instrument.ts`, error capture is a **no-op** without them. So no local check can confirm reporting works - an agent claiming otherwise is claiming something it cannot know.
 >
-> This must be confirmed against a deployed environment where the DSN is set. It matters more than usual: the error-sanitisation work earlier in this branch made Sentry the **only** place error detail exists. If the SDK upgrade silently broke reporting, there is no user-visible symptom and nothing fails — you simply stop receiving errors.
+> This must be confirmed against a deployed environment where the DSN is set. It matters more than usual: the error-sanitisation work earlier in this branch made Sentry the **only** place error detail exists. If the SDK upgrade silently broke reporting, there is no user-visible symptom and nothing fails - you simply stop receiving errors.
 >
 > After deploying, trigger a known 500 (`POST /api/stripe/checkout` with an unrecognised `priceId`) and confirm the event appears in your Sentry project.
 
 The original step text follows, retained for the deployed check:
 
-A silently broken error reporter is worse than none, and the gate cannot detect it. Trigger a real error — request `/api/stripe/checkout` with an unknown `priceId`, which is a known 500 — and confirm it appears in your Sentry project.
+A silently broken error reporter is worse than none, and the gate cannot detect it. Trigger a real error - request `/api/stripe/checkout` with an unknown `priceId`, which is a known 500 - and confirm it appears in your Sentry project.
 
 This matters more than usual right now: the recent error-sanitisation work made Sentry the **only** place the detail exists. Report whether the event arrived.
 
@@ -339,11 +339,11 @@ Suggested message: `chore(deps): upgrade Sentry SDKs to 10.x`
 
 ---
 
-> 🔴 **PLAN DEFECT FOUND DURING EXECUTION — Vite 8 and vitest 4 are a coupled pair.**
+> 🔴 **PLAN DEFECT FOUND DURING EXECUTION - Vite 8 and vitest 4 are a coupled pair.**
 >
 > `vitest@3.2.4` declares `vite: "^5 || ^6 || ^7.0.0-0"` as a plain **dependency**, not a peer. It does not support Vite 8, so npm nests a private `vite@7.3.6` for vitest while `vitest.config.ts`'s plugin instance resolves against the root `vite@8.1.5`. The two-instance skew breaks automatic JSX-runtime injection, producing `ReferenceError: React is not defined` across six component test files (21 tests). Confirmed by isolation: forcing a single deduped Vite tree-wide passes.
 >
-> This plan originally sequenced vitest at Task 11, _after_ Vite — which cannot work. **The vitest portion of Task 11 is pulled forward into this task.** The ESLint plugin bumps in Task 11 are independent and stay there.
+> This plan originally sequenced vitest at Task 11, _after_ Vite - which cannot work. **The vitest portion of Task 11 is pulled forward into this task.** The ESLint plugin bumps in Task 11 are independent and stay there.
 >
 > Also required and unplanned: `esbuild` 0.25.0 → 0.28.1, because Vite 8's optional peer needs `^0.27 || ^0.28`.
 
@@ -358,7 +358,7 @@ Suggested message: `chore(deps): upgrade Sentry SDKs to 10.x`
 - Consumes: Task 2.
 - Produces: build toolchain that Task 8 depends on.
 
-Vite 8 swaps the bundler from esbuild/Rollup to Rolldown/Oxc. The config surface here is genuinely clean — no `rollupOptions`, no `optimizeDeps.esbuildOptions`, no custom `resolve.mainFields`, no `import.meta.hot.accept(url)` anywhere. The risk is not config, it is that a different bundler produces different output.
+Vite 8 swaps the bundler from esbuild/Rollup to Rolldown/Oxc. The config surface here is genuinely clean - no `rollupOptions`, no `optimizeDeps.esbuildOptions`, no custom `resolve.mainFields`, no `import.meta.hot.accept(url)` anywhere. The risk is not config, it is that a different bundler produces different output.
 
 - [ ] **Step 1: Upgrade**
 
@@ -366,7 +366,7 @@ Vite 8 swaps the bundler from esbuild/Rollup to Rolldown/Oxc. The config surface
 npm install -D vite@8.1.5
 ```
 
-`@vitejs/plugin-react` is pinned `^5.0.4`; version 5.2.0 adds Vite 8 support and is already inside that range, so the lockfile refresh resolves it with no `package.json` edit. **Do not** jump to plugin-react 6.x — it requires new peers and opts you into the React Compiler, which is out of scope.
+`@vitejs/plugin-react` is pinned `^5.0.4`; version 5.2.0 adds Vite 8 support and is already inside that range, so the lockfile refresh resolves it with no `package.json` edit. **Do not** jump to plugin-react 6.x - it requires new peers and opts you into the React Compiler, which is out of scope.
 
 - [ ] **Step 2: Build and compare output**
 
@@ -374,7 +374,7 @@ npm install -D vite@8.1.5
 npm run build
 ```
 
-Expected: succeeds. Then inspect `dist/public/` — confirm assets are present and the bundle sizes are in the same order of magnitude as before. A different bundler can legitimately change chunking; a 10x size change is a red flag worth reporting.
+Expected: succeeds. Then inspect `dist/public/` - confirm assets are present and the bundle sizes are in the same order of magnitude as before. A different bundler can legitimately change chunking; a 10x size change is a red flag worth reporting.
 
 - [ ] **Step 3: Verify Sentry sourcemap upload still fires**
 
@@ -405,7 +405,7 @@ Suggested message: `chore(deps): upgrade Vite to 8.x`
 - Consumes: Task 1.
 - Produces: nothing later tasks depend on.
 
-The audit found only **two** certain breaks, both mechanical. The change that sounds scariest — the query-parser default flipping from `extended` to `simple` — is a complete no-op here: all ~30 `req.query` reads are flat scalars, exhaustively verified.
+The audit found only **two** certain breaks, both mechanical. The change that sounds scariest - the query-parser default flipping from `extended` to `simple` - is a complete no-op here: all ~30 `req.query` reads are flat scalars, exhaustively verified.
 
 - [ ] **Step 1: Upgrade, including the types**
 
@@ -433,7 +433,7 @@ app.use((req, res) => {
 });
 ```
 
-Scope note: these run only under `npm run dev` and `npm start`. Vercel bypasses them via `vercel.json`'s SPA rewrite, so production traffic is unaffected — but local dev breaks hard without the fix.
+Scope note: these run only under `npm run dev` and `npm start`. Vercel bypasses them via `vercel.json`'s SPA rewrite, so production traffic is unaffected - but local dev breaks hard without the fix.
 
 - [ ] **Step 3: Confirm nothing else uses removed routing syntax**
 
@@ -449,11 +449,11 @@ Expected: no bare `*`, no optional `:param?`, no regex-string routes. `server/ro
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
 
-Then verify the two raw-body webhook mounts still work. `server/app.ts:143-167` (Stripe) and `:169-240` (Resend) both use `express.raw()` ahead of the `express.json()` mount and check `Buffer.isBuffer(req.body)`. These are payment-adjacent, so confirm by hand rather than trusting the gate — the e2e suite does not exercise webhooks.
+Then verify the two raw-body webhook mounts still work. `server/app.ts:143-167` (Stripe) and `:169-240` (Resend) both use `express.raw()` ahead of the `express.json()` mount and check `Buffer.isBuffer(req.body)`. These are payment-adjacent, so confirm by hand rather than trusting the gate - the e2e suite does not exercise webhooks.
 
 - [ ] **Step 5: Note a behaviour improvement, do not "fix" it**
 
-Express 5 auto-forwards promise rejections to error middleware. `server/routes/mentions.ts` has 13 async handlers registered without `asyncHandler`; under Express 5 these now return clean error responses instead of hanging. That is an improvement — do not mistake the changed behaviour for a regression.
+Express 5 auto-forwards promise rejections to error middleware. `server/routes/mentions.ts` has 13 async handlers registered without `asyncHandler`; under Express 5 these now return clean error responses instead of hanging. That is an improvement - do not mistake the changed behaviour for a regression.
 
 - [ ] **Step 6: Report, do not commit**
 
@@ -473,7 +473,7 @@ Suggested message: `chore(deps): upgrade Express to 5.x`
 - Consumes: Task 1.
 - Produces: nothing later tasks depend on.
 
-🔴 **These two must move in the same commit.** `drizzle-zod` is only genuinely Zod-4-compatible at **0.8.3+**, and its current 0.7.x declares an unbounded `zod >=3.0.0` peer — so npm will **not** stop a broken install. `shared/schema.ts` calls `createInsertSchema()` 45 times; getting this wrong breaks validation across the app silently.
+🔴 **These two must move in the same commit.** `drizzle-zod` is only genuinely Zod-4-compatible at **0.8.3+**, and its current 0.7.x declares an unbounded `zod >=3.0.0` peer - so npm will **not** stop a broken install. `shared/schema.ts` calls `createInsertSchema()` 45 times; getting this wrong breaks validation across the app silently.
 
 - [ ] **Step 1: Upgrade both together**
 
@@ -481,13 +481,13 @@ Suggested message: `chore(deps): upgrade Express to 5.x`
 npm install zod@4.4.3 drizzle-zod@0.8.3
 ```
 
-- [ ] **Step 2: Fix the `.errors` sites — there are 18, not 13**
+- [ ] **Step 2: Fix the `.errors` sites - there are 18, not 13**
 
 > ⚠️ A pre-analysis pass found the original audit **undercounted by five**. It missed both `server/routes/brands.ts` catch-block sites, which use an `instanceof ZodError` pattern rather than `safeParse().error.errors`, and it undercounted repeated occurrences in `factSheet.ts` and `factSheetV2.ts`. Nine further sites already use `.issues` correctly and must not be touched.
 >
 > **The authoritative, verified list with exact line numbers and surrounding expressions is in `scratchpad/p1/tailwind-zod-analysis.md`.** Work from that, not from the list below, which is retained only to show what the original audit believed.
 
-`ZodError.errors` was **removed** in v4 — not deprecated, gone. Accessing it yields `undefined` and throws on any malformed request. Replace with `.issues` at exactly these sites:
+`ZodError.errors` was **removed** in v4 - not deprecated, gone. Accessing it yields `undefined` and throws on any malformed request. Replace with `.issues` at exactly these sites:
 
 - `server/routes/assistant.ts:185`
 - `server/routes/brands.ts:366`, `:420`
@@ -507,7 +507,7 @@ grep -rn "\.errors" server/ --include=*.ts | grep -i "zod\|parsed\|result\|valid
 
 Run: `npm run check`
 
-`shared/schema.ts`'s `createInsertSchema()` calls are the highest-risk surface — drizzle's own issue tracker flags coerced and enum fields specifically. Errors here are the reason this task exists; fix them properly rather than casting.
+`shared/schema.ts`'s `createInsertSchema()` calls are the highest-risk surface - drizzle's own issue tracker flags coerced and enum fields specifically. Errors here are the reason this task exists; fix them properly rather than casting.
 
 - [ ] **Step 4: Regression-test the JSON-schema generation path**
 
@@ -521,7 +521,7 @@ Expected: passing. Also confirm the generated schema still has the expected shap
 
 - [ ] **Step 5: Leave the deprecated-but-working forms alone**
 
-`.strict()` at `server/routes/intelligence.ts:356`, `.passthrough()` at `server/lib/agentTaskSchemas.ts:10`, and `z.string().url()` / `.email()` in `server/env.ts` and `shared/factAgent/schema.ts` are all deprecated in v4 but still functional. Migrating them is churn with no benefit in this task — leave them.
+`.strict()` at `server/routes/intelligence.ts:356`, `.passthrough()` at `server/lib/agentTaskSchemas.ts:10`, and `z.string().url()` / `.email()` in `server/env.ts` and `shared/factAgent/schema.ts` are all deprecated in v4 but still functional. Migrating them is churn with no benefit in this task - leave them.
 
 - [ ] **Step 6: Full gate**
 
@@ -550,9 +550,9 @@ Suggested message: `chore(deps): upgrade Zod to 4.x and drizzle-zod to 0.8.x`
 - Consumes: Task 5 (Vite 8).
 - Produces: nothing later tasks depend on.
 
-🔴 **`tailwindcss` and `tailwind-merge` must move in the same commit** — tailwind-merge v3 assumes v4 class syntax project-wide via the shared `cn()` helper.
+🔴 **`tailwindcss` and `tailwind-merge` must move in the same commit** - tailwind-merge v3 assumes v4 class syntax project-wide via the shared `cn()` helper.
 
-**Good news the audit established:** your OKLCH design-token system **survives without restructuring**. In `@config` compatibility mode the exclusion list (`corePlugins`, `safelist`, `separator`) does not touch `theme.extend.colors`, `darkMode`, `content` or `plugins` — all of which `tailwind.config.ts` uses. The hand-written `oklch(...)` values in `index.css` were never part of Tailwind's generated palette.
+**Good news the audit established:** your OKLCH design-token system **survives without restructuring**. In `@config` compatibility mode the exclusion list (`corePlugins`, `safelist`, `separator`) does not touch `theme.extend.colors`, `darkMode`, `content` or `plugins` - all of which `tailwind.config.ts` uses. The hand-written `oklch(...)` values in `index.css` were never part of Tailwind's generated palette.
 
 - [ ] **Step 1: Run the official codemod first**
 
@@ -560,7 +560,7 @@ Suggested message: `chore(deps): upgrade Zod to 4.x and drizzle-zod to 0.8.x`
 npx @tailwindcss/upgrade
 ```
 
-This automates the `@tailwind` → `@import` swap and the `outline-none` → `outline-hidden` rename across **64 occurrences in 41 files**. Review its diff before proceeding — do not accept it blindly.
+This automates the `@tailwind` → `@import` swap and the `outline-none` → `outline-hidden` rename across **64 occurrences in 41 files**. Review its diff before proceeding - do not accept it blindly.
 
 - [ ] **Step 2: Upgrade the packages together**
 
@@ -568,11 +568,11 @@ This automates the `@tailwind` → `@import` swap and the `outline-none` → `ou
 npm install tailwindcss@4.3.3 tailwind-merge@3.6.0 && npm install -D @tailwindcss/typography@0.5.20 @tailwindcss/vite@4.3.3
 ```
 
-`@tailwindcss/typography` only needs a minor bump — stable v4 support landed in 0.5.20, not a major.
+`@tailwindcss/typography` only needs a minor bump - stable v4 support landed in 0.5.20, not a major.
 
 - [ ] **Step 3: Switch from PostCSS to the Vite plugin**
 
-`@tailwindcss/vite` is already a dependency but has never been registered — `vite.config.ts`'s plugins array does not import it. It is currently inert. For a pure-Vite SPA this is the cleaner path than `@tailwindcss/postcss`.
+`@tailwindcss/vite` is already a dependency but has never been registered - `vite.config.ts`'s plugins array does not import it. It is currently inert. For a pure-Vite SPA this is the cleaner path than `@tailwindcss/postcss`.
 
 Add it to `vite.config.ts`:
 
@@ -589,7 +589,7 @@ export default defineConfig({
 });
 ```
 
-Then delete `postcss.config.js` — `tailwindcss` is no longer a PostCSS plugin in v4.
+Then delete `postcss.config.js` - `tailwindcss` is no longer a PostCSS plugin in v4.
 
 - [ ] **Step 4: Verify the token system survived**
 
@@ -599,13 +599,13 @@ npm run build
 
 Then run the app and confirm in the browser that CSS custom properties resolve: `getComputedStyle(document.documentElement).getPropertyValue('--brand-accent')` should return an `oklch(...)` value, not empty. Check both light and dark themes.
 
-This is the single highest-value check in the task — if the tokens broke, everything looks subtly wrong rather than obviously broken.
+This is the single highest-value check in the task - if the tokens broke, everything looks subtly wrong rather than obviously broken.
 
 - [ ] **Step 5: Visual QA the two changed utility defaults**
 
 Two changes need eyes, not a typecheck:
 
-- **`space-x` / `space-y` / `divide`** changed selector from `:not([hidden]) ~ :not([hidden])` to `:not(:last-child)` — **326 occurrences across 84 files**. Do **not** eyeball all of them. A pre-analysis pass narrowed this: **55 sites have a conditionally-rendered direct child**, and of those **17 have the conditional as the _last_ child** — exactly where the new selector diverges, so they will visibly gain or lose trailing spacing.
+- **`space-x` / `space-y` / `divide`** changed selector from `:not([hidden]) ~ :not([hidden])` to `:not(:last-child)` - **326 occurrences across 84 files**. Do **not** eyeball all of them. A pre-analysis pass narrowed this: **55 sites have a conditionally-rendered direct child**, and of those **17 have the conditional as the _last_ child** - exactly where the new selector diverges, so they will visibly gain or lose trailing spacing.
 
   Check those 17 first. They include `brands.tsx:536`, `community-engagement.tsx:341/526/657/758`, `crawler-check.tsx:154/225/417`, and `geo-signals.tsx:915/1051/1204/1476`. The complete list is in `scratchpad/p1/tailwind-zod-analysis.md`. If all 17 are correct, the remaining 271 unconditional sites are safe by construction.
 
@@ -617,7 +617,7 @@ Two changes need eyes, not a typecheck:
 npm run check && npm run lint && npm test && npm run test:e2e
 ```
 
-Expected: all clean; e2e 61/2/0. Note the e2e suite asserts behaviour, not appearance — it will **not** catch a visual regression, which is why Step 5 exists.
+Expected: all clean; e2e 61/2/0. Note the e2e suite asserts behaviour, not appearance - it will **not** catch a visual regression, which is why Step 5 exists.
 
 - [ ] **Step 7: Report, do not commit**
 
@@ -640,7 +640,7 @@ Graded LOW by the audit, for one decisive reason: `server/stripeClient.ts:18-22`
 
 🔴 **The single most important rule for this task: do not touch that pin.** Removing or changing it reintroduces every risk this task otherwise avoids.
 
-The two browser packages `@stripe/stripe-js` and `@stripe/react-stripe-js` were already removed as dead code — checkout is server-driven via a hosted Checkout Session and Elements is never used.
+The two browser packages `@stripe/stripe-js` and `@stripe/react-stripe-js` were already removed as dead code - checkout is server-driven via a hosted Checkout Session and Elements is never used.
 
 - [ ] **Step 1: Upgrade**
 
@@ -660,7 +660,7 @@ Expected: the `apiVersion` is still passed to the `Stripe` constructor and still
 
 Run: `npm run check`
 
-The v21/v22 breaking changes — `Stripe` becoming a true ES6 class, callback-style removal, positional-argument changes, CJS destructured require, the `types/` directory removal — are all already satisfied by existing code style. `server/stripeClient.ts:22` and `scripts/setup-stripe-products.ts:3` both use `new Stripe(...)` and `import Stripe from "stripe"`.
+The v21/v22 breaking changes - `Stripe` becoming a true ES6 class, callback-style removal, positional-argument changes, CJS destructured require, the `types/` directory removal - are all already satisfied by existing code style. `server/stripeClient.ts:22` and `scripts/setup-stripe-products.ts:3` both use `new Stripe(...)` and `import Stripe from "stripe"`.
 
 - [ ] **Step 4: Full gate**
 
@@ -670,7 +670,7 @@ npm run check && npm run lint && npm test && npm run test:e2e
 
 Expected: all clean; e2e 61/2/0.
 
-`tests/e2e/billing.spec.ts` asserts the checkout endpoint returns 500 with the generic message `"Failed to create checkout session"` and **no** SQL in the body. That behaviour is unrelated to the SDK version, so it should pass unchanged. If it does not, report the actual response before changing anything — the billing bugs are deliberately unfixed and must stay that way.
+`tests/e2e/billing.spec.ts` asserts the checkout endpoint returns 500 with the generic message `"Failed to create checkout session"` and **no** SQL in the body. That behaviour is unrelated to the SDK version, so it should pass unchanged. If it does not, report the actual response before changing anything - the billing bugs are deliberately unfixed and must stay that way.
 
 - [ ] **Step 5: Report, do not commit**
 
@@ -678,9 +678,9 @@ Suggested message: `chore(deps): upgrade Stripe SDK to 22.x`
 
 ---
 
-> 🔴 **PLAN GAP FOUND DURING EXECUTION — this plan covered 17 packages; 59 were outdated.**
+> 🔴 **PLAN GAP FOUND DURING EXECUTION - this plan covered 17 packages; 59 were outdated.**
 >
-> The dependency audit was scoped to the 17 packages listed in the design spec's §7 table, which was written as "the interesting ones" rather than "all of them". **Neither the audit nor this plan ever ran `npm outdated`**, so the full baseline was never established — while the stated goal was "every dependency to its latest safe version".
+> The dependency audit was scoped to the 17 packages listed in the design spec's §7 table, which was written as "the interesting ones" rather than "all of them". **Neither the audit nor this plan ever ran `npm outdated`**, so the full baseline was never established - while the stated goal was "every dependency to its latest safe version".
 >
 > Discovered while investigating an `openai`/`zod` peer warning during Task 9. Tasks 9b–9d below close it.
 >
@@ -688,12 +688,12 @@ Suggested message: `chore(deps): upgrade Stripe SDK to 22.x`
 
 ### Task 9b: Bulk minor/patch sweep
 
-**~44 packages**, no major version changes — mostly Radix primitives, plus `@supabase/supabase-js`, `@tanstack/react-query`, `@playwright/test`.
+**~44 packages**, no major version changes - mostly Radix primitives, plus `@supabase/supabase-js`, `@tanstack/react-query`, `@playwright/test`.
 
 Low risk as a batch precisely because none crosses a major boundary. Run as one install and one gate rather than 44 rounds.
 
 - [ ] Install all outstanding minor/patch updates in one command.
-- [ ] Full gate. Any failure is attributable to a small, bounded set — bisect only if something breaks.
+- [ ] Full gate. Any failure is attributable to a small, bounded set - bisect only if something breaks.
 - [ ] Report, do not commit.
 
 ### Task 9c: Low-risk missed majors
@@ -702,7 +702,7 @@ Test and tooling only, so a break is visible immediately and cannot reach produc
 
 `@testing-library/jest-dom` 6→7 · `@types/supertest` 6→7 · `lint-staged` 15→17 · `globals` 15→17 · `uuid` 11→14 · `@types/node` 20→26
 
-`@types/node` is the one to watch — a six-major jump in ambient Node types can surface type errors across `server/`.
+`@types/node` is the one to watch - a six-major jump in ambient Node types can surface type errors across `server/`.
 
 - [ ] Install, resolve any type errors **at the type level**, full gate.
 
@@ -710,10 +710,10 @@ Test and tooling only, so a break is visible immediately and cannot reach produc
 
 Four packages that touch production behaviour. Each needs its own reasoning, not a batch install:
 
-- **`openai` 5→6** — core to the product. Check the client construction, streaming, and structured-output paths. The app does **not** use `openai/helpers/zod` (verified), so the optional zod peer is irrelevant.
-- **`pino` 9→10 + `pino-pretty` 11→13** — logging throughout `server/`. A logger that silently changes format or drops fields is hard to notice and hard to debug later.
-- **`express-rate-limit` 7→8** — this is the login limiter (10 per IP/email per 15 min). A behaviour change here affects both security and the e2e suite's budget.
-- **`@hookform/resolvers` 3→5** — two majors, and it bridges `react-hook-form` to zod, which just moved to v4.
+- **`openai` 5→6** - core to the product. Check the client construction, streaming, and structured-output paths. The app does **not** use `openai/helpers/zod` (verified), so the optional zod peer is irrelevant.
+- **`pino` 9→10 + `pino-pretty` 11→13** - logging throughout `server/`. A logger that silently changes format or drops fields is hard to notice and hard to debug later.
+- **`express-rate-limit` 7→8** - this is the login limiter (10 per IP/email per 15 min). A behaviour change here affects both security and the e2e suite's budget.
+- **`@hookform/resolvers` 3→5** - two majors, and it bridges `react-hook-form` to zod, which just moved to v4.
 
 - [ ] Upgrade one at a time with a gate between, so attribution stays cheap.
 
@@ -732,7 +732,7 @@ Four packages that touch production behaviour. Each needs its own reasoning, not
 
 🔴 **Ships alone.** TypeScript majors interact with every other package's types; bundling this with anything else makes a failure impossible to attribute.
 
-**6.0.3, not 7.** Verified against the npm registry: `6.0.2` and `6.0.3` are real stable releases, and `typescript-eslint` peers `typescript >=4.8.4 <6.1.0` — so 6.0.3 is the **highest** version that keeps type-aware linting working. TypeScript 7 ships no compiler API and the typescript-eslint issue to support it was closed _not planned_.
+**6.0.3, not 7.** Verified against the npm registry: `6.0.2` and `6.0.3` are real stable releases, and `typescript-eslint` peers `typescript >=4.8.4 <6.1.0` - so 6.0.3 is the **highest** version that keeps type-aware linting working. TypeScript 7 ships no compiler API and the typescript-eslint issue to support it was closed _not planned_.
 
 - [ ] **Step 1: Upgrade**
 
@@ -750,11 +750,11 @@ npm install -D typescript@6.0.3
 
 - [ ] **Step 3: Verify the path aliases still resolve**
 
-An intermediate source claimed `baseUrl` is removed in TypeScript 6/7. This was **not** confirmed against primary documentation and is flagged low-confidence — but `tsconfig.json:16`'s `baseUrl` underpins the `@/*` and `@shared/*` aliases used throughout `client/src`, so verify rather than assume.
+An intermediate source claimed `baseUrl` is removed in TypeScript 6/7. This was **not** confirmed against primary documentation and is flagged low-confidence - but `tsconfig.json:16`'s `baseUrl` underpins the `@/*` and `@shared/*` aliases used throughout `client/src`, so verify rather than assume.
 
 Run: `npm run check`
 
-If alias resolution breaks, migrate to `paths` without `baseUrl` (supported since TS 4.x) rather than removing the aliases. Note that Vite resolves aliases independently via `vite.config.ts:37-42`, so a build can succeed while the typecheck fails — do not let that mask the problem.
+If alias resolution breaks, migrate to `paths` without `baseUrl` (supported since TS 4.x) rather than removing the aliases. Note that Vite resolves aliases independently via `vite.config.ts:37-42`, so a build can succeed while the typecheck fails - do not let that mask the problem.
 
 - [ ] **Step 4: Confirm the linting toolchain still works**
 
@@ -764,7 +764,7 @@ This is the whole reason 6.0.3 was chosen over 7.
 npm run lint
 ```
 
-Expected: clean, with type-aware rules still running. If `typescript-eslint` reports an unsupported TypeScript version, stop and report — do not proceed to Phase 2 with linting broken.
+Expected: clean, with type-aware rules still running. If `typescript-eslint` reports an unsupported TypeScript version, stop and report - do not proceed to Phase 2 with linting broken.
 
 - [ ] **Step 5: Full gate**
 
@@ -811,13 +811,13 @@ Expected: all 148 files passing. If failures appear, look for arrow-function moc
 
 `vitest-axe@0.1.0` is unmaintained and used in exactly one test (`tests/unit/MentionsTab.test.tsx`). It has no upper peer bound so it will not block, but treat that test as the canary.
 
-- [ ] **Step 3: Upgrade the ESLint plugins — but NOT ESLint itself**
+- [ ] **Step 3: Upgrade the ESLint plugins - but NOT ESLint itself**
 
 ```bash
 npm install -D typescript-eslint@latest eslint-config-prettier@10.1.8 eslint-plugin-react-refresh@0.5.3
 ```
 
-🔴 **`eslint` stays at 9.x.** Do not upgrade it. Do not upgrade `eslint-plugin-react`. Do not upgrade `eslint-plugin-react-hooks` — its next compatible release is a 5→7 jump with new rules, which is a separate project, not a version bump.
+🔴 **`eslint` stays at 9.x.** Do not upgrade it. Do not upgrade `eslint-plugin-react`. Do not upgrade `eslint-plugin-react-hooks` - its next compatible release is a 5→7 jump with new rules, which is a separate project, not a version bump.
 
 - [ ] **Step 4: Verify lint still runs**
 
@@ -825,7 +825,7 @@ npm install -D typescript-eslint@latest eslint-config-prettier@10.1.8 eslint-plu
 npm run lint
 ```
 
-Expected: clean. If it crashes rather than reporting rule violations, something upgraded ESLint transitively — check `npm ls eslint` and pin it back to 9.x.
+Expected: clean. If it crashes rather than reporting rule violations, something upgraded ESLint transitively - check `npm ls eslint` and pin it back to 9.x.
 
 - [ ] **Step 5: Full gate**
 
@@ -855,7 +855,7 @@ npm run test:e2e -- --reporter=list > /tmp/phase1-e2e.txt 2>&1; echo "EXIT=$?" >
 
 - [ ] **Step 2: Write the baseline**
 
-Record: the date, the final version of every upgraded package, the e2e result, anything that needed a code change beyond a version bump and why, every visual-QA observation from Tasks 1, 3, 5 and 8, and anything deliberately **not** upgraded with the reason — ESLint 9, `eslint-plugin-react`, `eslint-plugin-react-hooks`, TypeScript 7, and the eight unused Radix packages.
+Record: the date, the final version of every upgraded package, the e2e result, anything that needed a code change beyond a version bump and why, every visual-QA observation from Tasks 1, 3, 5 and 8, and anything deliberately **not** upgraded with the reason - ESLint 9, `eslint-plugin-react`, `eslint-plugin-react-hooks`, TypeScript 7, and the eight unused Radix packages.
 
 - [ ] **Step 3: Report, do not commit**
 
@@ -869,8 +869,8 @@ Suggested message: `docs: record phase 1 dependency baseline`
 - [ ] `npm run check`, `npm run lint`, `npm test` and `npm run test:e2e` all clean, with e2e at **61 passed / 2 skipped / 0 failed**.
 - [ ] `npm run build` succeeds and Sentry sourcemap upload still fires.
 - [ ] Visual QA done for the tour engine (Task 1), the Trends chart's null handling (Task 3), and Tailwind's spacing and focus rings (Task 8).
-- [ ] A real error confirmed arriving in Sentry (Task 4) — it is now the only place error detail exists.
-- [ ] Stripe webhooks smoke-tested by hand (Task 6) — the e2e suite does not cover them.
+- [ ] A real error confirmed arriving in Sentry (Task 4) - it is now the only place error detail exists.
+- [ ] Stripe webhooks smoke-tested by hand (Task 6) - the e2e suite does not cover them.
 - [ ] `STRIPE_API_VERSION` pin verified intact (Task 9).
 - [ ] Baseline recorded.
 

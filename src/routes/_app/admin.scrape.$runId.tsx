@@ -15,8 +15,8 @@ const AdminScrapeInspector = lazy(() => import("@/pages/admin-scrape-inspector")
 // esm/useMatch.js: `React.useContext(matchContext)`), not an opt-in
 // registration a wouter-style ancestor <Route> would need to populate. That
 // context is available to any descendant of this route's rendered component
-// tree — including AdminScrapeInspector nested one level deeper inside
-// AuthenticatedRoute — with no wrapper required. $runId is this route's own
+// tree - including AdminScrapeInspector nested one level deeper inside
+// AuthenticatedRoute - with no wrapper required. $runId is this route's own
 // path param, so match.params already contains it.
 //
 // client/src/pages/admin-scrape-inspector.tsx reads `runId` with
@@ -25,13 +25,13 @@ const AdminScrapeInspector = lazy(() => import("@/pages/admin-scrape-inspector")
 // exact route's match context, not a shared multi-route component, so it can
 // name its route and get the param fully typed.
 export const Route = createFileRoute("/_app/admin/scrape/$runId")({
-  // AdminScrapeInspector used to set `<title>{`Scrape inspector — ${brand?.
+  // AdminScrapeInspector used to set `<title>{`Scrape inspector - ${brand?.
   // name ?? run.id}`}</title>` itself, computed from a client-side useQuery
-  // result — there is no loader here to compute that server-side, and this
+  // result - there is no loader here to compute that server-side, and this
   // task's file scope doesn't add one. Falls back to a static title
-  // matching the sibling /admin/scrape list route's "Recent scrapes —
+  // matching the sibling /admin/scrape list route's "Recent scrapes -
   // admin" naming convention; this is an admin-only, auth-gated page so
   // the exact title has no SEO stakes.
-  head: () => ({ meta: [{ title: "Scrape inspector — admin" }] }),
+  head: () => ({ meta: [{ title: "Scrape inspector - admin" }] }),
   component: () => <AuthenticatedRoute component={AdminScrapeInspector} />,
 });

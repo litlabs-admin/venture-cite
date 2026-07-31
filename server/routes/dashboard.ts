@@ -1,12 +1,12 @@
-// Dashboard aggregate endpoints (Track 12 — AI Visibility Report redesign).
+// Dashboard aggregate endpoints (Track 12 - AI Visibility Report redesign).
 //
 // Thin read-only endpoints that assemble the hero/rankings/gap-matrix/
 // entity-strength views from existing Phase-1 tables. No new schema.
 //
 // Included:
-//   GET /api/dashboard/hero/:brandId            — hero row numbers
-//   GET /api/dashboard/rankings/:brandId        — per-platform rollup + snippets
-//   GET /api/dashboard/gap-matrix/:brandId      — competitor × query-type cells
+//   GET /api/dashboard/hero/:brandId            - hero row numbers
+//   GET /api/dashboard/rankings/:brandId        - per-platform rollup + snippets
+//   GET /api/dashboard/gap-matrix/:brandId      - competitor × query-type cells
 
 import type { Express } from "express";
 import { storage } from "../storage";
@@ -37,7 +37,7 @@ import { scanPagesForFindings } from "../lib/siteHealthContentScan";
 import type { SiteHealthFinding } from "@shared/siteHealthFindings";
 
 // Platforms we surface on the dashboard. Only platforms in this list
-// are rendered as rows — matches the set we actually query via
+// are rendered as rows - matches the set we actually query via
 // citationChecker. Adding a platform here requires adding it to the
 // citation runner too.
 const CORE_PLATFORMS = AI_PLATFORMS_CORE;
@@ -45,7 +45,7 @@ const CORE_PLATFORMS = AI_PLATFORMS_CORE;
 // Strip the citation-delimiter markers from a stored citationContext.
 // Rows are persisted as "{statusLine}\n\n||| RAW_RESPONSE |||\n{body}"
 // (or the older "--- RAW RESPONSE ---"). For dashboard display we only
-// want the body text — the status line is redundant with the Cited/Not
+// want the body text - the status line is redundant with the Cited/Not
 // cited pill the UI already renders.
 function extractResponseBody(ctx: string | null | undefined): string | null {
   if (!ctx) return null;
@@ -57,7 +57,7 @@ function extractResponseBody(ctx: string | null | undefined): string | null {
       return body.length > 0 ? body : null;
     }
   }
-  // No delimiter — treat whole string as body, unless it starts with the
+  // No delimiter - treat whole string as body, unless it starts with the
   // obvious "Cited" / "Not cited" status lines, in which case skip it.
   const trimmed = ctx.trim();
   if (/^(Cited|Not cited|Check failed)/i.test(trimmed)) return null;
@@ -72,11 +72,11 @@ async function requireOwnedBrand(req: any) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared loader — brand prompts + cited/uncited rankings.
+// Shared loader - brand prompts + cited/uncited rankings.
 //
 // Wave 9.2: accepts an optional `since` Date overriding the default
 // 30-day window. Used by Citations to scope dashboard reads to "rankings
-// from the active run only" while a fresh run is in flight — without
+// from the active run only" while a fresh run is in flight - without
 // this, completed-cells from the new run mix with un-rechecked-cells
 // from the old run for the entire run duration. When `since` is null
 // (no active run), behavior is unchanged: 30-day rolling window.
@@ -96,7 +96,7 @@ async function loadRankingsContext(
 }
 
 // Wave 9.2: parse the optional ?since=<ISO> query param. Returns null
-// when missing or malformed — the loader then falls back to the default
+// when missing or malformed - the loader then falls back to the default
 // 30-day window. Defensive against junk input (clients only ever pass
 // what useActiveCitationRuns surfaced, but we guard anyway).
 function parseSinceQuery(req: { query: Record<string, unknown> }): Date | null {
@@ -120,7 +120,7 @@ function lastScanAt(rankings: GeoRanking[]): Date | null {
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/dashboard/site-health/:brandId — in-module robots.txt cache.
+// GET /api/dashboard/site-health/:brandId - in-module robots.txt cache.
 //
 // The crawler-access evaluation hits the network (robots.txt fetch), which
 // is too slow/expensive to redo on every dashboard load. Cache per brandId
@@ -143,13 +143,13 @@ type SiteHealthCacheEntry = {
   unknown: number;
   blockedCrawlers: string[];
   platform: string | null;
-  // Sitemap URL count — the SITE's size (crawled pages the sitemap
+  // Sitemap URL count - the SITE's size (crawled pages the sitemap
   // advertises), distinct from `pagesFetched` on a scrape run (the
   // cost-bounded fact-extraction SAMPLE, ~10 URLs). null = sitemap
   // unavailable/unfetchable; the UI falls back to pagesCrawled.
   sitemapUrlCount: number | null;
   // PENDING, not measured. Set only on the deadline-timeout placeholder
-  // returned by getSiteHealthCached when the real compute hasn't finished —
+  // returned by getSiteHealthCached when the real compute hasn't finished -
   // never set on anything that reaches cacheSiteHealth. A pending entry
   // carries all-false/null discovery and zero crawler counts, which look
   // exactly like a genuinely terrible site if a caller forgets to check this
@@ -160,18 +160,18 @@ const SITE_HEALTH_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 // BOUNDED. A plain unbounded Map here was a slow memory leak: entries are only
 // ever overwritten per brand, never removed, so a long-lived process serving
 // many brands grows forever. Map preserves insertion order, so deleting the
-// first key evicts the oldest — enough for a cache this small, without pulling
+// first key evicts the oldest - enough for a cache this small, without pulling
 // in an LRU dependency.
 const SITE_HEALTH_CACHE_MAX = 500;
 // Bounded wait for a cold-cache compute before answering with a placeholder.
 //
 // Was 4s. Live probing against apple.com measured: robots 477ms, sitemap
 // 135ms, llms.txt 7777ms (a 404 that serves a 110KB custom error page),
-// mcp.json 1531ms, security.txt 132ms — i.e. a real, honest compute that
+// mcp.json 1531ms, security.txt 132ms - i.e. a real, honest compute that
 // legitimately exceeds 4s on a slow 404 page. 4s guaranteed a timeout on any
 // site with one slow discovery file, and the timeout placeholder used to be
 // scored and rendered as if it were real data (all-false discovery, zero
-// crawler counts) — a timeout is not a measurement. 9s gives probes (each
+// crawler counts) - a timeout is not a measurement. 9s gives probes (each
 // individually capped at 10s) room to actually finish while still protecting
 // the dashboard from a truly hung site.
 const SITE_HEALTH_DEADLINE_MS = 9_000;
@@ -183,7 +183,7 @@ const siteHealthCache = new Map<string, SiteHealthCacheEntry>();
 
 // Coalesces concurrent computes for the SAME brand. Without this, N dashboard
 // loads landing together on a cold cache each fired their own ~5 outbound
-// requests (robots + 3 discovery probes + homepage) at the customer's site — a
+// requests (robots + 3 discovery probes + homepage) at the customer's site - a
 // thundering herd we point at someone else's server. Now the first caller does
 // the work and the rest await its promise.
 const siteHealthInFlight = new Map<string, Promise<SiteHealthCacheEntry>>();
@@ -228,7 +228,7 @@ async function getSiteHealthCached(
   siteHealthInFlight.set(brandId, work);
 
   // DEADLINE. The underlying probes each allow 10s, so a slow customer site
-  // could hold this HTTP response open for ~10s — one unresponsive domain
+  // could hold this HTTP response open for ~10s - one unresponsive domain
   // stalling someone's dashboard. Wait a bounded time, then answer with what
   // we have.
   //
@@ -242,7 +242,7 @@ async function getSiteHealthCached(
   const raced = await Promise.race([work.catch(() => null), deadline]);
   if (raced) return raced;
   if (cached) return cached;
-  // PENDING placeholder — NEVER cached (see cacheSiteHealth callers; this
+  // PENDING placeholder - NEVER cached (see cacheSiteHealth callers; this
   // object is returned directly, never passed to cacheSiteHealth). Discovery
   // is UNKNOWN (null), not "absent" (false): a slow site's files may well
   // exist, we just haven't found out yet within the deadline. `pending: true`
@@ -264,7 +264,7 @@ async function getSiteHealthCached(
 }
 
 // UNKNOWN, not "absent". Used for the pending-timeout placeholder and as the
-// degrade-on-throw default in computeSiteHealth — both cases mean "we could
+// degrade-on-throw default in computeSiteHealth - both cases mean "we could
 // not measure this", never "confirmed missing".
 const EMPTY_DISCOVERY = {
   robotsTxt: null,
@@ -274,7 +274,7 @@ const EMPTY_DISCOVERY = {
   securityTxt: null,
 } as const;
 
-// Bounded fetcher adapter for discoverSitemapUrls — reuses the same
+// Bounded fetcher adapter for discoverSitemapUrls - reuses the same
 // SSRF-safe fetch as robots/discovery, capped byte size, never throws.
 const sitemapFetcher = async (url: string, opts?: { maxBytes?: number }) => {
   const { status, text } = await safeFetchText(url, {
@@ -287,13 +287,13 @@ const sitemapFetcher = async (url: string, opts?: { maxBytes?: number }) => {
 
 // Site size (sitemap URL count), capped at a few hundred entries by
 // discoverSitemapUrls itself (MAX_ENTRIES = 200). Degrades to null on any
-// failure — never blocks or throws, runs inside the same 6h cache/4s
+// failure - never blocks or throws, runs inside the same 6h cache/4s
 // deadline as the rest of computeSiteHealth.
 async function getSitemapUrlCount(website: string): Promise<number | null> {
   // COUNT, don't COLLECT. `discoverSitemapUrls` exists to hand the fact-scraper
   // a workable list of URLs, so it stops at MAX_ENTRIES (200). Using its length
   // as the site's page count reported "200 pages" for apple.com, whose sitemap
-  // actually holds 848 — a truncation artifact rendered as though it were a
+  // actually holds 848 - a truncation artifact rendered as though it were a
   // measurement, which is worse than showing nothing.
   //
   // We only need the tally, so count <loc> elements directly. Nested
@@ -374,7 +374,7 @@ async function computeSiteHealth(website: string | null): Promise<SiteHealthCach
         fetchRobots(website),
         fetchDiscovery(website).catch(() => ({ ...EMPTY_DISCOVERY })),
         // Runs concurrently with the robots/discovery fetches, inside the
-        // same 6h cache — never a per-render network round-trip. Best-effort:
+        // same 6h cache - never a per-render network round-trip. Best-effort:
         // detectPlatform never throws, degrades to null on any failure.
         detectPlatform(website).catch(() => null),
         // Same treatment: concurrent, best-effort, null on failure. This is
@@ -406,7 +406,7 @@ async function computeSiteHealth(website: string | null): Promise<SiteHealthCach
       sitemapUrlCount,
     };
   } catch (err) {
-    // Network/parse failure — degrade gracefully, never 500 the dashboard.
+    // Network/parse failure - degrade gracefully, never 500 the dashboard.
     logger.error({ err }, "Site health robots.txt check failed");
     return {
       checkedAt,
@@ -424,14 +424,14 @@ async function computeSiteHealth(website: string | null): Promise<SiteHealthCach
 }
 
 // ---------------------------------------------------------------------------
-// Citation-readiness scoring — pure function, unit-tested in
+// Citation-readiness scoring - pure function, unit-tested in
 // tests/unit/siteHealth.test.ts. Weights below are the full spec; keep them
 // in sync with that file's expectations.
 //
 //   discovery (35 pts):      robots.txt = 10, sitemap.xml = 15, llms.txt = 10
 //   crawler access (35 pts): round(allowed / total * 35)
 //   crawl success (30 pts):  round(pagesFetched / (pagesFetched + pagesFailed) * 30)
-//                            EXCLUDED entirely when no crawl run exists — a
+//                            EXCLUDED entirely when no crawl run exists - a
 //                            brand that's never been crawled is UNMEASURED,
 //                            not penalised, so the score rescales over the
 //                            70 points that were actually measurable.
@@ -439,13 +439,13 @@ async function computeSiteHealth(website: string | null): Promise<SiteHealthCach
 //   Final score = round(earned / attainable * 100).
 //   null when: website is null AND there's no crawl run (nothing at all to
 //   measure), OR `pending` is true (the compute hasn't finished within the
-//   deadline — a timeout is not a measurement and must never be scored).
+//   deadline - a timeout is not a measurement and must never be scored).
 //
 //   Each discovery flag is `boolean | null`: null means UNKNOWN (the probe
-//   timed out, hit a 429, or errored — see fetchDiscovery in
+//   timed out, hit a 429, or errored - see fetchDiscovery in
 //   server/lib/crawlerAccess.ts), NOT "confirmed absent". An unmeasured file
-//   is EXCLUDED from both earned and attainable — same rescale pattern as
-//   the never-crawled case above — so a site with 2 confirmed-present files
+//   is EXCLUDED from both earned and attainable - same rescale pattern as
+//   the never-crawled case above - so a site with 2 confirmed-present files
 //   and 3 unknown ones scores identically to a site with only those same 2
 //   files ever probed, not as "3 missing".
 // ---------------------------------------------------------------------------
@@ -460,7 +460,7 @@ export function scoreSiteHealth(params: {
   };
   crawlers: { total: number; allowed: number };
   crawl: { pagesFetched: number; pagesFailed: number } | null; // null = no crawl run
-  pending?: boolean; // true = compute hasn't finished — never scored
+  pending?: boolean; // true = compute hasn't finished - never scored
 }): number | null {
   const { website, discovery, crawlers, crawl, pending } = params;
 
@@ -472,7 +472,7 @@ export function scoreSiteHealth(params: {
 
   for (const key of Object.keys(DISCOVERY_WEIGHTS) as (keyof typeof DISCOVERY_WEIGHTS)[]) {
     const value = discovery[key];
-    if (value === null || value === undefined) continue; // unknown — excluded, not zeroed
+    if (value === null || value === undefined) continue; // unknown - excluded, not zeroed
     attainable += DISCOVERY_WEIGHTS[key];
     if (value) earned += DISCOVERY_WEIGHTS[key];
   }
@@ -493,7 +493,7 @@ export function scoreSiteHealth(params: {
 }
 
 // ---------------------------------------------------------------------------
-// Per-page severity for the Site Health detail page — SAME rules as the
+// Per-page severity for the Site Health detail page - SAME rules as the
 // issue aggregate in the SQL above (GET /api/dashboard/site-health/:brandId),
 // just evaluated in JS over individual rows instead of a grouped count.
 // Keep these two in sync; a page landing in "high" here must land in the
@@ -553,11 +553,11 @@ export function setupDashboardRoutes(app: Express): void {
         const avgAuthorityScore =
           authScores.length > 0 ? authScores.reduce((a, b) => a + b, 0) / authScores.length : null;
 
-        // Average rank across cited rows — lower is better.
+        // Average rank across cited rows - lower is better.
         const ranks = cited.map((r) => r.rank).filter((r): r is number => typeof r === "number");
         const avgRank = ranks.length > 0 ? ranks.reduce((a, b) => a + b, 0) / ranks.length : 0;
 
-        // Canonical visibility score (server/lib/visibilityMetrics.ts) —
+        // Canonical visibility score (server/lib/visibilityMetrics.ts) -
         // the single definition now shared by /geo-analytics, /rankings
         // and /entity-strength, so the number is identical across screens.
         // This call is byte-for-byte the prior hero formula (unit-tested).
@@ -569,7 +569,7 @@ export function setupDashboardRoutes(app: Express): void {
         );
 
         // Trend delta. The stored "visibility_score" series holds the run
-        // CITATION RATE (see metricsSnapshot.ts — and weekly_catchup diffs it
+        // CITATION RATE (see metricsSnapshot.ts - and weekly_catchup diffs it
         // as a rate too). So the delta MUST be rate-vs-rate: comparing the
         // composite visibilityScore against a stored rate produced a permanent
         // phantom trend (e.g. a flat brand always showing "+15"). The headline
@@ -618,7 +618,7 @@ export function setupDashboardRoutes(app: Express): void {
 
         // Group rows by canonical platform label (case-insensitive match).
         // Only the exact platform names the citation runner writes are honored
-        // — no legacy aliases. Platforms not in CORE_PLATFORMS are ignored
+        // - no legacy aliases. Platforms not in CORE_PLATFORMS are ignored
         // so deprecated/unsupported engines don't leak into the dashboard.
         const canon = new Map<string, string>();
         for (const p of CORE_PLATFORMS) canon.set(p.toLowerCase(), p);
@@ -634,7 +634,7 @@ export function setupDashboardRoutes(app: Express): void {
 
         const platforms = CORE_PLATFORMS.map((label) => {
           const rows = byPlatform.get(label) ?? [];
-          // Skip platforms that have no data at all — no empty cards.
+          // Skip platforms that have no data at all - no empty cards.
           if (rows.length === 0) return null;
 
           const cited = rows.filter((r) => r.isCited === 1);
@@ -644,13 +644,13 @@ export function setupDashboardRoutes(app: Express): void {
           const avgRank =
             ranks.length > 0 ? Math.round(ranks.reduce((a, b) => a + b, 0) / ranks.length) : null;
 
-          // Canonical 0..100 score — same scale as the hero and
+          // Canonical 0..100 score - same scale as the hero and
           // /api/geo-analytics's platformBreakdown (one number, one
           // meaning across every screen that shows a per-platform score;
           // this used to be divided by 10 here only, which made Overview
           // and Report disagree for the same platform). Authority is null
           // (not 0) when NO cited row carries a score, so the scorer
-          // drops its weight instead of capping — same as the hero.
+          // drops its weight instead of capping - same as the hero.
           const authScores = cited
             .map((r) => r.authorityScore)
             .filter((s): s is number => typeof s === "number");
@@ -726,11 +726,11 @@ export function setupDashboardRoutes(app: Express): void {
           { platform: string; prompt: string; url: string; citedAt: Date }
         >();
         for (const r of toCitedArr(rankings)) {
-          // `citingOutletUrl` ONLY — the matcher-derived source that actually
+          // `citingOutletUrl` ONLY - the matcher-derived source that actually
           // referenced the brand.
           //
           // This used to prefer `citedUrls`, which the schema defines as
-          // "list of all URLs the LLM cited in its response" — every link in
+          // "list of all URLs the LLM cited in its response" - every link in
           // the answer, most of which have nothing to do with the brand. On
           // the Apple brand that turned 117 attributed sources into 962 raw
           // URLs (226 after dedupe), so "cited URLs" counted the whole
@@ -801,7 +801,7 @@ export function setupDashboardRoutes(app: Express): void {
         }
         const categories = Array.from(categorySet).sort();
 
-        // Brand row — mark "yes" for any category with >=1 cited ranking.
+        // Brand row - mark "yes" for any category with >=1 cited ranking.
         const brandCellCounts: Record<string, { cited: number; total: number }> = {};
         for (const c of categories) brandCellCounts[c] = { cited: 0, total: 0 };
         for (const r of rankings) {
@@ -826,7 +826,7 @@ export function setupDashboardRoutes(app: Express): void {
                   : "partial";
         }
 
-        // Competitor rows from competitor_geo_rankings. Core only — the gap
+        // Competitor rows from competitor_geo_rankings. Core only - the gap
         // matrix compares the brand against rival COMPANIES, and an
         // unfiltered read takes the first 6 rows of the citation-mined pool,
         // which is mostly product names and publishers.
@@ -853,7 +853,7 @@ export function setupDashboardRoutes(app: Express): void {
             const cellDiffs: Record<string, number> = {};
             let totalMentions = 0;
             let gapCount = 0;
-            // Gap threshold — only call a category a "gap" when the competitor
+            // Gap threshold - only call a category a "gap" when the competitor
             // has at least this many more citations than the brand. Prevents
             // "competitor cited once, brand cited zero" from registering as
             // dominance. Tune per-product as the citation volume grows.
@@ -977,7 +977,7 @@ export function setupDashboardRoutes(app: Express): void {
   // Phase 4: deterministic "do this next" rules engine. Loads brand state
   // via parallel storage queries, calls the pure engine in
   // server/lib/recommendationsEngine.ts, and returns up to 5 prioritised
-  // recommendations. Sub-200ms target — no LLM call, just count queries.
+  // recommendations. Sub-200ms target - no LLM call, just count queries.
   // ==========================================================================
   app.get(
     "/api/brands/:brandId/recommendations",
@@ -1076,7 +1076,7 @@ export function setupDashboardRoutes(app: Express): void {
   // Robots.txt-based AI crawler access score + latest fact-scrape run stats.
   // Robots.txt evaluation is cached in-module per brandId (6h TTL) so this
   // never hits the network on every dashboard load. Deliberately NOT behind
-  // aiLimitMiddleware — it doesn't call any LLM and shouldn't consume quota.
+  // aiLimitMiddleware - it doesn't call any LLM and shouldn't consume quota.
   // ==========================================================================
   app.get(
     "/api/dashboard/site-health/:brandId",
@@ -1091,9 +1091,9 @@ export function setupDashboardRoutes(app: Express): void {
 
         const latestRun = await storage.getLatestCompletedScrapeRun(brand.id).catch(() => null);
 
-        // Issue counts — single grouped aggregate over the latest run's
+        // Issue counts - single grouped aggregate over the latest run's
         // pages, never a full row fetch. Degrades to all-zero on any
-        // failure (missing table, bad run id, etc.) — never 500s.
+        // failure (missing table, bad run id, etc.) - never 500s.
         let issues = { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
         if (latestRun) {
           try {
@@ -1105,7 +1105,7 @@ export function setupDashboardRoutes(app: Express): void {
                 // and low DISJOINT. Without it a 2xx PDF that yielded no facts
                 // matched both filters and `total` counted that one page twice,
                 // so the severity counts would not have summed to a page count.
-                // A non-HTML page yielding nothing is a `low`, not a `medium` —
+                // A non-HTML page yielding nothing is a `low`, not a `medium` -
                 // extracting little from a PDF is expected, not a defect.
                 medium: sql<number>`count(*) filter (where ${brandFactScrapePages.statusCode} >= 200 and ${brandFactScrapePages.statusCode} < 300 and ${brandFactScrapePages.factCount} = 0 and (${brandFactScrapePages.contentType} is null or ${brandFactScrapePages.contentType} ilike '%html%'))::int`,
                 low: sql<number>`count(*) filter (where ${brandFactScrapePages.statusCode} >= 200 and ${brandFactScrapePages.statusCode} < 300 and ${brandFactScrapePages.contentType} is not null and ${brandFactScrapePages.contentType} not ilike '%html%')::int`,
@@ -1142,7 +1142,7 @@ export function setupDashboardRoutes(app: Express): void {
             website: health.website,
             checkedAt: health.checkedAt,
             score,
-            // The compute hasn't finished within the deadline yet — the
+            // The compute hasn't finished within the deadline yet - the
             // discovery/crawler fields above are all-unknown/zero and MUST
             // NOT be read as a measurement. The background compute is still
             // running and will populate the cache; the next load gets the
@@ -1158,10 +1158,10 @@ export function setupDashboardRoutes(app: Express): void {
               blockedCrawlers: health.blockedCrawlers,
             },
             crawl: {
-              // "Pages we audited" — the cost-bounded fact-extraction sample.
+              // "Pages we audited" - the cost-bounded fact-extraction sample.
               pagesCrawled: latestRun?.pagesFetched ?? null,
               pagesFailed: latestRun?.pagesFailed ?? null,
-              // The SITE's size — sitemap URL count. This is what the "N
+              // The SITE's size - sitemap URL count. This is what the "N
               // pages" chip should show; pagesCrawled is a fallback when the
               // sitemap is unavailable.
               sitemapUrlCount: health.sitemapUrlCount,
@@ -1231,7 +1231,7 @@ export function setupDashboardRoutes(app: Express): void {
   // GET /api/dashboard/site-health/:brandId/content-findings
   // Per-page CONTENT findings (meta tags, OG tags, heading structure,
   // readability, structured answer formats, FAQ content, content density).
-  // These require re-fetching each page's HTML (excerpt is never persisted —
+  // These require re-fetching each page's HTML (excerpt is never persisted -
   // brand_fact_scrape_pages.excerpt is a dead column), so this is a SIBLING
   // endpoint, never inlined into the hot /site-health path or its 4s
   // deadline. Cached per brand with a 6h TTL + in-flight coalescing, same
@@ -1280,7 +1280,7 @@ export function setupDashboardRoutes(app: Express): void {
     })();
     contentFindingsInFlight.set(brandId, work);
 
-    // Bounded wait — the underlying page fetches can take longer than a
+    // Bounded wait - the underlying page fetches can take longer than a
     // request should stay open. If the deadline passes, the abandoned `work`
     // promise keeps running and populates the cache for the NEXT request; we
     // answer with stale cache (if any) or an empty result now, never a hung
@@ -1323,14 +1323,14 @@ export function setupDashboardRoutes(app: Express): void {
   );
 
   // ==========================================================================
-  // Brand perception scoring — five axes (trust/quality/value/market/
+  // Brand perception scoring - five axes (trust/quality/value/market/
   // innovation) judged from what AI models actually said about the brand
   // (server/lib/perceptionScorer.ts). Runs are persisted so the dashboard
   // reads the newest one instead of paying an LLM call on every render.
   // ==========================================================================
 
   // Drizzle returns `numeric` columns as strings, so trust/quality/value/
-  // market/innovation/overall arrive as e.g. "66.6" — convert to number
+  // market/innovation/overall arrive as e.g. "66.6" - convert to number
   // before serialising so the JSON contract stays numeric. Null stays
   // null (never NaN, never 0).
   function numericOrNull(v: string | number | null): number | null {
@@ -1355,7 +1355,7 @@ export function setupDashboardRoutes(app: Express): void {
     };
   }
 
-  // GET /api/dashboard/perception/:brandId — read only, no LLM, cheap.
+  // GET /api/dashboard/perception/:brandId - read only, no LLM, cheap.
   app.get(
     "/api/dashboard/perception/:brandId",
     asyncHandler(async (req, res) => {
@@ -1365,7 +1365,7 @@ export function setupDashboardRoutes(app: Express): void {
 
         // Single query: last up-to-7 runs, newest first. Feeds both the
         // "latest" card (row 0) and the sparkline "history" (reversed to
-        // oldest-first below) — no second round-trip / N+1.
+        // oldest-first below) - no second round-trip / N+1.
         const recentRuns = await db
           .select({
             overall: brandPerceptionRuns.overall,
@@ -1399,7 +1399,7 @@ export function setupDashboardRoutes(app: Express): void {
     }),
   );
 
-  // POST /api/dashboard/perception/:brandId/run — computes and persists one
+  // POST /api/dashboard/perception/:brandId/run - computes and persists one
   // run. Behind aiLimitMiddleware because it calls an LLM (unlike the
   // read-only GET above and unlike site-health).
   app.post(
@@ -1411,7 +1411,7 @@ export function setupDashboardRoutes(app: Express): void {
         if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
 
         // COST SAFEGUARD. Every run spends an LLM call over up to 40 excerpts,
-        // and nothing about the underlying evidence changes minute to minute —
+        // and nothing about the underlying evidence changes minute to minute -
         // it only moves when a new citation check lands. `aiLimitMiddleware`
         // caps a USER's overall AI usage, but says nothing about one brand
         // being re-scored in a loop, so this adds a per-brand cooldown.
@@ -1470,7 +1470,7 @@ export function setupDashboardRoutes(app: Express): void {
         const result = await scoreBrandPerception({ brandName: brand.name, evidence });
 
         // Drizzle's `numeric` columns accept strings on write (and return
-        // strings on read — see numericOrNull above). Convert the
+        // strings on read - see numericOrNull above). Convert the
         // number|null axis values accordingly; null stays null.
         const toNumericInput = (v: number | null): string | null => (v === null ? null : String(v));
 

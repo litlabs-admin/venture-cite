@@ -44,7 +44,7 @@ function PromptLine({ row, index }: { row: PromptRow; index: number }) {
 // #f5f5f4, rotated -90° so it fills from 12 o'clock, round linecap), score
 // centred over it, severity counts to the right, crawl meta beneath.
 //
-// WHAT THE SCORE IS: citation readiness — can AI systems FIND the site
+// WHAT THE SCORE IS: citation readiness - can AI systems FIND the site
 // (robots.txt / sitemap.xml / llms.txt), are they ALLOWED to read it (AI
 // crawler rules), and did our crawl of it actually SUCCEED (pages fetched vs
 // failed). Weights live server-side in scoreSiteHealth() so they are auditable
@@ -52,8 +52,8 @@ function PromptLine({ row, index }: { row: PromptRow; index: number }) {
 // crawler access and called it "Site Health"; that is one sub-signal of the
 // reference's panel, not the panel.
 //
-// The severity counts are real rows from the last crawl — 5xx/fetch failures,
-// 4xx, reachable-but-nothing-extractable, and non-HTML — not invented tiers.
+// The severity counts are real rows from the last crawl - 5xx/fetch failures,
+// 4xx, reachable-but-nothing-extractable, and non-HTML - not invented tiers.
 
 const DONUT_R = 26.5; // measured: reference uses r=26.5, not 26
 const CIRC = 2 * Math.PI * DONUT_R;
@@ -63,7 +63,7 @@ function Donut({ pct }: { pct: number | null }) {
   return (
     <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90" aria-hidden>
       {/* Track matches every other meter on the page (bg-vc-muted). It was
-          #f3f4f6 — Tailwind gray-100, a COOL value in a warm-stone surface,
+          #f3f4f6 - Tailwind gray-100, a COOL value in a warm-stone surface,
           and one step off the #f5f5f4 stone-100 used everywhere else. */}
       <circle
         cx="28"
@@ -92,7 +92,7 @@ function Donut({ pct }: { pct: number | null }) {
 // Severity ramp. The reference uses red / amber / yellow / stone-300, but this
 // app is deliberately blue-only outside functional status (amber was removed
 // app-wide). So: red for CRITICAL only, the brand accent for HIGH, and the
-// neutral ramp for the two tiers that are informational rather than urgent —
+// neutral ramp for the two tiers that are informational rather than urgent -
 // which is also exactly what the reference does for its own `low` (stone-300).
 //
 // The ramp descends in visual weight, so urgency reads before the label does,
@@ -101,7 +101,7 @@ const SEVERITY: Record<string, string> = {
   crit: "var(--negative)",
   high: "var(--brand-accent)",
   med: "var(--fg-disabled)", // stone-400
-  low: "var(--border-strong)", // stone-300 — same as the reference's own `low`
+  low: "var(--border-strong)", // stone-300 - same as the reference's own `low`
 };
 
 // Measured: 8×8 square swatch (no radius), count 12/600 ink, label 11/400.
@@ -149,12 +149,12 @@ export function SiteHealthPanel({
   // NORMALISE BEFORE READING. This panel used to index `health.discovery[k]`
   // and `health.crawl.pagesCrawled` directly, which threw
   // "Cannot read properties of undefined" the moment the API returned anything
-  // without those nested objects — a server still serving an older payload
+  // without those nested objects - a server still serving an older payload
   // shape, a partial response, a degraded error envelope. Because this panel
   // renders inside the dashboard's tree, that single throw took down the WHOLE
   // dashboard via the error boundary: one panel's payload must never be able
   // to do that. Defaults below are all "not measured", never "measured zero".
-  // UNKNOWN default (null), not "absent" (false) — a missing payload means
+  // UNKNOWN default (null), not "absent" (false) - a missing payload means
   // "we haven't measured this", never "confirmed missing".
   const discovery = health?.discovery ?? {
     robotsTxt: null,
@@ -178,17 +178,17 @@ export function SiteHealthPanel({
     blockedCrawlers: [],
   };
 
-  // Reference footer: "53 pages · nextjs · 1d ago". Same three slots here —
-  // pages, detected platform, recency — plus the discovery count, which the
+  // Reference footer: "53 pages · nextjs · 1d ago". Same three slots here -
+  // pages, detected platform, recency - plus the discovery count, which the
   // reference surfaces on its Optimize page rather than the tile. `platform`
   // is a real signature match (server/lib/platformDetect.ts) and is simply
   // omitted when nothing matched confidently, never guessed.
   // All FIVE files the reference lists (robots.txt, sitemap.xml, llms.txt,
   // mcp.json, security.txt). This counted only the first three while the
-  // server had already started probing five, so the chip under-reported —
+  // server had already started probing five, so the chip under-reported -
   // apple.com reads 3/5, not 2/3.
   // Chip counts only CONFIRMED-present files (=== true). Unknown (null) files
-  // are neither present nor absent, so they must not be counted as failures —
+  // are neither present nor absent, so they must not be counted as failures -
   // the denominator stays 5 (all files probed), and when any file is unknown
   // the chip says so rather than silently rendering "3/5" as if that meant
   // "2 confirmed missing".
@@ -201,7 +201,7 @@ export function SiteHealthPanel({
     unknownCount > 0
       ? `${found}/${DISCOVERY_FILES.length} discovery (${unknownCount} unknown)`
       : `${found}/${DISCOVERY_FILES.length} discovery`;
-  // Prefer the sitemap's URL count — the SITE's size — for the "N pages"
+  // Prefer the sitemap's URL count - the SITE's size - for the "N pages"
   // chip, matching the reference ("53 pages" = the crawled site size, not
   // the cost-bounded fact-extraction sample). Falls back to the audited
   // page count only when the sitemap is unavailable.
@@ -229,7 +229,7 @@ export function SiteHealthPanel({
             <div className="h-8 flex-1 rounded-sm bg-vc-muted" />
           </div>
         ) : health?.pending ? (
-          // The compute hasn't finished within the deadline — a timeout is
+          // The compute hasn't finished within the deadline - a timeout is
           // NOT a measurement. Never render a score or zeroes here; the
           // background compute keeps running and the next load gets the
           // real answer.
@@ -243,13 +243,13 @@ export function SiteHealthPanel({
             <div className="min-w-0 flex-1">
               <p className="mb-1 text-data text-vc-tertiary">Measuring…</p>
               <p className="text-label text-vc-label">
-                This can take a few seconds on a first audit — check back shortly.
+                This can take a few seconds on a first audit - check back shortly.
               </p>
             </div>
           </div>
         ) : !health || health.score === null ? (
           // No website on the brand, or robots.txt unreadable. The donut stays
-          // as an empty track and the figure is a dash — 0 would read as
+          // as an empty track and the figure is a dash - 0 would read as
           // "every crawler blocked", a very different and much worse fact.
           <div className="flex flex-1 items-center gap-5">
             <div className="relative flex-shrink-0">
@@ -288,7 +288,7 @@ export function SiteHealthPanel({
                   nothing wrong we say so in words rather than printing four
                   zeroes, which reads as "not measured" rather than "clean". */}
               {/* The reference shows all four severity counts whenever a crawl
-                  exists — including zeros ("0 crit · 1 high · 3 med · 3 low").
+                  exists - including zeros ("0 crit · 1 high · 3 med · 3 low").
                   An earlier version here collapsed an all-zero crawl to the
                   words "No issues found", which meant a healthy site rendered
                   a different LAYOUT from an unhealthy one and never matched the
@@ -307,7 +307,7 @@ export function SiteHealthPanel({
                 )}
               </div>
               {/* Chips, matching the reference's "53 pages · nextjs · 1d ago"
-                  row — three discrete pills rather than one run-on line. */}
+                  row - three discrete pills rather than one run-on line. */}
               <div className="flex flex-wrap items-center gap-1">
                 {meta.length > 0 ? (
                   meta.map((m) => <Chip key={m}>{m}</Chip>)
@@ -330,13 +330,13 @@ export function SiteHealthPanel({
 // Two states, and which one shows is a statement about the data, not a style
 // choice:
 //
-//   SCORED — the brand has a persisted perception run. Shows `overall` and the
+//   SCORED - the brand has a persisted perception run. Shows `overall` and the
 //   three highest-scoring axes of Trust/Quality/Value/Market/Innovation. Axes
 //   the judge could not assess from the evidence are null and are skipped
 //   entirely rather than shown as a middling number; `overall` averages only
 //   what was scorable.
 //
-//   NOT SCORED — falls back to mention tone, which is measured continuously
+//   NOT SCORED - falls back to mention tone, which is measured continuously
 //   from real LLM verdicts (fallback/capped placeholder rows are excluded
 //   server-side). Tone is a genuinely different, weaker claim than perception,
 //   so it is labelled "tone", never presented as a perception score.
@@ -345,7 +345,7 @@ export function SiteHealthPanel({
 // POST .../perception/:id/run is rate-limited.
 
 // Same row geometry as the scored-axis rows above, so the panel reads as one
-// component whichever state it is in — only the labels and the meaning change.
+// component whichever state it is in - only the labels and the meaning change.
 function ToneRow({ label, n, total }: { label: string; n: number; total: number }) {
   const pct = total === 0 ? 0 : Math.round((n / total) * 100);
   return (
@@ -363,7 +363,7 @@ function ToneRow({ label, n, total }: { label: string; n: number; total: number 
 
 /** The reference's 7-bar strip under the perception score: 7px-wide bars whose
  *  height tracks each past run's overall, most recent last. Slots with no run
- *  yet render as faded stubs — the reference does the same before a brand has
+ *  yet render as faded stubs - the reference does the same before a brand has
  *  history ("Historical trends will appear after your next analysis"), so the
  *  strip shows how much history exists rather than implying a full series. */
 const TREND_SLOTS = 7;
@@ -398,7 +398,7 @@ const fmt1 = (n: number) => n.toFixed(1);
 
 /** The HEADLINE score is an INTEGER. Measured on the reference: its big figure
  *  renders "64", not "64.0", while the axis rows beside it render "66.6". Two
- *  different roles, two different formats — printing "85.0" up there was the
+ *  different roles, two different formats - printing "85.0" up there was the
  *  most visible thing making our panel look unlike theirs. */
 const fmt0 = (n: number) => String(Math.round(n));
 
@@ -422,7 +422,7 @@ function PerceptionPanel({
   loading: boolean;
 }) {
   // Only axes the judge could actually score. Nulls are dropped, not rendered
-  // as zero or as a midpoint — an unassessable axis is not a low-scoring one.
+  // as zero or as a midpoint - an unassessable axis is not a low-scoring one.
   const scored: { label: string; value: number }[] = perception
     ? AXES.flatMap(([k, label]) => {
         const value = perception[k];

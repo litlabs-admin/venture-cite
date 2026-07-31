@@ -4,13 +4,13 @@ import { PanelLabel } from "./primitives";
 // The dashboard's container grammar, extracted so the rest of the app can
 // adopt it without copying className strings.
 //
-// The dashboard has always drawn these inline — VisibilityChart, RankingsPanel,
+// The dashboard has always drawn these inline - VisibilityChart, RankingsPanel,
 // PromptsRow, BottomRow and GapsRow each hand-write the same padding and
 // hairlines. That was fine for six panels in one directory; it is not fine as
 // the grammar spreads across ~35 pages, because the string is what drifts.
 //
 // THE GRAMMAR, in one place:
-//   • full-bleed cells, never cards — no rounded corners, no shadows, no gaps
+//   • full-bleed cells, never cards - no rounded corners, no shadows, no gaps
 //   • separation is a 1px hairline drawn by the ROW, not by the panel
 //   • px-8 py-6 for a third-or-wider panel, px-6 py-6 for a narrow column
 //   • eyebrow is PanelLabel: 10px / 600 / uppercase / tracking-wider
@@ -70,7 +70,7 @@ export function Panel({
 
 /**
  * A horizontal band of panels. Draws the bottom hairline that separates it
- * from the next row — panels never draw their own bottom edge on desktop.
+ * from the next row - panels never draw their own bottom edge on desktop.
  *
  * `cols` is the lg column count; the grid is always 1-col on mobile and has
  * NO gap, because separation is hairlines rather than whitespace.
@@ -103,7 +103,7 @@ export function PanelRow({
 /**
  * Page canvas. Full-bleed and theme-aware.
  *
- * AppShell gives these pages an UNPADDED canvas — a page that wraps itself in
+ * AppShell gives these pages an UNPADDED canvas - a page that wraps itself in
  * a padded container stops every row's hairline short of the viewport edge,
  * which is the single most common way this grammar gets broken.
  */

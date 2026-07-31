@@ -5,7 +5,7 @@
 -- for which Postgres has no operator (SQLSTATE 42883 "operator does not
 -- exist: character varying <> uuid"). The trigger therefore raised on
 -- EVERY auth.users insert, and GoTrue surfaced it as the generic
--- "Database error creating new user" — so 0074 broke registration for
+-- "Database error creating new user" - so 0074 broke registration for
 -- all new users, not just the originally-reported email.
 --
 -- The original 0001 function never compared id (it only *assigned*

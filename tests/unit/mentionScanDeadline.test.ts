@@ -1,6 +1,6 @@
 // runMentionScanJob must respect the deadline the cron orchestrator passes it.
 //
-// It used to open with `void deadlineMs` — the parameter was accepted and
+// It used to open with `void deadlineMs` - the parameter was accepted and
 // thrown away, so the job walked every brand with mention monitoring on no
 // matter how little budget was left. The orchestrator gives it a 30s cap out
 // of a ~57s total, and every step queued behind it (weekly-digest-aggregator,
@@ -134,7 +134,7 @@ describe("runMentionScanJob deadline", () => {
     await runMentionScanJob(Date.now() + 60_000);
 
     expect(stubs.runMentionScan).toHaveBeenCalledTimes(3);
-    // The schedule succeeded even though one brand's scan did not — retrying
+    // The schedule succeeded even though one brand's scan did not - retrying
     // it every tick for 20h would crowd out the brands behind it.
     expect(stubs.markJobRan).toHaveBeenCalledWith("mention-scan");
   });

@@ -35,7 +35,7 @@ export type WorkflowStep = {
   taskType?: AgentTaskType;
   parallel?: boolean;
   /** For parallel steps: what happens when ≥1 task fails but ≥1 succeeds.
-   *  "fail" (default) — fail whole step. "continue" — complete with the
+   *  "fail" (default) - fail whole step. "continue" - complete with the
    *  successful subset's outputs; record per-task errors into step.errors. */
   onPartialFailure?: "fail" | "continue";
   /** When true, this step polls a background content_generation_job instead
@@ -69,7 +69,7 @@ function priorOutputsOf(run: WorkflowRun): Record<string, unknown> {
 }
 
 // Postgres advisory lock keyed by a hash of the run id. If the lock is held
-// and the run hasn't advanced in >5 minutes, assume the holder crashed —
+// and the run hasn't advanced in >5 minutes, assume the holder crashed -
 // force-release and retry. Otherwise skip the tick (another worker owns it).
 async function withRunLock<T>(runId: string, fn: () => Promise<T>): Promise<T | null> {
   const lockKeyArg = `workflow_run:${runId}`;
@@ -302,7 +302,7 @@ async function advanceRunInner(runId: string): Promise<void> {
     }
 
     if (!step.taskType) {
-      const msg = `Step ${step.key} has no taskType and no run() — misconfigured`;
+      const msg = `Step ${step.key} has no taskType and no run() - misconfigured`;
       logger.error({ runId, stepKey: step.key }, msg);
       states[idx] = { ...current, status: "failed", error: msg };
       await workflowStorage.updateRun(runId, {
@@ -395,7 +395,7 @@ async function advanceRunInner(runId: string): Promise<void> {
   }
 
   if (current.status === "running") {
-    // await_job step — poll the content_generation_jobs table.
+    // await_job step - poll the content_generation_jobs table.
     if (step.awaitJob) {
       const jobId =
         (current.output as { jobId?: string } | undefined)?.jobId ??
@@ -434,7 +434,7 @@ async function advanceRunInner(runId: string): Promise<void> {
         return;
       }
 
-      // Look up the job directly — bypass per-user ownership check since
+      // Look up the job directly - bypass per-user ownership check since
       // the workflow engine operates in a trusted context.
       let job: schema.ContentGenerationJob | undefined;
       try {
@@ -450,13 +450,13 @@ async function advanceRunInner(runId: string): Promise<void> {
       }
 
       if (!job) {
-        // Job row missing — not fatal yet; next tick retries. If this
+        // Job row missing - not fatal yet; next tick retries. If this
         // persists, the 15-min timeout above will catch it.
         return;
       }
 
       // Schema comment says values are pending|running|succeeded|failed|
-      // cancelled. Accept "completed" too for forward-compat — historic
+      // cancelled. Accept "completed" too for forward-compat - historic
       // code in this file used that label, and a stray legacy row
       // shouldn't wedge a workflow.
       if (job.status === "succeeded" || job.status === "completed") {
@@ -603,7 +603,7 @@ async function advanceRunInner(runId: string): Promise<void> {
   }
 
   if (current.status === "completed") {
-    // Shouldn't normally land here — advance.
+    // Shouldn't normally land here - advance.
     await workflowStorage.updateRun(runId, {
       currentStepIndex: idx + 1,
     });
@@ -660,7 +660,7 @@ export async function tickActiveRuns(): Promise<void> {
 }
 
 // In-memory debounce for the lazy-eval workflow tick. The 30s global cron
-// was dropped for serverless compatibility — instead each authenticated
+// was dropped for serverless compatibility - instead each authenticated
 // request fires a per-user tick (fire-and-forget). Without this Map every
 // burst of requests would issue parallel advanceRun calls; advanceRun is
 // idempotent so a race is safe, but the DB churn is wasteful. Per-lambda

@@ -1,4 +1,4 @@
-// Debug harness — sends one call to the LLM with our v2 prompt + JSON
+// Debug harness - sends one call to the LLM with our v2 prompt + JSON
 // Schema and dumps the raw response so we can see exactly what's going
 // wrong with empty-fact returns under strict mode.
 import "dotenv/config";

@@ -2,11 +2,11 @@ import { describe, it, expect, vi } from "vitest";
 import { runStaticSource } from "../../server/lib/factAgent/v2/sourceStatic";
 
 // 2026-05-28 (Phase 2): runStaticSource falls back to Jina Reader
-// (https://r.jina.ai/<url>) on a hollow-shell page — a REAL network call
+// (https://r.jina.ai/<url>) on a hollow-shell page - a REAL network call
 // to a live public service (server/lib/factAgent/v2/jinaFallback.ts),
 // enabled by default (FACT_AGENT_JINA_ENABLED defaults to "on"). Left
 // unmocked, these tests were making genuine outbound requests for
-// https://example.com/about — which r.jina.ai can actually render,
+// https://example.com/about - which r.jina.ai can actually render,
 // non-deterministically turning an intended hollow-shell skip into a
 // "done" result. Mock it so the suite is hermetic.
 vi.mock("../../server/lib/factAgent/v2/jinaFallback", () => ({
@@ -112,7 +112,7 @@ describe("runStaticSource", () => {
     // 2026-05-28 production fix (sourceStatic.ts step 6): a differing
     // canonical used to hard-skip the page entirely, which silently
     // killed scraping for every brand whose homepage canonicalises
-    // bare-host -> www-host. It's now informational only — the page is
+    // bare-host -> www-host. It's now informational only - the page is
     // still fetched and extracted, and canonicalRedirect is passed
     // through for the executor to dedup against later. Give the page
     // real body content (>= 200 chars) so it isn't ALSO caught by the

@@ -4,7 +4,7 @@ export type RecommendationPriority = "P0" | "P1" | "P2";
 export type RecommendationCategory = "setup" | "content" | "citations" | "signals" | "growth";
 
 export type Recommendation = {
-  /** Stable string id — part of the public contract. NEVER reuse an id
+  /** Stable string id - part of the public contract. NEVER reuse an id
    *  for a different rule, because clients persist dismissed-ids in
    *  localStorage; reusing an id would mis-attribute a user's dismissal
    *  to the new rule. */
@@ -30,7 +30,7 @@ export type RecommendationState = {
    *  runs completed yet. */
   citationRate: number | null;
   lastSignalsScanAt: Date | null;
-  /** Phase 6 — Pulse cross-feature. Most recent Signals scan's
+  /** Phase 6 - Pulse cross-feature. Most recent Signals scan's
    *  overallScore as a 0..100 percentage. Null when no scan has been
    *  run, or when the row predates the percentage representation. Lets
    *  the engine fire different recs based on RESULT quality, not just
@@ -53,7 +53,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** Pure function. Given a snapshot of brand state, returns the next
  *  3–5 recommendations in priority order (P0 first, then P1, then P2).
- *  No side effects — fully testable. */
+ *  No side effects - fully testable. */
 export function getRecommendations(state: RecommendationState): Recommendation[] {
   const recs: Recommendation[] = [];
   const brandId = state.brand?.id;
@@ -65,7 +65,7 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
     recs.push({
       id: "create-brand",
       title: "Create your first brand",
-      why: "Brand profiles are the foundation — every other feature attaches to one.",
+      why: "Brand profiles are the foundation - every other feature attaches to one.",
       ctaLabel: "Create brand",
       ctaHref: "/setup?tab=brands",
       priority: "P0",
@@ -110,7 +110,7 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
     recs.push({
       id: "generate-citation-prompts",
       title: "Generate citation-check prompts",
-      why: "Citation checks ask AI engines questions and look for your brand in the answers — you need prompts to ask.",
+      why: "Citation checks ask AI engines questions and look for your brand in the answers - you need prompts to ask.",
       ctaLabel: "Generate prompts",
       ctaHref: `/monitor?tab=citations&brandId=${brandId}&action=generate-prompts`,
       priority: "P0",
@@ -186,7 +186,7 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
       title: "Re-run GEO Signals scan",
       why:
         state.lastSignalsScanAt === null
-          ? "GEO Signals scores chunkability, schema, and FAQ — never run for this brand."
+          ? "GEO Signals scores chunkability, schema, and FAQ - never run for this brand."
           : `Last scan was ${Math.floor((Date.now() - state.lastSignalsScanAt.getTime()) / MS_PER_DAY)} days ago.`,
       ctaLabel: "Run scan",
       ctaHref: `/diagnose?tab=signals&brandId=${brandId}`,
@@ -249,7 +249,7 @@ export function getRecommendations(state: RecommendationState): Recommendation[]
     recs.push({
       id: "try-community-outreach",
       title: "Try Reddit outreach for AEO",
-      why: "Posts you make today can show up in AI answers within 4–8 weeks — direct AEO signal.",
+      why: "Posts you make today can show up in AI answers within 4–8 weeks - direct AEO signal.",
       ctaLabel: "Open Community",
       ctaHref: `/act?tab=community&brandId=${brandId}`,
       priority: "P2",

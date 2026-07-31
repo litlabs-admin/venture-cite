@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export type StatusDotTone = "success" | "warn" | "fail" | "neutral" | "pending";
 
-// "success" has no entry here — it renders as a neutral check glyph instead
+// "success" has no entry here - it renders as a neutral check glyph instead
 // of a colour, not a coloured dot. See the branch below. Green (and the
 // chart-4 violet that used to stand in for it) is reserved for actions,
 // never for signalling a status outcome.
@@ -24,7 +24,7 @@ export function StatusDot({
   "aria-label"?: string;
 }) {
   if (tone === "success") {
-    // Neutral text colour + a check glyph — never a coloured dot — so
+    // Neutral text colour + a check glyph - never a coloured dot - so
     // "success" isn't encoded by colour alone.
     return (
       <Check

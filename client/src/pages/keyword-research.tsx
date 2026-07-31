@@ -99,7 +99,7 @@ export default function KeywordResearchPage() {
     },
     onSuccess: (data) => {
       if (data.count === 0) {
-        // Soft "no new keywords" case — not a failure, just informational.
+        // Soft "no new keywords" case - not a failure, just informational.
         // Handler returns { data: [], count: 0, message } when all
         // discovered keywords already existed for this brand.
         toast({
@@ -168,7 +168,7 @@ export default function KeywordResearchPage() {
 
   const getScoreColor = (score: number) => {
     // Zero (including cold-start, no data yet) is a neutral "no data" state,
-    // not a failing one — colour only arrives once there's a real score.
+    // not a failing one - colour only arrives once there's a real score.
     if (score <= 0) return "text-foreground";
     // High score: neutral text, not green/chart-4. The check icon rendered
     // alongside the value is what signals "good", not colour.
@@ -180,7 +180,7 @@ export default function KeywordResearchPage() {
 
   return (
     // Title/description moved to src/routes/_app/keyword-research.tsx's
-    // `head()` — metadata belongs to the route, not this component.
+    // `head()` - metadata belongs to the route, not this component.
     <PanelPage>
       <PanelRow cols={3}>
         <Panel
@@ -408,7 +408,7 @@ export default function KeywordResearchPage() {
                                 <span className="text-ui font-semibold text-foreground inline-flex items-center gap-1">
                                   {keyword.searchVolume
                                     ? keyword.searchVolume.toLocaleString()
-                                    : "—"}
+                                    : "-"}
                                   <Sparkles className="h-3 w-3 text-muted-foreground" />
                                 </span>
                               </TooltipTrigger>
@@ -421,7 +421,7 @@ export default function KeywordResearchPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className="text-ui font-semibold text-foreground inline-flex items-center gap-1">
-                                  {keyword.difficulty || "—"}
+                                  {keyword.difficulty || "-"}
                                   <Sparkles className="h-3 w-3 text-muted-foreground" />
                                 </span>
                               </TooltipTrigger>

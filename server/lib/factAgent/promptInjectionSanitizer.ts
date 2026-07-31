@@ -1,5 +1,5 @@
 // Spec 2 §4.8.1: drop facts whose key or value contains prompt-injection
-// markers. Conservative — false positives are cheap (one missing fact) and
+// markers. Conservative - false positives are cheap (one missing fact) and
 // false negatives are expensive (a tampered fact ends up in the brand
 // fact sheet, then in downstream content generation prompts).
 

@@ -11,7 +11,7 @@ const QUERY_PARAM = "brandId";
  * Single source of truth for the currently-selected brand across the app.
  *
  * Selection precedence (industry-standard: URL > user preference > default):
- *   1. `?brandId=<id>` in the URL — bookmarkable and shareable
+ *   1. `?brandId=<id>` in the URL - bookmarkable and shareable
  *   2. last selection persisted to localStorage
  *   3. first brand in the user's brand list
  *
@@ -22,7 +22,7 @@ const QUERY_PARAM = "brandId";
  *
  * This hook is mounted from many different routes (it is not route-scoped),
  * so it reads/writes search with `{ strict: false }` / `to: "."` rather than
- * a specific route's typed search — see native-api-contract.md rule 3.
+ * a specific route's typed search - see native-api-contract.md rule 3.
  */
 export function useBrandSelection() {
   const navigate = useNavigate();

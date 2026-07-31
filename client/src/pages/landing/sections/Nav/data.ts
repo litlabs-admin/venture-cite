@@ -1,7 +1,7 @@
 // The landing page's navigation, in one place.
 //
 // This file used to carry five link sets feeding two mega-menus: features,
-// solutions, tools, a resources list and a resources footer row — roughly
+// solutions, tools, a resources list and a resources footer row - roughly
 // thirty destinations, most of them pointing at /register or at an in-page
 // anchor dressed up as a product page. The page has six sections; it did not
 // need a navigation system.
@@ -12,7 +12,7 @@
 //
 // Every href is an in-page anchor. The only real routes left in the chrome
 // are Sign in and Get started, rendered directly by Nav/MobileMenu/Footer as
-// TanStack <Link>s rather than living in this list — they are conversion
+// TanStack <Link>s rather than living in this list - they are conversion
 // actions, not navigation, and they navigate client-side.
 
 export type SectionLink = {
@@ -25,7 +25,7 @@ export type SectionLink = {
 // Order matches the order the sections appear on the page, and each label
 // matches that section's own SectionHeader, so a nav row and the heading it
 // scrolls to read the same. ("Approach" and "Proof" are those headers'
-// subtitles — "Why VentureCite" and "Revenue" are too long for a nav row.)
+// subtitles - "Why VentureCite" and "Revenue" are too long for a nav row.)
 export const pageSections: SectionLink[] = [
   { name: "Why now", href: "#why-now-section" },
   { name: "Platform", href: "#platform-section" },
@@ -33,7 +33,7 @@ export const pageSections: SectionLink[] = [
 ];
 
 // #revenue-section and #learn-research-section still exist on the page and
-// still carry their ids — they are simply no longer advertised in the chrome.
+// still carry their ids - they are simply no longer advertised in the chrome.
 // Anyone holding a deep link to either one keeps landing in the right place.
 
 export const containerMaxWidth = 1120;

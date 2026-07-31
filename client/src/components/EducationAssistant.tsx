@@ -1,4 +1,4 @@
-// EducationAssistant — outer shell of the AI Tutor chatbot.
+// EducationAssistant - outer shell of the AI Tutor chatbot.
 //
 // Owns the Sheet open/close state and the view switcher (thread vs history).
 // Data layer lives in `useChatbot`; per-view rendering is delegated to
@@ -267,7 +267,7 @@ export default function EducationAssistant() {
             )}
           </SheetHeader>
 
-          {/* Body — switches between thread and history */}
+          {/* Body - switches between thread and history */}
           {view === "history" ? (
             <HistoryView
               threads={chatbot.threads}

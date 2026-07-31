@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
 // Polls /api/brands/:brandId/citation-runs/active. Used as a status gate by
-// every dependent page — when `hasActive` is true, those pages bump their
+// every dependent page - when `hasActive` is true, those pages bump their
 // dependent queries onto a 6 s refetch interval (via useCitationLiveRefresh).
 //
 // Wave 9 idle-aware backoff: a brand that's not running anything still mounts

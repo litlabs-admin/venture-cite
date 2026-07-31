@@ -1,8 +1,8 @@
-// Distribute dialog — extracted from articles.tsx (Wave 7).
+// Distribute dialog - extracted from articles.tsx (Wave 7).
 //
 // Three views: Generate (pick platforms), Results (current run output),
 // History (past distributions). selectedPlatforms now persists across
-// tab switches within a session — closing the dialog still resets.
+// tab switches within a session - closing the dialog still resets.
 // Buffer profile match only auto-fires on unambiguous matches.
 
 import { useEffect, useState } from "react";
@@ -139,13 +139,13 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
     onError: (_err, vars) => {
       setCardErrors((prev) => ({
         ...prev,
-        [vars.distributionId]: "Network error — try again",
+        [vars.distributionId]: "Network error - try again",
       }));
     },
   });
 
   // Returns every Buffer channel matching this platform. Caller decides
-  // what to do with 0 / 1 / >1 — see PlatformPostButton.
+  // what to do with 0 / 1 / >1 - see PlatformPostButton.
   const matchBufferChannels = (platform: string) => {
     const p = platform.toLowerCase();
     return bufferProfiles.filter(
@@ -164,7 +164,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
     onSuccess: async (data) => {
       const successCount = data.data.filter((r: any) => r.status === "success").length;
       // Merge new platform results into existing cards rather than
-      // replacing — a partial regeneration (e.g. just Twitter) must not
+      // replacing - a partial regeneration (e.g. just Twitter) must not
       // erase a previously-posted LinkedIn card.
       setGeneratedContent((prev) => {
         const incoming = new Map<string, GeneratedRow>();
@@ -364,7 +364,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
             {aiGenerated && <AIGeneratedPill />}
           </DialogTitle>
           <DialogDescription>
-            AI rewrites your article for each platform — copy and post manually.
+            AI rewrites your article for each platform - copy and post manually.
           </DialogDescription>
         </DialogHeader>
 
@@ -505,7 +505,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
               className="w-full"
               onClick={() => {
                 setView("generate");
-                // Wave 7: keep selectedPlatforms — user often regenerates
+                // Wave 7: keep selectedPlatforms - user often regenerates
                 // for the same set after editing the article.
               }}
               data-testid="button-distribute-more"

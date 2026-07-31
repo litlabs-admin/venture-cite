@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 // perceptionScorer constructs `new OpenAI(...)` at module load time, so it
-// must be mocked the same way sentimentBatcher.test.ts mocks it — as a real
+// must be mocked the same way sentimentBatcher.test.ts mocks it - as a real
 // constructor function, not an arrow function (vitest calls it with `new`).
 vi.mock("openai", () => ({
   default: vi.fn().mockImplementation(function () {

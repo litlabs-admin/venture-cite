@@ -1,4 +1,4 @@
-// Brand perception scoring — five axes (trust/quality/value/market/
+// Brand perception scoring - five axes (trust/quality/value/market/
 // innovation) judged strictly from what AI models actually said about the
 // brand in stored citation-check responses. See migrations/0088_brand_
 // perception_runs.sql for the honesty constraints this module must uphold:
@@ -10,13 +10,13 @@ import { attachAiLogger } from "./aiLogger";
 import { MODELS } from "./modelConfig";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 
-// Constructed LAZILY, on first scoring call — never at import time.
+// Constructed LAZILY, on first scoring call - never at import time.
 //
 // server/routes/dashboard.ts imports this module, so an eager `new OpenAI()`
 // here made merely IMPORTING the dashboard routes throw "Missing credentials"
 // whenever OPENAI_API_KEY was absent. That broke every unit test touching
 // those routes (siteHealth, dashboardRecommendationInputs) and would equally
-// break any environment that boots the API without an OpenAI key — a missing
+// break any environment that boots the API without an OpenAI key - a missing
 // LLM key should disable scoring, not the dashboard.
 let _openai: OpenAI | null = null;
 function getOpenAI(): OpenAI {
@@ -31,7 +31,7 @@ function getOpenAI(): OpenAI {
   return _openai;
 }
 
-// Same delimiter used by hallucinationDetector.ts / competitorDiscovery.ts —
+// Same delimiter used by hallucinationDetector.ts / competitorDiscovery.ts -
 // geo_rankings.citation_context is stored as
 // "{statusLine}\n\n||| RAW_RESPONSE |||\n{rawModelAnswer}".
 const RAW_DELIM = "||| RAW_RESPONSE |||";
@@ -92,7 +92,7 @@ export function gatherEvidence(
 ): EvidenceSnippet[] {
   const maxSnippets = opts.maxSnippets ?? 40;
   // BRAND RELEVANCE. citation_context holds the model's answer to a prompt we
-  // checked the brand against — NOT necessarily an answer about the brand. A
+  // checked the brand against - NOT necessarily an answer about the brand. A
   // prompt like "best PR agencies" returns a paragraph that may never mention
   // this customer. Scoring "how is this brand perceived" from text that does
   // not discuss it is exactly the fabrication the rest of this pipeline
@@ -166,7 +166,7 @@ const MAX_LIST_ITEMS = 8;
 const MAX_ITEM_CHARS = 60;
 
 // One decimal of precision (matches the numeric(4,1) storage column and the
-// reference product's 66.6 / 65.8-style scores) — still clamped 0-100, still
+// reference product's 66.6 / 65.8-style scores) - still clamped 0-100, still
 // null for anything non-numeric/out-of-range.
 function coerceAxis(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
@@ -212,7 +212,7 @@ export function parseScoreResponse(raw: string): PerceptionScore {
 
 /**
  * Mean of the non-null axes, rounded. Null axes are excluded from both the
- * numerator and denominator — never treated as zero. Returns null only
+ * numerator and denominator - never treated as zero. Returns null only
  * when every axis is null.
  */
 export function computeOverall(axes: {
@@ -238,13 +238,13 @@ export interface ScoreBrandPerceptionResult extends PerceptionScore {
 
 /**
  * Judge brand perception from the supplied evidence only. If there is no
- * evidence, returns an all-null result WITHOUT calling the LLM — a run
+ * evidence, returns an all-null result WITHOUT calling the LLM - a run
  * with zero real snippets must never fabricate a score.
  */
 export async function scoreBrandPerception({
   brandName,
   evidence,
-  // Default resolved at CALL time, not import time — see getOpenAI().
+  // Default resolved at CALL time, not import time - see getOpenAI().
   client,
 }: {
   brandName: string;
@@ -283,7 +283,7 @@ export async function scoreBrandPerception({
 HARD RULES:
 - Score ONLY from the supplied excerpts. Do NOT use outside knowledge about the brand and do NOT guess.
 - If an axis cannot be judged from the evidence, return null for that axis. Do NOT default to a middling number (e.g. 50) when unsure.
-- "praised" and "questioned" must be short noun phrases quoted or closely paraphrased FROM the excerpts — never invented.
+- "praised" and "questioned" must be short noun phrases quoted or closely paraphrased FROM the excerpts - never invented.
 
 Axes (each a number 0-100 with ONE DECIMAL of precision, e.g. 66.6, or null):
 - trust: how much the excerpts suggest the brand is trustworthy/reliable

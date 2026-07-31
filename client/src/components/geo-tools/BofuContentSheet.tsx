@@ -1,6 +1,6 @@
 // Wave 9.4: full-content view + publish lifecycle for BOFU pieces.
 // Replaces the previous geo-tools card body which only rendered a
-// 500-char preview in a 160px scroll area — generated content was in
+// 500-char preview in a 160px scroll area - generated content was in
 // the DB but invisible to the user. This sheet exposes the whole
 // piece, the publish lifecycle, schema-markup helpers, and a delete.
 
@@ -223,13 +223,13 @@ export default function BofuContentSheet({ content, open, onOpenChange }: Props)
 
           <TabsContent value="metadata" className="space-y-3 text-caption">
             <Row label="Type">{content.contentType}</Row>
-            <Row label="Primary keyword">{content.primaryKeyword || "—"}</Row>
+            <Row label="Primary keyword">{content.primaryKeyword || "-"}</Row>
             <Row label="Compared with">
               {Array.isArray(content.comparedWith) && content.comparedWith.length > 0
                 ? content.comparedWith.join(", ")
-                : "—"}
+                : "-"}
             </Row>
-            <Row label="Target intent">{content.targetIntent || "—"}</Row>
+            <Row label="Target intent">{content.targetIntent || "-"}</Row>
             <Row label="AI score">{content.aiScore ?? "Not scored"}</Row>
             <Row label="Created">{new Date(content.createdAt as any).toLocaleString()}</Row>
             <Row label="Last updated">{new Date(content.updatedAt as any).toLocaleString()}</Row>

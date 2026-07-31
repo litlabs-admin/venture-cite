@@ -295,7 +295,7 @@ export class DatabaseStorage implements IStorage {
 
   // Wave 4.4: optimistic-lock variant of updateBrand. Caller passes the
   // version they last read; the UPDATE only matches when nobody has
-  // written in between. Returns undefined when 0 rows matched — caller
+  // written in between. Returns undefined when 0 rows matched - caller
   // must distinguish "not found" from "version conflict" by re-fetching.
   async updateBrandIfVersion(
     id: string,
@@ -315,7 +315,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Plan 6: atomic CAS from autopilot_status='failed' → 'pending'. The
-  // WHERE clause is what guarantees race safety — two simultaneous
+  // WHERE clause is what guarantees race safety - two simultaneous
   // retries both reach the UPDATE, but only one row will match the
   // "still failed" predicate; the other returns 0 rows. Caller maps
   // false → 409. Also clears autopilotError so the stale failure
@@ -334,7 +334,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteBrand(id: string): Promise<boolean> {
-    // Hard-delete primitive — used by the brand purge cron after the
+    // Hard-delete primitive - used by the brand purge cron after the
     // grace window. Application code should call softDeleteBrand
     // instead so users get a 30-day undo window. The FK cascade
     // (migrations/0003_fk_hardening.sql) cleans up child rows.
@@ -401,7 +401,7 @@ export class DatabaseStorage implements IStorage {
     // Strip perBrand[brandId] sub-tree from every user that has it.
     // Called from deleteBrand (synchronous hard delete) AND directly
     // from the brand-purge cron (runBrandPurgeJob raw-deletes the row
-    // without going through deleteBrand, so it must call this itself —
+    // without going through deleteBrand, so it must call this itself -
     // otherwise the JSONB sub-tree is orphaned forever on purge).
     await db.execute(sql`
       UPDATE users
@@ -425,7 +425,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteOldTourEvents(olderThan: Date): Promise<number> {
     // Retain on server_received_at (server clock), not occurred_at
-    // (clamped, but still client-influenced) — retention must key off
+    // (clamped, but still client-influenced) - retention must key off
     // a trusted column so rows can't dodge or trigger early cleanup.
     const result = await db.execute(sql`
       DELETE FROM tour_events WHERE server_received_at < ${olderThan.toISOString()}
@@ -595,7 +595,7 @@ export class DatabaseStorage implements IStorage {
 
   async createGeoRanking(insertRanking: InsertGeoRanking): Promise<GeoRanking> {
     // onConflictDoNothing guards the partial unique index on
-    // (run_id, brand_prompt_id, ai_platform) — migration 0085. The unlocked
+    // (run_id, brand_prompt_id, ai_platform) - migration 0085. The unlocked
     // kickoff-inline run and the cron drain can otherwise both write the same
     // (run, prompt, platform) cell, and the run aggregate COUNT(*)/SUM would
     // then double-count, corrupting total_checks / citation_rate.
@@ -605,7 +605,7 @@ export class DatabaseStorage implements IStorage {
       .onConflictDoNothing()
       .returning();
     if (result[0]) return result[0];
-    // Conflict: a row for this (run, prompt, platform) already exists — the
+    // Conflict: a row for this (run, prompt, platform) already exists - the
     // index only fires when both run_id and brand_prompt_id are non-null, so
     // both are safe to filter on here. Return the existing row so the caller's
     // contract (always get a row back) holds.
@@ -706,7 +706,7 @@ export class DatabaseStorage implements IStorage {
 
   async archiveBrandPrompts(brandId: string): Promise<void> {
     // Archive every tracked prompt for this brand. Does not touch
-    // suggestions — call archiveSuggestedPrompts for those.
+    // suggestions - call archiveSuggestedPrompts for those.
     await db
       .update(schema.brandPrompts)
       .set({ isActive: 0, status: "archived" })
@@ -740,7 +740,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.brandPrompts.id, id));
   }
 
-  /** Flip a prompt between tracked and archived — the "ON" toggle. Keeps the
+  /** Flip a prompt between tracked and archived - the "ON" toggle. Keeps the
    *  legacy `isActive` int in lockstep with `status` so any older reader that
    *  still consults it does not see a contradiction. */
   async setBrandPromptStatus(
@@ -785,10 +785,10 @@ export class DatabaseStorage implements IStorage {
     suggestionId: string,
     replaceTrackedId: string | null,
   ): Promise<void> {
-    // Wave 4.3: atomic swap when replacing — both updates succeed together
+    // Wave 4.3: atomic swap when replacing - both updates succeed together
     // so we can't end up with two tracked prompts (or none) for the slot.
     // Wave 9.1: when replaceTrackedId is null, the user is filling an
-    // empty slot (tracked count < cap) — just promote, no archive.
+    // empty slot (tracked count < cap) - just promote, no archive.
     await db.transaction(async (tx) => {
       if (replaceTrackedId) {
         await tx
@@ -884,10 +884,10 @@ export class DatabaseStorage implements IStorage {
     return row?.ranAt ? new Date(row.ranAt as string | Date) : null;
   }
 
-  /** Phase 6 — Pulse cross-feature. Returns the latest Signals run's
+  /** Phase 6 - Pulse cross-feature. Returns the latest Signals run's
    *  ranAt AND its overallScore so the recommendations engine can fire
    *  a DIFFERENT rec for a low-scoring scan ("Your last scan returned
-   *  35% — content depth is below threshold") vs just a stale-scan
+   *  35% - content depth is below threshold") vs just a stale-scan
    *  rec ("Last scan was N days ago"). Previously the engine only had
    *  ranAt and treated every scan equally regardless of result. */
   async getLastGeoSignalSummary(
@@ -948,7 +948,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Wave 9.1: recompute totals + per-platform breakdown for a run by
-  // reading geo_rankings live. The canonical aggregator — call this any
+  // reading geo_rankings live. The canonical aggregator - call this any
   // time is_cited mutates on a ranking (re-detect, future bulk fixes)
   // so the cached aggregate on citation_runs stays in sync with what the
   // drill-down would show. Cheaper than dragging it through application
@@ -994,7 +994,7 @@ export class DatabaseStorage implements IStorage {
 
   // Wave 8: lightweight "is any run live for this brand" check used by the
   // live-update polling hook on every dependent page. Hits the partial
-  // index on (brand_id, status) — should be O(1) regardless of run history.
+  // index on (brand_id, status) - should be O(1) regardless of run history.
   async getActiveCitationRuns(
     brandId: string,
   ): Promise<Array<{ id: string; startedAt: Date; progressPct: number; status: string }>> {
@@ -1243,7 +1243,7 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  // Crash recovery — flip `running` jobs older than N minutes back to
+  // Crash recovery - flip `running` jobs older than N minutes back to
   // `failed`. Called once on server boot so we don't have orphaned rows.
   // Wave 7: also classifies the failure as 'timeout' (which the refund
   // helper considers refundable) and returns the affected jobs so the
@@ -1417,7 +1417,7 @@ export class DatabaseStorage implements IStorage {
       (discoveredBy === "manual" || discoveredBy === "ai" ? "core" : "discovered");
     // Use raw SQL so we can target the functional unique index
     // (lower(name), lower(coalesce(domain,''))). db.execute returns raw
-    // snake_case pg rows — we only use it for the id, then re-read via
+    // snake_case pg rows - we only use it for the id, then re-read via
     // Drizzle to get the camelCase-mapped row callers expect.
     const result = await db.execute<{ id: string }>(sql`
       INSERT INTO competitors (
@@ -1470,7 +1470,7 @@ export class DatabaseStorage implements IStorage {
     if (brandId) conditions.push(eq(schema.competitors.brandId, brandId));
     if (!includeDeleted) conditions.push(isNull(schema.competitors.deletedAt));
     // `core` is the curated competitive set: manual adds and AI-inferred
-    // direct competitors. `discovered` is the citation-mined pool — every
+    // direct competitors. `discovered` is the citation-mined pool - every
     // entity a model happened to name in an answer, which includes product
     // lines ("iPhone", "S Pen"), publishers ("CNET"), operating systems
     // ("macOS") and the tracked brand itself. That pool is useful as MENTION
@@ -1487,7 +1487,7 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  // Partial update — used by the edit dialog on the competitors page.
+  // Partial update - used by the edit dialog on the competitors page.
   // Only columns the user is expected to edit are included; caller must
   // whitelist at the route level.
   async updateCompetitor(
@@ -1559,7 +1559,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // Wave 2 — per-run, per-prompt competitor citation row. Idempotent via
+  // Wave 2 - per-run, per-prompt competitor citation row. Idempotent via
   // the unique index (competitor_id, run_id, brand_prompt_id, ai_platform)
   // from migration 0027, so a retried citation run updates rather than
   // duplicating.
@@ -1700,7 +1700,7 @@ export class DatabaseStorage implements IStorage {
     // 3 queries total: brands, cited rankings, competitor snapshots.
     // `opts.since` constrains every time-scoped read so the leaderboard
     // reflects a window (default: last 30 days) instead of all-time
-    // cumulative totals — which is what makes "Square" look like it
+    // cumulative totals - which is what makes "Square" look like it
     // exploded when really the numbers just accumulate forever.
     const since = opts?.since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const leaderboard: {
@@ -1719,7 +1719,7 @@ export class DatabaseStorage implements IStorage {
 
     const brandIds = brands.map((b) => b.id);
 
-    // Wave B — a brand's citations live on geo_rankings rows keyed by
+    // Wave B - a brand's citations live on geo_rankings rows keyed by
     // BOTH article_id (from article-attached citation runs) and
     // brand_prompt_id (from brand-prompt citation runs). The original
     // leaderboard only summed articles, so any brand whose citations were
@@ -1797,7 +1797,7 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Wave 2 — read from the per-run, per-prompt competitor_geo_rankings
+    // Wave 2 - read from the per-run, per-prompt competitor_geo_rankings
     // table so the leaderboard reflects actual LLM-judged citations, not
     // a coarse aggregate. One row per (competitor × platform × prompt ×
     // run); count cited rows within the window, bucket by platform.
@@ -1812,7 +1812,7 @@ export class DatabaseStorage implements IStorage {
     //
     // But the COUNTS still have to come from every row. competitor_geo_
     // rankings are keyed by competitor row id, and the same company often
-    // exists as both a core row and a discovered one — measured live, core
+    // exists as both a core row and a discovered one - measured live, core
     // `Spotify / spotify.com` had 0 citations while discovered `Spotify / ""`
     // had 11. Filtering before counting would silently discard those.
     const allCompetitors = brandId
@@ -2200,7 +2200,7 @@ export class DatabaseStorage implements IStorage {
         similarity: Number(row.sim),
       };
     } catch {
-      // pg_trgm not available — fall back to exact case-insensitive match.
+      // pg_trgm not available - fall back to exact case-insensitive match.
       const exact = await db
         .select({ id: schema.faqItems.id, question: schema.faqItems.question })
         .from(schema.faqItems)
@@ -2221,7 +2221,7 @@ export class DatabaseStorage implements IStorage {
   // ============================================================
 
   async upsertTrackedContentUrl(insert: InsertTrackedContentUrl): Promise<TrackedContentUrl> {
-    // One row per (source_type, source_id) — when a piece of content's
+    // One row per (source_type, source_id) - when a piece of content's
     // published_url changes we update in place rather than churning.
     const existing = await db
       .select()
@@ -2410,7 +2410,7 @@ export class DatabaseStorage implements IStorage {
             .from(schema.citationQuality)
             .orderBy(desc(schema.citationQuality.totalQualityScore));
 
-    // Wave D — Phase-1 fallback. citation_quality is a Phase-2 table the
+    // Wave D - Phase-1 fallback. citation_quality is a Phase-2 table the
     // active pipeline doesn't populate, so for real brands this always
     // returns []. Synthesize rows from geo_rankings so the Citation
     // Quality breakdown card actually renders.
@@ -2443,7 +2443,7 @@ export class DatabaseStorage implements IStorage {
             citationUrl: r.citingOutletUrl ?? null,
             authorityScore: authority,
             relevanceScore: relevance,
-            // No "recency" signal in Phase-1 data — derive from checkedAt
+            // No "recency" signal in Phase-1 data - derive from checkedAt
             // age: brand-new rows = 100, 90+ day old = 0.
             recencyScore: Math.max(
               0,
@@ -2714,7 +2714,7 @@ export class DatabaseStorage implements IStorage {
     // The partial unique index on `(brandId, domain, subcategory, factKey)`
     // is filtered to `source='scraped' AND dismissed_at IS NULL`, so user-
     // entered rows + scraped rows for the SAME logical fact can both
-    // exist. The UI then renders them twice — the user-reported "duplicate
+    // exist. The UI then renders them twice - the user-reported "duplicate
     // unrelated data" symptom.
     //
     // Collapse them here. Within a (domain, subcategory, factKey) group:
@@ -2807,7 +2807,7 @@ export class DatabaseStorage implements IStorage {
         const loserNorm = normalizeForDedup(loser.factValue ?? "");
         const loserPayload: Payload = (loser.valuePayload as Payload | null) ?? {};
         if (loserNorm === winnerNorm) {
-          // Same value — merge losing row's sources into the winner's.
+          // Same value - merge losing row's sources into the winner's.
           const winnerSources = winnerPayload.sources ?? [];
           const loserSources = loserPayload.sources ?? [];
           const byUrl = new Map(winnerSources.map((s) => [s.url, s]));
@@ -2816,7 +2816,7 @@ export class DatabaseStorage implements IStorage {
           }
           winnerPayload.sources = Array.from(byUrl.values()).slice(0, 20);
         } else {
-          // Different value — carry as an alternative.
+          // Different value - carry as an alternative.
           const existing = carriedAlternatives.find(
             (a) => normalizeForDedup(a.value) === loserNorm,
           );
@@ -3289,7 +3289,7 @@ export class DatabaseStorage implements IStorage {
   async tryAcquireScrapeLock(brandId: string): Promise<boolean> {
     // pg_try_advisory_lock takes a bigint key; derive from hashtext()
     // so collisions across features are unlikely. Lock is session-scoped.
-    // node-postgres returns { rows: [...] }, not a bare array — indexing
+    // node-postgres returns { rows: [...] }, not a bare array - indexing
     // result[0] gives undefined and silently treats every call as contended,
     // which leaves runs stuck at status='pending' forever.
     const result = await db.execute(
@@ -3333,10 +3333,10 @@ export class DatabaseStorage implements IStorage {
 
   async recordCurrentMetrics(brandId: string): Promise<void> {
     // The "Record Snapshot" button on the Trends tab calls this. Compute
-    // share-of-answer from brand_prompts × geo_rankings — the tables the
+    // share-of-answer from brand_prompts × geo_rankings - the tables the
     // active citation pipeline actually writes to. (The prompt_portfolio
-    // table this used to prefer was dead — the active pipeline never wrote
-    // to it — and was dropped; see migration 0082.)
+    // table this used to prefer was dead - the active pipeline never wrote
+    // to it - and was dropped; see migration 0082.)
     const brandPrompts = await this.getBrandPromptsByBrandId(brandId);
     if (brandPrompts.length > 0) {
       const rankings = await this.getGeoRankingsByBrandPromptIds(brandPrompts.map((p) => p.id));
@@ -3355,7 +3355,7 @@ export class DatabaseStorage implements IStorage {
       } as any);
     }
 
-    // citation_quality — average totalQualityScore across citations.
+    // citation_quality - average totalQualityScore across citations.
     // getCitationQualities has its own Phase-1 fallback (Wave D), so this
     // always returns something when there are cited rankings.
     const citations = await this.getCitationQualities(brandId);
@@ -3370,7 +3370,7 @@ export class DatabaseStorage implements IStorage {
       } as any);
     }
 
-    // hallucinations — always write a row (even 0 unresolved is useful for
+    // hallucinations - always write a row (even 0 unresolved is useful for
     // trend tracking).
     const hallucinations = await this.getBrandHallucinations(brandId);
     const unresolvedCount = hallucinations.filter(
@@ -4381,7 +4381,7 @@ export class DatabaseStorage implements IStorage {
       const data = (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]);
       rows = (data as Record<string, unknown>[]).map(mapRow);
     } else {
-      // Default: newest first — keyset on (discovered_at DESC, id DESC).
+      // Default: newest first - keyset on (discovered_at DESC, id DESC).
       const cursorClause =
         opts.cursor != null
           ? sql`AND (discovered_at, id) < (${opts.cursor.discoveredAt}, ${opts.cursor.id})`

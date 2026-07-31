@@ -2,7 +2,7 @@
 --
 -- geo_rankings previously had no brand_id; every consumer derived the
 -- brand by joining through brand_prompts (brand_prompt_id) or articles
--- (article_id) — an easy "forgot the join -> wrong brand's data" footgun
+-- (article_id) - an easy "forgot the join -> wrong brand's data" footgun
 -- and an extra hop on hot read paths.
 --
 -- Add the column nullable + indexed, backfill from both join paths

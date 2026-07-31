@@ -12,7 +12,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
 // Sessionstorage key that hands the verify-email page the address the
-// user just registered with — avoids a query-string param that could
+// user just registered with - avoids a query-string param that could
 // leak into logs/referrers.
 const PENDING_VERIFY_EMAIL_KEY = "venturecite:pending-verify-email";
 
@@ -71,7 +71,7 @@ export default function Register() {
         navigate({ to: "/verify-email" });
         return;
       }
-      // Legacy path — kept so an older server (or a future flag flip
+      // Legacy path - kept so an older server (or a future flag flip
       // back) still works without breaking the client. Most installs
       // will never hit this branch.
       if (data?.access_token) {
@@ -100,7 +100,7 @@ export default function Register() {
   };
 
   return (
-    // Title/robots moved to src/routes/_app/register.tsx's `head()` —
+    // Title/robots moved to src/routes/_app/register.tsx's `head()` -
     // metadata belongs to the route, not this component.
     <PanelPage className="flex items-center justify-center p-4">
       <PanelRow cols={1} last className="w-full max-w-md">

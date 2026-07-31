@@ -1,4 +1,4 @@
-// Mentions rebuild (0050) — Task 19.2
+// Mentions rebuild (0050) - Task 19.2
 // Detail panel for a single BrandMention.  Opens as a right-side Sheet on
 // desktop and a bottom Sheet on mobile (<768 px) per spec §3.12.E.
 
@@ -163,7 +163,7 @@ export default function MentionDetailSheet({
   const isMobile = useIsMobile();
   // When the Sheet opens, focus moves automatically to the first focusable
   // element inside the dialog (the Radix close button). Radix Dialog handles
-  // this via the `autoFocus` strategy — no extra work needed. When closed,
+  // this via the `autoFocus` strategy - no extra work needed. When closed,
   // the parent's `onClose` callback is responsible for returning focus to the
   // originating row element.
 
@@ -348,7 +348,7 @@ export default function MentionDetailSheet({
                       </SelectContent>
                     </Select>
                     <p className="text-caption text-muted-foreground">
-                      Status is final — no further transitions allowed.
+                      Status is final - no further transitions allowed.
                     </p>
                   </div>
                 ) : (
@@ -416,7 +416,7 @@ export default function MentionDetailSheet({
                 </div>
                 {isTerminal && (
                   <p className="text-caption text-muted-foreground">
-                    Mark false positive is unavailable — status is final.
+                    Mark false positive is unavailable - status is final.
                   </p>
                 )}
               </section>

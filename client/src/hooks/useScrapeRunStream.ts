@@ -58,12 +58,7 @@ export type ScrapeStreamEvent =
   | { type: "slice_pending"; lastEventId: string; reason: string };
 
 export type ScrapeStreamStatus =
-  | "idle"
-  | "connecting"
-  | "streaming"
-  | "reconnecting"
-  | "done"
-  | "error";
+  "idle" | "connecting" | "streaming" | "reconnecting" | "done" | "error";
 
 export interface UseScrapeRunStreamResult {
   events: ScrapeStreamEvent[];
@@ -195,14 +190,14 @@ export function useScrapeRunStream(): UseScrapeRunStreamResult {
         }
       }
 
-      // Stream closed without `done` — treat as reconnect candidate.
+      // Stream closed without `done` - treat as reconnect candidate.
       if (statusRef.current === "streaming") {
         setStatus("reconnecting");
         void consume(runId, retryCount + 1);
       }
     } catch (err: any) {
       if (err?.name === "AbortError") return;
-      // Network blip / laptop sleep — bounded reconnect with backoff.
+      // Network blip / laptop sleep - bounded reconnect with backoff.
       if (retryCount < 5 && runIdRef.current) {
         setStatus("reconnecting");
         setTimeout(

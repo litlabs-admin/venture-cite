@@ -4,10 +4,10 @@ import type { Listicle } from "./useDashboardData";
 // ─── Listicles ───────────────────────────────────────────────────────────────
 // Replaced "Conversations", which needed AI-crawler tracking that does not
 // exist. "Best X" roundups are a source AI engines lean on heavily, and
-// presence in them is already scanned and stored — it was surfaced nowhere on
+// presence in them is already scanned and stored - it was surfaced nowhere on
 // this page.
 //
-// `isIncluded` is an INTEGER column (0/1), not a boolean — compare against 1
+// `isIncluded` is an INTEGER column (0/1), not a boolean - compare against 1
 // rather than testing truthiness, or every row counts as included.
 export function summariseListicles(rows: Listicle[]) {
   const included = rows.filter((r) => r.isIncluded === 1);
@@ -17,7 +17,7 @@ export function summariseListicles(rows: Listicle[]) {
   return {
     total: rows.length,
     included: included.length,
-    // Null, not 0, when nothing carries a position — an average of no
+    // Null, not 0, when nothing carries a position - an average of no
     // samples is not "position zero".
     avgPosition:
       ranked.length > 0

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-// RAF-driven count-up, cubic ease-out (1-(1-t)^3), default duration 600ms —
+// RAF-driven count-up, cubic ease-out (1-(1-t)^3), default duration 600ms -
 // verified against assets/useAnimatedNumber-Cg_7h-09.js. Respects
 // prefers-reduced-motion by jumping straight to the end value. Returns the
 // raw animated number; callers handle their own rounding/formatting since

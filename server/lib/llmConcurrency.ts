@@ -6,7 +6,7 @@
 // LLM calls that take seconds anyway.
 //
 // Crash safety: every slot row has `expires_at = now() + 60s` set at insert
-// time. A function that dies mid-call doesn't leak its slot — the next
+// time. A function that dies mid-call doesn't leak its slot - the next
 // acquire sees the row as expired and won't count it. Daily-orchestrator
 // also sweeps expired rows for housekeeping.
 import { sql } from "drizzle-orm";

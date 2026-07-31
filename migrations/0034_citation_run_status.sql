@@ -13,7 +13,7 @@
 -- finished runs don't accidentally trigger live-update polling on first
 -- boot after this migration applies.
 --
--- The partial index makes the "is any run active?" check O(1) — it only
+-- The partial index makes the "is any run active?" check O(1) - it only
 -- contains rows in non-terminal states, which is at most a handful per
 -- brand at any moment.
 

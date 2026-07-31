@@ -120,7 +120,7 @@ async function classifyPages(
 For each page you are given (real page titles + leading extracts from the live Wikipedia API), pick exactly one classification:
 - "existing": the brand name, website, or a tracked competitor appears explicitly in the extract text
 - "opportunity": the page is topically relevant to the brand's industry/products and the brand could legitimately be cited there, but the brand is not yet named in the extract
-- "irrelevant": the page is tangential or unrelated — drop it
+- "irrelevant": the page is tangential or unrelated - drop it
 
 Return JSON: {"pages": [{"title": string, "classification": "existing"|"opportunity"|"irrelevant", "reason": string (<=140 chars)}]}
 Titles in the output MUST exactly match the input titles.`,

@@ -78,7 +78,7 @@ export default function PlatformPostButton({
     );
   }
 
-  // 2. Buffer not connected — prompt to connect.
+  // 2. Buffer not connected - prompt to connect.
   if (!bufferConnected) {
     return (
       <Button
@@ -123,7 +123,7 @@ export default function PlatformPostButton({
       </p>
     ) : null;
 
-  // 4. Exactly one match — post directly.
+  // 4. Exactly one match - post directly.
   if (matches.length === 1) {
     const channel = matches[0];
     return (
@@ -152,7 +152,7 @@ export default function PlatformPostButton({
     );
   }
 
-  // 5. Multiple matches — popover picker.
+  // 5. Multiple matches - popover picker.
   return (
     <div className="flex flex-col gap-1">
       <Popover open={pickerOpen} onOpenChange={setPickerOpen}>

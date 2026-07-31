@@ -8,7 +8,7 @@ import { createFileRoute, Navigate } from "@tanstack/react-router";
 //
 // Phase 2 Task 6a: wouter's <Redirect> swapped for TanStack Router's own
 // <Navigate>, imported directly from "@tanstack/react-router" rather than
-// the router-compat shim (@/lib/router-compat) — see
+// the router-compat shim (@/lib/router-compat) - see
 // src/routes/-shared/routeGates.tsx, which now also uses native <Navigate>
 // (Phase 2 Task 7 deleted the shim's local Redirect helper). "/" is a real
 // route in this tree, so `to` (not `href`) type-checks here.

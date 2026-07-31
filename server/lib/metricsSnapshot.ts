@@ -13,7 +13,7 @@ export async function recordCurrentMetrics(
   brandId: string,
   runStats: { citationRate: number; totalChecks: number; totalCited: number },
 ): Promise<void> {
-  // 1. Citation rate — also written as "share_of_answer" for the TrendsTab
+  // 1. Citation rate - also written as "share_of_answer" for the TrendsTab
   // chart which queries that key. Same underlying numerator (cited/total)
   // since we don't currently distinguish SoA from citation-rate per run.
   await storage.createMetricsSnapshot({
@@ -29,14 +29,14 @@ export async function recordCurrentMetrics(
     metricDetails: { totalChecks: runStats.totalChecks, totalCited: runStats.totalCited },
   } as any);
 
-  // Fetch prompts + rankings ONCE — reused by the visibility_score
+  // Fetch prompts + rankings ONCE - reused by the visibility_score
   // (per-prompt) snapshot and the citation_quality snapshot below.
   const prompts = await storage.getBrandPromptsByBrandId(brandId);
   const promptIds = prompts.map((p) => p.id);
   const rankings =
     promptIds.length > 0 ? await storage.getGeoRankingsByBrandPromptIds(promptIds) : [];
 
-  // 2. visibility_score — REQUIRED. Both the dashboard hero delta
+  // 2. visibility_score - REQUIRED. Both the dashboard hero delta
   // (server/routes/dashboard.ts → getMetricsHistory("visibility_score"))
   // and the weekly_catchup delta_calc step
   // (server/lib/workflows/weeklyCatchup.ts → prior.metricDetails.byPrompt)
@@ -70,7 +70,7 @@ export async function recordCurrentMetrics(
     },
   } as any);
 
-  // 3. Citation quality — average relevance_score across cited rankings in this run.
+  // 3. Citation quality - average relevance_score across cited rankings in this run.
   if (promptIds.length > 0) {
     const cited = rankings.filter((r) => r.isCited === 1);
     const withRelevance = cited.filter((r) => typeof (r as any).relevanceScore === "number");
@@ -87,7 +87,7 @@ export async function recordCurrentMetrics(
     }
   }
 
-  // 4. Hallucinations — unresolved count. Written under two metric keys:
+  // 4. Hallucinations - unresolved count. Written under two metric keys:
   // "hallucinations" for TrendsTab's existing query, and
   // "hallucinations_unresolved" preserved for anything that still reads it.
   const hallucinations = await storage.getBrandHallucinations(brandId).catch(() => []);

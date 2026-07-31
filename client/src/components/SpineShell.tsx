@@ -24,9 +24,9 @@ export interface SpineTab {
 
 export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; tabs: SpineTab[] }) {
   // SpineShell hosts under whichever stage route mounted it (monitor,
-  // diagnose, act, setup, report) — it has no single `from` route, so this
+  // diagnose, act, setup, report) - it has no single `from` route, so this
   // reads/writes search loosely ({ strict: false } / to: location) rather
-  // than against one route's typed `Route.useSearch()` — see
+  // than against one route's typed `Route.useSearch()` - see
   // native-api-contract.md rule 3. `tab` is declared (as an optional string)
   // on every one of those routes' schemas in
   // src/routes/-shared/searchSchemas.ts.
@@ -42,10 +42,10 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
     // `to: location` rather than a route literal: this component isn't
     // tied to one route (it mounts under monitor/diagnose/act/setup/report),
     // so `location` (the current pathname) is a runtime `string`, not a
-    // literal — TanStack Router accepts a plain `string` `to` for exactly
+    // literal - TanStack Router accepts a plain `string` `to` for exactly
     // this case (see native-api-contract.md). `search` is a function of the
     // previous search object so every existing param (notably `brandId`,
-    // read by useBrandSelection() from nearly every page) survives — only
+    // read by useBrandSelection() from nearly every page) survives - only
     // `tab` changes.
     navigate({
       to: location,
@@ -59,13 +59,13 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
       {/* Full-bleed tab band. This is the shared chrome above 13 pages across
           four stage routes, so it sets the grammar those pages sit in: a
           hairline-bounded strip flush to the viewport edge, no rounded pill,
-          no gap between triggers — separation is a 1px rule, same as every
+          no gap between triggers - separation is a 1px rule, same as every
           panel row on the Dashboard.
 
           Still sticky, for the original reason: without it, child sticky
           toolbars (e.g. the article picker on the Signals page) have nothing
           to anchor against and look orphaned at the top of the viewport.
-          `bg-vc-surface` rather than a translucent blur — the panel grammar
+          `bg-vc-surface` rather than a translucent blur - the panel grammar
           has no frosted layers, and a solid band keeps the hairline crisp
           while content scrolls beneath it. */}
       <TabsList
@@ -98,7 +98,7 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
           // is a routine one-line purpose statement, not something that
           // needs attention. No border, no bg fill, and the glyph is
           // uncoloured (`currentColor` off the muted text) rather than the
-          // amber `text-warning` it had — amber is this design system's
+          // amber `text-warning` it had - amber is this design system's
           // attention colour and this isn't an attention case.
           <div
             key={`${t.value}-desc`}
@@ -117,7 +117,7 @@ export default function SpineShell({ defaultTab, tabs }: { defaultTab: string; t
               {/* The sidebar/tab strip above is already mounted by the time
                   this Suspense trips, so the loading shape is knowable at
                   least at the "content region" level (unlike routeGates.tsx's
-                  whole-page gates, which keep RouteSpinner) — a generic
+                  whole-page gates, which keep RouteSpinner) - a generic
                   shape-matched skeleton reads better here than a spinner. */}
               <Suspense fallback={<ContentSkeleton />}>
                 <Body />

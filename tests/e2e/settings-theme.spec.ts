@@ -13,11 +13,11 @@
 // implementation has a concrete contract to match.
 //
 // No login() here: this suite runs against the shared `storageState`
-// (playwright/.auth/state.json, produced once by tests/e2e/auth.setup.ts —
+// (playwright/.auth/state.json, produced once by tests/e2e/auth.setup.ts -
 // see playwright.config.ts's "chromium" project). The login endpoint
 // rate-limits at 10 attempts per (IP, email) per 15 minutes
 // (server/auth.ts), and a per-test login here would burn into that budget
-// for no benefit — every test's context already arrives authenticated.
+// for no benefit - every test's context already arrives authenticated.
 //
 // DISCREPANCY FROM THE BRIEF: the brief guessed localStorage key "vc_theme"
 // and assumed only two possible stored values (light/dark). Neither is
@@ -27,10 +27,10 @@
 //     which reads the same literal key.
 //   - Three theme VALUES exist: "system" | "light" | "dark" (theme.ts:36).
 //     "system" is what getStoredTheme() returns when nothing is stored
-//     (theme.ts:57-66) — there is no bare "unset" state once you're past
+//     (theme.ts:57-66) - there is no bare "unset" state once you're past
 //     the FOUC script's own read.
-//   - The applied marker the brief guessed — a `dark` class on
-//     `document.documentElement` — IS correct (applyResolvedTheme,
+//   - The applied marker the brief guessed - a `dark` class on
+//     `document.documentElement` - IS correct (applyResolvedTheme,
 //     theme.ts:107-119), but that function does one more thing the brief
 //     didn't mention: it also sets `document.documentElement.style.
 //     colorScheme` to "light" or "dark" (theme.ts:115-118), which native
@@ -50,7 +50,7 @@
 // CROSS-TEST / CROSS-SPEC CONTAMINATION: the brief warned that the shared
 // storageState carries localStorage between specs. Empirically this file's
 // tests (and, per grep, every other e2e spec) rely solely on Playwright's
-// default per-test `page`/`context` fixtures — no fixture in this project
+// default per-test `page`/`context` fixtures - no fixture in this project
 // scopes context to "worker" or otherwise reuses a context across tests
 // (confirmed: grep for `newContext`/`test.use`/`configure` across
 // tests/e2e turns up only auth.setup.ts's one-time login write and the two
@@ -60,7 +60,7 @@
 // on disk; that file is written exactly once (by auth.setup.ts) and is
 // never rewritten by ordinary spec tests, so a `localStorage.setItem` call
 // inside one test cannot actually leak into another test or another spec
-// file under this project's current fixture setup — each test starts
+// file under this project's current fixture setup - each test starts
 // from the identical on-disk snapshot regardless of what earlier tests
 // did in-memory. That said, this file still follows the brief's guidance
 // defensively and for readability: every test below sets the exact
@@ -71,7 +71,7 @@
 import { test, expect } from "@playwright/test";
 import { SEL } from "./support/selectors";
 
-// See the discrepancy note above — this is the REAL key (theme.ts:41),
+// See the discrepancy note above - this is the REAL key (theme.ts:41),
 // not the brief's guessed "vc_theme". Hardcoded here (not imported from
 // application source) to match this suite's existing convention of
 // pinning literal storage keys directly in the spec with a file:line
@@ -87,7 +87,7 @@ async function getThemeState(page: import("@playwright/test").Page) {
 
 test.describe("Settings and theme", () => {
   test.afterEach(async ({ page }) => {
-    // Defensive cleanup — see the contamination note above. Leaves this
+    // Defensive cleanup - see the contamination note above. Leaves this
     // file's contexts in the same "nothing stored" state they'd have
     // started in, whether or not that's strictly load-bearing today.
     await page.evaluate((key) => {
@@ -127,7 +127,7 @@ test.describe("Settings and theme", () => {
     const { isDark, colorScheme } = await getThemeState(page);
     expect(isDark).toBe(true);
     // applyResolvedTheme (theme.ts:107-119) sets both the class AND the
-    // native color-scheme hint — assert the full contract, not just half.
+    // native color-scheme hint - assert the full contract, not just half.
     expect(colorScheme).toBe("dark");
   });
 
@@ -153,7 +153,7 @@ test.describe("Settings and theme", () => {
     // deterministic OS-preference signal instead of depending on whatever
     // colour scheme the test host happens to report.
     // page starts on about:blank, where localStorage is inaccessible
-    // (SecurityError) — navigate first to establish a real origin before
+    // (SecurityError) - navigate first to establish a real origin before
     // touching storage.
     await page.goto("/settings");
     await page.evaluate((key) => localStorage.removeItem(key), THEME_STORAGE_KEY);
@@ -177,8 +177,8 @@ test.describe("Settings and theme", () => {
     // Exercises the write path (ThemeToggle -> useTheme().setTheme ->
     // setStoredTheme + applyResolvedTheme, ThemeProvider.tsx:51-57), not
     // just the read path the brief's two tests covered. No reload
-    // involved — proves the in-app toggle applies the class live.
-    // page starts on about:blank — navigate first, storage isn't reachable
+    // involved - proves the in-app toggle applies the class live.
+    // page starts on about:blank - navigate first, storage isn't reachable
     // until there's a real origin (see the note in the previous test).
     await page.goto("/settings");
     await page.evaluate((key) => localStorage.removeItem(key), THEME_STORAGE_KEY);
@@ -200,14 +200,14 @@ test.describe("Settings and theme", () => {
 
   test("theme survives client-side navigation, not just a reload", async ({ page }) => {
     // The brief only checked survival across `page.reload()`, which is a
-    // full document (re-)load and re-runs the FOUC script every time —
+    // full document (re-)load and re-runs the FOUC script every time -
     // exactly the case that already works today. What the migration can
     // actually break is a client-side route change that does NOT hit a
     // fresh document load. Prove this is a genuine in-app navigation (not
     // a disguised full reload) by planting a `window` marker beforehand:
     // a real full-page load would reset it, an SPA navigation via
     // wouter's <Link> (client/src/components/Sidebar.tsx:59) would not.
-    // page starts on about:blank — navigate first, storage isn't reachable
+    // page starts on about:blank - navigate first, storage isn't reachable
     // until there's a real origin (see the note earlier in this file), then
     // set the theme and reload once to have the FOUC script apply it.
     await page.goto("/settings");

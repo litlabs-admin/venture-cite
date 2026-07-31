@@ -25,7 +25,7 @@ export function ActionsPanel() {
       </div>
 
       <div className="-mx-1 flex flex-col">
-        {/* Row 1 — pre-expanded */}
+        {/* Row 1 - pre-expanded */}
         <div>
           <button
             type="button"
@@ -65,7 +65,7 @@ export function ActionsPanel() {
           )}
         </div>
 
-        {/* Rows 2-4 — collapsed */}
+        {/* Rows 2-4 - collapsed */}
         {restRows.map((row) => (
           <div key={row.title} className="border-t border-vc-subtle">
             <button

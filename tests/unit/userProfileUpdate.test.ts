@@ -1,4 +1,4 @@
-// Coverage for PATCH /api/user/profile — Settings page profile form
+// Coverage for PATCH /api/user/profile - Settings page profile form
 // (Foundations Plan 3, Task 2).
 
 import { describe, it, expect, beforeEach, vi } from "vitest";

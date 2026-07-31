@@ -47,7 +47,7 @@ export async function assertChatbotBudget(userId: string, tier: Tier): Promise<v
   }
 }
 
-// Atomic UPSERT — increments today's row.
+// Atomic UPSERT - increments today's row.
 export async function recordChatbotUsage(
   userId: string,
   inputTokens: number,

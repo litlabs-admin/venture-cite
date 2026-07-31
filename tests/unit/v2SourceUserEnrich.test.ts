@@ -9,7 +9,7 @@ vi.mock("../../server/lib/llmConcurrency", () => ({
 
 vi.mock("openai", () => ({
   // vitest 4 calls this with `new` (the OpenAI client is instantiated via
-  // `new`), so the implementation must be a real function — arrow
+  // `new`), so the implementation must be a real function - arrow
   // functions cannot be constructor-called and would throw.
   default: vi.fn().mockImplementation(function () {
     return {
@@ -59,7 +59,7 @@ describe("restoreSpacesFromSources", () => {
     expect(restoreSpacesFromSources(paraphrase, sources)).toBe(paraphrase);
   });
 
-  it("requires an exact despaced match — a prefix of a source is not restored", () => {
+  it("requires an exact despaced match - a prefix of a source is not restored", () => {
     // despace("venture") is a prefix of despace(desc) but not equal, so the
     // long description must NOT be substituted in.
     expect(restoreSpacesFromSources("venture", sources)).toBe("venture");
@@ -132,7 +132,7 @@ describe("runUserEnrichSource", () => {
       out.facts.some((f) => f.factKey === "description" && f.factValue.includes("AI for SMBs")),
     ).toBe(true);
     // deterministicFallback emits the controlled-vocab key "productLine"
-    // (not "products") for the offerings domain — see sourceUserEnrich.ts.
+    // (not "products") for the offerings domain - see sourceUserEnrich.ts.
     expect(out.facts.some((f) => f.factKey === "productLine")).toBe(true);
   });
 

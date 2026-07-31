@@ -37,7 +37,7 @@ const stubs = vi.hoisted(() => ({
   deleteExpiredFactScrapeCache: vi.fn(async () => 0),
   deleteExpiredLlmConcurrencySlots: vi.fn(async () => 0),
   // Both used to be scheduler-only jobs with no orchestrator step, so they
-  // never needed stubbing here. They are orchestrator steps now — without
+  // never needed stubbing here. They are orchestrator steps now - without
   // DISABLE_IN_PROCESS_SCHEDULER they would otherwise never run at all.
   deleteOldTourEvents: vi.fn(async () => 0),
   detectFactScrapeFailureRate: vi.fn(async () => ({ alerted: 0 })),
@@ -86,7 +86,7 @@ vi.mock("../../server/lib/factAgent/v2/vercelBudget", () => ({
   cronStepBudget: (w: number = 1) => Math.floor(55_000 * w),
 }));
 // llm_jobs drain/prune steps (added 2026-05-28). Same pattern as
-// reverify — orchestrator dynamically imports llmJobs at runtime.
+// reverify - orchestrator dynamically imports llmJobs at runtime.
 vi.mock("../../server/lib/llmJobs", () => ({
   drainPendingLlmJobs: vi.fn(async () => ({
     attempted: 0,

@@ -27,7 +27,7 @@ vi.mock("../../server/db", () => ({
 
 // Replace drizzle-orm operators with tagged sentinels so we can
 // introspect exactly which ones the scheduler used to build its
-// WHERE clause — without dragging in drizzle's circular SQL graph.
+// WHERE clause - without dragging in drizzle's circular SQL graph.
 const isNullCalls: unknown[] = [];
 const andCalls: unknown[][] = [];
 const neCalls: unknown[][] = [];
@@ -50,7 +50,7 @@ vi.mock("drizzle-orm", async () => {
   };
 });
 
-describe("citation scan scheduler — Foundations Plan 1 Task 11", () => {
+describe("citation scan scheduler - Foundations Plan 1 Task 11", () => {
   beforeEach(() => {
     whereSpy.mockReset();
     fromSpy.mockClear();
@@ -58,7 +58,7 @@ describe("citation scan scheduler — Foundations Plan 1 Task 11", () => {
     whereSpy.mockResolvedValue([]);
   });
 
-  it("selectBrandsForCitationScan filters only on deletedAt IS NULL — no cadence gate", async () => {
+  it("selectBrandsForCitationScan filters only on deletedAt IS NULL - no cadence gate", async () => {
     // scheduler.ts pulls in a large module graph (node-cron, drizzle,
     // citationChecker, emailService, workflowEngine, ...). That import
     // alone takes ~4.5s in isolation and can tip over the default 5s
@@ -72,13 +72,13 @@ describe("citation scan scheduler — Foundations Plan 1 Task 11", () => {
     expect(whereSpy).toHaveBeenCalledTimes(1);
 
     // The argument to .where() should be a single isNull(deletedAt)
-    // SQL token — NOT an `and(...)` composite that includes any
+    // SQL token - NOT an `and(...)` composite that includes any
     // autoCitationSchedule / autoCitationActive predicate. Drizzle's
     // `isNull` produces an SQL object with a single `column` field;
     // `and` produces a chunked SQL object with multiple `queryChunks`.
     // We assert the operator surface is the simple isNull shape and
     // that no autoCitation* column is the predicate's target.
-    // The predicate must be a single isNull(deletedAt) — NOT wrapped
+    // The predicate must be a single isNull(deletedAt) - NOT wrapped
     // in `and(...)` and NOT involving `ne(autoCitationSchedule, ...)`.
     const whereArg = whereSpy.mock.calls[0][0] as { __op?: string; col?: { name?: string } };
     expect(whereArg.__op).toBe("isNull");

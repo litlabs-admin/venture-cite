@@ -28,7 +28,7 @@ export default function Pricing() {
   const [betaCode, setBetaCode] = useState("");
   // Stripe redirects back with a plain `?success=true` / `?canceled=true`
   // query string. TanStack's default search parser JSON-parses primitive
-  // values, so these arrive as the boolean `true`, not the string "true" —
+  // values, so these arrive as the boolean `true`, not the string "true" -
   // check for both so this survives either encoding.
   const search = useSearch({ strict: false }) as Record<string, unknown>;
   const success = search.success === true || search.success === "true";
@@ -144,7 +144,7 @@ export default function Pricing() {
   return (
     // Mounted by src/routes/pricing.tsx, a server-rendered top-level route
     // (not under `_app`, which is ssr:false). Title/meta come from that
-    // route's `head()` — this component renders none of its own, per the
+    // route's `head()` - this component renders none of its own, per the
     // project's "metadata belongs to the route" rule.
     <PanelPage>
       <div className="px-8 py-6 max-w-5xl mx-auto">
@@ -246,7 +246,7 @@ export default function Pricing() {
                     // TINT with accent-coloured label and only goes solid on
                     // hover; forcing `bg-primary` here repainted the background
                     // solid while leaving the label accent-blue, i.e. blue text
-                    // on a blue fill — invisible. The popular plan is already
+                    // on a blue fill - invisible. The popular plan is already
                     // distinguished by its ring, scale and "Most Popular" badge.
                     className="w-full"
                     variant={plan.popular ? "default" : "outline"}
@@ -255,7 +255,7 @@ export default function Pricing() {
                     // was harmless only while Stripe returned no products: the
                     // moment real products load (i.e. the moment billing goes
                     // live) every tier that has a price went straight to
-                    // checkout — including Free, which would open a $0/month
+                    // checkout - including Free, which would open a $0/month
                     // subscription instead of signing the visitor up, and
                     // Enterprise, whose button says "Contact Sales" but would
                     // have immediately charged $249/month.
@@ -283,7 +283,7 @@ export default function Pricing() {
                     ) : null}
                     {/* The label must describe what the button actually does.
                       Enterprise previously read "Contact Sales" while wired
-                      to Checkout — a $249/month charge behind a button that
+                      to Checkout - a $249/month charge behind a button that
                       promises a conversation. It has a real, active price in
                       Stripe, so self-serve is honest; if you'd rather this be
                       sales-led, the fix is to give it its own branch above

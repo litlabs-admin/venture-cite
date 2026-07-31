@@ -1,4 +1,4 @@
-// MentionsTab — Task 20, Mentions Rebuild plan.
+// MentionsTab - Task 20, Mentions Rebuild plan.
 // Spec §3.12. Composition layer: wires useMentions hook to the Mentions UI.
 //
 // Layout (top to bottom):
@@ -57,7 +57,7 @@ export type MentionsTabProps = {
 // ---------------------------------------------------------------------------
 
 // Sentiment tone: renders as neutral text + an icon, never as a coloured
-// number by itself — and only once there's data to report. A zero count
+// number by itself - and only once there's data to report. A zero count
 // (including cold start, before any scan has run) is a "nothing yet"
 // state and stays neutral rather than rendering as a false signal.
 // `--positive` is reserved for data-viz series per the colour-system
@@ -119,9 +119,9 @@ function MentionCardSkeleton() {
 //   data-tour-id="mentions.firstResult"
 export default function MentionsTab({ brandId }: MentionsTabProps) {
   // Mounted under more than one route (the /monitor?tab=mentions spine tab
-  // and the legacy /geo-tools page), so — like SpineShell — this reads/writes
+  // and the legacy /geo-tools page), so - like SpineShell - this reads/writes
   // search loosely ({ strict: false } / to: location) rather than against
-  // one route's typed `Route.useSearch()` — see native-api-contract.md rule
+  // one route's typed `Route.useSearch()` - see native-api-contract.md rule
   // 3. `mention` is declared (as an optional string) on /monitor's schema in
   // src/routes/-shared/searchSchemas.ts; `useSearch({ strict: false })`'s
   // FullSearchSchema merges across the whole route tree, so it types here
@@ -164,7 +164,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
     [brandsResponse, brandId],
   );
 
-  // ── Last completed scan — fetched from dedicated endpoint ─────────────────
+  // ── Last completed scan - fetched from dedicated endpoint ─────────────────
 
   const { data: lastScanData } = useQuery<{ data: ScanJob | null }>({
     queryKey: ["/api/brand-mentions/scans/last", brandId],
@@ -193,11 +193,11 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
     (mention: BrandMention) => {
       // `to: location` rather than a route literal: this tab mounts under
       // more than one route (see the comment above), so `location` (the
-      // current pathname) is a runtime `string`, not a literal — TanStack
+      // current pathname) is a runtime `string`, not a literal - TanStack
       // Router accepts a plain `string` `to` for exactly this case. `search`
       // is a function of the previous search object so every existing param
       // (notably `brandId`, read by useBrandSelection() from nearly every
-      // page) survives — only `mention` changes.
+      // page) survives - only `mention` changes.
       navigate({
         to: location,
         search: (prev: Record<string, unknown>) => ({ ...prev, mention: mention.id }),
@@ -413,7 +413,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
                 Bulk select
               </Button>
 
-              {/* Delete selected — visible when bulk mode active and items selected */}
+              {/* Delete selected - visible when bulk mode active and items selected */}
               {bulkMode && selectedIds.size > 0 && (
                 <Button
                   size="sm"
@@ -429,7 +429,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
               {/* Spacer */}
               <div className="flex-1" />
 
-              {/* Delete all for brand — danger zone */}
+              {/* Delete all for brand - danger zone */}
               <Button
                 size="sm"
                 variant="ghost"

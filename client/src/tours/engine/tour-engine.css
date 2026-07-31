@@ -6,7 +6,7 @@
  * as part of the product, not a foreign widget.
  *
  * IMPORTANT TOKEN SYNTAX: tokens in this codebase are raw OKLCH values
- * (see client/src/index.css). Use bare `var(--x)` — never `hsl(var(--x))`,
+ * (see client/src/index.css). Use bare `var(--x)` - never `hsl(var(--x))`,
  * which would yield hsl(oklch(...)), invalid CSS, and a transparent panel.
  * Pattern used everywhere else in the project (`bg-[var(--positive)]`,
  * `tailwind.config.ts: background: "var(--background)"`).
@@ -16,7 +16,7 @@
  *   • title-aware: `.shepherd-has-title .shepherd-content .shepherd-X` (3 classes, 0,3,0)
  *
  * Every popover we render has a title, so `.shepherd-has-title` is on the
- * panel and the title-aware rules win — they're why the header showed up
+ * panel and the title-aware rules win - they're why the header showed up
  * gray and the cancel icon stayed default-tinted in earlier passes. To
  * beat them we use `.shepherd-element.shepherd-has-title .shepherd-content
  * .shepherd-X` (4 classes, 0,4,0). Tying source-order wins; this exceeds.
@@ -88,7 +88,7 @@
   }
 }
 
-/* Content wrapper — Shepherd may give this a background; force transparent
+/* Content wrapper - Shepherd may give this a background; force transparent
    so our panel-level surface shows through evenly behind header + body. */
 .shepherd-element .shepherd-content {
   background: transparent;
@@ -96,7 +96,7 @@
   padding: 0;
 }
 
-/* Arrow tip — match panel chrome. Shepherd renders the arrow as a
+/* Arrow tip - match panel chrome. Shepherd renders the arrow as a
    rotated square with `:before` carrying the visible face. The
    `.shepherd-has-title[data-popper-placement^=bottom]` variant sets a
    gray background; we match its specificity (3 classes + attr) to win
@@ -232,7 +232,7 @@
   border-color: var(--border-strong);
 }
 
-/* "Don't show again" — tertiary text-style affordance, left-aligned. */
+/* "Don't show again" - tertiary text-style affordance, left-aligned. */
 .shepherd-element .shepherd-footer .tour-skip-forever {
   background: transparent;
   border: none;
@@ -259,7 +259,7 @@
   border-radius: 4px;
 }
 
-/* ─── Mobile fallback — bottom-sheet under 768px ─────────────────────────── */
+/* ─── Mobile fallback - bottom-sheet under 768px ─────────────────────────── */
 
 @media (max-width: 767px) {
   .shepherd-element {

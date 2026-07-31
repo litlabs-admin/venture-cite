@@ -1,14 +1,14 @@
 // Universal brand/competitor detection.
 //
 // Every surface that answers "is this entity mentioned in this text" goes
-// through detectBrandAndCompetitors() — AI response citation checks, Reddit
+// through detectBrandAndCompetitors() - AI response citation checks, Reddit
 // mention scanning, listicle analysis, Wikipedia scans, hallucination
 // re-verification. One function, one set of rules.
 //
 // The matcher is deliberately simple: whole-word regex against a list of
 // user-editable name variations, with a few corrections for real-world
 // cases (possessives, diacritics, URL-boundary domains, ambiguous short
-// names). Rank/relevance scoring stays in the LLM analyzer — this matcher
+// names). Rank/relevance scoring stays in the LLM analyzer - this matcher
 // only answers the yes/no presence question.
 //
 // See docs/superpowers/specs/2026-04-25-universal-citation-detection-design.md
@@ -61,7 +61,7 @@ function extractDomain(websiteOrDomain: string): string | null {
     const host = new URL(withProto).hostname;
     return host.replace(/^www\./, "") || null;
   } catch {
-    // Not a valid URL — treat the raw string as a domain if it contains a dot
+    // Not a valid URL - treat the raw string as a domain if it contains a dot
     if (raw.includes(".") && !/\s/.test(raw)) {
       return raw.replace(/^www\./, "");
     }
@@ -165,7 +165,7 @@ function compileNameVariant(variant: string): CompiledVariant | null {
     };
   }
 
-  // Name variant — whole-word + possessive-tolerant. Internal whitespace
+  // Name variant - whole-word + possessive-tolerant. Internal whitespace
   // becomes \s+ so "Notion Labs" also matches "Notion  Labs" / "Notion\nLabs".
   const parts = folded.split(/\s+/).filter(Boolean).map(escapeRegex);
   if (parts.length === 0) return null;
@@ -236,7 +236,7 @@ function runVariant(text: string, foldedText: string, v: CompiledVariant): numbe
     const start = m.index;
     const end = start + m[0].length;
     if (v.ambiguous && !hasSignalNearby(text, start, end)) {
-      // No signal nearby — skip this hit. Move past it to avoid infinite loops
+      // No signal nearby - skip this hit. Move past it to avoid infinite loops
       // on zero-width matches.
       if (v.regex.lastIndex === start) v.regex.lastIndex = start + 1;
       continue;

@@ -3,10 +3,10 @@
 // The whole point of a citation run is to measure whether an AI assistant names
 // the brand UNPROMPTED. If the question itself contains the brand's name, the
 // answer is guaranteed to mention it and we score a fake citation. The prompt
-// generators only *ask* the LLM not to do this — this is the enforcement.
+// generators only *ask* the LLM not to do this - this is the enforcement.
 //
 // Key idea: reject any prompt that the citation matcher itself would flag. That
-// makes prompt-filtering symmetric with citation-detection — a prompt passes
+// makes prompt-filtering symmetric with citation-detection - a prompt passes
 // iff running it cannot produce a name-based self-citation, by the exact same
 // rules (including the ambiguity gate that stops common-word brands like
 // "Stripe"/"Notion" from over-rejecting).

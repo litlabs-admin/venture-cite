@@ -8,7 +8,7 @@
 // Production evidence (admin@venturecite.com, read 2026-07-30): the row held
 // `global: { v: 2, skippedAt: "2026-07-29T19:18:01.391Z" }` and global-welcome
 // still auto-fired 7 times the following day. Lifetime: 133 auto-fires, 6
-// completions, 21 skips. The PATCH was always landing — it was never read in
+// completions, 21 skips. The PATCH was always landing - it was never read in
 // time.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";

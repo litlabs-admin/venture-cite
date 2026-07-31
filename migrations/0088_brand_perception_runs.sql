@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS public.brand_perception_runs (
 );
 
 -- The dashboard's only query is "newest run for this brand", and the history
--- view will be "runs for this brand, newest first" — one index serves both.
+-- view will be "runs for this brand, newest first" - one index serves both.
 CREATE INDEX IF NOT EXISTS brand_perception_runs_brand_created_idx
   ON public.brand_perception_runs (brand_id, created_at DESC);
 

@@ -2,10 +2,10 @@
 import { test, expect } from "@playwright/test";
 import { SEL } from "./support/selectors";
 
-// This deliberately does NOT complete a registration — that would create a
+// This deliberately does NOT complete a registration - that would create a
 // real Supabase user and send a real verification email on every run.
 // These tests only verify the forms render, validate client-side, and are
-// reachable — the parts a framework migration could silently break.
+// reachable - the parts a framework migration could silently break.
 
 test.describe("Registration and password reset", () => {
   test("register page renders every field and is marked noindex", async ({ page }) => {
@@ -19,7 +19,7 @@ test.describe("Registration and password reset", () => {
     //
     // React 19 hoists <title>/<meta>/<link> children rendered anywhere in
     // the tree directly into <head> itself, so Helmet's data-rh="true"
-    // marker no longer appears on the tags it manages — react-helmet-async
+    // marker no longer appears on the tags it manages - react-helmet-async
     // is expected to be removed entirely once the framework migration
     // lands, at which point this marker disappears for good. Locate the
     // tag by its exact page-specific content instead: a bare
@@ -48,7 +48,7 @@ test.describe("Registration and password reset", () => {
     // client/src/pages/register.tsx renders a live "Passwords do not
     // match" message the instant confirmPassword diverges from password,
     // and disables button[data-testid="button-register"] via
-    // `disabled={... || !passwordsMatch}` — the button never becomes
+    // `disabled={... || !passwordsMatch}` - the button never becomes
     // clickable for a mismatched pair, so there is nothing to click here.
     // (Playwright's .click() would just hang against actionability
     // checks until the mismatch resolves, which it never does.) Assert on

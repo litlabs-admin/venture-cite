@@ -33,7 +33,7 @@ describe("extractCitedUrls", () => {
 
   it("rejects non-http(s) schemes", () => {
     const text =
-      "Visit javascript:alert(1) or file:///etc/passwd or data:text/plain;base64,YWJj — but https://stripe.com is fine.";
+      "Visit javascript:alert(1) or file:///etc/passwd or data:text/plain;base64,YWJj - but https://stripe.com is fine.";
     const urls = extractCitedUrls(text);
     expect(urls).toEqual(["https://stripe.com"]);
   });

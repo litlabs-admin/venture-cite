@@ -113,15 +113,15 @@ async function main() {
     if (looksCollapsed(f.factValue)) {
       unmatched++;
       console.log(
-        `[manual] brand=${f.brandId} ${f.source}/${f.factKey} looks space-collapsed but no source match — edit by hand:\n   ${JSON.stringify(f.factValue.slice(0, 90))}`,
+        `[manual] brand=${f.brandId} ${f.source}/${f.factKey} looks space-collapsed but no source match - edit by hand:\n   ${JSON.stringify(f.factValue.slice(0, 90))}`,
       );
     }
   }
 
   // Diagnostic: flag brand RECORD fields that are themselves space-collapsed.
   // If brands.description is space-less, every "You" (source='user') fact
-  // inherits it and the real fix is upstream — re-enter the brand info or fix
-  // the brand-generation path — not this script.
+  // inherits it and the real fix is upstream - re-enter the brand info or fix
+  // the brand-generation path - not this script.
   let brandFieldHits = 0;
   for (const b of brands as Array<Record<string, unknown>>) {
     if (brandFilter && b.id !== brandFilter) continue;
@@ -141,7 +141,7 @@ async function main() {
   );
   if (brandFieldHits > 0) {
     console.log(
-      "Upstream brand fields are space-collapsed — this script can't restore those (no clean source). " +
+      "Upstream brand fields are space-collapsed - this script can't restore those (no clean source). " +
         "Fix the brand record (re-enter the description) so user-enrich stops inheriting the corruption.",
     );
   }

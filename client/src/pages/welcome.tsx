@@ -54,8 +54,8 @@ type SseEvent = {
 };
 
 // Server-driven activation pipeline state. The autopilot runs the phases
-// strictly in order — FactSheet kernel first, then prompts grounded in
-// it, then web-grounded citations — and is resumable server-side, so
+// strictly in order - FactSheet kernel first, then prompts grounded in
+// it, then web-grounded citations - and is resumable server-side, so
 // this screen only ever reflects status; it never drives the work.
 type AutopilotStatus =
   | "idle"
@@ -141,7 +141,7 @@ function Reveal({ children, className }: { children: React.ReactNode; className?
 }
 
 // ---------------------------------------------------------------------------
-// Activation pipeline model — the single source of progress truth.
+// Activation pipeline model - the single source of progress truth.
 // ---------------------------------------------------------------------------
 
 const PHASES: { key: string; label: string; desc: string }[] = [
@@ -435,11 +435,11 @@ export default function Welcome() {
   // Auto-advance into the Dashboard the moment the baseline is ready.
   // The spine's global-welcome tour auto-fires at `/dashboard`, so the
   // guided tour runs alongside whatever finishes in the background.
-  // Failures do NOT auto-redirect — the user chooses retry or proceed.
+  // Failures do NOT auto-redirect - the user chooses retry or proceed.
   //
   // Native-router note: this used to target bare "/" with a `?brandId=`
   // query string. Post-migration, "/" is the public Landing route
-  // (src/routes/index.tsx) — for an authenticated visitor it hard-redirects
+  // (src/routes/index.tsx) - for an authenticated visitor it hard-redirects
   // to "/dashboard" via `window.location.href`, which drops the query
   // string entirely. Targeting "/dashboard" directly (where FirstRunGate
   // now mounts the Home/Dashboard component) is what actually
@@ -597,7 +597,7 @@ export default function Welcome() {
                 <Badge variant="secondary" className="text-label font-normal align-middle">
                   auto-detected
                 </Badge>{" "}
-                came from your site. Correct anything that's off — accuracy here sets the baseline.
+                came from your site. Correct anything that's off - accuracy here sets the baseline.
               </p>
 
               {/* Logo + Name */}
@@ -819,7 +819,7 @@ export default function Welcome() {
 }
 
 // ---------------------------------------------------------------------------
-// Activation panel — the ONE progress surface. Ordered phases, four-state
+// Activation panel - the ONE progress surface. Ordered phases, four-state
 // vocabulary (Done / Working / Queued), one editorial verdict line, honest
 // "this finishes without you" copy, and a non-blocking path forward.
 // ---------------------------------------------------------------------------
@@ -847,7 +847,7 @@ function ActivationPanel({
   const verdict = done
     ? `${brandName}'s AI-visibility baseline is ready.`
     : failed
-      ? "Setup stopped partway. Your brand is saved — retry, or pick it up from the dashboard."
+      ? "Setup stopped partway. Your brand is saved - retry, or pick it up from the dashboard."
       : `We're establishing how AI engines represent ${brandName}. This runs on its own.`;
 
   return (
@@ -866,7 +866,7 @@ function ActivationPanel({
           </h2>
         </div>
 
-        {/* The single editorial verdict sentence — advisor voice, stated
+        {/* The single editorial verdict sentence - advisor voice, stated
             before the detail. Serif is the one warmth tell. */}
         <p
           className="mt-3 text-ui leading-snug text-foreground"
@@ -944,7 +944,7 @@ function ActivationPanel({
           <p className="text-caption text-muted-foreground">
             {done
               ? "Taking you to your dashboard…"
-              : "Safe to leave — this finishes in the background."}
+              : "Safe to leave - this finishes in the background."}
           </p>
           <div className="flex gap-2">
             {failed ? (

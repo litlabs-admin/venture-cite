@@ -42,7 +42,7 @@ const STATUS_LABEL: Record<BrandFactScrapePage["status"], string> = {
 };
 
 function formatBytes(n: number | null | undefined): string {
-  if (n == null) return "—";
+  if (n == null) return "-";
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
@@ -52,9 +52,9 @@ function formatDuration(
   fetchedAt: string | Date | null | undefined,
   startedAt?: string | Date | null,
 ): string {
-  if (!fetchedAt || !startedAt) return "—";
+  if (!fetchedAt || !startedAt) return "-";
   const ms = new Date(fetchedAt).getTime() - new Date(startedAt).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return "—";
+  if (!Number.isFinite(ms) || ms < 0) return "-";
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
@@ -93,10 +93,10 @@ function PageRow({
         {page.factCount ?? 0}
       </TableCell>
       <TableCell className="py-2 pr-3 px-0 text-caption text-muted-foreground">
-        {page.lang ?? "—"}
+        {page.lang ?? "-"}
       </TableCell>
       <TableCell className="py-2 pr-3 px-0 text-caption text-muted-foreground">
-        {page.errorKind ? truncate(page.errorKind, 20) : "—"}
+        {page.errorKind ? truncate(page.errorKind, 20) : "-"}
       </TableCell>
       <TableCell className="py-2 px-0 text-caption tabular-nums text-muted-foreground">
         {formatDuration(page.fetchedAt, runStartedAt)}

@@ -330,7 +330,7 @@ describe("GET /api/brand-fact-sheet/runs/:runId/stream", () => {
     expect(searchLlm).toBeTruthy();
     expect(searchLlm!.data.status).toBe("failed");
     expect(searchLlm!.data.errorKind).toBe("llm_error");
-    // static_pages has no log row — no event for it
+    // static_pages has no log row - no event for it
     const staticPages = sourceUpdates.find((e) => e.data.source === "staticPages");
     expect(staticPages).toBeUndefined();
   });
@@ -341,7 +341,7 @@ describe("GET /api/brand-fact-sheet/runs/:runId/stream", () => {
     // an artificial delay on first call, then non-terminal status. To keep
     // test fast, monkey-patch Date.now within the route's perspective is
     // not feasible without altering source. Instead, validate the slice_pending
-    // emission by aborting via destroy after budget — but we can directly
+    // emission by aborting via destroy after budget - but we can directly
     // test the path by saturating with many non-terminal ticks and aborting:
     // not a true budget test. We'll assert the simpler invariant: when run
     // never reaches terminal AND client doesn't abort, the heartbeat comment

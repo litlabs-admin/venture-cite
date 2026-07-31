@@ -1,6 +1,6 @@
 // Consolidated cross-run, cross-platform history for a single tracked
 // prompt. Replaces what used to be split between ResultsTab's
-// latest-run-only accordion and HistoryTab's per-run drill-down — this is
+// latest-run-only accordion and HistoryTab's per-run drill-down - this is
 // the one place to see everything that ever happened for a prompt. Rendered
 // inside AppShell's inspector (see useInspector in AppShell.tsx), opened
 // from a prompt row in PromptsTab.tsx / ResultsTab.tsx / HistoryTab.tsx.
@@ -16,13 +16,13 @@ import { PlatformResultCard, type PlatformResult } from "./PlatformResultCard";
 type PromptDetailProps = {
   // Currently informational only (kept for callers that have it and for a
   // future promptId-based join if the server ever groups run details by
-  // id) — matching against a run's byPrompt rows happens via `promptText`
+  // id) - matching against a run's byPrompt rows happens via `promptText`
   // since that's the only stable key the /run/:runId/details endpoint
   // exposes. See the comment on `promptText` below.
   promptId?: string;
   // The server's per-run /details endpoint groups results by prompt TEXT,
-  // not promptId (a run can outlive the prompt row it was checked against —
-  // prompts get edited/archived — so there's no stable id to join on
+  // not promptId (a run can outlive the prompt row it was checked against -
+  // prompts get edited/archived - so there's no stable id to join on
   // historically). Callers that already have the BrandPrompt row pass its
   // current text so we can look up its slice of each run; without it we
   // fall back to "current run only" via `usePromptResults`, which the
@@ -44,10 +44,10 @@ export default function PromptDetail({ promptId, promptText, brandId }: PromptDe
     { enabled: !!activeRunId },
   );
 
-  // Match this run's byPrompt rows (grouped by text — see the type comment
+  // Match this run's byPrompt rows (grouped by text - see the type comment
   // above) against the prompt's current text. If we don't know the text
   // (caller didn't pass it), fall back to whatever single row exists when
-  // the run only has one prompt — better than showing nothing — otherwise
+  // the run only has one prompt - better than showing nothing - otherwise
   // show the "no match" empty state rather than guessing wrong.
   const promptRowForRun = useMemo(() => {
     const rows = runDetailData?.data?.byPrompt;

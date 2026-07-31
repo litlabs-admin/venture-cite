@@ -12,14 +12,14 @@ import type { PageExplainer } from "@/components/PageHeader";
  */
 export const pageExplainers = {
   dashboard: {
-    summary: "Your GEO dashboard — see citation trends, rankings, and what to do next.",
+    summary: "Your GEO dashboard - see citation trends, rankings, and what to do next.",
     expectedOutcome: "New data appears within minutes after each citation check completes.",
   },
   brands: {
     summary:
-      "Brand profiles power every other feature — name, industry, tone, USPs, and tracked variations.",
+      "Brand profiles power every other feature - name, industry, tone, USPs, and tracked variations.",
     prerequisites: "Add a brand before generating content or running citation checks.",
-    expectedOutcome: "Brand details propagate everywhere instantly — no rebuild needed.",
+    expectedOutcome: "Brand details propagate everywhere instantly - no rebuild needed.",
   },
   articles: {
     summary: "AI-optimized articles you've generated. Publish to your site, then track citations.",
@@ -32,7 +32,7 @@ export const pageExplainers = {
       "Generate AI-optimized articles tuned for citation by ChatGPT, Claude, Perplexity, and others.",
     prerequisites: "Pick a brand. Optional but useful: keywords + target customers.",
     expectedOutcome:
-      "Generation takes 2–5 minutes — you'll see live progress and can edit on save.",
+      "Generation takes 2–5 minutes - you'll see live progress and can edit on save.",
     relatedConcept: "GEO",
   },
   citations: {
@@ -40,11 +40,11 @@ export const pageExplainers = {
       "Asks ChatGPT, Claude, Perplexity, and others your prompts and tracks whether they mention you.",
     prerequisites: "Run AFTER setting up a brand and generating a few articles.",
     expectedOutcome:
-      "Citations typically appear 1–2 weeks after new content is published — LLM models re-index on their own schedule.",
+      "Citations typically appear 1–2 weeks after new content is published - LLM models re-index on their own schedule.",
     relatedConcept: "GEO",
   },
   aiVisibility: {
-    summary: "One-time setup checklist — make your site machine-readable for AI engines.",
+    summary: "One-time setup checklist - make your site machine-readable for AI engines.",
     prerequisites: "Do this BEFORE expecting citations.",
     expectedOutcome: "Each item completed boosts the chance an AI cites you accurately.",
     relatedConcept: "GEO",
@@ -62,19 +62,19 @@ export const pageExplainers = {
   },
   aiIntelligence: {
     summary:
-      "Deep dive into AI-engine behavior — mentions, hallucinations, citation quality, sources.",
+      "Deep dive into AI-engine behavior - mentions, hallucinations, citation quality, sources.",
     prerequisites: "Most useful after 2+ weeks of citation runs.",
     relatedConcept: "GEO",
   },
   community: {
     summary:
-      "Reddit + forum outreach — direct engagement that LLMs scrape into their training data.",
+      "Reddit + forum outreach - direct engagement that LLMs scrape into their training data.",
     expectedOutcome: "AEO tactic: posts you make today can show up in AI answers within 4–8 weeks.",
     relatedConcept: "AEO",
   },
   competitors: {
     summary:
-      "Track competitor brands across the same prompts — see who else AI engines cite, how, and when.",
+      "Track competitor brands across the same prompts - see who else AI engines cite, how, and when.",
     prerequisites:
       "Add competitors manually or let the system auto-discover them from citation runs.",
   },
@@ -91,13 +91,13 @@ export const pageExplainers = {
   },
   geoTools: {
     summary:
-      "Auxiliary tools — bulk ops, data exports, schema generators, listicle scanners, FAQ helpers.",
+      "Auxiliary tools - bulk ops, data exports, schema generators, listicle scanners, FAQ helpers.",
   },
   crawlerCheck: {
     summary:
       "Check whether AI crawlers (GPTBot, ClaudeBot, PerplexityBot, etc.) are allowed to read your site.",
     expectedOutcome:
-      "Run after publishing your robots.txt — flags any AI crawler currently blocked.",
+      "Run after publishing your robots.txt - flags any AI crawler currently blocked.",
     relatedConcept: "GEO",
   },
   faqManager: {
@@ -107,7 +107,7 @@ export const pageExplainers = {
   },
   brandFactSheet: {
     summary:
-      "Canonical facts about your brand — used by AI to verify mentions and avoid hallucinations.",
+      "Canonical facts about your brand - used by AI to verify mentions and avoid hallucinations.",
     expectedOutcome:
       "Adding facts here directly reduces 'wrong' citations (e.g., wrong founding year, wrong CEO).",
     relatedConcept: "GEO",

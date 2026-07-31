@@ -19,9 +19,9 @@ import { logger } from "../lib/logger";
 
 export function setupLlmJobsRoutes(app: Express): void {
   // Single-job poll. Returns:
-  //   { status: 'pending' | 'running', jobId }                        — keep polling
-  //   { status: 'succeeded', jobId, result }                          — render result
-  //   { status: 'failed' | 'cancelled', jobId, errorKind, errorMessage } — surface to user
+  //   { status: 'pending' | 'running', jobId }                        - keep polling
+  //   { status: 'succeeded', jobId, result }                          - render result
+  //   { status: 'failed' | 'cancelled', jobId, errorKind, errorMessage } - surface to user
   app.get(
     "/api/llm-jobs/:jobId",
     isAuthenticated,
@@ -33,7 +33,7 @@ export function setupLlmJobsRoutes(app: Express): void {
           return sendError(res, null, "Invalid job id", 400);
         }
 
-        // Ownership gate FIRST — before pollLlmJob, which finalizes the job
+        // Ownership gate FIRST - before pollLlmJob, which finalizes the job
         // and persists its side effects. A caller must not be able to
         // force-finalize a job they don't own just by knowing its id.
         const ownsJob = await db
@@ -42,12 +42,12 @@ export function setupLlmJobsRoutes(app: Express): void {
           .where(eq(schema.llmJobs.id, jobId))
           .limit(1);
         const owner = ownsJob[0];
-        // 404 (not 403) on every miss — anti-enumeration, hides existence.
+        // 404 (not 403) on every miss - anti-enumeration, hides existence.
         if (!owner) {
           return sendError(res, null, "Job not found", 404);
         }
         const isAdminUser = (user as { isAdmin?: number }).isAdmin === 1;
-        // Cron-spawned jobs have userId=null — admin-only (the fail-open
+        // Cron-spawned jobs have userId=null - admin-only (the fail-open
         // `owner.userId && …` guard previously exposed these to any caller).
         if (owner.userId === null) {
           if (!isAdminUser) return sendError(res, null, "Job not found", 404);
@@ -95,7 +95,7 @@ export function setupLlmJobsRoutes(app: Express): void {
             completedAt: j.completedAt,
             errorKind: j.errorKind,
             errorMessage: j.errorMessage,
-            // Don't send result blob on the list view — too big. Client
+            // Don't send result blob on the list view - too big. Client
             // calls /:jobId for individual rendering.
           })),
         });

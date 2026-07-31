@@ -2,8 +2,8 @@
 //
 // Why this exists
 // --------------
-// One-shot LLM endpoints — keyword discovery, FAQ generation, hallucination
-// detection, prompt generation, suggestion generation — historically ran
+// One-shot LLM endpoints - keyword discovery, FAQ generation, hallucination
+// detection, prompt generation, suggestion generation - historically ran
 // INLINE inside the request handler. On Vercel Hobby (10s function ceiling,
 // ~6.3s effective LLM budget) any prompt that legitimately needs >6s gets
 // aborted mid-call and the user sees a 504. The work is genuinely lost.
@@ -63,7 +63,7 @@
 // -------------------
 // Vercel's waitUntil() extends the function lifetime up to maxDuration. On
 // Hobby that's still 10s. It does NOT give us minutes of free background
-// work. OpenAI's Responses background mode does — the work runs on their
+// work. OpenAI's Responses background mode does - the work runs on their
 // servers, we just kick off and retrieve.
 //
 // OpenRouter (non-GPT) gap
@@ -85,7 +85,7 @@ import { logger } from "./logger";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 import { captureAndFlush } from "./sentryReport";
 
-// Standalone OpenAI client — kept separate from routesShared.ts because
+// Standalone OpenAI client - kept separate from routesShared.ts because
 // the route layer pulls in express + ownership + rate limiters we don't
 // need here. The retrieve calls are fast (<1s) so a tight timeout is OK.
 const openai = new OpenAI({
@@ -99,7 +99,7 @@ const openai = new OpenAI({
 attachAiLogger(openai);
 
 // -----------------------------------------------------------------------
-// Kind registry — each route owns its finalize handler and registers it
+// Kind registry - each route owns its finalize handler and registers it
 // at app startup. The poll endpoint dispatches by kind.
 // -----------------------------------------------------------------------
 
@@ -136,7 +136,7 @@ export function registerLlmJobHandler<P, R>(handler: LlmJobHandler<P, R>): void 
   HANDLERS.set(handler.kind, handler as LlmJobHandler);
 }
 
-/** Test helper — clear the registry. Production code never calls this. */
+/** Test helper - clear the registry. Production code never calls this. */
 export function _resetLlmJobHandlersForTests(): void {
   HANDLERS.clear();
 }
@@ -155,7 +155,7 @@ export interface ResponseFormat {
 }
 
 export interface EnqueueParams<P = Record<string, unknown>> {
-  /** Stable kind id — must match a registered handler. */
+  /** Stable kind id - must match a registered handler. */
   kind: string;
   /** Original request payload. Persisted so the cron drain can finalize
    *  the job even when the original handler context is gone. */
@@ -207,7 +207,7 @@ export async function enqueueLlmJob<P>(params: EnqueueParams<P>): Promise<Enqueu
 
   try {
     // OpenAI Responses API in background mode. response.id is the handle
-    // we use for retrieve(). store=true is REQUIRED — without it the
+    // we use for retrieve(). store=true is REQUIRED - without it the
     // response is dropped after the create() call returns.
     const response = await openai.responses.create({
       model: params.model,
@@ -247,7 +247,7 @@ export async function enqueueLlmJob<P>(params: EnqueueParams<P>): Promise<Enqueu
         completedAt: new Date(),
       })
       .where(eq(schema.llmJobs.id, jobId));
-    // Re-throw so the route handler returns 502 to the client — they
+    // Re-throw so the route handler returns 502 to the client - they
     // never saw the jobId yet.
     throw err;
   }
@@ -268,7 +268,7 @@ export async function pollLlmJob(jobId: string): Promise<PollResult | null> {
   const row = rows[0];
   if (!row) return null;
 
-  // Terminal states are cached — no point hitting OpenAI again.
+  // Terminal states are cached - no point hitting OpenAI again.
   if (row.status === "succeeded" || row.status === "failed" || row.status === "cancelled") {
     return rowToPollResult(row);
   }
@@ -284,7 +284,7 @@ export async function pollLlmJob(jobId: string): Promise<PollResult | null> {
     const response = await openai.responses.retrieve(row.responseId);
     return await applyResponseToRow(row, response);
   } catch (err) {
-    // Don't mark the row failed on a transient retrieve error — the
+    // Don't mark the row failed on a transient retrieve error - the
     // job may still be running on OpenAI's side. Just return the
     // current "running" state so the client polls again.
     logger.warn(
@@ -295,7 +295,7 @@ export async function pollLlmJob(jobId: string): Promise<PollResult | null> {
   }
 }
 
-/** Cron entry point — sweep jobs whose clients haven't polled. */
+/** Cron entry point - sweep jobs whose clients haven't polled. */
 export async function drainPendingLlmJobs(
   deadlineMs: number,
   batchSize = 20,
@@ -342,13 +342,13 @@ export async function drainPendingLlmJobs(
   return counters;
 }
 
-/** Cron prune step — delete jobs past their expires_at. */
+/** Cron prune step - delete jobs past their expires_at. */
 export async function pruneExpiredLlmJobs(): Promise<number> {
   const result = await db.delete(schema.llmJobs).where(lt(schema.llmJobs.expiresAt, new Date()));
   return (result as unknown as { rowCount?: number }).rowCount ?? 0;
 }
 
-/** UI helper — list a user's recent jobs (Diagnose → Jobs tab, etc.). */
+/** UI helper - list a user's recent jobs (Diagnose → Jobs tab, etc.). */
 export async function listRecentLlmJobsForUser(userId: string, limit = 20): Promise<LlmJob[]> {
   return await db
     .select()
@@ -382,7 +382,7 @@ interface NormalizedResponse {
   error?: { message?: string };
 }
 
-/** Apply an OpenAI response object to a job row. Idempotent — repeated
+/** Apply an OpenAI response object to a job row. Idempotent - repeated
  *  applies on a 'succeeded' row return the same cached result. */
 async function applyResponseToRow(
   row: LlmJob,
@@ -439,7 +439,7 @@ async function applyResponseToRow(
     try {
       structuredOutput = outputText ? JSON.parse(outputText) : null;
     } catch {
-      // Plain text — leave structuredOutput=null.
+      // Plain text - leave structuredOutput=null.
     }
     const usage = extractUsage(response);
 
@@ -520,7 +520,7 @@ async function applyResponseToRow(
     };
   }
 
-  // Unknown status — leave the row alone, client polls again.
+  // Unknown status - leave the row alone, client polls again.
   return rowToPollResult(row);
 }
 

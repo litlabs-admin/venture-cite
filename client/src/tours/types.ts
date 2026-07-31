@@ -20,7 +20,7 @@ export interface TourContext {
 export type TourCopy = string | ((ctx: TourContext) => string);
 
 export interface TourStep {
-  id: string; // stable ID, e.g. "intro" — survives reorders
+  id: string; // stable ID, e.g. "intro" - survives reorders
   target?: string; // data-tour-id selector value
   title?: TourCopy;
   content: TourCopy;
@@ -28,7 +28,7 @@ export interface TourStep {
   waitTimeoutMs?: number; // default 3000
   // Popper.js placement values. The `-start`/`-end` variants align the
   // popover with the start/end edge of the target instead of centering
-  // on it — useful for narrow vertical targets like sidebar nav rows
+  // on it - useful for narrow vertical targets like sidebar nav rows
   // where the centered default would float mid-list.
   attachTo?:
     | "top"

@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // The page renders router links via dashboard-panel primitives (CCLink) and
-// reads brand selection from a hook — stub both so this test is about
+// reads brand selection from a hook - stub both so this test is about
 // payload handling and rendering, not navigation or brand-list plumbing.
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, ...rest }: { children?: React.ReactNode }) => <a {...rest}>{children}</a>,
@@ -84,14 +84,14 @@ const pageRows: SiteHealthPage[] = [
   },
 ];
 
-describe("SiteHealthDetailPage — full data", () => {
+describe("SiteHealthDetailPage - full data", () => {
   it("renders the score, meta rows, and grouped issues", () => {
     renderWithData(fullHealth, { runId: "run-1", pages: pageRows });
 
     expect(screen.getByText("Acme Corp")).toBeTruthy();
     expect(screen.getByText("74")).toBeTruthy();
     // "Pages" stat shows the sitemap's URL count (site size, 53), not the
-    // audited sample (10) — the audited count appears as the stat's caption.
+    // audited sample (10) - the audited count appears as the stat's caption.
     expect(screen.getByText("53")).toBeTruthy();
     expect(screen.getByText("10 audited")).toBeTruthy();
     expect(screen.getByText("6")).toBeTruthy();
@@ -101,7 +101,7 @@ describe("SiteHealthDetailPage — full data", () => {
   });
 });
 
-describe("SiteHealthDetailPage — sitemap unavailable", () => {
+describe("SiteHealthDetailPage - sitemap unavailable", () => {
   it("falls back to the audited page count and names the missing source", () => {
     renderWithData(
       { ...fullHealth, crawl: { ...fullHealth.crawl, sitemapUrlCount: null } },
@@ -112,7 +112,7 @@ describe("SiteHealthDetailPage — sitemap unavailable", () => {
   });
 });
 
-describe("SiteHealthDetailPage — no crawl run", () => {
+describe("SiteHealthDetailPage - no crawl run", () => {
   it("renders a Not crawled yet state with an empty pages array, without throwing", () => {
     expect(() =>
       renderWithData(
@@ -124,7 +124,7 @@ describe("SiteHealthDetailPage — no crawl run", () => {
   });
 });
 
-describe("SiteHealthDetailPage — missing nested objects", () => {
+describe("SiteHealthDetailPage - missing nested objects", () => {
   it("renders without throwing when discovery/crawlers/crawl/issues are absent", () => {
     const bare = { website: "https://example.com", checkedAt: "", score: null } as never;
     expect(() => renderWithData(bare, { runId: null, pages: [] })).not.toThrow();
@@ -135,7 +135,7 @@ describe("SiteHealthDetailPage — missing nested objects", () => {
   });
 });
 
-describe("SiteHealthDetailPage — content findings (advisory, 0 pts)", () => {
+describe("SiteHealthDetailPage - content findings (advisory, 0 pts)", () => {
   it("appends content findings to What To Fix Next as advisory, never a +N pts badge", () => {
     renderWithData(
       fullHealth,
@@ -160,7 +160,7 @@ describe("SiteHealthDetailPage — content findings (advisory, 0 pts)", () => {
   });
 });
 
-describe("SiteHealthDetailPage — pending (deadline-timeout placeholder)", () => {
+describe("SiteHealthDetailPage - pending (deadline-timeout placeholder)", () => {
   it("shows a Measuring… state, never a score, when pending is true", () => {
     renderWithData({ ...fullHealth, score: null, pending: true }, { runId: null, pages: [] });
     expect(screen.getByText("Measuring…")).toBeTruthy();
@@ -168,7 +168,7 @@ describe("SiteHealthDetailPage — pending (deadline-timeout placeholder)", () =
   });
 });
 
-describe("SiteHealthDetailPage — crawl to cite rate", () => {
+describe("SiteHealthDetailPage - crawl to cite rate", () => {
   it("shows a dash for the unmeasured crawl-to-cite-rate stat, never 0", () => {
     renderWithData(fullHealth, { runId: "run-1", pages: pageRows });
     expect(screen.getByText(/No data source yet/)).toBeTruthy();

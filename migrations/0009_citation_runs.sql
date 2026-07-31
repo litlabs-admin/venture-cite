@@ -1,4 +1,4 @@
--- Citation run history — one row per manual or cron-triggered citation check.
+-- Citation run history - one row per manual or cron-triggered citation check.
 -- Stores aggregate totals + per-platform breakdown so the trend chart renders
 -- without re-aggregating every geo_rankings row.
 

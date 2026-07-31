@@ -55,7 +55,7 @@ vi.mock("../../server/db", () => {
     where: () => selectChain,
     limit: () => Promise.resolve(stubs.dbUser ? [stubs.dbUser] : []),
   };
-  // Drizzle chain: update().set(vals).where(cond).returning() — the
+  // Drizzle chain: update().set(vals).where(cond).returning() - the
   // Plan 4 fix to BUG #1 uses a conditional UPDATE...RETURNING to
   // detect the race winner. Simulate that by inspecting whether the
   // gated column is currently null on the in-memory row.
@@ -83,14 +83,14 @@ vi.mock("../../server/db", () => {
             if (stubs.dbUser.welcomedAt === null) {
               Object.assign(stubs.dbUser, pendingVals);
             } else {
-              // Race loser — set nothing, return zero rows.
+              // Race loser - set nothing, return zero rows.
               pendingVals = null;
             }
           } else {
             Object.assign(stubs.dbUser, pendingVals);
           }
         };
-        // Promise-shaped (no .returning) — resolve directly.
+        // Promise-shaped (no .returning) - resolve directly.
         const thenable: any = {
           then(onF: any, onR: any) {
             applyMutation();
@@ -134,7 +134,7 @@ vi.mock("../../server/supabase", () => ({
 }));
 
 // Login re-auth happens on the dedicated supabaseAuth client (server/lib/
-// supabaseAuth.ts), NOT supabaseAdmin — see server/auth.ts. Mock the real
+// supabaseAuth.ts), NOT supabaseAdmin - see server/auth.ts. Mock the real
 // module (which otherwise constructs a real supabase-js client from
 // SUPABASE_URL and would attempt a genuine network call).
 vi.mock("../../server/lib/supabaseAuth", () => ({
@@ -350,7 +350,7 @@ describe("POST /api/auth/register (requires verification)", () => {
   });
 
   it("surfaces a genuine createUser failure as 400 and does NOT self-heal (no resend)", async () => {
-    // Weak-password is also a 422 — must not be misread as "already
+    // Weak-password is also a 422 - must not be misread as "already
     // exists" (that would falsely tell the user they registered).
     stubs.createUser.mockResolvedValue({
       data: { user: null },
@@ -418,7 +418,7 @@ describe("welcome email on first login", () => {
     });
     expect(status).toBe(200);
     expect(body?.success).toBe(true);
-    // Welcome email is dispatched via waitUntil — flush captured
+    // Welcome email is dispatched via waitUntil - flush captured
     // promises so assertions run after the detached work resolves.
     await flushWaitUntil();
     expect(stubs.sendWelcomeEmail).toHaveBeenCalledTimes(1);

@@ -4,12 +4,12 @@ import SpineShell from "@/components/SpineShell";
 import { brandScoped } from "@/components/BrandScopedTab";
 import HallucinationsTab from "@/components/intelligence/HallucinationsTab";
 
-// "What's wrong & why?" — Hallucinations is the diagnostic half of the
+// "What's wrong & why?" - Hallucinations is the diagnostic half of the
 // dissolved ai-intelligence page (its Citation Quality tab was removed
-// because the citation_quality table is dead — the server synthesized the
+// because the citation_quality table is dead - the server synthesized the
 // authority/relevance/recency scores, so the surface could not be
 // defended); Signals and Crawler are the technical readiness checks. The
-// Issues tab was retired — recommendations live on the Dashboard
+// Issues tab was retired - recommendations live on the Dashboard
 // (Pulse) as the single canonical worklist surface.
 const GeoSignals = lazy(() => import("@/pages/geo-signals"));
 const CrawlerCheck = lazy(() => import("@/pages/crawler-check"));

@@ -41,7 +41,7 @@ export function applyTourStateOp(
     return next;
   }
 
-  // markCompleted / markSkipped — both write to global or perBrand[id][tourId].
+  // markCompleted / markSkipped - both write to global or perBrand[id][tourId].
   if (!args.tourId || args.version === undefined) return next;
   const field = op === "markCompleted" ? "completedAt" : "skippedAt";
   const record = { v: args.version, [field]: args.timestamp };
@@ -61,7 +61,7 @@ export function applyTourStateOp(
     perBrand[args.brandId] = brand;
     next.perBrand = perBrand;
   } else {
-    // Page tour without brand context — store in a perUser sub-tree.
+    // Page tour without brand context - store in a perUser sub-tree.
     const perUser = ((next.perUser as Record<string, unknown> | undefined) ?? {}) as Record<
       string,
       unknown

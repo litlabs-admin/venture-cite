@@ -1,4 +1,4 @@
-// useChatbot — single source of truth for the chatbot's data layer.
+// useChatbot - single source of truth for the chatbot's data layer.
 //
 // Owns: list of threads, active thread id, transcript of active thread,
 // streaming send (with AbortController), create/archive/restore mutations.
@@ -61,7 +61,7 @@ export function useChatbot(opts: { enabled: boolean; brandId: string | null }) {
   // Brand-switch handling. When the user changes the active brand at the
   // app level AND the current thread was started under a different brand,
   // automatically detach so the next send creates a fresh thread under the
-  // new brand. We don't create the thread eagerly — a no-op switch (open
+  // new brand. We don't create the thread eagerly - a no-op switch (open
   // panel, change brand, close panel) shouldn't litter the history list.
   useEffect(() => {
     if (!enabled) return;
@@ -72,13 +72,13 @@ export function useChatbot(opts: { enabled: boolean; brandId: string | null }) {
     const active = threads.find((t) => t.id === activeThreadId);
     if (!active) return;
     if (active.brandId === brandId) return;
-    // Different brand AND the thread has actual content — start fresh.
+    // Different brand AND the thread has actual content - start fresh.
     if (active.messageCount > 0) {
       setActiveThreadId(null);
       setMessages([]);
       setError(null);
       setBudgetExceeded(false);
-      setBrandSwitchNotice("Brand changed — your next message will start a new chat.");
+      setBrandSwitchNotice("Brand changed - your next message will start a new chat.");
     }
   }, [enabled, brandId, activeThreadId, threads]);
 
@@ -258,7 +258,7 @@ export function useChatbot(opts: { enabled: boolean; brandId: string | null }) {
         }
       } catch (err) {
         if ((err as Error).name === "AbortError") {
-          // User clicked stop — keep partial output.
+          // User clicked stop - keep partial output.
           return;
         }
         setError((err as Error).message || "Failed to send message");

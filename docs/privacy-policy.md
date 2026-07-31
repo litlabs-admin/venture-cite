@@ -71,17 +71,17 @@ We do not use your content to train any AI model.
 Depending on your jurisdiction (notably under GDPR if you're in the EU/UK
 or CCPA if you're in California), you have rights to:
 
-- **Access** your personal data — use **Settings → Download my data (JSON)**
+- **Access** your personal data - use **Settings → Download my data (JSON)**
   to get a complete export.
-- **Erasure** — use **Settings → Delete account**. The deletion is
+- **Erasure** - use **Settings → Delete account**. The deletion is
   scheduled with a 30-day grace period during which you can email us to
   cancel. After the grace period, your account, brands, articles,
   citations, and integrations are permanently deleted; audit log rows
   remain (with your user ID detached) for compliance integrity.
-- **Rectification** — edit your profile in the app, or contact us.
-- **Portability** — the export above is provided in machine-readable
+- **Rectification** - edit your profile in the app, or contact us.
+- **Portability** - the export above is provided in machine-readable
   JSON format.
-- **Object to processing** / **withdraw consent** — for marketing email,
+- **Object to processing** / **withdraw consent** - for marketing email,
   use the unsubscribe link in any email or **Settings → Email preferences**.
 
 To exercise any right not self-served by the app, email **[CONTACT EMAIL]**.

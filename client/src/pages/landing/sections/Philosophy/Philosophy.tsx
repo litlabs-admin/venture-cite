@@ -42,7 +42,7 @@ export function Philosophy() {
                 <PlaybookCard
                   number="01"
                   title="Every major engine, not a sample"
-                  // Keep this list in step with AiLogoGrid — the card's logo
+                  // Keep this list in step with AiLogoGrid - the card's logo
                   // grid renders the same eight engines, and a copy/visual
                   // mismatch here reads as a mistake.
                   body="ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews, Grok, Meta AI, DeepSeek. Each one recommends a different set of brands for the same question. Tracking two or three is guessing."

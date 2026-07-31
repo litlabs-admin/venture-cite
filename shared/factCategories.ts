@@ -1,6 +1,6 @@
 // Canonical brand-fact categories. These are the values the auto-scraper
 // in server/lib/factExtractor.ts emits into brand_fact_sheet.factCategory,
-// so the UI MUST group on the same set — otherwise every scraped row is
+// so the UI MUST group on the same set - otherwise every scraped row is
 // invisible despite being in the DB.
 //
 // Keep this as the single source of truth: the scraper, the UI, and the

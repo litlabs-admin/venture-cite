@@ -121,18 +121,18 @@ function parseRedditRss(xml: string): RssItem[] {
  * Scan Reddit for brand mentions.
  *
  * Two execution modes, both unauthenticated:
- *   1. Public JSON — /search.json against www.reddit.com. Comment-tree
+ *   1. Public JSON - /search.json against www.reddit.com. Comment-tree
  *      expansion is SKIPPED (it would burn the unauth quota).
- *   2. RSS fallback (when public JSON returns 403/429) — /search.rss.
+ *   2. RSS fallback (when public JSON returns 403/429) - /search.rss.
  *      Lower fidelity: no engagement scores, no NSFW flag, no comments.
  *
- * THERE IS NO OAUTH PATH — it was removed deliberately. This scanner is
+ * THERE IS NO OAUTH PATH - it was removed deliberately. This scanner is
  * unauthenticated by design and carries no Reddit credentials.
  *
  * KNOWN LIMITATION: Reddit currently 403s unauthenticated traffic on BOTH
  * of these endpoints. Measured 2026-07-30 across every tracked brand;
  * source_health's last successful Reddit scan is 2026-05-27. When that
- * happens this returns `failed`, not an empty list — the caller records a
+ * happens this returns `failed`, not an empty list - the caller records a
  * source failure, because an empty list would read as "nothing was said
  * about this brand", which is a different and false claim.
  */
@@ -159,8 +159,8 @@ export async function scanRedditSource(
  * Public-path scan: one field-scoped query per name variation.
  *
  * Why per-variation: Reddit's public /search.json rejects long Lucene queries
- * with HTTP 414 (URI Too Long). One variation per call —
- * `(title:"Samsung" OR selftext:"Samsung")` — stays well under the limit
+ * with HTTP 414 (URI Too Long). One variation per call -
+ * `(title:"Samsung" OR selftext:"Samsung")` - stays well under the limit
  * while preserving field-scoping (more precise than unscoped phrase search).
  *
  * Strategy: try variations in order. STOP at the first variation that returns
@@ -232,11 +232,11 @@ async function scanViaPublic(
         }
         // JSON succeeded for this variation. If it produced mentions, stop here.
         if (foundForThisVariation > 0) break;
-        continue; // JSON ran but matched nothing — try next variation, skip RSS.
+        continue; // JSON ran but matched nothing - try next variation, skip RSS.
       }
     }
 
-    // JSON failed (non-OK or unparseable) — try RSS fallback for this variation.
+    // JSON failed (non-OK or unparseable) - try RSS fallback for this variation.
     const rssPath = `/search.rss?q=${encodeURIComponent(q)}&sort=relevance&t=${t}`;
     const rssRes = await redditPublicFetch(rssPath);
     if (!rssRes.ok) {
@@ -276,7 +276,7 @@ async function scanViaPublic(
   if (mentions.length === 0 && failures.length === variations.length) {
     return {
       mentions: [],
-      failed: `reddit: ${failures[0] ?? "all variation queries failed"} (public JSON + RSS both blocked — Reddit refuses unauthenticated traffic)`,
+      failed: `reddit: ${failures[0] ?? "all variation queries failed"} (public JSON + RSS both blocked - Reddit refuses unauthenticated traffic)`,
     };
   }
 

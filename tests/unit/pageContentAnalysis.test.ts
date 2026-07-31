@@ -7,7 +7,7 @@ function wrap(head: string, body: string): string {
   return `<html><head>${head}</head><body>${body}</body></html>`;
 }
 
-describe("analysePageHtml — meta title", () => {
+describe("analysePageHtml - meta title", () => {
   it("flags metaTitleMissing when there is no <title>", () => {
     const f = analysePageHtml(wrap("", "<p>hi</p>"), URL);
     expect(f.metaTitleMissing).toBe(true);
@@ -38,7 +38,7 @@ describe("analysePageHtml — meta title", () => {
   });
 });
 
-describe("analysePageHtml — meta description", () => {
+describe("analysePageHtml - meta description", () => {
   it("flags metaDescriptionMissing when absent", () => {
     const f = analysePageHtml(wrap("<title>Some Title Here</title>", "<p>hi</p>"), URL);
     expect(f.metaDescriptionMissing).toBe(true);
@@ -72,7 +72,7 @@ describe("analysePageHtml — meta description", () => {
   });
 });
 
-describe("analysePageHtml — open graph", () => {
+describe("analysePageHtml - open graph", () => {
   it("flags ogMissing when neither og:title nor og:image is present", () => {
     const f = analysePageHtml(wrap("", "<p>hi</p>"), URL);
     expect(f.ogMissing).toBe(true);
@@ -89,7 +89,7 @@ describe("analysePageHtml — open graph", () => {
   });
 });
 
-describe("analysePageHtml — heading structure", () => {
+describe("analysePageHtml - heading structure", () => {
   it("flags headingNoH1 when there is no H1", () => {
     const f = analysePageHtml(wrap("", "<h2>Sub</h2><p>hi</p>"), URL);
     expect(f.headingNoH1).toBe(true);
@@ -115,7 +115,7 @@ describe("analysePageHtml — heading structure", () => {
   });
 });
 
-describe("analysePageHtml — structured answer formats", () => {
+describe("analysePageHtml - structured answer formats", () => {
   it("flags jsonLdAnswerFormatMissing when there is no JSON-LD", () => {
     const f = analysePageHtml(wrap("", "<p>hi</p>"), URL);
     expect(f.jsonLdAnswerFormatMissing).toBe(true);
@@ -147,7 +147,7 @@ describe("analysePageHtml — structured answer formats", () => {
   });
 });
 
-describe("analysePageHtml — FAQ content", () => {
+describe("analysePageHtml - FAQ content", () => {
   it("flags faqContentMissing when no Q&A pattern is present", () => {
     const f = analysePageHtml(wrap("", "<p>Just some prose with no questions.</p>"), URL);
     expect(f.faqContentMissing).toBe(true);
@@ -174,7 +174,7 @@ describe("analysePageHtml — FAQ content", () => {
   });
 });
 
-describe("analysePageHtml — content density", () => {
+describe("analysePageHtml - content density", () => {
   it("flags thinContent under 300 chars of body text", () => {
     const f = analysePageHtml(wrap("", "<p>Short.</p>"), URL);
     expect(f.thinContent).toBe(true);

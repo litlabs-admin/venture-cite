@@ -1,6 +1,6 @@
-// Spec 2 §4.7 — eight failure-state branches.
+// Spec 2 §4.7 - eight failure-state branches.
 // Mapping: seven explicit error_kind cases + an "unknown" fallback.
-// NOTE: The eighth row in Spec 2 §4.7 ("Mixed — some pages worked") is rendered
+// NOTE: The eighth row in Spec 2 §4.7 ("Mixed - some pages worked") is rendered
 // by the per-page panel + diff view, NOT here. This component only handles
 // terminal-failure runs.
 import { Link } from "@tanstack/react-router";
@@ -90,7 +90,7 @@ export function ScrapeFailureState({
           <AlertDescription className="space-y-3">
             <p>
               We couldn't see real content without rendering JavaScript. We don't run a headless
-              browser yet — but you can paste a description of your brand below and we'll use that
+              browser yet - but you can paste a description of your brand below and we'll use that
               instead.
             </p>
             <Button asChild size="sm" data-testid="scrape-failure-spa-add-fact">
@@ -143,7 +143,7 @@ export function ScrapeFailureState({
           <AlertDescription className="space-y-3">
             <p>
               We respect <code className="rounded bg-muted px-1 py-0.5">Disallow</code> rules in
-              your robots.txt. Add facts manually below — or remove the rule for
+              your robots.txt. Add facts manually below - or remove the rule for
               <code className="ml-1 rounded bg-muted px-1 py-0.5">VentureCiteBot/1.0</code>.
             </p>
             <Button asChild size="sm" data-testid="scrape-failure-robots-add-fact">
@@ -179,7 +179,7 @@ export function ScrapeFailureState({
           <AlertTitle>This scrape ran past the 5-minute limit</AlertTitle>
           <AlertDescription>
             <p>
-              We saved whatever partial results we got below. Try re-running tomorrow — if this
+              We saved whatever partial results we got below. Try re-running tomorrow - if this
               keeps happening, your site may be very large or slow to respond.
             </p>
           </AlertDescription>
@@ -197,7 +197,7 @@ export function ScrapeFailureState({
           <AlertTitle>We couldn't reach {host}</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>
-              Every connection attempt failed — TLS handshake, DNS, or the site is blocking
+              Every connection attempt failed - TLS handshake, DNS, or the site is blocking
               automated traffic. Double-check the URL is correct and reachable from the public
               internet.
             </p>
@@ -223,7 +223,7 @@ export function ScrapeFailureState({
           <AlertTitle>None of the pages we tried worked</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>
-              The pages we picked returned a mix of errors — some 404, some timed out, some blocked.
+              The pages we picked returned a mix of errors - some 404, some timed out, some blocked.
               This usually means the URL list we generated doesn't match your site's real structure.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -251,7 +251,7 @@ export function ScrapeFailureState({
           <AlertTitle>Scrape failed</AlertTitle>
           <AlertDescription>
             <p>
-              Something went wrong while reading {host}. Try re-scraping — if it keeps failing,
+              Something went wrong while reading {host}. Try re-scraping - if it keeps failing,
               contact support with run ID{" "}
               <code className="rounded bg-muted px-1 py-0.5">{runId}</code>.
             </p>

@@ -1,10 +1,10 @@
 // server/routes/tours.ts
 //
 // Tour engine API. Three endpoints:
-//   GET  /api/tours/state            — read user's tour state blob
-//   PATCH /api/tours/state           — whitelisted ops on tour state
-//   POST /api/tours/events           — batched event ingestion (idempotent)
-//   GET  /api/admin/tours/metrics    — admin-gated tour funnel metrics
+//   GET  /api/tours/state            - read user's tour state blob
+//   PATCH /api/tours/state           - whitelisted ops on tour state
+//   POST /api/tours/events           - batched event ingestion (idempotent)
+//   GET  /api/admin/tours/metrics    - admin-gated tour funnel metrics
 //
 // State lives in users.onboarding_state.tours (JSONB sub-tree).
 // Events go to the tour_events table.
@@ -37,7 +37,7 @@ function requireUserId(req: AuthedReq, res: Response): string | null {
 }
 
 function isAdmin(req: AuthedReq): boolean {
-  // users.is_admin (integer 1) — same gate as the shared `isAdmin`
+  // users.is_admin (integer 1) - same gate as the shared `isAdmin`
   // middleware in server/auth.ts, not a hardcoded email domain.
   return req.user?.isAdmin === 1;
 }
@@ -87,7 +87,7 @@ const EventsBatchSchema = z.object({
 });
 
 export function setupTourRoutes(app: Express): void {
-  // GET /api/tours/state — returns the tours sub-tree of onboarding_state.
+  // GET /api/tours/state - returns the tours sub-tree of onboarding_state.
   app.get(
     "/api/tours/state",
     asyncHandler(async (req: AuthedReq, res) => {
@@ -98,7 +98,7 @@ export function setupTourRoutes(app: Express): void {
 
       // Legacy bridge: pre-launch users who saw the old `guidedSeen` flag
       // shouldn't get global-welcome re-fired. Synthesize the effective
-      // state at READ time WITHOUT persisting — a GET must be safe/
+      // state at READ time WITHOUT persisting - a GET must be safe/
       // idempotent (the old code did a write inside GET, which also
       // raced PATCH and could clobber the whole onboarding_state column).
       // The next genuine PATCH persists global naturally; until then the
@@ -124,7 +124,7 @@ export function setupTourRoutes(app: Express): void {
     }),
   );
 
-  // PATCH /api/tours/state — whitelisted ops only.
+  // PATCH /api/tours/state - whitelisted ops only.
   app.patch(
     "/api/tours/state",
     asyncHandler(async (req: AuthedReq, res) => {
@@ -159,7 +159,7 @@ export function setupTourRoutes(app: Express): void {
     }),
   );
 
-  // POST /api/tours/events — batched, idempotent.
+  // POST /api/tours/events - batched, idempotent.
   app.post(
     "/api/tours/events",
     asyncHandler(async (req: AuthedReq, res) => {
@@ -214,7 +214,7 @@ export function setupTourRoutes(app: Express): void {
     }),
   );
 
-  // GET /api/admin/tours/metrics — admin-only funnel snapshot.
+  // GET /api/admin/tours/metrics - admin-only funnel snapshot.
   app.get(
     "/api/admin/tours/metrics",
     asyncHandler(async (req: AuthedReq, res) => {

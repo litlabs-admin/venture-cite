@@ -2,7 +2,7 @@
 // components/sections/Nav/icons.tsx because the Nav copy hardcodes
 // stroke-width 2, while index.html uses stroke-width 1.5 for two of the
 // three arrow-right instances in this section (headline link + data-tile
-// cards) and 2 for the third (resource row cards) — verbatim per source.
+// cards) and 2 for the third (resource row cards) - verbatim per source.
 type IconProps = { size?: number; strokeWidth?: number; className?: string };
 
 export function ArrowRightIcon({ size = 12, strokeWidth = 2, className }: IconProps) {

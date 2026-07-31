@@ -91,7 +91,7 @@ interface SchemaAudit {
   completenessPercent: number;
   populatedFields: string[];
   missingFields: string[];
-  // The catalogue of fields the auditor measured against — used to split
+  // The catalogue of fields the auditor measured against - used to split
   // `missingFields` into required vs recommended buckets in the UI.
   required: string[];
   recommended: string[];
@@ -110,7 +110,7 @@ const STAGE_BLURBS: Record<string, string> = {
   Retrieve:
     "Real retrieval surface. Combines query-term coverage, the fraction of headings phrased as questions, and the fraction of chunks that are formatted as AI-friendly answer units.",
   Signal:
-    "Your overall scorecard score, decomposed into the pipeline stage it represents. The number above is the same as the headline % on the Signal Scorecard — both routes feed off computeSignals().",
+    "Your overall scorecard score, decomposed into the pipeline stage it represents. The number above is the same as the headline % on the Signal Scorecard - both routes feed off computeSignals().",
   Serve:
     "Real citability signals: byline detection, outbound citation count, and whether at least one chunk has a heading plus a direct 200+ char answer.",
 };
@@ -176,7 +176,7 @@ function geoReducer(state: ReducerState, action: ReducerAction): ReducerState {
 // honest. If the active scorecard later needs a freshness label, lean
 // on date-fns formatDistanceToNow instead.)
 
-// Line-level LCS diff — small enough to inline; no new dep.
+// Line-level LCS diff - small enough to inline; no new dep.
 //
 // 2026-05-28 perf cap: this is O(m·n). Two 1500-line articles produce a
 // 2.25M cell DP table that took 5-10s to render and froze the dialog
@@ -198,7 +198,7 @@ function lineDiff(
     return [
       {
         kind: "equal",
-        text: `(Article is ${a.length} lines / ${oldText.length.toLocaleString()} chars; optimised is ${b.length} lines / ${newText.length.toLocaleString()} chars — ${delta >= 0 ? "+" : ""}${delta.toLocaleString()} lines.)`,
+        text: `(Article is ${a.length} lines / ${oldText.length.toLocaleString()} chars; optimised is ${b.length} lines / ${newText.length.toLocaleString()} chars - ${delta >= 0 ? "+" : ""}${delta.toLocaleString()} lines.)`,
       },
       {
         kind: "equal",
@@ -361,7 +361,7 @@ export default function GeoSignals() {
     [],
   );
 
-  // Per-signal "what does this measure" map — replaces the 171-line
+  // Per-signal "what does this measure" map - replaces the 171-line
   // inline "How signals are scored" Collapsible. Surfaced as a
   // hoverable info icon on each scorecard row so the documentation
   // sits next to the result instead of taking over the page.
@@ -385,7 +385,7 @@ export default function GeoSignals() {
     [],
   );
 
-  // Legend explanations for the schema cards — replace the three
+  // Legend explanations for the schema cards - replace the three
   // standalone "Completeness / Required / Recommended" cards with a
   // single tooltip on the section header.
   const SCHEMA_LEGEND_BLURB =
@@ -394,7 +394,7 @@ export default function GeoSignals() {
   const { data: articlesData } = useQuery<{ data: Article[] }>({
     // Pass status=all so drafts / generating / failed articles also
     // appear in the picker. The default server filter is status=ready
-    // which silently hid in-progress work — the user wondered why an
+    // which silently hid in-progress work - the user wondered why an
     // article they JUST clicked Generate on didn't show up in Diagnose.
     queryKey: ["/api/articles", selectedBrandId, "all"],
     enabled: !!selectedBrandId,
@@ -407,7 +407,7 @@ export default function GeoSignals() {
   const articles = articlesData?.data || [];
   const selectedArticle = articles.find((a) => a.id === selectedArticleId);
 
-  // Shared with citations.tsx via client/src/hooks/usePrompts.ts — this used
+  // Shared with citations.tsx via client/src/hooks/usePrompts.ts - this used
   // to be its own independently-shaped query (`["/api/brand-prompts",
   // selectedBrandId]`, an array key) for the exact same
   // `/api/brand-prompts/:brandId` endpoint citations.tsx fetches under a
@@ -426,13 +426,13 @@ export default function GeoSignals() {
   useEffect(() => {
     if (!selectedArticle || urlTouched) return;
     if (url) return;
-    // Use the article's own `externalUrl` — where the user told us it
+    // Use the article's own `externalUrl` - where the user told us it
     // actually lives on their site. The previous code synthesised
     // `${brand.website}/articles/${slug}`, but `slug` was removed from
     // the articles table during Wave 7 unification (the column comment
     // in shared/schema.ts says "Replaces the old slug-based fake URL").
     // Every auto-fill became `…/articles/undefined`, which then audited
-    // a 404, then cached "no schemas found" under the wrong hash key —
+    // a 404, then cached "no schemas found" under the wrong hash key -
     // breaking the Schema Lab → Authority signal loop end-to-end.
     const externalUrl = (selectedArticle as any).externalUrl as string | undefined;
     if (externalUrl && externalUrl.trim().length > 0) {
@@ -460,7 +460,7 @@ export default function GeoSignals() {
       geoDispatch({ type: "set", key: articleKey, tab: "analyze", data: data?.data });
     },
     onError: (err: Error) => {
-      // Aborts are intentional — don't toast on those, the user clicked Cancel.
+      // Aborts are intentional - don't toast on those, the user clicked Cancel.
       if (/abort/i.test(err.message ?? "") || err.name === "AbortError") return;
       toast({
         title: "Analysis failed",
@@ -655,7 +655,7 @@ export default function GeoSignals() {
   // optimised output.
   const optimizedContent: string = activeSlice.optimizeResult?.optimizedContent ?? "";
 
-  // Single source of truth — mirrors the server's bucketize() thresholds
+  // Single source of truth - mirrors the server's bucketize() thresholds
   // exactly (excellent ≥0.8, good ≥0.6, needs_improvement ≥0.4, poor <0.4).
   // The previous version had a 60% AND 40% case both returning chart-3
   // which collapsed two buckets into one colour; now the 4 buckets get
@@ -663,7 +663,7 @@ export default function GeoSignals() {
   // status label so the colour and the icon never contradict.
   const getScoreColor = (score: number, max: number) => {
     const ratio = max > 0 ? score / max : 0;
-    // Top tier: neutral text, not green/chart-4 — the CheckCircle rendered
+    // Top tier: neutral text, not green/chart-4 - the CheckCircle rendered
     // by getStatusIcon alongside it is what signals "excellent", not colour.
     if (ratio >= 0.8) return "text-foreground";
     if (ratio >= 0.6) return "text-chart-1";
@@ -711,24 +711,24 @@ export default function GeoSignals() {
 
   return (
     // Only ever rendered client-side, as a lazy tab inside
-    // client/src/pages/diagnose.tsx (no route of its own) — title/meta
+    // client/src/pages/diagnose.tsx (no route of its own) - title/meta
     // removed per this task's blanket rule; /diagnose falls back to root
     // defaults.
     <PanelPage>
       {/* The four KPI cards (Overall / Chunks / Schema / Pipeline)
-            that used to sit above the tabs were removed — every number
+            that used to sit above the tabs were removed - every number
             was already shown one click below inside its respective tab,
             so the strip was pure redundancy. The active scorecard
             inside the Signals tab is now the canonical headline. */}
 
-      {/* Sticky article toolbar — anchored below the SpineShell stage
+      {/* Sticky article toolbar - anchored below the SpineShell stage
             tablist (which is also sticky at z-20). top-14 keeps
             this strip directly underneath the stage tabs so they stack
             cleanly without overlap. The previous top-0 made this float
             up to viewport top while the stage tabs were scrolled away
             → audit flag "sticks under nothing". z-10 < z-20 keeps the
             layering correct. */}
-      {/* Top article bar — only on the tabs WITHOUT a target query. On the
+      {/* Top article bar - only on the tabs WITHOUT a target query. On the
             Signal Scorecard the article picker sits inline next to the query
             (one line, no duplicate picker). */}
       {activeTab !== "signals" && (
@@ -755,7 +755,7 @@ export default function GeoSignals() {
               literally the Scorecard's overall number echoed back (see
               STAGE_BLURBS.Signal above). The remaining 3 stages now
               render as a collapsible "Pipeline breakdown" panel inside
-              the Scorecard tab — same data, no separate tab.
+              the Scorecard tab - same data, no separate tab.
             - "Freshness" was a per-article-list view: it iterated over
               every article in the brand and color-coded the
               `updatedAt` age. The per-article freshness already shows
@@ -837,7 +837,7 @@ export default function GeoSignals() {
                         <CommandList>
                           {brandPrompts.length === 0 && (
                             <CommandEmpty>
-                              No tracked prompts — type a freeform query above.
+                              No tracked prompts - type a freeform query above.
                             </CommandEmpty>
                           )}
                           {filteredPrompts.length > 0 && (
@@ -864,7 +864,7 @@ export default function GeoSignals() {
                               })}
                               {filteredPrompts.length > 50 && (
                                 <div className="px-2 py-1.5 text-caption text-muted-foreground">
-                                  Showing 50 of {filteredPrompts.length} — refine your search
+                                  Showing 50 of {filteredPrompts.length} - refine your search
                                 </div>
                               )}
                             </CommandGroup>
@@ -887,7 +887,7 @@ export default function GeoSignals() {
                     )}
                     Analyze Signals
                   </Button>
-                  {/* Cancel button — appears while the request is in
+                  {/* Cancel button - appears while the request is in
                         flight. Aborts via the AbortController stored in
                         analyzeAbortRef so the user isn't stuck waiting
                         on a 30-second call they regret. */}
@@ -909,7 +909,7 @@ export default function GeoSignals() {
                         when the article has no updatedAt; Authority's
                         schema sub-score drops out when no schema audit
                         is on file). So 100% is reachable when every
-                        input was measurable — the previous "X / 100"
+                        input was measurable - the previous "X / 100"
                         could never reach 100 because the underlying
                         sum capped at 90 (and 86 in production with the
                         Schema chain broken). */}
@@ -994,7 +994,7 @@ export default function GeoSignals() {
                       >
                         <AlertTriangle className="w-4 h-4" />
                         <span>
-                          <span className="font-medium text-foreground">{signal.signal}</span> —{" "}
+                          <span className="font-medium text-foreground">{signal.signal}</span> -{" "}
                           {signal.recommendations[0] ?? "Not applicable for this article."}
                         </span>
                       </div>
@@ -1010,7 +1010,7 @@ export default function GeoSignals() {
                       ? "Pick a target query and run analysis"
                       : "Select an article above to begin"
                   }
-                  description="Scores across all 7 signals — six content signals plus freshness. Only what's measurable counts toward the headline %."
+                  description="Scores across all 7 signals - six content signals plus freshness. Only what's measurable counts toward the headline %."
                 />
               )}
             </Panel>
@@ -1022,7 +1022,7 @@ export default function GeoSignals() {
                 Documentation now sits beside the data it explains
                 instead of taking over the page. See SIGNAL_BLURBS above. */}
 
-          {/* Pipeline breakdown — was a separate sub-tab; now an
+          {/* Pipeline breakdown - was a separate sub-tab; now an
                 inline collapsible because its "Signal" stage is the
                 same number as the Scorecard above and the other 3
                 stages are just derived views of the same content+query.
@@ -1102,13 +1102,13 @@ export default function GeoSignals() {
                               >
                                 {(() => {
                                   // "pass" is neutral (secondary-foreground on
-                                  // secondary), not green/chart-4 — the stage
+                                  // secondary), not green/chart-4 - the stage
                                   // status is carried by the check icon + label
                                   // in the detail row below, not this glyph's
                                   // colour alone.
                                   // Not a literal white: `bg-warning` resolves to
                                   // --brand-accent, which in dark is a light blue
-                                  // — a white glyph on it disappears. Each fill
+                                  // - a white glyph on it disappears. Each fill
                                   // carries its own designed label token instead.
                                   const iconColor =
                                     stage.status === "pass"
@@ -1424,7 +1424,7 @@ export default function GeoSignals() {
               }
             >
               <p className="mb-4 text-data text-vc-tertiary">
-                Audit structured data completeness — required and recommended fields per schema
+                Audit structured data completeness - required and recommended fields per schema
                 type. Feeds the Authority signal automatically when audited URL matches the
                 article's external URL.
               </p>
@@ -1449,7 +1449,7 @@ export default function GeoSignals() {
                           // Without externalUrl on the article, the cache key
                           // is wrong and the Authority signal can't pick up
                           // the audit. Tell them how to fix it.
-                          "This article has no published URL set. Add an 'External URL' on the article editor to auto-fill — or paste any URL to audit it."
+                          "This article has no published URL set. Add an 'External URL' on the article editor to auto-fill - or paste any URL to audit it."
                         : "Auto-filled from this article's external URL. Edit if you want to audit a different page."}
                     </p>
                   </div>
@@ -1480,7 +1480,7 @@ export default function GeoSignals() {
 
                 {/* 2026-05-28: the three glossary cards (Completeness /
                     Required / Recommended) used to render here before any
-                    audit data — pure docs, ate vertical space. Replaced
+                    audit data - pure docs, ate vertical space. Replaced
                     with one inline help icon on the section header below;
                     SCHEMA_LEGEND_BLURB holds the same explanation. */}
 
@@ -1493,7 +1493,7 @@ export default function GeoSignals() {
                         as "Missing" for any page with no JSON-LD, which
                         looked indistinguishable from a stub. */}
                     {!schemaFetched ? (
-                      // Fetch FAILED — surface this prominently as an
+                      // Fetch FAILED - surface this prominently as an
                       // error banner instead of letting the "all 14 types
                       // missing" body render as if it were a real audit
                       // result. Without this, a WAF-blocked fetch is
@@ -1572,7 +1572,7 @@ export default function GeoSignals() {
                               {totalSchemasFound === 0 && (
                                 <span className="text-muted-foreground">
                                   {" "}
-                                  — page is reachable but has no structured data
+                                  - page is reachable but has no structured data
                                 </span>
                               )}
                             </div>
@@ -1599,7 +1599,7 @@ export default function GeoSignals() {
                                   (1000 * 60 * 60 * 24),
                               ),
                             )}{" "}
-                            day(s) ago — Re-audit forces a fresh fetch.
+                            day(s) ago - Re-audit forces a fresh fetch.
                           </p>
                         )}
                       </div>
@@ -1672,8 +1672,8 @@ export default function GeoSignals() {
                                       {pct}%
                                     </span>
                                   )}
-                                  {/* "default" here was bg-primary — the action
-                                    accent — marking an outcome. Present/Missing
+                                  {/* "default" here was bg-primary - the action
+                                    accent - marking an outcome. Present/Missing
                                     is a status, so it reads neutral and the
                                     check glyph carries the meaning. */}
                                   <Badge variant={schema.present ? "secondary" : "outline"}>

@@ -151,7 +151,7 @@ export default function CrawlerCheck() {
 
   return (
     // Only ever rendered client-side, as a lazy tab inside
-    // client/src/pages/diagnose.tsx (no route of its own) — title/meta
+    // client/src/pages/diagnose.tsx (no route of its own) - title/meta
     // removed per this task's blanket rule; /diagnose falls back to root
     // defaults.
     <PanelPage>
@@ -317,7 +317,7 @@ export default function CrawlerCheck() {
                 <div className="space-y-4">
                   {checkResult.recommendations.map((rec, index) => {
                     // The backend prefixes its single highest-impact line with
-                    // "CRITICAL:" (see server/routes/analytics.ts) — that's the
+                    // "CRITICAL:" (see server/routes/analytics.ts) - that's the
                     // one item worth the reference's "TOP PRIORITY" left-border
                     // stripe treatment, not necessarily index 0.
                     const isTopPriority = rec.startsWith("CRITICAL:");

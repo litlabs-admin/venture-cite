@@ -51,7 +51,7 @@ CREATE INDEX IF NOT EXISTS fact_scrape_events_created_idx
   ON fact_scrape_events (created_at);
 
 -- Read pattern 4: failed-step alerting (used by the dashboard
--- "scrape health" panel — counts failures in last N hours).
+-- "scrape health" panel - counts failures in last N hours).
 CREATE INDEX IF NOT EXISTS fact_scrape_events_outcome_created_idx
   ON fact_scrape_events (outcome, created_at DESC)
   WHERE outcome = 'failed';

@@ -1,10 +1,10 @@
-// Coverage for the chatbot budget helper (Phase 5 — A1).
+// Coverage for the chatbot budget helper (Phase 5 - A1).
 //
 // 2026-05-27: `CHATBOT_DAILY_TOKEN_CAP` is now `-1` for every tier so the
 // production runtime early-returns from `assertChatbotBudget` before any
 // DB read. The throw-path tests below temporarily override the caps to
 // positive values so they still verify the underlying budget LOGIC is
-// correct — if caps are ever re-enabled, regressions in the cap math
+// correct - if caps are ever re-enabled, regressions in the cap math
 // stay caught.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";

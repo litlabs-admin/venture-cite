@@ -101,7 +101,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS brand_mentions_brand_id_source_url_uniq
   ON brand_mentions (brand_id, lower(source_url));
 
 -- ============================================================
--- (d) tracked_content_urls — polymorphic registry of brand-owned
+-- (d) tracked_content_urls - polymorphic registry of brand-owned
 -- published URLs that the citation checker should match against.
 -- ============================================================
 
@@ -131,7 +131,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS tracked_content_urls_source_uniq
   ON tracked_content_urls (source_type, source_id);
 
 -- ============================================================
--- (e) citation_runs.self_citation_count — aggregate maintained by the
+-- (e) citation_runs.self_citation_count - aggregate maintained by the
 -- citation checker as it detects matches against tracked_content_urls.
 -- ============================================================
 

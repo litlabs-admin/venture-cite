@@ -24,7 +24,7 @@ interface PageHeaderProps {
   actions?: ReactNode;
   leading?: ReactNode;
   /** Optional. When present, renders an (i) icon next to the title that
-   *  opens a popover with the explainer copy. Backward-compatible —
+   *  opens a popover with the explainer copy. Backward-compatible -
    *  existing callers without this prop keep working unchanged. */
   explainer?: PageExplainer;
 }

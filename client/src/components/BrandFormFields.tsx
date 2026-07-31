@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 
 // `form` is the react-hook-form instance. Typed as `any` on purpose so this
-// component stays decoupled from brands.tsx's z.infer'd FormValues — the
+// component stays decoupled from brands.tsx's z.infer'd FormValues - the
 // RHF invariant generics don't widen to UseFormReturn<any> cleanly.
 interface Props {
   form: any;
@@ -273,7 +273,7 @@ export default function BrandFormFields({ form, idSuffix = "" }: Props) {
               />
             </FormControl>
             <FormDescription>
-              Comma-separated list of extra ways your brand gets referenced — former names (Facebook
+              Comma-separated list of extra ways your brand gets referenced - former names (Facebook
               → Meta), nicknames, common misspellings. Legal suffixes ("Inc.", "LLC"), acronyms of
               3+ word company names, and your website domain are detected automatically; you don't
               need to list them here.

@@ -52,7 +52,7 @@ export function useInspector(): InspectorApi {
 // The inspector has two mutually exclusive presentations: an inline aside at
 // xl+ and an overlay Sheet below xl. They MUST be gated in JS, not just CSS.
 // A Radix Sheet left `open` at xl+ keeps its full-screen overlay + body
-// scroll-lock active even when its content is `display:none` (xl:hidden) —
+// scroll-lock active even when its content is `display:none` (xl:hidden) -
 // which froze the entire Dashboard on desktop the moment a tile was
 // clicked. Tailwind's xl breakpoint is 1280px; this hook mirrors use-mobile.
 const XL_BREAKPOINT = 1280;
@@ -88,7 +88,7 @@ function shellTitleFor(location: string, tab: string | null): string | null {
  *
  *  MIGRATION NOTE: the panel grammar is being rolled out across every page.
  *  A route joins this list only once its page ACTUALLY renders <PanelPage> /
- *  <PanelRow> / <Panel> — adding it early strips the padding a Card-based
+ *  <PanelRow> / <Panel> - adding it early strips the padding a Card-based
  *  page still relies on, and the content ends up flush against the viewport.
  *  So this list grows one converted page at a time; it is a record of what
  *  has migrated, not a wish list. */
@@ -97,7 +97,7 @@ const FULL_BLEED_EXACT = new Set([
   "/dashboard",
   "/settings",
   "/report",
-  // Spine routes flip only when EVERY tab they host has converted — one route
+  // Spine routes flip only when EVERY tab they host has converted - one route
   // hosts 3-6 tab pages, so a half-converted spine would strip the padding a
   // Card-based sibling tab still needs.
   "/diagnose", // crawler-check, geo-signals, HallucinationsTab
@@ -118,7 +118,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [inspector, setInspector] = useState<InspectorPayload | null>(null);
   const location = useRouterState({ select: (s) => s.location.pathname });
   // AppShell mounts above every authenticated route (Dashboard, Report,
-  // and all four spine stages), so — like SpineShell — it reads search
+  // and all four spine stages), so - like SpineShell - it reads search
   // loosely rather than against one route's typed search; see
   // native-api-contract.md rule 3. `tab` is declared (as an optional string)
   // on every spine stage's schema in src/routes/-shared/searchSchemas.ts.
@@ -159,13 +159,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
     : null;
   // `useSearch({ strict: false })`'s FullSearchSchema type widens `tab` across
   // every route in the tree (including ones that don't declare it), so a
-  // runtime narrow — not a cast — is what gets back to a plain `string | null`.
+  // runtime narrow - not a cast - is what gets back to a plain `string | null`.
   const activeTab = typeof search.tab === "string" ? search.tab : null;
   const title = shellTitleFor(location, activeTab);
   const ownsContextBar = title !== null;
   const fullBleed = isFullBleed(location);
   // Exactly one presentation is live at a time. Below xl the overlay Sheet
-  // owns it; at xl+ the inline aside does. Never both — see useIsXlUp above.
+  // owns it; at xl+ the inline aside does. Never both - see useIsXlUp above.
   const showInlineInspector = ownsContextBar && inspector !== null && isXlUp;
   const showSheetInspector = ownsContextBar && inspector !== null && !isXlUp;
 
@@ -177,12 +177,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <InspectorContext.Provider value={inspectorApi}>
       {/* `vc-app` sets the authenticated app's DEFAULT type to the product
-          scale (12px/1.5) — see index.css. Without it, any element that
+          scale (12px/1.5) - see index.css. Without it, any element that
           forgets a text-* class inherits the browser's 16px and sticks out of
           a UI where 90% of text is 10–13px. Scoped to the shell so the
           marketing pages keep their own larger register. */}
       <div className="vc-app flex min-h-screen bg-vc-page">
-        {/* Skip link — keyboard / screen-reader (carried from AppLayout). */}
+        {/* Skip link - keyboard / screen-reader (carried from AppLayout). */}
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"
@@ -190,7 +190,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           Skip to main content
         </a>
 
-        {/* Zone 1 — nav rail (desktop fixed; reused so nav.* tour targets stay). */}
+        {/* Zone 1 - nav rail (desktop fixed; reused so nav.* tour targets stay). */}
         <div className="print:hidden">
           <Sidebar />
         </div>
@@ -204,8 +204,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
                     five nav.* steps. Below lg the desktop <aside> is
                     display:none, so those targets can never resolve and the
                     tour silently collapsed to its one anchorless step. The
-                    two paths are mutually exclusive by breakpoint — this
-                    button is lg:hidden, the sidebar is hidden lg:flex — so
+                    two paths are mutually exclusive by breakpoint - this
+                    button is lg:hidden, the sidebar is hidden lg:flex - so
                     exactly one of them renders and the other drops out. */}
                 <Button
                   variant="ghost"
@@ -225,24 +225,24 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </Link>
             {/* Mobile help: the desktop context bar is lg:-only, so without
                 this the "?" (tour replay / AI tutor) is unreachable on phones
-                — where it's most needed. Sits in the balanced right slot. */}
+                - where it's most needed. Sits in the balanced right slot. */}
             <PageHeaderHelp
               tourId={pageTourFor(location, activeTab)}
               pageLabel={title ?? "this page"}
             />
           </header>
 
-          {/* Zone 2 — context bar. Measured against the reference dashboard:
+          {/* Zone 2 - context bar. Measured against the reference dashboard:
               56px tall, px-8, one hairline bottom border, 14px/600 title on
               the left and the controls right-aligned at h-8. No backdrop
-              blur, no shadow — this chrome is a hairline, not a layer. */}
+              blur, no shadow - this chrome is a hairline, not a layer. */}
           {ownsContextBar && (
             <div className="sticky top-0 z-20 hidden h-[56px] items-center border-b border-vc-default bg-vc-surface px-8 lg:flex print:hidden">
               {/* No brand mark or page title here: the sidebar already shows
-                  both — the logo at its head, and the active stage highlighted
+                  both - the logo at its head, and the active stage highlighted
                   in the nav. Repeating them put the logo on screen twice and
                   named the page the nav had already named. The brand selector
-                  takes the vacated left slot — it scopes everything below it,
+                  takes the vacated left slot - it scopes everything below it,
                   so it reads first. */}
               <div className="flex w-full items-center justify-between">
                 <BrandSelector className="w-48" />
@@ -268,7 +268,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             {/* Canvas */}
             <main id="main-content" className="min-w-0 flex-1 overflow-y-auto">
               {/* The AI Tutor pill (EducationAssistant.tsx) is `fixed bottom-6
-                  right-6 h-12` — anchored to the viewport, not this canvas —
+                  right-6 h-12` - anchored to the viewport, not this canvas -
                   and covers roughly the bottom 72px on the right for every
                   authenticated route. It is not dismissible, so content that
                   ends near the bottom needs its own clearance. `pb-24` (96px)
@@ -287,7 +287,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               )}
             </main>
 
-            {/* Zone 3 — inspector (desktop xl+). Live on every route that owns
+            {/* Zone 3 - inspector (desktop xl+). Live on every route that owns
                 a context bar (ownsContextBar = shellTitleFor(...) !== null:
                 Dashboard, Report, and every Monitor/Diagnose/Act/Setup
                 stage + its standalone twins), not Command-Center-only. Quiet
@@ -318,8 +318,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        {/* Mobile / tablet inspector — overlay sheet, live on every route
-            with a context bar (see Zone 3's comment above — not
+        {/* Mobile / tablet inspector - overlay sheet, live on every route
+            with a context bar (see Zone 3's comment above - not
             Command-Center-only). `open` is gated by !isXlUp so the modal
             overlay + scroll-lock never activate at xl+, where the inline
             aside is the live presentation. */}

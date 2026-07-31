@@ -1,7 +1,7 @@
 // Theme picker rendered AS a chunk of <DropdownMenu> children. Designed to
 // drop into an existing DropdownMenuContent (the sidebar user menu) without
 // adding its own trigger/content/portal. Keeps the keyboard nav from the
-// parent menu intact — arrow keys flow from "Account settings" straight
+// parent menu intact - arrow keys flow from "Account settings" straight
 // through "System / Light / Dark" without re-opening anything.
 //
 // We deliberately use DropdownMenuRadioGroup so the OS narrates each option
@@ -27,7 +27,7 @@ const OPTIONS: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
 // A compact, always-visible light/dark toggle for the sidebar footer. The full
 // System/Light/Dark picker still lives in the account menu (ThemeMenuItems);
 // this surfaces the most common action (flip light<->dark) without the user
-// having to discover the dropdown — a repeated piece of client feedback.
+// having to discover the dropdown - a repeated piece of client feedback.
 export function QuickThemeToggle({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";

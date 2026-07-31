@@ -9,7 +9,7 @@ export const promptTestInputSchema = z
   })
   .passthrough();
 
-// Discriminated by taskType. Currently only prompt_test is live — queued by
+// Discriminated by taskType. Currently only prompt_test is live - queued by
 // weeklyCatchupWorkflow's citation_check step.
 export const AGENT_TASK_SCHEMAS = {
   prompt_test: promptTestInputSchema,

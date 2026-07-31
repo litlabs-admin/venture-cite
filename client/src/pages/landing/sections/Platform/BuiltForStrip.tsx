@@ -1,25 +1,25 @@
-// "Built for" footer strip — verbatim from index.html 2408-2419.
+// "Built for" footer strip - verbatim from index.html 2408-2419.
 //
 // STRUCTURAL CORRECTION vs. the task brief: a fresh re-read (confirmed by
 // programmatically balancing every <div>/</div> in the 2026-2425 range)
 // shows this strip is NOT nested inside the bordered panel
 // ("border border-default overflow-hidden bg-white", opened index.html:2033)
 // alongside the 3 rows. That panel div's own closing tag is at index.html
-// line 2407 — one line BEFORE this strip's wrapper opens at line 2408. The
+// line 2407 - one line BEFORE this strip's wrapper opens at line 2408. The
 // strip is a SIBLING of the panel, sharing only the outer
 // mx-auto/max-width:1120px wrapper. It also has its own independent
 // entrance transition (opacity-0, transition-all duration-500, delay
-// 400ms — no translate-y) rather than the panel's opacity-0 translate-y-8
+// 400ms - no translate-y) rather than the panel's opacity-0 translate-y-8
 // duration-700. See Platform.tsx and the closing report for how this is
 // reflected in the JSX nesting.
 //
 // The 4 items are separated by a small rounded div "dot" (w-1 h-1
-// rounded-full bg-default), not a literal bullet/pipe character — the last
+// rounded-full bg-default), not a literal bullet/pipe character - the last
 // item (Enterprise) has no trailing separator.
 //
 // None of these are links any more. Three of the four pointed at other
 // sections of this same page, which made "Marketing agencies" behave like a
-// destination for agencies rather than what it is — a statement about who the
+// destination for agencies rather than what it is - a statement about who the
 // product is for.
 const items = ["Brand teams", "Marketing agencies", "Startups", "Enterprise"];
 

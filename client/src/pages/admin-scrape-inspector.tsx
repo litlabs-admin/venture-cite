@@ -127,7 +127,7 @@ type InspectorResponse = {
   };
 };
 
-// Neutral, token-based category colours — no chart-4 (data-viz only) and
+// Neutral, token-based category colours - no chart-4 (data-viz only) and
 // no --positive (data-viz only, not status/chip use per the colour-system
 // decision) standing in for "this step went fine".
 const STEP_COLORS: Record<string, string> = {
@@ -138,7 +138,7 @@ const STEP_COLORS: Record<string, string> = {
 };
 
 function fmtDuration(ms: number | null | undefined): string {
-  if (ms == null) return "—";
+  if (ms == null) return "-";
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(2)}s`;
 }
@@ -204,7 +204,7 @@ function Stat({
   value: number | string;
   tone?: "ok" | "warn" | "fail";
 }) {
-  // "ok" is neutral text + a check icon, not green/chart-4 — colour never
+  // "ok" is neutral text + a check icon, not green/chart-4 - colour never
   // carries the outcome by itself.
   const toneClass =
     tone === "warn" ? "text-(--warning)" : tone === "fail" ? "text-destructive" : "text-vc-primary";
@@ -275,7 +275,7 @@ export default function AdminScrapeInspector() {
   return (
     <PanelPage>
       {/* Title moved to src/routes/_app/admin.scrape.$runId.tsx's `head()`
-          — metadata belongs to the route, not this component. That route
+          - metadata belongs to the route, not this component. That route
           can only set a static title (no loader computes the brand name
           server-side), unlike this component's former dynamic title. */}
 

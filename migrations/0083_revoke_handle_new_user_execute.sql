@@ -12,7 +12,7 @@
 -- handle_new_user is a TRIGGER function only (on_auth_user_created on
 -- auth.users, see 0075). Triggers invoke the function as the table owner
 -- regardless of EXECUTE grants, so revoking EXECUTE from the API roles
--- closes the RPC hole and breaks nothing — no app code calls it via .rpc()
+-- closes the RPC hole and breaks nothing - no app code calls it via .rpc()
 -- (client uses Supabase for auth only; see 0081).
 --
 -- Idempotent: REVOKE on an absent grant is a no-op, safe to re-run.

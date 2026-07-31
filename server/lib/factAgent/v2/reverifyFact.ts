@@ -117,7 +117,7 @@ export async function reverifyFact(args: VerifyFactArgs): Promise<VerifyFactResu
     };
   }
 
-  // Brand context for the prompt — fetched cheaply.
+  // Brand context for the prompt - fetched cheaply.
   const brandRows = await db
     .select({
       id: schema.brands.id,
@@ -136,7 +136,7 @@ export async function reverifyFact(args: VerifyFactArgs): Promise<VerifyFactResu
     const res = await safeFetchTextWithLockedIp(row.sourceUrl, {
       maxBytes: 2 * 1024 * 1024,
       // Tier-aware: ~6s Hobby, 10s Pro. Reverify doesn't get a
-      // second chance per tick — the unreachable counter bumps and
+      // second chance per tick - the unreachable counter bumps and
       // we move on.
       timeoutMs: PAGE_FETCH_TIMEOUT_MS,
     });
@@ -205,7 +205,7 @@ export async function reverifyFact(args: VerifyFactArgs): Promise<VerifyFactResu
         }
       }
     } catch (err) {
-      // LLM failed — record an attempt and bail.
+      // LLM failed - record an attempt and bail.
       await db
         .update(schema.brandFactSheet)
         .set({
@@ -242,7 +242,7 @@ export async function reverifyFact(args: VerifyFactArgs): Promise<VerifyFactResu
   }
 
   if (normalize(candidate.factValue) === normalize(row.factValue)) {
-    // Match — bump last_verified.
+    // Match - bump last_verified.
     await db
       .update(schema.brandFactSheet)
       .set({
@@ -333,7 +333,7 @@ export async function findStaleFacts(
   return rows;
 }
 
-/** Cron entry point — verify up to `batchSize` stale facts in this tick. */
+/** Cron entry point - verify up to `batchSize` stale facts in this tick. */
 export async function runReverificationBatch(
   batchSize: number,
   llm: LlmCallable,

@@ -8,7 +8,7 @@
 // describing the OpenAI structured-outputs JSON Schema. Providers that
 // understand it (OpenAI direct, OpenRouter for OpenAI-family models)
 // pass it through to the underlying chat-completions call. Providers
-// that don't (Claude via OpenRouter — Anthropic's API doesn't honour
+// that don't (Claude via OpenRouter - Anthropic's API doesn't honour
 // json_schema) just ignore the field and rely on the prompt's
 // instruction to return JSON; the post-parse Zod step catches any
 // drift.
@@ -37,7 +37,7 @@ function isTransient(err: unknown): boolean {
   if (typeof e.status === "number") {
     if (e.status === 429) return true;
     if (e.status >= 500 && e.status < 600) return true;
-    return false; // 4xx is a caller error — don't fail over
+    return false; // 4xx is a caller error - don't fail over
   }
   // Network errors typically lack a status code
   return true;
