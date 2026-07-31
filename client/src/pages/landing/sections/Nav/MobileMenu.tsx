@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "@tanstack/react-router";
-import { MenuIcon, XIcon, PlaceholderIcon } from "./icons";
-import { mobileTopLinks, productSolutions, productTools } from "./data";
+import { MenuIcon, XIcon } from "./icons";
+import { pageSections } from "./data";
 
 // Verbatim structure from TrakkrNav-JAUeEuWq.js `Xe`: full-screen overlay
 // below the 52/56px nav bar, body scroll locked while open, Escape closes.
@@ -50,84 +50,21 @@ export function MobileMenu() {
           <div className="lg:hidden fixed inset-0 top-[52px] sm:top-[56px] bg-vc-surface z-40 overflow-y-auto">
             <div className="px-4 py-3">
               <div className="space-y-0.5">
-                {mobileTopLinks.map((link, index) => (
+                {/* The page's sections, same list the desktop nav and the
+                    footer render. This used to be three separate blocks —
+                    top links, a Solutions group and a Tools group, each with
+                    its own placeholder icon — advertising a product surface
+                    that does not exist. */}
+                {pageSections.map((section) => (
                   <a
-                    key={link.label}
-                    href={link.href}
+                    key={section.href}
+                    href={section.href}
                     onClick={() => setIsOpen(false)}
-                    className={`
-                    block px-4 py-2.5 text-[15px] font-medium rounded transition-colors
-                    ${index === 0 ? "text-vc-accent bg-vc-accent-subtle" : "text-vc-secondary hover:bg-vc-muted hover:text-vc-primary"}
-                  `}
+                    className="block px-4 py-2.5 text-[15px] font-medium rounded transition-colors text-vc-secondary hover:bg-vc-muted hover:text-vc-primary"
                   >
-                    {link.label}
+                    {section.name}
                   </a>
                 ))}
-                {/* Real (server-rendered) route, so it gets a TanStack
-                    `<Link>` here rather than joining mobileTopLinks' plain
-                    `<a href>` array (those all point at in-page # anchors or
-                    other full-reload destinations). */}
-                <Link
-                  to="/pricing"
-                  onClick={() => setIsOpen(false)}
-                  className="block px-4 py-2.5 text-[15px] font-medium rounded transition-colors text-vc-secondary hover:bg-vc-muted hover:text-vc-primary"
-                >
-                  Pricing
-                </Link>
-              </div>
-
-              <div className="mt-5 pt-4 border-t border-vc-default">
-                <h3 className="px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-vc-text-muted mb-2">
-                  Solutions
-                </h3>
-                <div className="space-y-0.5">
-                  {productSolutions.map((item) => (
-                    <a
-                      key={item.name}
-                      href={item.href}
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-[14px] text-vc-secondary hover:bg-vc-muted hover:text-vc-primary rounded transition-colors"
-                    >
-                      <div className="w-7 h-7 rounded bg-vc-muted flex items-center justify-center shrink-0">
-                        <PlaceholderIcon size={14} className="text-vc-text-muted" />
-                      </div>
-                      <span className="font-medium">{item.name}</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-vc-default">
-                <h3 className="px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-vc-text-muted mb-2">
-                  Tools
-                </h3>
-                <div className="space-y-0.5">
-                  {productTools.map((item) => {
-                    const rowClass =
-                      "flex items-center gap-3 px-4 py-2.5 text-[14px] text-vc-secondary hover:bg-vc-muted hover:text-vc-primary rounded transition-colors";
-                    const content = (
-                      <>
-                        <div className="w-7 h-7 rounded bg-vc-muted flex items-center justify-center shrink-0">
-                          <PlaceholderIcon size={14} className="text-vc-text-muted" />
-                        </div>
-                        <span className="font-medium">{item.name}</span>
-                      </>
-                    );
-                    // Both branches of the source's external/internal ternary
-                    // render the same <a> now that next/Link is gone, and no
-                    // menu link is external.
-                    return (
-                      <a
-                        key={item.name}
-                        href={item.href}
-                        className={rowClass}
-                        onClick={() => setIsOpen(false)}
-                      >
-                        {content}
-                      </a>
-                    );
-                  })}
-                </div>
               </div>
 
               <div className="mt-5 pt-4 border-t border-vc-default space-y-2">

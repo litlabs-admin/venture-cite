@@ -4,7 +4,6 @@
 // programmatically instead of transcribed here.
 
 export interface ResourceCardData {
-  href: string;
   iconSrc: string;
   /** Exact per-card icon size classes from source (they differ per icon). */
   iconClassName: string;
@@ -22,7 +21,6 @@ export interface ResourceCardData {
 // in place.
 export const resourceCards: ResourceCardData[] = [
   {
-    href: "/glossary",
     iconSrc: "/venturecite/images/resources/documentation-blue.png",
     iconClassName: "w-10 sm:w-12 h-10 sm:h-12",
     title: "Glossary",
@@ -31,7 +29,6 @@ export const resourceCards: ResourceCardData[] = [
     showMobileEyebrow: true,
   },
   {
-    href: "#platform-section",
     iconSrc: "/venturecite/images/resources/api-blue.png",
     iconClassName: "w-[52px] h-[52px]",
     title: "How It Works",
@@ -40,7 +37,6 @@ export const resourceCards: ResourceCardData[] = [
     showMobileEyebrow: false,
   },
   {
-    href: "#revenue-section",
     iconSrc: "/venturecite/images/resources/mcp-blue.png",
     iconClassName: "w-[38px] sm:w-[46px] h-[38px] sm:h-[46px]",
     title: "Proof",
@@ -51,7 +47,6 @@ export const resourceCards: ResourceCardData[] = [
 ];
 
 export interface DataTileData {
-  href: string;
   iconSlug: string;
   /** Extra icon classes beyond the shared base (only ai-traffic has this, per source). */
   iconExtraClassName?: string;
@@ -71,7 +66,6 @@ export interface DataTileData {
 // untouched.
 export const dataTiles: DataTileData[] = [
   {
-    href: "#revenue-section",
     iconSlug: "rankings",
     title: "Benchmarks",
     count: "",
@@ -80,7 +74,6 @@ export const dataTiles: DataTileData[] = [
     delayMs: 150,
   },
   {
-    href: "#platform-section",
     iconSlug: "citations",
     title: "Citations",
     count: "",
@@ -89,7 +82,6 @@ export const dataTiles: DataTileData[] = [
     delayMs: 205,
   },
   {
-    href: "#revenue-section",
     iconSlug: "ai-traffic",
     iconExtraClassName: "opacity-[0.85]",
     title: "Share of answer",
@@ -99,7 +91,6 @@ export const dataTiles: DataTileData[] = [
     delayMs: 260,
   },
   {
-    href: "#philosophy-section",
     iconSlug: "query-fanout",
     title: "Prompt scoring",
     count: "",

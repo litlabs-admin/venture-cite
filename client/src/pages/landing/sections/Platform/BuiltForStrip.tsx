@@ -1,5 +1,3 @@
-import { ArrowRightIcon } from "./icons";
-
 // "Built for" footer strip — verbatim from index.html 2408-2419.
 //
 // STRUCTURAL CORRECTION vs. the task brief: a fresh re-read (confirmed by
@@ -19,17 +17,11 @@ import { ArrowRightIcon } from "./icons";
 // rounded-full bg-default), not a literal bullet/pipe character — the last
 // item (Enterprise) has no trailing separator.
 //
-// The source pointed the last three at /trakkr-for/* audience pages, leaving
-// the first plain. VentureCite ships no audience pages, so they point at the
-// in-page sections that actually answer each audience's question — keeping the
-// linked branch live rather than dead. "Brand teams" stays unlinked, as in the
-// source: the platform section is what the whole strip sits under already.
-const items: { label: string; href?: string }[] = [
-  { label: "Brand teams" },
-  { label: "Marketing agencies", href: "#revenue-section" },
-  { label: "Startups", href: "#philosophy-section" },
-  { label: "Enterprise", href: "#platform-section" },
-];
+// None of these are links any more. Three of the four pointed at other
+// sections of this same page, which made "Marketing agencies" behave like a
+// destination for agencies rather than what it is — a statement about who the
+// product is for.
+const items = ["Brand teams", "Marketing agencies", "Startups", "Enterprise"];
 
 export function BuiltForStrip({ isVisible }: { isVisible: boolean }) {
   return (
@@ -42,24 +34,11 @@ export function BuiltForStrip({ isVisible }: { isVisible: boolean }) {
           Built for
         </span>
         <div className="flex flex-wrap items-center gap-3 sm:gap-5">
-          {items.map((item, i) => (
-            <span key={item.label} className="flex items-center gap-3 sm:gap-5">
-              {item.href ? (
-                <a
-                  href={item.href}
-                  className="group inline-flex items-center gap-1 text-[12px] sm:text-[13px] font-medium text-vc-secondary hover:text-vc-accent transition-colors duration-150"
-                >
-                  {item.label}
-                  <ArrowRightIcon
-                    size={11}
-                    className="text-vc-text-muted/60 group-hover:text-vc-accent group-hover:translate-x-0.5 transition-all duration-150"
-                  />
-                </a>
-              ) : (
-                <span className="text-[12px] sm:text-[13px] font-medium text-vc-secondary">
-                  {item.label}
-                </span>
-              )}
+          {items.map((label, i) => (
+            <span key={label} className="flex items-center gap-3 sm:gap-5">
+              <span className="text-[12px] sm:text-[13px] font-medium text-vc-secondary">
+                {label}
+              </span>
               {i < items.length - 1 && <span className="w-1 h-1 rounded-full bg-vc-default" />}
             </span>
           ))}

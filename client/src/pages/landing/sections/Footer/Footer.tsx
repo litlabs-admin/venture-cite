@@ -1,13 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { FooterColumn } from "./FooterColumn";
-import { ArrowRightIcon, LinkedInIcon } from "./icons";
-import {
-  solutionsLinks,
-  mobileProductLinks,
-  desktopProductLinks,
-  mobileLearnLinks,
-  desktopLearnLinks,
-} from "./data";
+import { ArrowRightIcon } from "./icons";
+import { pageSections } from "@/pages/landing/sections/Nav/data";
 import { BrandLogo } from "@/components/BrandLogo";
 
 // index.html:3627-3769. Every reveal block in the source is already
@@ -60,29 +54,13 @@ export function Footer() {
             </div>
 
             <div
-              className={`grid grid-cols-3 gap-4 mb-5 pb-5 border-b border-vc-default ${revealY(isVisible)}`}
+              className={`mb-5 pb-5 border-b border-vc-default ${revealY(isVisible)}`}
               style={{ transitionDelay: "50ms" }}
             >
-              <div>
-                <FooterColumn title="Product" links={mobileProductLinks} size="mobile">
-                  {/* Real (server-rendered) route — a TanStack `<Link>`
-                      via FooterColumn's children slot, not a data-driven
-                      href, since every entry in mobileProductLinks is a
-                      full-reload `<a>`. */}
-                  <Link
-                    to="/pricing"
-                    className="block text-[11px] text-vc-secondary hover:text-vc-accent transition-colors"
-                  >
-                    Pricing
-                  </Link>
-                </FooterColumn>
-              </div>
-              <div>
-                <FooterColumn title="Solutions" links={solutionsLinks} size="mobile" />
-              </div>
-              <div>
-                <FooterColumn title="Learn" links={mobileLearnLinks} size="mobile" />
-              </div>
+              {/* One column of the page's own sections. Was three (Product,
+                  Solutions, Learn) whose nine rows resolved to five anchors,
+                  /register three times, and /glossary. */}
+              <FooterColumn title="Sections" links={pageSections} size="mobile" />
             </div>
 
             <div className={revealY(isVisible)} style={{ transitionDelay: "100ms" }}>
@@ -97,7 +75,7 @@ export function Footer() {
           </div>
 
           {/* Desktop grid — index.html:3675-3739 */}
-          <div className="hidden sm:grid grid-cols-3 lg:grid-cols-[180px_1fr_1fr_1fr_160px] gap-6 lg:gap-0 py-10 lg:py-0">
+          <div className="hidden sm:grid grid-cols-3 lg:grid-cols-[180px_1fr_160px] gap-6 lg:gap-0 py-10 lg:py-0">
             <div
               className={`col-span-3 lg:col-span-1 lg:py-10 lg:px-6 lg:border-r border-vc-default flex flex-col ${revealY(
                 isVisible,
@@ -109,45 +87,13 @@ export function Footer() {
               <p className="text-[12px] text-vc-secondary leading-relaxed mb-4 max-w-[180px]">
                 Get recommended by AI engines. Every question your buyers ask.
               </p>
-              <div className="flex items-center gap-2">
-                <a
-                  href="https://linkedin.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="LinkedIn"
-                  className="w-7 h-7 rounded border border-vc-default flex items-center justify-center text-vc-text-muted hover:text-vc-accent hover:border-vc-accent hover:bg-vc-accent-subtle transition-all duration-150"
-                >
-                  <LinkedInIcon className="w-3 h-3" />
-                </a>
-              </div>
             </div>
 
             <div
               className={`lg:py-8 lg:px-5 lg:border-r border-vc-default ${revealY(isVisible)}`}
               style={{ transitionDelay: "50ms" }}
             >
-              <FooterColumn title="Product" links={desktopProductLinks} size="desktop">
-                <Link
-                  to="/pricing"
-                  className="block text-[12px] text-vc-secondary hover:text-vc-accent transition-colors duration-150"
-                >
-                  Pricing
-                </Link>
-              </FooterColumn>
-            </div>
-
-            <div
-              className={`lg:py-8 lg:px-5 lg:border-r border-vc-default ${revealY(isVisible)}`}
-              style={{ transitionDelay: "75ms" }}
-            >
-              <FooterColumn title="Solutions" links={solutionsLinks} size="desktop" />
-            </div>
-
-            <div
-              className={`lg:py-8 lg:px-5 lg:border-r border-vc-default ${revealY(isVisible)}`}
-              style={{ transitionDelay: "100ms" }}
-            >
-              <FooterColumn title="Learn" links={desktopLearnLinks} size="desktop" />
+              <FooterColumn title="Sections" links={pageSections} size="desktop" />
             </div>
 
             <div

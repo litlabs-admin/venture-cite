@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import type { FooterLink } from "./data";
+import type { SectionLink } from "@/pages/landing/sections/Nav/data";
 
 interface FooterColumnProps {
   title: string;
-  links: FooterLink[];
+  links: SectionLink[];
   size: "mobile" | "desktop";
   /** Extra trailing item after the plain links, e.g. the Free Tools trigger. */
   children?: ReactNode;

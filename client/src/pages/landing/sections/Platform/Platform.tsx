@@ -4,7 +4,6 @@ import { TrackMockup } from "./TrackMockup";
 import { UnderstandMockup } from "./UnderstandMockup";
 import { ImproveMockup } from "./ImproveMockup";
 import { BuiltForStrip } from "./BuiltForStrip";
-import { ArrowRightIcon } from "./icons";
 
 // Verbatim from _reference/index.html 2003-2425 (section-header-02 sibling
 // + <section id="platform-section">). Three stacked bordered-panel rows
@@ -34,16 +33,12 @@ function FeatureText({
   eyebrow,
   heading,
   body,
-  linkText,
-  href,
   isVisible,
 }: {
   number: string;
   eyebrow: string;
   heading: string;
   body: string;
-  linkText: string;
-  href: string;
   isVisible: boolean;
 }) {
   return (
@@ -76,19 +71,9 @@ function FeatureText({
         <h3 className="text-[16px] sm:text-[20px] lg:text-[24px] font-semibold text-vc-primary tracking-[-0.02em] leading-[1.15] mb-2 sm:mb-3">
           {heading}
         </h3>
-        <p className="text-[12px] sm:text-[14px] text-vc-secondary leading-relaxed mb-3 sm:mb-5 max-w-[380px]">
+        <p className="text-[12px] sm:text-[14px] text-vc-secondary leading-relaxed max-w-[380px]">
           {body}
         </p>
-        <a
-          href={href}
-          className="inline-flex items-center gap-2 text-[11px] sm:text-[13px] font-semibold text-vc-accent hover:text-vc-accent-hover transition-colors duration-150 group"
-        >
-          {linkText}
-          <ArrowRightIcon
-            size={14}
-            className="group-hover:translate-x-1 transition-transform duration-200"
-          />
-        </a>
       </div>
     </div>
   );
@@ -122,8 +107,6 @@ export function Platform() {
                         eyebrow="Track"
                         heading="Know every prompt that recommends you — and every one that names a rival"
                         body="Track who gets recommended across ChatGPT, Claude, Perplexity, Gemini, and more, on the questions your buyers actually ask. Your position, prompt by prompt."
-                        linkText="See who gets recommended"
-                        href="#why-now-section"
                         isVisible={isVisible}
                       />
                     </div>
@@ -145,8 +128,6 @@ export function Platform() {
                         eyebrow="Understand"
                         heading="Understand why it recommends them and not you"
                         body="See which sources AI trusts when it makes a recommendation, which questions send buyers to a competitor, and exactly what's missing from your coverage."
-                        linkText="See how it works"
-                        href="#revenue-section"
                         isVisible={isVisible}
                       />
                     </div>
@@ -162,8 +143,6 @@ export function Platform() {
                         eyebrow="Improve"
                         heading="Publish the evidence AI needs to recommend you"
                         body="Generate articles and FAQs that answer the questions buyers ask, scored against the same GEO signals AI engines reward, and publish straight to your channels."
-                        linkText="Start improving"
-                        href="#philosophy-section"
                         isVisible={isVisible}
                       />
                     </div>

@@ -1,139 +1,37 @@
-// Copy, hrefs, and stagger-delay constants verified against
-// _reference/index.html (lines 682-896) and, for behavior not visible in
-// the closed-menu DOM snapshot, _reference/assets/TrakkrNav-JAUeEuWq.js and
-// _reference/assets/nav-data-DcRPnYz_.js.
+// The landing page's navigation, in one place.
+//
+// This file used to carry five link sets feeding two mega-menus: features,
+// solutions, tools, a resources list and a resources footer row — roughly
+// thirty destinations, most of them pointing at /register or at an in-page
+// anchor dressed up as a product page. The page has six sections; it did not
+// need a navigation system.
+//
+// Nav, MobileMenu and Footer all render THIS list, so the page cannot
+// disagree with itself about what it contains. Adding a section means adding
+// one row here and one `id` on the section.
+//
+// Every href is an in-page anchor. The only real routes left in the chrome
+// are Sign in and Get started, rendered directly by Nav/MobileMenu/Footer as
+// TanStack <Link>s rather than living in this list — they are conversion
+// actions, not navigation, and they navigate client-side.
 
-export type NavItem = {
+export type SectionLink = {
+  /** Label shown in the nav, mobile menu and footer. */
   name: string;
+  /** `#id` of the target <section> on the landing page. */
   href: string;
-  description: string;
-  iconSlug?: string; // maps to a lucide glyph via NavItemIcon; only rendered while a mega-menu is open
-  iconSrc?: string; // real asset override — takes precedence over iconSlug when present
-  external?: boolean;
 };
 
-// Product mega-menu, left column ("Features"). Header delay 40ms; items
-// stagger at 60 + index*30ms (60/90/120/150/180).
-export const productFeatures: NavItem[] = [
-  {
-    name: "Citations",
-    href: "#platform-section",
-    description: "The sources behind each recommendation",
-    iconSlug: "citations",
-  },
-  {
-    name: "Share of answer",
-    href: "#platform-section",
-    description: "How often you are the brand named",
-    iconSlug: "perception",
-  },
-  {
-    name: "Competitors",
-    href: "#revenue-section",
-    description: "Who gets recommended instead of you",
-    iconSlug: "competitors",
-  },
-  {
-    name: "Content",
-    href: "#philosophy-section",
-    description: "Publish what earns the recommendation",
-    iconSlug: "workflows",
-  },
-  {
-    name: "GEO signals",
-    href: "#philosophy-section",
-    description: "Score what engines reward",
-    iconSlug: "agent",
-  },
+// Order matches the order the sections appear on the page, and each label
+// matches that section's own SectionHeader, so a nav row and the heading it
+// scrolls to read the same. ("Approach" and "Proof" are those headers'
+// subtitles — "Why VentureCite" and "Revenue" are too long for a nav row.)
+export const pageSections: SectionLink[] = [
+  { name: "Why now", href: "#why-now-section" },
+  { name: "Platform", href: "#platform-section" },
+  { name: "Approach", href: "#philosophy-section" },
+  { name: "Proof", href: "#revenue-section" },
+  { name: "Research", href: "#learn-research-section" },
 ];
 
-// Product mega-menu, right column top ("Solutions"). Header delay 80ms;
-// items stagger at 120 + index*30ms (120/150/180).
-export const productSolutions: NavItem[] = [
-  { name: "Startups", href: "/register", description: "Get named alongside the giants" },
-  { name: "Agencies", href: "/register", description: "Recommendations, tracked per client" },
-  { name: "Enterprise", href: "/register", description: "Every brand, every market" },
-];
-
-// Product mega-menu, right column bottom ("Tools"). Header delay 160ms;
-// items stagger at 200 + index*30ms (200/230/260/290).
-export const productTools: NavItem[] = [
-  {
-    name: "Crawler check",
-    href: "#platform-section",
-    description: "See your site the way AI does",
-  },
-  {
-    name: "GEO glossary",
-    href: "/glossary",
-    description: "The vocabulary, defined",
-  },
-  {
-    name: "Share-of-answer report",
-    href: "#revenue-section",
-    description: "Who was recommended, weekly",
-  },
-  {
-    name: "FAQ optimization",
-    href: "#philosophy-section",
-    description: "Answer the questions buyers ask",
-  },
-];
-
-// Resources mega-menu featured tile. Illustration reused from the source's
-// asset set (a generic isometric book, no third-party branding on it).
-export const resourcesFeatured: NavItem = {
-  name: "GEO glossary",
-  href: "/glossary",
-  description: "Every term in generative engine optimization, defined",
-  iconSlug: "docs",
-  iconSrc: "/venturecite/images/resources/documentation-blue.png",
-};
-
-// Resources mega-menu list. The source listed an API Reference and an MCP
-// Server here; VentureCite ships neither, so those rows are gone rather than
-// renamed. The Pricing row is gone too — the page's Pricing section was
-// removed, and there is no other honest destination for it. Remaining rows
-// point at routes that exist.
-export const resourcesList: NavItem[] = [
-  {
-    name: "How it works",
-    href: "#platform-section",
-    description: "Get tracked, understood, recommended",
-    iconSrc: "/venturecite/images/resources/api-blue.png",
-  },
-  {
-    name: "Why now",
-    href: "#why-now-section",
-    description: "Why AI now writes the shortlist",
-    iconSlug: "data",
-  },
-];
-
-// Resources mega-menu footer row — appears together, delay 240ms (not staggered per-item).
-export const resourcesFooterLinks = [
-  { name: "Glossary", href: "/glossary" },
-  { name: "Log in", href: "/login" },
-  { name: "Get started", href: "/register" },
-];
-
-// Plain nav link (no mega-menu). Pricing is a real server-rendered route
-// again (src/routes/pricing.tsx) — it's rendered directly in Nav.tsx as its
-// own TanStack `<Link>` next to this one, not added here, since demoLink is
-// an in-page "#" anchor and Pricing should navigate client-side to a
-// different route.
-export const demoLink = { name: "How it works", href: "#platform-section" };
-
-// Mobile menu top link list ($e in TrakkrNav-JAUeEuWq.js). Index 0 ("Features")
-// is always rendered with the accent/active treatment, per the source.
-// Pricing is restored directly in MobileMenu.tsx as its own TanStack `<Link>`
-// after this list, not as an entry here — see this array's rendering site.
-export const mobileTopLinks = [
-  { label: "Platform", href: "#platform-section" },
-  { label: "Glossary", href: "/glossary" },
-  { label: "Log in", href: "/login" },
-  { label: "Get started", href: "/register" },
-];
-
-export const megaMenuEase = "cubic-bezier(0.16, 1, 0.3, 1)";
 export const containerMaxWidth = 1120;

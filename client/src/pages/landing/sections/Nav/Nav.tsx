@@ -1,9 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { ProductMegaMenu } from "./ProductMegaMenu";
-import { ResourcesMegaMenu } from "./ResourcesMegaMenu";
 import { MobileMenu } from "./MobileMenu";
-import { demoLink, containerMaxWidth } from "./data";
+import { pageSections, containerMaxWidth } from "./data";
 import { BrandLogo } from "@/components/BrandLogo";
+
+// The two mega-menus this used to open (Product and Resources, ~30 links
+// between them) are gone. They advertised a product surface the app does not
+// have — most rows resolved to /register or to an anchor on this same page —
+// and a one-page site does not need a hover-triggered navigation system.
+// What is left is the page's own sections, plus the two conversion actions.
 
 export function Nav() {
   return (
@@ -18,24 +22,19 @@ export function Nav() {
           <BrandLogo imgClassName="h-[26px] w-auto" textClassName="text-body" />
         </Link>
 
+        {/* Plain <a> anchors, not TanStack <Link>s: these scroll within the
+            current document. Routing them would push a history entry and make
+            Back walk the section list. */}
         <div className="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
-          <ProductMegaMenu />
-          <ResourcesMegaMenu />
-          <a
-            href={demoLink.href}
-            className="h-9 px-4 text-[13px] font-medium text-vc-secondary hover:text-vc-primary hover:bg-vc-muted transition-all duration-250 rounded inline-flex items-center"
-          >
-            {demoLink.name}
-          </a>
-          {/* Real (server-rendered) route, unlike the # anchors above — a
-              TanStack `<Link>` so it navigates client-side instead of a
-              full reload. */}
-          <Link
-            to="/pricing"
-            className="h-9 px-4 text-[13px] font-medium text-vc-secondary hover:text-vc-primary hover:bg-vc-muted transition-all duration-250 rounded inline-flex items-center"
-          >
-            Pricing
-          </Link>
+          {pageSections.map((section) => (
+            <a
+              key={section.href}
+              href={section.href}
+              className="h-9 px-4 text-[13px] font-medium text-vc-secondary hover:text-vc-primary hover:bg-vc-muted transition-all duration-250 rounded inline-flex items-center"
+            >
+              {section.name}
+            </a>
+          ))}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

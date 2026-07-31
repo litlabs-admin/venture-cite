@@ -1,5 +1,4 @@
 import { SectionHeader } from "@/pages/landing/sections/SectionHeader/SectionHeader";
-import { ArrowRightIcon } from "@/pages/landing/sections/Nav/icons";
 import { useScrollReveal } from "@/pages/landing/hooks/useScrollReveal";
 import { AiTrafficPanel } from "./AiTrafficPanel";
 import { RevenueAttributionPanel } from "./RevenueAttributionPanel";
@@ -84,13 +83,6 @@ export function Revenue() {
                       Weekly reports
                     </span>
                   </div>
-                  <a
-                    href="/register"
-                    className="text-[10px] sm:text-[12px] font-medium text-vc-accent hover:text-vc-accent-hover flex items-center gap-1 transition-colors shrink-0"
-                  >
-                    Get Started
-                    <ArrowRightIcon size={12} />
-                  </a>
                 </div>
               </div>
             </div>

@@ -51,7 +51,7 @@ export function LearnResearch() {
               style={{ transitionTimingFunction: scrollRevealEase }}
             >
               {resourceCards.map((item) => (
-                <ResourceCard key={item.href} item={item} isVisible={isVisible} />
+                <ResourceCard key={item.title} item={item} isVisible={isVisible} />
               ))}
             </div>
 
@@ -62,9 +62,9 @@ export function LearnResearch() {
               }
               style={{ transitionTimingFunction: scrollRevealEase }}
             >
-              <a className="group inline-flex flex-col gap-1.5 w-full" href="#platform-section">
+              <div className="inline-flex flex-col gap-1.5 w-full">
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-[15px] sm:text-[16px] font-semibold text-vc-primary tracking-[-0.01em] group-hover:text-vc-accent transition-colors duration-200">
+                  <span className="text-[15px] sm:text-[16px] font-semibold text-vc-primary tracking-[-0.01em]">
                     See how AI search actually works
                   </span>
                   <ArrowRightIcon
@@ -81,7 +81,7 @@ export function LearnResearch() {
                     AI referral traffic · illustrative
                   </span>
                 </span>
-              </a>
+              </div>
 
               <AiSearchAreaChart isVisible={isVisible} />
             </div>

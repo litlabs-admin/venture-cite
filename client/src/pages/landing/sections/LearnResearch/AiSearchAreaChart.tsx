@@ -24,7 +24,7 @@ export function AiSearchAreaChart({ isVisible }: { isVisible: boolean }) {
       style={{ background: "var(--hb-surface-wash)", boxShadow: "var(--hb-shadow-raised)" }}
     >
       <div className="vc-ds" style={{ background: "transparent" }}>
-        <a className="block" aria-label="See how AI search actually works" href="#platform-section">
+        <div className="block">
           <div className="relative" style={{ height: 210 }}>
             {chartYAxisLabels.map((l) => (
               <span
@@ -176,7 +176,7 @@ export function AiSearchAreaChart({ isVisible }: { isVisible: boolean }) {
               </div>
             ))}
           </div>
-        </a>
+        </div>
       </div>
     </div>
   );
