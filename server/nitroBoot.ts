@@ -63,6 +63,12 @@ import { Sentry } from "./instrument";
 
 let started = false;
 
+/** Accepts the usual spellings so "1"/"yes"/"TRUE" don't silently no-op. */
+function isTruthyEnv(v: string | undefined): boolean {
+  if (!v) return false;
+  return ["1", "true", "yes", "on"].includes(v.trim().toLowerCase());
+}
+
 export default function nitroBoot(): void {
   if (process.env.VERCEL) return;
   if (process.env.NODE_ENV !== "production") return;
@@ -96,10 +102,38 @@ async function run(): Promise<void> {
       });
     }
 
-    initScheduler();
+    // DISABLE_IN_PROCESS_SCHEDULER exists for the "external scheduler" shape.
+    //
+    // Six jobs are registered BOTH here (node-cron) and in the daily
+    // orchestrator endpoint: account-purge, auto-citation, brand-purge,
+    // listicle-scan, mention-scan, weekly-report. If an external scheduler
+    // calls POST /api/cron/daily-orchestrator while this in-process cron is
+    // also live, each of those runs twice — duplicate report emails and
+    // duplicate LLM spend. The advisory locks do not help: they stop two
+    // runners overlapping, not one firing 15 minutes after the other.
+    //
+    // On Render's free plan the process sleeps after ~15 minutes idle, which
+    // takes this scheduler down with it — so that deployment MUST drive the
+    // orchestrator externally and set this flag. See render.yaml.
+    //
+    // server/lib/jobDebounce.ts is the belt to this braces: it guards the
+    // three costly jobs even if both triggers are somehow live at once.
+    if (isTruthyEnv(process.env.DISABLE_IN_PROCESS_SCHEDULER)) {
+      logger.info(
+        "nitroBoot: in-process scheduler DISABLED by DISABLE_IN_PROCESS_SCHEDULER — " +
+          "scheduled work must be driven by POST /api/cron/daily-orchestrator",
+      );
+    } else {
+      initScheduler();
+    }
     void resumeInFlightAutopilots();
 
     logger.info(
+      {
+        scheduler: isTruthyEnv(process.env.DISABLE_IN_PROCESS_SCHEDULER)
+          ? "disabled (external)"
+          : "in-process",
+      },
       "nitroBoot: boot side-effects complete (migrations, orphan-citation-run reconciliation, scheduler, autopilot resume)",
     );
   } catch (err) {

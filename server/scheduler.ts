@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { sendWeeklyVisibilityReport, isEmailConfigured, type BrandReport } from "./emailService";
 import { discoverCompetitors } from "./lib/competitorDiscovery";
 import { withAdvisoryLock, lockKeys, type LockKey } from "./lib/advisoryLock";
+import { withJobDebounce, DEBOUNCE_WINDOWS } from "./lib/jobDebounce";
 import { runMentionScan } from "./lib/runMentionScan";
 import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
@@ -35,12 +36,23 @@ const schedulerLockKeys = {
 };
 
 export async function runWeeklyReportJob(): Promise<{ sent: number; skipped: number }> {
-  const outcome = await withAdvisoryLock(
-    schedulerLockKeys.weeklyReport,
-    "weekly-report-job",
-    runWeeklyReportJobImpl,
+  // Debounce OUTSIDE the advisory lock. The lock stops two runners racing;
+  // it does nothing about the in-process cron firing at 08:00 and an external
+  // scheduler hitting /api/cron/daily-orchestrator at 08:15, by which time the
+  // lock is long released. That second pass emails every user again.
+  const gate = await withJobDebounce(
+    "weekly-report",
+    DEBOUNCE_WINDOWS["weekly-report"],
+    async () => {
+      const outcome = await withAdvisoryLock(
+        schedulerLockKeys.weeklyReport,
+        "weekly-report-job",
+        runWeeklyReportJobImpl,
+      );
+      return outcome.ran ? outcome.result : { sent: 0, skipped: 0 };
+    },
   );
-  return outcome.ran ? outcome.result : { sent: 0, skipped: 0 };
+  return gate.ran ? gate.result : { sent: 0, skipped: 0 };
 }
 
 async function runWeeklyReportJobImpl(): Promise<{ sent: number; skipped: number }> {
@@ -193,8 +205,12 @@ export async function selectBrandsForCitationScan() {
 }
 
 export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
-  await withAdvisoryLock(schedulerLockKeys.autoCitation, "auto-citation-job", () =>
-    runAutoCitationJobImpl(deadlineMs),
+  // Window is 45min against an hourly cadence — a genuine hourly tick still
+  // runs; a second trigger in the same hour does not.
+  await withJobDebounce("auto-citation", DEBOUNCE_WINDOWS["auto-citation"], () =>
+    withAdvisoryLock(schedulerLockKeys.autoCitation, "auto-citation-job", () =>
+      runAutoCitationJobImpl(deadlineMs),
+    ),
   );
 }
 
@@ -351,6 +367,12 @@ export async function runCompetitorDiscoveryJob(deadlineMs?: number): Promise<vo
 }
 export async function runMentionScanJob(deadlineMs?: number): Promise<void> {
   void deadlineMs;
+  await withJobDebounce("mention-scan", DEBOUNCE_WINDOWS["mention-scan"], () =>
+    runMentionScanJobLocked(),
+  );
+}
+
+async function runMentionScanJobLocked(): Promise<void> {
   await withAdvisoryLock(lockKeys.mentionScan, "mention-scan", async () => {
     const brands = await storage.listBrandsWithMentionMonitoring();
     for (const b of brands) {

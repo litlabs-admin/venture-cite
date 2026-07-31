@@ -94,6 +94,13 @@ const envSchema = z.object({
   // Buffer feature don't need to set it.
   BUFFER_ENCRYPTION_KEY: z.string().optional(),
 
+  // Set to "true" when an EXTERNAL scheduler drives
+  // POST /api/cron/daily-orchestrator, so the in-process node-cron scheduler
+  // does not run the same six jobs a second time. Required on Render free
+  // tier, where the process sleeps and the in-process scheduler is unreliable
+  // anyway. See server/nitroBoot.ts and render.yaml.
+  DISABLE_IN_PROCESS_SCHEDULER: z.string().optional(),
+
   // No REDDIT_* credentials. The mention scanner reads Reddit
   // unauthenticated only (public JSON + RSS fallback); the OAuth path and
   // these four vars were removed together. Re-declaring them here would

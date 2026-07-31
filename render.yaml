@@ -70,6 +70,22 @@ services:
       # runs a migration or a scheduled job. ──
       - key: NODE_ENV
         value: production
+      # ── Single owner of scheduled work. ──
+      # Six jobs are registered BOTH in the in-process node-cron scheduler
+      # and in POST /api/cron/daily-orchestrator: account-purge,
+      # auto-citation, brand-purge, listicle-scan, mention-scan and
+      # weekly-report. With both live they each run twice — duplicate weekly
+      # report EMAILS to real users, and duplicate LLM spend on citation and
+      # mention scans. The advisory locks do not prevent this: they stop two
+      # runners overlapping, not one firing 15 minutes after the other.
+      #
+      # On this free plan the in-process scheduler is not viable regardless —
+      # the service sleeps after ~15 minutes idle and node-cron dies with it.
+      # So the external scheduler owns scheduling, and this flag switches the
+      # in-process one off. If you ever move to a paid always-on plan and
+      # drop the external scheduler, set this to false instead.
+      - key: DISABLE_IN_PROCESS_SCHEDULER
+        value: "true"
       # Pin to the version verified with real builds this session
       # (`node -v` => v24.11.1). No .nvmrc/engines field exists in the repo
       # today (confirmed) so Render would otherwise pick its own default.
