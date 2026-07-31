@@ -45,12 +45,17 @@ export function Nav() {
             >
               Sign in
             </Link>
-            {/* Two-tier button system: this persistent nav CTA is the DARK
-                tier (ink-fill). The accent fill is reserved for the in-page
-                conversion CTA in the hero. Never both accent. */}
+            {/* One primary action, one colour. This used to be the dark
+                ink-fill tier, on the reasoning that the accent belonged to
+                the hero CTA alone — but the same "Get started" then rendered
+                ink here, accent in the hero and closing CTA, and a pale
+                accent-subtle in the footer. Three colours for one action
+                reads as three different actions. Hierarchy comes from size
+                and placement instead: this is h-9/13px, the hero CTA is
+                h-11/16px. */}
             <Link
               to="/register"
-              className="h-9 px-4 bg-ink-fill text-white text-[13px] font-medium rounded hover:bg-ink transition-colors duration-150 inline-flex items-center"
+              className="h-9 px-4 bg-vc-accent text-white text-[13px] font-medium rounded hover:bg-vc-accent-hover transition-colors duration-150 inline-flex items-center"
             >
               Get started
             </Link>

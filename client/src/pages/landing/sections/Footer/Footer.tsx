@@ -66,7 +66,7 @@ export function Footer() {
             <div className={revealY(isVisible)} style={{ transitionDelay: "100ms" }}>
               <Link
                 to="/register"
-                className="h-9 w-full bg-vc-accent-subtle text-vc-accent text-[12px] font-medium rounded flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-vc-accent hover:text-white transition-all duration-150"
+                className="h-9 w-full bg-vc-accent text-white text-[12px] font-medium rounded flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-vc-accent-hover transition-colors duration-150"
               >
                 Get started
                 <ArrowRightIcon size={14} />
@@ -105,7 +105,7 @@ export function Footer() {
               </div>
               <Link
                 to="/register"
-                className="h-9 px-4 bg-vc-accent-subtle text-vc-accent text-[13px] font-medium rounded flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-vc-accent hover:text-white transition-all duration-150"
+                className="h-9 px-4 bg-vc-accent text-white text-[13px] font-medium rounded flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-vc-accent-hover transition-colors duration-150"
               >
                 Get started
                 <ArrowRightIcon size={14} />

@@ -23,12 +23,32 @@ export function ClosingCta() {
         className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-full overflow-hidden pointer-events-none"
         style={{ maxWidth: 1120 }}
       >
+        {/* Sized 100% 180% from the top, NOT `cover`.
+
+            The art is a ~square gradient: white for its top third, then a
+            fast transition to saturated blue. Under `cover` the section's
+            short box cropped a window out of the MIDDLE of that image, so
+            the transition landed exactly on the copy — the heading sat on
+            near-white (fine) while the paragraph 60px below sat on
+            rgb(72,99,255) at a measured 1.03:1 against its own colour.
+            Invisible, and no text colour fixes it: on a mid-luminance blue,
+            white tops out at 4.66:1 and black at 4.5:1, and the block spans
+            both ends of the ramp anyway.
+
+            Stretching the gradient to 1.8x the box height and anchoring it
+            top puts the copy block on the white end — measured in-browser at
+            17.67:1 for the heading and 4.79:1 for the paragraph, both AA —
+            while the bottom row stays genuinely blue, rgb(88,113,255), so
+            the section keeps the blue floor it is drawn around. Past 2x the
+            paragraph stops improving (4.79 is its ceiling, set by its own
+            darkest backdrop pixel) and the floor washes out to
+            rgb(137,155,255) and then to near-white. 1x is the broken case. */}
         <div
           className="absolute inset-0"
           style={{
             backgroundImage: "url(/venturecite/images/closing-cta-bg.avif)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
+            backgroundSize: "100% 180%",
+            backgroundPosition: "center top",
             backgroundRepeat: "no-repeat",
           }}
         />
