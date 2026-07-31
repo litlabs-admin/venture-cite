@@ -4138,11 +4138,29 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.brands.id, brandId));
   }
 
+  // Ordered least-recently-scanned first, never-scanned before that.
+  //
+  // The order matters because runMentionScanJob now honours a deadline and
+  // bails mid-list. Unordered, Postgres would hand back much the same
+  // sequence every tick, so the same prefix would be rescanned forever and
+  // the tail would never be reached at all. Oldest-first makes each run pick
+  // up where the last one stopped.
   async listBrandsWithMentionMonitoring(): Promise<{ id: string; userId: string }[]> {
+    const lastScan = db
+      .select({
+        brandId: schema.scanJobs.brandId,
+        lastAt: sql<Date | null>`max(${schema.scanJobs.createdAt})`.as("last_at"),
+      })
+      .from(schema.scanJobs)
+      .groupBy(schema.scanJobs.brandId)
+      .as("last_scan");
+
     const rows = await db
       .select({ id: schema.brands.id, userId: schema.brands.userId })
       .from(schema.brands)
-      .where(eq(schema.brands.monitorMentions, true));
+      .leftJoin(lastScan, eq(lastScan.brandId, schema.brands.id))
+      .where(eq(schema.brands.monitorMentions, true))
+      .orderBy(sql`${lastScan.lastAt} asc nulls first`);
     // userId is nullable in the schema (historical design); brands with
     // monitor_mentions=true must have a user, so cast is safe in practice.
     return rows.map((r) => ({ id: r.id, userId: r.userId ?? "" }));

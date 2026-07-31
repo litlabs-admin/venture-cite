@@ -8,7 +8,7 @@ import { storage } from "./storage";
 import { sendWeeklyVisibilityReport, isEmailConfigured, type BrandReport } from "./emailService";
 import { discoverCompetitors } from "./lib/competitorDiscovery";
 import { withAdvisoryLock, lockKeys, type LockKey } from "./lib/advisoryLock";
-import { withJobDebounce, DEBOUNCE_WINDOWS } from "./lib/jobDebounce";
+import { withJobDebounce, shouldRunJob, markJobRan, DEBOUNCE_WINDOWS } from "./lib/jobDebounce";
 import { runMentionScan } from "./lib/runMentionScan";
 import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
@@ -365,17 +365,36 @@ export async function runCompetitorDiscoveryJob(deadlineMs?: number): Promise<vo
     runForEveryBrand("competitor-discovery", (bid) => discoverCompetitors(bid), { deadlineMs }),
   );
 }
+// Deliberately NOT withJobDebounce(): that records completion whenever the
+// body returns, and this body can return having scanned only some brands.
+// Recording a partial pass would block the next tick for the full 20h window
+// and, because the scan is Monday-gated, strand the remaining brands for a
+// week. So the debounce is opened by hand and only closed on a complete pass.
 export async function runMentionScanJob(deadlineMs?: number): Promise<void> {
-  void deadlineMs;
-  await withJobDebounce("mention-scan", DEBOUNCE_WINDOWS["mention-scan"], () =>
-    runMentionScanJobLocked(),
-  );
+  const { shouldRun } = await shouldRunJob("mention-scan", DEBOUNCE_WINDOWS["mention-scan"]);
+  if (!shouldRun) return;
+
+  if (await runMentionScanJobLocked(deadlineMs)) await markJobRan("mention-scan");
 }
 
-async function runMentionScanJobLocked(): Promise<void> {
-  await withAdvisoryLock(lockKeys.mentionScan, "mention-scan", async () => {
+/** Resolves true only when every brand was scanned. */
+async function runMentionScanJobLocked(deadlineMs?: number): Promise<boolean> {
+  const outcome = await withAdvisoryLock(lockKeys.mentionScan, "mention-scan", async () => {
     const brands = await storage.listBrandsWithMentionMonitoring();
+    let processed = 0;
     for (const b of brands) {
+      // Checked per brand, matching runForEveryBrand. A single brand's scan
+      // can still overrun the deadline — the orchestrator's budget is a
+      // best-effort cap, not a hard kill — but it stops the job walking the
+      // whole list and starving every step queued behind it.
+      if (deadlineMs !== undefined && Date.now() > deadlineMs) {
+        logger.info(
+          { job: "mention-scan", processed, total: brands.length },
+          "mention-scan: deadline hit — remaining brands deferred to the next run",
+        );
+        return false;
+      }
+      processed += 1;
       try {
         const job = await storage.createScanJob({
           brandId: b.id,
@@ -384,10 +403,16 @@ async function runMentionScanJobLocked(): Promise<void> {
         });
         await runMentionScan(job.id);
       } catch (err) {
+        // A brand that throws still counts as attempted: it is the scan that
+        // failed, not the schedule, and retrying it every tick for 20h would
+        // crowd out the brands behind it.
         logger.error({ err, brandId: b.id }, "cron.mention_scan.brand_failed");
       }
     }
+    return true;
   });
+  // Lock not acquired => another runner owns this pass and will record it.
+  return outcome.ran ? outcome.result : false;
 }
 export async function runListicleScanJob(deadlineMs?: number): Promise<void> {
   await withAdvisoryLock(lockKeys.listicleScan, "listicle-scan", () =>
