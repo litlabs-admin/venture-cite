@@ -36,26 +36,29 @@ export function Hero() {
               }`}
               style={{ transitionTimingFunction: scrollRevealEase }}
             >
-              {/* H1 states plainly what the product does, rather than the
-                  category thesis. There is deliberately no accent-coloured
-                  full stop: --accent is interactive/brand only, never
+              {/* H1 names the OUTCOME the buyer is paying for — being
+                  recommended — not the mechanism (tracking, citations,
+                  monitoring). "Recommends", not "mentions": a mention is
+                  neutral and a brand can be mentioned as the loser of a
+                  comparison. There is deliberately no accent-coloured full
+                  stop: --accent is interactive/brand only, never
                   decorative. */}
               <h1 className="text-[22px] sm:text-[26px] lg:text-[32px] font-semibold text-vc-primary tracking-[-0.025em] leading-[1.2] mb-4 max-w-[820px] mx-auto">
-                See how ChatGPT, Claude, and Perplexity describe your brand and fix what they get
-                wrong.
+                Be the brand ChatGPT, Claude, and Perplexity recommend.
               </h1>
 
-              {/* The former H1 line, demoted to subhead. The previous subhead
-                  ("Find where AI overlooks, misreads or undersells you…") was
-                  dropped as redundant against the new H1, which already states
-                  the find-and-fix motion. */}
+              {/* Subhead carries the stakes and the mechanism, in that order:
+                  buyers ask AI before they ask you, and we tell you why you
+                  are left out. Keeps the find-and-fix motion that used to sit
+                  in the H1, now subordinate to the outcome. */}
               <p
                 className={`text-[14px] lg:text-[16px] text-vc-secondary leading-relaxed mb-7 max-w-[540px] mx-auto transition-all duration-500 ${
                   mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
                 style={{ transitionDelay: "100ms" }}
               >
-                AI is shaping how buyers see your brand. Take control of the story.
+                Buyers ask AI what to buy before they ask you. See who it names instead, and what it
+                takes to be on that list.
               </p>
 
               <div

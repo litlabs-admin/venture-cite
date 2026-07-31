@@ -75,29 +75,29 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1.0, maximum-scale=1" },
-      { title: "VentureCite — Get cited by AI search engines" },
+      { title: "VentureCite — Get recommended by AI engines" },
       {
         name: "description",
         content:
-          "VentureCite shows you where AI overlooks, misreads or undersells your brand, then fixes the pages and sources shaping every AI answer. Take control of how AI search engines cite you.",
+          "VentureCite shows you which brands AI recommends when your buyers ask what to buy, why it picks them over you, and what to publish to get on that list. Across every major AI engine.",
       },
       { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1" },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "VentureCite" },
-      { property: "og:title", content: "VentureCite — Get cited by AI search engines" },
+      { property: "og:title", content: "VentureCite — Get recommended by AI engines" },
       {
         property: "og:description",
         content:
-          "Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer.",
+          "See which brands AI recommends when your buyers ask, why it picks them, and what it takes to be on that list.",
       },
       { property: "og:url", content: "https://venturecite.com/" },
       { property: "og:image", content: "https://venturecite.com/favicon.png" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "VentureCite — Get cited by AI search engines" },
+      { name: "twitter:title", content: "VentureCite — Get recommended by AI engines" },
       {
         name: "twitter:description",
         content:
-          "Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer.",
+          "See which brands AI recommends when your buyers ask, why it picks them, and what it takes to be on that list.",
       },
       { name: "twitter:image", content: "https://venturecite.com/favicon.png" },
     ],
@@ -209,7 +209,7 @@ const SOFTWARE_APPLICATION_JSON_LD = {
   applicationCategory: "BusinessApplication",
   url: "https://venturecite.com/",
   description:
-    "VentureCite is a Generative Engine Optimization (GEO) platform that shows brands where AI search engines overlook, misread or undersell them, then fixes the pages and sources shaping every AI answer.",
+    "VentureCite is a Generative Engine Optimization (GEO) platform that helps brands get recommended by AI engines. It tracks which brands ChatGPT, Claude, Perplexity and Gemini recommend when buyers ask what to buy, explains why, and generates the content needed to win a place on that list.",
   offers: { "@type": "Offer", category: "SaaS" },
 };
 

@@ -48,11 +48,11 @@ export function Revenue() {
                   style={{ transitionDelay: "100ms", transitionTimingFunction: EASE }}
                 >
                   <h2 className="text-[18px] sm:text-[24px] lg:text-[28px] font-semibold text-vc-primary tracking-[-0.02em] leading-[1.2] mb-2">
-                    See where your AI visibility comes from
+                    See which recommendations actually bring buyers
                   </h2>
                   <p className="text-[13px] sm:text-[14px] text-vc-secondary leading-relaxed max-w-xl">
-                    Track citations across ChatGPT, Claude, Perplexity, and Gemini, and see which
-                    engines are putting your brand in front of people. No engineering required.
+                    Follow a recommendation from the answer that made it to the visit it sent you,
+                    across ChatGPT, Claude, Perplexity, and Gemini. No engineering required.
                   </p>
                 </div>
               </div>

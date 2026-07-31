@@ -120,8 +120,8 @@ export function Platform() {
                       <FeatureText
                         number="01"
                         eyebrow="Track"
-                        heading="See exactly where you show up across every AI platform"
-                        body="Monitor your visibility across ChatGPT, Claude, Perplexity, Gemini, and more. Know your position for every prompt that matters to your business."
+                        heading="Know every prompt that recommends you — and every one that names a rival"
+                        body="Track who gets recommended across ChatGPT, Claude, Perplexity, Gemini, and more, on the questions your buyers actually ask. Your position, prompt by prompt."
                         linkText="Explore tracking"
                         href="#why-now-section"
                         isVisible={isVisible}
@@ -143,8 +143,8 @@ export function Platform() {
                       <FeatureText
                         number="02"
                         eyebrow="Understand"
-                        heading="See why you're winning or losing"
-                        body="Discover which sources AI cites when it mentions you. See the queries driving recommendations and the gaps in your coverage."
+                        heading="Understand why it recommends them and not you"
+                        body="See which sources AI trusts when it makes a recommendation, which questions send buyers to a competitor, and exactly what's missing from your coverage."
                         linkText="See how it works"
                         href="#revenue-section"
                         isVisible={isVisible}
@@ -160,8 +160,8 @@ export function Platform() {
                       <FeatureText
                         number="03"
                         eyebrow="Improve"
-                        heading="Turn signals into content AI engines want to cite"
-                        body="Generate citation-ready articles and FAQs, scored against the same GEO signals AI engines reward, and publish straight to your channels."
+                        heading="Publish the evidence AI needs to recommend you"
+                        body="Generate articles and FAQs that answer the questions buyers ask, scored against the same GEO signals AI engines reward, and publish straight to your channels."
                         linkText="Start improving"
                         href="#philosophy-section"
                         isVisible={isVisible}

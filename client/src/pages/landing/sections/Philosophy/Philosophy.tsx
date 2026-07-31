@@ -30,10 +30,10 @@ export function Philosophy() {
                 style={{ transitionTimingFunction: EASE }}
               >
                 <p className="text-[13px] sm:text-[14px] text-vc-secondary mb-1">
-                  Other tools give you a dashboard.
+                  Other tools tell you AI left you out.
                 </p>
                 <h2 className="text-[18px] sm:text-[24px] lg:text-[28px] font-semibold text-vc-primary tracking-[-0.02em]">
-                  VentureCite gives you a playbook.
+                  VentureCite gets you recommended.
                 </h2>
               </div>
 
@@ -46,7 +46,7 @@ export function Philosophy() {
                   // Keep this list in step with AiLogoGrid — the card's logo
                   // grid renders the same eight engines, and a copy/visual
                   // mismatch here reads as a mistake.
-                  body="ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews, Grok, Meta AI, DeepSeek. Each one surfaces different brands for the same query. Tracking two or three is guessing."
+                  body="ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews, Grok, Meta AI, DeepSeek. Each one recommends a different set of brands for the same question. Tracking two or three is guessing."
                   ctaLabel="See all features"
                   delayMs={100}
                   isVisible={isVisible}
@@ -58,7 +58,7 @@ export function Philosophy() {
                   number="02"
                   href="#revenue-section"
                   title="Actions, not dashboards"
-                  body="Every week, VentureCite synthesizes your citation and GEO signals into prioritized actions you can execute today. Not reports you file. A playbook you run."
+                  body="Every week, VentureCite turns your citation and GEO signals into a ranked list of the moves most likely to win you a recommendation. Not reports you file. A playbook you run."
                   ctaLabel="See how actions work"
                   delayMs={180}
                   isVisible={isVisible}
@@ -70,7 +70,7 @@ export function Philosophy() {
                   number="03"
                   href="#learn-research-section"
                   title="An assistant that fixes it"
-                  body="VentureCite's assistant diagnoses what's costing you citations, drafts the fix, and walks you through it end to end. Nothing ships without your approval."
+                  body="VentureCite's assistant diagnoses what's keeping you off the shortlist, drafts the fix, and walks you through it end to end. Nothing ships without your approval."
                   ctaLabel="See how it works"
                   delayMs={260}
                   isVisible={isVisible}

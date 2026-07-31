@@ -43,13 +43,14 @@ export function ClosingCta() {
             style={{ transitionTimingFunction: scrollRevealEase }}
           >
             <h2 className="text-[20px] sm:text-[28px] lg:text-[32px] font-semibold text-vc-primary tracking-[-0.02em] leading-[1.2] mb-3 sm:mb-4">
-              Get cited by AI search engines.
+              Get recommended by AI engines.
               <br />
-              Track every mention. Optimize every prompt.
+              Every question your buyers ask.
             </h2>
             <p className="text-[13px] sm:text-[14px] lg:text-[16px] text-vc-secondary leading-relaxed mb-6 sm:mb-8 max-w-[520px] mx-auto">
-              Citation tracking, share-of-answer, competitor benchmarks, and AI content generation —
-              across ChatGPT, Claude, Perplexity, Gemini, Copilot, and Google AI Overview.
+              Recommendation tracking, share-of-answer, competitor benchmarks, and AI content
+              generation — across ChatGPT, Claude, Perplexity, Gemini, Copilot, and Google AI
+              Overview.
             </p>
             <div
               className={`transition-all duration-500 max-w-[440px] mx-auto ${

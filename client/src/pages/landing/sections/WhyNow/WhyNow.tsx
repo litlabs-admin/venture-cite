@@ -83,11 +83,12 @@ export function WhyNow() {
                   style={{ transitionDelay: "100ms", transitionTimingFunction: EASE }}
                 >
                   <h2 className="text-[17px] sm:text-[22px] lg:text-[26px] font-semibold text-vc-primary tracking-[-0.02em] leading-[1.25] mb-2">
-                    Make AI their first stop before buying
+                    AI writes the shortlist now
                   </h2>
                   <p className="text-[12px] sm:text-[13px] text-vc-secondary leading-relaxed max-w-lg">
-                    Once shoppers try AI, it&apos;s their go-to for research. A few brands per
-                    query, no second page. You&apos;re on the shortlist or you don&apos;t exist.
+                    Once buyers try AI, it&apos;s their go-to for research. It answers with a
+                    handful of brands and no second page. Either it recommends you, or you never
+                    enter the conversation.
                   </p>
                 </div>
               </div>

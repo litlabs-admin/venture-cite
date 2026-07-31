@@ -19,11 +19,11 @@ export const Route = createFileRoute("/")({
   // <title>/<meta> pair before this task moved metadata to the route.
   head: () => ({
     meta: [
-      { title: "VentureCite — Get cited by AI search engines" },
+      { title: "VentureCite — Get recommended by AI engines" },
       {
         name: "description",
         content:
-          "Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer.",
+          "See which brands AI recommends when your buyers ask, why it picks them, and what it takes to be on that list.",
       },
     ],
   }),

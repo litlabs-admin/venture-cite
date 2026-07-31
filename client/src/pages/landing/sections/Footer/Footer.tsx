@@ -55,7 +55,7 @@ export function Footer() {
                 <BrandLogo imgClassName="h-6 w-auto" textClassName="text-caption" />
               </Link>
               <p className="text-[11px] text-vc-secondary leading-relaxed">
-                Get cited by AI search engines. Track every mention. Optimize every prompt.
+                Get recommended by AI engines. Every question your buyers ask.
               </p>
             </div>
 
@@ -107,7 +107,7 @@ export function Footer() {
                 <BrandLogo imgClassName="h-6 w-auto" textClassName="text-caption" />
               </Link>
               <p className="text-[12px] text-vc-secondary leading-relaxed mb-4 max-w-[180px]">
-                Get cited by AI search engines. Track every mention. Optimize every prompt.
+                Get recommended by AI engines. Every question your buyers ask.
               </p>
               <div className="flex items-center gap-2">
                 <a
