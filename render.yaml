@@ -1,12 +1,10 @@
 # Render Blueprint — free-tier web service.
 #
 # Derived from the actual repo state (not assumption):
-#   - `npm run build` = `db:migrate && vite build && esbuild server/vercelEntry.ts
-#     ...--outfile=api/_bundle.js` (package.json). The esbuild step only feeds
-#     the now-deleted Vercel `api/index.ts` entry — see docs/deploy-runbook.md
-#     "Vercel build output" section. It's dead weight on Render (produces an
-#     unused file) but harmless; not removed here because package.json is out
-#     of scope for this change, see the runbook for the recommended cleanup.
+#   - `npm run build` = `db:migrate && vite build` (package.json). The old
+#     esbuild step that bundled server/vercelEntry.ts into api/_bundle.js is
+#     gone, along with that entry file and the api/ directory — verified
+#     absent 2026-07-31. Nothing Vercel-specific runs in this build any more.
 #   - `vite build` runs the `nitro` Vite plugin (vite.config.ts). With no
 #     VERCEL env var present, Nitro auto-detects the `node-server` preset and
 #     (because vite.config.ts pins `output.dir` for non-Vercel builds) writes
@@ -43,6 +41,12 @@
 #     would run the same job set twice (in-process scheduler + externally
 #     triggered orchestrator) — see docs/deploy-runbook.md, flagged there as
 #     a decision the user needs to make, not resolved here.
+#
+# NOTE ON REDDIT: there are no REDDIT_* variables to set. The mention
+# scanner reads Reddit unauthenticated only (public JSON + RSS); the OAuth
+# path and its four credential vars were removed. Reddit currently 403s that
+# unauthenticated traffic, so the Mentions feature returns Hacker News
+# results only and records Reddit as a failed source.
 #
 # Secrets are intentionally left unset (`sync: false`) — set real values in
 # the Render dashboard. No secret values are ever written to this file.
@@ -140,7 +144,7 @@ services:
         sync: false
 
     # Everything else (SENTRY_DSN, LOG_LEVEL, DATABASE_CA_CERT_PATH,
-    # REDDIT_CLIENT_ID/SECRET/USERNAME/PASSWORD, the *_CRON schedule
+    # the *_CRON schedule
     # overrides consumed by server/scheduler.ts, JINA_API_KEY,
     # FACT_AGENT_*_ENABLED, WEEKLY_MAX_BRANDS_PER_USER, etc.) is optional —
     # see docs/deploy-runbook.md for the complete table. Add them in the
