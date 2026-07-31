@@ -37,41 +37,55 @@ export function Hero() {
               style={{ transitionTimingFunction: scrollRevealEase }}
             >
               {/* The H1 is written for the FOUNDER reading it, not for the
-                  product. A plain capability line ("Get your brand recommended
-                  by AI engines") describes what we sell; it makes nobody feel
-                  anything. This names a loss they cannot currently see - a
-                  buyer being pointed at a competitor, in a room they were never
-                  in - which is the actual reason to care.
+                  product. It names a loss they cannot currently see - a rival
+                  being named in answers they never watch - and then turns it
+                  into a question they cannot answer, which is the reason to
+                  read on.
 
-                  Present tense and second person ("right now", "your buyers"),
-                  because the whole point is that it is happening already, not
-                  that it might.
+                  Present tense ("already"), because the point is that it is
+                  happening now, not that it might.
 
-                  Deliberately NO engine names. Listing ChatGPT, Claude and
-                  Perplexity turns the promise into a feature list and dates the
-                  line every time the field moves; the logo row below already
-                  names them. The break is sm+ only - forcing it on a 320px
-                  screen strands one word on its own line.
+                  Deliberately NO engine names here. Listing ChatGPT, Claude
+                  and Perplexity turns the promise into a feature list and
+                  dates the line every time the field moves; the logo row below
+                  already names them, and the subhead covers the breadth.
 
-                  No accent-coloured full stop either: --accent is
-                  interactive/brand only, never decorative. */}
-              <h1 className="text-[22px] sm:text-[26px] lg:text-[32px] font-semibold text-vc-primary tracking-[-0.025em] leading-[1.2] mb-4 max-w-[820px] mx-auto">
-                Right now, AI is telling your buyers which brand to choose.
-                <br className="hidden sm:block" /> You have no idea whether it says yours.
+                  The break before "Is yours?" is lg+ only, which is exactly
+                  where the container (880px) fits the first sentence on one
+                  line. Forcing it from sm, as this first did, produced three
+                  lines between 640 and ~1000px: the sentence wrapped, stranding
+                  "answers." alone, and only then came the break. Below lg the
+                  text simply reflows.
+
+                  The non-breaking space earns its place at every width below
+                  lg - measured at 375px, "Is" otherwise ended one line and
+                  "yours?" sat alone on the next.
+
+                  max-w is 880px, not the 820px this inherited: at 32px the
+                  first sentence needs ~825px, so 820 wrapped "answers." onto a
+                  line of its own. Threshold measured at 860px; 880 leaves
+                  headroom for font-metric variation.
+
+                  No accent-coloured full stop: --accent is interactive/brand
+                  only, never decorative. */}
+              <h1 className="text-[22px] sm:text-[26px] lg:text-[32px] font-semibold text-vc-primary tracking-[-0.025em] leading-[1.2] mb-4 max-w-[880px] mx-auto">
+                Your competitor&apos;s name is already showing up in AI answers.
+                <br className="hidden lg:block" /> Is&nbsp;yours?
               </h1>
 
-              {/* The H1 now carries the stakes, so the subhead is purely the
-                  resolution - it answers "so what do I do about it?" and is
-                  the first place the product is named. It used to open by
-                  restating that buyers ask AI, which the headline says. */}
+              {/* The H1 asks the question, so the subhead is purely the
+                  answer to "so what do I do about it?", and is the first place
+                  the product is named. Three beats: measure, benchmark, fix -
+                  and the fix names both delivery models, since "done for you"
+                  is the part a founder reading this at 11pm actually wants. */}
               <p
                 className={`text-[14px] lg:text-[16px] text-vc-secondary leading-relaxed mb-7 max-w-[540px] mx-auto transition-all duration-500 ${
                   mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
                 style={{ transitionDelay: "100ms" }}
               >
-                VentureCite shows you which brands it recommends in your category, why it picks
-                them, and exactly what to publish to become the one it names.
+                VentureCite measures your real citations across every major AI platform, benchmarks
+                you against competitors, and builds the fix DIY or done for you.
               </p>
 
               <div
