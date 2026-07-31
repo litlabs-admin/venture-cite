@@ -36,34 +36,42 @@ export function Hero() {
               }`}
               style={{ transitionTimingFunction: scrollRevealEase }}
             >
-              {/* H1 names the OUTCOME the buyer is paying for — being
-                  recommended — not the mechanism (tracking, citations,
-                  monitoring). "Recommended", not "mentioned": a mention is
-                  neutral, and a brand can be mentioned as the loser of a
-                  comparison.
+              {/* The H1 is written for the FOUNDER reading it, not for the
+                  product. A plain capability line ("Get your brand recommended
+                  by AI engines") describes what we sell; it makes nobody feel
+                  anything. This names a loss they cannot currently see — a
+                  buyer being pointed at a competitor, in a room they were never
+                  in — which is the actual reason to care.
 
-                  Deliberately NO engine names here. Listing ChatGPT, Claude
-                  and Perplexity turns the promise into a feature list and
-                  dates the headline every time the field moves; "AI engines"
-                  is the category, and the logo row below already names them.
-                  Also no accent-coloured full stop: --accent is
+                  Present tense and second person ("right now", "your buyers"),
+                  because the whole point is that it is happening already, not
+                  that it might.
+
+                  Deliberately NO engine names. Listing ChatGPT, Claude and
+                  Perplexity turns the promise into a feature list and dates the
+                  line every time the field moves; the logo row below already
+                  names them. The break is sm+ only — forcing it on a 320px
+                  screen strands one word on its own line.
+
+                  No accent-coloured full stop either: --accent is
                   interactive/brand only, never decorative. */}
               <h1 className="text-[22px] sm:text-[26px] lg:text-[32px] font-semibold text-vc-primary tracking-[-0.025em] leading-[1.2] mb-4 max-w-[820px] mx-auto">
-                Get your brand recommended by AI engines.
+                Right now, AI is telling your buyers which brand to choose.
+                <br className="hidden sm:block" /> You have no idea whether it says yours.
               </h1>
 
-              {/* Subhead carries the stakes and the mechanism, in that order:
-                  buyers ask AI before they ask you, and we tell you why you
-                  are left out. Keeps the find-and-fix motion that used to sit
-                  in the H1, now subordinate to the outcome. */}
+              {/* The H1 now carries the stakes, so the subhead is purely the
+                  resolution — it answers "so what do I do about it?" and is
+                  the first place the product is named. It used to open by
+                  restating that buyers ask AI, which the headline says. */}
               <p
                 className={`text-[14px] lg:text-[16px] text-vc-secondary leading-relaxed mb-7 max-w-[540px] mx-auto transition-all duration-500 ${
                   mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
                 style={{ transitionDelay: "100ms" }}
               >
-                Buyers ask AI what to buy before they ask you. See which brands it recommends today,
-                why it picks them, and what it takes to be named instead.
+                VentureCite shows you which brands it recommends in your category, why it picks
+                them, and exactly what to publish to become the one it names.
               </p>
 
               <div
