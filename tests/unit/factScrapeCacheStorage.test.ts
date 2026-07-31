@@ -8,7 +8,14 @@ import { db } from "../../server/db";
 import { sql } from "drizzle-orm";
 
 async function clear() {
-  await db.execute(sql`DELETE FROM fact_scrape_cache`);
+  // Scoped to THIS file's own key prefix. It used to be an unscoped
+  // `DELETE FROM fact_scrape_cache`, which emptied the whole table — including
+  // the 'lifecycle-test:%' rows tests/unit/v2LifecycleStorage.test.ts inserts
+  // and then counts. Vitest runs those two files in parallel threads against
+  // one real database, so whichever lost the race failed. That made roughly
+  // half of all full-suite runs go red, on a rotating cast of tests, while
+  // every one of them passed in isolation.
+  await db.execute(sql`DELETE FROM fact_scrape_cache WHERE cache_key LIKE 'search-llm:test:%'`);
 }
 
 describe("storage.factScrapeCache", () => {
