@@ -94,10 +94,22 @@ describe("SiteHealthDetailPage - full data", () => {
     // audited sample (10) - the audited count appears as the stat's caption.
     expect(screen.getByText("53")).toBeTruthy();
     expect(screen.getByText("10 audited")).toBeTruthy();
-    expect(screen.getByText("6")).toBeTruthy();
-    expect(screen.getByText("Next.js")).toBeTruthy();
     expect(screen.getByText("https://example.com/broken")).toBeTruthy();
     expect(screen.getByText("https://example.com/missing")).toBeTruthy();
+  });
+
+  // The Open Issues and Platform tiles were removed from this page, along with
+  // the tab strip. Asserted as absent rather than deleted, so the removal is
+  // guarded: Open Issues restated the findings list's own count as a metric,
+  // and the issue rows above are still the real assertion that issues render.
+  it("no longer renders the Open Issues tile, the Platform tile or the tab strip", () => {
+    renderWithData(fullHealth, { runId: "run-1", pages: pageRows });
+
+    expect(screen.queryByText("Open Issues")).toBeNull();
+    expect(screen.queryByText("6")).toBeNull();
+    expect(screen.queryByText("Platform")).toBeNull();
+    expect(screen.queryByText("Next.js")).toBeNull();
+    expect(screen.queryByRole("tablist")).toBeNull();
   });
 });
 
@@ -169,11 +181,20 @@ describe("SiteHealthDetailPage - pending (deadline-timeout placeholder)", () => 
 });
 
 describe("SiteHealthDetailPage - crawl to cite rate", () => {
-  it("shows a dash for the unmeasured crawl-to-cite-rate stat, never 0", () => {
+  // The tile is gone. It had no data source at all and rendered a permanent
+  // dash, so the honesty rule it used to enforce ("never a 0 for something we
+  // cannot measure") now has nothing to apply to. What still matters is that
+  // removing it did not leave a 0 behind in its place.
+  it("no longer renders the crawl-to-cite-rate stat at all", () => {
     renderWithData(fullHealth, { runId: "run-1", pages: pageRows });
-    expect(screen.getByText(/No data source yet/)).toBeTruthy();
-    // The dash primitive renders "–"; confirm at least one is present and
-    // that the stat is not silently rendered as a numeric 0.
-    expect(screen.getAllByText("–").length).toBeGreaterThan(0);
+
+    expect(screen.queryByText(/No data source yet/)).toBeNull();
+    // Scoped to this stat's own label. A bare /Crawl/ also matches the header's
+    // "Crawler access" link and the CRAWLERS meta tile, both of which stay.
+    expect(screen.queryByText(/Crawl → Cite/i)).toBeNull();
+    // The CRAWLERS tile still renders a legitimate "0 blocked", so a bare
+    // queryByText("0") would find that instead - assert on the stat grid's
+    // metric text size, which only the stat tiles use.
+    expect(document.querySelector(".text-metric")?.textContent).not.toBe("0");
   });
 });

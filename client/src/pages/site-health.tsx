@@ -1,20 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Download } from "lucide-react";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
-import {
-  PanelLabel,
-  NoValue,
-  CCLink,
-  DEST,
-  type Dest,
-} from "@/components/dashboard-panels/primitives";
+import { PanelLabel, NoValue, CCLink, DEST } from "@/components/dashboard-panels/primitives";
 import type { SiteHealth } from "@/components/dashboard-panels/useDashboardData";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  computeSiteHealthFindings,
-  type SiteHealthFinding,
-  type SiteHealthFindingCategory,
-} from "@shared/siteHealthFindings";
+import { computeSiteHealthFindings, type SiteHealthFinding } from "@shared/siteHealthFindings";
 
 // ─── Site Health detail ──────────────────────────────────────────────────────
 // Destination of the dashboard's Site Health panel's "Optimize ›" link.
@@ -63,15 +52,6 @@ const SEVERITY_LABEL: Record<string, string> = {
 };
 
 const SEVERITY_ORDER = ["critical", "high", "medium", "low"] as const;
-
-// Which existing route best addresses a finding's category. Only real
-// destinations from primitives.tsx's DEST map - a category with no good fit
-// (CONTENT STRUCTURE's advisory findings) gets no link rather than a fake one.
-const CATEGORY_DEST: Partial<Record<SiteHealthFindingCategory, Dest>> = {
-  DISCOVERABILITY: DEST.crawler,
-  "CRAWLER ACCESS": DEST.crawler,
-  "CONTENT QUALITY": DEST.signals,
-};
 
 function csvEscape(v: string | number | null | undefined) {
   const s = v === null || v === undefined ? "" : String(v);
@@ -194,7 +174,6 @@ function IssueGroup({
 /** Left-accent callout for the single highest-point finding - the one thing
  *  worth fixing before anything else. */
 function TopPriority({ finding }: { finding: SiteHealthFinding }) {
-  const dest = CATEGORY_DEST[finding.category];
   return (
     <div className="border-b border-vc-default px-8 py-6">
       <PanelLabel>Top Priority</PanelLabel>
@@ -213,14 +192,6 @@ function TopPriority({ finding }: { finding: SiteHealthFinding }) {
             {finding.affectedUrls.length} affected page
             {finding.affectedUrls.length === 1 ? "" : "s"}
           </p>
-        )}
-        {dest && (
-          <CCLink
-            dest={dest}
-            className="mt-2 inline-flex items-center gap-1 text-label font-medium text-vc-accent hover:underline"
-          >
-            Fix this →
-          </CCLink>
         )}
       </div>
     </div>
@@ -277,22 +248,6 @@ function WhatToFixNext({
           );
         })}
       </ul>
-    </div>
-  );
-}
-
-function VerifyWithRealBotData() {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-vc-default bg-vc-muted/30 px-8 py-5">
-      <p className="text-data text-vc-tertiary">
-        Measure what AI bots actually do, not just what they should see.
-      </p>
-      <CCLink
-        dest={DEST.crawler}
-        className="flex-shrink-0 text-label font-medium text-vc-accent hover:underline"
-      >
-        Verify with real bot data →
-      </CCLink>
     </div>
   );
 }
@@ -376,10 +331,10 @@ export default function SiteHealthDetailPage() {
       ["Website", health?.website ?? ""],
       ["Generated", new Date().toISOString()],
       [],
-      ["Citation readiness", health?.score ?? ""],
-      ["Pages", pageCountForStat ?? ""],
-      ["Open issues", neverCrawled ? "" : issues.total],
-      [],
+      // The Citation readiness / Pages / Open issues summary rows were dropped
+      // from this export on request. Note the page still shows Citation
+      // readiness and Pages as tiles, so the CSV now reports less than the
+      // screen - restore these three lines to put them back.
       ["Findings"],
       ["Category", "Title", "Points", "Advisory", "Affected URLs"],
       ...findings.map((f) => [
@@ -462,24 +417,9 @@ export default function SiteHealthDetailPage() {
         </div>
       </div>
 
-      {/* Tab strip: only Findings is implemented; Pages/Issues are disabled
-          with real badge counts - a control that goes nowhere is worse than
-          no control, so these stay disabled rather than faked as clickable. */}
-      {!loading && health?.website && (
-        <div className="border-b border-vc-default px-8 py-3">
-          <Tabs value="findings">
-            <TabsList>
-              <TabsTrigger value="findings">Findings</TabsTrigger>
-              <TabsTrigger value="pages" disabled>
-                Pages{pageCountForStat !== null ? ` (${pageCountForStat})` : ""}
-              </TabsTrigger>
-              <TabsTrigger value="issues" disabled>
-                Issues{!neverCrawled ? ` (${issues.total})` : ""}
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      )}
+      {/* The tab strip was removed. It held one implemented view (Findings)
+          plus disabled Pages/Issues placeholders, so it labelled the page
+          rather than navigating it - nothing became unreachable. */}
 
       {loading ? (
         <div className="space-y-px">
@@ -505,8 +445,10 @@ export default function SiteHealthDetailPage() {
         </div>
       ) : (
         <>
-          {/* Stat row */}
-          <div className="grid grid-cols-1 border-b border-vc-default sm:grid-cols-2 lg:grid-cols-4">
+          {/* Stat row. Two tiles, not four: Open Issues was the findings list's
+              own count restated as a metric, and Crawl → Cite Rate never had a
+              data source to read. */}
+          <div className="grid grid-cols-1 border-b border-vc-default sm:grid-cols-2">
             <StatTile
               label="Citation Readiness"
               value={
@@ -537,29 +479,10 @@ export default function SiteHealthDetailPage() {
                     : undefined
               }
             />
-            <StatTile
-              label="Open Issues"
-              value={
-                neverCrawled ? <NoValue className="text-metric font-semibold" /> : issues.total
-              }
-            />
-            {/* No data source joins fact-scrape pages to which prompts cited
-                them, so this stat is genuinely unmeasured - same treatment
-                as the dashboard's AI Traffic tile. */}
-            <StatTile
-              label="Crawl → Cite Rate"
-              value={<NoValue className="text-metric font-semibold" />}
-              caption="No data source yet - requires linking crawled pages to citation results."
-            />
           </div>
 
-          {/* Meta row */}
-          <div className="grid grid-cols-1 border-b border-vc-default sm:grid-cols-3">
-            <MetaTile label="Platform">
-              <span className="text-caption text-vc-secondary">
-                {health.platform ?? <NoValue className="text-caption" />}
-              </span>
-            </MetaTile>
+          {/* Meta row. Two tiles since Platform was removed. */}
+          <div className="grid grid-cols-1 border-b border-vc-default sm:grid-cols-2">
             <MetaTile label="Discovery">
               <div className="flex flex-col gap-1">
                 <DiscoveryRow label="robots.txt" status={discovery.robotsTxt} />
@@ -594,8 +517,6 @@ export default function SiteHealthDetailPage() {
             </>
           )}
 
-          <VerifyWithRealBotData />
-
           {/* Body: issues grouped by severity, listing affected page URLs */}
           {neverCrawled ? (
             <div className="flex flex-col items-center justify-center px-8 py-16 text-center">
@@ -608,11 +529,7 @@ export default function SiteHealthDetailPage() {
             <div className="flex flex-col items-center justify-center px-8 py-16 text-center">
               <p className="text-body text-vc-tertiary">No pages recorded for the latest crawl.</p>
             </div>
-          ) : issues.total === 0 ? (
-            <div className="flex flex-col items-center justify-center px-8 py-16 text-center">
-              <p className="text-body text-vc-tertiary">No issues found in the last crawl.</p>
-            </div>
-          ) : (
+          ) : issues.total === 0 ? null : (
             <div>
               {SEVERITY_ORDER.map((sev) => (
                 <IssueGroup key={sev} severity={sev} pages={pagesBySeverity[sev]} />

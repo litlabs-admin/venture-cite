@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { Loader2, Sparkles, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +36,6 @@ import {
   useEditPrompt,
   useArchivePrompt,
   useCreatePrompt,
-  useSetPromptStatus,
   useReorderPrompts,
 } from "@/hooks/usePrompts";
 
@@ -50,7 +47,6 @@ import {
 // it so affordances disable before a request would be refused.
 
 const TRACKED_CAP = 10;
-const PROMPT_MAX_LEN = 500;
 
 type MutationBody = { success: boolean; error?: string; data?: unknown };
 
@@ -72,16 +68,14 @@ export default function PromptsTab({
   promptsAgeLabel,
 }: PromptsTabProps) {
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const { data: suggestionsData } = usePromptSuggestions(selectedBrandId);
   const suggestions = suggestionsData?.data ?? [];
-  // The table renders archived rows too, greyed with their toggle off - the
-  // `prompts` prop from the page is tracked-only, which would make a row
-  // switched off disappear with no way to switch it back on.
+  // The table is fed every status, not just the tracked set, so the Filter's
+  // Inactive option has something to show. Archived rows render greyed.
   const { data: allPromptsData } = useAllPrompts(selectedBrandId);
   const tablePrompts = allPromptsData?.data ?? prompts;
-  const { data: historyData, isLoading: historyLoading } = usePromptScoreHistory(selectedBrandId);
+  const { data: historyData } = usePromptScoreHistory(selectedBrandId);
   const { data: resultsData } = usePromptResults(selectedBrandId);
 
   const generate = useGeneratePrompts(selectedBrandId);
@@ -92,7 +86,6 @@ export default function PromptsTab({
   const editPrompt = useEditPrompt(selectedBrandId);
   const archivePrompt = useArchivePrompt(selectedBrandId);
   const createPrompt = useCreatePrompt(selectedBrandId);
-  const setPromptStatus = useSetPromptStatus(selectedBrandId);
   const reorder = useReorderPrompts(selectedBrandId);
 
   const [archiving, setArchiving] = useState<BrandPrompt | null>(null);
@@ -100,8 +93,6 @@ export default function PromptsTab({
   // away: the server rejects exact duplicates (they would double the run cost
   // and split one prompt's results across two rows), so the point of the
   // action is to seed a variation.
-  const [duplicating, setDuplicating] = useState<BrandPrompt | null>(null);
-  const [duplicateText, setDuplicateText] = useState("");
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [accepting, setAccepting] = useState<BrandPrompt | null>(null);
   const [acceptReplaceId, setAcceptReplaceId] = useState("");
@@ -133,14 +124,13 @@ export default function PromptsTab({
     return out;
   }, [resultsData]);
 
+  // The table renders no score-derived column any more, so its row model is
+  // just the prompt. historyById and blindSpotIds are still built above - the
+  // CSV export below still writes Score, Change, Runs and Blind spot, and that
+  // is now their only consumer.
   const rows: PromptRowModel[] = useMemo(
-    () =>
-      tablePrompts.map((p) => ({
-        prompt: p,
-        history: historyById.get(p.id),
-        blindSpot: blindSpotIds.has(p.id),
-      })),
-    [tablePrompts, historyById, blindSpotIds],
+    () => tablePrompts.map((p) => ({ prompt: p })),
+    [tablePrompts],
   );
 
   const notify = (d: MutationBody, okTitle: string, failTitle: string) =>
@@ -150,13 +140,10 @@ export default function PromptsTab({
         : { title: failTitle, description: d.error, variant: "destructive" },
     );
 
-  // Opening a prompt is a navigation, not a side panel - the detail view has
-  // its own page (see client/src/pages/prompt-detail.tsx), matching the
-  // reference. The inspector is left for surfaces that genuinely drill down
-  // without leaving the list.
-  function openDetail(p: BrandPrompt) {
-    void navigate({ to: "/prompts/$promptId", params: { promptId: p.id } });
-  }
+  // The per-prompt detail page (/prompts/$promptId) was removed, along with
+  // the row click and the menu item that opened it. Per-run detail is still
+  // available inside the Latest Results and History tabs, which render the
+  // same PromptDetail component inline.
 
   function create(text: string) {
     createPrompt.mutate(text, {
@@ -165,7 +152,7 @@ export default function PromptsTab({
         else if (body.error === "tracked_set_full")
           toast({
             title: "Tracked set is full",
-            description: `Switch one off to free a slot (cap ${TRACKED_CAP}).`,
+            description: `Archive one to free a slot (cap ${TRACKED_CAP}).`,
             variant: "destructive",
           });
         else if (body.error === "duplicate_prompt")
@@ -214,15 +201,21 @@ export default function PromptsTab({
 
   function exportCsv() {
     const header = ["Prompt", "Score", "Change", "Runs", "Status", "Added", "Blind spot"];
-    const body = rows.map((r) => [
-      r.prompt.prompt,
-      r.history?.score ?? "",
-      r.history?.delta ?? "",
-      r.history?.runs ?? 0,
-      r.prompt.status,
-      r.prompt.createdAt ? new Date(r.prompt.createdAt).toISOString().slice(0, 10) : "",
-      r.blindSpot ? "yes" : "no",
-    ]);
+    // Read straight from the lookups rather than the row model - the table
+    // stopped carrying score history when its Score column was removed, but
+    // the export still reports it.
+    const body = rows.map((r) => {
+      const h = historyById.get(r.prompt.id);
+      return [
+        r.prompt.prompt,
+        h?.score ?? "",
+        h?.delta ?? "",
+        h?.runs ?? 0,
+        r.prompt.status,
+        r.prompt.createdAt ? new Date(r.prompt.createdAt).toISOString().slice(0, 10) : "",
+        blindSpotIds.has(r.prompt.id) ? "yes" : "no",
+      ];
+    });
     const csv = [header, ...body]
       .map((line) =>
         line
@@ -296,94 +289,23 @@ export default function PromptsTab({
 
       <PromptsTable
         rows={rows}
-        historyLoading={historyLoading}
+
         suggestionCount={suggestions.length}
         cap={TRACKED_CAP}
         createPending={createPrompt.isPending}
-        onOpen={openDetail}
         onEdit={(p, text) =>
           editPrompt.mutate(
             { promptId: p.id, text },
             { onSuccess: (d: MutationBody) => notify(d, "Prompt updated", "Update failed") },
           )
         }
-        onDuplicate={(p) => {
-          setDuplicating(p);
-          setDuplicateText(p.prompt);
-        }}
-        onDiagnose={() => {
-          void navigate({ to: "/diagnose", search: { tab: "signals" } });
-        }}
-        onCreateContent={() => {
-          void navigate({ to: "/act", search: { tab: "create" } });
-        }}
         onArchive={(p) => setArchiving(p)}
-        onToggle={(p, next) =>
-          setPromptStatus.mutate(
-            { promptId: p.id, status: next },
-            {
-              onSuccess: ({ body }) => {
-                if (!body.success) {
-                  toast({
-                    title: "Couldn't update",
-                    description:
-                      body.error === "tracked_set_full"
-                        ? `That would exceed the cap of ${TRACKED_CAP}.`
-                        : body.error,
-                    variant: "destructive",
-                  });
-                }
-              },
-            },
-          )
-        }
         onReorder={(ids) => reorder.mutate(ids)}
         onCreate={create}
         onCreateMany={createMany}
         onSuggest={() => setSuggestionsOpen(true)}
         onExport={exportCsv}
       />
-
-      {/* Duplicate - opens prefilled so the copy can be varied before saving */}
-      <Dialog
-        open={!!duplicating}
-        onOpenChange={(o) => {
-          if (!o) setDuplicating(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Duplicate prompt</DialogTitle>
-            <DialogDescription>
-              Vary the wording before saving - an exact copy is rejected, since two identical
-              prompts double the run cost and split one prompt&apos;s results across two rows.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={duplicateText}
-            maxLength={PROMPT_MAX_LEN}
-            rows={4}
-            onChange={(e) => setDuplicateText(e.target.value)}
-          />
-          <p className="text-right text-caption text-muted-foreground">
-            {duplicateText.length}/{PROMPT_MAX_LEN}
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDuplicating(null)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!duplicateText.trim() || createPrompt.isPending}
-              onClick={() => {
-                create(duplicateText.trim());
-                setDuplicating(null);
-              }}
-            >
-              Add prompt
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Archive confirm */}
       <AlertDialog open={!!archiving} onOpenChange={(o) => !o && setArchiving(null)}>

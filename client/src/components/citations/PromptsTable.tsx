@@ -2,28 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
-  BarChart3,
   ChevronDown,
   ChevronsUpDown,
   Copy,
   Download,
-  FileText,
-  Flag,
   GripVertical,
-  Lightbulb,
-  MoreHorizontal,
-  Pause,
   Pencil,
-  Play,
   Plus,
   Search,
   SlidersHorizontal,
-  Stethoscope,
   Trash2,
   X,
 } from "lucide-react";
 import type { BrandPrompt } from "@shared/schema";
-import type { PromptScoreHistory } from "@/hooks/usePrompts";
 
 // ─── Prompts table ───────────────────────────────────────────────────────────
 // Ported from the reference Prompts tab (captured DOM + computed styles).
@@ -31,55 +22,30 @@ import type { PromptScoreHistory } from "@/hooks/usePrompts";
 //   toolbar      min-h-12, px-8, search w-64 h-8, buttons h-8 px-2.5 rounded
 //   header row   h-10, sticky, bg-muted/50, 10px/500 uppercase tracking-wider
 //   row          h-11, px-4, gap-1.5, 13px prompt text, hairline bottom
-//   columns      drag w-4 · select w-5 · prompt flex-1 · vol w-16 · 7d w-12
-//                · score w-10 · Δ w-10 · on w-8 · added w-24 · actions w-16
+//   columns      drag w-4 · select w-5 · prompt flex-1 · score w-10 · added w-24
 //   footer       h-7, 10px, "Showing X of Y prompts"
 //
-// TWO REFERENCE FEATURES ARE DELIBERATELY NOT REPRODUCED, on different
-// grounds:
-//   * AI VOL renders as a dash. It is a per-row VALUE with no source yet -
-//     the same treatment the Dashboard gives its unbacked metrics.
-//   * Tags and Audiences (the column, the two sibling tabs, the filters) are
-//     omitted entirely. Those are whole features with interactive controls,
-//     and a control that cannot do anything is worse than an absent one.
-// See docs/dashboard-reference.md for the same distinction applied to
-// the dashboard's Share menu.
+// Tags and Audiences (the column, the two sibling tabs, the filters) are
+// omitted entirely - whole features with interactive controls, and a control
+// that cannot do anything is worse than an absent one. See
+// docs/dashboard-reference.md for the same distinction applied to the
+// dashboard's Share menu.
+//
+// AI Vol, the 7-day sparkline, Δ, the On toggle and the per-row action column
+// were removed on request. AI Vol had never had a data source and only ever
+// rendered a dash.
 
 export type PromptRowModel = {
   prompt: BrandPrompt;
-  history: PromptScoreHistory | undefined;
-  /** Cited on zero platforms in the latest run - the reference's "blind spot". */
-  blindSpot: boolean;
 };
 
-type SortKey = "manual" | "score" | "delta" | "added" | "az";
-type ViewKey = "all" | "blind" | "movers" | "attention";
+type SortKey = "manual" | "added" | "az";
 type StatusFilter = "all" | "active" | "inactive";
 
-const VIEWS: { key: ViewKey; label: string; hint: string }[] = [
-  { key: "all", label: "All", hint: "Everything, manually sorted" },
-  { key: "movers", label: "Movers", hint: "Biggest changes first" },
-  { key: "attention", label: "Attention", hint: "Low scores · losing ground" },
-  { key: "blind", label: "Blind spots", hint: "Where you’re invisible" },
-];
-
-const SORTS: { key: SortKey; label: string }[] = [
-  { key: "manual", label: "Manual order" },
-  { key: "score", label: "Score" },
-  { key: "delta", label: "Biggest change" },
-  { key: "added", label: "Date added" },
-  { key: "az", label: "A → Z" },
-];
-
-const COLUMNS = [
-  { key: "vol", label: "AI volume" },
-  { key: "spark", label: "7-day trend" },
-  { key: "score", label: "Score" },
-  { key: "delta", label: "Change" },
-  { key: "on", label: "Active" },
-  { key: "added", label: "Date added" },
-] as const;
-type ColumnKey = (typeof COLUMNS)[number]["key"];
+// VIEWS, SORTS and COLUMNS are gone with the Display menu that was their only
+// UI. Sorting survives - the Score/Added/Prompt headers still sort on click -
+// but the view switcher (All / Movers / Attention / Blind spots) and the
+// per-column show/hide are removed, so the table renders a fixed column set.
 
 const BTN =
   "h-8 px-2.5 flex items-center gap-1.5 rounded border border-vc-default text-caption text-vc-secondary transition-colors hover:bg-vc-muted/50";
@@ -108,44 +74,6 @@ function useDismiss<T extends HTMLElement>(open: boolean, close: () => void) {
     };
   }, [open, close]);
   return ref;
-}
-
-/** 48×14 sparkline of a prompt's recent scores. Flat line when a single run
- *  exists - one point is a position, not a trend, so it is drawn as such. */
-function Sparkline({ series }: { series: PromptScoreHistory["series"] }) {
-  if (!series.length) {
-    return <div className="h-3.5 w-12" aria-hidden />;
-  }
-  const w = 48;
-  const h = 14;
-  const values = series.map((p) => p.score);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const step = values.length > 1 ? w / (values.length - 1) : 0;
-  const points = values.map((v, i) => {
-    const x = values.length > 1 ? i * step : w / 2;
-    const y = h - 2 - ((v - min) / span) * (h - 4);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const d =
-    values.length === 1
-      ? `M0,${(h / 2).toFixed(1)} L${w},${(h / 2).toFixed(1)}`
-      : `M${points.join(" L")}`;
-  const rising = values[values.length - 1] >= values[0];
-  return (
-    <svg width={w} height={h} className="overflow-visible" aria-hidden>
-      <path
-        d={d}
-        fill="none"
-        stroke={rising ? "var(--brand-accent)" : "var(--negative)"}
-        strokeWidth="1.25"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity={values.length === 1 ? 0.35 : 1}
-      />
-    </svg>
-  );
 }
 
 function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
@@ -185,15 +113,9 @@ function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => voi
 
 export function PromptsTable({
   rows,
-  historyLoading,
   suggestionCount,
-  onOpen,
   onEdit,
-  onDuplicate,
-  onDiagnose,
-  onCreateContent,
   onArchive,
-  onToggle,
   onReorder,
   onCreate,
   onCreateMany,
@@ -203,15 +125,12 @@ export function PromptsTable({
   cap,
 }: {
   rows: PromptRowModel[];
-  historyLoading: boolean;
   suggestionCount: number;
-  onOpen: (p: BrandPrompt) => void;
   onEdit: (p: BrandPrompt, text: string) => void;
-  onDuplicate: (p: BrandPrompt) => void;
-  onDiagnose: (p: BrandPrompt) => void;
-  onCreateContent: (p: BrandPrompt) => void;
+  /** Bulk-archive from the selection bar - the only remaining way to take a
+   *  prompt out of the tracked set now the per-row menu and On toggle are
+   *  gone. */
   onArchive: (p: BrandPrompt) => void;
-  onToggle: (p: BrandPrompt, next: "tracked" | "archived") => void;
   onReorder: (ids: string[]) => void;
   onCreate: (text: string) => void;
   onCreateMany: (texts: string[]) => void;
@@ -221,16 +140,13 @@ export function PromptsTable({
   cap: number;
 }) {
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<ViewKey>("all");
   const [sort, setSort] = useState<SortKey>("manual");
   // Defaults to the tracked set, like the reference. The table is fed every
   // status so a paused prompt can be switched back on, but opening on all of
   // them buries 9 live prompts under 27 archived ones.
   const [status, setStatus] = useState<StatusFilter>("active");
-  const [hidden, setHidden] = useState<Set<ColumnKey>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [openMenu, setOpenMenu] = useState<null | "filter" | "display" | "add">(null);
-  const [rowMenu, setRowMenu] = useState<string | null>(null);
+  const [openMenu, setOpenMenu] = useState<null | "filter" | "add">(null);
   const [draft, setDraft] = useState("");
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
@@ -241,18 +157,7 @@ export function PromptsTable({
 
   const close = () => setOpenMenu(null);
   const filterRef = useDismiss<HTMLDivElement>(openMenu === "filter", close);
-  const displayRef = useDismiss<HTMLDivElement>(openMenu === "display", close);
   const addRef = useDismiss<HTMLDivElement>(openMenu === "add", close);
-  const rowMenuRef = useDismiss<HTMLDivElement>(!!rowMenu, () => setRowMenu(null));
-
-  const shown = (k: ColumnKey) => !hidden.has(k);
-  const toggleColumn = (k: ColumnKey) =>
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(k)) next.delete(k);
-      else next.add(k);
-      return next;
-    });
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -261,16 +166,7 @@ export function PromptsTable({
     if (status === "active") out = out.filter((r) => r.prompt.status === "tracked");
     if (status === "inactive") out = out.filter((r) => r.prompt.status !== "tracked");
 
-    if (view === "blind") out = out.filter((r) => r.blindSpot);
-    if (view === "movers") out = out.filter((r) => (r.history?.delta ?? 0) !== 0);
-    if (view === "attention")
-      out = out.filter((r) => (r.history?.score ?? 0) < 50 || (r.history?.delta ?? 0) < 0);
-
     const sorted = [...out];
-    if (sort === "score")
-      sorted.sort((a, b) => (b.history?.score ?? -1) - (a.history?.score ?? -1));
-    if (sort === "delta")
-      sorted.sort((a, b) => Math.abs(b.history?.delta ?? 0) - Math.abs(a.history?.delta ?? 0));
     if (sort === "added")
       sorted.sort(
         (a, b) =>
@@ -281,7 +177,7 @@ export function PromptsTable({
     // flipping it would fight the drag-reorder the user just performed.
     if (dir === "asc" && sort !== "manual") sorted.reverse();
     return sorted;
-  }, [rows, query, status, view, sort, dir]);
+  }, [rows, query, status, sort, dir]);
 
   const allSelected = visible.length > 0 && visible.every((r) => selected.has(r.prompt.id));
 
@@ -315,25 +211,6 @@ export function PromptsTable({
     );
   }
 
-  // Header summary, mirroring the reference's "↑3 ↓1 ⚑21 blind spots" chip.
-  // Every figure is counted from data already on screen.
-  const summary = useMemo(() => {
-    let up = 0;
-    let down = 0;
-    for (const r of rows) {
-      const d = r.history?.delta;
-      if (d === null || d === undefined) continue;
-      if (d > 0) up += 1;
-      else if (d < 0) down += 1;
-    }
-    const lastRun = rows
-      .map((r) => r.history?.lastRunAt)
-      .filter(Boolean)
-      .sort()
-      .pop();
-    return { up, down, blind: rows.filter((r) => r.blindSpot).length, lastRun };
-  }, [rows]);
-
   function toggleSelect(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -345,7 +222,7 @@ export function PromptsTable({
 
   // Drag-reorder is only coherent against the stored manual order; under any
   // other sort the drop position would not map to an orderIndex.
-  const canDrag = sort === "manual" && view === "all" && !query;
+  const canDrag = sort === "manual" && !query;
 
   function handleDrop(targetId: string) {
     if (!dragId || dragId === targetId) return;
@@ -399,41 +276,6 @@ export function PromptsTable({
         </div>
 
         <div className="ml-auto flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
-          {/* Run summary - same figures as the reference's header chip. */}
-          <span className="mr-1 hidden items-center gap-2.5 text-data lg:flex">
-            {summary.lastRun && (
-              <span className="flex items-center gap-1.5 text-vc-text-muted">
-                <span className="h-1 w-1 shrink-0 rounded-full bg-vc-accent/50" aria-hidden />
-                Last run{" "}
-                {new Date(summary.lastRun).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            )}
-            <span className="flex items-center gap-1 text-vc-secondary" title="Prompts that gained">
-              <ArrowUp className="h-2.5 w-2.5 text-positive" aria-hidden />
-              <span className="tabular-nums">{summary.up}</span>
-            </span>
-            <span
-              className="flex items-center gap-1 text-vc-secondary"
-              title="Prompts that lost ground"
-            >
-              <ArrowDown className="h-2.5 w-2.5 text-destructive" aria-hidden />
-              <span className="tabular-nums">{summary.down}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setView("blind")}
-              title="Show only prompts where no engine cited you"
-              className="flex items-center gap-1 text-vc-secondary transition-colors hover:text-vc-accent"
-            >
-              <Flag className="h-2.5 w-2.5 text-vc-text-muted" aria-hidden />
-              <span className="tabular-nums">{summary.blind}</span>
-              <span className="text-vc-text-muted">blind spots</span>
-            </button>
-          </span>
-
           <div className="relative" ref={filterRef}>
             <button
               type="button"
@@ -466,67 +308,6 @@ export function PromptsTable({
                   >
                     <span className="capitalize">{s}</span>
                     {status === s && <span className="text-vc-accent">✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="relative" ref={displayRef}>
-            <button
-              type="button"
-              className={BTN}
-              aria-expanded={openMenu === "display"}
-              onClick={() => setOpenMenu(openMenu === "display" ? null : "display")}
-            >
-              Display
-              <ChevronDown className="h-3 w-3" aria-hidden />
-            </button>
-            {openMenu === "display" && (
-              <div className={MENU}>
-                <p className={MENU_LABEL}>View</p>
-                {VIEWS.map((v) => (
-                  <button
-                    key={v.key}
-                    type="button"
-                    className={MENU_ITEM}
-                    onClick={() => {
-                      setView(v.key);
-                      close();
-                    }}
-                  >
-                    <span>
-                      {v.label}
-                      <span className="block text-label text-vc-text-muted">{v.hint}</span>
-                    </span>
-                    {view === v.key && <span className="text-vc-accent">✓</span>}
-                  </button>
-                ))}
-                <p className={MENU_LABEL}>Sort</p>
-                {SORTS.map((s) => (
-                  <button
-                    key={s.key}
-                    type="button"
-                    className={MENU_ITEM}
-                    onClick={() => {
-                      setSort(s.key);
-                      close();
-                    }}
-                  >
-                    <span>{s.label}</span>
-                    {sort === s.key && <span className="text-vc-accent">✓</span>}
-                  </button>
-                ))}
-                <p className={MENU_LABEL}>Columns</p>
-                {COLUMNS.map((c) => (
-                  <button
-                    key={c.key}
-                    type="button"
-                    className={MENU_ITEM}
-                    onClick={() => toggleColumn(c.key)}
-                  >
-                    <span>{c.label}</span>
-                    {shown(c.key) && <span className="text-vc-accent">✓</span>}
                   </button>
                 ))}
               </div>
@@ -639,35 +420,9 @@ export function PromptsTable({
         <div className="relative flex min-w-0 flex-1 items-center">
           <SortHeader label="Prompt" sortKey="az" />
         </div>
-        {shown("vol") && (
-          <div className="flex w-16 shrink-0 items-center justify-end">
-            <span className={TH} title="No search-volume source is connected yet">
-              AI Vol
-            </span>
-          </div>
-        )}
-        {shown("spark") && <div className="w-12 shrink-0" />}
-        {shown("score") && (
-          <div className="flex w-10 shrink-0 items-center justify-end">
-            <SortHeader label="Score" sortKey="score" />
-          </div>
-        )}
-        {shown("delta") && (
-          <div className="flex w-10 shrink-0 items-center justify-end">
-            <SortHeader label="Δ" sortKey="delta" />
-          </div>
-        )}
-        {shown("on") && (
-          <div className="flex w-8 shrink-0 items-center">
-            <span className={TH}>On</span>
-          </div>
-        )}
-        {shown("added") && (
-          <div className="flex w-24 shrink-0 items-center">
-            <SortHeader label="Added" sortKey="added" />
-          </div>
-        )}
-        <div className="w-16 shrink-0" />
+        <div className="flex w-24 shrink-0 items-center">
+          <SortHeader label="Added" sortKey="added" />
+        </div>
       </div>
 
       {/* Rows */}
@@ -675,7 +430,6 @@ export function PromptsTable({
         {visible.map((r) => {
           const p = r.prompt;
           const active = p.status === "tracked";
-          const h = r.history;
           return (
             <div
               key={p.id}
@@ -683,8 +437,10 @@ export function PromptsTable({
               onDragStart={() => canDrag && setDragId(p.id)}
               onDragOver={(e) => canDrag && e.preventDefault()}
               onDrop={() => canDrag && handleDrop(p.id)}
-              onClick={() => onOpen(p)}
-              className={`group flex h-11 w-full min-w-0 cursor-pointer items-center gap-1.5 overflow-hidden border-b border-vc-subtle px-4 transition-colors duration-150 hover:bg-vc-muted/50 ${
+              // No row click: the per-prompt detail page it opened is gone.
+              // cursor-pointer goes with it - a pointer over a row that does
+              // nothing is a promise the table can no longer keep.
+              className={`group flex h-11 w-full min-w-0 items-center gap-1.5 overflow-hidden border-b border-vc-subtle px-4 transition-colors duration-150 hover:bg-vc-muted/50 ${
                 dragId === p.id ? "opacity-40" : ""
               }`}
             >
@@ -762,260 +518,19 @@ export function PromptsTable({
                     >
                       <Copy className="h-3 w-3" aria-hidden />
                     </button>
-                    {/* Rank slip - positive rankDelta means the mean placement
-                        got worse since the previous run. */}
-                    {h?.rankDelta !== null && h?.rankDelta !== undefined && h.rankDelta > 0 && (
-                      <span
-                        title={`Your rank slipped on this prompt (now ${h.rank})`}
-                        className="inline-flex h-4 shrink-0 items-center gap-0.5 rounded px-1 text-destructive/80"
-                      >
-                        <ArrowDown className="h-2.5 w-2.5" aria-hidden />
-                        <span className="text-label font-semibold leading-none tabular-nums">
-                          {h.rankDelta}
-                        </span>
-                      </span>
-                    )}
-                    {r.blindSpot && (
-                      <span
-                        title="No AI engine cited you on this prompt in the last run"
-                        className="inline-flex h-4 shrink-0 items-center gap-0.5 rounded px-1 text-destructive/80"
-                      >
-                        <Flag className="h-2.5 w-2.5" aria-hidden />
-                      </span>
-                    )}
                   </div>
                 )}
               </div>
 
-              {shown("vol") && (
-                <div className="w-16 shrink-0 text-right">
-                  {/* No search-volume source exists; a dash, never a number. */}
-                  <span className="font-mono text-data tabular-nums text-vc-hover">–</span>
-                </div>
-              )}
-
-              {shown("spark") && (
-                <div className="w-12 shrink-0">
-                  {historyLoading ? (
-                    <span className="block h-3 w-12 rounded-sm bg-vc-muted" aria-hidden />
-                  ) : (
-                    <Sparkline series={h?.series ?? []} />
-                  )}
-                </div>
-              )}
-
-              {shown("score") && (
-                <div className="w-10 shrink-0 text-right">
-                  <span
-                    className={`font-mono text-data font-medium tabular-nums ${
-                      h?.score === null || h?.score === undefined
-                        ? "text-vc-hover"
-                        : "text-vc-primary"
-                    }`}
-                  >
-                    {h?.score ?? "–"}
-                  </span>
-                </div>
-              )}
-
-              {shown("delta") && (
-                <div className="w-10 shrink-0 text-right">
-                  <span
-                    className={`font-mono text-data font-medium tabular-nums ${
-                      h?.delta === null || h?.delta === undefined
-                        ? "text-vc-hover"
-                        : h.delta > 0
-                          ? "text-positive"
-                          : h.delta < 0
-                            ? "text-destructive"
-                            : "text-vc-tertiary"
-                    }`}
-                  >
-                    {h?.delta === null || h?.delta === undefined
-                      ? "–"
-                      : `${h.delta > 0 ? "+" : ""}${h.delta}`}
-                  </span>
-                </div>
-              )}
-
-              {shown("on") && (
-                <div className="w-8 shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={active}
-                    aria-label={active ? "Switch prompt off" : "Switch prompt on"}
-                    onClick={() => onToggle(p, active ? "archived" : "tracked")}
-                    className="group/toggle flex h-8 w-8 items-center justify-center rounded transition-colors duration-150 hover:bg-vc-muted/60 active:scale-[0.92]"
-                  >
-                    <span
-                      className={`block h-2.5 w-2.5 rounded-full transition-all duration-200 ${
-                        active
-                          ? "bg-vc-accent ring-[3px] ring-vc-accent/15 group-hover/toggle:ring-[5px] group-hover/toggle:ring-vc-accent/25"
-                          : "bg-vc-hover ring-[3px] ring-transparent"
-                      }`}
-                    />
-                  </button>
-                </div>
-              )}
-
-              {shown("added") && (
-                <div className="w-24 shrink-0">
-                  <span className="font-mono text-data tabular-nums text-vc-secondary">
-                    {p.createdAt
-                      ? new Date(p.createdAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })
-                      : "–"}
-                  </span>
-                </div>
-              )}
-
-              <div
-                className="relative flex w-16 shrink-0 items-center justify-end gap-0.5"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {(r.blindSpot || (h?.rankDelta ?? 0) > 0) && (
-                  <button
-                    type="button"
-                    aria-label="Diagnose"
-                    title="Diagnose this query"
-                    onClick={() => onDiagnose(p)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded text-vc-accent transition-all duration-100 hover:bg-vc-accent-subtle"
-                  >
-                    <Stethoscope className="h-3 w-3" aria-hidden />
-                  </button>
-                )}
-                <div ref={rowMenu === p.id ? rowMenuRef : undefined}>
-                  <button
-                    type="button"
-                    aria-label="More actions"
-                    onClick={() => setRowMenu(rowMenu === p.id ? null : p.id)}
-                    className="rounded p-1.5 text-vc-text-muted transition-all duration-100 hover:bg-vc-muted hover:text-vc-secondary"
-                  >
-                    <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
-                  </button>
-                  {rowMenu === p.id && (
-                    <div className={`${MENU} w-52`}>
-                      <button
-                        type="button"
-                        className={MENU_ITEM}
-                        onClick={() => {
-                          setRowMenu(null);
-                          setEditingId(p.id);
-                          setEditDraft(p.prompt);
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Pencil className="h-3 w-3" aria-hidden />
-                          Edit prompt
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={MENU_ITEM}
-                        onClick={() => {
-                          setRowMenu(null);
-                          void navigator.clipboard?.writeText(p.prompt);
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Copy className="h-3 w-3" aria-hidden />
-                          Copy prompt text
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={MENU_ITEM}
-                        onClick={() => {
-                          setRowMenu(null);
-                          onDuplicate(p);
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Plus className="h-3 w-3" aria-hidden />
-                          Duplicate
-                        </span>
-                      </button>
-
-                      <div className="my-1 h-px bg-vc-subtle" />
-
-                      <button
-                        type="button"
-                        className={MENU_ITEM}
-                        onClick={() => {
-                          setRowMenu(null);
-                          onOpen(p);
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          <BarChart3 className="h-3 w-3" aria-hidden />
-                          View rank breakdown
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={MENU_ITEM}
-                        onClick={() => {
-                          setRowMenu(null);
-                          onDiagnose(p);
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Stethoscope className="h-3 w-3" aria-hidden />
-                          Diagnose this query
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={MENU_ITEM}
-                        onClick={() => {
-                          setRowMenu(null);
-                          onCreateContent(p);
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          <FileText className="h-3 w-3" aria-hidden />
-                          Create content
-                        </span>
-                      </button>
-
-                      <div className="my-1 h-px bg-vc-subtle" />
-
-                      <button
-                        type="button"
-                        className={MENU_ITEM}
-                        onClick={() => {
-                          setRowMenu(null);
-                          onToggle(p, active ? "archived" : "tracked");
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          {active ? (
-                            <Pause className="h-3 w-3" aria-hidden />
-                          ) : (
-                            <Play className="h-3 w-3" aria-hidden />
-                          )}
-                          {active ? "Pause tracking" : "Resume tracking"}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`${MENU_ITEM} text-destructive hover:text-destructive`}
-                        onClick={() => {
-                          setRowMenu(null);
-                          onArchive(p);
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Trash2 className="h-3 w-3" aria-hidden />
-                          Archive prompt
-                        </span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+              <div className="w-24 shrink-0">
+                <span className="font-mono text-data tabular-nums text-vc-secondary">
+                  {p.createdAt
+                    ? new Date(p.createdAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "–"}
+                </span>
               </div>
             </div>
           );
@@ -1025,7 +540,7 @@ export function PromptsTable({
           <p className="px-4 py-6 text-caption text-vc-tertiary">
             {rows.length === 0
               ? "No prompts yet."
-              : "No prompts match this view. Clear the search or switch views."}
+              : "No prompts match. Clear the search or change the filter."}
           </p>
         )}
 
@@ -1042,7 +557,7 @@ export function PromptsTable({
             onKeyDown={(e) => e.key === "Enter" && submitDraft()}
             onBlur={submitDraft}
             placeholder={
-              atCap ? `At the ${cap}-prompt limit - switch one off first` : "Add a prompt..."
+              atCap ? `At the ${cap}-prompt limit - archive one to free a slot` : "Add a prompt..."
             }
             className="min-w-0 flex-1 bg-transparent text-body text-vc-primary outline-none placeholder:text-vc-text-muted disabled:cursor-not-allowed"
           />
@@ -1067,18 +582,6 @@ export function PromptsTable({
             </button>
           </div>
         )}
-      </div>
-
-      {/* Footer */}
-      <div className="flex h-7 items-center justify-between border-t border-vc-subtle px-4 text-label text-vc-text-muted">
-        <span>
-          Showing <span className="font-mono tabular-nums text-vc-secondary">{visible.length}</span>{" "}
-          of <span className="font-mono tabular-nums">{rows.length}</span> prompts
-        </span>
-        <span className="flex items-center gap-1">
-          <Lightbulb className="h-3 w-3" aria-hidden />
-          {trackedCount}/{cap} switched on
-        </span>
       </div>
 
       {/* Paste-a-list dialog */}

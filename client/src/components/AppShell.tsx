@@ -105,9 +105,11 @@ const FULL_BLEED_EXACT = new Set([
   "/monitor", // citations, competitors, TrendsTab, MentionsTab
   "/act", // content, articles, keyword-research, geo-tools, faq-manager, community-engagement
 ]);
-// The prompt detail page draws its own top bar, section hairlines and 340px
-// aside edge-to-edge, so it takes the unpadded canvas too.
-const FULL_BLEED_PREFIXES = ["/prompts/"];
+// Empty since the prompt detail page (/prompts/$promptId) was removed - it was
+// the only prefix match. Kept as a list rather than deleted because full-bleed
+// is a property of a route's layout, and the next one that draws its own
+// edge-to-edge chrome belongs here rather than in a new mechanism.
+const FULL_BLEED_PREFIXES: string[] = [];
 
 function isFullBleed(location: string) {
   return FULL_BLEED_EXACT.has(location) || FULL_BLEED_PREFIXES.some((p) => location.startsWith(p));
