@@ -9,16 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import { ErrorState } from "@/components/ui/error-state";
-import {
-  Sparkles,
-  Play,
-  RefreshCw,
-  Target,
-  Loader2,
-  Calendar,
-  MoreVertical,
-  ArrowRight,
-} from "lucide-react";
+import { Sparkles, Play, Target, Loader2, Calendar, MoreVertical, ArrowRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +24,21 @@ import { useActiveCitationRuns } from "@/hooks/useActiveCitationRuns";
 import { useCitationLiveRefresh } from "@/hooks/useCitationLiveRefresh";
 import { usePrompts, useRunPrompts, useBackfillPrompts, promptKeys } from "@/hooks/usePrompts";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
+
+// Inner tab bar. Module scope so TAB_IDS can gate the `?ptab=` value read
+// further down, and so the two can never drift apart.
+//
+// Tour engine targets (literal data-tour-id strings included so the
+// verify-tour-targets script can statically discover them):
+//   data-tour-id="citations.tab.prompts"
+//   data-tour-id="citations.tab.results"
+//   data-tour-id="citations.tab.history"
+const TABS = [
+  { id: "prompts", label: "Prompts", icon: Sparkles, tourId: "citations.tab.prompts" },
+  { id: "results", label: "Latest Results", icon: Target, tourId: "citations.tab.results" },
+  { id: "history", label: "History", icon: Calendar, tourId: "citations.tab.history" },
+];
+const TAB_IDS = TABS.map((t) => t.id);
 
 export default function Citations() {
   const { toast } = useToast();
@@ -348,7 +354,13 @@ export default function Citations() {
   const search = useSearch({ strict: false });
   const [lastUsedTab, setLastUsedTab] = usePersistedState<string>("vc_citations_tab", "prompts");
   const ptabFromUrl = typeof search.ptab === "string" ? search.ptab : undefined;
-  const activeTab = ptabFromUrl ?? lastUsedTab;
+  // Falls back to "prompts" for any tab id this page no longer renders. Both
+  // sources are untyped strings that outlive a deploy: `?ptab=` can be a stale
+  // bookmark, and `vc_citations_tab` persists in localStorage - so a user whose
+  // last-used tab was the removed "schedule" would otherwise get the tab bar
+  // with nothing beneath it.
+  const requestedTab = ptabFromUrl ?? lastUsedTab;
+  const activeTab = TAB_IDS.includes(requestedTab) ? requestedTab : "prompts";
   const setActiveTab = (value: string) => {
     setLastUsedTab(value);
     navigate({
@@ -362,19 +374,6 @@ export default function Citations() {
   const promptsAgeLabel = hasPrompts
     ? formatDistanceToNow(new Date(prompts[0].createdAt), { addSuffix: true })
     : null;
-
-  // Tour engine targets (literal data-tour-id strings included so the
-  // verify-tour-targets script can statically discover them):
-  //   data-tour-id="citations.tab.prompts"
-  //   data-tour-id="citations.tab.results"
-  //   data-tour-id="citations.tab.history"
-  //   data-tour-id="citations.tab.schedule"
-  const TABS = [
-    { id: "prompts", label: "Prompts", icon: Sparkles, tourId: "citations.tab.prompts" },
-    { id: "results", label: "Latest Results", icon: Target, tourId: "citations.tab.results" },
-    { id: "history", label: "History", icon: Calendar, tourId: "citations.tab.history" },
-    { id: "schedule", label: "Schedule", icon: RefreshCw, tourId: "citations.tab.schedule" },
-  ];
 
   return (
     <PanelPage>
@@ -588,17 +587,6 @@ export default function Citations() {
             <div className="px-8 py-6">
               <HistoryTab selectedBrandId={selectedBrandId} />
             </div>
-          )}
-
-          {/* SCHEDULE TAB - cadence is non-configurable; see scheduler.ts */}
-          {activeTab === "schedule" && (
-            <PanelRow cols={1} last>
-              <Panel width="wide" border="last">
-                <p className="text-caption text-vc-tertiary">
-                  Citation scans run weekly for every brand.
-                </p>
-              </Panel>
-            </PanelRow>
           )}
         </>
       )}

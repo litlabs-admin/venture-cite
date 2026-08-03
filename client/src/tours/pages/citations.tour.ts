@@ -29,12 +29,5 @@ export const citationsTour: TourConfig = {
       content:
         "After each run, see which engines cited you, the rank, and the surrounding context.",
     },
-    {
-      id: "schedule-tab",
-      target: "citations.tab.schedule",
-      attachTo: "bottom",
-      title: "Schedule recurring runs",
-      content: "Weekly runs surface trends. Daily runs are best for active campaigns.",
-    },
   ],
 };
