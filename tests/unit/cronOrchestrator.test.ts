@@ -14,7 +14,7 @@ const stubs = vi.hoisted(() => ({
   runMentionScanJob: vi.fn(async () => undefined),
   runListicleScanJob: vi.fn(async () => undefined),
   runFactScrapeBackstop: vi.fn(async () => ({ advanced: 0, failed: 0 })),
-  runMonthlyFactRefresh: vi.fn(async () => ({ processed: 0 })),
+  runFactSheetRefresh: vi.fn(async () => ({ processed: 0 })),
   runWeeklySummary: vi.fn(async () => undefined),
   runWeeklyCatchupKickoff: vi.fn(async () => ({ started: 0, skipped: 0, failed: 0 })),
   runWeeklyDigestAggregator: vi.fn(async () => ({ sent: 0, pending: 0 })),
@@ -41,7 +41,17 @@ const stubs = vi.hoisted(() => ({
   // DISABLE_IN_PROCESS_SCHEDULER they would otherwise never run at all.
   deleteOldTourEvents: vi.fn(async () => 0),
   detectFactScrapeFailureRate: vi.fn(async () => ({ alerted: 0 })),
+  runBrandActivationSweep: vi.fn(async () => ({ processed: 0, total: 0 })),
   dbSelect: vi.fn(),
+}));
+
+// Stubbed for the same reason as the modules below, plus one of its own: it
+// imports competitorDiscovery, which constructs an OpenAI client at module
+// scope. Without this the whole suite fails to import, before any
+// beforeEach could set OPENAI_API_KEY.
+vi.mock("../../server/lib/brandActivation", () => ({
+  runBrandActivationSweep: stubs.runBrandActivationSweep,
+  populateBrandDashboard: vi.fn(async () => ({ ran: [], skipped: [] })),
 }));
 
 vi.mock("../../server/scheduler", () => ({
@@ -62,8 +72,8 @@ vi.mock("../../server/lib/citationReconciliation", () => ({
 vi.mock("../../server/lib/factAgent/v2/factScrapeBackstop", () => ({
   runFactScrapeBackstop: stubs.runFactScrapeBackstop,
 }));
-vi.mock("../../server/lib/factAgent/v2/runMonthlyRefresh", () => ({
-  runMonthlyFactRefresh: stubs.runMonthlyFactRefresh,
+vi.mock("../../server/lib/factAgent/v2/runFactSheetRefresh", () => ({
+  runFactSheetRefresh: stubs.runFactSheetRefresh,
 }));
 vi.mock("../../server/lib/factAgent/v2/weeklySummary", () => ({
   runWeeklySummary: stubs.runWeeklySummary,

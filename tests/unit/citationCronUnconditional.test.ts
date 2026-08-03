@@ -50,6 +50,19 @@ vi.mock("drizzle-orm", async () => {
   };
 });
 
+// Imported at module scope, NOT inside the test.
+//
+// scheduler.ts pulls in a large module graph (node-cron, drizzle,
+// citationChecker, emailService, workflowEngine, ...) and takes ~5-6s to
+// resolve. Doing that inside the `it` charged it against the test's own
+// timeout, so the test failed intermittently under full-suite load - not
+// because the assertions were wrong but because the machine was busy. It had
+// already been bumped from the default 5s to 20s once for this reason; the
+// fix is to stop timing the import at all rather than to keep raising the
+// ceiling. vi.mock calls are hoisted above this, so the mocks below still
+// apply. Matches how cronOrchestrator.test.ts imports its subject.
+const { selectBrandsForCitationScan } = await import("../../server/scheduler");
+
 describe("citation scan scheduler - Foundations Plan 1 Task 11", () => {
   beforeEach(() => {
     whereSpy.mockReset();
@@ -59,12 +72,6 @@ describe("citation scan scheduler - Foundations Plan 1 Task 11", () => {
   });
 
   it("selectBrandsForCitationScan filters only on deletedAt IS NULL - no cadence gate", async () => {
-    // scheduler.ts pulls in a large module graph (node-cron, drizzle,
-    // citationChecker, emailService, workflowEngine, ...). That import
-    // alone takes ~4.5s in isolation and can tip over the default 5s
-    // vitest timeout when the full suite runs under load. Give this
-    // specific test more headroom rather than weakening the assertions.
-    const { selectBrandsForCitationScan } = await import("../../server/scheduler");
     await selectBrandsForCitationScan();
 
     expect(selectSpy).toHaveBeenCalledTimes(1);
@@ -88,5 +95,5 @@ describe("citation scan scheduler - Foundations Plan 1 Task 11", () => {
     expect(andCalls).toHaveLength(0);
     // isNull was called exactly once, and only for deleted_at.
     expect(isNullCalls).toHaveLength(1);
-  }, 20000);
+  });
 });

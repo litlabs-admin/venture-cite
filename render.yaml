@@ -109,6 +109,22 @@ services:
       # trigger. Its debounce window is 45min, deliberately under the hour.
       - key: DISABLE_IN_PROCESS_SCHEDULER
         value: "true"
+      # Orchestrator wall-clock budget. Defaults to ~58s, derived from Vercel's
+      # 60s function ceiling - a limit that does not exist here. This is a
+      # long-lived node server, and the orchestrator is a plain HTTP request.
+      #
+      # It has to be raised because the per-step caps are advisory: a step that
+      # checks its deadline only between work items runs straight past its cap.
+      # Measured against the production database: fact-reverification-batch
+      # took 244s against a 30s cap, and v2-fact-sheet-refresh 82s against 50s
+      # for a SINGLE brand. At 58s total the first such step ate the whole
+      # budget and every step behind it was skipped - silently, on every tick,
+      # including brand-activation and auto-citation.
+      #
+      # 15 minutes against an hourly trigger leaves the tick finished long
+      # before the next one, and jobDebounce still guarantees one worker.
+      - key: CRON_ORCHESTRATOR_BUDGET_MS
+        value: "900000"
       # Pin to the version verified with real builds this session
       # (`node -v` => v24.11.1). No .nvmrc/engines field exists in the repo
       # today (confirmed) so Render would otherwise pick its own default.

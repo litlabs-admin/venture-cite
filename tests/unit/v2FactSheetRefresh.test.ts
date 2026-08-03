@@ -97,12 +97,12 @@ vi.mock("openai", () => ({
   })),
 }));
 
-import { runMonthlyFactRefresh } from "../../server/lib/factAgent/v2/runMonthlyRefresh";
+import { runFactSheetRefresh } from "../../server/lib/factAgent/v2/runFactSheetRefresh";
 
-describe("runMonthlyFactRefresh", () => {
+describe("runFactSheetRefresh", () => {
   it("returns processed:0 when no stale brands found", async () => {
     stubs.dbExecute.mockResolvedValueOnce({ rows: [] });
-    const result = await runMonthlyFactRefresh();
+    const result = await runFactSheetRefresh();
     expect(result.processed).toBe(0);
   });
 });

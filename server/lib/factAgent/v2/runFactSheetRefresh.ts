@@ -1,8 +1,11 @@
-// V2 monthly refresh. Picks brands that haven't completed a scrape in
-// 30+ days and runs the full pipeline inline. Vercel 60s function ceiling
-// limits us to ~3-5 brands per cron tick; subsequent ticks pick up the
-// next batch via the "completed_at IS NULL OR completed_at < 30 days"
+// V2 fact-sheet refresh. Picks brands that haven't completed a scrape in
+// REFRESH_INTERVAL_DAYS and runs the full pipeline inline. Vercel 60s function
+// ceiling limits us to ~3-5 brands per cron tick; subsequent ticks pick up the
+// next batch via the "completed_at IS NULL OR completed_at < interval"
 // ordering.
+//
+// Was monthly (and named for it) until the fact sheet moved to the same weekly
+// rhythm as the citation run - see REFRESH_INTERVAL_DAYS.
 //
 // The pipeline body lives in runFullScrape.ts (shared with onboarding
 // activation); this file only selects stale brands and maps each raw
@@ -13,7 +16,18 @@ import { logger } from "../../logger";
 import { runFullScrapeForBrand } from "./runFullScrape";
 import { cronStepBudget } from "./vercelBudget";
 
-const REFRESH_INTERVAL_DAYS = 30;
+// Weekly, not monthly. The fact sheet is what grounds hallucination
+// detection: detectHallucinationsForRun skips entirely when a brand has no
+// facts, so a stale or missing fact sheet silently emptied the dashboard's
+// Hallucinations panel no matter how many citation runs completed. Refreshing
+// on the same weekly rhythm as the citation run keeps the two in step.
+//
+// Cost note: this is 4x the previous scrape volume. MAX_BRANDS_PER_TICK
+// bounds it per tick, not per week - see the ceiling comment below.
+const REFRESH_INTERVAL_DAYS = 7;
+// ponytail: 3 brands/tick against an hourly cron is a ~72 brands/day ceiling.
+// Raise this, not the schedule, if the brand count ever outgrows it - the
+// staleness query already orders oldest-first, so the backlog drains in order.
 const MAX_BRANDS_PER_TICK = 3;
 // On Pro (60s) this resolves to ~46s. On Hobby (10s) it shrinks to
 // ~7s so the cron step doesn't overrun the function timeout.
@@ -94,7 +108,7 @@ async function refreshOneBrand(brand: StaleBrand, deadlineMs: number): Promise<v
   );
 }
 
-export async function runMonthlyFactRefresh(deadlineMs?: number): Promise<{ processed: number }> {
+export async function runFactSheetRefresh(deadlineMs?: number): Promise<{ processed: number }> {
   const budgetEnd = deadlineMs ?? Date.now() + DEFAULT_REFRESH_BUDGET_MS;
   const stale = await findStaleBrands(MAX_BRANDS_PER_TICK);
   if (stale.length === 0) return { processed: 0 };
@@ -106,9 +120,9 @@ export async function runMonthlyFactRefresh(deadlineMs?: number): Promise<{ proc
       await refreshOneBrand(brand, budgetEnd);
       processed += 1;
     } catch (err) {
-      logger.warn({ err, brandId: brand.id }, "monthly-refresh: brand-level error");
+      logger.warn({ err, brandId: brand.id }, "fact-sheet-refresh: brand-level error");
     }
   }
-  logger.info({ processed, total: stale.length }, "monthly-fact-refresh tick complete");
+  logger.info({ processed, total: stale.length }, "fact-sheet-refresh tick complete");
   return { processed };
 }

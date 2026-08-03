@@ -25,10 +25,10 @@ import {
 } from "../lib/crawlerAccess";
 import { logger } from "../lib/logger";
 import { db } from "../db";
-import { sql, and, desc, isNotNull, eq } from "drizzle-orm";
-import { brandFactScrapePages, geoRankings, brandPerceptionRuns } from "@shared/schema";
+import { sql, desc, eq } from "drizzle-orm";
+import { brandFactScrapePages, brandPerceptionRuns } from "@shared/schema";
 import { aiLimitMiddleware } from "../lib/routesShared";
-import { gatherEvidence, scoreBrandPerception } from "../lib/perceptionScorer";
+import { runPerceptionScoring } from "../lib/perceptionRun";
 import { detectPlatform } from "../lib/platformDetect";
 import { discoverSitemapUrls } from "../lib/factAgent/v2/sitemapDiscovery";
 import { safeFetchText } from "../lib/ssrf";
@@ -197,35 +197,108 @@ function cacheSiteHealth(brandId: string, entry: SiteHealthCacheEntry): void {
   }
 }
 
+// Durable mirror of the in-process cache above.
+//
+// siteHealthCache is a plain Map, so it dies with the process. Every deploy
+// and every restart therefore served `pending: true` ("Measuring…") on the
+// first dashboard load for every brand, and because the Map is per-process
+// nothing could pre-warm it either. Persisting each computed entry to
+// system_state fixes both: a cold process hydrates from the last real
+// measurement, and the weekly activation job can warm a brand it will never
+// share a process with.
+//
+// system_state rather than a new table - it is an existing key/value store
+// with a JSON column, and this is one row per brand. ponytail: no migration.
+const siteHealthStateKey = (brandId: string) => `site_health:${brandId}`;
+
+function isFresh(entry: SiteHealthCacheEntry): boolean {
+  return Date.now() - new Date(entry.checkedAt).getTime() < SITE_HEALTH_CACHE_TTL_MS;
+}
+
+async function readPersistedSiteHealth(brandId: string): Promise<SiteHealthCacheEntry | null> {
+  try {
+    const raw = await storage.getSystemState(siteHealthStateKey(brandId));
+    if (!raw || typeof raw !== "object") return null;
+    const entry = raw as SiteHealthCacheEntry;
+    // A persisted `pending` placeholder would be a stored non-measurement.
+    // cacheSiteHealth is never called with one, but reject it here too so a
+    // hand-edited row can't pin a brand to "unmeasured".
+    if (entry.pending || !entry.checkedAt) return null;
+    return entry;
+  } catch (err) {
+    logger.warn({ err, brandId }, "site health: persisted read failed");
+    return null;
+  }
+}
+
+/** Best-effort persist. Swallows everything, including a SYNCHRONOUS throw.
+ *
+ *  This was `void storage.setSystemState(...).catch(...)`, which handles a
+ *  rejected promise but not a method that throws before returning one - and
+ *  that throw propagated out of the compute, discarding a site-health reading
+ *  we had already paid for and answering `pending` instead. Losing the
+ *  cross-process warm start is an acceptable failure here; losing the
+ *  measurement is not. */
+async function persistSiteHealth(brandId: string, entry: SiteHealthCacheEntry): Promise<void> {
+  try {
+    await storage.setSystemState(siteHealthStateKey(brandId), entry);
+  } catch (err) {
+    logger.warn({ err, brandId }, "site health: persist failed");
+  }
+}
+
 async function getSiteHealthCached(
   brandId: string,
   website: string | null,
 ): Promise<SiteHealthCacheEntry> {
   const cached = siteHealthCache.get(brandId);
-  if (cached && Date.now() - new Date(cached.checkedAt).getTime() < SITE_HEALTH_CACHE_TTL_MS) {
+  if (cached && isFresh(cached)) {
     return cached;
   }
-  const existing = siteHealthInFlight.get(brandId);
-  if (existing) return existing;
+  // Expired-but-real answer to fall back on, for the error and deadline paths
+  // below. Starts as whatever THIS process has; the work promise upgrades it if
+  // a persisted row turns up.
+  let stale: SiteHealthCacheEntry | null = cached ?? null;
 
-  const work = (async () => {
-    try {
-      const fresh = await computeSiteHealth(website);
-      cacheSiteHealth(brandId, fresh);
-      return fresh;
-    } catch (err) {
-      // computeSiteHealth already degrades internally, but if it ever throws,
-      // serve the STALE entry rather than failing the panel. Expired-but-real
-      // beats nothing; only a brand we have never measured falls through.
-      logger.error({ err, brandId }, "site health compute failed");
-      if (cached) return cached;
-      throw err;
-    } finally {
-      siteHealthInFlight.delete(brandId);
-    }
-  })();
+  // NOTHING may be awaited between this lookup and the .set() below, or the
+  // coalescing breaks: N concurrent cold-cache requests would each find an
+  // empty map, each start their own compute, and hammer the customer's domain
+  // N times. Reading the persisted row here rather than inside `work` cost
+  // exactly that (caught by the "fetchRobots called once" test) - so the read
+  // lives inside the work promise, where every caller shares its result.
+  let work = siteHealthInFlight.get(brandId);
+  if (!work) {
+    work = (async () => {
+      try {
+        // Cold process: a previous instance may already have measured this
+        // brand. Only short-circuit on a STILL-FRESH row - a stale one is worth
+        // recomputing, though it is still a better answer than `pending`, so it
+        // is kept as the fallback either way.
+        const persisted = await readPersistedSiteHealth(brandId);
+        if (persisted) {
+          siteHealthCache.set(brandId, persisted);
+          stale ??= persisted;
+          if (isFresh(persisted)) return persisted;
+        }
 
-  siteHealthInFlight.set(brandId, work);
+        const fresh = await computeSiteHealth(website);
+        cacheSiteHealth(brandId, fresh);
+        await persistSiteHealth(brandId, fresh);
+        return fresh;
+      } catch (err) {
+        // computeSiteHealth already degrades internally, but if it ever throws,
+        // serve the STALE entry rather than failing the panel. Expired-but-real
+        // beats nothing; only a brand we have never measured falls through.
+        logger.error({ err, brandId }, "site health compute failed");
+        if (stale) return stale;
+        throw err;
+      } finally {
+        siteHealthInFlight.delete(brandId);
+      }
+    })();
+
+    siteHealthInFlight.set(brandId, work);
+  }
 
   // DEADLINE. The underlying probes each allow 10s, so a slow customer site
   // could hold this HTTP response open for ~10s - one unresponsive domain
@@ -241,7 +314,9 @@ async function getSiteHealthCached(
   );
   const raced = await Promise.race([work.catch(() => null), deadline]);
   if (raced) return raced;
-  if (cached) return cached;
+  // Expired-but-real beats `pending`, whether it came from this process or a
+  // previous one.
+  if (stale) return stale;
   // PENDING placeholder - NEVER cached (see cacheSiteHealth callers; this
   // object is returned directly, never passed to cacheSiteHealth). Discovery
   // is UNKNOWN (null), not "absent" (false): a slow site's files may well
@@ -261,6 +336,27 @@ async function getSiteHealthCached(
     sitemapUrlCount: null,
     pending: true,
   };
+}
+
+/**
+ * Compute site health for a brand and persist it, with no response deadline.
+ *
+ * The request path races the compute against SITE_HEALTH_DEADLINE_MS because a
+ * slow customer domain must not hold a dashboard open. A background job has no
+ * such caller, so it waits for the real answer - which is the whole point of
+ * warming: the next dashboard load reads a finished measurement instead of
+ * starting one.
+ *
+ * Never throws: a brand whose site is unreachable is a normal outcome here.
+ */
+export async function warmSiteHealth(brandId: string, website: string | null): Promise<void> {
+  try {
+    const fresh = await computeSiteHealth(website);
+    cacheSiteHealth(brandId, fresh);
+    await persistSiteHealth(brandId, fresh);
+  } catch (err) {
+    logger.warn({ err, brandId }, "site health: warm failed");
+  }
 }
 
 // UNKNOWN, not "absent". Used for the pending-timeout placeholder and as the
@@ -1440,56 +1536,13 @@ export function setupDashboardRoutes(app: Express): void {
           }
         }
 
-        const rows = await db
-          .select({
-            citationContext: geoRankings.citationContext,
-            aiPlatform: geoRankings.aiPlatform,
-          })
-          .from(geoRankings)
-          .where(and(eq(geoRankings.brandId, brand.id), isNotNull(geoRankings.citationContext)))
-          .orderBy(desc(geoRankings.checkedAt))
-          .limit(400);
-
-        // Pass the brand identity so only snippets that actually DISCUSS this
-        // brand are scored. The bare registrable domain is included as an
-        // alias, so an answer that cites the site without naming the company
-        // still counts as evidence.
-        const domainAlias = (brand.website ?? "")
-          .replace(/^https?:\/\//i, "")
-          .replace(/^www\./i, "")
-          .split("/")[0]
-          .split(".")[0];
-        const evidence = gatherEvidence(rows, {
-          brandName: brand.name,
-          aliases: domainAlias ? [domainAlias] : [],
-        });
-        if (evidence.length === 0) {
+        // The scoring itself lives in lib/perceptionRun.ts so the weekly
+        // brand-activation job runs the exact same code. Null means "no
+        // evidence to score", which stays an empty panel - never a zero.
+        const inserted = await runPerceptionScoring(brand);
+        if (!inserted) {
           return res.json({ success: true, data: null });
         }
-
-        const result = await scoreBrandPerception({ brandName: brand.name, evidence });
-
-        // Drizzle's `numeric` columns accept strings on write (and return
-        // strings on read - see numericOrNull above). Convert the
-        // number|null axis values accordingly; null stays null.
-        const toNumericInput = (v: number | null): string | null => (v === null ? null : String(v));
-
-        const [inserted] = await db
-          .insert(brandPerceptionRuns)
-          .values({
-            brandId: brand.id,
-            trust: toNumericInput(result.trust),
-            quality: toNumericInput(result.quality),
-            value: toNumericInput(result.value),
-            market: toNumericInput(result.market),
-            innovation: toNumericInput(result.innovation),
-            overall: toNumericInput(result.overall),
-            praised: result.praised,
-            questioned: result.questioned,
-            evidenceCount: result.evidenceCount,
-            model: result.model,
-          })
-          .returning();
 
         res.json({ success: true, data: serializePerceptionRun(inserted) });
       } catch (error) {

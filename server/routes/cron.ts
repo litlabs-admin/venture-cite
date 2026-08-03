@@ -1,9 +1,9 @@
 // Daily cron orchestrator (Vercel migration).
 //
 // Vercel Hobby allows a single daily cron entry. All previously-discrete
-// scheduler jobs (account purge, brand purge, auto-citation, weekly scans,
-// monthly fact refresh, weekly digest fallback, weekly catchup kickoff,
-// legacy weekly report) collapse into this one endpoint.
+// scheduler jobs (account purge, brand purge, auto-citation, brand activation,
+// fact-sheet refresh, weekly digest fallback, weekly catchup kickoff, legacy
+// weekly report) collapse into this one endpoint.
 //
 // Function timeout is 60s on Hobby (configured in vercel.json). The
 // orchestrator tracks a wall-clock budget and:
@@ -22,17 +22,15 @@ import {
   runAccountPurgeJob,
   runBrandPurgeJob,
   runAutoCitationJob,
-  runCompetitorDiscoveryJob,
-  runMentionScanJob,
-  runListicleScanJob,
   runWeeklyCatchupKickoff,
   runWeeklyDigestAggregator,
   runWeeklyReportJob,
   detectFactScrapeFailureRate,
 } from "../scheduler";
 import { runTourEventsCleanupJob } from "../lib/tourCleanup";
+import { runBrandActivationSweep } from "../lib/brandActivation";
 import { runFactScrapeBackstop } from "../lib/factAgent/v2/factScrapeBackstop";
-import { runMonthlyFactRefresh } from "../lib/factAgent/v2/runMonthlyRefresh";
+import { runFactSheetRefresh } from "../lib/factAgent/v2/runFactSheetRefresh";
 import { runWeeklySummary } from "../lib/factAgent/v2/weeklySummary";
 import { reconcileOrphanCitationRuns } from "../lib/citationReconciliation";
 import { resumeInFlightAutopilots } from "../lib/onboardingAutopilot";
@@ -48,10 +46,30 @@ import { asyncHandler } from "../lib/asyncHandler";
 
 import { captureAndFlush } from "../lib/sentryReport";
 import { CRON_TOTAL_BUDGET_MS, LLM_CALL_TIMEOUT_MS } from "../lib/factAgent/v2/vercelBudget";
-// Total wall-clock budget for the orchestrator. Derived from
-// VERCEL_FUNCTION_BUDGET_MS so a Hobby (10s) vs Pro (60s) deploy
-// inherits the right budget without code changes.
-const ORCHESTRATOR_BUDGET_MS = CRON_TOTAL_BUDGET_MS;
+// Total wall-clock budget for the orchestrator.
+//
+// Defaults to CRON_TOTAL_BUDGET_MS, derived from VERCEL_FUNCTION_BUDGET_MS so
+// a Hobby (10s) vs Pro (60s) deploy inherits the right budget without code
+// changes. CRON_ORCHESTRATOR_BUDGET_MS overrides it for deployments that are
+// NOT serverless - the Render node-server target has no function timeout at
+// all, so inheriting a 58s Vercel budget there is pure loss.
+//
+// It matters because the per-step caps below are ADVISORY: a step that checks
+// its deadline only between units of work sails straight past its cap.
+// Measured against the production database on this deploy:
+// fact-reverification-batch took 244s against a 30s cap, and
+// v2-fact-sheet-refresh 82s against 50s - for ONE brand. With a 58s total,
+// the first such step consumes everything and every step behind it is skipped,
+// every tick, silently. Ordering (cheap and gated first, open-ended last)
+// limits the blast radius; a budget that matches the platform removes it.
+function getOrchestratorBudget(): number {
+  const raw = process.env.CRON_ORCHESTRATOR_BUDGET_MS;
+  const n = raw ? parseInt(raw, 10) : NaN;
+  // Upper bound keeps a runaway value from pinning a worker indefinitely.
+  if (Number.isFinite(n) && n >= 10_000 && n <= 3_600_000) return n;
+  return CRON_TOTAL_BUDGET_MS;
+}
+const ORCHESTRATOR_BUDGET_MS = getOrchestratorBudget();
 
 // Per-step soft caps. The step runs against a deadline = min(stepCap,
 // remaining-orchestrator-budget). Heavy iterations honour the deadline
@@ -68,15 +86,19 @@ const STEP_CAPS_MS = {
   "chatbot-prune": 5_000,
   "stripe-products-setup": 5_000,
   "auto-citation": 30_000,
-  "competitor-discovery": 30_000,
-  "mention-scan": 30_000,
-  "listicle-scan": 30_000,
+  // Replaces the separate competitor-discovery / mention-scan / listicle-scan
+  // steps. Those three ran behind a global Monday gate and had no per-brand
+  // staleness check, so they could not simply be moved onto the hourly tick -
+  // they would have re-run every brand every hour. The sweep gates each
+  // sub-job, per brand, on its own weekly ledger instead. The budget is
+  // generous because it now covers five producers, not one.
+  "brand-activation": 45_000,
   "weekly-catchup-kickoff": 5_000,
   "weekly-digest-aggregator": 10_000,
   "weekly-report-legacy": 20_000,
   "fact-scrape-backstop": 30_000,
   "v2-lifecycle-cleanup": 30_000,
-  "v2-monthly-fact-refresh": 50_000,
+  "v2-fact-sheet-refresh": 50_000,
   "v2-weekly-summary": 20_000,
   // Phase 4 (2026-05-28): per-fact re-verification - cheaper than a
   // full re-scrape. Processes up to ~20 stale facts per tick.
@@ -304,53 +326,11 @@ export function setupCronRoutes(app: Express): void {
         logger.info({ pages, runs, logs, cache, slots }, "v2-lifecycle-cleanup: deleted rows");
       });
 
-      // Monthly fact refresh: finds brands that haven't been re-scraped in
-      // 30+ days and runs the full v2 pipeline for up to MAX_BRANDS_PER_TICK.
-      // Subsequent ticks pick up the next batch automatically.
-      await orch.run("v2-monthly-fact-refresh", (deadline) => runMonthlyFactRefresh(deadline));
+      // NOTE: v2-fact-sheet-refresh used to run here. It now runs LAST - see
+      // the comment on it at the bottom of this function for why.
 
-      // Per-fact re-verification: cheaper than a full re-scrape. Hits
-      // each stale fact's source URL, re-extracts ONLY that fact, and
-      // either marks it verified or records drift. Budget bounded.
-      await orch.run("fact-reverification-batch", async () => {
-        const { runReverificationBatch } = await import("../lib/factAgent/v2/reverifyFact");
-        // We need an LLM callable here; the structured-data pre-pass
-        // in reverify covers most facts, but for the rest we use the
-        // same gpt-4o-mini that runs in the main pipeline.
-        const OpenAI = (await import("openai")).default;
-        const { MODELS } = await import("../lib/modelConfig");
-        const openai = new OpenAI({
-          apiKey: process.env.OPENAI_API_KEY,
-          // Inherit Vercel-tier-aware LLM timeout. On Hobby this is
-          // ~6.3s; on Pro ~25s. Avoid orphaning the cron tick.
-          timeout: LLM_CALL_TIMEOUT_MS,
-          maxRetries: 0,
-        });
-        const llm: import("../lib/factAgent/v2/extractionPrompt").LlmCallable = async (prompt) => {
-          const messages =
-            typeof prompt === "string"
-              ? [{ role: "user" as const, content: prompt }]
-              : [
-                  { role: "system" as const, content: prompt.system },
-                  { role: "user" as const, content: prompt.user },
-                ];
-          const responseFormat =
-            typeof prompt === "object" &&
-            prompt &&
-            "responseFormat" in prompt &&
-            (prompt as { responseFormat?: unknown }).responseFormat
-              ? (prompt as { responseFormat: unknown }).responseFormat
-              : { type: "json_object" as const };
-          const res = await openai.chat.completions.create({
-            model: MODELS.misc,
-            response_format: responseFormat as never,
-            messages,
-          });
-          return res.choices?.[0]?.message?.content ?? "";
-        };
-        const counters = await runReverificationBatch(20, llm);
-        logger.info({ counters }, "fact-reverification-batch: counters");
-      });
+      // NOTE: fact-reverification-batch used to run here too. Both fact steps
+      // now run at the very end - see the comments on them there.
 
       // Vercel-Hobby LLM-jobs substrate. The mutation routes (keyword
       // discovery, FAQ generation, etc.) enqueue an llm_jobs row whose
@@ -449,10 +429,15 @@ export function setupCronRoutes(app: Express): void {
       // the next cron tick.
       await orch.run("auto-citation", (deadline) => runAutoCitationJob(deadline));
 
+      // Everything the citation run does not populate: site health, mention
+      // scan, listicle scan, perception scoring, competitor discovery. Runs on
+      // EVERY tick and gates per brand per sub-job on a weekly ledger, so each
+      // brand refreshes on the anniversary of its own creation rather than on
+      // a global Monday. A brand created on a Tuesday no longer waits six days
+      // for its first mention and listicle scan.
+      await orch.run("brand-activation", (deadline) => runBrandActivationSweep(deadline));
+
       if (isMonday) {
-        await orch.run("competitor-discovery", (deadline) => runCompetitorDiscoveryJob(deadline));
-        await orch.run("mention-scan", (deadline) => runMentionScanJob(deadline));
-        await orch.run("listicle-scan", (deadline) => runListicleScanJob(deadline));
         await orch.run("weekly-catchup-kickoff", () => runWeeklyCatchupKickoff());
       }
 
@@ -463,6 +448,83 @@ export function setupCronRoutes(app: Express): void {
       if (isSunday) {
         await orch.run("weekly-report-legacy", () => runWeeklyReportJob());
       }
+
+      // ── Open-ended fact steps, last on purpose ──────────────────────────
+      // Both walk a work queue and check their deadline only between items,
+      // so both routinely overrun their caps (measured: 244s against 30s, and
+      // 82s against 50s). Everything above is either cheap or per-brand gated
+      // and finishes in seconds, so running these last means an overrun costs
+      // only the other open-ended step - not auto-citation, not
+      // brand-activation, not the day's housekeeping. Both are self-healing:
+      // whatever they don't reach, they reach on the next tick.
+
+      // Per-fact re-verification: cheaper than a full re-scrape. Hits each
+      // stale fact's source URL, re-extracts ONLY that fact, and either marks
+      // it verified or records drift.
+      await orch.run("fact-reverification-batch", async () => {
+        const { runReverificationBatch } = await import("../lib/factAgent/v2/reverifyFact");
+        // We need an LLM callable here; the structured-data pre-pass
+        // in reverify covers most facts, but for the rest we use the
+        // same gpt-4o-mini that runs in the main pipeline.
+        const OpenAI = (await import("openai")).default;
+        const { MODELS } = await import("../lib/modelConfig");
+        const openai = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+          // Inherit Vercel-tier-aware LLM timeout. On Hobby this is
+          // ~6.3s; on Pro ~25s. Avoid orphaning the cron tick.
+          timeout: LLM_CALL_TIMEOUT_MS,
+          maxRetries: 0,
+        });
+        const llm: import("../lib/factAgent/v2/extractionPrompt").LlmCallable = async (prompt) => {
+          const messages =
+            typeof prompt === "string"
+              ? [{ role: "user" as const, content: prompt }]
+              : [
+                  { role: "system" as const, content: prompt.system },
+                  { role: "user" as const, content: prompt.user },
+                ];
+          const responseFormat =
+            typeof prompt === "object" &&
+            prompt &&
+            "responseFormat" in prompt &&
+            (prompt as { responseFormat?: unknown }).responseFormat
+              ? (prompt as { responseFormat: unknown }).responseFormat
+              : { type: "json_object" as const };
+          const res = await openai.chat.completions.create({
+            model: MODELS.misc,
+            response_format: responseFormat as never,
+            messages,
+          });
+          return res.choices?.[0]?.message?.content ?? "";
+        };
+        const counters = await runReverificationBatch(20, llm);
+        logger.info({ counters }, "fact-reverification-batch: counters");
+      });
+
+      // Weekly fact refresh: brands not re-scraped in 7+ days, full v2
+      // pipeline, up to MAX_BRANDS_PER_TICK. Weekly rather than monthly
+      // because hallucination detection is skipped outright for a brand with
+      // no fact sheet, so a stale one empties that dashboard panel.
+      //
+      // RUNS LAST, DELIBERATELY. This is the most expensive step in the
+      // orchestrator and the only one that reliably overruns its own cap: the
+      // deadline is checked BETWEEN brands, so a single slow site blows
+      // straight through it. Measured at 81.7s against a 50s cap for ONE
+      // brand.
+      //
+      // While it sat earlier in this function it consumed the entire
+      // orchestrator budget on the first tick and every step behind it -
+      // auto-citation and brand-activation included - was skipped. Weekly
+      // refresh made that permanent rather than occasional: at 30 days most
+      // ticks found nothing stale and returned instantly, at 7 days it finds
+      // work nearly every tick.
+      //
+      // Ordering is the fix rather than a smaller cap, because the cap is
+      // advisory. Everything above is either cheap or per-brand gated, so it
+      // completes in seconds and leaves the remainder to this step; and if
+      // this one is starved instead, nothing breaks - it is self-healing and
+      // simply refreshes the same brand on the next tick.
+      await orch.run("v2-fact-sheet-refresh", (deadline) => runFactSheetRefresh(deadline));
 
       const failedSteps = orch.results.filter((r) => !r.ok).map((r) => r.step);
       const skippedSteps = orch.results.filter((r) => r.skipped).map((r) => r.step);

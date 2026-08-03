@@ -6,6 +6,7 @@ import { generateBrandPrompts } from "./promptGenerator";
 import { discoverCompetitors } from "./competitorDiscovery";
 import { runBrandPrompts } from "../citationChecker";
 import { runFullScrapeForBrand } from "./factAgent/v2/runFullScrape";
+import { populateBrandDashboard } from "./brandActivation";
 import { cronStepBudget } from "./factAgent/v2/vercelBudget";
 import type { Brand } from "@shared/schema";
 
@@ -183,6 +184,34 @@ export async function runOnboardingAutopilot(
       );
       return;
     }
+
+    // Step 3: everything the citation run does not populate - site health,
+    // mention scan, listicle scan, perception scoring. Without this the
+    // dashboard's Mentions, Listicles and Perception panels render dashes on
+    // a brand-new brand until the next weekly sweep, and Perception forever,
+    // since its only other trigger is a button on a different page.
+    //
+    // Runs LAST and deliberately does not gate completion: these are
+    // supplementary panels, and the citation data that makes the dashboard
+    // useful has already landed by this point. Whatever the deadline cuts
+    // short is picked up by the weekly sweep, which reads the same per-brand
+    // ledger this call writes - so nothing re-runs and nothing is skipped.
+    // populateBrandDashboard never throws.
+    //
+    // Given its OWN budget rather than `options.deadlineMs`. By the time the
+    // fact scrape, prompt generation and citation run have all completed, the
+    // caller's 50s is normally spent - so inheriting it meant every producer
+    // here skipped, on every onboarding, and the new brand's Mentions,
+    // Listicles and Perception panels stayed empty until the next hourly
+    // sweep. That is the exact failure this phase exists to fix.
+    //
+    // Safe because this whole call is already detached from the HTTP response
+    // (routes/onboarding.ts wraps it in waitUntil, which is a no-op shim off
+    // Vercel - on the Render node-server target the promise simply runs on).
+    // The budget is a courtesy bound on one brand's activation, not a platform
+    // deadline; anything it cuts short the weekly sweep finishes, because both
+    // read the same ledger.
+    await populateBrandDashboard(brandId, { deadlineMs: Date.now() + 120_000 });
 
     await setAutopilot(brandId, {
       autopilotStatus: "completed",

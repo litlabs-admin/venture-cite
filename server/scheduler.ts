@@ -248,7 +248,36 @@ async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
       }
 
       // Step 1: Re-check citations on the locked tracked set.
-      const runResult = await runBrandPrompts(brand.id, undefined, { triggeredBy: "cron" });
+      //
+      // The deadline is passed through. Without it this call was unbounded:
+      // the loop above checks the budget BETWEEN brands, but one brand runs
+      // every tracked prompt against every platform, which is minutes of LLM
+      // calls. So a single brand could run far past the orchestrator's whole
+      // budget - observed running 25+ minutes against a 15 minute total - and
+      // every step behind auto-citation, brand-activation included, was
+      // skipped for budget before it ever got a turn.
+      //
+      // runBrandPrompts is slice-aware and resumable (the same mechanism
+      // onboarding uses): whatever it does not finish this tick resumes on the
+      // next one via the citation_runs existing-rankings filter.
+      const runResult = await runBrandPrompts(brand.id, undefined, {
+        triggeredBy: "cron",
+        deadlineMs,
+      });
+
+      // A deadline-truncated run is NOT this week's run. Leave
+      // lastAutoCitationAt alone so isBrandDueForCitation keeps saying yes and
+      // the next tick resumes; stamping it here would gate the brand for six
+      // days on a partial pass, which is exactly the trap the mention scan
+      // fell into. Suggestions are skipped too - they are regenerated from the
+      // run's results, and half a run is the wrong input.
+      if (!runResult.done) {
+        logger.info(
+          { brandId: brand.id, name: brand.name },
+          "auto-citation: slice incomplete - resuming next tick, not stamping lastAutoCitationAt",
+        );
+        continue;
+      }
 
       // Step 2: Refresh suggestions for the user to review.
       const suggestionResult = await generateSuggestedPrompts(brand.id, { replaceExisting: true });
@@ -300,11 +329,16 @@ async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
   );
 }
 
-// Weekly automation crons. Each iterates every brand in serial with a
+// Weekly automation jobs. Each iterates every brand in serial with a
 // try/catch per brand so one brand's failure doesn't stop the run.
-const COMPETITOR_DISCOVERY_CRON = process.env.COMPETITOR_DISCOVERY_CRON || "0 7 * * 1"; // Monday 7 AM UTC
-const MENTION_SCAN_CRON = process.env.MENTION_SCAN_CRON || "0 9 * * 1"; // Monday 9 AM UTC
-const LISTICLE_SCAN_CRON = process.env.LISTICLE_SCAN_CRON || "0 11 * * 1"; // Monday 11 AM UTC
+//
+// These are no longer scheduled directly - lib/brandActivation.ts drives them
+// per brand on a weekly ledger (see the registration in initScheduler). They
+// remain exported for the admin/manual trigger paths and for the "run this
+// job across every brand right now" case, which the sweep deliberately cannot
+// express. COMPETITOR_DISCOVERY_CRON / MENTION_SCAN_CRON / LISTICLE_SCAN_CRON
+// are gone with the schedules they configured; BRAND_ACTIVATION_CRON replaces
+// all three.
 // Every per-brand iteration accepts a deadline so the daily orchestrator
 // can bail out cleanly before the function timeout. Brands that didn't
 // get processed today get retried tomorrow - natural backoff via the
@@ -751,21 +785,36 @@ export function initScheduler(): void {
     logger.info({ cron: AUTO_CITATION_CRON }, "auto-citation job scheduled");
   }
 
-  // Phase 2 automation crons - run independent of email config.
-  if (cron.validate(COMPETITOR_DISCOVERY_CRON)) {
+  // Brand activation. Supersedes the three separate Monday crons that used to
+  // live here (competitor-discovery, mention-scan, listicle-scan): those ran
+  // every brand on a global Monday with no per-brand staleness check, so they
+  // could not share a schedule with the hourly orchestrator without re-running
+  // every brand every hour. runBrandActivationSweep gates each brand's each
+  // sub-job on its own weekly ledger, and adds the two producers that were
+  // never scheduled at all (perception scoring, site-health warming).
+  //
+  // Registered hourly to match the orchestrator step exactly - the sweep is a
+  // no-op for any brand that is not due, so the cadence is set by the ledger,
+  // not by this expression. The jobs' own functions (runCompetitorDiscoveryJob
+  // et al) are still exported for the manual/admin trigger paths.
+  const BRAND_ACTIVATION_CRON = process.env.BRAND_ACTIVATION_CRON || "0 * * * *";
+  if (cron.validate(BRAND_ACTIVATION_CRON)) {
     cron.schedule(
-      COMPETITOR_DISCOVERY_CRON,
-      cronCrashGuard("competitor-discovery", runCompetitorDiscoveryJob),
+      BRAND_ACTIVATION_CRON,
+      // Deferred import, deliberately. A static one pulls brandActivation's
+      // whole producer graph (competitor discovery, the listicle scanner, the
+      // mention scanner, perception scoring) into every module that imports
+      // this file, on boot, whether or not the sweep ever runs. That cost is
+      // real and measurable: it pushed the scheduler import in
+      // tests/unit/citationCronUnconditional.test.ts past its 20s ceiling
+      // under full-suite load, which is that test telling us the graph got too
+      // heavy. Resolve it when the tick fires instead.
+      cronCrashGuard("brand-activation", async () => {
+        const { runBrandActivationSweep } = await import("./lib/brandActivation");
+        await runBrandActivationSweep();
+      }),
     );
-    logger.info({ cron: COMPETITOR_DISCOVERY_CRON }, "competitor discovery scheduled");
-  }
-  if (cron.validate(MENTION_SCAN_CRON)) {
-    cron.schedule(MENTION_SCAN_CRON, cronCrashGuard("mention-scan", runMentionScanJob));
-    logger.info({ cron: MENTION_SCAN_CRON }, "mention scan scheduled");
-  }
-  if (cron.validate(LISTICLE_SCAN_CRON)) {
-    cron.schedule(LISTICLE_SCAN_CRON, cronCrashGuard("listicle-scan", runListicleScanJob));
-    logger.info({ cron: LISTICLE_SCAN_CRON }, "listicle scan scheduled");
+    logger.info({ cron: BRAND_ACTIVATION_CRON }, "brand activation sweep scheduled");
   }
   // Spec 2 §4.11: serial-failure alerting - daily at 11 UTC.
   const DETECT_FACT_SCRAPE_FAILURE_CRON =
