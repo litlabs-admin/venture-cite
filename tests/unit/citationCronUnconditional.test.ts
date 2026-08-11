@@ -1,99 +1,76 @@
-// Foundations Plan 1 Task 11: citation scans must run weekly for
-// every active brand, regardless of the legacy autoCitationSchedule /
-// autoCitationActive flags. This test asserts that
-// `selectBrandsForCitationScan` builds a query that filters ONLY on
-// `deletedAt IS NULL` (no cadence gate in the WHERE clause).
-
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// scheduler.ts transitively imports citationChecker → openai client,
-// which throws at module load if OPENAI_API_KEY is unset. Stub it.
-process.env.OPENAI_API_KEY ||= "test-key";
-process.env.OPENROUTER_API_KEY ||= "test-key";
-process.env.RESEND_API_KEY ||= "test-key";
-process.env.SUPABASE_URL ||= "http://localhost:54321";
-process.env.SUPABASE_SERVICE_ROLE_KEY ||= "test-service-key";
-process.env.DATABASE_URL ||= "postgres://test:test@localhost:5432/test";
-
-// Capture every Drizzle builder call so we can introspect the WHERE.
-const whereSpy = vi.fn();
-const fromSpy = vi.fn().mockReturnValue({ where: whereSpy });
-const selectSpy = vi.fn().mockReturnValue({ from: fromSpy });
-
-vi.mock("../../server/db", () => ({
-  db: { select: selectSpy },
-  pool: {},
-}));
-
-// Replace drizzle-orm operators with tagged sentinels so we can
-// introspect exactly which ones the scheduler used to build its
-// WHERE clause - without dragging in drizzle's circular SQL graph.
-const isNullCalls: unknown[] = [];
-const andCalls: unknown[][] = [];
-const neCalls: unknown[][] = [];
-vi.mock("drizzle-orm", async () => {
-  const actual = await vi.importActual<typeof import("drizzle-orm")>("drizzle-orm");
-  return {
-    ...actual,
-    isNull: (col: unknown) => {
-      isNullCalls.push(col);
-      return { __op: "isNull", col };
-    },
-    and: (...args: unknown[]) => {
-      andCalls.push(args);
-      return { __op: "and", args };
-    },
-    ne: (...args: unknown[]) => {
-      neCalls.push(args);
-      return { __op: "ne", args };
-    },
-  };
-});
-
-// Imported at module scope, NOT inside the test.
+// Which brands the weekly citation scan is allowed to run for.
 //
-// scheduler.ts pulls in a large module graph (node-cron, drizzle,
-// citationChecker, emailService, workflowEngine, ...) and takes ~5-6s to
-// resolve. Doing that inside the `it` charged it against the test's own
-// timeout, so the test failed intermittently under full-suite load - not
-// because the assertions were wrong but because the machine was busy. It had
-// already been bumped from the default 5s to 20s once for this reason; the
-// fix is to stop timing the import at all rather than to keep raising the
-// ceiling. vi.mock calls are hoisted above this, so the mocks below still
-// apply. Matches how cronOrchestrator.test.ts imports its subject.
-const { selectBrandsForCitationScan } = await import("../../server/scheduler");
+// Two invariants, and they have different histories:
+//
+//   1. No cadence gate. Foundations Plan 1 Task 11 removed the legacy
+//      autoCitationSchedule / autoCitationActive flags - every live brand is
+//      scanned weekly, gated only by "has it been ~6 days" in
+//      isBrandDueForCitation.
+//
+//   2. Only brands whose owner is entitled to paid work. A citation run hits
+//      four AI engines per prompt, every week, forever. Running it for
+//      read-only accounts (a cancelled trial, a subscription that failed) is
+//      the one thing that would make "downgrade instead of lock out"
+//      expensive, and it would be invisible - a bigger LLM bill, no error.
+//
+// Deliberately a source-text check rather than a runtime one: the query is raw
+// SQL joining users, so a mocked db.execute would only ever return whatever
+// the mock was told to, proving nothing about the WHERE clause. Importing the
+// real module to run the real query would need a live database. The invariant
+// is a fact about the source, so the source is what gets asserted - the same
+// reasoning as tests/unit/schedulerOrchestratorParity.test.ts.
 
-describe("citation scan scheduler - Foundations Plan 1 Task 11", () => {
-  beforeEach(() => {
-    whereSpy.mockReset();
-    fromSpy.mockClear();
-    selectSpy.mockClear();
-    whereSpy.mockResolvedValue([]);
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { PAYING_TIERS, usageLimits } from "@shared/schema";
+
+const scheduler = readFileSync(
+  fileURLToPath(new URL("../../server/scheduler.ts", import.meta.url)),
+  "utf8",
+);
+
+/** The body of selectBrandsForCitationScan, isolated from the rest of the file. */
+function selectorBody(): string {
+  const start = scheduler.indexOf("export async function selectBrandsForCitationScan");
+  expect(start, "selectBrandsForCitationScan not found - has it been renamed?").toBeGreaterThan(-1);
+  const body = scheduler.slice(start, scheduler.indexOf("\n}", start));
+  // Guard the extraction itself, so the assertions below cannot pass against
+  // an empty string.
+  expect(body.length).toBeGreaterThan(100);
+  return body;
+}
+
+describe("citation scan selector", () => {
+  it("skips soft-deleted brands", () => {
+    expect(selectorBody()).toMatch(/deleted_at\s+IS\s+NULL/i);
   });
 
-  it("selectBrandsForCitationScan filters only on deletedAt IS NULL - no cadence gate", async () => {
-    await selectBrandsForCitationScan();
+  it("skips brands whose owner is not entitled to paid work", () => {
+    const body = selectorBody();
+    // Joins the owner and filters on their tier. Without this, a read-only
+    // account keeps consuming weekly citation runs at our expense.
+    expect(body).toMatch(/join\s+users/i);
+    expect(body).toContain("access_tier");
+    expect(body).toContain("PAYING_TIERS");
+  });
 
-    expect(selectSpy).toHaveBeenCalledTimes(1);
-    expect(fromSpy).toHaveBeenCalledTimes(1);
-    expect(whereSpy).toHaveBeenCalledTimes(1);
+  it("has no cadence gate in the query", () => {
+    // Cadence is decided per brand by isBrandDueForCitation, not in the
+    // selector. The legacy flags must not creep back in here.
+    const body = selectorBody();
+    expect(body).not.toContain("auto_citation_schedule");
+    expect(body).not.toContain("auto_citation_active");
+  });
 
-    // The argument to .where() should be a single isNull(deletedAt)
-    // SQL token - NOT an `and(...)` composite that includes any
-    // autoCitationSchedule / autoCitationActive predicate. Drizzle's
-    // `isNull` produces an SQL object with a single `column` field;
-    // `and` produces a chunked SQL object with multiple `queryChunks`.
-    // We assert the operator surface is the simple isNull shape and
-    // that no autoCitation* column is the predicate's target.
-    // The predicate must be a single isNull(deletedAt) - NOT wrapped
-    // in `and(...)` and NOT involving `ne(autoCitationSchedule, ...)`.
-    const whereArg = whereSpy.mock.calls[0][0] as { __op?: string; col?: { name?: string } };
-    expect(whereArg.__op).toBe("isNull");
-    expect(whereArg.col?.name).toBe("deleted_at");
-    // No autoCitation cadence gating anywhere in the call graph.
-    expect(neCalls).toHaveLength(0);
-    expect(andCalls).toHaveLength(0);
-    // isNull was called exactly once, and only for deleted_at.
-    expect(isNullCalls).toHaveLength(1);
+  it("excludes the non-paying states from PAYING_TIERS", () => {
+    // The selector is only as correct as this list. pending = signed up with
+    // no plan; readonly = lapsed. Neither may trigger paid work.
+    expect(PAYING_TIERS).not.toContain("pending");
+    expect(PAYING_TIERS).not.toContain("readonly");
+    // ...and every tier it does contain must be a real one.
+    for (const tier of PAYING_TIERS) {
+      expect(usageLimits[tier as keyof typeof usageLimits], `${tier} has no limits`).toBeDefined();
+    }
   });
 });

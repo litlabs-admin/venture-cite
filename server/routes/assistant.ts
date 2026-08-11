@@ -26,6 +26,7 @@ import { assertChatbotBudget, recordChatbotUsage } from "../lib/chatbotBudget";
 import { BudgetExceededError, estimateCostCents, type Tier } from "../lib/llmPricing";
 import { getOpenRouterClient, CHATBOT_MODEL } from "../lib/openrouterClient";
 import { SYSTEM_PROMPT } from "../lib/chatbotKnowledge";
+import { resolveTier } from "@shared/schema";
 
 const uuidSchema = z.string().uuid();
 
@@ -175,7 +176,7 @@ export function setupAssistantRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const tier = (user.accessTier ?? "free") as Tier;
+        const tier = resolveTier(user) as Tier;
 
         // ---- Pre-stream validation (returns JSON) ----
         const parsed = chatRequestSchema.safeParse(req.body);

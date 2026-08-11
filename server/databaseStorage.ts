@@ -116,11 +116,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
+    // No trial granted here. Stripe owns the trial now: a new account starts
+    // at "pending", the app is gated until they pick a plan, and the 14 days
+    // live on the Stripe subscription. (This method also has no callers in
+    // practice - real signups create the users row via the handle_new_user
+    // trigger - but it must not disagree with the trigger if that changes.)
     const result = await db
       .insert(schema.users)
       .values({
         ...insertUser,
-        accessTier: insertUser.accessTier ?? "free",
+        accessTier: insertUser.accessTier ?? "pending",
         isAdmin: insertUser.isAdmin ?? 0,
         articlesUsedThisMonth: insertUser.articlesUsedThisMonth ?? 0,
         brandsUsed: insertUser.brandsUsed ?? 0,
@@ -1276,7 +1281,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserStripeInfo(
     userId: string,
-    info: { stripeCustomerId?: string; stripeSubscriptionId?: string; accessTier?: string },
+    info: {
+      stripeCustomerId?: string;
+      stripeSubscriptionId?: string;
+      accessTier?: string;
+      /** Mirrors the Stripe subscription's trial_end. Stripe owns the trial;
+       *  this is only so the UI can render a countdown without a round trip. */
+      trialEndsAt?: Date | null;
+    },
   ): Promise<User | undefined> {
     const result = await db
       .update(schema.users)

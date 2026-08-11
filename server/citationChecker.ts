@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { storage } from "./storage";
 import type { GeoRanking, Brand } from "@shared/schema";
+import { resolveTier } from "@shared/schema";
 import { attachAiLogger } from "./lib/aiLogger";
 import { CITATION_MODELS, OPENROUTER_BASE_URL } from "./lib/modelConfig";
 import { citationRatePct } from "./lib/visibilityMetrics";
@@ -437,7 +438,7 @@ export async function runBrandPrompts(
   // be null for orphaned/legacy rows; in that case skip the check.
   if (brand.userId) {
     const owner = await storage.getUser(brand.userId);
-    const tier = (owner?.accessTier ?? "free") as Tier;
+    const tier = (owner ? resolveTier(owner) : "pending") as Tier;
     await assertWithinBudget(brand.userId, tier);
   }
 

@@ -16,6 +16,7 @@ import { asyncHandler } from "../lib/routesShared";
 import { isAuthenticated } from "../auth";
 
 import { logger } from "../lib/logger";
+import { TRIAL_DAYS } from "@shared/schema";
 import { captureAndFlush } from "../lib/sentryReport";
 export function setupBillingRoutes(app: Express): void {
   // Foundations Plan 3 Task 2: Stripe customer-portal session for the
@@ -204,16 +205,77 @@ export function setupBillingRoutes(app: Express): void {
           customerId = customer.id;
         }
 
+        // ── Already subscribed? Change the plan, do not sell a second one. ──
+        //
+        // This endpoint used to create a Checkout Session unconditionally. A
+        // Pro customer clicking "Agency" therefore ended up with TWO live
+        // subscriptions and two recurring charges, and because the user row
+        // holds a single stripeSubscriptionId, whichever webhook landed last
+        // overwrote the other - leaving an orphaned subscription that billed
+        // forever with nothing in the app pointing at it. The same path fired
+        // on a double-click or a second tab.
+        //
+        // An existing active subscription is therefore an UPDATE, not a
+        // purchase: swap the item's price in place and let Stripe prorate.
+        if (customerId) {
+          const active = await stripe.subscriptions.list({
+            customer: customerId,
+            status: "active",
+            limit: 10,
+          });
+
+          const current = active.data[0];
+          if (current) {
+            const item = current.items.data[0];
+            if (item?.price?.id === priceId) {
+              return res
+                .status(400)
+                .json({ success: false, error: "You're already on this plan." });
+            }
+
+            // always_invoice bills the proration immediately rather than
+            // parking it on the next invoice, so an upgrade takes effect and
+            // is paid for in the same moment the customer asked for it.
+            const updated = await stripe.subscriptions.update(current.id, {
+              items: [{ id: item.id, price: priceId }],
+              proration_behavior: "always_invoice",
+              // Carries the user through to customer.subscription.updated,
+              // which is what actually re-grants the tier.
+              metadata: { userId },
+            });
+
+            logger.info(
+              { userId, subscriptionId: updated.id, priceId },
+              "stripe.checkout: switched plan on existing subscription",
+            );
+            // No redirect: the change is already live. The client refetches.
+            return res.json({ success: true, updated: true });
+          }
+        }
+
         const baseUrl = process.env.APP_URL || req.headers.origin || `http://${req.headers.host}`;
-        const session = await stripe.checkout.sessions.create({
-          customer: customerId,
-          payment_method_types: ["card"],
-          line_items: [{ price: priceId, quantity: 1 }],
-          mode: "subscription",
-          success_url: successUrl || `${baseUrl}/pricing?success=true`,
-          cancel_url: cancelUrl || `${baseUrl}/pricing?canceled=true`,
-          client_reference_id: userId,
-        });
+        const session = await stripe.checkout.sessions.create(
+          {
+            customer: customerId,
+            payment_method_types: ["card"],
+            line_items: [{ price: priceId, quantity: 1 }],
+            mode: "subscription",
+            // Stripe owns the trial. The card is collected now, nothing is
+            // charged for TRIAL_DAYS, and Stripe bills automatically on the
+            // first day after - which is also what gives us
+            // customer.subscription.trial_will_end for the reminder email.
+            subscription_data: { trial_period_days: TRIAL_DAYS },
+            success_url: successUrl || `${baseUrl}/pricing?success=true`,
+            cancel_url: cancelUrl || `${baseUrl}/pricing?canceled=true`,
+            client_reference_id: userId,
+          },
+          {
+            // Collapses a double-click or a retried request into ONE session
+            // instead of two. Scoped to (user, price) so a genuine later
+            // purchase of a different plan is unaffected.
+            idempotencyKey: `checkout:${userId}:${priceId}`,
+          },
+        );
 
         res.json({ success: true, url: session.url });
       } catch (error: any) {

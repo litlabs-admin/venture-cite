@@ -614,7 +614,14 @@ export interface IStorage {
   // User Stripe methods
   updateUserStripeInfo(
     userId: string,
-    info: { stripeCustomerId?: string; stripeSubscriptionId?: string; accessTier?: string },
+    info: {
+      stripeCustomerId?: string;
+      stripeSubscriptionId?: string;
+      accessTier?: string;
+      /** Mirrors the Stripe subscription's trial_end. Stripe owns the trial;
+       *  this is only so the UI can render a countdown without a round trip. */
+      trialEndsAt?: Date | null;
+    },
   ): Promise<User | undefined>;
   getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
 

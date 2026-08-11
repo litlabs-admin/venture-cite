@@ -12,7 +12,7 @@
 import type { Express, Response } from "express";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db";
-import { users } from "@shared/schema";
+import { users, resolveTier } from "@shared/schema";
 import { logger } from "../lib/logger";
 import { validateDomain } from "@shared/validateDomain";
 import { safeFetchText } from "../lib/ssrf";
@@ -371,7 +371,7 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
           return res.status(400).json({ success: false, error: "website is required" });
         }
 
-        const tier = (user.accessTier || "free") as Tier;
+        const tier = resolveTier(user) as Tier;
         const schema = await import("@shared/schema");
 
         let brand;

@@ -8,7 +8,7 @@
 import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { usageLimits } from "@shared/schema";
+import { usageLimits, resolveTier } from "@shared/schema";
 import {
   setupAuth,
   attachUserIfPresent,
@@ -29,6 +29,7 @@ import { setupLogoProxyRoutes } from "./routes/logoProxy";
 import { setupBrandRoutes } from "./routes/brands";
 import { setupBufferRoutes } from "./routes/buffer";
 import { setupBillingRoutes } from "./routes/billing";
+import { setupEnterpriseInquiryRoutes } from "./routes/enterpriseInquiry";
 
 import { setupContentRoutes } from "./routes/content";
 import { setupArticlesRoutes } from "./routes/articles";
@@ -111,6 +112,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stripe billing: publishable key + products + checkout + portal
   // (Wave 5.1: extracted). Webhook stays in server/index.ts (raw body).
   setupBillingRoutes(app);
+  // Sales-led Enterprise plan's counterpart to Checkout. Unauthenticated by
+  // design - it exists to hear from people who have no account yet.
+  setupEnterpriseInquiryRoutes(app);
 
   // Body/query brandId ownership guard.
   app.use(enforceBrandOwnership);
@@ -131,7 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const usage = await storage.getUserUsage(user.id);
-        const tier = (user.accessTier || "free") as keyof typeof usageLimits;
+        const tier = resolveTier(user);
         const limits = usageLimits[tier] || usageLimits.free;
 
         res.json({
@@ -150,7 +154,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ? -1
                 : Math.max(0, limits.maxBrands - (usage?.brandsUsed || 0)),
             resetDate: usage?.resetDate,
-            tier: user.accessTier || "free",
+            // resolveTier, not the raw column: an expired trial must not
+            // report itself as "trial" next to entitlements that are all 0.
+            tier,
           },
         });
       } catch (error) {
@@ -295,7 +301,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const { code, maxUses, accessTier, expiresAt } = req.body;
 
-        const validTiers = ["free", "beta", "pro", "enterprise", "admin"];
+        // Derived from usageLimits so it can never drift again. It was a
+        // hand-written list missing "agency", so minting an Agency invite
+        // silently downgraded it to beta (20 articles/3 brands, not 40/10).
+        const validTiers = Object.keys(usageLimits);
         const tier = accessTier && validTiers.includes(accessTier) ? accessTier : "beta";
         const uses = typeof maxUses === "number" && maxUses > 0 ? maxUses : 10;
 

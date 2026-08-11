@@ -84,7 +84,7 @@ export async function withArticleQuota<T>(
         throw new UsageLimitError(
           "articles",
           limits.articlesPerMonth,
-          `You've reached your monthly limit of ${limits.articlesPerMonth} articles. Upgrade your plan for more.`,
+          `You've reached your monthly limit of ${limits.articlesPerMonth} articles. Upgrade at /pricing for more.`,
         );
       }
     } else {
@@ -198,7 +198,7 @@ export async function withBrandQuota<T>(
         throw new UsageLimitError(
           "brands",
           limits.maxBrands,
-          `Brand limit reached - your ${tier} plan allows ${limits.maxBrands}. Delete an existing brand or upgrade for more.`,
+          `Brand limit reached - your ${tier} plan allows ${limits.maxBrands}. Delete an existing brand, or upgrade at /pricing.`,
         );
       }
     }

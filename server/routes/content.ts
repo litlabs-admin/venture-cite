@@ -32,6 +32,7 @@ import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import * as schema from "@shared/schema";
+import { resolveTier } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { MODELS } from "../lib/modelConfig";
 import { type GenerationPayload } from "../contentGenerationWorker";
@@ -267,7 +268,7 @@ export function setupContentRoutes(app: Express): void {
           .where(eq(schema.articles.id, article.id));
 
         // Atomic check + reserve + insert.
-        const tier = ((user as any).accessTier || "free") as Tier;
+        const tier = resolveTier(user as any) as Tier;
         const jobId = await withArticleQuota(user.id, tier, async (tx) => {
           const [row] = await tx
             .insert(schema.contentGenerationJobs)

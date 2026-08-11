@@ -9,6 +9,9 @@ interface User {
   lastName: string | null;
   timezone?: string | null;
   accessTier: string;
+  /** End of the signup trial, ISO string over the wire. Null for paying and
+   *  legacy accounts. Feed it to resolveTier() rather than reading it raw. */
+  trialEndsAt?: string | null;
   profileImageUrl?: string | null;
   isAdmin?: boolean;
 }

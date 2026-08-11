@@ -12,6 +12,7 @@ import { withJobDebounce, shouldRunJob, markJobRan, DEBOUNCE_WINDOWS } from "./l
 import { runMentionScan } from "./lib/runMentionScan";
 import { scanBrandListicles } from "./lib/listicleScanner";
 import { logger } from "./lib/logger";
+import { PAYING_TIERS } from "@shared/schema";
 import { logSystemAudit } from "./lib/audit";
 import { supabaseAdmin } from "./supabase";
 import { startRun } from "./lib/workflowEngine";
@@ -201,7 +202,17 @@ function isBrandDueForCitation(brand: { lastAutoCitationAt: Date | null }): bool
 // Selector for the citation-scan cron: every non-soft-deleted brand,
 // regardless of the legacy autoCitationSchedule/Active flags.
 export async function selectBrandsForCitationScan() {
-  return db.select().from(schema.brands).where(isNull(schema.brands.deletedAt));
+  // Same rule as the activation sweep: only brands whose owner is entitled to
+  // work that spends money. A read-only account keeps its data but stops
+  // consuming weekly citation runs.
+  const rows = await db.execute<{ id: string; last_auto_citation_at: Date | null }>(sql`
+    SELECT b.*
+    FROM brands b
+    JOIN users u ON u.id = b.user_id
+    WHERE b.deleted_at IS NULL
+      AND u.access_tier = ANY(${PAYING_TIERS})
+  `);
+  return ((rows as { rows?: unknown[] }).rows ?? []) as (typeof schema.brands.$inferSelect)[];
 }
 
 export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {

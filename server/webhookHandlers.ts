@@ -7,13 +7,38 @@ import { logger } from "./lib/logger";
 import { logSystemAudit } from "./lib/audit";
 
 import { captureAndFlush } from "./lib/sentryReport";
-// Map Stripe product names to access tiers
-function tierFromProduct(productName: string): string {
-  const name = productName.toLowerCase();
-  if (name.includes("enterprise")) return "enterprise";
-  if (name.includes("pro")) return "pro";
-  if (name.includes("beta")) return "beta";
-  return "free";
+import { usageLimits } from "@shared/schema";
+import {
+  sendPaymentFailedEmail,
+  sendPaymentActionRequiredEmail,
+  sendTrialEndingEmail,
+} from "./lib/billingEmails";
+
+/**
+ * The tier a Stripe product grants, read from its `tier` metadata key.
+ *
+ * This used to substring-match the product's NAME - "enterprise", then "pro",
+ * then "beta", defaulting to "free". That silently broke the moment a plan was
+ * named anything else: the $500 plan is called "Agency", which matches none of
+ * them, so every Agency customer would have been charged and then dropped to
+ * free-tier access.
+ *
+ * Metadata is the right source because the rest of the billing code already
+ * treats it as required - routes/billing.ts refuses to sell a price whose
+ * product has no `metadata.tier`, and hides such products from the pricing
+ * page. Reading the same field here means a product is either fully sellable
+ * or not sellable at all, with no third state where it can be bought but
+ * grants nothing.
+ *
+ * Returns null when the metadata is missing or unrecognised. Callers must
+ * treat that as "leave the user's tier alone" - never as a downgrade. An
+ * unrecognised product is our configuration error, and taking access away
+ * from someone who just paid is the worst possible response to it.
+ */
+function tierFromProduct(product: Stripe.Product | undefined): string | null {
+  const tier = product?.metadata?.tier?.trim().toLowerCase();
+  if (!tier) return null;
+  return tier in usageLimits ? tier : null;
 }
 
 // Insert the event.id into the dedupe table. Returns true if this is the
@@ -113,15 +138,39 @@ export class WebhookHandlers {
               expand: ["items.data.price.product"],
             });
             const product = sub.items.data[0]?.price?.product as Stripe.Product | undefined;
-            if (product?.name) {
-              updates.accessTier = tierFromProduct(product.name);
+            const tier = tierFromProduct(product);
+            if (tier) {
+              updates.accessTier = tier;
+            } else {
+              // Paid, but we cannot tell what for. Leave the tier untouched and
+              // shout: the customer keeps whatever access they had, and this
+              // needs a human to add `metadata.tier` to the product in Stripe.
+              logger.error(
+                { userId, productId: product?.id, productName: product?.name },
+                "stripe: product has no usable metadata.tier - tier NOT updated",
+              );
+              captureAndFlush(new Error("Stripe product missing metadata.tier"), {
+                tags: { source: "stripe-webhook.tier-lookup" },
+                extra: { productId: product?.id, productName: product?.name, userId },
+              });
             }
           } catch (err) {
             logger.error(
               { err, subscriptionId: session.subscription },
-              "stripe: failed to retrieve subscription for tier",
+              "stripe: failed to retrieve subscription for tier - rethrowing so Stripe retries",
             );
             captureAndFlush(err, { tags: { source: "stripe-webhook.tier-lookup" } });
+            // RETHROW. Swallowing this let execution fall through to
+            // markStripeEventProcessed(), which stamps the event as done and
+            // means Stripe never redelivers it. On a transient error the
+            // customer had then paid and there was no event left in the system
+            // that would ever grant their tier - a silent pay-and-get-nothing.
+            //
+            // Throwing returns 400 from the route, so Stripe retries with
+            // backoff for up to 3 days. Re-running is safe: the handlers are
+            // setter-style, and the idempotency table only skips events whose
+            // side effects actually completed.
+            throw err;
           }
         }
 
@@ -142,13 +191,51 @@ export class WebhookHandlers {
           expand: ["items.data.price.product"],
         });
         const product = expandedSub.items.data[0]?.price?.product as Stripe.Product | undefined;
-        const tier = product?.name ? tierFromProduct(product.name) : "free";
-        const newTier = sub.status === "active" ? tier : "free";
+        const tier = tierFromProduct(product);
         const previousTier = user.accessTier;
+
+        // An inactive subscription lands on "expired", not "free". Free is a
+        // legacy tier that still carries real entitlements (1 brand, 5
+        // articles); handing it to someone whose payment lapsed would be a
+        // reward. "expired" is the no-access state the trial also ends in, so
+        // both paths reach the same paywall.
+        //
+        // An active subscription whose product has no usable metadata.tier
+        // keeps the user where they are rather than being downgraded - same
+        // reasoning as the checkout handler above.
+        // `trialing` is an entitled state, not a pending one: the customer
+        // picked a plan and put a card down, so they get that plan's tier for
+        // the whole trial. Treating it as inactive would have locked out every
+        // trialling customer on day one.
+        const entitled = sub.status === "active" || sub.status === "trialing";
+
+        let newTier: string;
+        if (!entitled) {
+          // readonly, not zero-access: their data stays visible and only new
+          // work stops. See usageLimits in shared/schema.ts.
+          newTier = "readonly";
+        } else if (tier) {
+          newTier = tier;
+        } else {
+          newTier = previousTier;
+          logger.error(
+            { userId: user.id, productId: product?.id, productName: product?.name },
+            "stripe: active subscription product has no usable metadata.tier - tier NOT updated",
+          );
+          captureAndFlush(new Error("Stripe product missing metadata.tier"), {
+            tags: { source: "stripe-webhook.subscription-updated" },
+            extra: { productId: product?.id, productName: product?.name, userId: user.id },
+          });
+        }
 
         await storage.updateUserStripeInfo(user.id, {
           stripeSubscriptionId: sub.id,
           accessTier: newTier,
+          // Mirror Stripe's own trial_end so the UI can render a countdown
+          // without a round trip. Cleared the moment the trial is over, so a
+          // stale timestamp can never keep the banner alive.
+          trialEndsAt:
+            sub.status === "trialing" && sub.trial_end ? new Date(sub.trial_end * 1000) : null,
         });
         logger.info(
           { userId: user.id, tier, status: sub.status },
@@ -164,6 +251,32 @@ export class WebhookHandlers {
         break;
       }
 
+      // Stripe fires this 3 days before the trial converts. It only exists
+      // because the trial is Stripe-managed - an app-managed trial has no
+      // equivalent hook, which is one of the reasons to let Stripe own it.
+      case "customer.subscription.trial_will_end": {
+        const sub = event.data.object as Stripe.Subscription;
+        const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+        const user = await storage.getUserByStripeCustomerId(customerId);
+        if (!user?.email) break;
+
+        const daysLeft = sub.trial_end
+          ? Math.max(1, Math.ceil((sub.trial_end * 1000 - Date.now()) / 86_400_000))
+          : 3;
+        const price = sub.items.data[0]?.price;
+        const amount =
+          price?.unit_amount != null
+            ? new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: (price.currency || "usd").toUpperCase(),
+              }).format(price.unit_amount / 100)
+            : null;
+
+        logger.info({ userId: user.id, daysLeft }, "stripe: trial_will_end - notifying customer");
+        await sendTrialEndingEmail(user.email, { daysLeft, amount });
+        break;
+      }
+
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
@@ -171,21 +284,146 @@ export class WebhookHandlers {
         if (!user) break;
 
         const previousTier = user.accessTier;
-        await storage.updateUserStripeInfo(user.id, { accessTier: "free" });
-        logger.info({ userId: user.id }, "stripe: customer.subscription.deleted - reset to free");
+        // readonly, not "free": free is a legacy grant (a brand + 5 articles)
+        // that a cancelled customer should not inherit. readonly keeps their
+        // data visible and stops all new work, so the account costs us nothing.
+        await storage.updateUserStripeInfo(user.id, {
+          accessTier: "readonly",
+          trialEndsAt: null,
+        });
+        logger.info({ userId: user.id }, "stripe: customer.subscription.deleted - now read-only");
         await logSystemAudit(user.id, {
           action: "subscription.cancel",
           entityType: "subscription",
           entityId: sub.id,
           before: { accessTier: previousTier },
-          after: { accessTier: "free" },
+          after: { accessTier: "readonly" },
         });
+        break;
+      }
+
+      // Renewals never pass through Checkout again, so checkout.session
+      // .completed only ever covers the FIRST payment. invoice.paid is
+      // Stripe's documented signal for provisioning on every subsequent
+      // cycle - without it, a renewal that arrives after any tier drift
+      // (a lapsed past_due, a manual edit) is never reconciled back.
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subId =
+          typeof (invoice as { subscription?: unknown }).subscription === "string"
+            ? ((invoice as { subscription?: string }).subscription as string)
+            : null;
+        if (!subId) break;
+
+        const customerId =
+          typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+        if (!customerId) break;
+        const user = await storage.getUserByStripeCustomerId(customerId);
+        if (!user) break;
+
+        const sub = await stripe.subscriptions.retrieve(subId, {
+          expand: ["items.data.price.product"],
+        });
+        const product = sub.items.data[0]?.price?.product as Stripe.Product | undefined;
+        const tier = tierFromProduct(product);
+
+        // Same rule as everywhere else: an unrecognised product never
+        // downgrades a paying customer.
+        if (tier && sub.status === "active" && user.accessTier !== tier) {
+          await storage.updateUserStripeInfo(user.id, { accessTier: tier });
+          logger.info(
+            { userId: user.id, tier, invoiceId: invoice.id },
+            "stripe: invoice.paid - tier reconciled on renewal",
+          );
+        }
         break;
       }
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        logger.warn({ customerId: invoice.customer }, "stripe: invoice.payment_failed");
+        const customerId =
+          typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+
+        // Access is deliberately NOT revoked here. Smart Retries keep trying
+        // for the configured window and most of these recover; cutting the
+        // customer off on the first decline would manufacture the churn we are
+        // trying to prevent. The tier only drops when the subscription itself
+        // leaves 'active' (customer.subscription.updated) or is cancelled.
+        const email =
+          invoice.customer_email ||
+          (customerId
+            ? ((await storage.getUserByStripeCustomerId(customerId))?.email ?? null)
+            : null);
+
+        logger.warn(
+          { customerId, invoiceId: invoice.id, attempt: invoice.attempt_count, notified: !!email },
+          "stripe: invoice.payment_failed",
+        );
+        if (email) {
+          await sendPaymentFailedEmail(email, {
+            amountDue: invoice.amount_due,
+            currency: invoice.currency,
+            hostedInvoiceUrl: invoice.hosted_invoice_url,
+          });
+        }
+        break;
+      }
+
+      // SCA / 3D Secure. Distinct from a decline: the card is fine, the bank
+      // wants the cardholder to authenticate. Telling these customers to
+      // update their card would be wrong and would leave them stuck with an
+      // unpaid invoice and no access.
+      case "invoice.payment_action_required": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId =
+          typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+        const email =
+          invoice.customer_email ||
+          (customerId
+            ? ((await storage.getUserByStripeCustomerId(customerId))?.email ?? null)
+            : null);
+
+        logger.warn(
+          { customerId, invoiceId: invoice.id, notified: !!email },
+          "stripe: invoice.payment_action_required",
+        );
+        if (email) {
+          await sendPaymentActionRequiredEmail(email, {
+            hostedInvoiceUrl: invoice.hosted_invoice_url,
+          });
+        }
+        break;
+      }
+
+      // Money is being taken back and there is a deadline to respond. This
+      // must not sit in the generic unhandled bucket with benign noise like
+      // payment_intent.created.
+      case "charge.dispute.created": {
+        const dispute = event.data.object as Stripe.Dispute;
+        logger.error(
+          { disputeId: dispute.id, amount: dispute.amount, reason: dispute.reason },
+          "stripe: charge.dispute.created - respond before the evidence deadline",
+        );
+        captureAndFlush(new Error("Stripe dispute opened"), {
+          tags: { source: "stripe-webhook.dispute" },
+          extra: { disputeId: dispute.id, amount: dispute.amount, reason: dispute.reason },
+        });
+        break;
+      }
+
+      // Finalization failing means the invoice never even reaches the customer -
+      // no charge is attempted and nothing else in this switch will fire. The
+      // usual cause is Stripe Tax missing a customer location.
+      case "invoice.finalization_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        logger.error(
+          { invoiceId: invoice.id, customerId: invoice.customer },
+          "stripe: invoice.finalization_failed - this invoice will never be charged until fixed",
+        );
+        captureAndFlush(new Error("Stripe invoice finalization failed"), {
+          tags: { source: "stripe-webhook.finalization" },
+          extra: { invoiceId: invoice.id },
+        });
         break;
       }
 

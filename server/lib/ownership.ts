@@ -17,6 +17,10 @@ export function requireUser(req: Request): {
   id: string;
   isAdmin?: number;
   accessTier?: string;
+  // req.user is the full users row, so this is always present in practice.
+  // It has to be declared or resolveTier() sees undefined and fails closed,
+  // reporting every trialling user as expired.
+  trialEndsAt?: Date | null;
   email?: string;
 } {
   const user = (req as any).user;

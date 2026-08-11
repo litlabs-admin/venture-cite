@@ -56,6 +56,10 @@ vi.mock("../../server/lib/advisoryLock", () => ({
 }));
 vi.mock("../../server/db", () => ({
   db: {
+    // selectBrandsForCitationScan now uses raw SQL to join users and exclude
+    // non-paying tiers, so it reads through db.execute rather than the
+    // query builder.
+    execute: async () => ({ rows: stubs.brands }),
     select: () => ({ from: () => ({ where: async () => stubs.brands }) }),
     update: () => ({
       set: (v: unknown) => ({

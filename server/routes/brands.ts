@@ -22,6 +22,7 @@ import {
   citationRuns,
   insertBrandSchema,
   usageLimits,
+  resolveTier,
 } from "@shared/schema";
 import { MODELS } from "../lib/modelConfig";
 import { safeFetchText } from "../lib/ssrf";
@@ -79,7 +80,7 @@ export function setupBrandRoutes(app: Express): void {
 
         // Wave 4.2: cheap pre-check for fast UX feedback. Authoritative
         // check happens inside withBrandQuota at insert time (FOR UPDATE).
-        const tier = (user.accessTier || "free") as keyof typeof usageLimits;
+        const tier = resolveTier(user);
         const tierLimit = (usageLimits[tier] || usageLimits.free).maxBrands;
         if (tierLimit !== -1) {
           const existingBrands = await storage.getBrandsByUserId(user.id);
@@ -247,7 +248,7 @@ Be specific and accurate based on the content. If you can't determine something,
         }
 
         try {
-          const tier = (user.accessTier || "free") as Tier;
+          const tier = resolveTier(user) as Tier;
           const schema = await import("@shared/schema");
           const brand = await withBrandQuota(user.id, tier, async (tx) => {
             const [row] = await tx
@@ -322,7 +323,7 @@ Be specific and accurate based on the content. If you can't determine something,
 
         let brand: Awaited<ReturnType<typeof storage.createBrand>>;
         try {
-          const tier = (user.accessTier || "free") as Tier;
+          const tier = resolveTier(user) as Tier;
           const schema = await import("@shared/schema");
           brand = await withBrandQuota(user.id, tier, async (tx) => {
             const [row] = await tx

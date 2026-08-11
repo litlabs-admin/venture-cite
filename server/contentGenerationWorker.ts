@@ -17,6 +17,7 @@ import OpenAI from "openai";
 import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
+import { resolveTier } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS } from "./lib/modelConfig";
@@ -112,7 +113,7 @@ async function runJobToCompletionOrDeadline(
   }
 
   const userRow = await storage.getUser(job.userId);
-  const tier = (userRow?.accessTier ?? "free") as Tier;
+  const tier = (userRow ? resolveTier(userRow) : "pending") as Tier;
   await assertWithinBudget(job.userId, tier);
 
   // Flip the article into 'generating' on the first call. Idempotent.

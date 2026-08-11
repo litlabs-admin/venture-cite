@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { spineTitleFor, pageTourFor } from "@/lib/spineStages";
 import { BrandLogo } from "@/components/BrandLogo";
+import { TrialBanner, TrialGate } from "@/components/TrialGate";
 
 // ─── AppShell ────────────────────────────────────────────────────────────────
 // The one persistent three-zone shell (nav rail / context bar + canvas /
@@ -269,6 +270,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <div className="flex min-h-0 flex-1">
             {/* Canvas */}
             <main id="main-content" className="min-w-0 flex-1 overflow-y-auto">
+              {/* Trial countdown. Sits inside the scroll container, above the
+                  page, so it scrolls away rather than permanently stealing a
+                  row of chrome from an app that is mostly dense tables.
+                  Renders nothing unless the account is actually on a trial. */}
+              <TrialBanner />
               {/* The AI Tutor pill (EducationAssistant.tsx) is `fixed bottom-6
                   right-6 h-12` - anchored to the viewport, not this canvas -
                   and covers roughly the bottom 72px on the right for every
@@ -281,10 +287,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
               {fullBleed ? (
                 // The Dashboard's own grid reaches the viewport edge; the
                 // shell contributes nothing but the max-width column.
-                <div className="mx-auto w-full max-w-[1800px]">{children}</div>
+                <div className="mx-auto w-full max-w-[1800px]">
+                  <TrialGate>{children}</TrialGate>
+                </div>
               ) : (
                 <div className="mx-auto w-full max-w-[1400px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 min-[1450px]:pb-6">
-                  {children}
+                  <TrialGate>{children}</TrialGate>
                 </div>
               )}
             </main>

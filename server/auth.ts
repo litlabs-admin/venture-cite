@@ -27,6 +27,10 @@ function publicUserShape(dbUser: typeof users.$inferSelect) {
     lastName: dbUser.lastName ?? null,
     timezone: dbUser.timezone ?? null,
     accessTier: dbUser.accessTier,
+    // The client needs this to show days-remaining and to render the paywall
+    // once a trial lapses. resolveTier() in shared/schema.ts is the single
+    // authority on what it means.
+    trialEndsAt: dbUser.trialEndsAt,
     profileImageUrl: dbUser.profileImageUrl,
     isAdmin: dbUser.isAdmin === 1,
   };
@@ -206,6 +210,11 @@ const PUBLIC_API_ROUTES = new Set<string>([
   // still need an account before you can be charged.
   "GET /api/stripe/products",
   "GET /api/stripe/publishable-key",
+  // Enterprise enquiry from the pricing page. Public for the same reason the
+  // catalogue above is: the plan is sold by conversation to people who do not
+  // have an account yet, so requiring a session would mean only existing
+  // customers could ask about it. Writes nothing but a log line and an email.
+  "POST /api/enterprise-inquiry",
 ]);
 
 export const requireAuthForApi: RequestHandler = (req, res, next) => {

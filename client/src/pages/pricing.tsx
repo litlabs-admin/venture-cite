@@ -1,14 +1,42 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Link, useSearch } from "@tanstack/react-router";
 import { apiRequest } from "@/lib/queryClient";
 import { isAllowedStripeRedirect } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Check, ArrowLeft, Sparkles, Crown, Zap, Users, Gift, Loader2 } from "lucide-react";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
+import { SELLABLE_TIERS, TRIAL_DAYS, PLAN_PRICE_CENTS } from "@shared/schema";
+
+/** One rendered pricing card. `priceId` is absent for anything not sold
+ *  through Stripe Checkout - today that is Enterprise, and the placeholder
+ *  cards shown before the live products load. */
+interface PlanCard {
+  name: string;
+  description: string;
+  price: string;
+  interval: string;
+  features: string[];
+  popular: boolean;
+  tier: string;
+  priceId?: string;
+  /** What this plan is SUPPOSED to cost, in cents. A Stripe price that does
+   *  not match is a stale catalogue, not a price change - see planCards. */
+  amountCents: number;
+}
 
 interface StripeProduct {
   id: string;
@@ -23,9 +51,79 @@ interface StripeProduct {
   }[];
 }
 
+/**
+ * The words for each sellable plan, keyed by tier.
+ *
+ * Stripe owns the PRICE - a page that hardcodes an amount will eventually lie
+ * about what the card is charged - but it does not own the marketing copy, and
+ * a product whose `features` metadata is missing or stale must not render a
+ * plan card with an empty feature list under a real price. So this is both the
+ * placeholder shown before /api/stripe/products resolves and the fallback when
+ * a product carries no usable copy.
+ *
+ * Keep in step with server/setupProducts.ts, which writes the same features
+ * into Stripe when the catalogue is synced.
+ */
+// Module scope, not a const inside the component: planCards is built at the
+// top of the render and would otherwise hit this in its temporal dead zone
+// ("Cannot access 'formatPrice' before initialization"). It closes over
+// nothing, so there is no reason for it to live inside.
+function formatPrice(amount: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amount / 100);
+}
+
+const PLAN_COPY: Record<string, PlanCard> = {
+  pro: {
+    name: "Pro",
+    description: "Track how AI engines see your brand",
+    price: "$99",
+    amountCents: PLAN_PRICE_CENTS.pro,
+    interval: "month",
+    features: [
+      "AI visibility tracking across every major engine",
+      "Weekly citation checks",
+      "Competitor benchmarking",
+      "Site health and crawler access audits",
+      "3 brand profiles",
+    ],
+    popular: true,
+    tier: "pro",
+  },
+  agency: {
+    name: "Agency",
+    description: "Everything in Pro, plus content built to get you cited",
+    price: "$500",
+    amountCents: PLAN_PRICE_CENTS.agency,
+    interval: "month",
+    features: [
+      "Everything in Pro",
+      "40 AI-generated articles/month",
+      "Reddit and community posts",
+      "10 brand profiles",
+      "Priority support",
+    ],
+    popular: false,
+    tier: "agency",
+  },
+};
+
 export default function Pricing() {
   const { toast } = useToast();
+  // The trial is granted at SIGNUP, not by Stripe - there is no
+  // trial_period_days on the subscription. So a logged-OUT visitor cannot
+  // "start a trial" through Checkout: POST /api/stripe/checkout is
+  // authenticated and answered them 401, which surfaced as a dead
+  // "Failed to start checkout" toast on the primary CTA of a marketing page.
+  // Signed out, the CTA is a signup. Signed in, it is a purchase.
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const signedIn = !!user;
   const [betaCode, setBetaCode] = useState("");
+  const [inquiryOpen, setInquiryOpen] = useState(false);
+  const [inquiry, setInquiry] = useState({ name: "", email: "", company: "", message: "" });
   // Stripe redirects back with a plain `?success=true` / `?canceled=true`
   // query string. TanStack's default search parser JSON-parses primitive
   // values, so these arrive as the boolean `true`, not the string "true" -
@@ -40,12 +138,85 @@ export default function Pricing() {
 
   const products = productsData?.data || [];
 
+  // The APP defines which plans exist; Stripe supplies the price for the ones
+  // it knows about. Both directions of drift are handled:
+  //
+  //   plan in Stripe but not here    ignored (the account still carries the
+  //                                  previous pricing's Free/Pro/Enterprise
+  //                                  products, each duplicated)
+  //   plan here but not in Stripe    still rendered, with our own price and no
+  //                                  Subscribe button - Agency does not exist
+  //                                  in Stripe yet, and dropping it left the
+  //                                  page advertising a single plan
+  //
+  // Deriving the list from Stripe alone did the second of those silently,
+  // which is how the page ended up showing one $79 card and nothing else.
+  // Duplicates resolve to the LAST match, i.e. the most recently created, so a
+  // freshly synced catalogue wins over what it replaced.
+  const planCards: PlanCard[] = SELLABLE_TIERS.map((tier) => {
+    const copy = PLAN_COPY[tier];
+    const matches = products.filter((p) => p.metadata?.tier === tier);
+    // Duplicates resolve to the most recently created, so a freshly synced
+    // catalogue wins over whatever it replaced.
+    const product = matches[matches.length - 1];
+    const price = product?.prices?.[0];
+
+    // A Stripe price is only used when it MATCHES what this plan is supposed
+    // to cost. The account still carries the previous pricing - a live "Pro"
+    // product at $79 with tier metadata that matches ours perfectly - and
+    // trusting it made the page advertise the old price under the new plan.
+    //
+    // The two bad options were to print our $99 over Stripe's live $79 (the
+    // page lies about what the card is charged) or to print $79 (the page
+    // shows pricing nobody agreed to). Neither is acceptable, so on a
+    // mismatch we show the real price and DISABLE checkout: the button falls
+    // back to "Contact Sales" because there is no correct thing to sell yet.
+    // Sync the catalogue and both halves line up on their own.
+    const priceMatches =
+      !!price && price.unit_amount === copy.amountCents && price.currency?.toLowerCase() === "usd";
+
+    if (!product || !price || !priceMatches) {
+      if (price && !priceMatches) {
+        // Loud, because this means the pricing page and Stripe disagree about
+        // money and nobody can buy this plan until it is resolved.
+        console.warn(
+          `[pricing] Stripe price for "${tier}" is ${price.unit_amount} ${price.currency}, expected ${copy.amountCents} usd. Checkout disabled for this plan until the catalogue is synced.`,
+        );
+      }
+      return copy;
+    }
+
+    const fromStripe = (product.metadata?.features || "")
+      .split(",")
+      .map((f) => f.trim())
+      .filter(Boolean);
+    return {
+      ...copy,
+      interval: price.recurring?.interval || copy.interval,
+      // Stripe owns the price; this file owns the words. A product with no
+      // usable `features` metadata otherwise drew an empty feature list.
+      features: fromStripe.length > 0 ? fromStripe : copy.features,
+      priceId: price.id,
+    };
+  });
+
   const checkoutMutation = useMutation({
     mutationFn: async (priceId: string) => {
       const response = await apiRequest("POST", "/api/stripe/checkout", { priceId });
       return response.json();
     },
     onSuccess: (data) => {
+      // An existing subscriber gets their plan SWAPPED server-side rather than
+      // a second subscription sold to them, so there is no Checkout URL to
+      // redirect to - the change is already live and billed.
+      if (data?.updated) {
+        void queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        toast({
+          title: "Plan updated",
+          description: "Your new plan is active. We've billed the difference for this period.",
+        });
+        return;
+      }
       if (data?.url && isAllowedStripeRedirect(data.url)) {
         window.location.href = data.url;
       } else {
@@ -56,8 +227,37 @@ export default function Pricing() {
         });
       }
     },
+    onError: (e: Error) => {
+      // Surface the server's own message when it has one - "You're already on
+      // this plan" is far more use than a generic failure.
+      toast({
+        title: e?.message?.includes("already on this plan")
+          ? "You're already on this plan"
+          : "Failed to start checkout",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const enterpriseInquiry = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/enterprise-inquiry", inquiry);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data?.success) {
+        setInquiryOpen(false);
+        setInquiry({ name: "", email: "", company: "", message: "" });
+        toast({
+          title: "Thanks - we'll be in touch",
+          description: "We usually reply within one business day.",
+        });
+      } else {
+        toast({ title: data?.error || "Could not send that", variant: "destructive" });
+      }
+    },
     onError: () => {
-      toast({ title: "Failed to start checkout", variant: "destructive" });
+      toast({ title: "Could not send that. Please try again.", variant: "destructive" });
     },
   });
 
@@ -78,68 +278,26 @@ export default function Pricing() {
     },
   });
 
-  const formatPrice = (amount: number, currency: string) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency.toUpperCase(),
-    }).format(amount / 100);
+  // Enterprise is sales-led and has no Stripe product, so it is never in the
+  // /api/stripe/products response and has to be appended here. It carries no
+  // priceId, which is what routes its button to the contact flow rather than
+  // to Checkout.
+  const enterpriseCard: PlanCard = {
+    name: "Enterprise",
+    description: "Done-for-you, priced to your scope",
+    price: "Talk to us",
+    amountCents: 0,
+    interval: "",
+    features: [
+      "Everything in Agency",
+      "Unlimited brand profiles",
+      "Managed content and outreach",
+      "Custom integrations",
+      "Dedicated account manager",
+    ],
+    popular: false,
+    tier: "enterprise",
   };
-
-  const defaultPlans = [
-    {
-      name: "Free",
-      description: "Get started with basic GEO features",
-      price: "$0",
-      interval: "forever",
-      features: [
-        "1 brand profile",
-        "5 AI-generated articles/month",
-        "Auto-humanization included",
-        "Basic GEO rankings",
-        "Community support",
-      ],
-      cta: "Get Started",
-      popular: false,
-      tier: "free",
-    },
-    {
-      name: "Pro",
-      description: "For growing businesses and agencies",
-      price: "$79",
-      interval: "month",
-      features: [
-        "5 brand profiles",
-        "40 AI-generated articles/month",
-        "Auto-humanization & AI detection",
-        "Full GEO rankings & analytics",
-        "AI Intelligence dashboard",
-        "Publication Intelligence",
-        "Priority support",
-      ],
-      cta: "Start Free Trial",
-      popular: true,
-      tier: "pro",
-    },
-    {
-      name: "Enterprise",
-      description: "For large teams and enterprises",
-      price: "$249",
-      interval: "month",
-      features: [
-        "Everything in Pro",
-        "Unlimited brand profiles",
-        "200 AI-generated articles/month",
-        "GEO AI Agent automation",
-        "AI Traffic Analytics",
-        "Custom integrations",
-        "Dedicated account manager",
-        "SSO & advanced security",
-      ],
-      cta: "Contact Sales",
-      popular: false,
-      tier: "enterprise",
-    },
-  ];
 
   return (
     // Mounted by src/routes/pricing.tsx, a server-rendered top-level route
@@ -177,128 +335,198 @@ export default function Pricing() {
 
         <div className="text-center mb-12">
           <Badge className="mb-4 bg-vc-muted text-vc-tertiary hover:bg-vc-muted">
-            <Sparkles className="w-3 h-3 mr-1" /> Launch Pricing
+            <Sparkles className="w-3 h-3 mr-1" /> {TRIAL_DAYS}-day free trial
           </Badge>
           <h1
             className="text-page font-semibold text-vc-primary mb-4"
             data-testid="text-page-title"
           >
-            Choose Your GEO Plan
+            Find out what AI says about you
           </h1>
           <p className="text-ui text-vc-tertiary max-w-2xl mx-auto">
-            Optimize your brand's visibility in AI search engines with our comprehensive GEO
-            platform
+            Track where ChatGPT, Claude, Perplexity and Gemini cite your brand, see who they
+            recommend instead, and fix the gaps.
+          </p>
+          {/* The trial is granted at SIGNUP, not through Checkout - there is no
+              trial_period_days on the Stripe subscription. So this page has to
+              say so out loud: a visitor who reads only the plan cards sees
+              nothing but two prices and no hint they can try it first. */}
+          <p className="mt-4 text-ui font-medium text-vc-primary">
+            Start free for {TRIAL_DAYS} days. Cancel any time before it ends.
           </p>
         </div>
 
-        <PanelRow cols={3} className="mb-12">
-          {(products.length > 0
-            ? products.map((product, idx) => ({
-                name: product.name,
-                description: product.description || "",
-                price: product.prices[0]
-                  ? formatPrice(product.prices[0].unit_amount, product.prices[0].currency)
-                  : "$0",
-                interval: product.prices[0]?.recurring?.interval || "month",
-                features: (product.metadata?.features || "").split(",").filter(Boolean),
-                priceId: product.prices[0]?.id,
-                popular: product.metadata?.popular === "true",
-                tier: product.metadata?.tier || "pro",
-              }))
-            : defaultPlans
-          ).map((plan, idx) => (
-            <div key={plan.name} data-testid={`pricing-card-${plan.name.toLowerCase()}`}>
-              <Panel
-                width="narrow"
-                border={idx === 2 ? "last" : "row"}
-                className={`relative ${plan.popular ? "ring-2 ring-vc-accent" : ""}`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-vc-accent">
-                      <Crown className="w-3 h-3 mr-1" /> Most Popular
-                    </Badge>
-                  </div>
+        {/* Plain cards, not the dashboard's <Panel> grammar. Panel sets
+            `overflow-hidden` and draws COLUMN SEPARATORS rather than card
+            outlines, which clipped the "Most Popular" badge off the top of the
+            Pro card and left the other two plans with no visible border at
+            all. A pricing card is a self-contained object, so it gets a real
+            box.
+
+            `items-stretch` + `h-full` + `mt-auto` on the button keep the three
+            cards the same height with their CTAs on one line, regardless of
+            how many features or how long a description each plan has. Without
+            it the buttons staircased down the row. */}
+        <div className="mb-12 grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
+          {[...planCards, enterpriseCard].map((plan) => (
+            <div
+              key={plan.name}
+              data-testid={`pricing-card-${plan.name.toLowerCase()}`}
+              className={`relative flex h-full flex-col rounded-lg border bg-vc-surface p-6 ${
+                plan.popular ? "border-vc-accent ring-1 ring-vc-accent" : "border-vc-default"
+              }`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                  <Badge className="bg-vc-accent text-primary-foreground">Most Popular</Badge>
+                </div>
+              )}
+
+              <div className="mb-4 text-center">
+                <h2 className="text-ui font-semibold text-vc-primary">{plan.name}</h2>
+                {/* Two lines reserved. Descriptions differ in length (Agency
+                    wraps, Pro does not), and without a floor the price below
+                    sat 18px lower on that one card - measured. */}
+                <p className="mt-1 min-h-[36px] text-caption text-vc-tertiary">
+                  {plan.description}
+                </p>
+              </div>
+
+              <div className="mb-6 flex items-baseline justify-center gap-1">
+                <span className="text-metric font-semibold text-vc-primary">{plan.price}</span>
+                {plan.interval && (
+                  <span className="text-caption text-vc-tertiary">/{plan.interval}</span>
                 )}
-                <div className="text-center pb-2">
-                  <h2 className="text-page font-semibold text-vc-primary">{plan.name}</h2>
-                  <p className="text-caption text-vc-tertiary">{plan.description}</p>
-                </div>
-                <div className="text-center">
-                  <div className="mb-6">
-                    <span className="text-stat font-semibold tabular-nums text-vc-primary">
-                      {plan.price}
-                    </span>
-                    <span className="text-caption text-vc-tertiary">/{plan.interval}</span>
-                  </div>
-                  <ul className="space-y-3 text-left">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <Check className="w-5 h-5 text-positive shrink-0 mt-0.5" />
-                        <span className="text-data text-vc-secondary">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="mt-6">
-                  <Button
-                    // No bg override. The `default` variant rests as an accent
-                    // TINT with accent-coloured label and only goes solid on
-                    // hover; forcing `bg-primary` here repainted the background
-                    // solid while leaving the label accent-blue, i.e. blue text
-                    // on a blue fill - invisible. The popular plan is already
-                    // distinguished by its ring, scale and "Most Popular" badge.
-                    className="w-full"
-                    variant={plan.popular ? "default" : "outline"}
-                    // Behaviour is driven by TIER first, then by price
-                    // availability. It used to check `plan.priceId` first, which
-                    // was harmless only while Stripe returned no products: the
-                    // moment real products load (i.e. the moment billing goes
-                    // live) every tier that has a price went straight to
-                    // checkout - including Free, which would open a $0/month
-                    // subscription instead of signing the visitor up, and
-                    // Enterprise, whose button says "Contact Sales" but would
-                    // have immediately charged $249/month.
-                    onClick={() => {
-                      if (plan.tier === "free") {
-                        // Free is an account, not a purchase. Never route it
-                        // through Checkout even though it has a $0 price object.
-                        window.location.href = "/register";
-                        return;
-                      }
-                      if ("priceId" in plan && plan.priceId) {
-                        checkoutMutation.mutate(plan.priceId);
-                        return;
-                      }
-                      toast({
-                        title: "This plan isn't available for self-serve checkout yet.",
-                        description: "Please contact us and we'll get you set up.",
-                      });
-                    }}
-                    disabled={checkoutMutation.isPending}
-                    data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
-                  >
-                    {checkoutMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : null}
-                    {/* The label must describe what the button actually does.
-                      Enterprise previously read "Contact Sales" while wired
-                      to Checkout - a $249/month charge behind a button that
-                      promises a conversation. It has a real, active price in
-                      Stripe, so self-serve is honest; if you'd rather this be
-                      sales-led, the fix is to give it its own branch above
-                      (contact link) rather than to change this label back. */}
-                    {plan.tier === "free"
-                      ? "Get Started"
-                      : "priceId" in plan && plan.priceId
+              </div>
+
+              <ul className="mb-6 space-y-2.5">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-vc-accent" aria-hidden />
+                    <span className="text-caption text-vc-secondary">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* mt-auto pins every CTA to the bottom of its card. */}
+              <div className="mt-auto">
+                <Button
+                  className="w-full"
+                  variant={plan.popular ? "default" : "outline"}
+                  // Tier first, then price availability. Enterprise is
+                  // sales-led and must never reach Checkout; a sellable plan
+                  // reaches it only with a price that matched the expected
+                  // amount (see planCards).
+                  onClick={() => {
+                    if (plan.tier === "enterprise") {
+                      setInquiryOpen(true);
+                      return;
+                    }
+                    // No account yet: the trial starts at registration, so
+                    // that is where this goes. Checkout would only 401.
+                    if (!signedIn) {
+                      window.location.href = "/register";
+                      return;
+                    }
+                    if (plan.priceId) {
+                      checkoutMutation.mutate(plan.priceId);
+                      return;
+                    }
+                    toast({
+                      title: "This plan isn't available for checkout yet.",
+                      description: "Please contact us and we'll get you set up.",
+                    });
+                  }}
+                  disabled={checkoutMutation.isPending}
+                  data-testid={`button-subscribe-${plan.name.toLowerCase()}`}
+                >
+                  {checkoutMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  {/* The label must describe what the button actually does:
+                      "Subscribe" only when there is a verified price behind it,
+                      never as decoration over a dead branch. */}
+                  {plan.tier === "enterprise"
+                    ? "Book a call"
+                    : !signedIn
+                      ? "Start free trial"
+                      : plan.priceId
                         ? "Subscribe"
                         : "Contact Sales"}
-                  </Button>
-                </div>
-              </Panel>
+                </Button>
+              </div>
             </div>
           ))}
-        </PanelRow>
+        </div>
+
+        {/* Enterprise enquiry. The counterpart to Checkout for the one plan
+            that is sold by conversation rather than by card - see
+            server/routes/enterpriseInquiry.ts. A dialog rather than a separate
+            page so the visitor never loses the pricing context they were
+            reading, and rather than a mailto so the lead reaches us even if
+            they have no mail client configured. */}
+        <Dialog open={inquiryOpen} onOpenChange={setInquiryOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Talk to us about Enterprise</DialogTitle>
+              <DialogDescription>
+                Tell us what you need and we&apos;ll come back with a scope and a price. Managed
+                content, outreach and custom integrations are all on the table.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                placeholder="Your name"
+                value={inquiry.name}
+                maxLength={120}
+                onChange={(e) => setInquiry({ ...inquiry, name: e.target.value })}
+                data-testid="input-inquiry-name"
+              />
+              <Input
+                type="email"
+                placeholder="Work email"
+                value={inquiry.email}
+                maxLength={200}
+                onChange={(e) => setInquiry({ ...inquiry, email: e.target.value })}
+                data-testid="input-inquiry-email"
+              />
+              <Input
+                placeholder="Company (optional)"
+                value={inquiry.company}
+                maxLength={200}
+                onChange={(e) => setInquiry({ ...inquiry, company: e.target.value })}
+                data-testid="input-inquiry-company"
+              />
+              <Textarea
+                placeholder="What are you trying to achieve? (optional)"
+                rows={4}
+                value={inquiry.message}
+                maxLength={2000}
+                onChange={(e) => setInquiry({ ...inquiry, message: e.target.value })}
+                data-testid="input-inquiry-message"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setInquiryOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                // Mirrors the server's own rule so the visitor is told before
+                // the round-trip, not after it.
+                disabled={
+                  !inquiry.name.trim() || !inquiry.email.trim() || enterpriseInquiry.isPending
+                }
+                onClick={() => enterpriseInquiry.mutate()}
+                data-testid="button-send-inquiry"
+              >
+                {enterpriseInquiry.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : null}
+                Send enquiry
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <PanelRow cols={1} className="max-w-md mx-auto">
           <Panel width="wide" border="last">

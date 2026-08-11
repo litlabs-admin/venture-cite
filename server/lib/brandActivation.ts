@@ -31,6 +31,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
 import { logger } from "./logger";
+import { PAYING_TIERS } from "@shared/schema";
 import { captureAndFlush } from "./sentryReport";
 import { discoverCompetitors } from "./competitorDiscovery";
 import { scanBrandListicles } from "./listicleScanner";
@@ -193,8 +194,23 @@ async function runJob(
 export async function runBrandActivationSweep(
   deadlineMs?: number,
 ): Promise<{ processed: number; total: number }> {
+  // Only brands whose owner is actually entitled to work that costs money.
+  //
+  // Read-only accounts (a cancelled trial, a subscription that failed) keep
+  // their data visible, and that is the whole bargain: visible, but frozen. A
+  // weekly citation run across four AI engines plus the activation sweep is
+  // real spend, every week, forever - running it for accounts paying nothing
+  // would make "downgrade instead of lock out" quietly expensive.
+  //
+  // PAYING_TIERS is the single list; unknown or pending tiers are excluded by
+  // omission, which fails closed.
   const brands = await db.execute<{ id: string }>(sql`
-    SELECT id FROM brands WHERE deleted_at IS NULL ORDER BY created_at ASC
+    SELECT b.id
+    FROM brands b
+    JOIN users u ON u.id = b.user_id
+    WHERE b.deleted_at IS NULL
+      AND u.access_tier = ANY(${PAYING_TIERS})
+    ORDER BY b.created_at ASC
   `);
   const list = (brands as { rows?: Array<{ id: string }> }).rows ?? [];
 

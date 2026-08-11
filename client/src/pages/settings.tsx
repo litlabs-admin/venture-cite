@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { resolveTier } from "@shared/schema";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { getAccessToken } from "@/lib/authStore";
 import BufferConnectDialog from "@/components/articles/BufferConnectDialog";
@@ -293,7 +294,9 @@ function PasswordSection() {
 function BillingSection() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const plan = user?.accessTier ?? "free";
+  // resolveTier, not the raw column - a lapsed trial showed "Current plan:
+  // trial" while having no entitlements at all.
+  const plan = user ? resolveTier(user) : "free";
   const openPortal = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/billing/portal-session");
