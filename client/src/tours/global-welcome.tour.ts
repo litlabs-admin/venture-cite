@@ -14,7 +14,26 @@ export const globalWelcomeTour: TourConfig = {
   id: "global-welcome",
   version: 2,
   scope: "global",
-  trigger: { kind: "route", routes: ["/", "/dashboard"] },
+  // Fires on the Dashboard, but ONLY once the user actually has a brand.
+  //
+  // A plain route trigger fired on /dashboard and then appeared on /welcome,
+  // which looked like the route match was wrong. It was not - it is a race.
+  // A brand-new user lands on /dashboard, this tour matches and opens, and
+  // only then does FirstRunGate (src/routes/-shared/routeGates.tsx) see zero
+  // brands and <Navigate to="/welcome">. TourOrchestrator is mounted in
+  // __root.tsx, OUTSIDE the route tree, so that navigation never unmounts it
+  // and the open Shepherd modal simply rides along onto the welcome page.
+  //
+  // `brands >= 1` is precisely FirstRunGate's own condition for NOT
+  // redirecting, so the tour can no longer fire on a render that is about to
+  // be navigated away from. It fires on the first dashboard visit after
+  // onboarding instead - which is also where its steps make sense, since they
+  // walk the sidebar's five-stage spine.
+  trigger: {
+    kind: "predicate",
+    routes: ["/", "/dashboard"],
+    evaluate: (ctx) => ctx.counts.brands >= 1,
+  },
   steps: [
     {
       id: "intro",

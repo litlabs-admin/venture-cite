@@ -33,8 +33,14 @@ vi.mock("@/tours/engine/featureFlag", () => ({ isTourEngineEnabled: () => true }
 vi.mock("@tanstack/react-router", () => ({
   useRouterState: () => "/dashboard",
 }));
+// One brand, so global-welcome is actually eligible. Its trigger now requires
+// counts.brands >= 1 - FirstRunGate's own condition for not redirecting to
+// /welcome - and with no data at all the tour is correctly suppressed, which
+// would make this file pass for the wrong reason. The subject here is the
+// STATE gate (does a tour fire before persisted state has loaded), not
+// eligibility, so the fixture has to clear eligibility first.
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: undefined }),
+  useQuery: () => ({ data: { data: [{ id: "b-1" }] } }),
 }));
 vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 
