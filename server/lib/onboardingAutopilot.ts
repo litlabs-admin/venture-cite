@@ -132,7 +132,13 @@ export async function runOnboardingAutopilot(
         );
       }
 
-      const result = await generateBrandPrompts(brand);
+      // Re-read: the Phase 0 scrape above writes corrected industry /
+      // description / audience back onto the brands row, and `brand` was
+      // fetched before that. Without this the prompts are generated
+      // against the pre-correction profile - the exact thing the
+      // write-back exists to prevent.
+      const freshBrand = (await storage.getBrandById(brandId)) ?? brand;
+      const result = await generateBrandPrompts(freshBrand);
       const promptsGenerated = result.saved.length;
       if (promptsGenerated === 0) {
         throw new Error(result.error || "Prompt generation produced no prompts");

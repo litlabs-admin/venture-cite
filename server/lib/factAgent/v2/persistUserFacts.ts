@@ -43,7 +43,16 @@ export async function persistUserFacts(
       const rows = facts.map((f) => ({
         brandId: args.brandId,
         domain: f.domain,
-        subcategory: subcategoryFor(f.domain as Domain, f.factKey),
+        // `other` facts all share one subcategory label, so two of them in
+        // the same domain (e.g. brand values + brand voice, both
+        // positioning/other) collide on the partial unique index - and the
+        // batch insert is all-or-nothing, so ONE collision silently dropped
+        // every user fact for the brand. Their own otherLabel is both unique
+        // enough to separate them and a better display label than "Other".
+        subcategory:
+          f.factKey === "other" && typeof f.valuePayload?.otherLabel === "string"
+            ? f.valuePayload.otherLabel.slice(0, 64)
+            : subcategoryFor(f.domain as Domain, f.factKey),
         factKey: f.factKey,
         factValue: f.factValue,
         valueType: f.valueType,
@@ -55,8 +64,17 @@ export async function persistUserFacts(
         runId: args.runId,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }));
-      await tx.insert(schema.brandFactSheet).values(rows as never);
-      return { inserted: rows.length };
+      // Belt and braces: any remaining tuple collision would still abort the
+      // whole batch, so lose the one duplicate rather than all the facts.
+      const seen = new Set<string>();
+      const deduped = rows.filter((r) => {
+        const key = `${r.domain}|${r.subcategory}|${r.factKey}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      await tx.insert(schema.brandFactSheet).values(deduped as never);
+      return { inserted: deduped.length };
     });
   } catch (err) {
     logger.warn({ err, brandId: args.brandId, runId: args.runId }, "persistUserFacts failed");

@@ -55,6 +55,7 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
 
   --color-sidebar: var(--sidebar-background);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -647,14 +648,17 @@
        button/input that's already following the same rule. */
     --ring: var(--brand-accent-subtle);
     /* Categorical data ramp = TDS's series colours, in TDS's order. The lead
-     is the brand green, so the first series and the accent match. TDS also
-     ships a sixth (--tds-s6 #2aa5b0); it is deliberately not exposed as a token,
-     having previously sat unused as --brand-accent-secondary. */
+     is the brand green, so the first series and the accent match. The sixth
+     (--tds-s6) was previously withheld; it is exposed now because the
+     citation platforms are a 6-way categorical set (Grok joined ChatGPT,
+     Claude, Gemini, Perplexity and DeepSeek) and a 5-colour ramp forced two
+     platforms to share a hue. */
     --chart-1: #3b5bf6; /* brand blue leads the chart ramp */
     --chart-2: oklch(0.5632 0.1669 263.3); /* --tds-s2 #3f6fd6 blue */
     --chart-3: oklch(0.7224 0.1378 64.6); /* --tds-s3 #e0913a amber */
     --chart-4: oklch(0.6056 0.2189 292.7); /* --tds-s4 #8b5cf6 violet */
     --chart-5: oklch(0.6457 0.154 0); /* --tds-s5 #d6608a pink */
+    --chart-6: oklch(0.6431 0.0961 205.9); /* --tds-s6 #2aa5b0 teal */
     --sidebar-background: var(--bg-surface-1);
     --sidebar-foreground: var(--fg-secondary);
     /* Monochrome lane: the active nav item is a raised NEUTRAL chip with

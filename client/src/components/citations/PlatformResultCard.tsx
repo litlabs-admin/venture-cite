@@ -50,6 +50,7 @@ const CHART_TEXT_CLASSES = [
   "text-warning",
   "text-chart-4",
   "text-chart-5",
+  "text-chart-6",
 ];
 const CHART_BORDER_CLASSES = [
   "border-chart-1",
@@ -57,6 +58,7 @@ const CHART_BORDER_CLASSES = [
   "border-warning",
   "border-chart-4",
   "border-chart-5",
+  "border-chart-6",
 ];
 
 function colorClassForPlatform(platform: string): string {
@@ -74,6 +76,7 @@ const PLATFORM_DEEP_LINKS: Record<string, ((prompt: string) => string) | null> =
   Gemini: (q) => `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
   Claude: null,
   DeepSeek: null,
+  Grok: null,
 };
 
 // One card per platform result inside the by-prompt accordion. Shows a clear

@@ -30,13 +30,14 @@ import { requireUser } from "../lib/ownership";
 import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
 import type { Tier } from "../lib/llmPricing";
 import { logAudit } from "../lib/audit";
+import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
+import { getOpenrouterClient } from "../lib/factAgent/v2/openrouterClient";
 import {
-  aiLimitMiddleware,
-  openai,
-  safeParseJson,
-  sendError,
-  asyncHandler,
-} from "../lib/routesShared";
+  BRAND_PROFILE_SYSTEM_PROMPT,
+  brandProfileSchema,
+  parseBrandProfile,
+  type BrandProfile,
+} from "../lib/brandProfilePrompt";
 
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
@@ -120,7 +121,8 @@ export function setupBrandRoutes(app: Express): void {
           });
         }
 
-        if (!process.env.OPENAI_API_KEY) {
+        const analysisClient = getOpenrouterClient();
+        if (!analysisClient) {
           return res.status(503).json({ success: false, error: "AI service is not configured" });
         }
 
@@ -155,30 +157,14 @@ export function setupBrandRoutes(app: Express): void {
           pageContent = `Could not fetch website content from ${url}. Please analyze based on the URL/domain name alone.`;
         }
 
-        let result: Record<string, any> = {};
+        let result: BrandProfile = brandProfileSchema.parse({});
         let analysisQuality: "full" | "partial" = "full";
         try {
-          const completion = await openai.chat.completions.create(
+          const completion = await analysisClient.chat.completions.create(
             {
               model: MODELS.brandAutofill,
               messages: [
-                {
-                  role: "system",
-                  content: `You are an expert brand analyst. Given a company's website content, extract brand information and return a JSON object with these fields:
-- name: The brand/product name (short)
-- companyName: The full legal/company name
-- industry: The primary industry (e.g., "Technology", "Healthcare", "Finance")
-- description: A 2-3 sentence description of what the company does
-- tone: One of: "professional", "casual", "friendly", "formal", "conversational", "authoritative"
-- targetAudience: Who they sell to (e.g., "B2B SaaS companies", "small business owners")
-- products: An array of main products/services (e.g., ["Product A", "Service B"])
-- keyValues: An array of core brand values (e.g., ["Innovation", "Trust"])
-- uniqueSellingPoints: An array of what makes them unique (e.g., ["AI-powered", "24/7 support"])
-- brandVoice: A brief description of their communication style
-- nameVariations: An array of common name variations for tracking (e.g., ["stripe", "stripe inc", "stripe payments"])
-
-Be specific and accurate based on the content. If you can't determine something, make a reasonable inference from the domain/industry.`,
-                },
+                { role: "system", content: BRAND_PROFILE_SYSTEM_PROMPT },
                 {
                   role: "user",
                   content: `Website URL: ${url}\n\nWebsite content:\n${pageContent}`,
@@ -190,10 +176,10 @@ Be specific and accurate based on the content. If you can't determine something,
             { signal: AbortSignal.timeout(25000) },
           );
 
-          const parsed = safeParseJson<Record<string, any>>(completion.choices[0].message.content);
+          const parsed = parseBrandProfile(completion.choices[0].message.content);
           if (!parsed || !parsed.name) {
             analysisQuality = "partial";
-            result = parsed ?? {};
+            result = parsed ?? result;
           } else {
             result = parsed;
           }
@@ -215,27 +201,13 @@ Be specific and accurate based on the content. If you can't determine something,
           website: url,
           tone: result.tone || "professional",
           targetAudience: result.targetAudience || undefined,
-          products: Array.isArray(result.products)
-            ? result.products
-            : typeof result.products === "string"
-              ? result.products.split(",").map((s: string) => s.trim())
-              : [],
-          keyValues: Array.isArray(result.keyValues)
-            ? result.keyValues
-            : typeof result.keyValues === "string"
-              ? result.keyValues.split(",").map((s: string) => s.trim())
-              : [],
-          uniqueSellingPoints: Array.isArray(result.uniqueSellingPoints)
-            ? result.uniqueSellingPoints
-            : typeof result.uniqueSellingPoints === "string"
-              ? result.uniqueSellingPoints.split(",").map((s: string) => s.trim())
-              : [],
+          // The comma-string coercions that used to live here moved into
+          // brandProfileSchema, which normalises every array field.
+          products: result.products,
+          keyValues: result.keyValues,
+          uniqueSellingPoints: result.uniqueSellingPoints,
           brandVoice: result.brandVoice || undefined,
-          nameVariations: Array.isArray(result.nameVariations)
-            ? result.nameVariations
-            : typeof result.nameVariations === "string"
-              ? result.nameVariations.split(",").map((s: string) => s.trim())
-              : [],
+          nameVariations: result.nameVariations,
         };
 
         const existingByName = await storage.getBrandsByUserId(user.id);

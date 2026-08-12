@@ -67,8 +67,8 @@ export default function Home() {
           description={
             <>
               Set up your first brand and we&apos;ll build a live AI-visibility operating system:
-              monitor where ChatGPT, Claude, Perplexity, and Gemini cite you, diagnose the gaps, and
-              act on them.
+              monitor where ChatGPT, Claude, Perplexity, Gemini, DeepSeek and Grok cite you,
+              diagnose the gaps, and act on them.
             </>
           }
           action={{

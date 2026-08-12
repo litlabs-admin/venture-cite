@@ -532,19 +532,54 @@ describe("POST /api/dashboard/perception/:brandId/run", () => {
     expect(perceptionStubs.scoreBrandPerception).not.toHaveBeenCalled();
   });
 
-  it("returns data: null and never scores/inserts when there is no evidence", async () => {
+  // A zero-evidence run still writes a row, with every axis null and
+  // evidenceCount 0. Writing nothing made "we scored and found no evidence"
+  // indistinguishable from "this brand was never scored", so the UI could not
+  // explain an empty panel. No LLM call happens on this path.
+  it("records a zero-evidence run without scoring when there is no evidence", async () => {
     const brand = makeBrand();
     storageStubs.getBrandById.mockResolvedValue(brand);
     queueSelect([]); // cooldown check - no prior run
     queueSelect([]); // geoRankings rows
     perceptionStubs.gatherEvidence.mockReturnValue([]);
+    // scoreBrandPerception is still called, but it short-circuits on empty
+    // evidence and returns all-null WITHOUT an LLM call (perceptionScorer.ts
+    // :254). That is what keeps a zero-evidence row free of a made-up score.
+    perceptionStubs.scoreBrandPerception.mockResolvedValue({
+      trust: null,
+      quality: null,
+      value: null,
+      market: null,
+      innovation: null,
+      overall: null,
+      praised: [],
+      questioned: [],
+      evidenceCount: 0,
+      model: null,
+    });
+    queueInsert([
+      {
+        trust: null,
+        quality: null,
+        value: null,
+        market: null,
+        innovation: null,
+        overall: null,
+        praised: [],
+        questioned: [],
+        evidenceCount: 0,
+        model: null,
+        createdAt: new Date("2026-07-29T12:00:00Z"),
+      },
+    ]);
 
     const r = await call(app, "POST", `/api/dashboard/perception/${brand.id}/run`);
 
     expect(r.status).toBe(200);
-    expect(r.body.data).toBeNull();
-    expect(perceptionStubs.scoreBrandPerception).not.toHaveBeenCalled();
-    expect(dbState.insertMock).not.toHaveBeenCalled();
+    expect(r.body.data).not.toBeNull();
+    expect(r.body.data.evidenceCount).toBe(0);
+    expect(r.body.data.overall).toBeNull();
+    expect(dbState.insertMock).toHaveBeenCalled();
   });
 
   it("returns 429 with Retry-After when the newest run is inside the cooldown window", async () => {

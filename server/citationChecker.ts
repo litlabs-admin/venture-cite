@@ -53,6 +53,7 @@ export const DEFAULT_CITATION_PLATFORMS = [
   "DeepSeek",
   "Claude",
   "Gemini",
+  "Grok",
 ] as const;
 
 // Cap on per-run competitor map size. Vercel Hobby has 1024 MB memory; a
@@ -484,7 +485,10 @@ export async function runBrandPrompts(
     } as any);
   }
 
-  const cappedPlatforms = platforms.slice(0, 5);
+  // Derived, not a literal: this cap silently dropped the 6th platform from
+  // every run when Grok was added, and a dropped platform looks identical to
+  // one that was never cited.
+  const cappedPlatforms = platforms.slice(0, DEFAULT_CITATION_PLATFORMS.length);
   const rankings: GeoRanking[] = [];
   let totalCited = 0;
 
@@ -1299,7 +1303,7 @@ export async function runBrandPrompts(
 
 // ---- Wave 9: async kickoff path ----------------------------------------
 //
-// `runBrandPrompts` can take 30-120s for a full run (10 prompts × 5
+// `runBrandPrompts` can take 30-120s for a full run (15 prompts × 6
 // platforms). Vercel's 60s function cap forces us to bound the kickoff
 // path: we run inline up to a deadline, then return what's done; the
 // client's /advance polling loop drives the remainder to completion.

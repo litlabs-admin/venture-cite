@@ -8,6 +8,7 @@
 import OpenAI from "openai";
 import { OPENROUTER_BASE_URL } from "../../modelConfig";
 import { LLM_CALL_TIMEOUT_MS } from "./vercelBudget";
+import { attachAiLogger } from "../../aiLogger";
 
 let cached: OpenAI | null | undefined;
 
@@ -27,6 +28,11 @@ export function getOpenrouterClient(): OpenAI | null {
     timeout: LLM_CALL_TIMEOUT_MS,
     maxRetries: 1,
   });
+  // The analysis calls (brand profile, competitor discovery, prompt
+  // generation) moved onto this client from their own direct-OpenAI
+  // clients, which each attached the logger themselves. Attach here so
+  // those requests stay visible in logs.
+  attachAiLogger(cached);
   return cached;
 }
 

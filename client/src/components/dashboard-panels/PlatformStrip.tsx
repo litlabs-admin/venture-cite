@@ -12,17 +12,18 @@ import type { PlatformRank } from "./useDashboardData";
 // platform's visibility score over /100, one line describing the engine, and
 // an accent call-to-action. Cells with no data get the "No data yet" variant.
 //
-// ONLY platforms we actually query get a cell. Grok, Meta AI and Google AI
-// used to occupy three greyed-out cells rendering `–` "not queried yet" -
-// a fifth of the strip spent advertising engines that produce no data and
-// that the user cannot enable. The reference's 8-wide grid is not a reason
-// to ship three dead columns.
+// ONLY platforms we actually query get a cell. Meta AI and Google AI used to
+// occupy greyed-out cells rendering `–` "not queried yet" - strip space spent
+// advertising engines that produce no data and that the user cannot enable.
+// The reference's 8-wide grid is not a reason to ship dead columns. Grok was
+// one of those dead cells; it is a real queried platform now, so it earns one.
 
 const LOGOS: Record<string, string> = {
   ChatGPT: "/venturecite/images/ai-logos/chatgpt.svg",
   Claude: "/venturecite/images/ai-logos/claude.svg",
   Perplexity: "/venturecite/images/ai-logos/perplexity.svg",
   Gemini: "/venturecite/images/ai-logos/gemini.svg",
+  Grok: "/venturecite/images/ai-logos/grok.svg",
 };
 
 // One line per engine, shown in the hover card. Same register as the
@@ -33,6 +34,7 @@ const BLURB: Record<string, string> = {
   Perplexity: "Perplexity AI - answer engine with citations",
   Gemini: "Google's Gemini - search-grounded assistant",
   DeepSeek: "DeepSeek - open-weight reasoning models",
+  Grok: "xAI's Grok - real-time answers grounded in X and the web",
 };
 
 // DeepSeek ships no logo asset, so it falls back to a monogram rather than a
@@ -140,7 +142,7 @@ export function PlatformStrip({ platforms }: { platforms: PlatformRank[] }) {
   return (
     <div className="border-b border-vc-default">
       <div className="flex">
-        <div className="grid flex-1 grid-cols-3 sm:grid-cols-5">
+        <div className="grid flex-1 grid-cols-3 sm:grid-cols-6">
           {CELLS.map((name, i) => {
             const p = byName.get(name);
             return (

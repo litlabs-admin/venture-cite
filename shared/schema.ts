@@ -578,7 +578,7 @@ export type InsertLlmJob = z.infer<typeof insertLlmJobSchema>;
 // Wave 7: the legacy content_drafts table was absorbed into `articles` (with
 // status='draft'). See migration 0033_content_unification.sql.
 
-// Tracks each batch of 10 prompts generated for a brand. Enables prompt
+// Tracks each batch of prompts generated for a brand. Enables prompt
 // versioning so users can see which prompts were used in historical runs.
 export const promptGenerations = pgTable(
   "prompt_generations",

@@ -39,7 +39,7 @@ export const globalWelcomeTour: TourConfig = {
       id: "intro",
       title: "Welcome to VentureCite",
       content:
-        "VentureCite measures and improves how AI engines (ChatGPT, Claude, Perplexity, Gemini) cite your brand. A quick 60-second tour of the five-stage workflow?",
+        "VentureCite measures and improves how AI engines (ChatGPT, Claude, Perplexity, Gemini, DeepSeek, Grok) cite your brand. A quick 60-second tour of the five-stage workflow?",
     },
     // Narrow viewports only. The five nav.* steps below target the desktop
     // sidebar, which is `hidden lg:flex` - under 1024px they resolve to

@@ -19,4 +19,5 @@ export const PLATFORM_COLORS: Record<string, string> = {
   Gemini: "bg-muted text-chart-2 border-chart-2",
   Perplexity: "bg-muted text-chart-4 border-chart-4",
   DeepSeek: "bg-muted text-chart-5 border-chart-5",
+  Grok: "bg-muted text-chart-6 border-chart-6",
 };

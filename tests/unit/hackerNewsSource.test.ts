@@ -270,6 +270,26 @@ describe("scanHackerNewsSource", () => {
     expect(calledUrl).toContain("/search_by_date");
   });
 
+  // -------------------------------------------------------------------------
+  // Root-cause regression: Algolia's tagFilters use a bare comma for OR.
+  // "(story,comment)" is invalid syntax and makes Algolia ignore the tag
+  // filter entirely (and, empirically, the query text with it) - live check
+  // showed nbHits jump from 0 to 8000+ for a brand with zero real coverage.
+  // -------------------------------------------------------------------------
+  it("sends tags=story,comment without wrapping parentheses", async () => {
+    mockFetch.mockResolvedValue(makeOkResponse({ hits: [] }));
+
+    await scanHackerNewsSource({
+      query: '"Linear"',
+      variations: ["Linear"],
+      brandId: "brand-abc",
+    });
+
+    const calledUrl: string = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain(`tags=${encodeURIComponent("story,comment")}`);
+    expect(calledUrl).not.toContain(encodeURIComponent("(story,comment)"));
+  });
+
   it("omits numericFilters when sinceUnix is not provided", async () => {
     mockFetch.mockResolvedValue(makeOkResponse({ hits: [] }));
 

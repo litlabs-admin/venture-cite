@@ -606,7 +606,7 @@ export default function Brands() {
                     </h3>
                     <p className="text-caption text-vc-tertiary">
                       Now that your brand is set up, follow the step-by-step checklists to ensure
-                      ChatGPT, Claude, Perplexity, Gemini, Grok, and Manus AI can find and cite your
+                      ChatGPT, Claude, Perplexity, Gemini, DeepSeek, and Grok can find and cite your
                       brand.
                     </p>
                   </div>

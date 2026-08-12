@@ -164,6 +164,7 @@ export default function Citations() {
     "Querying DeepSeek...",
     "Querying Claude...",
     "Querying Gemini...",
+    "Querying Grok...",
     "Analyzing responses for brand mentions...",
   ]);
 

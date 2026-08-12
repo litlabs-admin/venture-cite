@@ -25,6 +25,7 @@ import MentionDetailSheet from "@/components/geo-tools/MentionDetailSheet";
 import MentionsFilters from "@/components/geo-tools/MentionsFilters";
 import { AddMentionDialog } from "@/components/geo-tools/AddMentionDialog";
 
+import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -254,6 +255,26 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [deleteAllConfirmInput, setDeleteAllConfirmInput] = useState("");
 
+  // Mirror server-side `collectVariations`: brand name first, then
+  // nameVariations, deduped case-insensitively, drop entries < 2 chars.
+  // Shared by ScanStatusPanel (search-terms line) and the empty state below,
+  // so both surfaces report the exact same terms the scanner used.
+  const searchVariations = useMemo(() => {
+    const all = [brand?.name, ...(brand?.nameVariations ?? [])];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of all) {
+      if (typeof raw !== "string") continue;
+      const v = raw.trim();
+      if (v.length < 2) continue;
+      const key = v.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(v);
+    }
+    return out;
+  }, [brand?.name, brand?.nameVariations]);
+
   const brandName = brand?.name ?? "";
   const deleteAllConfirmEnabled = deleteAllConfirmInput.trim() === brandName && brandName !== "";
 
@@ -311,6 +332,15 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
     !hasActiveFilters;
   const showFilteredEmpty = !!brandId && hasFiltered && !showNoMentionsAfterScan;
 
+  // A source that refused the request did not "find nothing" - it was never
+  // searched. Reddit blocks unauthenticated datacenter traffic (403/429), so
+  // without this the empty state would claim a search that never happened.
+  const blockedSources = Object.entries(
+    (lastCompletedScan?.perSource ?? {}) as Record<string, { reason?: string } | undefined>,
+  )
+    .filter(([, v]) => typeof v?.reason === "string" && v.reason.length > 0)
+    .map(([source, v]) => ({ source, reason: v!.reason as string }));
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   // Early: no brand selected
@@ -337,23 +367,7 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
             brandId={brandId}
             brandName={brandName}
             brandMonitorMentions={brand?.monitorMentions ?? false}
-            variations={(() => {
-              // Mirror server-side `collectVariations`: brand name first, then
-              // nameVariations, deduped case-insensitively, drop entries < 2 chars.
-              const all = [brand?.name, ...(brand?.nameVariations ?? [])];
-              const seen = new Set<string>();
-              const out: string[] = [];
-              for (const raw of all) {
-                if (typeof raw !== "string") continue;
-                const v = raw.trim();
-                if (v.length < 2) continue;
-                const key = v.toLowerCase();
-                if (seen.has(key)) continue;
-                seen.add(key);
-                out.push(v);
-              }
-              return out;
-            })()}
+            variations={searchVariations}
             activeScan={activeScan}
             lastCompletedScan={lastCompletedScan}
             scanCooldown={scanCooldown}
@@ -463,11 +477,46 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
                   </div>
                 )}
 
-                {showNoMentionsAfterScan && (
+                {showNoMentionsAfterScan && lastCompletedScan && (
                   <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-vc-default p-8 text-center">
                     <p className="text-caption font-medium">No mentions found yet.</p>
                     <p className="text-caption text-vc-tertiary">
-                      {"We'll keep checking daily. Add variations to widen the search."}
+                      Last scan{" "}
+                      {formatDistanceToNow(
+                        new Date(lastCompletedScan.completedAt ?? lastCompletedScan.createdAt),
+                        { addSuffix: true },
+                      )}{" "}
+                      searched Reddit and Hacker News for{" "}
+                      {searchVariations.length === 0
+                        ? "no search terms"
+                        : searchVariations.map((v, i) => (
+                            <React.Fragment key={v}>
+                              {i > 0 && " or "}
+                              <code className="rounded bg-muted px-1 py-0.5 font-mono">{v}</code>
+                            </React.Fragment>
+                          ))}
+                      .{" "}
+                      {blockedSources.length > 0 ? (
+                        <>
+                          {blockedSources.map((b) => b.source).join(" and ")}{" "}
+                          {blockedSources.length === 1 ? "refused" : "refused"} the request, so that
+                          source was not actually searched:{" "}
+                          <span className="text-vc-secondary">{blockedSources[0].reason}</span>.
+                          Re-run the scan later.{" "}
+                        </>
+                      ) : (
+                        <>
+                          That is an honest result, not a broken scan - real-world discussion may
+                          genuinely not exist under these terms yet.{" "}
+                        </>
+                      )}
+                      <button
+                        onClick={() => navigate({ to: "/brands" })}
+                        className="text-primary underline-offset-2 hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Add a search variation
+                      </button>{" "}
+                      to widen the search.
                     </p>
                   </div>
                 )}

@@ -30,18 +30,20 @@ export async function getLastPerceptionRunAt(brandId: string): Promise<Date | nu
 /**
  * Score one brand and persist the run.
  *
- * Resolves null when there is nothing to score - a brand with no cited
- * context yet has no evidence, and a run of zero excerpts would be a
- * fabricated reading, not a low one. Callers must treat null as "not
- * measured" and leave the panel empty.
+ * When there is no evidence, this still writes a run row - with every axis
+ * NULL and evidenceCount 0 - instead of returning nothing. That row is the
+ * only way the UI can tell "we tried and the brand was never named in an AI
+ * answer" apart from "this brand has never been scored at all". No LLM call
+ * is made in that case: a run of zero excerpts must never buy a fabricated
+ * reading.
  *
- * Costs one LLM call. Callers own the rate limiting.
+ * Costs one LLM call when evidence exists. Callers own the rate limiting.
  */
 export async function runPerceptionScoring(brand: {
   id: string;
   name: string;
   website: string | null;
-}): Promise<typeof brandPerceptionRuns.$inferSelect | null> {
+}): Promise<typeof brandPerceptionRuns.$inferSelect> {
   const rows = await db
     .select({
       citationContext: geoRankings.citationContext,
@@ -65,8 +67,11 @@ export async function runPerceptionScoring(brand: {
     brandName: brand.name,
     aliases: domainAlias ? [domainAlias] : [],
   });
-  if (evidence.length === 0) return null;
 
+  // scoreBrandPerception already returns an all-null result for zero
+  // evidence WITHOUT calling the LLM (see perceptionScorer.ts), so calling
+  // it unconditionally here still costs nothing when there is nothing to
+  // score - it just gives us one shape to insert either way.
   const result = await scoreBrandPerception({ brandName: brand.name, evidence });
 
   // Drizzle's `numeric` columns accept strings on write (and return strings on

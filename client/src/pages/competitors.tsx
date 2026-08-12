@@ -51,6 +51,9 @@ const platformIcon: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   perplexity: SiPerplexity,
   gemini: SiGooglegemini,
   deepseek: Brain,
+  // react-icons ships no reliable Grok glyph, so it takes the same generic
+  // fallback DeepSeek already uses rather than risking a build break.
+  grok: Brain,
 };
 
 interface LeaderboardEntry {

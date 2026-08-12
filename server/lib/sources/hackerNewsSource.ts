@@ -144,10 +144,16 @@ export async function scanHackerNewsSource(
         failures.push(`rate-limited on "${variation}"`);
         continue;
       }
+      // Algolia's HN tagFilters use a bare comma for OR ("story,comment").
+      // Wrapping the value in parentheses - "(story,comment)" - is NOT valid
+      // tagFilters syntax here: Algolia silently drops the whole tag filter,
+      // so the query text stops filtering results and the endpoint returns
+      // arbitrary recent items instead. Verified live: with parens, nbHits
+      // was 8000+ for a brand with zero real coverage; without parens, 0.
       const url =
         `https://hn.algolia.com/api/v1/search_by_date` +
         `?query=${encodeURIComponent(variation)}` +
-        `&tags=${encodeURIComponent("(story,comment)")}` +
+        `&tags=${encodeURIComponent("story,comment")}` +
         `&hitsPerPage=25` +
         numericFilter;
       try {

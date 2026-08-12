@@ -520,7 +520,7 @@ export function setupPromptsRoutes(app: Express): void {
           Array.isArray(platformsRaw) ? platformsRaw : [...DEFAULT_CITATION_PLATFORMS]
         )
           .filter((p): p is string => typeof p === "string")
-          .slice(0, 5);
+          .slice(0, DEFAULT_CITATION_PLATFORMS.length);
 
         // Wave 9.2: reject empty platforms array. Previously the kickoff
         // would happily create a run, do zero AI calls, and finalize as

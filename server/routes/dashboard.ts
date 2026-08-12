@@ -1537,13 +1537,11 @@ export function setupDashboardRoutes(app: Express): void {
         }
 
         // The scoring itself lives in lib/perceptionRun.ts so the weekly
-        // brand-activation job runs the exact same code. Null means "no
-        // evidence to score", which stays an empty panel - never a zero.
+        // brand-activation job runs the exact same code. It always writes a
+        // row now, even with zero evidence (every axis NULL) - that record
+        // is how the UI tells "scored, nothing to say yet" apart from
+        // "never scored".
         const inserted = await runPerceptionScoring(brand);
-        if (!inserted) {
-          return res.json({ success: true, data: null });
-        }
-
         res.json({ success: true, data: serializePerceptionRun(inserted) });
       } catch (error) {
         sendError(res, error, "Failed to run brand perception scoring");

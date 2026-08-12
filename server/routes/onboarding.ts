@@ -20,13 +20,14 @@ import { scrapeLogoUrl } from "../lib/logoScraper";
 import { downloadAndStoreLogo } from "../lib/logoStorage";
 import crypto from "crypto";
 import { requireUser, requireBrand, OwnershipError } from "../lib/ownership";
+import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
+import { getOpenrouterClient } from "../lib/factAgent/v2/openrouterClient";
 import {
-  aiLimitMiddleware,
-  openai,
-  safeParseJson,
-  sendError,
-  asyncHandler,
-} from "../lib/routesShared";
+  BRAND_PROFILE_SYSTEM_PROMPT,
+  brandProfileSchema,
+  parseBrandProfile,
+  type BrandProfile,
+} from "../lib/brandProfilePrompt";
 import { MODELS } from "../lib/modelConfig";
 import { storage } from "../storage";
 import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
@@ -187,55 +188,56 @@ export function setupOnboardingRoutes(app: Express) {
           }
         }
 
-        const callBrandLLM = async (context: string): Promise<Record<string, any>> => {
-          const completion = await openai.chat.completions.create({
+        const callBrandLLM = async (context: string): Promise<BrandProfile> => {
+          const client = getOpenrouterClient();
+          if (!client) throw new Error("AI service is not configured");
+          const completion = await client.chat.completions.create({
             model: MODELS.brandAutofill,
             response_format: { type: "json_object" },
             temperature: 0.3,
             messages: [
-              {
-                role: "system",
-                content: `You are an expert brand analyst. Return a JSON object with these fields: brandName, industry, description, products (array), keyValues (array), uniqueSellingPoints (array), targetAudience, brandVoice, competitors (array of {name, domain, description}).
-If unsure of a field, omit it or return empty. Never invent a URL.`,
-              },
+              { role: "system", content: BRAND_PROFILE_SYSTEM_PROMPT },
               { role: "user", content: context },
             ],
             max_tokens: 1200,
           });
-          return safeParseJson<Record<string, any>>(completion.choices[0]?.message?.content) ?? {};
+          return (
+            parseBrandProfile(completion.choices[0]?.message?.content) ??
+            brandProfileSchema.parse({})
+          );
         };
 
-        let parsed: Record<string, any> = {};
+        let parsed: BrandProfile = brandProfileSchema.parse({});
         if (pageText.length > 200) {
           sseWrite(res, { type: "log", icon: "brain", message: "Analyzing homepage content…" });
           parsed = await callBrandLLM(
             `Website URL: ${homepageUrl}\n\nWebsite content:\n${pageText}`,
           ).catch((err) => {
             logger.warn({ err, domain }, "onboarding scrape: strategy 1 LLM failed");
-            return {};
+            return brandProfileSchema.parse({});
           });
-          if (parsed.brandName) {
+          if (parsed.name) {
             sseWrite(res, {
               type: "log",
               icon: "check",
-              message: `Detected brand name: ${parsed.brandName}`,
+              message: `Detected brand name: ${parsed.name}`,
             });
           }
         }
 
-        const factsCount = (obj: Record<string, any>): number => {
+        const factsCount = (obj: BrandProfile): number => {
           let n = 0;
-          for (const key of [
-            "brandName",
-            "industry",
-            "description",
-            "targetAudience",
-            "brandVoice",
+          for (const value of [
+            obj.name,
+            obj.industry,
+            obj.description,
+            obj.targetAudience,
+            obj.brandVoice,
           ]) {
-            if (typeof obj[key] === "string" && obj[key].trim()) n += 1;
+            if (typeof value === "string" && value.trim()) n += 1;
           }
-          for (const key of ["products", "keyValues", "uniqueSellingPoints"]) {
-            if (Array.isArray(obj[key]) && obj[key].length > 0) n += 1;
+          for (const list of [obj.products, obj.keyValues, obj.uniqueSellingPoints]) {
+            if (Array.isArray(list) && list.length > 0) n += 1;
           }
           return n;
         };
@@ -288,55 +290,38 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
           if (sitemapText) {
             const merged = await callBrandLLM(
               `Website URL: ${homepageUrl}\n\nCombined page content:\n${pageText}\n\n${sitemapText}`,
-            ).catch(() => ({}) as Record<string, any>);
-            for (const [k, v] of Object.entries(merged)) {
-              if (!parsed[k] || (Array.isArray(parsed[k]) && parsed[k].length === 0)) {
-                parsed[k] = v;
+            ).catch(() => brandProfileSchema.parse({}));
+            for (const [k, v] of Object.entries(merged) as [keyof BrandProfile, unknown][]) {
+              const current = parsed[k];
+              if (!current || (Array.isArray(current) && current.length === 0)) {
+                (parsed as Record<string, unknown>)[k] = v;
               }
             }
           }
         }
 
-        if (factsCount(parsed) < 3) {
-          sseWrite(res, {
-            type: "log",
-            icon: "brain",
-            message: "Still thin - asking the model what it knows…",
-          });
-          const fallback = await callBrandLLM(
-            `What do you know about the domain ${domain}? Return the usual JSON shape.`,
-          ).catch(() => ({}) as Record<string, any>);
-          for (const [k, v] of Object.entries(fallback)) {
-            if (!parsed[k] || (Array.isArray(parsed[k]) && parsed[k].length === 0)) {
-              parsed[k] = v;
-            }
-          }
-        }
-
-        const competitors = Array.isArray(parsed.competitors)
-          ? parsed.competitors
-              .filter((c: any) => c && typeof c.name === "string")
-              .slice(0, 10)
-              .map((c: any) => ({
-                name: String(c.name).slice(0, 200),
-                domain: typeof c.domain === "string" ? c.domain.slice(0, 200) : "",
-                description: typeof c.description === "string" ? c.description.slice(0, 500) : "",
-              }))
-          : [];
+        // A third strategy used to live here: when the first two returned
+        // thin data it asked the model "What do you know about the domain
+        // X?" with NO page content at all. For any company below Wikipedia
+        // notability that is a hallucination generator, and it fired
+        // exactly when the user had least evidence to catch it - the
+        // output goes straight onto the "Confirm the brand" screen.
+        // Thin input must present as thin so the user corrects it.
 
         const data = {
-          brandName: typeof parsed.brandName === "string" ? parsed.brandName : "",
-          industry: typeof parsed.industry === "string" ? parsed.industry : "",
-          description: typeof parsed.description === "string" ? parsed.description : "",
-          products: Array.isArray(parsed.products) ? parsed.products : [],
-          keyValues: Array.isArray(parsed.keyValues) ? parsed.keyValues : [],
-          uniqueSellingPoints: Array.isArray(parsed.uniqueSellingPoints)
-            ? parsed.uniqueSellingPoints
-            : [],
-          targetAudience: typeof parsed.targetAudience === "string" ? parsed.targetAudience : "",
-          brandVoice: typeof parsed.brandVoice === "string" ? parsed.brandVoice : "",
+          brandName: parsed.name ?? "",
+          companyName: parsed.companyName ?? "",
+          industry: parsed.industry ?? "",
+          description: parsed.description ?? "",
+          tone: parsed.tone ?? "",
+          products: parsed.products,
+          keyValues: parsed.keyValues,
+          uniqueSellingPoints: parsed.uniqueSellingPoints,
+          targetAudience: parsed.targetAudience ?? "",
+          brandVoice: parsed.brandVoice ?? "",
+          nameVariations: parsed.nameVariations,
           logoUrl,
-          competitors,
+          competitors: parsed.competitors,
         };
 
         sseWrite(res, { type: "result", data });
@@ -405,6 +390,9 @@ If unsure of a field, omit it or return empty. Never invent a URL.`,
                   ? brandData.uniqueSellingPoints
                   : [],
                 brandVoice: typeof brandData.brandVoice === "string" ? brandData.brandVoice : null,
+                nameVariations: Array.isArray(brandData.nameVariations)
+                  ? brandData.nameVariations
+                  : [],
                 logoUrl: typeof brandData.logoUrl === "string" ? brandData.logoUrl : null,
                 autopilotStatus: "pending",
                 autopilotStep: 0,

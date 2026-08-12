@@ -11,7 +11,7 @@ const TERMS = [
     whyItMatters:
       "Increasingly, people get information directly from AI assistants instead of clicking through to websites. If AI engines don't know your brand, you're invisible to a growing slice of demand. GEO is the discipline of being part of those answers.",
     howVentureCiteCovers: [
-      "Citation tracking across ChatGPT, Claude, Perplexity, Gemini, DeepSeek",
+      "Citation tracking across ChatGPT, Claude, Perplexity, Gemini, DeepSeek, Grok",
       "AI-optimized content generation tuned for chunkability and authority signals",
       "GEO Signals scoring + brand fact sheet to reduce hallucinations",
     ],

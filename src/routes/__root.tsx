@@ -209,7 +209,7 @@ const SOFTWARE_APPLICATION_JSON_LD = {
   applicationCategory: "BusinessApplication",
   url: "https://venturecite.com/",
   description:
-    "VentureCite is a Generative Engine Optimization (GEO) platform that helps brands get recommended by AI engines. It tracks which brands ChatGPT, Claude, Perplexity and Gemini recommend when buyers ask what to buy, explains why, and generates the content needed to win a place on that list.",
+    "VentureCite is a Generative Engine Optimization (GEO) platform that helps brands get recommended by AI engines. It tracks which brands ChatGPT, Claude, Perplexity, Grok and Gemini recommend when buyers ask what to buy, explains why, and generates the content needed to win a place on that list.",
   offers: { "@type": "Offer", category: "SaaS" },
 };
 

@@ -9,6 +9,7 @@ import { withSlot } from "../../llmConcurrency";
 import { storage } from "../../../storage";
 import { logger } from "../../logger";
 import { MODELS } from "../../modelConfig";
+import { isGenericIndustry } from "../../genericIndustry";
 import {
   ALLOWED_KEYS,
   CURRENT_SCHEMA_VERSION,
@@ -100,7 +101,11 @@ function buildUserPrompt(args: RunSearchSourceArgs): string {
   const lines = [
     `Brand URL: ${args.brandUrl}`,
     args.brandName ? `Brand name: ${args.brandName}` : null,
-    args.industry ? `Industry hint: ${args.industry}` : null,
+    // Same gate as extractionPrompt.ts: a generic sector label anchors
+    // the researcher onto the wrong market, so it is dropped entirely.
+    args.industry && !isGenericIndustry(args.industry)
+      ? `Industry hint (unverified - if the sources contradict it, the sources win): ${args.industry}`
+      : null,
     "",
     "Visit the URL above and extract facts about THIS specific company (not other companies with similar names). Return JSON only.",
   ].filter(Boolean);

@@ -49,8 +49,17 @@ interface PersistArgs {
   sourceUrl: string;
 }
 
-function normalizeValue(v: string): string {
-  return v.toLowerCase().trim().replace(/\s+/g, " ");
+// Total on purpose. `alternatives` is read back out of a jsonb payload that
+// the extraction model contributes to (newPayload spreads f.valuePayload), so
+// an entry can arrive without a `value` at all. That threw here, and the
+// throw was swallowed as "persistFacts: write failed (non-fatal)" - which
+// meant a brand-new brand could finish a scrape with an EMPTY fact sheet and
+// no error anywhere above.
+function normalizeValue(v: unknown): string {
+  return String(v ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 /** Build a fresh sources entry from an extracted fact. */
@@ -276,7 +285,13 @@ export async function persistFacts(
           confidence: Number(existing.confidence) || 0,
         },
       ];
-      const existingAlternatives: AlternativeEntry[] = existingPayload?.alternatives ?? [];
+      // Drop malformed buckets rather than carrying them forward: an
+      // alternative without a string `value` is unusable for every
+      // comparison below, and re-persisting it spreads the corruption.
+      const existingAlternatives: AlternativeEntry[] = (existingPayload?.alternatives ?? []).filter(
+        (a): a is AlternativeEntry =>
+          !!a && typeof a.value === "string" && Array.isArray(a.sources),
+      );
       const existingValueNorm = normalizeValue(existing.factValue);
       const incomingValueNorm = normalizeValue(f.factValue);
 

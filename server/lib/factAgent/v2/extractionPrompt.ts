@@ -27,6 +27,7 @@ import {
   type Fact,
   type Domain,
 } from "@shared/factAgent/schema";
+import { isGenericIndustry } from "../../genericIndustry";
 
 export interface BuildPromptOpts {
   brandUrl: string;
@@ -73,6 +74,7 @@ CRITICAL RULES
 3. Confidence in [0.0, 1.0]. Use 1.0 only when the fact appears verbatim. 0.7-0.9 for paraphrased. 0.3-0.6 for inferred. Below 0.3 omit.
 4. sourceExcerpt must be a verbatim ≤200-char snippet from the page that supports the fact.
 5. sourceUrl must be the page URL you are extracting from.
+6. If the page describes what the company SELLS (a homepage, product page or pricing page almost always does), you MUST emit an \`offerings.productCategory\` fact. Write the specific product category a buyer would type into a search box while shopping for it: 2-6 words, e.g. "Enterprise AI Voice Agents", "Headless E-commerce Platforms", "Remote Patient Monitoring Devices". NEVER a top-level sector word - "Technology", "Software", "SaaS", "AI", "Healthcare", "Finance", "Media", "General" are all rejected. Test it: could a reader name three competitors of this company from your category alone? If it would fit Salesforce, Pfizer and Stripe at once, go narrower. The same rule applies to \`identity.industry\` if you emit one.
 
 CONTROLLED VOCABULARY - pick factKey from this list exactly. Do not invent new keys.
 ${VOCAB_BLOCK}
@@ -92,7 +94,12 @@ export function buildExtractionPrompt(payload: string, opts: BuildPromptOpts): B
   const ctx = [
     `Brand URL: ${opts.brandUrl}`,
     opts.brandName ? `Brand name: ${opts.brandName}` : null,
-    opts.industry ? `Industry hint: ${opts.industry}` : null,
+    // A generic sector label is worse than no hint: it anchors the
+    // extractor onto the wrong market. Drop it, and mark a specific one
+    // as unverified so the page always wins.
+    opts.industry && !isGenericIndustry(opts.industry)
+      ? `Industry hint (unverified - if the page contradicts it, the page wins): ${opts.industry}`
+      : null,
   ]
     .filter(Boolean)
     .join("\n");

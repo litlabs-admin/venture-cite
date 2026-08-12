@@ -61,6 +61,7 @@ export interface FullScrapeBrandInput {
 // be retuned between Vercel Hobby (10 s function budget) and Pro (60 s)
 // with a single env flip. Pro default = 25 s; Hobby = ~6 s.
 import { LLM_CALL_TIMEOUT_MS } from "./vercelBudget";
+import { applyFactSheetToBrand } from "./brandProfileWriteback";
 
 // Build provider clients lazily; same pattern as factSheetV2.ts. A
 // missing OPENROUTER_API_KEY just disables the Claude fallback rather
@@ -639,6 +640,19 @@ export async function runFullScrapeForBrand(
             outcome: "ok",
             metadata: { errorKind: null },
           });
+          // Reconcile the brands row against what we just verified. Runs
+          // AFTER the terminal write (that write is the SLA - nothing here
+          // may be able to wedge it) and never throws. Hooked to the scrape
+          // rather than to onboarding so every rescrape self-corrects,
+          // including the cron and the manual full-rescrape route.
+          try {
+            await applyFactSheetToBrand(brand.id, activeRunId);
+          } catch (writebackErr) {
+            logger.warn(
+              { err: writebackErr, brandId: brand.id, runId: activeRunId },
+              "runFullScrape: brand profile write-back failed (non-fatal)",
+            );
+          }
         }
         await flushEvents();
       } catch (callbackErr) {

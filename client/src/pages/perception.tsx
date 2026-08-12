@@ -153,6 +153,7 @@ const LOGO_FILES: Record<string, string> = {
   Perplexity: "perplexity",
   Gemini: "gemini",
   DeepSeek: "deepseek",
+  Grok: "grok",
 };
 
 function PlatformLogo({ platform }: { platform: string }) {
@@ -327,7 +328,8 @@ export default function PerceptionPage() {
       </div>
 
       {!perception ? (
-        // NEVER SCORED - a first-class empty state, not an error.
+        // NEVER SCORED - no run row exists at all. A first-class empty
+        // state, not an error.
         <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-vc-default py-16 text-center">
           <p className="text-body text-vc-tertiary">
             This brand has never been scored for perception.
@@ -335,6 +337,22 @@ export default function PerceptionPage() {
           <p className="text-data text-vc-hover">
             Run a scoring pass to see how AI describes {selectedBrand?.name ?? "this brand"} across
             trust, quality, value, market, and innovation.
+          </p>
+        </div>
+      ) : evidenceCount === 0 ? (
+        // SCORED, NO EVIDENCE - a run happened, but the brand was never
+        // named in any stored AI answer, so there was nothing to judge.
+        // Distinct from "never scored": this tells the user WHY it's empty
+        // and what changes it, instead of rendering a dashboard of dashes.
+        <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-vc-default py-16 text-center">
+          <p className="text-body text-vc-tertiary">
+            No AI answer named {selectedBrand?.name ?? "this brand"} yet, so there is nothing to
+            score.
+          </p>
+          <p className="text-data text-vc-hover">
+            Perception is judged only from AI answers that mention the brand. Once{" "}
+            {selectedBrand?.name ?? "this brand"} is cited in an AI answer, re-score to see trust,
+            quality, value, market, and innovation.
           </p>
         </div>
       ) : (

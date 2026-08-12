@@ -67,6 +67,15 @@ const PRICING_PER_1K_TOKENS_CENTS: Record<string, { in: number; out: number }> =
   // pre-dated the fix still cost-estimate sensibly via the
   // `startsWith` matcher in estimateCostCents.
   "deepseek/deepseek-v3.2": { in: 0.027, out: 0.041 },
+  // Prices below verified 2026-08-13 against https://openrouter.ai/api/v1/models.
+  // Conversion: dollars per 1M / 10 = cents per 1k. A missing row here is
+  // not an error - it silently falls through to FALLBACK_PRICING and makes
+  // every cost row for that model fiction.
+  "google/gemini-3.1-flash-lite": { in: 0.025, out: 0.15 }, // $0.25 / $1.50 per 1M
+  "deepseek/deepseek-v4-flash": { in: 0.014, out: 0.028 }, // $0.14 / $0.28 per 1M
+  "x-ai/grok-4.3": { in: 0.125, out: 0.25 }, // $1.25 / $2.50 per 1M
+  // Analysis tier - brand profile, competitor discovery, prompt generation.
+  "openai/gpt-5.6-luna": { in: 0.01, out: 0.06 }, // $0.10 / $0.60 per 1M
   // OpenAI web-search chat model used for the ChatGPT citation check.
   "gpt-4o-mini-search-preview": { in: 0.015, out: 0.06 },
 };

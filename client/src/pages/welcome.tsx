@@ -34,13 +34,16 @@ type Competitor = { name: string; domain: string; description?: string };
 
 type ScrapedData = {
   brandName: string;
+  companyName: string;
   industry: string;
   description: string;
+  tone: string;
   products: string[];
   keyValues: string[];
   uniqueSellingPoints: string[];
   targetAudience: string;
   brandVoice: string;
+  nameVariations: string[];
   logoUrl: string | null;
   competitors: Competitor[];
 };
@@ -158,7 +161,7 @@ const PHASES: { key: string; label: string; desc: string }[] = [
   {
     key: "citations",
     label: "Measuring AI citations",
-    desc: "Asking ChatGPT, Claude, Gemini, Perplexity and DeepSeek those questions and recording where you're cited.",
+    desc: "Asking ChatGPT, Claude, Gemini, Perplexity, DeepSeek and Grok those questions and recording where you're cited.",
   },
 ];
 
@@ -400,13 +403,16 @@ export default function Welcome() {
       const body = {
         brandData: {
           brandName: editName.trim(),
+          companyName: scrapedData?.companyName ?? "",
           industry: editIndustry.trim(),
           description: editDescription.trim(),
+          tone: scrapedData?.tone ?? "",
           targetAudience: editTargetAudience.trim(),
           brandVoice: editBrandVoice.trim(),
           products: editProducts,
           keyValues: editKeyValues,
           uniqueSellingPoints: editUsps,
+          nameVariations: scrapedData?.nameVariations ?? [],
           logoUrl: scrapedData?.logoUrl ?? null,
           website,
         },

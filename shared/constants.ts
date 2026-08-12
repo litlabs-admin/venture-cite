@@ -18,10 +18,10 @@ export const AI_PLATFORMS_ACTIVE = [
   "Perplexity",
   "Gemini",
   "DeepSeek",
+  "Grok",
 ] as const;
 
 export const AI_PLATFORMS_PLANNED = [
-  "Grok",
   "Microsoft Copilot",
   "Meta AI",
   "Google AI",
