@@ -15,6 +15,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   DOMAINS,
   FactsResponseSchema,
+  buildFactsJsonSchema,
   isAllowedFactKey,
   type Domain,
   type Fact,
@@ -29,6 +30,20 @@ import { filterByBrandDomain } from "./domainAllowlist";
 const VOCAB_BLOCK = DOMAINS.map(
   (d) => `  ${d}: ${(ALLOWED_KEYS[d] as readonly string[]).join(", ")}`,
 ).join("\n");
+
+// Same strict JSON Schema the static-page extractor uses (extractionPrompt.ts).
+// perplexity/sonar rejects `response_format: { type: "json_object" }` as of
+// 2026-08 ("response_format.type must be one of json_schema, text"). Reusing
+// this builder means the two facts sources can never drift in shape, and the
+// API now enforces the shape itself instead of relying on prose.
+const FACTS_JSON_SCHEMA = buildFactsJsonSchema();
+// `json_schema` is typed as Record<string, unknown> upstream (built once for
+// both OpenAI strict mode and this call), so cast at the call site the same
+// way runFullScrape.ts does for its own responseFormat pass-through.
+const RESPONSE_FORMAT = {
+  type: "json_schema" as const,
+  json_schema: FACTS_JSON_SCHEMA,
+} as never;
 
 export interface RunSearchSourceArgs {
   brandId: string;
@@ -68,7 +83,7 @@ function cacheKey(brandId: string, brandUrl: string): string {
 
 const SYSTEM_PROMPT = `You are a brand-facts researcher.
 
-Visit the brand's URL and closely-linked pages (about, team, pricing, contact, blog, press) and extract structured facts about the company. Return JSON only.
+Visit the brand's URL and closely-linked pages (about, team, pricing, contact, blog, press) and extract structured facts about the company. The response schema is enforced - you cannot return anything else.
 
 CRITICAL RULES:
 1. Every fact MUST have a sourceUrl. Use the URL of the page you took the fact from.
@@ -79,23 +94,7 @@ CRITICAL RULES:
 CONTROLLED VOCABULARY - pick factKey from this list exactly. Do not invent new keys.
 ${VOCAB_BLOCK}
 
-If a fact genuinely doesn't fit any of the above, use factKey="other" and put a short label in valuePayload.otherLabel.
-
-Return JSON in exactly this shape:
-{
-  "facts": [
-    {
-      "domain": "identity"|"offerings"|"positioning"|"team"|"operations"|"credentials"|"growth"|"contact",
-      "factKey": "<one of the controlled-vocab keys above>",
-      "factValue": "<value>",
-      "valueType": "string"|"number"|"array",
-      "valuePayload": null|object,
-      "confidence": 0.0..1.0,
-      "sourceExcerpt": "<verbatim snippet>",
-      "sourceUrl": "<page URL>"
-    }
-  ]
-}`;
+If a fact genuinely doesn't fit any of the above, use factKey="other" and put a short label in valuePayload.otherLabel.`;
 
 function buildUserPrompt(args: RunSearchSourceArgs): string {
   const lines = [
@@ -149,7 +148,7 @@ export async function runSearchSource(args: RunSearchSourceArgs): Promise<Search
     raw = await withSlot("perplexity", args.runId, async () => {
       const res = await client.chat.completions.create({
         model: MODELS.citationPerplexity,
-        response_format: { type: "json_object" },
+        response_format: RESPONSE_FORMAT,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: buildUserPrompt(args) },
@@ -158,7 +157,14 @@ export async function runSearchSource(args: RunSearchSourceArgs): Promise<Search
       return res.choices?.[0]?.message?.content ?? "";
     });
   } catch (err) {
-    logger.warn({ err, brandId: args.brandId, runId: args.runId }, "sourceSearch: provider error");
+    // This is the ONLY source of facts from live web search. A provider
+    // rejection here silently zeroes out this whole source unless the log
+    // says so - state the consequence, not just the error, so it is
+    // greppable when the provider changes its API contract again.
+    logger.warn(
+      { err, brandId: args.brandId, runId: args.runId },
+      "sourceSearch: provider error - search-LLM source contributed ZERO facts for this brand",
+    );
     return {
       status: "failed",
       facts: [],
@@ -184,7 +190,7 @@ export async function runSearchSource(args: RunSearchSourceArgs): Promise<Search
         repairRaw = await withSlot("perplexity", args.runId, async () => {
           const res = await client.chat.completions.create({
             model: MODELS.citationPerplexity,
-            response_format: { type: "json_object" },
+            response_format: RESPONSE_FORMAT,
             messages: [
               { role: "system", content: SYSTEM_PROMPT },
               { role: "user", content: buildUserPrompt(args) },

@@ -498,9 +498,8 @@ export default function MentionsTab({ brandId }: MentionsTabProps) {
                       .{" "}
                       {blockedSources.length > 0 ? (
                         <>
-                          {blockedSources.map((b) => b.source).join(" and ")}{" "}
-                          {blockedSources.length === 1 ? "refused" : "refused"} the request, so that
-                          source was not actually searched:{" "}
+                          {blockedSources.map((b) => b.source).join(" and ")} refused the request,
+                          so that source was not actually searched:{" "}
                           <span className="text-vc-secondary">{blockedSources[0].reason}</span>.
                           Re-run the scan later.{" "}
                         </>

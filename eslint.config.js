@@ -22,6 +22,11 @@ export default tseslint.config(
       // linters and formatters. The plugin rewrites it on every dev-server
       // start, so anything we "fix" here comes straight back.
       "src/routeTree.gen.ts",
+      // Vercel build output. `api/_bundle.js` is a generated server bundle,
+      // not source: it is gitignored, no config references it, and linting it
+      // reported 233 no-undef errors for Node globals - every lint error in
+      // the repo came from this one generated file.
+      "api/**",
       // Local vendored tool/skill caches - not project source, never lint
       // (also gitignored). Their browser/UMD bundles otherwise flood the
       // report and break lint-staged if accidentally staged.

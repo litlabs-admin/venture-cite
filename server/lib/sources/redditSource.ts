@@ -276,7 +276,12 @@ async function scanViaPublic(
   if (mentions.length === 0 && failures.length === variations.length) {
     return {
       mentions: [],
-      failed: `reddit: ${failures[0] ?? "all variation queries failed"} (public JSON + RSS both blocked - Reddit refuses unauthenticated traffic)`,
+      // Report what happened, not why. Reddit answers some hosts and
+      // refuses others: it returns 403/429 to local and datacenter IPs that
+      // it rate-limits, while the deployed environment gets served normally.
+      // Naming a universal cause here put a false explanation in front of
+      // the user on the one environment where the source works.
+      failed: `reddit: ${failures[0] ?? "all variation queries failed"} (public JSON and RSS both refused this request)`,
     };
   }
 

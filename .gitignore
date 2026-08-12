@@ -117,3 +117,6 @@ brainstorms/
 .codex/
 # Superpowers specs, plans and baselines
 !docs/superpowers/**/*.md
+
+# Vercel build output (generated server bundle, not source)
+api/

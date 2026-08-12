@@ -57,9 +57,13 @@ export const MODELS = {
   // citation-mining pass. Both call sites must use this key: they share
   // one OpenRouter client, so a bare OpenAI snapshot name would 404.
   competitorDiscovery: ANALYSIS_MODEL,
-  // ChatGPT citation check - direct OpenAI client.
-  citationChatGPT: OPENAI_MINI_SNAPSHOT,
-  // The remaining four platforms go through OpenRouter. Slugs verified
+  // No `citationChatGPT` key: the ChatGPT citation check needs a
+  // web-grounded model, so it uses `gpt-4o-mini-search-preview`, declared
+  // directly on CITATION_MODELS.ChatGPT below. A key here holding the
+  // non-search snapshot was read by nothing and stated the wrong model -
+  // the same "edit the obvious place, change nothing" trap that let the
+  // DeepSeek slug 404 in production.
+  // The other five platforms go through OpenRouter. Slugs verified
   // against https://openrouter.ai/api/v1/models on 2026-04-16 - edit here
   // if OpenRouter renames or deprecates any of them.
   citationClaude: "anthropic/claude-haiku-4.5",
