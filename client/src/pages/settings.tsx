@@ -32,6 +32,17 @@ import { useTourState, useTourStatePatch } from "@/hooks/useTourState";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
+import { PanelLabel } from "@/components/dashboard-panels/primitives";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type NotificationPreference = {
   type: string;
@@ -291,12 +302,101 @@ function PasswordSection() {
 }
 
 // Billing - bounces the user to a Stripe customer portal session.
+interface SubscriptionInfo {
+  status: string;
+  planName: string | null;
+  tier: string | null;
+  amount: number | null;
+  currency: string;
+  interval: string;
+  currentPeriodEnd?: number;
+  cancelAtPeriodEnd: boolean;
+  trialEnd?: number | null;
+}
+
+interface InvoiceRow {
+  id: string;
+  number: string | null;
+  status: string;
+  amountPaid: number;
+  amountDue: number;
+  currency: string;
+  created: number;
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+}
+
+const money = (cents: number, currency: string) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(
+    cents / 100,
+  );
+
+const shortDate = (unixSeconds: number) =>
+  new Date(unixSeconds * 1000).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
 function BillingSection() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [confirmCancel, setConfirmCancel] = useState(false);
+
   // resolveTier, not the raw column - a lapsed trial showed "Current plan:
   // trial" while having no entitlements at all.
   const plan = user ? resolveTier(user) : "free";
+
+  const { data: subResp, isLoading: subLoading } = useQuery<{
+    success: boolean;
+    data: SubscriptionInfo | null;
+  }>({ queryKey: ["/api/billing/subscription"] });
+  const sub = subResp?.data ?? null;
+
+  const { data: invResp, isLoading: invLoading } = useQuery<{
+    success: boolean;
+    data: InvoiceRow[];
+  }>({ queryKey: ["/api/billing/invoices"] });
+  const invoices = invResp?.data ?? [];
+
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["/api/billing/subscription"] });
+    void queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+  };
+
+  const cancel = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/billing/cancel")).json(),
+    onSuccess: (data: { success?: boolean; error?: string }) => {
+      setConfirmCancel(false);
+      if (!data?.success) {
+        toast({ description: data?.error ?? "Could not cancel", variant: "destructive" });
+        return;
+      }
+      refresh();
+      toast({
+        title: "Subscription cancelled",
+        description: "You keep full access until the end of the period you have paid for.",
+      });
+    },
+    onError: (err: unknown) =>
+      toast({ description: getApiErrorMessage(err, "Could not cancel"), variant: "destructive" }),
+  });
+
+  const resume = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/billing/resume")).json(),
+    onSuccess: (data: { success?: boolean; error?: string }) => {
+      if (!data?.success) {
+        toast({ description: data?.error ?? "Could not resume", variant: "destructive" });
+        return;
+      }
+      refresh();
+      toast({ title: "Subscription resumed", description: "Your plan will renew as normal." });
+    },
+    onError: (err: unknown) =>
+      toast({ description: getApiErrorMessage(err, "Could not resume"), variant: "destructive" }),
+  });
+
   const openPortal = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/billing/portal-session");
@@ -321,23 +421,162 @@ function BillingSection() {
       }),
   });
 
+  const trialing = sub?.status === "trialing";
+
   return (
     <Panel label="Billing">
-      <p className="mb-4 text-data text-vc-tertiary">
-        Manage subscription, payment method, and invoices through Stripe.
-      </p>
-      <div className="space-y-3">
-        <p className="text-caption text-vc-tertiary" data-testid="text-billing-plan">
-          Current plan: <span className="font-medium text-vc-primary">{plan}</span>
-        </p>
-        <Button
-          onClick={() => openPortal.mutate()}
-          disabled={openPortal.isPending}
-          data-testid="button-manage-billing"
-        >
-          {openPortal.isPending ? "Opening…" : "Manage billing"}
-        </Button>
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <p className="text-caption text-vc-tertiary" data-testid="text-billing-plan">
+            Current plan: <span className="font-medium text-vc-primary">{plan}</span>
+          </p>
+
+          {subLoading ? (
+            <p className="text-caption text-vc-tertiary">Loading your subscription…</p>
+          ) : !sub ? (
+            <p className="text-caption text-vc-tertiary" data-testid="text-no-subscription">
+              No active subscription.
+            </p>
+          ) : (
+            <div className="space-y-1 text-caption text-vc-secondary">
+              <p data-testid="text-subscription-summary">
+                {sub.planName ?? "Subscription"}
+                {sub.amount != null && ` - ${money(sub.amount, sub.currency)}/${sub.interval}`}
+              </p>
+              {/* The three states a live subscription can be in are worded
+                  differently on purpose. "Renews" and "ends" are opposite
+                  promises, and a trial that is about to take money for the
+                  first time deserves to say so plainly. */}
+              {sub.cancelAtPeriodEnd ? (
+                <p className="font-medium text-warning" data-testid="text-cancels-on">
+                  Cancels on {sub.currentPeriodEnd ? shortDate(sub.currentPeriodEnd) : "period end"}
+                  . You keep access until then.
+                </p>
+              ) : trialing && sub.trialEnd ? (
+                <p data-testid="text-trial-ends">
+                  Free trial - first charge on {shortDate(sub.trialEnd)}
+                </p>
+              ) : sub.currentPeriodEnd ? (
+                <p data-testid="text-renews-on">Renews on {shortDate(sub.currentPeriodEnd)}</p>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => openPortal.mutate()}
+            disabled={openPortal.isPending}
+            data-testid="button-manage-billing"
+          >
+            {openPortal.isPending ? "Opening…" : "Payment method"}
+          </Button>
+
+          {/* Cancel and Resume are mutually exclusive - a subscription is
+              either running or already winding down. Showing both would put a
+              destructive action next to its own undo. */}
+          {sub && !sub.cancelAtPeriodEnd && (
+            <Button
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setConfirmCancel(true)}
+              data-testid="button-cancel-subscription"
+            >
+              Cancel subscription
+            </Button>
+          )}
+          {sub?.cancelAtPeriodEnd && (
+            <Button
+              onClick={() => resume.mutate()}
+              disabled={resume.isPending}
+              data-testid="button-resume-subscription"
+            >
+              {resume.isPending ? "Resuming…" : "Resume subscription"}
+            </Button>
+          )}
+        </div>
+
+        <div>
+          <PanelLabel>Invoices</PanelLabel>
+          {invLoading ? (
+            <p className="mt-2 text-caption text-vc-tertiary">Loading invoices…</p>
+          ) : invoices.length === 0 ? (
+            <p className="mt-2 text-caption text-vc-tertiary" data-testid="text-no-invoices">
+              No invoices yet. Your first one appears after the trial converts.
+            </p>
+          ) : (
+            <ul className="mt-2 divide-y divide-vc-subtle" data-testid="list-invoices">
+              {invoices.map((inv) => (
+                <li key={inv.id} className="flex items-center justify-between gap-4 py-2">
+                  <div className="min-w-0">
+                    <p className="text-caption text-vc-primary">
+                      {shortDate(inv.created)}
+                      {inv.number && (
+                        <span className="ml-2 font-mono text-label text-vc-tertiary">
+                          {inv.number}
+                        </span>
+                      )}
+                    </p>
+                    {/* Anything not paid is called out. A quiet row for an
+                        unpaid invoice is how customers end up surprised by a
+                        lapsed account. */}
+                    {inv.status !== "paid" && (
+                      <p className="text-label capitalize text-warning">{inv.status}</p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="font-mono text-data tabular-nums text-vc-secondary">
+                      {money(inv.status === "paid" ? inv.amountPaid : inv.amountDue, inv.currency)}
+                    </span>
+                    {inv.invoicePdf && (
+                      <a
+                        href={inv.invoicePdf}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-label font-medium text-vc-accent hover:underline"
+                      >
+                        PDF
+                      </a>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel your subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {trialing
+                ? `You won't be charged. Your trial keeps running until ${
+                    sub?.trialEnd ? shortDate(sub.trialEnd) : "it ends"
+                  }.`
+                : `You keep full access until ${
+                    sub?.currentPeriodEnd
+                      ? shortDate(sub.currentPeriodEnd)
+                      : "the end of this period"
+                  }.`}{" "}
+              After that your brands and results stay visible, but scans and content generation
+              stop. You can resume any time before then.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep my plan</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancel.mutate()}
+              disabled={cancel.isPending}
+              data-testid="button-confirm-cancel"
+            >
+              {cancel.isPending ? "Cancelling…" : "Cancel subscription"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Panel>
   );
 }

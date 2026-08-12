@@ -18,6 +18,20 @@ import { isAuthenticated } from "../auth";
 import { logger } from "../lib/logger";
 import { TRIAL_DAYS } from "@shared/schema";
 import { captureAndFlush } from "../lib/sentryReport";
+
+// When the current period ends, in unix seconds.
+//
+// Stripe moved current_period_end OFF the subscription and onto the
+// subscription ITEM. Reading it from the subscription returns undefined on
+// this API version, which rendered "Cancels on period end" with no date - the
+// one fact a cancellation notice actually needs. Subscription-level is kept as
+// a fallback so an older API version still resolves.
+function periodEnd(sub: import("stripe").Stripe.Subscription): number | undefined {
+  const item = sub.items?.data?.[0] as unknown as { current_period_end?: number } | undefined;
+  const onSub = (sub as unknown as { current_period_end?: number }).current_period_end;
+  return item?.current_period_end ?? onSub ?? sub.cancel_at ?? undefined;
+}
+
 export function setupBillingRoutes(app: Express): void {
   // Foundations Plan 3 Task 2: Stripe customer-portal session for the
   // expanded Settings page. Exposed under /api/billing/* so the new
@@ -218,13 +232,24 @@ export function setupBillingRoutes(app: Express): void {
         // An existing active subscription is therefore an UPDATE, not a
         // purchase: swap the item's price in place and let Stripe prorate.
         if (customerId) {
-          const active = await stripe.subscriptions.list({
+          // status "all", then filter - NOT status:"active".
+          //
+          // A trialing subscription is a real, live subscription with a card
+          // behind it; Stripe just has not charged it yet. Listing only
+          // "active" missed every trialing customer, so anyone upgrading
+          // during their trial fell through to Checkout and ended up with a
+          // SECOND subscription - the exact double-billing this block exists
+          // to prevent. Most upgrades happen during a trial, so the guard was
+          // missing the common case.
+          const existing = await stripe.subscriptions.list({
             customer: customerId,
-            status: "active",
-            limit: 10,
+            status: "all",
+            limit: 20,
           });
 
-          const current = active.data[0];
+          const current = existing.data.find(
+            (x) => x.status === "active" || x.status === "trialing",
+          );
           if (current) {
             const item = current.items.data[0];
             if (item?.price?.id === priceId) {
@@ -285,6 +310,211 @@ export function setupBillingRoutes(app: Express): void {
         logger.error({ err: error }, "stripe.checkout failed");
         captureAndFlush(error, { tags: { source: "billing.ts:137" } });
         res.status(500).json({ success: false, error: "Failed to create checkout session" });
+      }
+    }),
+  );
+
+  // ─── Subscription state ────────────────────────────────────────────────────
+  // Everything the Settings billing panel needs in one call: what they are on,
+  // when it renews, whether it is already set to cancel, and the trial end.
+  //
+  // Read straight from Stripe rather than the users row. The row carries the
+  // TIER (what they may do); Stripe carries the SUBSCRIPTION (what happens to
+  // their money and when). Rendering a renewal date from our own copy would
+  // eventually show a date Stripe disagrees with.
+  app.get(
+    "/api/billing/subscription",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      const sessionUser = (req as any).user;
+      const dbUser = await storage.getUser(sessionUser.id);
+      if (!dbUser?.stripeCustomerId) {
+        // Never subscribed. Not an error - the panel renders its empty state.
+        return res.json({ success: true, data: null });
+      }
+      try {
+        const { getStripeClient } = await import("../stripeClient");
+        const stripe = getStripeClient();
+        const subs = await stripe.subscriptions.list({
+          customer: dbUser.stripeCustomerId,
+          status: "all",
+          limit: 10,
+          // "data.items.data.price" is already Stripe's 4-level expand limit;
+          // adding ".product" makes it 5 and the whole call 400s
+          // (property_expansion_max_depth), which surfaced as the billing
+          // panel silently showing no subscription at all. The product is
+          // fetched separately below instead.
+          expand: ["data.items.data.price"],
+        });
+        // A customer can carry cancelled subscriptions from earlier signups;
+        // the live one is what the panel is about.
+        const sub =
+          subs.data.find((x) => x.status === "active" || x.status === "trialing") ??
+          subs.data.find((x) => x.status === "past_due");
+        if (!sub) return res.json({ success: true, data: null });
+
+        const item = sub.items.data[0];
+        // price.product is an id string at this expand depth. One extra fetch
+        // is cheaper than losing the whole panel to an expansion error.
+        const productId =
+          typeof item?.price?.product === "string" ? item.price.product : item?.price?.product?.id;
+        const product = productId
+          ? await stripe.products.retrieve(productId).catch(() => undefined)
+          : undefined;
+        return res.json({
+          success: true,
+          data: {
+            status: sub.status,
+            planName: product?.name ?? null,
+            tier: product?.metadata?.tier ?? null,
+            amount: item?.price?.unit_amount ?? null,
+            currency: item?.price?.currency ?? "usd",
+            interval: item?.price?.recurring?.interval ?? "month",
+            currentPeriodEnd: periodEnd(sub),
+            cancelAtPeriodEnd: sub.cancel_at_period_end,
+            trialEnd: sub.trial_end,
+          },
+        });
+      } catch (err) {
+        logger.error({ err, userId: sessionUser.id }, "billing.subscription failed");
+        captureAndFlush(err, { tags: { source: "billing.subscription" } });
+        return res.status(502).json({ success: false, error: "Could not load your subscription" });
+      }
+    }),
+  );
+
+  // ─── Cancel ────────────────────────────────────────────────────────────────
+  // cancel_at_period_end, never an immediate delete. They paid for the period,
+  // so they keep it; an immediate cancel takes away time already bought AND is
+  // terminal - the subscription cannot be revived, only replaced by a new one.
+  // Deferring keeps "Cancel" reversible right up to the renewal date, which is
+  // what the resume route below exists for.
+  //
+  // Access is NOT revoked here. The tier changes only when Stripe actually ends
+  // the subscription and fires customer.subscription.deleted.
+  app.post(
+    "/api/billing/cancel",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      const sessionUser = (req as any).user;
+      const dbUser = await storage.getUser(sessionUser.id);
+      if (!dbUser?.stripeCustomerId) {
+        return res.status(400).json({ success: false, error: "No subscription to cancel." });
+      }
+      try {
+        const { getStripeClient } = await import("../stripeClient");
+        const stripe = getStripeClient();
+        const subs = await stripe.subscriptions.list({
+          customer: dbUser.stripeCustomerId,
+          status: "all",
+          limit: 10,
+        });
+        const sub = subs.data.find((x) => x.status === "active" || x.status === "trialing");
+        if (!sub) {
+          return res.status(400).json({ success: false, error: "No active subscription." });
+        }
+        const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: true });
+        logger.info(
+          { userId: sessionUser.id, subscriptionId: sub.id },
+          "billing.cancel: set to cancel at period end",
+        );
+        return res.json({
+          success: true,
+          data: {
+            cancelAtPeriodEnd: true,
+            endsAt: periodEnd(updated),
+          },
+        });
+      } catch (err) {
+        logger.error({ err, userId: sessionUser.id }, "billing.cancel failed");
+        captureAndFlush(err, { tags: { source: "billing.cancel" } });
+        return res.status(502).json({ success: false, error: "Could not cancel right now" });
+      }
+    }),
+  );
+
+  // Undo a pending cancellation, any time before the period actually ends.
+  app.post(
+    "/api/billing/resume",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      const sessionUser = (req as any).user;
+      const dbUser = await storage.getUser(sessionUser.id);
+      if (!dbUser?.stripeCustomerId) {
+        return res.status(400).json({ success: false, error: "No subscription found." });
+      }
+      try {
+        const { getStripeClient } = await import("../stripeClient");
+        const stripe = getStripeClient();
+        const subs = await stripe.subscriptions.list({
+          customer: dbUser.stripeCustomerId,
+          status: "all",
+          limit: 10,
+        });
+        const sub = subs.data.find(
+          (x) => (x.status === "active" || x.status === "trialing") && x.cancel_at_period_end,
+        );
+        if (!sub) {
+          return res
+            .status(400)
+            .json({ success: false, error: "Nothing to resume - this plan is not cancelling." });
+        }
+        await stripe.subscriptions.update(sub.id, { cancel_at_period_end: false });
+        logger.info(
+          { userId: sessionUser.id, subscriptionId: sub.id },
+          "billing.resume: cancellation reversed",
+        );
+        return res.json({ success: true });
+      } catch (err) {
+        logger.error({ err, userId: sessionUser.id }, "billing.resume failed");
+        captureAndFlush(err, { tags: { source: "billing.resume" } });
+        return res.status(502).json({ success: false, error: "Could not resume right now" });
+      }
+    }),
+  );
+
+  // ─── Invoices ──────────────────────────────────────────────────────────────
+  // Read-only list for the Settings panel. Only the fields the table renders
+  // are returned: a raw Stripe invoice carries far more than a billing table
+  // needs, and shipping all of it to the browser would leak internal ids and
+  // customer detail for no benefit.
+  app.get(
+    "/api/billing/invoices",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      const sessionUser = (req as any).user;
+      const dbUser = await storage.getUser(sessionUser.id);
+      // No billing account yet is an empty list, not an error.
+      if (!dbUser?.stripeCustomerId) return res.json({ success: true, data: [] });
+      try {
+        const { getStripeClient } = await import("../stripeClient");
+        const stripe = getStripeClient();
+        const invoices = await stripe.invoices.list({
+          customer: dbUser.stripeCustomerId,
+          limit: 24,
+        });
+        return res.json({
+          success: true,
+          data: invoices.data
+            // A draft is not a bill anyone owes yet; listing one reads as a
+            // surprise charge.
+            .filter((inv) => inv.status && inv.status !== "draft")
+            .map((inv) => ({
+              id: inv.id,
+              number: inv.number,
+              status: inv.status,
+              amountPaid: inv.amount_paid,
+              amountDue: inv.amount_due,
+              currency: inv.currency,
+              created: inv.created,
+              hostedInvoiceUrl: inv.hosted_invoice_url,
+              invoicePdf: inv.invoice_pdf,
+            })),
+        });
+      } catch (err) {
+        logger.error({ err, userId: sessionUser.id }, "billing.invoices failed");
+        captureAndFlush(err, { tags: { source: "billing.invoices" } });
+        return res.status(502).json({ success: false, error: "Could not load invoices" });
       }
     }),
   );
