@@ -149,3 +149,22 @@ describe("dunning", () => {
     expect(helper).toContain("return false;");
   });
 });
+
+describe("trial visibility", () => {
+  it("stamps trial_ends_at from checkout, not only from subscription.updated", () => {
+    // checkout.session.completed is the ONLY event a brand-new subscriber
+    // gets; Stripe sends no `updated` for a subscription it just created. With
+    // trial_ends_at left null, TrialBanner - which reads exactly that field -
+    // renders nothing, so a 14-day trial ran to its first charge without the
+    // app ever mentioning it. Found on a real production signup.
+    const checkout = handlers.slice(
+      handlers.indexOf('case "checkout.session.completed"'),
+      handlers.indexOf('case "customer.subscription.updated"'),
+    );
+    expect(checkout).toContain("updates.trialEndsAt");
+    expect(checkout).toContain('sub.status === "trialing"');
+    // Cleared when it is not a trial, so a stale date cannot keep a countdown
+    // alive - the same rule subscription.updated follows.
+    expect(checkout).toContain("new Date(sub.trial_end * 1000) : null");
+  });
+});

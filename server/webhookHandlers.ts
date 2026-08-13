@@ -153,6 +153,7 @@ export class WebhookHandlers {
           stripeCustomerId?: string;
           stripeSubscriptionId?: string;
           accessTier?: string;
+          trialEndsAt?: Date | null;
         } = {};
 
         if (session.customer && typeof session.customer === "string") {
@@ -166,6 +167,18 @@ export class WebhookHandlers {
               expand: ["items.data.price.product"],
             });
             const product = sub.items.data[0]?.price?.product as Stripe.Product | undefined;
+            // Mirror the trial end here, not only in subscription.updated.
+            // This is the ONLY event a brand-new subscriber gets - Stripe does
+            // not send an `updated` for a subscription it has just created -
+            // so leaving it out left trial_ends_at null for every new
+            // customer, and TrialBanner reads that field for its countdown.
+            // The result was a 14-day trial that the app never mentioned: no
+            // countdown, no warning, then a charge. Verified against a real
+            // production signup, whose row had a null trial_ends_at while
+            // Stripe held a trial_end two weeks out.
+            updates.trialEndsAt =
+              sub.status === "trialing" && sub.trial_end ? new Date(sub.trial_end * 1000) : null;
+
             const tier = tierFromProduct(product);
             if (tier) {
               updates.accessTier = tier;

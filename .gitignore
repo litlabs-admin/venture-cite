@@ -128,3 +128,6 @@ brainstorms/
 
 # Vercel build output (generated server bundle, not source)
 api/
+
+# Local secret drops (webhook signing secrets etc) - never commit these
+*.local.txt
