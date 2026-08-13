@@ -104,3 +104,48 @@ describe("checkout duplicate-subscription guard", () => {
     expect(billing).toContain("idempotencyKey");
   });
 });
+
+// ─── Dunning ─────────────────────────────────────────────────────────────────
+// Both of these were found by driving real test-mode Stripe rather than by
+// reading the code, and both are the kind of bug that only shows up on the
+// unhappy path days after signup.
+
+describe("dunning", () => {
+  it("keeps a past_due customer entitled while Stripe retries", () => {
+    // The first decline used to drop them straight to readonly - while the
+    // payment_failed email was telling them their account stays active, and
+    // while Smart Retries were still days from giving up.
+    const entitled = handlers.slice(
+      handlers.indexOf("const entitled ="),
+      handlers.indexOf("let newTier"),
+    );
+    expect(entitled).toContain('sub.status === "past_due"');
+    // unpaid is the terminal state, not a retry window.
+    expect(entitled).not.toContain('sub.status === "unpaid"');
+  });
+
+  it("does not send the decline email when the invoice is only awaiting 3DS", () => {
+    // Stripe fires payment_action_required AND payment_failed for the same SCA
+    // attempt, a second apart. Sending both tells the customer to confirm the
+    // payment and then to replace a card that is working fine.
+    expect(handlers).toContain("invoiceAwaitingAuthentication");
+    const failed = handlers.slice(
+      handlers.indexOf('case "invoice.payment_failed"'),
+      handlers.indexOf('case "invoice.payment_action_required"'),
+    );
+    expect(failed).toContain("if (email && !needsAuth)");
+  });
+
+  it("classifies the failure from the payment intent, not the attempt count", () => {
+    // attempt_count === 0 correlates with SCA today but is not what the
+    // distinction means; requires_action is.
+    const helper = handlers.slice(
+      handlers.indexOf("async function invoiceAwaitingAuthentication"),
+      handlers.indexOf("// Insert the event.id"),
+    );
+    expect(helper).toContain('"requires_action"');
+    // On an error it must fall back to sending: silence on a real decline is
+    // worse than a slightly-off message.
+    expect(helper).toContain("return false;");
+  });
+});

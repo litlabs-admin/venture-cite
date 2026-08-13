@@ -41,6 +41,34 @@ function tierFromProduct(product: Stripe.Product | undefined): string | null {
   return tier in usageLimits ? tier : null;
 }
 
+/**
+ * True when this invoice failed because the bank wants the cardholder to
+ * authenticate (3DS), rather than because the card was declined.
+ *
+ * The distinction is not on the invoice itself - it lives on the payment
+ * intent - so this costs one expanded retrieve, on a path that is rare by
+ * definition. On any error it returns false, which sends the ordinary decline
+ * email: guessing wrong in that direction is a slightly-off message, while the
+ * other direction is silence on a payment that actually failed.
+ */
+async function invoiceAwaitingAuthentication(invoiceId: string | null | undefined) {
+  if (!invoiceId) return false;
+  try {
+    const { getStripeClient } = await import("./stripeClient");
+    const full = (await getStripeClient().invoices.retrieve(invoiceId, {
+      expand: ["payments.data.payment.payment_intent"],
+    })) as unknown as {
+      payments?: { data?: { payment?: { payment_intent?: { status?: string } } }[] };
+    };
+    return (full.payments?.data ?? []).some(
+      (p) => p.payment?.payment_intent?.status === "requires_action",
+    );
+  } catch (err) {
+    logger.warn({ err, invoiceId }, "stripe: could not classify payment failure");
+    return false;
+  }
+}
+
 // Insert the event.id into the dedupe table. Returns true if this is the
 // first time we've seen this event, false if it's already been recorded
 // (i.e. Stripe is retrying and we should skip processing).
@@ -207,7 +235,20 @@ export class WebhookHandlers {
         // picked a plan and put a card down, so they get that plan's tier for
         // the whole trial. Treating it as inactive would have locked out every
         // trialling customer on day one.
-        const entitled = sub.status === "active" || sub.status === "trialing";
+        // `past_due` is entitled too. It means one charge was declined and
+        // Stripe's Smart Retries are still working - a window of days, and most
+        // of those recover. Revoking on the first decline would lock out a
+        // customer who is about to pay, and it directly contradicts the
+        // payment_failed email, which tells them their account stays active
+        // while we retry. Access ends when the retries are exhausted: Stripe
+        // then cancels the subscription and fires
+        // customer.subscription.deleted, which downgrades below.
+        //
+        // `unpaid` is deliberately NOT here - that is the terminal state for
+        // accounts configured to be marked unpaid rather than cancelled, and it
+        // means the retry window is over.
+        const entitled =
+          sub.status === "active" || sub.status === "trialing" || sub.status === "past_due";
 
         let newTier: string;
         if (!entitled) {
@@ -355,11 +396,26 @@ export class WebhookHandlers {
             ? ((await storage.getUserByStripeCustomerId(customerId))?.email ?? null)
             : null);
 
+        // An SCA invoice fires payment_action_required AND payment_failed for
+        // the same attempt, a second apart. Without this check the customer
+        // gets two emails that contradict each other: "confirm this payment"
+        // followed by "update your payment method". The card is fine, so the
+        // second one sends them to fix something that is not broken. The
+        // payment_action_required handler already emailed them, so this path
+        // stays quiet.
+        const needsAuth = await invoiceAwaitingAuthentication(invoice.id);
+
         logger.warn(
-          { customerId, invoiceId: invoice.id, attempt: invoice.attempt_count, notified: !!email },
+          {
+            customerId,
+            invoiceId: invoice.id,
+            attempt: invoice.attempt_count,
+            notified: !!email && !needsAuth,
+            needsAuth,
+          },
           "stripe: invoice.payment_failed",
         );
-        if (email) {
+        if (email && !needsAuth) {
           await sendPaymentFailedEmail(email, {
             amountDue: invoice.amount_due,
             currency: invoice.currency,
