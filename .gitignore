@@ -115,8 +115,9 @@ attached_assets/
 brainstorms/
 .agents/
 .codex/
-# Superpowers specs, plans and baselines
-!docs/superpowers/**/*.md
+# Superpowers specs, plans and baselines stay LOCAL - they fall under the
+# global *.md ignore above. The handful already committed stay tracked;
+# git does not untrack a file just because it becomes ignored.
 
 # Vercel build output (generated server bundle, not source)
 api/
