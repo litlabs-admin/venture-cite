@@ -205,6 +205,32 @@ export default function Welcome() {
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
 
+  // Arriving straight from Stripe Checkout. The tier was granted by a webhook
+  // while the customer was still on Stripe's domain, so the cached /api/auth/me
+  // here is from before they had a plan - the trial banner and every limit
+  // read off it would be a step behind for the whole session.
+  //
+  // ponytail: one invalidate, no polling. The webhook lands in about a second
+  // and the next step is typing a domain and waiting ~10s for the scrape, so
+  // there is no realistic window where this is still stale by the time it
+  // matters. If confirm ever does race it, the 403 handler below catches it.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("checkout")) return;
+    void rqClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+  }, [rqClient]);
+
+  // A returning customer who reactivates lands here too, and they already have
+  // brands - this page is first-run only, so send them to the app rather than
+  // asking them to set up a brand they set up months ago. Scoped to the input
+  // scene so it can never fire over a run in progress.
+  const existingBrands = useQuery<{ success: boolean; data: unknown[] }>({
+    queryKey: ["/api/brands"],
+  });
+  const brandCount = existingBrands.data?.data?.length ?? 0;
+  useEffect(() => {
+    if (scene === "input" && brandCount > 0) void navigate({ to: "/dashboard" });
+  }, [scene, brandCount, navigate]);
+
   const [newBrandId, setNewBrandId] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -428,9 +454,23 @@ export default function Welcome() {
       setNewBrandId(json.brandId);
       setScene("activating");
     } catch (err: any) {
+      // The server sends a specific reason and, for a plan problem, a
+      // limitReached flag. err.message is the raw response text, so using it
+      // put a JSON blob in the toast - and for the commonest failure by far
+      // (no plan yet) it left the customer stuck on a form that can never
+      // succeed, after a scrape and an LLM call they had just waited for.
+      const body = err?.body as { error?: string; limitReached?: boolean } | undefined;
+      if (body?.limitReached) {
+        toast({
+          title: "Choose a plan to start measuring",
+          description: "Your free trial starts as soon as you pick one. Taking you to pricing…",
+        });
+        void navigate({ to: "/pricing" });
+        return;
+      }
       toast({
         title: "Could not confirm brand",
-        description: err?.message || "Please try again.",
+        description: body?.error || "Please try again.",
         variant: "destructive",
       });
     } finally {

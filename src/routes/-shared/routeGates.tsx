@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useAuth } from "@/hooks/use-auth";
 import { RouteSpinner, ContentSkeleton } from "@/components/foundations";
+import { resolveTier, usageLimits } from "@shared/schema";
 
 // Phase 2 Task 5: verbatim copies of the four small route-gate helpers that
 // used to live inline in client/src/App.tsx (AuthenticatedRoute, AuthenticatedBareRoute,
@@ -100,7 +101,7 @@ export function AuthenticatedBareRoute({ component: Component }: { component: Co
 }
 
 export function FirstRunGate({ component: Component }: { component: ComponentType }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   // The /api/brands response is { success: true, data: Brand[] }.
   // Unwrap it so the redirect check below sees the array, not the envelope.
   const brandsQuery = useQuery<{ success: boolean; data: unknown[] }>({
@@ -117,9 +118,18 @@ export function FirstRunGate({ component: Component }: { component: ComponentTyp
     return null;
   }
 
+  // The plan comes before the brand. Someone with no plan cannot create one -
+  // usageLimits gives them 0 brands and the server returns 403 - so sending
+  // them to /welcome first walked every new signup into a form that scrapes
+  // their site, runs an LLM over it, and only then refuses to save. Checking
+  // maxBrands rather than naming tiers keeps this true if the tiers change,
+  // and covers the lapsed account too: readonly is also 0, and a lapsed
+  // customer with nothing left to look at belongs on pricing, not on a brand
+  // form that will reject them.
   const brands = brandsQuery.data?.data;
   if (Array.isArray(brands) && brands.length === 0) {
-    return <Navigate to="/welcome" />;
+    const canCreateBrand = user ? usageLimits[resolveTier(user)].maxBrands !== 0 : true;
+    return <Navigate to={canCreateBrand ? "/welcome" : "/pricing"} />;
   }
 
   return (

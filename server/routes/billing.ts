@@ -290,7 +290,12 @@ export function setupBillingRoutes(app: Express): void {
             // first day after - which is also what gives us
             // customer.subscription.trial_will_end for the reminder email.
             subscription_data: { trial_period_days: TRIAL_DAYS },
-            success_url: successUrl || `${baseUrl}/pricing?success=true`,
+            // Forward, not back to the page they just left. They came here to
+            // start using the product; dropping them on the pricing page with
+            // a green tick makes them find their own way in. /welcome is the
+            // next real step, and it forwards to the dashboard by itself if
+            // they already have a brand.
+            success_url: successUrl || `${baseUrl}/welcome?checkout=success`,
             cancel_url: cancelUrl || `${baseUrl}/pricing?canceled=true`,
             client_reference_id: userId,
           },

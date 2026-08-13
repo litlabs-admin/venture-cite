@@ -19,7 +19,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Check, ArrowLeft, Sparkles, Crown, Zap, Users, Gift, Loader2 } from "lucide-react";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
-import { SELLABLE_TIERS, TRIAL_DAYS, PLAN_PRICE_CENTS } from "@shared/schema";
+import {
+  SELLABLE_TIERS,
+  TRIAL_DAYS,
+  PLAN_PRICE_CENTS,
+  PAYING_TIERS,
+  resolveTier,
+} from "@shared/schema";
 
 /** One rendered pricing card. `priceId` is absent for anything not sold
  *  through Stripe Checkout - today that is Enterprise, and the placeholder
@@ -121,6 +127,14 @@ export default function Pricing() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const signedIn = !!user;
+  // Whether the trial is still on offer, which is what the CTA has to say.
+  // It used to key off signed-in alone, so every logged-in visitor read
+  // "Subscribe" - hiding the 14-day trial from the exact people being asked to
+  // pay, on a page whose headline is "Start free for 14 days". The real split
+  // is not signed-in vs not, it is whether they already have a subscription:
+  // an existing customer switching plans keeps their billing period and gets
+  // no second trial, so offering them one would be a lie.
+  const onATrialablePlan = !signedIn || !PAYING_TIERS.includes(resolveTier(user!));
   const [betaCode, setBetaCode] = useState("");
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const [inquiry, setInquiry] = useState({ name: "", email: "", company: "", message: "" });
@@ -448,11 +462,11 @@ export default function Pricing() {
                       never as decoration over a dead branch. */}
                   {plan.tier === "enterprise"
                     ? "Book a call"
-                    : !signedIn
-                      ? "Start free trial"
-                      : plan.priceId
-                        ? "Subscribe"
-                        : "Contact Sales"}
+                    : !plan.priceId
+                      ? "Contact Sales"
+                      : onATrialablePlan
+                        ? "Start free trial"
+                        : "Switch to this plan"}
                 </Button>
               </div>
             </div>

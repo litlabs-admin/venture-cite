@@ -314,6 +314,28 @@ interface SubscriptionInfo {
   trialEnd?: number | null;
 }
 
+/** Only the fields the plan switcher reads out of /api/stripe/products. */
+interface StripeProductLite {
+  id: string;
+  name: string;
+  metadata: Record<string, string>;
+  prices: {
+    id: string;
+    unit_amount: number;
+    currency: string;
+    recurring: { interval: string } | null;
+  }[];
+}
+
+interface PlanOption {
+  tier: string;
+  priceId: string;
+  name: string;
+  amount: number;
+  currency: string;
+  interval: string;
+}
+
 interface InvoiceRow {
   id: string;
   number: string | null;
@@ -343,6 +365,7 @@ function BillingSection() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState<PlanOption | null>(null);
 
   // resolveTier, not the raw column - a lapsed trial showed "Current plan:
   // trial" while having no entitlements at all.
@@ -421,6 +444,74 @@ function BillingSection() {
       }),
   });
 
+  // The sellable catalogue, minus whatever they are already on. Prices come
+  // from Stripe rather than a constant here: a hardcoded amount eventually
+  // lies about what the card is charged.
+  const { data: prodResp } = useQuery<{ success: boolean; data: StripeProductLite[] }>({
+    queryKey: ["/api/stripe/products"],
+  });
+  const otherPlans: PlanOption[] = (prodResp?.data ?? [])
+    .flatMap((p) => {
+      const tier = p.metadata?.tier;
+      const price = p.prices?.[0];
+      // A product with no tier metadata or no price is not sellable - the same
+      // rule the webhook handler applies before granting entitlements.
+      if (!tier || !price || tier === sub?.tier) return [];
+      return [
+        {
+          tier,
+          priceId: price.id,
+          name: p.name,
+          amount: price.unit_amount,
+          currency: price.currency,
+          interval: price.recurring?.interval ?? "month",
+        },
+      ];
+    })
+    .sort((a, b) => a.amount - b.amount);
+
+  const switchPlan = useMutation({
+    mutationFn: async (priceId: string) =>
+      (await apiRequest("POST", "/api/stripe/checkout", { priceId })).json(),
+    onSuccess: (data: { success?: boolean; updated?: boolean; url?: string; error?: string }) => {
+      setPendingPlan(null);
+      // An existing subscription is swapped in place and billed immediately,
+      // so there is no URL to follow - the change is already live. Only a
+      // customer with no live subscription gets sent to Checkout.
+      if (data?.updated) {
+        refresh();
+        void queryClient.invalidateQueries({ queryKey: ["/api/billing/invoices"] });
+        // The tier on the "Current plan" line is our own mirror of Stripe, and
+        // it is written by the subscription.updated webhook - which is still
+        // in flight when this response arrives. Measured: the summary read
+        // "Agency" while the tier line still said "pro". One delayed refetch
+        // closes the gap.
+        // ponytail: a fixed delay, not a poll. Getting it wrong just means
+        // the label lags until the next navigation, which is what it did
+        // before.
+        setTimeout(() => void queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] }), 2500);
+        toast({
+          title: "Plan updated",
+          description: "Your new plan is active. We've billed the difference for this period.",
+        });
+        return;
+      }
+      if (data?.url && isAllowedStripeRedirect(data.url)) {
+        window.location.href = data.url;
+        return;
+      }
+      toast({
+        description: data?.error ?? "Could not change your plan",
+        variant: "destructive",
+      });
+    },
+    onError: (err: unknown) =>
+      toast({
+        description: getApiErrorMessage(err, "Could not change your plan"),
+        variant: "destructive",
+      }),
+  });
+
   const trialing = sub?.status === "trialing";
 
   return (
@@ -443,11 +534,18 @@ function BillingSection() {
                 {sub.planName ?? "Subscription"}
                 {sub.amount != null && ` - ${money(sub.amount, sub.currency)}/${sub.interval}`}
               </p>
-              {/* The three states a live subscription can be in are worded
+              {/* The states a live subscription can be in are worded
                   differently on purpose. "Renews" and "ends" are opposite
                   promises, and a trial that is about to take money for the
-                  first time deserves to say so plainly. */}
-              {sub.cancelAtPeriodEnd ? (
+                  first time deserves to say so plainly.
+                  past_due comes first: a failed payment outranks every other
+                  fact here, and it is the only one the customer must act on. */}
+              {sub.status === "past_due" ? (
+                <p className="font-medium text-warning" data-testid="text-past-due">
+                  Your last payment failed. We&apos;ll keep retrying - update your payment method to
+                  fix it now. Your access continues in the meantime.
+                </p>
+              ) : sub.cancelAtPeriodEnd ? (
                 <p className="font-medium text-warning" data-testid="text-cancels-on">
                   Cancels on {sub.currentPeriodEnd ? shortDate(sub.currentPeriodEnd) : "period end"}
                   . You keep access until then.
@@ -496,6 +594,40 @@ function BillingSection() {
             </Button>
           )}
         </div>
+
+        {/* Changing plan lived only on the pricing page, which is written for
+            people who have not bought yet - an existing customer had to go
+            back out to a sales page to spend more money. The swap happens on
+            the subscription they already have (no second checkout, no new
+            trial), so it belongs next to the subscription itself.
+            Hidden when there is nothing to switch: without a live
+            subscription the right action is to start one, which is what the
+            pricing page is for. */}
+        {sub && otherPlans.length > 0 && (
+          <div>
+            <PanelLabel>Change plan</PanelLabel>
+            <ul className="mt-2 divide-y divide-vc-subtle" data-testid="list-plan-options">
+              {otherPlans.map((p) => (
+                <li key={p.priceId} className="flex items-center justify-between gap-4 py-2">
+                  <div className="min-w-0">
+                    <p className="text-caption text-vc-primary">{p.name}</p>
+                    <p className="text-label text-vc-tertiary">
+                      {money(p.amount, p.currency)}/{p.interval}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setPendingPlan(p)}
+                    disabled={switchPlan.isPending}
+                    data-testid={`button-switch-${p.tier}`}
+                  >
+                    {p.amount > (sub.amount ?? 0) ? "Upgrade" : "Downgrade"}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div>
           <PanelLabel>Invoices</PanelLabel>
@@ -573,6 +705,43 @@ function BillingSection() {
               data-testid="button-confirm-cancel"
             >
               {cancel.isPending ? "Cancelling…" : "Cancel subscription"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Money moves the moment this is confirmed, so the dialog says which
+          direction and roughly when - a switch that silently charges a card is
+          the kind of surprise that becomes a dispute. The exact figure is
+          Stripe's to compute from the unused time on the current plan, so this
+          does not invent one. */}
+      <AlertDialog open={!!pendingPlan} onOpenChange={(open) => !open && setPendingPlan(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch to {pendingPlan?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingPlan && pendingPlan.amount > (sub?.amount ?? 0)
+                ? `You'll be charged the difference for the rest of this period straight away, then ${money(
+                    pendingPlan.amount,
+                    pendingPlan.currency,
+                  )}/${pendingPlan.interval} from your next renewal. The new limits apply immediately.`
+                : pendingPlan
+                  ? `The unused part of your current plan is credited against your next invoice, which will be ${money(
+                      pendingPlan.amount,
+                      pendingPlan.currency,
+                    )}/${pendingPlan.interval}. Your lower limits apply immediately, so anything over them stops running.`
+                  : ""}{" "}
+              Your billing date does not change.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep my plan</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => pendingPlan && switchPlan.mutate(pendingPlan.priceId)}
+              disabled={switchPlan.isPending}
+              data-testid="button-confirm-switch"
+            >
+              {switchPlan.isPending ? "Switching…" : `Switch to ${pendingPlan?.name ?? "plan"}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
