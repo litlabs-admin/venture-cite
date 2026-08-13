@@ -1,4 +1,4 @@
-import { getStripeClient } from "./stripeClient";
+import { getStripeClient, isStripeTestMode } from "./stripeClient";
 import { logger } from "./lib/logger";
 import { usageLimits } from "@shared/schema";
 
@@ -67,6 +67,19 @@ function syncEnabled(): boolean {
 }
 
 export async function setupStripeProducts() {
+  // A deployed environment on test keys is a deliberate, temporary state - it
+  // is how the payment flow gets clicked through with Stripe's test cards,
+  // which the live API rejects. It is also completely silent: every checkout
+  // "succeeds", entitlements are granted, and no money moves. Say so loudly on
+  // every boot, because the failure mode is forgetting.
+  if (process.env.NODE_ENV === "production" && isStripeTestMode()) {
+    logger.warn(
+      "STRIPE IS IN TEST MODE ON A PRODUCTION BUILD - no card will ever be charged. " +
+        "Swap STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY and STRIPE_WEBHOOK_SECRET for live " +
+        "values before taking real customers.",
+    );
+  }
+
   if (!syncEnabled()) {
     logger.info(
       "stripe setup: skipped (set STRIPE_PRODUCT_SYNC=true to create the Pro/Agency products)",

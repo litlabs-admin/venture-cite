@@ -17,6 +17,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isAllowedStripeRedirect } from "@/lib/urlSafety";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { TestModeBanner } from "@/components/TrialGate";
 import { Check, ArrowLeft, Sparkles, Crown, Zap, Users, Gift, Loader2 } from "lucide-react";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 import {
@@ -328,6 +329,14 @@ export default function Pricing() {
           >
             <ArrowLeft className="w-4 h-4 mr-1" /> Back to Home
           </Link>
+        </div>
+
+        {/* Pricing sits outside AppShell, so it does not inherit the shell's
+            copy of this. It is also the page where the card is actually
+            entered, which makes it the one that most needs to say the
+            payment is simulated. */}
+        <div className="mb-8">
+          <TestModeBanner />
         </div>
 
         {success && (

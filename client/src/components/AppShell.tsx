@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { spineTitleFor, pageTourFor } from "@/lib/spineStages";
 import { BrandLogo } from "@/components/BrandLogo";
-import { TrialBanner, TrialGate } from "@/components/TrialGate";
+import { TestModeBanner, TrialBanner, TrialGate } from "@/components/TrialGate";
 
 // ─── AppShell ────────────────────────────────────────────────────────────────
 // The one persistent three-zone shell (nav rail / context bar + canvas /
@@ -274,6 +274,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   page, so it scrolls away rather than permanently stealing a
                   row of chrome from an app that is mostly dense tables.
                   Renders nothing unless the account is actually on a trial. */}
+              {/* Above the trial banner: which Stripe the app is talking to
+                  outranks how many days are left in a trial that cannot
+                  charge anyone anyway. */}
+              <TestModeBanner />
               <TrialBanner />
               {/* The AI Tutor pill (EducationAssistant.tsx) is `fixed bottom-6
                   right-6 h-12` - anchored to the viewport, not this canvas -

@@ -22,6 +22,24 @@ export function getStripeClient(): Stripe {
   return new Stripe(getStripeKey(), { apiVersion: STRIPE_API_VERSION });
 }
 
+/**
+ * Whether billing is pointed at Stripe's test mode.
+ *
+ * Deliberately supported in production: a deployed environment on test keys is
+ * how the whole payment flow gets clicked through with Stripe's test cards,
+ * which the live API rejects outright.
+ *
+ * The danger is forgetting. On test keys nothing ever charges, so a real
+ * visitor can "subscribe" with a fake card and receive full entitlements while
+ * no money moves - and there is no failure anywhere to notice, because from
+ * the app's side everything succeeded. That is why this is surfaced in the UI
+ * rather than left as a config detail: the state has to be visible to be
+ * temporary.
+ */
+export function isStripeTestMode(): boolean {
+  return (process.env.STRIPE_SECRET_KEY ?? "").startsWith("sk_test_");
+}
+
 // Alias - some routes import this name
 export async function getUncachableStripeClient(): Promise<Stripe> {
   return getStripeClient();

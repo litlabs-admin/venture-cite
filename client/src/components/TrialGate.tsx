@@ -35,6 +35,35 @@ function daysLeft(trialEndsAt: string | null | undefined): number {
   return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
 }
 
+/**
+ * Announces that billing is pointed at Stripe's test mode.
+ *
+ * A deployed environment on test keys is a deliberate, temporary state - it is
+ * the only way to click through the payment flow with Stripe's test cards,
+ * which the live API rejects. What makes it dangerous is that it is silent:
+ * every checkout "succeeds", entitlements are granted, and no money moves, so
+ * nothing anywhere looks wrong.
+ *
+ * This is the thing that keeps it temporary. It is not dismissible for the
+ * same reason - a banner you can hide is a banner you will stop seeing on the
+ * day it matters most.
+ */
+export function TestModeBanner() {
+  const { data } = useQuery<{ testMode?: boolean }>({ queryKey: ["/api/stripe/products"] });
+  if (!data?.testMode) return null;
+
+  return (
+    <div
+      className="flex flex-wrap items-center justify-center gap-x-2 border-b border-warning bg-warning-subtle px-4 py-2 text-caption font-medium text-warning"
+      data-testid="banner-stripe-test-mode"
+    >
+      <span>
+        Test mode - payments are simulated and no card is ever charged. Use Stripe test cards only.
+      </span>
+    </div>
+  );
+}
+
 export function TrialBanner() {
   const { user } = useAuth();
   if (!user) return null;

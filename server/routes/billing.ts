@@ -135,7 +135,12 @@ export function setupBillingRoutes(app: Express): void {
           (a, b) => (a.prices[0]?.unit_amount ?? 0) - (b.prices[0]?.unit_amount ?? 0),
         );
 
-        res.json({ success: true, data: sorted });
+        // testMode rides along on the response the pricing page and the
+        // billing panel already fetch, so the banner needs no extra request.
+        // It leaks nothing: the publishable key on the same page announces
+        // test mode anyway.
+        const { isStripeTestMode } = await import("../stripeClient");
+        res.json({ success: true, data: sorted, testMode: isStripeTestMode() });
       } catch (error: any) {
         logger.error({ err: error }, "Stripe products error");
         res.json({ success: true, data: [] });
