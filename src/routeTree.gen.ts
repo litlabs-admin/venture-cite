@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as GlossaryRouteImport } from './routes/glossary'
 import { Route as HealthRouteImport } from './routes/health'
+import { Route as InternalPageRouteImport } from './routes/internal-page'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as AppSplatRouteImport } from './routes/_app/$'
@@ -71,6 +72,11 @@ const GlossaryRoute = GlossaryRouteImport.update({
 const HealthRoute = HealthRouteImport.update({
   id: '/health',
   path: '/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InternalPageRoute = InternalPageRouteImport.update({
+  id: '/internal-page',
+  path: '/internal-page',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRoute = PricingRouteImport.update({
@@ -278,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/glossary': typeof GlossaryRoute
   '/health': typeof HealthRoute
+  '/internal-page': typeof InternalPageRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/$': typeof AppSplatRoute
@@ -323,6 +330,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/glossary': typeof GlossaryRoute
   '/health': typeof HealthRoute
+  '/internal-page': typeof InternalPageRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/$': typeof AppSplatRoute
@@ -370,6 +378,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/glossary': typeof GlossaryRoute
   '/health': typeof HealthRoute
+  '/internal-page': typeof InternalPageRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/_app/$': typeof AppSplatRoute
@@ -417,6 +426,7 @@ export interface FileRouteTypes {
     | '/'
     | '/glossary'
     | '/health'
+    | '/internal-page'
     | '/pricing'
     | '/privacy'
     | '/$'
@@ -462,6 +472,7 @@ export interface FileRouteTypes {
     | '/'
     | '/glossary'
     | '/health'
+    | '/internal-page'
     | '/pricing'
     | '/privacy'
     | '/$'
@@ -508,6 +519,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/glossary'
     | '/health'
+    | '/internal-page'
     | '/pricing'
     | '/privacy'
     | '/_app/$'
@@ -555,6 +567,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   GlossaryRoute: typeof GlossaryRoute
   HealthRoute: typeof HealthRoute
+  InternalPageRoute: typeof InternalPageRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   ApiSplatRoute: typeof ApiSplatRoute
@@ -589,6 +602,13 @@ declare module '@tanstack/react-router' {
       path: '/health'
       fullPath: '/health'
       preLoaderRoute: typeof HealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/internal-page': {
+      id: '/internal-page'
+      path: '/internal-page'
+      fullPath: '/internal-page'
+      preLoaderRoute: typeof InternalPageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -979,6 +999,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   GlossaryRoute: GlossaryRoute,
   HealthRoute: HealthRoute,
+  InternalPageRoute: InternalPageRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   ApiSplatRoute: ApiSplatRoute,
