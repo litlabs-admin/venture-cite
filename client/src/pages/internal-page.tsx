@@ -8,13 +8,11 @@ import { Download, Plus, Search, Trash2, Upload, X } from "lucide-react";
 // PUBLIC: this page has no authentication gate. Anyone with the URL can read
 // and edit the board. It holds no customer data.
 //
-// STORAGE: the board lives in localStorage under a `venturecite-` key. It is
-// not scoped by user, because no user is signed in. The board never reaches
-// the server, so one browser holds one board.
+// STORAGE: the board lives on the server, in one `system_state` row. Every
+// visitor reads and writes the same board, so a change is permanent and shared.
 //
-// ponytail: localStorage, not a table. The board needs no server, no migration
-// and no schema decision. Move it to Postgres when a second person must see the
-// same board; the JSON export below is the migration path.
+// ponytail: one row in a table that already exists, not a new table. The board
+// needs no migration and no schema decision.
 //
 // The seed list below comes from a full read of the codebase on 2026-08-10.
 // Each seeded ticket names the file that proves it. Nothing here is a guess.
@@ -55,6 +53,13 @@ const KIND_SWATCH: Record<Kind, string> = {
 };
 
 const WEIGHT_LABEL: Record<Weight, string> = { high: "High", medium: "Medium", low: "Low" };
+
+const SAVE_LABEL: Record<"idle" | "saving" | "saved" | "failed", string> = {
+  idle: "shared board",
+  saving: "saving...",
+  saved: "saved for everyone",
+  failed: "save failed",
+};
 
 let seedCounter = 0;
 function seed(t: Omit<Ticket, "id" | "order" | "column"> & { column?: Column }): Ticket {
@@ -236,21 +241,31 @@ const SEED: Ticket[] = [
   // Group 6: strengths worth protecting. Do not lose these in a rebuild.
 ];
 
-// Versioned. The seed only applies to an empty store, so a browser that already
-// held the old board would keep showing deleted tickets. Bump this suffix
-// whenever the seed changes and the old board must not survive.
-const STORAGE_KEY = "venturecite-internal-board-v3";
-const LEGACY_KEYS = ["venturecite-internal-board", "venturecite-internal-board-v2"];
-
-function load(): Ticket[] {
+// The board lives on the server, in one `system_state` row. Every visitor sees
+// the same board, and a change survives a refresh, a new browser and a deploy.
+// The server returns null when nobody has saved yet, so the seed above is the
+// first board anyone sees.
+async function loadFromServer(): Promise<Ticket[] | null> {
   try {
-    for (const key of LEGACY_KEYS) localStorage.removeItem(key);
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return SEED;
-    const parsed = JSON.parse(raw) as Ticket[];
-    return Array.isArray(parsed) && parsed.length ? parsed : SEED;
+    const res = await fetch("/api/board");
+    if (!res.ok) return null;
+    const body = (await res.json()) as { tickets: Ticket[] | null };
+    return body.tickets && body.tickets.length ? body.tickets : null;
   } catch {
-    return SEED;
+    return null;
+  }
+}
+
+async function saveToServer(tickets: Ticket[]): Promise<boolean> {
+  try {
+    const res = await fetch("/api/board", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tickets }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -260,22 +275,34 @@ export default function InternalPage() {
   const [query, setQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<Kind | "all">("all");
   const [editing, setEditing] = useState<Ticket | null>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  // A ref, not state. dragstart and drop can land in the same render, and a
+  // state value read inside the drop handler would still be null.
+  const dragRef = useRef<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load once the user id is known, so one browser can hold two boards.
+  // Read the shared board once on mount.
   useEffect(() => {
-    setTickets(load());
-    setReady(true);
+    let alive = true;
+    void loadFromServer().then((fromServer) => {
+      if (!alive) return;
+      if (fromServer) setTickets(fromServer);
+      setReady(true);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
+  // Write the whole board back after a change. The save is debounced, so a
+  // drag that touches several cards makes one request, not several.
   useEffect(() => {
     if (!ready) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
-    } catch {
-      // Storage can throw in private mode or when full. The board still works.
-    }
+    setSaveState("saving");
+    const timer = setTimeout(() => {
+      void saveToServer(tickets).then((ok) => setSaveState(ok ? "saved" : "failed"));
+    }, 400);
+    return () => clearTimeout(timer);
   }, [tickets, ready]);
 
   const visible = useMemo(() => {
@@ -339,8 +366,8 @@ export default function InternalPage() {
           <div>
             <h1 className="text-xl font-semibold text-vc-primary">Internal board</h1>
             <p className="mt-1 text-xs text-vc-tertiary">
-              {counts.total} items · {counts.open} open · {counts.shipped} shipped · saved in this
-              browser
+              {counts.total} items · {counts.open} open · {counts.shipped} shipped ·{" "}
+              {SAVE_LABEL[saveState]}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -422,8 +449,8 @@ export default function InternalPage() {
               key={col.key}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => {
-                if (dragId) move(dragId, col.key);
-                setDragId(null);
+                if (dragRef.current) move(dragRef.current, col.key);
+                dragRef.current = null;
               }}
               className="flex w-[300px] shrink-0 flex-col rounded-lg border border-vc-default bg-vc-muted"
             >
@@ -438,8 +465,8 @@ export default function InternalPage() {
                   <article
                     key={t.id}
                     draggable
-                    onDragStart={() => setDragId(t.id)}
-                    onDragEnd={() => setDragId(null)}
+                    onDragStart={() => (dragRef.current = t.id)}
+                    onDragEnd={() => (dragRef.current = null)}
                     onClick={() => setEditing(t)}
                     className="cursor-pointer rounded-md border border-vc-default bg-vc-surface p-2.5 transition-colors hover:border-vc-hover"
                   >

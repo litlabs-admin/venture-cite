@@ -215,6 +215,13 @@ const PUBLIC_API_ROUTES = new Set<string>([
   // have an account yet, so requiring a session would mean only existing
   // customers could ask about it. Writes nothing but a log line and an email.
   "POST /api/enterprise-inquiry",
+  // Public work board at /internal-page. The page itself has no sign-in, so
+  // its storage must be reachable without a token. The write route replaces
+  // one `system_state` row and validates the shape and the size, so it cannot
+  // be used to store arbitrary bulk data. Gate the PUT if the board must ever
+  // become read-only for the public.
+  "GET /api/board",
+  "PUT /api/board",
 ]);
 
 export const requireAuthForApi: RequestHandler = (req, res, next) => {

@@ -26,6 +26,7 @@ import { setupUnsubscribeRoutes } from "./routes/unsubscribe";
 import { setupOnboardingRoutes } from "./routes/onboarding";
 import { setupTourRoutes } from "./routes/tours";
 import { setupLogoProxyRoutes } from "./routes/logoProxy";
+import { setupBoardRoutes } from "./routes/board";
 import { setupBrandRoutes } from "./routes/brands";
 import { setupBufferRoutes } from "./routes/buffer";
 import { setupBillingRoutes } from "./routes/billing";
@@ -102,6 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Logo/favicon image proxy - so scraped external images pass CSP.
   setupLogoProxyRoutes(app);
+  setupBoardRoutes(app);
 
   // Brand CRUD (Wave 5.1: extracted from this file).
   setupBrandRoutes(app);
