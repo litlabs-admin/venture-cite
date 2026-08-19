@@ -167,6 +167,63 @@ function RootComponent() {
 // hydration, so it cannot be a React-managed side effect.
 const THEME_FOUC_SCRIPT = `
 (function () {
+  // Hydration watchdog.
+  //
+  // The landing page renders every section at opacity-0 from SSR and only
+  // reveals it from a useEffect (Hero's mounted, useScrollReveal's
+  // isVisible). So its readability depends on hydration completing. When
+  // hydration does not complete the visitor gets a nav bar over an empty
+  // white screen - reported from an iPad, but the browser was never the
+  // point: a runtime throw in any component, a chunk that 404s after a
+  // deploy, a CSP rule, a blocked or stalled network request and a browser
+  // too old to parse the bundle all produce the identical blank page.
+  //
+  // So this does not test for any of those causes. It adds js
+  // optimistically, then removes it unless the client entry reports that
+  // hydration actually finished (client/src/main.tsx sets hydrated). The
+  // CSS in pages/landing/styles.css keys off html:not(.js) and forces the
+  // start states visible, so ANY failure to hydrate - known or unknown,
+  // present or future - degrades to a static readable page instead of a
+  // blank one.
+  //
+  // Set outside the try below: it must not depend on the theme logic.
+  var docEl = document.documentElement;
+  docEl.classList.add("js");
+  var revealFallback = function () {
+    if (!docEl.hasAttribute("data-hydrated")) docEl.classList.remove("js");
+  };
+  // Two independent triggers, because neither alone covers every case.
+  // load fires once subresources settle - the fast path when a script
+  // 404s or is blocked outright. The timer covers what load cannot: a
+  // script that downloads and parses but throws during hydration, and a
+  // load event that never arrives because a request is hanging. 4s is
+  // past a slow 3G hydrate and well before a visitor gives up on a blank
+  // screen; the fallback is idempotent, so both firing is harmless.
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("load", revealFallback);
+  }
+  setTimeout(revealFallback, 4000);
+  // Two runtime APIs esbuild cannot downlevel (it rewrites syntax, not
+  // library calls) that dependencies in the client bundle call outright.
+  // Both landed in Safari 15.4, so an iPad on 15.0-15.3 throws on the first
+  // call and takes hydration with it. Cheaper to define them here, before
+  // the bundle loads, than to audit which dependency uses them.
+  if (!Object.hasOwn) {
+    Object.hasOwn = function (o, k) {
+      return Object.prototype.hasOwnProperty.call(o, k);
+    };
+  }
+  if (!Array.prototype.at) {
+    Object.defineProperty(Array.prototype, "at", {
+      value: function (n) {
+        n = Math.trunc(n) || 0;
+        if (n < 0) n += this.length;
+        return n < 0 || n >= this.length ? undefined : this[n];
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
   try {
     var stored = null;
     try {

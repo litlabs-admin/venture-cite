@@ -536,3 +536,33 @@ html:has(.vc-home) {
     scroll-behavior: auto;
   }
 }
+
+/*
+ * Failed-hydration fallback.
+ *
+ * Every section on this page ships from SSR at opacity-0 and is revealed
+ * only from a useEffect (Hero's `mounted`, useScrollReveal's `isVisible`).
+ * That makes the page's readability depend on hydration completing, and a
+ * page whose content is invisible until JavaScript succeeds will go blank
+ * for every reason JavaScript can fail - not just an old browser.
+ *
+ * The `js` class on <html> is not a browser or feature test. The watchdog
+ * in src/routes/__root.tsx adds it optimistically, then removes it unless
+ * client/src/main.tsx confirms hydration finished. So these rules fire for
+ * any cause: a bundle that will not parse, a component that throws, a chunk
+ * that 404s after a deploy, a blocked or stalled request, a CSP rule,
+ * JavaScript disabled outright, and whatever breaks next. A failure to
+ * hydrate costs the entrance animation, never the content.
+ *
+ * Deliberately written with :not() and an attribute substring match, both
+ * supported since roughly forever. A fallback that needs a modern selector
+ * to work would be broken in exactly the case it exists to handle - which
+ * is why :has() is not used here even though this file uses it above.
+ *
+ * ponytail: one substring match rather than a prop threaded through 40+
+ * call sites. It covers every current and future reveal for free.
+ */
+html:not(.js) [class*="opacity-0"] {
+  opacity: 1 !important;
+  transform: none !important;
+}

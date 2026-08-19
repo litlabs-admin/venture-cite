@@ -35,4 +35,15 @@ startTransition(() => {
       <StartClient />
     </StrictMode>,
   );
+  // Tells the hydration watchdog in src/routes/__root.tsx that hydration
+  // reached this line. Without it the watchdog strips the `js` class from
+  // <html> and the landing page falls back to its static, always-visible
+  // rendering (see the fallback rule in pages/landing/styles.css).
+  //
+  // Set here rather than in a component effect on purpose: this must be
+  // reached whether or not any particular route renders successfully, and
+  // hydrateRoot() returning means React owns the document. A component that
+  // throws is exactly the case the watchdog exists for, so the signal must
+  // not live inside one.
+  document.documentElement.setAttribute("data-hydrated", "");
 });

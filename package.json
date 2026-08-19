@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "browserslist": [
+    "safari >= 12",
+    "chrome >= 87",
+    "firefox >= 78",
+    "edge >= 88"
+  ],
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "npm run db:migrate && cross-env NODE_ENV=production vite build",

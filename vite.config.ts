@@ -201,6 +201,37 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Declared browser floor.
+    //
+    // Without this Vite picks its own default and the output silently
+    // tracks whatever is current, so the floor moves every time the
+    // toolchain updates and nobody finds out until a visitor reports a
+    // blank page. Declaring it makes the floor a decision instead of a
+    // side effect.
+    //
+    // Chosen by measuring rather than by picking a device: builds at
+    // safari15 / safari13 / safari12 came out at 21904 / 21960 / 22028 KB
+    // of assets. Going as low as esbuild can take us costs 0.5%, so there
+    // is no reason to stop higher. Set the floor where it stops being
+    // free, not where the last bug report came from.
+    //
+    // What this does and does not cover:
+    //   - SYNTAX is downleveled by esbuild. Verified: the logical
+    //     assignment operators (??=, ||=, &&=) that shipped 46 times in
+    //     the previous production bundle now compile out entirely.
+    //   - RUNTIME APIs are not. esbuild rewrites syntax, not library
+    //     calls, and does not inject polyfills. Dependencies calling a
+    //     newer method still need the browser to provide it. There are
+    //     two such calls today and __root.tsx defines them; a future
+    //     dependency can add a third silently. The hydration watchdog in
+    //     __root.tsx is what makes that non-fatal - it detects a failed
+    //     hydration whatever the cause, so an unpolyfilled API degrades
+    //     the page instead of blanking it. See @vitejs/plugin-legacy if
+    //     this ever needs to be airtight rather than merely safe.
+    //   - CSS is untouched by this setting. Tailwind v4 emits color-mix()
+    //     and oklch() by design, so Safari below 16.4 degrades visually
+    //     no matter what is set here.
+    target: ["safari12", "chrome87", "firefox78", "edge88"],
     // 'hidden' generates .map files but does NOT reference them in the
     // emitted JS via sourceMappingURL comments. The Sentry plugin uploads
     // them to Sentry; browsers never download them, so they're not
