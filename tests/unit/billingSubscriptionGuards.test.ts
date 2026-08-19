@@ -103,3 +103,27 @@ describe("cancellation", () => {
     expect(cancelBody).not.toContain("accessTier");
   });
 });
+
+describe("checkout idempotency window", () => {
+  it("scopes the key to a minute, not to the whole 24-hour cache", () => {
+    // Stripe caches an idempotent response for 24 HOURS and a Checkout session
+    // also lives 24 hours, so a key with no time component replays the SAME
+    // session right up to the moment it expires - and then keeps replaying the
+    // corpse. Anyone who opened checkout without finishing was handed that
+    // dead session on every later click for the rest of the day: Stripe shows
+    // "You're all done here" and the button looks broken. Seen in production.
+    const body = checkoutBody();
+    expect(body).toContain("idempotencyKey");
+    expect(body).toContain("Math.floor(Date.now() / 60_000)");
+    // The un-bucketed form is the bug.
+    expect(body).not.toMatch(/idempotencyKey: `checkout:\$\{userId\}:\$\{priceId\}`/);
+  });
+
+  it("still collapses a double-click", () => {
+    // Two clicks land in the same minute bucket, which is the whole point of
+    // the key. Losing that would open two subscriptions from one impatient
+    // customer.
+    const body = checkoutBody();
+    expect(body).toContain("`checkout:${userId}:${priceId}:");
+  });
+});

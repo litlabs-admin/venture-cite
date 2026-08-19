@@ -308,7 +308,24 @@ export function setupBillingRoutes(app: Express): void {
             // Collapses a double-click or a retried request into ONE session
             // instead of two. Scoped to (user, price) so a genuine later
             // purchase of a different plan is unaffected.
-            idempotencyKey: `checkout:${userId}:${priceId}`,
+            //
+            // The minute bucket is load-bearing. Stripe caches an idempotent
+            // response for 24 HOURS, and a Checkout session also lives 24
+            // hours - so a key without a time component replays the SAME
+            // session right up to the moment it dies, and then keeps replaying
+            // it. Anyone who opened checkout and did not finish got handed
+            // that dead session on every subsequent click, for the rest of the
+            // day, with no way out: Stripe renders "You're all done here" and
+            // the button appears to do nothing. Observed in production -
+            // damienwoods7 clicked Pro at 16:42, and every later attempt
+            // returned that expired session instead of a new one.
+            //
+            // A double-click or an auto-retry lands within the same minute,
+            // which is all this was ever meant to collapse. Straddling a
+            // minute boundary makes one extra unused session, which costs
+            // nothing and expires by itself - the opposite failure is a
+            // customer who cannot pay.
+            idempotencyKey: `checkout:${userId}:${priceId}:${Math.floor(Date.now() / 60_000)}`,
           },
         );
 
