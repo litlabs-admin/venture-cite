@@ -187,6 +187,13 @@ describe("runArticleSlice (Responses API)", () => {
       "job-3",
       "slice-token",
       expect.objectContaining({ content: expect.stringContaining("# My Article") }),
+      {
+        providerResponseId: "resp-done",
+        service: "openai",
+        model: "gpt-4o-mini",
+        tokensIn: 100,
+        tokensOut: 500,
+      },
     );
     expect(out).toEqual({ done: true, status: "succeeded" });
   });

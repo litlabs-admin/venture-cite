@@ -20,10 +20,12 @@ import { buildCoreCompetitorRows, mergeLeaderboardByDomain } from "./lib/leaderb
 import {
   type ClaimedContentGenerationJob,
   type CompletedContentJob,
+  type CompletedContentJobCost,
   type ContentJobTerminalUpdate,
   type FailedContentJob,
   IStorage,
 } from "./storage";
+import { enqueueContentCostCommand } from "./outbox/contentCostOutboxAdapter";
 import {
   type User,
   type InsertUser,
@@ -1237,6 +1239,25 @@ export class DatabaseStorage implements IStorage {
     id: string,
     advanceToken: string,
     article: CompletedContentJob,
+    cost: CompletedContentJobCost,
+  ): Promise<boolean> {
+    return this.completeContentJobSliceInTransaction(id, advanceToken, article, cost);
+  }
+
+  /** Legacy completion path for callers that do not have provider usage data. */
+  async completeContentJobSliceLegacy(
+    id: string,
+    advanceToken: string,
+    article: CompletedContentJob,
+  ): Promise<boolean> {
+    return this.completeContentJobSliceInTransaction(id, advanceToken, article, null);
+  }
+
+  private async completeContentJobSliceInTransaction(
+    id: string,
+    advanceToken: string,
+    article: CompletedContentJob,
+    cost: CompletedContentJobCost | null,
   ): Promise<boolean> {
     return db.transaction(async (tx) => {
       const [job] = await tx
@@ -1254,7 +1275,11 @@ export class DatabaseStorage implements IStorage {
             eq(schema.contentGenerationJobs.status, "running"),
           ),
         )
-        .returning({ articleId: schema.contentGenerationJobs.articleId });
+        .returning({
+          articleId: schema.contentGenerationJobs.articleId,
+          userId: schema.contentGenerationJobs.userId,
+          brandId: schema.contentGenerationJobs.brandId,
+        });
       if (!job) return false;
       if (!job.articleId) {
         throw new Error("Content generation job has no article");
@@ -1283,6 +1308,19 @@ export class DatabaseStorage implements IStorage {
         source: "generated",
         createdBy: "system",
       });
+      if (cost) {
+        if (!job.userId || !job.brandId) {
+          throw new Error("Content generation job has no user or brand for cost recording");
+        }
+        await tx.execute(sql`set local role venturecite_content_request`);
+        await tx.execute(sql`select set_config('venturecite.user_id', ${job.userId}, true)`);
+        await enqueueContentCostCommand(tx, {
+          ...cost,
+          contentJobId: id,
+          userId: job.userId,
+          brandId: job.brandId,
+        });
+      }
       return true;
     });
   }

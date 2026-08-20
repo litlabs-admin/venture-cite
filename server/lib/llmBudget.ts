@@ -67,12 +67,26 @@ export interface SpendRecord {
   model?: string | null;
   tokensIn: number;
   tokensOut: number;
+  idempotencyKey?: string | null;
 }
 
 export async function recordSpend(spend: SpendRecord): Promise<void> {
   const cents = estimateCostCents(spend.model, spend.tokensIn, spend.tokensOut);
-  try {
-    await db.execute(sql`
+  const insert = spend.idempotencyKey
+    ? sql`
+      insert into public.api_costs (user_id, service, model, tokens_in, tokens_out, est_cost_cents, idempotency_key)
+      values (
+        ${spend.userId},
+        ${spend.service},
+        ${spend.model ?? null},
+        ${spend.tokensIn},
+        ${spend.tokensOut},
+        ${cents},
+        ${spend.idempotencyKey}
+      )
+      on conflict (idempotency_key) do nothing
+    `
+    : sql`
       insert into public.api_costs (user_id, service, model, tokens_in, tokens_out, est_cost_cents)
       values (
         ${spend.userId},
@@ -82,7 +96,9 @@ export async function recordSpend(spend: SpendRecord): Promise<void> {
         ${spend.tokensOut},
         ${cents}
       )
-    `);
+    `;
+  try {
+    await db.execute(insert);
   } catch (err) {
     // Cost-tracking failure must NOT abort the user's request. The
     // worst case is a missed-spend event in the analytics; the work

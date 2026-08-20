@@ -94,6 +94,35 @@ describe("outbox worker", () => {
     });
   });
 
+  it("converges when the same command is delivered twice", async () => {
+    const command = claimed();
+    const outbox = repository(command);
+    const appliedKeys = new Set<string>();
+    const handler = vi.fn(async ({ idempotencyKey }: Parameters<OutboxCommandHandler>[0]) => {
+      appliedKeys.add(idempotencyKey);
+      return { providerReference: idempotencyKey };
+    });
+    const handlers: Record<ClaimedOutboxCommand["kind"], OutboxCommandHandler> = {
+      "stripe.create_customer": vi.fn(),
+      "resend.send_email": vi.fn(),
+      "buffer.create_post": vi.fn(),
+      "openai.create_response": vi.fn(),
+      "content_cost.record": handler,
+    };
+
+    await expect(runOutboxWorkerOnce({ outbox, handlers, leaseSeconds: 120 })).resolves.toEqual({
+      kind: "succeeded",
+      commandId: command.id,
+    });
+    await expect(runOutboxWorkerOnce({ outbox, handlers, leaseSeconds: 120 })).resolves.toEqual({
+      kind: "succeeded",
+      commandId: command.id,
+    });
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(appliedKeys).toEqual(new Set([command.idempotencyKey]));
+  });
+
   it("reschedules a retryable handler failure", async () => {
     const command = claimed();
     const outbox = repository(command);

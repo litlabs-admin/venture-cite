@@ -1795,9 +1795,13 @@ export const apiCosts = pgTable(
     tokensIn: integer("tokens_in").default(0).notNull(),
     tokensOut: integer("tokens_out").default(0).notNull(),
     estCostCents: integer("est_cost_cents").default(0).notNull(),
+    idempotencyKey: text("idempotency_key"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("api_costs_user_created_idx").on(table.userId, table.createdAt)],
+  (table) => [
+    index("api_costs_user_created_idx").on(table.userId, table.createdAt),
+    uniqueIndex("api_costs_idempotency_key_idx").on(table.idempotencyKey),
+  ],
 );
 
 export type ApiCost = typeof apiCosts.$inferSelect;

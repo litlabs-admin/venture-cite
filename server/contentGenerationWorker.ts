@@ -29,6 +29,7 @@ import type { ContentGenerationJob } from "@shared/schema";
 
 import { captureAndFlush } from "./lib/sentryReport";
 import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
+import { contentCostIdempotencyKey } from "./outbox/contentCostOutboxAdapter";
 
 // Both the kick-off (responses.create) and the poll (responses.retrieve)
 // are fast HTTP calls because the heavy lifting runs on OpenAI's
@@ -74,6 +75,7 @@ type SliceResult =
       kind: "completed";
       finalContent: string;
       title: string;
+      providerResponseId: string;
       tokensIn: number;
       tokensOut: number;
     }
@@ -222,6 +224,7 @@ async function runJobToCompletionOrDeadline(
       kind: "completed",
       finalContent,
       title,
+      providerResponseId: response.id,
       tokensIn: response.usage?.input_tokens ?? 0,
       tokensOut: response.usage?.output_tokens ?? 0,
     };
@@ -395,10 +398,21 @@ export async function runArticleSlice(
   }
 
   if (result.kind === "completed") {
-    const finished = await storage.completeContentJobSlice(job.id, advanceToken, {
-      content: result.finalContent,
-      title: result.title,
-    });
+    const finished = await storage.completeContentJobSlice(
+      job.id,
+      advanceToken,
+      {
+        content: result.finalContent,
+        title: result.title,
+      },
+      {
+        providerResponseId: result.providerResponseId,
+        service: "openai",
+        model: MODELS.contentGeneration,
+        tokensIn: result.tokensIn,
+        tokensOut: result.tokensOut,
+      },
+    );
     if (!finished) {
       return { done: true, status: "cancelled" };
     }
@@ -408,6 +422,10 @@ export async function runArticleSlice(
       model: MODELS.contentGeneration,
       tokensIn: result.tokensIn,
       tokensOut: result.tokensOut,
+      idempotencyKey: contentCostIdempotencyKey({
+        contentJobId: job.id,
+        providerResponseId: result.providerResponseId,
+      }),
     });
     logger.info({ jobId: job.id }, "content slice completed");
     return { done: true, status: "succeeded" };

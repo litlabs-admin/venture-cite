@@ -19,6 +19,96 @@ const { DatabaseStorage } = await import("../../server/databaseStorage");
 beforeEach(() => vi.clearAllMocks());
 
 describe("content job completion transaction", () => {
+  it("enqueues one content-cost command in the completion transaction", async () => {
+    const jobReturning = vi.fn(async () => [
+      { articleId: "article-1", userId: "user-1", brandId: "brand-1" },
+    ]);
+    const articleReturning = vi.fn(async () => [{ id: "article-1" }]);
+    const articleWhere = vi.fn(() => ({ returning: articleReturning }));
+    const articleSet = vi.fn(() => ({ where: articleWhere }));
+    const tx = {
+      execute: stubs.execute.mockImplementation(async (statement: unknown) => {
+        const query = sqlQuery(statement);
+        if (query.sql.includes("select id from private.enqueue_outbox_command")) {
+          return { rows: [{ id: "command-1" }] };
+        }
+        if (query.sql.includes("select private.get_outbox_command")) {
+          return {
+            rows: [
+              {
+                command: {
+                  id: "command-1",
+                  status: "pending",
+                  idempotency_key: "content-cost:job-1:response-1",
+                  aggregate_type: "content_generation_job",
+                  aggregate_id: "job-1",
+                  user_id: "user-1",
+                  brand_id: "brand-1",
+                  payload: {
+                    kind: "content_cost.record",
+                    contentJobId: "job-1",
+                    providerResponseId: "response-1",
+                    service: "openai",
+                    model: "gpt-test",
+                    tokensIn: 10,
+                    tokensOut: 20,
+                  },
+                  attempt_count: 0,
+                  max_attempts: 25,
+                  available_at: new Date("2026-08-20T00:00:00Z"),
+                  lease_token: null,
+                  lease_expires_at: null,
+                  provider_name: "internal",
+                  provider_operation: "record_content_cost",
+                  created_at: new Date("2026-08-20T00:00:00Z"),
+                },
+              },
+            ],
+          };
+        }
+        return { rows: [] };
+      }),
+      update: stubs.update
+        .mockReturnValueOnce({ set: () => ({ where: () => ({ returning: jobReturning }) }) })
+        .mockReturnValueOnce({ set: articleSet }),
+      insert: stubs.insert.mockReturnValue({ values: vi.fn(async () => undefined) }),
+    };
+    stubs.transaction.mockImplementation(async (work: (inner: typeof tx) => Promise<boolean>) =>
+      work(tx),
+    );
+
+    await expect(
+      new DatabaseStorage().completeContentJobSlice(
+        "job-1",
+        "token-1",
+        { content: "# Article", title: "Article" },
+        {
+          providerResponseId: "response-1",
+          service: "openai",
+          model: "gpt-test",
+          tokensIn: 10,
+          tokensOut: 20,
+        },
+      ),
+    ).resolves.toBe(true);
+
+    const enqueueStatements = stubs.execute.mock.calls
+      .map((call) => sqlQuery(call[0]))
+      .filter((query) => query.sql.includes("select id from private.enqueue_outbox_command"));
+    expect(enqueueStatements).toHaveLength(1);
+    expect(enqueueStatements[0]?.params).toContain("content-cost:job-1:response-1");
+    expect(enqueueStatements[0]?.params[6]).toEqual({
+      kind: "content_cost.record",
+      contentJobId: "job-1",
+      providerResponseId: "response-1",
+      service: "openai",
+      model: "gpt-test",
+      tokensIn: 10,
+      tokensOut: 20,
+    });
+    expect(enqueueStatements[0]?.params[8]).toBe(25);
+  });
+
   it("commits the job, article, and revision through one transaction", async () => {
     const jobReturning = vi.fn(async () => [{ articleId: "article-1" }]);
     const articleReturning = vi.fn(async () => [{ id: "article-1" }]);
@@ -34,7 +124,7 @@ describe("content job completion transaction", () => {
       work(tx),
     );
 
-    const complete = await new DatabaseStorage().completeContentJobSlice("job-1", "token-1", {
+    const complete = await new DatabaseStorage().completeContentJobSliceLegacy("job-1", "token-1", {
       content: "# Article",
       title: "Article",
     });
@@ -63,10 +153,14 @@ describe("content job completion transaction", () => {
       work(tx),
     );
 
-    const complete = await new DatabaseStorage().completeContentJobSlice("job-1", "old-token", {
-      content: "# Article",
-      title: "Article",
-    });
+    const complete = await new DatabaseStorage().completeContentJobSliceLegacy(
+      "job-1",
+      "old-token",
+      {
+        content: "# Article",
+        title: "Article",
+      },
+    );
 
     expect(complete).toBe(false);
     expect(stubs.update).toHaveBeenCalledTimes(1);

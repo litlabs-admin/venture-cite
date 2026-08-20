@@ -95,6 +95,14 @@ export type CompletedContentJob = {
   title: string;
 };
 
+export type CompletedContentJobCost = {
+  providerResponseId: string;
+  service: string;
+  model: string | null;
+  tokensIn: number;
+  tokensOut: number;
+};
+
 export type FailedContentJob = {
   errorKind: string;
   errorMessage: string;
@@ -295,6 +303,7 @@ export interface IStorage {
     id: string,
     advanceToken: string,
     article: CompletedContentJob,
+    cost: CompletedContentJobCost,
   ): Promise<boolean>;
   failContentJobSlice(
     id: string,
