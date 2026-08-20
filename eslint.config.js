@@ -33,6 +33,9 @@ export default tseslint.config(
       ".agents/**",
       ".claude/**",
       ".codex/**",
+      // The local Supabase CLI generates these files.
+      "supabase/.branches/**",
+      "supabase/.temp/**",
       // Standalone Next.js reference build for the /home2 marketing page. It
       // has its own toolchain (Next lint rules this config can't resolve) and
       // its own node_modules/.next; linting it here yields tens of thousands

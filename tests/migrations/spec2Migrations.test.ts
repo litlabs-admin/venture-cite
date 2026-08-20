@@ -10,12 +10,14 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Pool } from "pg";
 import fs from "node:fs";
 import path from "node:path";
+import { configureDestructiveDatabaseTest } from "../helpers/destructiveDatabaseTest";
 
-const url = process.env.TEST_DATABASE_URL;
+const databaseTest = configureDestructiveDatabaseTest(process.env);
+const url = process.env.DATABASE_URL;
 const SCHEMA = `spec2_test_${Date.now()}`;
 const MIGRATIONS_DIR = path.resolve(process.cwd(), "migrations");
 
-const describeIfDb = url ? describe : describe.skip;
+const describeIfDb = databaseTest.kind === "ready" ? describe : describe.skip;
 
 describeIfDb("Spec 2 migrations", () => {
   let pool: Pool;

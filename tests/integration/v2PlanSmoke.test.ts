@@ -3,12 +3,11 @@
 // Tier-3 URLs (blog/*) before persisting.
 //
 // dotenv must load BEFORE any server/db import.
-import "dotenv/config";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import express from "express";
 import { sql } from "drizzle-orm";
-import { db } from "../../server/db";
+import { configureDestructiveDatabaseTest } from "../helpers/destructiveDatabaseTest";
 
 // Auth shim → user 'smoke-user'
 vi.mock("../../server/auth", () => ({
@@ -51,69 +50,78 @@ vi.mock("../../server/lib/factAgent/v2/sitemapDiscovery", () => ({
     ]),
 }));
 
-import { setupFactSheetV2Routes } from "../../server/routes/factSheetV2";
+const databaseTest = configureDestructiveDatabaseTest(process.env);
 
-const TEST_USER_ID = "smoke-user";
-const TEST_BRAND_ID = "smoke-brand-v2-plan";
+if (databaseTest.kind === "ready") {
+  const { db } = await import("../../server/db");
+  const { setupFactSheetV2Routes } = await import("../../server/routes/factSheetV2");
 
-async function seed() {
-  await db.execute(sql`
+  const TEST_USER_ID = "smoke-user";
+  const TEST_BRAND_ID = "smoke-brand-v2-plan";
+
+  async function seed() {
+    await db.execute(sql`
     INSERT INTO users (id, email, created_at, updated_at)
     VALUES (${TEST_USER_ID}, 'smoke@test.local', now(), now())
     ON CONFLICT (id) DO NOTHING
   `);
-  await db.execute(sql`
+    await db.execute(sql`
     INSERT INTO brands (id, user_id, name, company_name, website, industry, created_at, updated_at, fact_scrape_enabled)
     VALUES (${TEST_BRAND_ID}, ${TEST_USER_ID}, 'Smoke Plan', 'Smoke Plan', 'https://example.com', 'saas', now(), now(), true)
     ON CONFLICT (id) DO NOTHING
   `);
-}
+  }
 
-async function cleanup() {
-  await db.execute(
-    sql`DELETE FROM brand_fact_scrape_pages WHERE run_id IN (SELECT id FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID})`,
-  );
-  await db.execute(sql`DELETE FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID}`);
-}
-
-describe("Plan 4 smoke: POST /plan creates run + pages end-to-end", () => {
-  beforeEach(async () => {
-    await cleanup();
-    await seed();
-  });
-
-  it("creates a run with the expected page rows", async () => {
-    const app = express();
-    app.use(express.json());
-    setupFactSheetV2Routes(app);
-
-    const res = await request(app)
-      .post("/api/brand-fact-sheet/plan")
-      .send({ brandId: TEST_BRAND_ID });
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(typeof res.body.runId).toBe("string");
-    expect(res.body.pages.length).toBeGreaterThanOrEqual(1);
-    // Homepage is always included by selectTopUrls regardless of sitemap.
-    expect(res.body.pages.some((p: { url: string }) => p.url === "https://example.com/")).toBe(
-      true,
+  async function cleanup() {
+    await db.execute(
+      sql`DELETE FROM brand_fact_scrape_pages WHERE run_id IN (SELECT id FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID})`,
     );
-    // Tier-3 blog URL must have been dropped.
-    expect(res.body.pages.every((p: { url: string }) => !p.url.includes("/blog/foo"))).toBe(true);
+    await db.execute(sql`DELETE FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID}`);
+  }
 
-    // Verify the run row landed in the DB.
-    const runRows = await db.execute(sql`
+  describe("Plan 4 smoke: POST /plan creates run + pages end-to-end", () => {
+    beforeEach(async () => {
+      await cleanup();
+      await seed();
+    });
+
+    it("creates a run with the expected page rows", async () => {
+      const app = express();
+      app.use(express.json());
+      setupFactSheetV2Routes(app);
+
+      const res = await request(app)
+        .post("/api/brand-fact-sheet/plan")
+        .send({ brandId: TEST_BRAND_ID });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(typeof res.body.runId).toBe("string");
+      expect(res.body.pages.length).toBeGreaterThanOrEqual(1);
+      // Homepage is always included by selectTopUrls regardless of sitemap.
+      expect(res.body.pages.some((p: { url: string }) => p.url === "https://example.com/")).toBe(
+        true,
+      );
+      // Tier-3 blog URL must have been dropped.
+      expect(res.body.pages.every((p: { url: string }) => !p.url.includes("/blog/foo"))).toBe(true);
+
+      // Verify the run row landed in the DB.
+      const runRows = await db.execute(sql`
       SELECT id, status FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID}
     `);
-    expect((runRows as unknown as { rows: Array<unknown> }).rows.length).toBe(1);
+      expect((runRows as unknown as { rows: Array<unknown> }).rows.length).toBe(1);
 
-    // Verify page rows were persisted for this run.
-    const pageRows = await db.execute(sql`
+      // Verify page rows were persisted for this run.
+      const pageRows = await db.execute(sql`
       SELECT id, url FROM brand_fact_scrape_pages WHERE run_id = ${res.body.runId}
     `);
-    expect(
-      (pageRows as unknown as { rows: Array<{ url: string }> }).rows.length,
-    ).toBeGreaterThanOrEqual(1);
+      expect(
+        (pageRows as unknown as { rows: Array<{ url: string }> }).rows.length,
+      ).toBeGreaterThanOrEqual(1);
+    });
   });
-});
+} else {
+  describe.skip("Plan 4 smoke: POST /plan creates run + pages end-to-end", () => {
+    it("requires TEST_DATABASE_URL", () => {});
+  });
+}

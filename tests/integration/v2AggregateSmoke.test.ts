@@ -6,12 +6,11 @@
 //   - the 'user' row's disagreement_count was incremented in the DB
 //
 // dotenv must load BEFORE any server/db import.
-import "dotenv/config";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import express from "express";
 import { sql } from "drizzle-orm";
-import { db } from "../../server/db";
+import { configureDestructiveDatabaseTest } from "../helpers/destructiveDatabaseTest";
 
 // Auth shim → user 'smoke-user'
 vi.mock("../../server/auth", () => ({
@@ -42,80 +41,89 @@ vi.mock("openai", async () => {
   };
 });
 
-import { setupFactSheetV2Routes } from "../../server/routes/factSheetV2";
+const databaseTest = configureDestructiveDatabaseTest(process.env);
 
-const TEST_USER_ID = "smoke-user";
-const TEST_BRAND_ID = "smoke-brand-v2-aggregate";
+if (databaseTest.kind === "ready") {
+  const { db } = await import("../../server/db");
+  const { setupFactSheetV2Routes } = await import("../../server/routes/factSheetV2");
 
-async function seed() {
-  await db.execute(sql`
+  const TEST_USER_ID = "smoke-user";
+  const TEST_BRAND_ID = "smoke-brand-v2-aggregate";
+
+  async function seed() {
+    await db.execute(sql`
     INSERT INTO users (id, email, created_at, updated_at)
     VALUES (${TEST_USER_ID}, 'smoke@test.local', now(), now())
     ON CONFLICT (id) DO NOTHING
   `);
-  await db.execute(sql`
+    await db.execute(sql`
     INSERT INTO brands (id, user_id, name, company_name, website, industry, created_at, updated_at)
     VALUES (${TEST_BRAND_ID}, ${TEST_USER_ID}, 'Smoke Aggregate', 'Smoke Aggregate', 'https://example.com', 'saas', now(), now())
     ON CONFLICT (id) DO NOTHING
   `);
-}
+  }
 
-async function cleanup() {
-  await db.execute(sql`DELETE FROM brand_fact_sheet WHERE brand_id = ${TEST_BRAND_ID}`);
-  await db.execute(
-    sql`DELETE FROM fact_scrape_logs WHERE run_id IN (SELECT id FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID})`,
-  );
-  await db.execute(sql`DELETE FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID}`);
-}
+  async function cleanup() {
+    await db.execute(sql`DELETE FROM brand_fact_sheet WHERE brand_id = ${TEST_BRAND_ID}`);
+    await db.execute(
+      sql`DELETE FROM fact_scrape_logs WHERE run_id IN (SELECT id FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID})`,
+    );
+    await db.execute(sql`DELETE FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID}`);
+  }
 
-describe("Plan 4 smoke: POST /aggregate consolidates run end-to-end", () => {
-  beforeEach(async () => {
-    await cleanup();
-    await seed();
-  });
+  describe("Plan 4 smoke: POST /aggregate consolidates run end-to-end", () => {
+    beforeEach(async () => {
+      await cleanup();
+      await seed();
+    });
 
-  it("increments disagreement_count and marks run completed", async () => {
-    // Insert a pending run.
-    const runRow = await db.execute(sql`
+    it("increments disagreement_count and marks run completed", async () => {
+      // Insert a pending run.
+      const runRow = await db.execute(sql`
       INSERT INTO brand_fact_scrape_runs (brand_id, triggered_by, status)
       VALUES (${TEST_BRAND_ID}, 'manual_rescrape', 'pending')
       RETURNING id
     `);
-    const runId = (runRow as unknown as { rows: Array<{ id: string }> }).rows[0].id;
+      const runId = (runRow as unknown as { rows: Array<{ id: string }> }).rows[0].id;
 
-    // Insert two facts for the same (domain, subcategory, factKey) with
-    // different values so the aggregate step finds a disagreement.
-    await db.execute(sql`
+      // Insert two facts for the same (domain, subcategory, factKey) with
+      // different values so the aggregate step finds a disagreement.
+      await db.execute(sql`
       INSERT INTO brand_fact_sheet (brand_id, domain, subcategory, fact_key, fact_value, value_type, source, run_id, confidence)
       VALUES
         (${TEST_BRAND_ID}, 'identity', 'description', 'tagline', 'Scraped tagline', 'string', 'scraped', ${runId}, '0.9'),
         (${TEST_BRAND_ID}, 'identity', 'description', 'tagline', 'User tagline', 'string', 'user', NULL, '1.0')
     `);
 
-    // Insert a fact_scrape_logs row so computeTerminalStatus sees >=1 fact
-    // and returns 'completed'.
-    await db.execute(sql`
+      // Insert a fact_scrape_logs row so computeTerminalStatus sees >=1 fact
+      // and returns 'completed'.
+      await db.execute(sql`
       INSERT INTO fact_scrape_logs (run_id, source, status, fact_count)
       VALUES (${runId}, 'static_pages', 'done', 1)
     `);
 
-    const app = express();
-    app.use(express.json());
-    setupFactSheetV2Routes(app);
+      const app = express();
+      app.use(express.json());
+      setupFactSheetV2Routes(app);
 
-    const res = await request(app).post("/api/brand-fact-sheet/aggregate").send({ runId });
+      const res = await request(app).post("/api/brand-fact-sheet/aggregate").send({ runId });
 
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBe("completed");
-    expect(res.body.disagreementsIncremented).toBeGreaterThanOrEqual(1);
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe("completed");
+      expect(res.body.disagreementsIncremented).toBeGreaterThanOrEqual(1);
 
-    // Verify the 'user' row's disagreement_count was incremented in the DB.
-    const userFactRow = await db.execute(sql`
+      // Verify the 'user' row's disagreement_count was incremented in the DB.
+      const userFactRow = await db.execute(sql`
       SELECT disagreement_count FROM brand_fact_sheet
       WHERE brand_id = ${TEST_BRAND_ID} AND source = 'user' AND fact_key = 'tagline'
     `);
-    const cnt = (userFactRow as unknown as { rows: Array<{ disagreement_count: number }> }).rows[0]
-      ?.disagreement_count;
-    expect(cnt).toBeGreaterThanOrEqual(1);
+      const cnt = (userFactRow as unknown as { rows: Array<{ disagreement_count: number }> })
+        .rows[0]?.disagreement_count;
+      expect(cnt).toBeGreaterThanOrEqual(1);
+    });
   });
-});
+} else {
+  describe.skip("Plan 4 smoke: POST /aggregate consolidates run end-to-end", () => {
+    it("requires TEST_DATABASE_URL", () => {});
+  });
+}

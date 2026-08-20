@@ -2,74 +2,83 @@
 // dotenv must load BEFORE the server/db import so DATABASE_URL is set when
 // the pool initializes. Global setup intentionally doesn't load dotenv -
 // see tests/setup.ts.
-import "dotenv/config";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { db } from "../../server/db";
 import { users } from "../../shared/schema";
 import { eq } from "drizzle-orm";
-import { storage } from "../../server/storage";
+import { configureDestructiveDatabaseTest } from "../helpers/destructiveDatabaseTest";
 
-const TEST_USER_ID = "00000000-0000-0000-0000-00000000aaaa";
+const databaseTest = configureDestructiveDatabaseTest(process.env);
 
-async function seedUser() {
-  await db.delete(users).where(eq(users.id, TEST_USER_ID));
-  await db.insert(users).values({
-    id: TEST_USER_ID,
-    email: "tours-test@example.com",
-    onboardingState: {},
-  } as never);
-}
+if (databaseTest.kind === "ready") {
+  const { db } = await import("../../server/db");
+  const { storage } = await import("../../server/storage");
 
-describe("tour state storage (integration)", () => {
-  beforeEach(seedUser);
+  const TEST_USER_ID = "00000000-0000-0000-0000-00000000aaaa";
 
-  afterAll(async () => {
+  async function seedUser() {
     await db.delete(users).where(eq(users.id, TEST_USER_ID));
-  });
+    await db.insert(users).values({
+      id: TEST_USER_ID,
+      email: "tours-test@example.com",
+      onboardingState: {},
+    } as never);
+  }
 
-  it("getTourState returns empty object for new user", async () => {
-    const tours = await storage.getTourState(TEST_USER_ID);
-    expect(tours).toEqual({});
-  });
+  describe("tour state storage (integration)", () => {
+    beforeEach(seedUser);
 
-  it("markCompleted on global-welcome writes state.global", async () => {
-    await storage.patchTourState(TEST_USER_ID, "markCompleted", {
-      tourId: "global-welcome",
-      version: 1,
-      brandId: null,
-      timestamp: "2026-05-05T12:00:00.000Z",
+    afterAll(async () => {
+      await db.delete(users).where(eq(users.id, TEST_USER_ID));
     });
-    const tours = await storage.getTourState(TEST_USER_ID);
-    expect((tours as { global?: { v: number; completedAt: string } }).global).toEqual({
-      v: 1,
-      completedAt: "2026-05-05T12:00:00.000Z",
-    });
-  });
 
-  it("suppress is idempotent on second call", async () => {
-    await storage.patchTourState(TEST_USER_ID, "suppress", {
-      tourId: "citations",
-      timestamp: "2026-05-05T12:00:00.000Z",
+    it("getTourState returns empty object for new user", async () => {
+      const tours = await storage.getTourState(TEST_USER_ID);
+      expect(tours).toEqual({});
     });
-    await storage.patchTourState(TEST_USER_ID, "suppress", {
-      tourId: "citations",
-      timestamp: "2026-05-05T12:01:00.000Z",
-    });
-    const tours = await storage.getTourState(TEST_USER_ID);
-    expect((tours as { perUserSuppressed?: string[] }).perUserSuppressed).toEqual(["citations"]);
-  });
 
-  it("clearBrand removes perBrand[brandId]", async () => {
-    await storage.patchTourState(TEST_USER_ID, "markCompleted", {
-      tourId: "citations",
-      version: 1,
-      brandId: "brand-test",
-      timestamp: "2026-05-05T12:00:00.000Z",
+    it("markCompleted on global-welcome writes state.global", async () => {
+      await storage.patchTourState(TEST_USER_ID, "markCompleted", {
+        tourId: "global-welcome",
+        version: 1,
+        brandId: null,
+        timestamp: "2026-05-05T12:00:00.000Z",
+      });
+      const tours = await storage.getTourState(TEST_USER_ID);
+      expect((tours as { global?: { v: number; completedAt: string } }).global).toEqual({
+        v: 1,
+        completedAt: "2026-05-05T12:00:00.000Z",
+      });
     });
-    await storage.clearTourStateForBrand("brand-test");
-    const tours = await storage.getTourState(TEST_USER_ID);
-    expect(
-      (tours as { perBrand?: Record<string, unknown> }).perBrand?.["brand-test"],
-    ).toBeUndefined();
+
+    it("suppress is idempotent on second call", async () => {
+      await storage.patchTourState(TEST_USER_ID, "suppress", {
+        tourId: "citations",
+        timestamp: "2026-05-05T12:00:00.000Z",
+      });
+      await storage.patchTourState(TEST_USER_ID, "suppress", {
+        tourId: "citations",
+        timestamp: "2026-05-05T12:01:00.000Z",
+      });
+      const tours = await storage.getTourState(TEST_USER_ID);
+      expect((tours as { perUserSuppressed?: string[] }).perUserSuppressed).toEqual(["citations"]);
+    });
+
+    it("clearBrand removes perBrand[brandId]", async () => {
+      await storage.patchTourState(TEST_USER_ID, "markCompleted", {
+        tourId: "citations",
+        version: 1,
+        brandId: "brand-test",
+        timestamp: "2026-05-05T12:00:00.000Z",
+      });
+      await storage.clearTourStateForBrand("brand-test");
+      const tours = await storage.getTourState(TEST_USER_ID);
+      expect(
+        (tours as { perBrand?: Record<string, unknown> }).perBrand?.["brand-test"],
+      ).toBeUndefined();
+    });
   });
-});
+} else {
+  describe.skip("tour state storage (integration)", () => {
+    it("requires TEST_DATABASE_URL", () => {});
+  });
+}
