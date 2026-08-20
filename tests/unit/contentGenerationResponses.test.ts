@@ -10,11 +10,18 @@ const stubs = vi.hoisted(() => ({
   responsesRetrieve: vi.fn(),
   getJob: vi.fn(),
   updateJob: vi.fn(async () => undefined),
-  setResponseId: vi.fn(async () => undefined),
+  finishSlice: vi.fn(async () => ({ id: "job-1", status: "succeeded" })),
+  failSlice: vi.fn(async () => true),
+  completeSlice: vi.fn(async () => true),
+  renewLease: vi.fn(async () => true),
+  releaseLease: vi.fn(async () => true),
+  setResponseId: vi.fn(async () => true),
+  responsesCancel: vi.fn(async () => undefined),
   setArticleReady: vi.fn(async () => undefined),
   setArticleFailed: vi.fn(async () => undefined),
   setArticleDraft: vi.fn(async () => undefined),
-  setArticleGeneratingFromDraft: vi.fn(async () => undefined),
+  resetCancelledArticle: vi.fn(async () => true),
+  setArticleGeneratingForContentJob: vi.fn(async () => true),
   createRevision: vi.fn(async () => undefined),
   getUser: vi.fn(async () => ({ accessTier: "free" })),
   getBrandById: vi.fn(async () => null),
@@ -28,6 +35,7 @@ vi.mock("openai", () => ({
     responses = {
       create: stubs.responsesCreate,
       retrieve: stubs.responsesRetrieve,
+      cancel: stubs.responsesCancel,
     };
     chat = { completions: { create: vi.fn() } };
   },
@@ -36,11 +44,17 @@ vi.mock("../../server/storage", () => ({
   storage: {
     getContentJobByIdAdmin: stubs.getJob,
     updateContentJob: stubs.updateJob,
+    finishContentJobSlice: stubs.finishSlice,
+    failContentJobSlice: stubs.failSlice,
+    completeContentJobSlice: stubs.completeSlice,
+    renewContentJobSliceLease: stubs.renewLease,
+    releaseContentJobSliceLease: stubs.releaseLease,
     updateContentJobResponseId: stubs.setResponseId,
     setArticleReady: stubs.setArticleReady,
     setArticleFailed: stubs.setArticleFailed,
     setArticleDraft: stubs.setArticleDraft,
-    setArticleGeneratingFromDraft: stubs.setArticleGeneratingFromDraft,
+    resetArticleForCancelledContentJob: stubs.resetCancelledArticle,
+    setArticleGeneratingForContentJob: stubs.setArticleGeneratingForContentJob,
     createRevision: stubs.createRevision,
     getUser: stubs.getUser,
     getBrandById: stubs.getBrandById,
@@ -85,7 +99,7 @@ beforeEach(() => {
 describe("runArticleSlice (Responses API)", () => {
   it("returns done:true status:failed when job is not found", async () => {
     stubs.getJob.mockResolvedValueOnce(undefined);
-    const out = await runArticleSlice("missing-id", Date.now() + 1000);
+    const out = await runArticleSlice("missing-id", Date.now() + 1000, "slice-token");
     expect(out).toMatchObject({ done: true, status: "failed" });
   });
 
@@ -107,14 +121,18 @@ describe("runArticleSlice (Responses API)", () => {
     });
     stubs.responsesCreate.mockResolvedValueOnce({ id: "resp-abc", status: "queued" });
 
-    const out = await runArticleSlice("job-1", Date.now() + 1000);
+    const out = await runArticleSlice("job-1", Date.now() + 1000, "slice-token");
 
     expect(stubs.responsesCreate).toHaveBeenCalledTimes(1);
     expect(stubs.responsesCreate.mock.calls[0][0]).toMatchObject({
       background: true,
       store: true,
     });
-    expect(stubs.setResponseId).toHaveBeenCalledWith("job-1", "resp-abc");
+    expect(stubs.responsesCreate.mock.calls[0][1]).toMatchObject({
+      idempotencyKey: "content-generation:job-1",
+      maxRetries: 0,
+    });
+    expect(stubs.setResponseId).toHaveBeenCalledWith("job-1", "slice-token", "resp-abc");
     expect(out).toEqual({ done: false, status: "running" });
     expect(stubs.responsesRetrieve).not.toHaveBeenCalled();
   });
@@ -132,11 +150,16 @@ describe("runArticleSlice (Responses API)", () => {
     });
     stubs.responsesRetrieve.mockResolvedValueOnce({ id: "resp-xyz", status: "in_progress" });
 
-    const out = await runArticleSlice("job-2", Date.now() + 1000);
+    const out = await runArticleSlice("job-2", Date.now() + 1000, "slice-token");
 
-    expect(stubs.responsesRetrieve).toHaveBeenCalledWith("resp-xyz");
+    expect(stubs.responsesRetrieve).toHaveBeenCalledWith(
+      "resp-xyz",
+      undefined,
+      expect.objectContaining({ maxRetries: 0 }),
+    );
     expect(stubs.responsesCreate).not.toHaveBeenCalled();
     expect(stubs.setResponseId).not.toHaveBeenCalled();
+    expect(stubs.releaseLease).toHaveBeenCalledWith("job-2", "slice-token");
     expect(out).toEqual({ done: false, status: "running" });
   });
 
@@ -158,22 +181,12 @@ describe("runArticleSlice (Responses API)", () => {
       usage: { input_tokens: 100, output_tokens: 500 },
     });
 
-    const out = await runArticleSlice("job-3", Date.now() + 1000);
+    const out = await runArticleSlice("job-3", Date.now() + 1000, "slice-token");
 
-    expect(stubs.setArticleReady).toHaveBeenCalledWith(
-      "article-3",
-      expect.stringContaining("# My Article"),
-      expect.any(String),
-    );
-    expect(stubs.createRevision).toHaveBeenCalledWith(
-      expect.objectContaining({
-        articleId: "article-3",
-        source: "generated",
-      }),
-    );
-    expect(stubs.updateJob).toHaveBeenCalledWith(
+    expect(stubs.completeSlice).toHaveBeenCalledWith(
       "job-3",
-      expect.objectContaining({ status: "succeeded" }),
+      "slice-token",
+      expect.objectContaining({ content: expect.stringContaining("# My Article") }),
     );
     expect(out).toEqual({ done: true, status: "succeeded" });
   });
@@ -195,15 +208,19 @@ describe("runArticleSlice (Responses API)", () => {
       error: { message: "Model overloaded" },
     });
 
-    const out = await runArticleSlice("job-4", Date.now() + 1000);
+    const out = await runArticleSlice("job-4", Date.now() + 1000, "slice-token");
 
     // The Responses API path must retrieve the response status before marking failed.
-    expect(stubs.responsesRetrieve).toHaveBeenCalledWith("resp-fail");
-    expect(stubs.updateJob).toHaveBeenCalledWith(
-      "job-4",
-      expect.objectContaining({ status: "failed" }),
+    expect(stubs.responsesRetrieve).toHaveBeenCalledWith(
+      "resp-fail",
+      undefined,
+      expect.objectContaining({ maxRetries: 0 }),
     );
-    expect(stubs.setArticleFailed).toHaveBeenCalledWith("article-4");
+    expect(stubs.failSlice).toHaveBeenCalledWith(
+      "job-4",
+      "slice-token",
+      expect.objectContaining({ errorMessage: "Model overloaded" }),
+    );
     expect(stubs.refundQuota).toHaveBeenCalled();
     expect(out).toMatchObject({ done: true, status: "failed" });
   });
@@ -224,13 +241,14 @@ describe("runArticleSlice (Responses API)", () => {
       status: "cancelled",
     });
 
-    const out = await runArticleSlice("job-5", Date.now() + 1000);
+    const out = await runArticleSlice("job-5", Date.now() + 1000, "slice-token");
 
-    expect(stubs.updateJob).toHaveBeenCalledWith(
+    expect(stubs.finishSlice).toHaveBeenCalledWith(
       "job-5",
+      "slice-token",
       expect.objectContaining({ status: "cancelled" }),
     );
-    expect(stubs.setArticleDraft).toHaveBeenCalledWith("article-5");
+    expect(stubs.resetCancelledArticle).toHaveBeenCalledWith("job-5");
     expect(out).toEqual({ done: true, status: "cancelled" });
   });
 
@@ -251,20 +269,124 @@ describe("runArticleSlice (Responses API)", () => {
       },
     });
 
-    const out = await runArticleSlice("job-legacy", Date.now() + 1000);
+    const out = await runArticleSlice("job-legacy", Date.now() + 1000, "slice-token");
 
     expect(stubs.responsesCreate).not.toHaveBeenCalled();
     expect(stubs.responsesRetrieve).not.toHaveBeenCalled();
-    expect(stubs.updateJob).toHaveBeenCalledWith(
+    expect(stubs.failSlice).toHaveBeenCalledWith(
       "job-legacy",
-      expect.objectContaining({
-        status: "failed",
-        errorMessage: expect.stringContaining("legacy"),
-      }),
+      "slice-token",
+      expect.objectContaining({ errorMessage: expect.stringContaining("legacy") }),
     );
-    expect(stubs.setArticleFailed).toHaveBeenCalledWith("article-legacy");
     expect(stubs.refundQuota).toHaveBeenCalled();
     expect(out).toMatchObject({ done: true, status: "failed" });
+  });
+
+  it("does not write the article when cancellation wins the terminal transition", async () => {
+    stubs.getJob.mockResolvedValueOnce({
+      id: "job-cancel-race",
+      userId: "user-1",
+      brandId: null,
+      articleId: "article-cancel-race",
+      status: "running",
+      streamBuffer: "",
+      openaiResponseId: "resp-done",
+      requestPayload: {
+        keywords: "k",
+        industry: "i",
+        type: "Article",
+        articleId: "article-cancel-race",
+      },
+    });
+    stubs.responsesRetrieve.mockResolvedValueOnce({
+      id: "resp-done",
+      status: "completed",
+      output_text: "# Article\n\nContent",
+    });
+    stubs.completeSlice.mockResolvedValueOnce(false);
+
+    const out = await runArticleSlice("job-cancel-race", Date.now() + 1000, "slice-token");
+
+    expect(out).toEqual({ done: true, status: "cancelled" });
+    expect(stubs.setArticleReady).not.toHaveBeenCalled();
+    expect(stubs.createRevision).not.toHaveBeenCalled();
+  });
+
+  it("does not reset an article when this worker loses the cancellation token", async () => {
+    stubs.getJob.mockResolvedValueOnce({
+      id: "job-stale-cancel",
+      userId: "user-1",
+      brandId: null,
+      articleId: "article-stale-cancel",
+      status: "running",
+      streamBuffer: "",
+      openaiResponseId: "resp-cancel",
+      requestPayload: {
+        keywords: "k",
+        industry: "i",
+        type: "Article",
+        articleId: "article-stale-cancel",
+      },
+    });
+    stubs.responsesRetrieve.mockResolvedValueOnce({ id: "resp-cancel", status: "cancelled" });
+    stubs.finishSlice.mockResolvedValueOnce(undefined);
+
+    const out = await runArticleSlice("job-stale-cancel", Date.now() + 1000, "old-token");
+
+    expect(out).toEqual({ done: true, status: "cancelled" });
+    expect(stubs.resetCancelledArticle).not.toHaveBeenCalled();
+  });
+
+  it("does not start a provider request after it loses the lease", async () => {
+    stubs.getJob.mockResolvedValueOnce({
+      id: "job-lost-lease",
+      userId: "user-1",
+      brandId: null,
+      articleId: "article-lost-lease",
+      status: "running",
+      streamBuffer: "",
+      openaiResponseId: "resp-lost-lease",
+      requestPayload: {
+        keywords: "k",
+        industry: "i",
+        type: "Article",
+        articleId: "article-lost-lease",
+      },
+    });
+    stubs.renewLease.mockResolvedValueOnce(false);
+
+    const out = await runArticleSlice("job-lost-lease", Date.now() + 1000, "old-token");
+
+    expect(out).toEqual({ done: true, status: "cancelled" });
+    expect(stubs.responsesRetrieve).not.toHaveBeenCalled();
+  });
+
+  it("cancels a newly created response when it loses the link token", async () => {
+    stubs.getJob.mockResolvedValueOnce({
+      id: "job-link-lost",
+      userId: "user-1",
+      brandId: null,
+      articleId: "article-link-lost",
+      status: "running",
+      streamBuffer: "",
+      openaiResponseId: null,
+      requestPayload: {
+        keywords: "k",
+        industry: "i",
+        type: "Article",
+        articleId: "article-link-lost",
+      },
+    });
+    stubs.responsesCreate.mockResolvedValueOnce({ id: "resp-link-lost", status: "queued" });
+    stubs.setResponseId.mockResolvedValueOnce(false);
+
+    const out = await runArticleSlice("job-link-lost", Date.now() + 1000, "old-token");
+
+    expect(out).toEqual({ done: true, status: "cancelled" });
+    expect(stubs.responsesCancel).toHaveBeenCalledWith(
+      "resp-link-lost",
+      expect.objectContaining({ maxRetries: 0 }),
+    );
   });
 });
 

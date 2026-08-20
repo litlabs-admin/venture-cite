@@ -33,7 +33,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import { resolveTier } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { MODELS } from "../lib/modelConfig";
 import { type GenerationPayload } from "../contentGenerationWorker";
 import {
@@ -289,10 +289,17 @@ export function setupContentRoutes(app: Express): void {
         // left a long window where the form was still visible after the
         // user clicked Generate. Doing it here is safe - the worker only
         // reads articleId from the job and re-confirms ownership.
-        await db
-          .update(schema.articles)
-          .set({ status: "generating", jobId, updatedAt: new Date() })
-          .where(eq(schema.articles.id, article.id));
+        await db.execute(sql`
+          UPDATE public.articles
+          SET status = 'generating', job_id = ${jobId}, updated_at = now()
+          WHERE id = ${article.id}
+            AND EXISTS (
+              SELECT 1
+              FROM public.content_generation_jobs
+              WHERE id = ${jobId}
+                AND status IN ('pending', 'running')
+            )
+        `);
 
         // Server-side drive: progress the job without requiring an open
         // browser tab. Additive - the client /advance loop still runs as
@@ -310,7 +317,11 @@ export function setupContentRoutes(app: Express): void {
                 const claimed = await storage.claimContentJobForSlice(jobId, 12);
                 if (claimed) {
                   const sliceDeadlineMs = Math.min(driveDeadlineMs, Date.now() + 10_000);
-                  const outcome = await runArticleSlice(jobId, sliceDeadlineMs);
+                  const outcome = await runArticleSlice(
+                    jobId,
+                    sliceDeadlineMs,
+                    claimed.advanceToken,
+                  );
                   if (outcome.done) break;
                 }
                 // The OpenAI Responses run is background:true - it needs
@@ -459,7 +470,7 @@ export function setupContentRoutes(app: Express): void {
         }
 
         const deadlineMs = Date.now() + 8000;
-        const outcome = await runArticleSlice(job.id, deadlineMs);
+        const outcome = await runArticleSlice(job.id, deadlineMs, claimed.advanceToken);
 
         const after = await storage.getContentJobById(job.id, user.id);
         const buf = (after as any)?.streamBuffer ?? "";
@@ -494,21 +505,17 @@ export function setupContentRoutes(app: Express): void {
         if (job.status !== "pending" && job.status !== "running") {
           return res.json({ success: true, data: { status: job.status, alreadyTerminal: true } });
         }
-        await storage.updateContentJob(job.id, {
-          status: "cancelled",
-          completedAt: new Date(),
-        } as any);
-        // The worker will notice on its next tick and refund + reset the
-        // article. But if the job never made it to 'running' (claim hadn't
-        // happened yet) we should refund + reset here - otherwise the article
-        // sits in 'draft' but the quota stays consumed.
-        if (job.status === "pending") {
-          const { refundArticleQuota } = await import("../lib/usageLimit");
-          await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
-          if (job.articleId) {
-            await storage.setArticleDraft(job.articleId).catch(() => undefined);
-          }
+        const cancelled = await storage.cancelContentJob(job.id);
+        if (!cancelled) {
+          const latest = await storage.getContentJobById(job.id, user.id);
+          return res.json({
+            success: true,
+            data: { status: latest?.status ?? job.status, alreadyTerminal: true },
+          });
         }
+        const { refundArticleQuota } = await import("../lib/usageLimit");
+        await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
+        await storage.resetArticleForCancelledContentJob(job.id).catch(() => undefined);
         res.json({ success: true, data: { status: "cancelled" } });
       } catch (error) {
         sendError(res, error, "Failed to cancel job");
@@ -542,18 +549,17 @@ export function setupContentRoutes(app: Express): void {
             data: { status: job.status, alreadyTerminal: true },
           });
         }
-        const wasPending = job.status === "pending";
-        await storage.updateContentJob(job.id, {
-          status: "cancelled",
-          completedAt: new Date(),
-        } as never);
-        if (wasPending) {
-          const { refundArticleQuota } = await import("../lib/usageLimit");
-          await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
-          if (job.articleId) {
-            await storage.setArticleDraft(job.articleId).catch(() => undefined);
-          }
+        const cancelled = await storage.cancelContentJob(job.id);
+        if (!cancelled) {
+          const latest = await storage.getContentJobById(job.id, user.id);
+          return res.json({
+            success: true,
+            data: { status: latest?.status ?? job.status, alreadyTerminal: true },
+          });
         }
+        const { refundArticleQuota } = await import("../lib/usageLimit");
+        await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
+        await storage.resetArticleForCancelledContentJob(job.id).catch(() => undefined);
         res.json({ success: true, data: { status: "cancelled" } });
       } catch (error) {
         sendError(res, error, "Failed to cancel article generation");

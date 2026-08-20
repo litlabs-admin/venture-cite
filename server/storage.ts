@@ -78,6 +78,28 @@ import {
   type SentimentCache,
 } from "@shared/schema";
 
+export type ClaimedContentGenerationJob = ContentGenerationJob & {
+  advanceToken: string;
+  advanceLeaseExpiresAt: Date;
+};
+
+export type ContentJobTerminalUpdate = {
+  status: "succeeded" | "failed" | "cancelled";
+  completedAt: Date;
+  errorMessage?: string | null;
+  errorKind?: string | null;
+};
+
+export type CompletedContentJob = {
+  content: string;
+  title: string;
+};
+
+export type FailedContentJob = {
+  errorKind: string;
+  errorMessage: string;
+};
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -263,14 +285,38 @@ export interface IStorage {
   claimContentJobForSlice(
     id: string,
     sliceBudgetSeconds: number,
+  ): Promise<ClaimedContentGenerationJob | undefined>;
+  finishContentJobSlice(
+    id: string,
+    advanceToken: string,
+    update: ContentJobTerminalUpdate,
   ): Promise<ContentGenerationJob | undefined>;
+  completeContentJobSlice(
+    id: string,
+    advanceToken: string,
+    article: CompletedContentJob,
+  ): Promise<boolean>;
+  failContentJobSlice(
+    id: string,
+    advanceToken: string,
+    failure: FailedContentJob,
+  ): Promise<boolean>;
+  renewContentJobSliceLease(id: string, advanceToken: string): Promise<boolean>;
+  releaseContentJobSliceLease(id: string, advanceToken: string): Promise<boolean>;
+  cancelContentJob(id: string): Promise<ContentGenerationJob | undefined>;
+  resetArticleForCancelledContentJob(id: string): Promise<boolean>;
+  setArticleGeneratingForContentJob(id: string, advanceToken: string): Promise<boolean>;
   // Pending or running jobs whose advance lock has expired. Used by the
   // daily cron orchestrator to drain orphaned generations.
   listAdvanceablePendingJobs(limit: number): Promise<ContentGenerationJob[]>;
   // Vercel migration: link an OpenAI Responses run to a content job.
   // Idempotent - passing the same id is a no-op. Used by runArticleSlice's
   // first call to record which OpenAI run owns this job.
-  updateContentJobResponseId(jobId: string, openaiResponseId: string): Promise<void>;
+  updateContentJobResponseId(
+    jobId: string,
+    advanceToken: string,
+    openaiResponseId: string,
+  ): Promise<boolean>;
   getActiveContentJob(userId: string): Promise<ContentGenerationJob | undefined>;
   getRecentCompletedContentJob(userId: string): Promise<ContentGenerationJob | undefined>;
   failStuckContentJobs(

@@ -17,7 +17,13 @@ import type { KnownTourId, TourStateOp } from "./lib/tourRegistry";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { buildCoreCompetitorRows, mergeLeaderboardByDomain } from "./lib/leaderboardMerge";
-import { IStorage } from "./storage";
+import {
+  type ClaimedContentGenerationJob,
+  type CompletedContentJob,
+  type ContentJobTerminalUpdate,
+  type FailedContentJob,
+  IStorage,
+} from "./storage";
 import {
   type User,
   type InsertUser,
@@ -103,6 +109,7 @@ import { applyTourStateOp } from "./lib/tourStateOps";
 // dead (serverless timeout, deploy, or crash). Used both by the freshness
 // bound in getActiveScanJobForBrand and by the failStaleScanJobs reaper.
 const SCAN_JOB_STALE_MINUTES = 30;
+const CONTENT_JOB_LEASE_SECONDS = 90;
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
@@ -1157,39 +1164,245 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async updateContentJobResponseId(jobId: string, openaiResponseId: string): Promise<void> {
-    await db
+  async updateContentJobResponseId(
+    jobId: string,
+    advanceToken: string,
+    openaiResponseId: string,
+  ): Promise<boolean> {
+    const result = await db
       .update(schema.contentGenerationJobs)
       .set({ openaiResponseId })
-      .where(eq(schema.contentGenerationJobs.id, jobId));
+      .where(
+        and(
+          eq(schema.contentGenerationJobs.id, jobId),
+          eq(schema.contentGenerationJobs.advanceToken, advanceToken),
+          eq(schema.contentGenerationJobs.status, "running"),
+        ),
+      )
+      .returning({ id: schema.contentGenerationJobs.id });
+    return result.length > 0;
   }
 
   async claimContentJobForSlice(
     id: string,
     sliceBudgetSeconds: number,
-  ): Promise<ContentGenerationJob | undefined> {
-    // Win the lock by setting last_advance_started_at = now() WHERE the
-    // existing value is NULL or older than the slice budget. Drizzle's
-    // raw sql is the cleanest way to express the time-window guard.
+  ): Promise<ClaimedContentGenerationJob | undefined> {
+    const leaseSeconds = Math.max(sliceBudgetSeconds, CONTENT_JOB_LEASE_SECONDS);
     const result = await db.execute(sql`
       UPDATE public.content_generation_jobs
-      SET last_advance_started_at = now()
+      SET status = 'running',
+          started_at = COALESCE(started_at, now()),
+          last_advance_started_at = now(),
+          advance_token = gen_random_uuid()::text,
+          advance_lease_expires_at = now() + make_interval(secs => ${leaseSeconds})
       WHERE id = ${id}
         AND status IN ('pending', 'running')
         AND (
-          last_advance_started_at IS NULL
-          OR last_advance_started_at < now() - make_interval(secs => ${sliceBudgetSeconds})
+          advance_lease_expires_at IS NULL
+          OR advance_lease_expires_at < now()
         )
       RETURNING id, user_id AS "userId", brand_id AS "brandId", status,
         request_payload AS "requestPayload", article_id AS "articleId",
         error_message AS "errorMessage", error_kind AS "errorKind",
         stream_buffer AS "streamBuffer", refunded_at AS "refundedAt",
         last_advance_started_at AS "lastAdvanceStartedAt",
+        advance_token AS "advanceToken", advance_lease_expires_at AS "advanceLeaseExpiresAt",
         created_at AS "createdAt", started_at AS "startedAt",
         completed_at AS "completedAt"
     `);
     const row = (result as any).rows?.[0];
-    return row as ContentGenerationJob | undefined;
+    return row as ClaimedContentGenerationJob | undefined;
+  }
+
+  async finishContentJobSlice(
+    id: string,
+    advanceToken: string,
+    update: ContentJobTerminalUpdate,
+  ): Promise<ContentGenerationJob | undefined> {
+    const [row] = await db
+      .update(schema.contentGenerationJobs)
+      .set({ ...update, advanceToken: null, advanceLeaseExpiresAt: null })
+      .where(
+        and(
+          eq(schema.contentGenerationJobs.id, id),
+          eq(schema.contentGenerationJobs.advanceToken, advanceToken),
+          eq(schema.contentGenerationJobs.status, "running"),
+        ),
+      )
+      .returning();
+    return row;
+  }
+
+  async completeContentJobSlice(
+    id: string,
+    advanceToken: string,
+    article: CompletedContentJob,
+  ): Promise<boolean> {
+    return db.transaction(async (tx) => {
+      const [job] = await tx
+        .update(schema.contentGenerationJobs)
+        .set({
+          status: "succeeded",
+          completedAt: new Date(),
+          advanceToken: null,
+          advanceLeaseExpiresAt: null,
+        })
+        .where(
+          and(
+            eq(schema.contentGenerationJobs.id, id),
+            eq(schema.contentGenerationJobs.advanceToken, advanceToken),
+            eq(schema.contentGenerationJobs.status, "running"),
+          ),
+        )
+        .returning({ articleId: schema.contentGenerationJobs.articleId });
+      if (!job) return false;
+      if (!job.articleId) {
+        throw new Error("Content generation job has no article");
+      }
+
+      const [updatedArticle] = await tx
+        .update(schema.articles)
+        .set({
+          status: "ready",
+          content: article.content,
+          title: article.title,
+          aiGenerated: true,
+          jobId: null,
+          version: sql`${schema.articles.version} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(schema.articles.id, job.articleId), eq(schema.articles.jobId, id)))
+        .returning({ id: schema.articles.id });
+      if (!updatedArticle) {
+        throw new Error("Content generation article is missing or has a newer job");
+      }
+
+      await tx.insert(schema.articleRevisions).values({
+        articleId: job.articleId,
+        content: article.content,
+        source: "generated",
+        createdBy: "system",
+      });
+      return true;
+    });
+  }
+
+  async failContentJobSlice(
+    id: string,
+    advanceToken: string,
+    failure: FailedContentJob,
+  ): Promise<boolean> {
+    return db.transaction(async (tx) => {
+      const [job] = await tx
+        .update(schema.contentGenerationJobs)
+        .set({
+          status: "failed",
+          errorKind: failure.errorKind,
+          errorMessage: failure.errorMessage,
+          completedAt: new Date(),
+          advanceToken: null,
+          advanceLeaseExpiresAt: null,
+        })
+        .where(
+          and(
+            eq(schema.contentGenerationJobs.id, id),
+            eq(schema.contentGenerationJobs.advanceToken, advanceToken),
+            eq(schema.contentGenerationJobs.status, "running"),
+          ),
+        )
+        .returning({ articleId: schema.contentGenerationJobs.articleId });
+      if (!job) return false;
+      if (!job.articleId) {
+        throw new Error("Content generation job has no article");
+      }
+
+      const [updatedArticle] = await tx
+        .update(schema.articles)
+        .set({ status: "failed", jobId: null, updatedAt: new Date() })
+        .where(and(eq(schema.articles.id, job.articleId), eq(schema.articles.jobId, id)))
+        .returning({ id: schema.articles.id });
+      if (!updatedArticle) {
+        throw new Error("Content generation article is missing or has a newer job");
+      }
+      return true;
+    });
+  }
+
+  async renewContentJobSliceLease(id: string, advanceToken: string): Promise<boolean> {
+    const result = await db.execute(sql`
+      UPDATE public.content_generation_jobs
+      SET advance_lease_expires_at = now() + make_interval(secs => ${CONTENT_JOB_LEASE_SECONDS})
+      WHERE id = ${id}
+        AND advance_token = ${advanceToken}
+        AND status = 'running'
+      RETURNING id
+    `);
+    return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0;
+  }
+
+  async releaseContentJobSliceLease(id: string, advanceToken: string): Promise<boolean> {
+    const result = await db.execute(sql`
+      UPDATE public.content_generation_jobs
+      SET advance_token = NULL,
+          advance_lease_expires_at = NULL
+      WHERE id = ${id}
+        AND advance_token = ${advanceToken}
+        AND status = 'running'
+      RETURNING id
+    `);
+    return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0;
+  }
+
+  async cancelContentJob(id: string): Promise<ContentGenerationJob | undefined> {
+    const [row] = await db
+      .update(schema.contentGenerationJobs)
+      .set({
+        status: "cancelled",
+        completedAt: new Date(),
+        advanceToken: null,
+        advanceLeaseExpiresAt: null,
+      })
+      .where(
+        and(
+          eq(schema.contentGenerationJobs.id, id),
+          inArray(schema.contentGenerationJobs.status, ["pending", "running"]),
+        ),
+      )
+      .returning();
+    return row;
+  }
+
+  async resetArticleForCancelledContentJob(id: string): Promise<boolean> {
+    const result = await db.execute(sql`
+      UPDATE public.articles
+      SET status = 'draft', job_id = NULL, updated_at = now()
+      WHERE job_id = ${id}
+        AND EXISTS (
+          SELECT 1
+          FROM public.content_generation_jobs
+          WHERE id = ${id}
+            AND status = 'cancelled'
+        )
+      RETURNING id
+    `);
+    return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0;
+  }
+
+  async setArticleGeneratingForContentJob(id: string, advanceToken: string): Promise<boolean> {
+    const result = await db.execute(sql`
+      UPDATE public.articles
+      SET status = 'generating', updated_at = now()
+      WHERE id = (
+        SELECT article_id
+        FROM public.content_generation_jobs
+        WHERE id = ${id}
+          AND advance_token = ${advanceToken}
+          AND status = 'running'
+      )
+        AND status IN ('draft', 'generating')
+      RETURNING id
+    `);
+    return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0;
   }
 
   async listAdvanceablePendingJobs(limit: number): Promise<ContentGenerationJob[]> {
@@ -1204,8 +1417,8 @@ export class DatabaseStorage implements IStorage {
       FROM public.content_generation_jobs
       WHERE status IN ('pending', 'running')
         AND (
-          last_advance_started_at IS NULL
-          OR last_advance_started_at < now() - INTERVAL '5 minutes'
+          advance_lease_expires_at IS NULL
+          OR advance_lease_expires_at < now()
         )
       ORDER BY created_at ASC
       LIMIT ${limit}

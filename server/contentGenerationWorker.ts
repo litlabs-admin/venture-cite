@@ -70,13 +70,41 @@ function classifyError(err: unknown): ErrorKind {
 }
 
 type SliceResult =
-  | { kind: "completed"; finalContent: string }
+  | {
+      kind: "completed";
+      finalContent: string;
+      title: string;
+      tokensIn: number;
+      tokensOut: number;
+    }
   | { kind: "deadline"; partialContent: string }
   | { kind: "cancelled" };
 
+function providerRequestOptions(deadlineMs: number, idempotencyKey?: string) {
+  const remainingMs = deadlineMs - Date.now();
+  if (remainingMs <= 0) {
+    const err: Error & { name?: string } = new Error("Content job slice deadline elapsed");
+    err.name = "TimeoutError";
+    throw err;
+  }
+  return {
+    timeout: Math.min(LLM_CALL_TIMEOUT_MS, remainingMs),
+    maxRetries: 0,
+    ...(idempotencyKey ? { idempotencyKey } : {}),
+  };
+}
+
+function cleanupRequestOptions(deadlineMs: number) {
+  return {
+    timeout: Math.max(1, Math.min(LLM_CALL_TIMEOUT_MS, deadlineMs - Date.now())),
+    maxRetries: 0,
+  };
+}
+
 async function runJobToCompletionOrDeadline(
   job: ContentGenerationJob,
-  _executionDeadline: number,
+  advanceToken: string,
+  executionDeadline: number,
 ): Promise<SliceResult> {
   const payload = job.requestPayload as unknown as GenerationPayload;
   const {
@@ -116,8 +144,15 @@ async function runJobToCompletionOrDeadline(
   const tier = (userRow ? resolveTier(userRow) : "pending") as Tier;
   await assertWithinBudget(job.userId, tier);
 
-  // Flip the article into 'generating' on the first call. Idempotent.
-  await storage.setArticleGeneratingFromDraft(articleId, job.id);
+  const articleStarted = await storage.setArticleGeneratingForContentJob(job.id, advanceToken);
+  if (!articleStarted && !existingResponseId) {
+    return { kind: "cancelled" };
+  }
+
+  const leaseHeld = await storage.renewContentJobSliceLease(job.id, advanceToken);
+  if (!leaseHeld) {
+    return { kind: "cancelled" };
+  }
 
   // First /advance call: kick off the OpenAI Responses run. Returns
   // immediately; the actual work runs on OpenAI's servers.
@@ -134,21 +169,41 @@ async function runJobToCompletionOrDeadline(
     });
 
     const response = await openaiBreaker.run(() =>
-      openai.responses.create({
-        model: MODELS.contentGeneration as string,
-        input: promptText,
-        background: true,
-        store: true,
-      }),
+      openai.responses.create(
+        {
+          model: MODELS.contentGeneration as string,
+          input: promptText,
+          background: true,
+          store: true,
+        },
+        providerRequestOptions(executionDeadline, `content-generation:${job.id}`),
+      ),
     );
 
-    await storage.updateContentJobResponseId(job.id, response.id);
+    const linked = await storage.updateContentJobResponseId(job.id, advanceToken, response.id);
+    if (!linked) {
+      try {
+        await openai.responses.cancel(response.id, cleanupRequestOptions(executionDeadline));
+      } catch (err) {
+        logger.warn(
+          { err, jobId: job.id, responseId: response.id },
+          "content response cleanup failed",
+        );
+      }
+      return { kind: "cancelled" };
+    }
 
     return { kind: "deadline", partialContent: "" };
   }
 
   // Subsequent /advance calls: poll OpenAI for completion.
-  const response = await openaiBreaker.run(() => openai.responses.retrieve(existingResponseId));
+  const response = await openaiBreaker.run(() =>
+    openai.responses.retrieve(
+      existingResponseId,
+      undefined,
+      providerRequestOptions(executionDeadline),
+    ),
+  );
 
   if (response.status === "completed") {
     const finalContent = extractResponseText(response as Parameters<typeof extractResponseText>[0]);
@@ -161,26 +216,15 @@ async function runJobToCompletionOrDeadline(
       throw err;
     }
 
-    if (response.usage) {
-      await recordSpend({
-        userId: job.userId,
-        service: "openai",
-        model: MODELS.contentGeneration,
-        tokensIn: response.usage.input_tokens ?? 0,
-        tokensOut: response.usage.output_tokens ?? 0,
-      });
-    }
-
     const headingMatch = finalContent.match(/^#\s+(.+)$/m);
     const title = headingMatch?.[1]?.trim() || `${keywords} - ${industry}`;
-    await storage.setArticleReady(articleId, finalContent, title);
-    await storage.createRevision({
-      articleId,
-      content: finalContent,
-      source: "generated",
-      createdBy: "system",
-    });
-    return { kind: "completed", finalContent };
+    return {
+      kind: "completed",
+      finalContent,
+      title,
+      tokensIn: response.usage?.input_tokens ?? 0,
+      tokensOut: response.usage?.output_tokens ?? 0,
+    };
   }
 
   if (response.status === "failed") {
@@ -289,7 +333,11 @@ export type SliceOutcome =
   | { done: true; status: "failed" | "cancelled"; errorKind?: ErrorKind; message?: string }
   | { done: false; status: "running" };
 
-export async function runArticleSlice(jobId: string, deadlineMs: number): Promise<SliceOutcome> {
+export async function runArticleSlice(
+  jobId: string,
+  deadlineMs: number,
+  advanceToken: string,
+): Promise<SliceOutcome> {
   const job = await storage.getContentJobByIdAdmin(jobId);
   if (!job) {
     return {
@@ -306,31 +354,18 @@ export async function runArticleSlice(jobId: string, deadlineMs: number): Promis
     };
   }
 
-  if (job.status === "pending") {
-    await storage.updateContentJob(job.id, {
-      status: "running",
-      startedAt: new Date(),
-    });
-  }
-
   let result: SliceResult;
   try {
-    result = await runJobToCompletionOrDeadline(job, deadlineMs);
+    result = await runJobToCompletionOrDeadline(job, advanceToken, deadlineMs);
   } catch (err) {
     const errorKind = classifyError(err);
     const message = err instanceof Error ? err.message : String(err);
-    await storage.updateContentJob(job.id, {
-      status: "failed",
+    const finished = await storage.failContentJobSlice(job.id, advanceToken, {
       errorMessage: message.slice(0, 500),
       errorKind,
-      completedAt: new Date(),
-    } as never);
-    if (job.articleId) {
-      try {
-        await storage.setArticleFailed(job.articleId);
-      } catch {
-        // best-effort
-      }
+    });
+    if (!finished) {
+      return { done: true, status: "cancelled" };
     }
     try {
       await refundArticleQuota(job.userId, job.id, errorKind);
@@ -360,29 +395,41 @@ export async function runArticleSlice(jobId: string, deadlineMs: number): Promis
   }
 
   if (result.kind === "completed") {
-    await storage.updateContentJob(job.id, {
-      status: "succeeded",
-      completedAt: new Date(),
+    const finished = await storage.completeContentJobSlice(job.id, advanceToken, {
+      content: result.finalContent,
+      title: result.title,
+    });
+    if (!finished) {
+      return { done: true, status: "cancelled" };
+    }
+    await recordSpend({
+      userId: job.userId,
+      service: "openai",
+      model: MODELS.contentGeneration,
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
     });
     logger.info({ jobId: job.id }, "content slice completed");
     return { done: true, status: "succeeded" };
   }
   if (result.kind === "cancelled") {
-    if (job.articleId) {
-      try {
-        await storage.setArticleDraft(job.articleId);
-      } catch {
-        // best-effort
-      }
-    }
-    await storage.updateContentJob(job.id, {
+    const finished = await storage.finishContentJobSlice(job.id, advanceToken, {
       status: "cancelled",
       completedAt: new Date(),
     });
+    if (!finished) {
+      return { done: true, status: "cancelled" };
+    }
+    try {
+      await storage.resetArticleForCancelledContentJob(job.id);
+    } catch {
+      // best-effort
+    }
     return { done: true, status: "cancelled" };
   }
 
-  // Deadline hit - leave job in 'running'; next /advance resumes.
+  // Release this token so the next slice can claim the running job.
+  await storage.releaseContentJobSliceLease(job.id, advanceToken);
   return { done: false, status: "running" };
 }
 

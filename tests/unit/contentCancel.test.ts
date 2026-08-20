@@ -18,6 +18,8 @@ const JOB_ID = "55555555-5555-4555-8555-555555555555";
 const stubs = vi.hoisted(() => ({
   getActiveContentJob: vi.fn(),
   getContentJobById: vi.fn(),
+  cancelContentJob: vi.fn(async () => undefined),
+  resetArticleForCancelledContentJob: vi.fn(async () => true),
   updateContentJob: vi.fn(async () => undefined),
   setArticleDraft: vi.fn(async () => undefined),
   refundArticleQuota: vi.fn(async () => undefined),
@@ -50,6 +52,8 @@ vi.mock("../../server/storage", () => ({
   storage: {
     getActiveContentJob: stubs.getActiveContentJob,
     getContentJobById: stubs.getContentJobById,
+    cancelContentJob: stubs.cancelContentJob,
+    resetArticleForCancelledContentJob: stubs.resetArticleForCancelledContentJob,
     updateContentJob: stubs.updateContentJob,
     setArticleDraft: stubs.setArticleDraft,
     // Not used by cancel but referenced via the setupContentRoutes import surface
@@ -168,6 +172,10 @@ beforeEach(() => {
   stubs.getContentJobById.mockReset();
   stubs.updateContentJob.mockReset();
   stubs.updateContentJob.mockResolvedValue(undefined);
+  stubs.cancelContentJob.mockReset();
+  stubs.cancelContentJob.mockResolvedValue({ id: JOB_ID, status: "cancelled" });
+  stubs.resetArticleForCancelledContentJob.mockReset();
+  stubs.resetArticleForCancelledContentJob.mockResolvedValue(true);
   stubs.setArticleDraft.mockReset();
   stubs.setArticleDraft.mockResolvedValue(undefined);
   stubs.refundArticleQuota.mockReset();
@@ -186,16 +194,38 @@ describe("POST /api/content/:articleId/cancel", () => {
     const { status, body } = await call(app, "POST", `/api/content/${ARTICLE_ID}/cancel`);
     expect(status).toBe(200);
     expect(body?.success).toBe(true);
-    expect(stubs.updateContentJob).toHaveBeenCalledTimes(1);
-    const args = stubs.updateContentJob.mock.calls[0] as unknown as [string, { status: string }];
-    expect(args[0]).toBe(JOB_ID);
-    expect(args[1].status).toBe("cancelled");
+    expect(stubs.cancelContentJob).toHaveBeenCalledWith(JOB_ID);
+    expect(stubs.resetArticleForCancelledContentJob).toHaveBeenCalledWith(JOB_ID);
   });
 
   it("returns 404 for an article owned by another user (anti-enumeration)", async () => {
     const app = buildApp();
     const { status } = await call(app, "POST", `/api/content/${FOREIGN_ARTICLE_ID}/cancel`);
     expect(status).toBe(404);
-    expect(stubs.updateContentJob).not.toHaveBeenCalled();
+    expect(stubs.cancelContentJob).not.toHaveBeenCalled();
+  });
+
+  it("returns the terminal state when completion wins the cancel race", async () => {
+    stubs.getContentJobById
+      .mockResolvedValueOnce({
+        id: JOB_ID,
+        userId: USER_ID,
+        articleId: ARTICLE_ID,
+        status: "running",
+      })
+      .mockResolvedValueOnce({
+        id: JOB_ID,
+        userId: USER_ID,
+        articleId: ARTICLE_ID,
+        status: "succeeded",
+      });
+    stubs.cancelContentJob.mockResolvedValueOnce(undefined);
+
+    const app = buildApp();
+    const { status, body } = await call(app, "POST", `/api/content/${ARTICLE_ID}/cancel`);
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ data: { status: "succeeded", alreadyTerminal: true } });
+    expect(stubs.setArticleDraft).not.toHaveBeenCalled();
   });
 });

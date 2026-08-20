@@ -502,7 +502,7 @@ async function advanceRunInner(runId: string): Promise<void> {
           // function timeout. The user's auth tick fires this code so
           // we don't want to block their request for the full 8s budget.
           const sliceDeadline = Date.now() + 6000;
-          await runArticleSlice(jobId, sliceDeadline);
+          await runArticleSlice(jobId, sliceDeadline, claimed.advanceToken);
         }
       } catch (err) {
         logger.warn({ err, runId, jobId }, "awaitJob: slice-drive failed, will retry next tick");

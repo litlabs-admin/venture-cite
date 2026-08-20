@@ -212,7 +212,7 @@ async function drainPendingContentJobs(
       const claimed = await storage.claimContentJobForSlice(j.id, 30);
       if (!claimed) continue;
       const sliceDeadline = Math.min(deadlineMs - 500, Date.now() + 7000);
-      const outcome = await runArticleSlice(j.id, sliceDeadline);
+      const outcome = await runArticleSlice(j.id, sliceDeadline, claimed.advanceToken);
       progressed += 1;
       if (outcome.done && outcome.status === "succeeded") completed += 1;
     } catch (err) {
