@@ -11,7 +11,10 @@ const contentRequestDistributionColumns = {
   platform: distributions.platform,
   status: distributions.status,
   distributedAt: distributions.distributedAt,
+  platformPostId: distributions.platformPostId,
+  platformUrl: distributions.platformUrl,
   metadata: distributions.metadata,
+  error: distributions.error,
   createdAt: distributions.createdAt,
 };
 

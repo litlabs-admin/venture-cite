@@ -94,13 +94,21 @@ describe("content request actor facade", () => {
         jobId: expect.anything(),
         aiGenerated: expect.anything(),
         viewCount: expect.anything(),
+        citationCount: expect.anything(),
+        humanScore: expect.anything(),
+        passesAiDetection: expect.anything(),
       }),
     );
     const distributionProjection = projections[2] ?? {};
     expect(distributionProjection).toEqual(
-      expect.objectContaining({ status: expect.anything(), distributedAt: expect.anything() }),
+      expect.objectContaining({
+        status: expect.anything(),
+        distributedAt: expect.anything(),
+        platformPostId: expect.anything(),
+        platformUrl: expect.anything(),
+        error: expect.anything(),
+      }),
     );
-    expect(distributionProjection).not.toHaveProperty("platformPostId");
     const jobProjection = projections.at(-1) ?? {};
     expect(jobProjection).toEqual(
       expect.objectContaining({ errorKind: expect.anything(), requestPayload: expect.anything() }),

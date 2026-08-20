@@ -29,6 +29,9 @@ const contentRequestArticleColumns = {
   createdAt: articles.createdAt,
   updatedAt: articles.updatedAt,
   seoData: articles.seoData,
+  citationCount: articles.citationCount,
+  humanScore: articles.humanScore,
+  passesAiDetection: articles.passesAiDetection,
 };
 
 export type ContentRequestArticle = Pick<Article, keyof typeof contentRequestArticleColumns>;

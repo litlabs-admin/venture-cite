@@ -36,6 +36,8 @@ import {
 import { parsePagination } from "../lib/pagination";
 import { aiLimitMiddleware, openai, sendError, asyncHandler } from "../lib/routesShared";
 import { postToBuffer } from "../lib/bufferPost";
+import { createRequestActor } from "../lib/requestActor";
+import { contentRequestData } from "../data/contentRequestData";
 
 import { logger } from "../lib/logger";
 export function setupArticlesRoutes(app: Express): void {
@@ -131,6 +133,7 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
+        const actor = createRequestActor(user.id);
         const { limit, offset } = parsePagination(req);
         const brandIdParam = typeof req.query.brandId === "string" ? req.query.brandId : undefined;
         if (brandIdParam) await requireBrand(brandIdParam, user.id);
@@ -147,7 +150,7 @@ export function setupArticlesRoutes(app: Express): void {
                   .filter(Boolean)
               : statusParam;
 
-        const articles = await storage.getArticlesByUserIdWithStatus(user.id, {
+        const articles = await contentRequestData.forActor(actor).articles.list({
           status,
           brandId: brandIdParam,
           limit,
@@ -166,7 +169,9 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.id, user.id);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.id);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
         res.json({ success: true, article });
       } catch (error) {
         sendError(res, error, "Failed to fetch article");
@@ -180,6 +185,7 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
+        const actor = createRequestActor(user.id);
         await requireArticle(req.params.id, user.id);
         const update = pickFields<any>(req.body, ARTICLE_WRITE_FIELDS);
         if (update.brandId) {
@@ -200,7 +206,7 @@ export function setupArticlesRoutes(app: Express): void {
             update as any,
           );
           if (!article) {
-            const current = await storage.getArticleById(req.params.id);
+            const current = await contentRequestData.forActor(actor).articles.get(req.params.id);
             return res.status(409).json({
               success: false,
               error:
@@ -251,9 +257,13 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireArticle(req.params.id, user.id);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.id);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
         const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
-        const revisions = await storage.listRevisions(req.params.id, limit);
+        const revisions = await contentRequestData
+          .forActor(actor)
+          .revisions.list(req.params.id, limit);
         res.json({ success: true, data: revisions });
       } catch (error) {
         sendError(res, error, "Failed to list revisions");
@@ -266,8 +276,10 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireArticle(req.params.id, user.id);
-        const revision = await storage.getRevisionById(req.params.revId);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.id);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
+        const revision = await contentRequestData.forActor(actor).revisions.get(req.params.revId);
         if (!revision || revision.articleId !== req.params.id) {
           return res.status(404).json({ success: false, error: "Revision not found" });
         }
@@ -286,8 +298,9 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
+        const actor = createRequestActor(user.id);
         const article = await requireArticle(req.params.id, user.id);
-        const revision = await storage.getRevisionById(req.params.revId);
+        const revision = await contentRequestData.forActor(actor).revisions.get(req.params.revId);
         if (!revision || revision.articleId !== article.id) {
           return res.status(404).json({ success: false, error: "Revision not found" });
         }
@@ -300,7 +313,7 @@ export function setupArticlesRoutes(app: Express): void {
             content: revision.content,
           } as any);
           if (!updated) {
-            const current = await storage.getArticleById(article.id);
+            const current = await contentRequestData.forActor(actor).articles.get(article.id);
             return res.status(409).json({
               success: false,
               error: "Article changed since restore was started. Refresh and try again.",
@@ -365,8 +378,12 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireArticle(req.params.articleId, user.id);
-        const distributions = await storage.getDistributions(req.params.articleId);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.articleId);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
+        const distributions = await contentRequestData
+          .forActor(actor)
+          .distributions.list(req.params.articleId);
         res.json({ success: true, data: distributions });
       } catch (error) {
         sendError(res, error, "Failed to fetch distributions");
@@ -385,9 +402,10 @@ export function setupArticlesRoutes(app: Express): void {
         if (typeof content !== "string") {
           return res.status(400).json({ success: false, error: "content is required" });
         }
-        const dist = await storage.getDistributionById(distributionId);
+        const dist = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .distributions.get(distributionId);
         if (!dist) return res.status(404).json({ success: false, error: "Distribution not found" });
-        await requireArticle(dist.articleId, user.id); // verifies article belongs to user
 
         const updated = await storage.updateDistribution(distributionId, {
           metadata: { ...((dist.metadata as object) ?? {}), content },
@@ -594,14 +612,10 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const distribution = await storage.getDistributionById(req.params.distributionId);
+        const distribution = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .distributions.get(req.params.distributionId);
         if (!distribution) {
-          return res.status(404).json({ success: false, error: "not_found" });
-        }
-        try {
-          await requireArticle(distribution.articleId, user.id);
-        } catch {
-          // 404 not 403 - anti-enumeration. CLAUDE.md.
           return res.status(404).json({ success: false, error: "not_found" });
         }
         const { channelId } = req.body ?? {};

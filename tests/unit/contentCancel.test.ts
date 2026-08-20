@@ -17,11 +17,13 @@ const JOB_ID = "55555555-5555-4555-8555-555555555555";
 const stubs = vi.hoisted(() => ({
   getActiveContentJob: vi.fn(),
   getContentJobById: vi.fn(),
+  getArticle: vi.fn(),
   cancelContentJob: vi.fn(async () => undefined),
   resetArticleForCancelledContentJob: vi.fn(async () => true),
   updateContentJob: vi.fn(async () => undefined),
   setArticleDraft: vi.fn(async () => undefined),
   refundArticleQuota: vi.fn(async () => undefined),
+  forActor: vi.fn(),
 }));
 
 vi.mock("../../server/auth", () => ({
@@ -64,6 +66,12 @@ vi.mock("../../server/storage", () => ({
     setArticleFailed: vi.fn(),
     createRevision: vi.fn(),
     createDraftArticle: vi.fn(),
+  },
+}));
+
+vi.mock("../../server/data/contentRequestData", () => ({
+  contentRequestData: {
+    forActor: stubs.forActor,
   },
 }));
 
@@ -167,6 +175,17 @@ async function call(
 }
 
 beforeEach(() => {
+  stubs.forActor.mockReset();
+  stubs.forActor.mockReturnValue({
+    articles: { get: stubs.getArticle },
+    jobs: { get: stubs.getContentJobById },
+  });
+  stubs.getArticle.mockReset();
+  stubs.getArticle.mockImplementation(async (id: string) =>
+    id === ARTICLE_ID
+      ? { id: ARTICLE_ID, brandId: "brand-x", status: "generating", jobId: JOB_ID }
+      : undefined,
+  );
   stubs.getActiveContentJob.mockReset();
   stubs.getContentJobById.mockReset();
   stubs.updateContentJob.mockReset();
@@ -193,6 +212,7 @@ describe("POST /api/content/:articleId/cancel", () => {
     const { status, body } = await call(app, "POST", `/api/content/${ARTICLE_ID}/cancel`);
     expect(status).toBe(200);
     expect(body?.success).toBe(true);
+    expect(stubs.forActor).toHaveBeenCalledWith({ userId: USER_ID });
     expect(stubs.cancelContentJob).toHaveBeenCalledWith(JOB_ID);
     expect(stubs.resetArticleForCancelledContentJob).toHaveBeenCalledWith(JOB_ID);
   });

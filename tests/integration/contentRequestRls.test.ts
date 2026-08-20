@@ -57,9 +57,15 @@ describeIfLocal("content request database RLS", () => {
       path.resolve(process.cwd(), "migrations/0097_request_rls_content.sql"),
       "utf8",
     );
+    const responseColumnsMigration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0103_content_request_response_columns.sql"),
+      "utf8",
+    );
     await ownerPool.query(foundationMigration);
     await ownerPool.query(contentMigration);
     await ownerPool.query(contentMigration);
+    await ownerPool.query(responseColumnsMigration);
+    await ownerPool.query(responseColumnsMigration);
 
     await ownerPool.query(
       `create role "${runtimeRole}" with
@@ -375,7 +381,7 @@ describeIfLocal("content request database RLS", () => {
     ).rejects.toMatchObject({ cause: { code: "42501" } });
   });
 
-  it("denies request access to worker fields and provider identifiers", async () => {
+  it("denies worker fields and permits distribution response fields", async () => {
     await expect(
       forUser(userAId, async (transaction) => {
         await transaction.execute(sql`
@@ -400,13 +406,12 @@ describeIfLocal("content request database RLS", () => {
       }),
     ).rejects.toMatchObject({ cause: { code: "42501" } });
 
-    await expect(
-      forUser(userAId, async (transaction) => {
-        await transaction.execute(sql`
-          select platform_post_id from public.distributions where article_id = ${articleAId}
-        `);
-      }),
-    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    const distribution = await forUser(userAId, async (transaction) =>
+      transaction.execute(sql`
+        select platform_post_id from public.distributions where article_id = ${articleAId}
+      `),
+    );
+    expect(distribution.rows).toEqual([{ platform_post_id: "provider-a" }]);
 
     await expect(
       forUser(userAId, async (transaction) => {

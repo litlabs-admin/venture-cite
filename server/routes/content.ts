@@ -60,6 +60,8 @@ import { acquireOrWait, secondsUntilAvailable } from "../lib/rateLimitBuckets";
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
 import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
+import { createRequestActor } from "../lib/requestActor";
+import { contentRequestData } from "../data/contentRequestData";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Keyword discovery handler - registered at module-load. The poll endpoint
@@ -356,11 +358,12 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const active = await storage.getActiveContentJob(user.id);
+        const jobs = contentRequestData.forActor(createRequestActor(user.id)).jobs;
+        const active = await jobs.getActive();
         if (active) {
           return res.json({ success: true, data: { ...active, type: "active" } });
         }
-        const recent = await storage.getRecentCompletedContentJob(user.id);
+        const recent = await jobs.getRecentCompleted(new Date(Date.now() - 24 * 60 * 60 * 1000));
         if (recent) {
           return res.json({ success: true, data: { ...recent, type: "completed" } });
         }
@@ -376,7 +379,9 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const job = await storage.getContentJobById(req.params.jobId, user.id);
+        const job = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
         res.json({
           success: true,
@@ -408,7 +413,9 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req: Request, res: Response) => {
       try {
         const user = requireUser(req);
-        const job = await storage.getContentJobById(req.params.jobId, user.id);
+        const job = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
 
         const [row] = await db
@@ -448,7 +455,9 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const job = await storage.getContentJobById(req.params.jobId, user.id);
+        const job = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
         if (job.status !== "pending" && job.status !== "running") {
           return res.json({
@@ -500,14 +509,15 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const job = await storage.getContentJobById(req.params.jobId, user.id);
+        const jobs = contentRequestData.forActor(createRequestActor(user.id)).jobs;
+        const job = await jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
         if (job.status !== "pending" && job.status !== "running") {
           return res.json({ success: true, data: { status: job.status, alreadyTerminal: true } });
         }
         const cancelled = await storage.cancelContentJob(job.id);
         if (!cancelled) {
-          const latest = await storage.getContentJobById(job.id, user.id);
+          const latest = await jobs.get(job.id);
           return res.json({
             success: true,
             data: { status: latest?.status ?? job.status, alreadyTerminal: true },
@@ -534,12 +544,16 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.articleId, user.id);
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const article = await content.articles.get(req.params.articleId);
+        if (!article) {
+          return res.status(404).json({ success: false, error: "Article not found" });
+        }
         const jobId = (article as { jobId?: string | null }).jobId ?? null;
         if (!jobId) {
           return res.json({ success: true, data: { status: article.status, noActiveJob: true } });
         }
-        const job = await storage.getContentJobById(jobId, user.id);
+        const job = await content.jobs.get(jobId);
         if (!job) {
           return res.json({ success: true, data: { status: article.status, noActiveJob: true } });
         }
@@ -551,7 +565,7 @@ export function setupContentRoutes(app: Express): void {
         }
         const cancelled = await storage.cancelContentJob(job.id);
         if (!cancelled) {
-          const latest = await storage.getContentJobById(job.id, user.id);
+          const latest = await content.jobs.get(job.id);
           return res.json({
             success: true,
             data: { status: latest?.status ?? job.status, alreadyTerminal: true },
@@ -579,6 +593,7 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
+        const actor = createRequestActor(user.id);
         const article = await requireArticle(req.params.id, user.id);
         if (!article.content) {
           return res
@@ -635,7 +650,7 @@ export function setupContentRoutes(app: Express): void {
             content: improved,
           } as any);
           if (!updated) {
-            const current = await storage.getArticleById(article.id);
+            const current = await contentRequestData.forActor(actor).articles.get(article.id);
             return res.status(409).json({
               success: false,
               error:
@@ -983,10 +998,12 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
         await requireBrand(brandId, user.id);
         const { status, category } = req.query;
 
-        const keywords = await storage.getKeywordResearch(brandId, {
-          status: status as string,
-          category: category as string,
-        });
+        const keywords = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .keywords.list(brandId, {
+            status: typeof status === "string" ? status : undefined,
+            category: typeof category === "string" ? category : undefined,
+          });
 
         res.json({
           success: true,
@@ -1007,7 +1024,9 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
         await requireBrand(brandId, user.id);
         const limit = parseInt(req.query.limit as string) || 10;
 
-        const keywords = await storage.getTopKeywordOpportunities(brandId, limit);
+        const keywords = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .keywords.listTopOpportunities(brandId, limit);
 
         res.json({
           success: true,
