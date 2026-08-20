@@ -768,6 +768,22 @@ function cronCrashGuard(jobName: string, fn: () => Promise<unknown>): () => void
 }
 
 export function initScheduler(): void {
+  const CONTENT_COST_OUTBOX_CRON = process.env.CONTENT_COST_OUTBOX_CRON || "*/5 * * * *";
+  if (cron.validate(CONTENT_COST_OUTBOX_CRON)) {
+    cron.schedule(
+      CONTENT_COST_OUTBOX_CRON,
+      cronCrashGuard("content-cost-outbox-drain", async () => {
+        const { runContentCostOutboxDrain } = await import("./outbox/contentCostOutboxDrain");
+        await runContentCostOutboxDrain({
+          maxCommands: 25,
+          deadlineMs: Date.now() + 20_000,
+          leaseSeconds: 60,
+        });
+      }),
+    );
+    logger.info({ cron: CONTENT_COST_OUTBOX_CRON }, "content cost outbox drain scheduled");
+  }
+
   // Daily account purge for users whose 30-day deletion grace has elapsed.
   if (cron.validate(ACCOUNT_PURGE_CRON)) {
     cron.schedule(ACCOUNT_PURGE_CRON, cronCrashGuard("account-purge", runAccountPurgeJob));

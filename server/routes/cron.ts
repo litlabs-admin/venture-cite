@@ -43,6 +43,7 @@ import { db } from "../db";
 import * as schema from "@shared/schema";
 import { and, inArray, lt } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
+import { runContentCostOutboxDrain } from "../outbox/contentCostOutboxDrain";
 
 import { captureAndFlush } from "../lib/sentryReport";
 import { CRON_TOTAL_BUDGET_MS, LLM_CALL_TIMEOUT_MS } from "../lib/factAgent/v2/vercelBudget";
@@ -81,6 +82,7 @@ const STEP_CAPS_MS = {
   "resume-in-flight-autopilots": 10_000,
   "drain-pending-content-jobs": 8_000,
   "drain-pending-citation-runs": 10_000,
+  "content-cost-outbox-drain": 20_000,
   "account-purge": 5_000,
   "brand-purge": 5_000,
   "chatbot-prune": 5_000,
@@ -300,6 +302,9 @@ export function setupCronRoutes(app: Express): void {
       await orch.run("drain-pending-content-jobs", (deadline) => drainPendingContentJobs(deadline));
       await orch.run("drain-pending-citation-runs", (deadline) =>
         drainPendingCitationRuns(deadline),
+      );
+      await orch.run("content-cost-outbox-drain", (deadlineMs) =>
+        runContentCostOutboxDrain({ maxCommands: 25, deadlineMs, leaseSeconds: 60 }),
       );
 
       // Both are millisecond-scale daily housekeeping, and both used to live

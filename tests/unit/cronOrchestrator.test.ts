@@ -41,6 +41,15 @@ const stubs = vi.hoisted(() => ({
   deleteOldTourEvents: vi.fn(async () => 0),
   detectFactScrapeFailureRate: vi.fn(async () => ({ alerted: 0 })),
   runBrandActivationSweep: vi.fn(async () => ({ processed: 0, total: 0 })),
+  runContentCostOutboxDrain: vi.fn(async () => ({
+    claimed: 0,
+    succeeded: 0,
+    rescheduled: 0,
+    deadLettered: 0,
+    cancelled: 0,
+    lostLease: 0,
+    stopReason: "idle" as const,
+  })),
   dbSelect: vi.fn(),
 }));
 
@@ -114,6 +123,9 @@ vi.mock("../../server/lib/onboardingAutopilot", () => ({
 }));
 vi.mock("../../server/contentGenerationWorker", () => ({
   runArticleSlice: stubs.runArticleSlice,
+}));
+vi.mock("../../server/outbox/contentCostOutboxDrain", () => ({
+  runContentCostOutboxDrain: stubs.runContentCostOutboxDrain,
 }));
 vi.mock("../../server/setupProducts", () => ({
   setupStripeProducts: stubs.setupStripeProducts,
@@ -258,6 +270,27 @@ describe("cron orchestrator", () => {
     expect(body).toMatchObject({ success: true, results: expect.any(Array) });
     expect(stubs.runAccountPurgeJob).toHaveBeenCalled();
     expect(stubs.runAutoCitationJob).toHaveBeenCalled();
+  });
+
+  it("runs the bounded content cost drain with the orchestrator deadline", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+
+    const { status, body } = await callOrchestrator(app, {
+      authorization: "Bearer secret",
+    });
+
+    expect(status).toBe(200);
+    expect(stubs.runContentCostOutboxDrain).toHaveBeenCalledWith({
+      maxCommands: 25,
+      deadlineMs: expect.any(Number),
+      leaseSeconds: 60,
+    });
+    expect(body.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ step: "content-cost-outbox-drain", ok: true }),
+      ]),
+    );
   });
 
   it("accepts an authenticated GET from Vercel Cron", async () => {
