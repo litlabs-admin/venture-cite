@@ -555,6 +555,7 @@ export const llmJobs = pgTable(
     kind: text("kind").notNull(),
     status: text("status").notNull().default("pending"),
     responseId: text("response_id"),
+    providerRequest: jsonb("provider_request"),
     payload: jsonb("payload").notNull(),
     result: jsonb("result"),
     errorKind: text("error_kind"),

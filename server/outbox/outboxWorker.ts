@@ -99,6 +99,7 @@ const ALL_OUTBOX_COMMAND_KINDS = [
   "resend.send_email",
   "buffer.create_post",
   "openai.create_response",
+  "openai.start_llm_job",
   "content_cost.record",
 ] as const satisfies readonly OutboxCommandKind[];
 

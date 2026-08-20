@@ -128,6 +128,11 @@ vi.mock("../../server/lib/sentryReport", () => ({
   captureAndFlush: vi.fn(),
 }));
 
+vi.mock("@vercel/functions", () => ({ waitUntil: vi.fn() }));
+vi.mock("../../server/outbox/contentCostOutboxDrain", () => ({
+  runContentCostOutboxDrain: vi.fn().mockResolvedValue({ stopReason: "idle" }),
+}));
+
 // Minimal in-memory llm_jobs table. enqueueLlmJob()/pollLlmJob() (server/lib/
 // llmJobs.ts) and the ownership check in server/routes/llmJobs.ts all read
 // and write schema.llmJobs directly (bypassing the storage layer), so the
@@ -145,6 +150,30 @@ vi.mock("../../server/db", async () => {
   let jobRow: Record<string, unknown> | null = null;
   let counter = 0;
 
+  const insert = (table: unknown) => {
+    if (table !== schema.llmJobs) return genericChain;
+    return {
+      values: (vals: Record<string, unknown>) => ({
+        returning: async () => {
+          counter += 1;
+          jobRow = {
+            id: `test-job-${counter}`,
+            status: "pending",
+            responseId: null,
+            result: null,
+            errorKind: null,
+            errorMessage: null,
+            startedAt: null,
+            completedAt: null,
+            createdAt: new Date(),
+            ...vals,
+          };
+          return [{ id: jobRow.id }];
+        },
+      }),
+    };
+  };
+
   return {
     db: {
       select: () => ({
@@ -153,31 +182,9 @@ vi.mock("../../server/db", async () => {
           return { where: () => ({ limit: () => Promise.resolve(jobRow ? [jobRow] : []) }) };
         },
       }),
-      insert: (table: unknown) => {
-        if (table !== schema.llmJobs) return genericChain;
-        return {
-          values: (vals: Record<string, unknown>) => ({
-            returning: async () => {
-              counter += 1;
-              jobRow = {
-                // The poll route rejects ids shorter than 8 chars as
-                // malformed, so pad well past that floor.
-                id: `test-job-${counter}`,
-                status: "pending",
-                responseId: null,
-                result: null,
-                errorKind: null,
-                errorMessage: null,
-                startedAt: null,
-                completedAt: null,
-                createdAt: new Date(),
-                ...vals,
-              };
-              return [{ id: jobRow.id }];
-            },
-          }),
-        };
-      },
+      insert,
+      transaction: async (work: (transaction: unknown) => Promise<unknown>) =>
+        work({ insert, execute: async () => [] }),
       update: (table: unknown) => {
         if (table !== schema.llmJobs) return genericChain;
         let pendingVals: Record<string, unknown> | null = null;
@@ -212,6 +219,9 @@ vi.mock("../../server/db", async () => {
     },
     __resetLlmJobsRowForTests: () => {
       jobRow = null;
+    },
+    __setLlmJobRunningForTests: (responseId: string) => {
+      if (jobRow) Object.assign(jobRow, { status: "running", responseId });
     },
   };
 });
@@ -257,9 +267,11 @@ vi.mock("../../server/lib/routesShared", async () => {
 
 const { setupContentRoutes } = await import("../../server/routes/content");
 const { setupLlmJobsRoutes } = await import("../../server/routes/llmJobs");
-const { __resetLlmJobsRowForTests } = (await import("../../server/db")) as unknown as {
-  __resetLlmJobsRowForTests: () => void;
-};
+const { __resetLlmJobsRowForTests, __setLlmJobRunningForTests } =
+  (await import("../../server/db")) as unknown as {
+    __resetLlmJobsRowForTests: () => void;
+    __setLlmJobRunningForTests: (responseId: string) => void;
+  };
 
 function buildApp(): express.Express {
   const app = express();
@@ -330,10 +342,6 @@ beforeEach(() => {
 
 describe("POST /api/keyword-research/discover", () => {
   it("tags inserted rows with provenance='ai-estimate'", async () => {
-    // Kickoff: enqueueLlmJob() calls openai.responses.create({background:
-    // true, store: true, ...}) and only needs the response id back.
-    stubs.responsesCreate.mockResolvedValue({ id: "resp-1", status: "queued" });
-
     const app = buildApp();
     const kickoff = await call(app, "POST", "/api/keyword-research/discover", {
       brandId: BRAND_ID,
@@ -342,8 +350,11 @@ describe("POST /api/keyword-research/discover", () => {
     // job and returns 202 with a jobId to poll.
     expect(kickoff.status).toBe(202);
     expect(kickoff.body?.jobId).toBeTruthy();
-    expect(stubs.responsesCreate).toHaveBeenCalledTimes(1);
+    expect(stubs.responsesCreate).not.toHaveBeenCalled();
     expect(stubs.createKeywordResearch).not.toHaveBeenCalled();
+
+    // The outbox worker starts the provider response and links its id.
+    __setLlmJobRunningForTests("resp-1");
 
     // Poll: openai.responses.retrieve() reports the background run as
     // completed. pollLlmJob() then dispatches to the "keyword_discovery"

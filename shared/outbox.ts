@@ -24,6 +24,10 @@ export const outboxCommandPayloadSchema = z.discriminatedUnion("kind", [
     inputReference: identifier,
   }),
   z.object({
+    kind: z.literal("openai.start_llm_job"),
+    llmJobId: identifier,
+  }),
+  z.object({
     kind: z.literal("content_cost.record"),
     contentJobId: identifier,
     providerResponseId: providerReference,

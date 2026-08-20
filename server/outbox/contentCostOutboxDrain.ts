@@ -31,13 +31,17 @@ export function createContentCostOutboxDrain(dependencies: DrainDependencies) {
 export async function runContentCostOutboxDrain(
   options: DrainOptions,
 ): Promise<ContentCostDrainResult> {
-  const [{ createContentCostOutboxHandler }, repositoryModule, workerModule] = await Promise.all([
+  const [contentCostModule, llmModule, repositoryModule, workerModule] = await Promise.all([
     import("./contentCostOutboxAdapter"),
+    import("./openAiLlmJobAdapter"),
     import("./outboxRepository"),
     import("./outboxWorker"),
   ]);
   const outbox = repositoryModule.createOutboxRepository();
-  const handlers = { "content_cost.record": createContentCostOutboxHandler() } as const;
+  const handlers = {
+    "content_cost.record": contentCostModule.createContentCostOutboxHandler(),
+    "openai.start_llm_job": llmModule.createOpenAiLlmJobHandler(),
+  } as const;
   const drain = createContentCostOutboxDrain({
     now: Date.now,
     runOnce: ({ leaseSeconds }) =>
