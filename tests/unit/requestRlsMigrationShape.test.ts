@@ -119,4 +119,41 @@ describe("request RLS migration shape", () => {
       migration,
     );
   });
+
+  it("keeps generation commands actor-bound and worker fields private", () => {
+    const migration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0106_content_request_generation_commands.sql"),
+      "utf8",
+    );
+    const supabaseMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/20260421000106_0106_content_request_generation_commands.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain("private.request_enqueue_content_generation");
+    expect(migration).toContain("private.request_cancel_content_generation");
+    expect(migration).toContain("private.request_cancel_content_generation_for_article");
+    expect(migration).toContain("SET search_path = pg_catalog, public, private");
+    expect(migration).toContain("venturecite.user_id");
+    expect(migration).toContain("brands.deleted_at IS NULL");
+    expect(migration).toContain("brand_row.deleted_at IS NOT NULL");
+    expect(migration).toContain("locked_job.created_at >= user_row.usage_reset_date");
+    expect(migration).toContain("FROM public.brands AS brands");
+    expect(migration).toContain("INTO brand_row");
+    expect(migration).toContain("status = 'generating'");
+    expect(migration).toContain("articles_used_this_month = articles_used_this_month + 1");
+    expect(migration).toContain("refunded_at");
+    expect(migration).toContain("job_id = p_job_id");
+    expect(migration).not.toContain("openai_response_id");
+    expect(migration).not.toContain("stream_buffer");
+    expect(migration).not.toMatch(
+      /grant\s+(?:select|update|insert)\s+\([^)]*(?:advance_token|openai_response_id|stream_buffer)/is,
+    );
+    expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
+      migration,
+    );
+  });
 });

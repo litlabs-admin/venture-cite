@@ -23,6 +23,7 @@ const stubs = vi.hoisted(() => ({
   updateContentJob: vi.fn(async () => undefined),
   setArticleDraft: vi.fn(async () => undefined),
   refundArticleQuota: vi.fn(async () => undefined),
+  cancelForArticle: vi.fn(),
   forActor: vi.fn(),
 }));
 
@@ -178,8 +179,10 @@ beforeEach(() => {
   stubs.forActor.mockReset();
   stubs.forActor.mockReturnValue({
     articles: { get: stubs.getArticle },
-    jobs: { get: stubs.getContentJobById },
+    jobs: { get: stubs.getContentJobById, cancelForArticle: stubs.cancelForArticle },
   });
+  stubs.cancelForArticle.mockReset();
+  stubs.cancelForArticle.mockResolvedValue({ kind: "cancelled", status: "cancelled" });
   stubs.getArticle.mockReset();
   stubs.getArticle.mockImplementation(async (id: string) =>
     id === ARTICLE_ID
@@ -213,32 +216,22 @@ describe("POST /api/content/:articleId/cancel", () => {
     expect(status).toBe(200);
     expect(body?.success).toBe(true);
     expect(stubs.forActor).toHaveBeenCalledWith({ userId: USER_ID });
-    expect(stubs.cancelContentJob).toHaveBeenCalledWith(JOB_ID);
-    expect(stubs.resetArticleForCancelledContentJob).toHaveBeenCalledWith(JOB_ID);
+    expect(stubs.cancelForArticle).toHaveBeenCalledWith(ARTICLE_ID);
   });
 
   it("returns 404 for an article owned by another user (anti-enumeration)", async () => {
+    stubs.cancelForArticle.mockResolvedValueOnce({ kind: "not_found" });
     const app = buildApp();
     const { status } = await call(app, "POST", `/api/content/${FOREIGN_ARTICLE_ID}/cancel`);
     expect(status).toBe(404);
-    expect(stubs.cancelContentJob).not.toHaveBeenCalled();
+    expect(stubs.cancelForArticle).toHaveBeenCalledWith(FOREIGN_ARTICLE_ID);
   });
 
   it("returns the terminal state when completion wins the cancel race", async () => {
-    stubs.getContentJobById
-      .mockResolvedValueOnce({
-        id: JOB_ID,
-        userId: USER_ID,
-        articleId: ARTICLE_ID,
-        status: "running",
-      })
-      .mockResolvedValueOnce({
-        id: JOB_ID,
-        userId: USER_ID,
-        articleId: ARTICLE_ID,
-        status: "succeeded",
-      });
-    stubs.cancelContentJob.mockResolvedValueOnce(undefined);
+    stubs.cancelForArticle.mockResolvedValueOnce({
+      kind: "already_terminal",
+      status: "succeeded",
+    });
 
     const app = buildApp();
     const { status, body } = await call(app, "POST", `/api/content/${ARTICLE_ID}/cancel`);

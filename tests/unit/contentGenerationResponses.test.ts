@@ -399,6 +399,11 @@ describe("runArticleSlice (Responses API)", () => {
 });
 
 describe("/state response shape", () => {
+  it("keeps the legacy contentLength field at zero", async () => {
+    const { CONTENT_LENGTH_COMPATIBILITY_VALUE } = await import("../../server/routes/content");
+    expect(CONTENT_LENGTH_COMPATIBILITY_VALUE).toBe(0);
+  });
+
   it("returns elapsedSeconds when the job is in_progress", async () => {
     const { computeJobStatePayload } = await import("../../server/routes/content");
     const startedAt = new Date(Date.now() - 12_000); // 12s ago

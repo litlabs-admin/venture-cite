@@ -72,6 +72,10 @@ describeIfLocal("content request database RLS", () => {
       ),
       "utf8",
     );
+    const generationCommandsMigration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0106_content_request_generation_commands.sql"),
+      "utf8",
+    );
     await ownerPool.query(foundationMigration);
     await ownerPool.query(contentMigration);
     await ownerPool.query(contentMigration);
@@ -81,6 +85,8 @@ describeIfLocal("content request database RLS", () => {
     await ownerPool.query(articleWritesMigration);
     await ownerPool.query(distributionKeywordWritesMigration);
     await ownerPool.query(distributionKeywordWritesMigration);
+    await ownerPool.query(generationCommandsMigration);
+    await ownerPool.query(generationCommandsMigration);
 
     await ownerPool.query(
       `create role "${runtimeRole}" with
@@ -598,6 +604,389 @@ describeIfLocal("content request database RLS", () => {
         `);
       }),
     ).rejects.toMatchObject({ cause: { code: "42501" } });
+  });
+
+  it("atomically reserves quota, creates one job, and rejects a duplicate request", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+    await ownerPool.query("update public.users set articles_used_this_month = 0 where id = $1", [
+      userAId,
+    ]);
+    const draft = await actorA.articles.createDraft({ brandId: brandAId });
+    const input = {
+      articleId: draft.id,
+      brandId: brandAId,
+      requestPayload: { keywords: "atomic", industry: "Software", type: "article" },
+      keywords: ["atomic"],
+      industry: "Software",
+      contentType: "article",
+      targetCustomers: null,
+      geography: null,
+      contentStyle: "b2c" as const,
+    };
+
+    const [first, second] = await Promise.all([
+      actorA.jobs.enqueueGeneration(input),
+      actorA.jobs.enqueueGeneration(input),
+    ]);
+    const results = [first, second];
+    const created = results.find((result) => result.kind === "created");
+    const duplicate = results.find((result) => result.kind === "conflict");
+    expect(created?.kind).toBe("created");
+    expect(duplicate).toEqual({ kind: "conflict", status: "generating" });
+    if (created?.kind !== "created") throw new Error("Expected a created job");
+
+    const state = await ownerPool.query<{
+      used: number;
+      job_count: string;
+      article_status: string;
+      article_job_id: string;
+    }>(
+      `select users.articles_used_this_month as used,
+              (select count(*)::text from public.content_generation_jobs where article_id = $2) as job_count,
+              articles.status as article_status, articles.job_id as article_job_id
+       from public.users join public.articles on articles.id = $2
+       where users.id = $1`,
+      [userAId, draft.id],
+    );
+    expect(state.rows).toEqual([
+      { used: 1, job_count: "1", article_status: "generating", article_job_id: created.jobId },
+    ]);
+
+    await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
+    await ownerPool.query("update public.users set articles_used_this_month = 0 where id = $1", [
+      userAId,
+    ]);
+  });
+
+  it("rolls back the request boundary when quota is exhausted", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+    await ownerPool.query("update public.users set articles_used_this_month = 5 where id = $1", [
+      userAId,
+    ]);
+    const draft = await actorA.articles.createDraft({ brandId: brandAId });
+    const result = await actorA.jobs.enqueueGeneration({
+      articleId: draft.id,
+      brandId: brandAId,
+      requestPayload: { keywords: "quota", industry: "Software" },
+      keywords: ["quota"],
+      industry: "Software",
+      contentType: "article",
+      targetCustomers: null,
+      geography: null,
+      contentStyle: "b2c",
+    });
+    expect(result).toEqual({ kind: "quota", cap: 5 });
+    const unchanged = await ownerPool.query<{ status: string; job_id: string | null }>(
+      "select status, job_id from public.articles where id = $1",
+      [draft.id],
+    );
+    expect(unchanged.rows).toEqual([{ status: "draft", job_id: null }]);
+    await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
+    await ownerPool.query("update public.users set articles_used_this_month = 0 where id = $1", [
+      userAId,
+    ]);
+  });
+
+  it("denies generated articles for the Pro tier", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+    await ownerPool.query(
+      "update public.users set access_tier = 'pro', articles_used_this_month = 0 where id = $1",
+      [userAId],
+    );
+    const draft = await actorA.articles.createDraft({ brandId: brandAId });
+    const result = await actorA.jobs.enqueueGeneration({
+      articleId: draft.id,
+      brandId: brandAId,
+      requestPayload: { keywords: "pro", industry: "Software" },
+      keywords: ["pro"],
+      industry: "Software",
+      contentType: "article",
+      targetCustomers: null,
+      geography: null,
+      contentStyle: "b2c",
+    });
+    expect(result).toEqual({ kind: "quota", cap: 0 });
+    await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
+    await ownerPool.query("update public.users set access_tier = 'free' where id = $1", [userAId]);
+  });
+
+  it("serializes enqueue against a brand soft-delete", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+    await ownerPool.query("update public.users set articles_used_this_month = 0 where id = $1", [
+      userAId,
+    ]);
+    const draft = await actorA.articles.createDraft({ brandId: brandAId });
+    const input = {
+      articleId: draft.id,
+      brandId: brandAId,
+      requestPayload: { keywords: "brand race", industry: "Software" },
+      keywords: ["brand race"],
+      industry: "Software",
+      contentType: "article",
+      targetCustomers: null,
+      geography: null,
+      contentStyle: "b2c" as const,
+    };
+    const [result] = await Promise.all([
+      actorA.jobs.enqueueGeneration(input),
+      ownerPool.query(
+        "update public.brands set deleted_at = now(), deletion_scheduled_for = now() where id = $1",
+        [brandAId],
+      ),
+    ]);
+    expect(["created", "not_found"]).toContain(result.kind);
+    const state = await ownerPool.query<{ status: string; job_id: string | null }>(
+      "select status, job_id from public.articles where id = $1",
+      [draft.id],
+    );
+    if (result.kind === "not_found") {
+      expect(state.rows).toEqual([{ status: "draft", job_id: null }]);
+    } else {
+      expect(state.rows).toEqual([{ status: "generating", job_id: result.jobId }]);
+    }
+    await ownerPool.query(
+      "update public.brands set deleted_at = null, deletion_scheduled_for = null where id = $1",
+      [brandAId],
+    );
+    await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
+    await ownerPool.query("update public.users set articles_used_this_month = 0 where id = $1", [
+      userAId,
+    ]);
+  });
+
+  it("cancels once, refunds once, and protects a newer article job", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+    const actorB = contentData.forActor(createRequestActor(userBId));
+    await ownerPool.query("update public.users set articles_used_this_month = 0 where id = $1", [
+      userAId,
+    ]);
+    const draft = await actorA.articles.createDraft({ brandId: brandAId });
+    const created = await actorA.jobs.enqueueGeneration({
+      articleId: draft.id,
+      brandId: brandAId,
+      requestPayload: { keywords: "cancel", industry: "Software" },
+      keywords: ["cancel"],
+      industry: "Software",
+      contentType: "article",
+      targetCustomers: null,
+      geography: null,
+      contentStyle: "b2c",
+    });
+    if (created.kind !== "created") throw new Error("Expected a created job");
+
+    expect(await actorB.jobs.cancel(created.jobId)).toEqual({ kind: "not_found" });
+    expect(await actorA.jobs.cancel(created.jobId)).toEqual({
+      kind: "cancelled",
+      status: "cancelled",
+    });
+    expect(await actorA.jobs.cancel(created.jobId)).toEqual({
+      kind: "already_terminal",
+      status: "cancelled",
+    });
+
+    const afterCancel = await ownerPool.query<{
+      used: number;
+      status: string;
+      job_id: string | null;
+    }>(
+      `select users.articles_used_this_month as used, articles.status, articles.job_id
+       from public.users join public.articles on articles.id = $2 where users.id = $1`,
+      [userAId, draft.id],
+    );
+    expect(afterCancel.rows).toEqual([{ used: 0, status: "draft", job_id: null }]);
+
+    const newer = await ownerPool.query<{ id: string }>(
+      `insert into public.content_generation_jobs
+         (user_id, brand_id, article_id, request_payload, status)
+       values ($1, $2, $3, '{}'::jsonb, 'running') returning id`,
+      [userAId, brandAId, draft.id],
+    );
+    await ownerPool.query(
+      "update public.articles set status = 'generating', job_id = $2 where id = $1",
+      [draft.id, newer.rows[0]?.id],
+    );
+    const old = await ownerPool.query<{ id: string }>(
+      `insert into public.content_generation_jobs
+         (user_id, brand_id, article_id, request_payload, status)
+       values ($1, $2, $3, '{}'::jsonb, 'running') returning id`,
+      [userAId, brandAId, draft.id],
+    );
+    await ownerPool.query("update public.articles set job_id = $2 where id = $1", [
+      draft.id,
+      newer.rows[0]?.id,
+    ]);
+    expect(await actorA.jobs.cancel(old.rows[0]?.id ?? "")).toEqual({
+      kind: "cancelled",
+      status: "cancelled",
+    });
+    const protectedArticle = await ownerPool.query<{ status: string; job_id: string }>(
+      "select status, job_id from public.articles where id = $1",
+      [draft.id],
+    );
+    expect(protectedArticle.rows).toEqual([{ status: "generating", job_id: newer.rows[0]?.id }]);
+
+    await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
+    await ownerPool.query("update public.users set articles_used_this_month = 0 where id = $1", [
+      userAId,
+    ]);
+  });
+
+  it("does not refund a cancellation for a job before the usage reset", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+    await ownerPool.query(
+      "update public.users set articles_used_this_month = 1, usage_reset_date = now() where id = $1",
+      [userAId],
+    );
+    const draft = await actorA.articles.createDraft({ brandId: brandAId });
+    const oldJob = await ownerPool.query<{ id: string }>(
+      `insert into public.content_generation_jobs
+         (user_id, brand_id, article_id, request_payload, status, created_at)
+       values ($1, $2, $3, '{}'::jsonb, 'running', now() - interval '2 months') returning id`,
+      [userAId, brandAId, draft.id],
+    );
+    const oldJobId = oldJob.rows[0]?.id;
+    if (!oldJobId) throw new Error("Expected an old job");
+    await ownerPool.query(
+      "update public.articles set status = 'generating', job_id = $2 where id = $1",
+      [draft.id, oldJobId],
+    );
+
+    expect(await actorA.jobs.cancel(oldJobId)).toEqual({
+      kind: "cancelled",
+      status: "cancelled",
+    });
+    const afterCancel = await ownerPool.query<{
+      used: number;
+      refunded_at: Date | null;
+      article_status: string;
+      article_job_id: string | null;
+    }>(
+      `select users.articles_used_this_month as used,
+              jobs.refunded_at,
+              articles.status as article_status,
+              articles.job_id as article_job_id
+       from public.users
+       join public.content_generation_jobs as jobs on jobs.id = $2
+       join public.articles as articles on articles.id = $3
+       where users.id = $1`,
+      [userAId, oldJobId, draft.id],
+    );
+    expect(afterCancel.rows).toEqual([
+      { used: 1, refunded_at: null, article_status: "draft", article_job_id: null },
+    ]);
+
+    await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
+    await ownerPool.query(
+      "update public.users set articles_used_this_month = 0, usage_reset_date = null where id = $1",
+      [userAId],
+    );
+  });
+
+  it("serializes a worker terminal transition against cancellation", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+    await ownerPool.query("update public.users set articles_used_this_month = 0 where id = $1", [
+      userAId,
+    ]);
+    const draft = await actorA.articles.createDraft({ brandId: brandAId });
+    const created = await actorA.jobs.enqueueGeneration({
+      articleId: draft.id,
+      brandId: brandAId,
+      requestPayload: { keywords: "terminal race", industry: "Software" },
+      keywords: ["terminal race"],
+      industry: "Software",
+      contentType: "article",
+      targetCustomers: null,
+      geography: null,
+      contentStyle: "b2c",
+    });
+    if (created.kind !== "created") throw new Error("Expected a created job");
+    const workerToken = `worker-race-${randomUUID()}`;
+    await ownerPool.query(
+      "update public.content_generation_jobs set status = 'running', advance_token = $2 where id = $1",
+      [created.jobId, workerToken],
+    );
+
+    const workerTerminal = async (): Promise<boolean> => {
+      const client = await ownerPool.connect();
+      try {
+        await client.query("begin");
+        const terminal = await client.query(
+          `update public.content_generation_jobs
+              set status = 'succeeded', completed_at = now(),
+                  advance_token = null, advance_lease_expires_at = null
+            where id = $1 and status = 'running' and advance_token = $2
+            returning article_id`,
+          [created.jobId, workerToken],
+        );
+        if (terminal.rowCount === 1) {
+          await client.query(
+            `update public.articles
+                set status = 'ready', job_id = null, content = 'Worker content',
+                    title = 'Worker title', updated_at = now()
+              where id = $1 and job_id = $2`,
+            [draft.id, created.jobId],
+          );
+        }
+        await client.query("commit");
+        return terminal.rowCount === 1;
+      } catch (error) {
+        await client.query("rollback");
+        throw error;
+      } finally {
+        client.release();
+      }
+    };
+
+    const [workerWon, cancelResult] = await Promise.all([
+      workerTerminal(),
+      actorA.jobs.cancel(created.jobId),
+    ]);
+    expect(["cancelled", "already_terminal"]).toContain(cancelResult.kind);
+    const finalState = await ownerPool.query<{ job_status: string; article_status: string }>(
+      `select jobs.status as job_status, articles.status as article_status
+         from public.content_generation_jobs as jobs
+         join public.articles as articles on articles.id = $2
+        where jobs.id = $1`,
+      [created.jobId, draft.id],
+    );
+    if (workerWon) {
+      expect(cancelResult).toEqual({ kind: "already_terminal", status: "succeeded" });
+      expect(finalState.rows).toEqual([{ job_status: "succeeded", article_status: "ready" }]);
+    } else {
+      expect(cancelResult).toEqual({ kind: "cancelled", status: "cancelled" });
+      expect(finalState.rows).toEqual([{ job_status: "cancelled", article_status: "draft" }]);
+    }
+    await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
+    await ownerPool.query("update public.users set articles_used_this_month = 0 where id = $1", [
+      userAId,
+    ]);
+  });
+
+  it("does not expose request commands to the runtime role without the request role", async () => {
+    await expect(
+      requestPool.query("select * from private.request_cancel_content_generation($1)", [jobAId]),
+    ).rejects.toMatchObject({ code: "42501" });
   });
 
   it("hides all content after its brand is soft-deleted", async () => {

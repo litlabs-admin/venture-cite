@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   articles,
@@ -90,6 +91,36 @@ const articleInsertValues = (input: ContentRequestArticleFields, status: "draft"
   status,
 });
 
+async function insertArticle(
+  transaction: RequestRepositoryTransaction,
+  input: ContentRequestArticleFields,
+  status: "draft" | "ready",
+): Promise<ContentRequestArticle> {
+  const id = randomUUID();
+  const values = articleInsertValues(input, status);
+  await transaction.execute(sql`
+    INSERT INTO public.articles (
+      id, brand_id, title, content, excerpt, meta_description, keywords,
+      industry, content_type, featured_image, author, status, target_customers,
+      geography, content_style, external_url, seo_data
+    ) VALUES (
+      ${id}, ${values.brandId}, ${values.title ?? ""}, ${values.content ?? ""},
+      ${values.excerpt ?? null}, ${values.metaDescription ?? null}, ${values.keywords ?? null},
+      ${values.industry ?? null}, ${values.contentType ?? null}, ${values.featuredImage ?? null},
+      ${values.author ?? null}, ${status}, ${values.targetCustomers ?? null},
+      ${values.geography ?? null}, ${values.contentStyle ?? null}, ${values.externalUrl ?? null},
+      ${values.seoData ?? null}
+    )
+  `);
+  const [created] = await transaction
+    .select(contentRequestArticleColumns)
+    .from(articles)
+    .where(eq(articles.id, id))
+    .limit(1);
+  if (!created) throw new Error("Article insert returned no row");
+  return created;
+}
+
 export function createContentRequestArticleRepository({
   actor,
   database,
@@ -141,25 +172,11 @@ export function createContentRequestArticleRepository({
     },
 
     createReady(input: ContentRequestArticleCreateReady): Promise<ContentRequestArticle> {
-      return run(async (transaction) => {
-        const [created] = await transaction
-          .insert(articles)
-          .values(articleInsertValues(input, "ready"))
-          .returning(contentRequestArticleColumns);
-        if (!created) throw new Error("Article insert returned no row");
-        return created;
-      });
+      return run((transaction) => insertArticle(transaction, input, "ready"));
     },
 
     createDraft(input: ContentRequestArticleCreateDraft): Promise<ContentRequestArticle> {
-      return run(async (transaction) => {
-        const [created] = await transaction
-          .insert(articles)
-          .values(articleInsertValues(input, "draft"))
-          .returning(contentRequestArticleColumns);
-        if (!created) throw new Error("Draft insert returned no row");
-        return created;
-      });
+      return run((transaction) => insertArticle(transaction, input, "draft"));
     },
 
     update(

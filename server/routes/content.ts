@@ -31,15 +31,9 @@
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
-import { db } from "../db";
-import * as schema from "@shared/schema";
-import { resolveTier } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
 import { MODELS } from "../lib/modelConfig";
 import { type GenerationPayload } from "../contentGenerationWorker";
 import { requireUser, requireBrand, requireArticle } from "../lib/ownership";
-import { withArticleQuota, isUsageLimitError } from "../lib/usageLimit";
-import type { Tier } from "../lib/llmPricing";
 import {
   openai,
   aiLimitMiddleware,
@@ -80,6 +74,17 @@ const keywordUpdateSchema = z
   .refine((update) => Object.keys(update).length > 0, {
     message: "At least one keyword field is required",
   });
+
+const contentGenerationRequestSchema = z
+  .object({
+    keywords: z.string().refine((value) => value.trim().length > 0),
+    industry: z.string().refine((value) => value.trim().length > 0),
+    type: z.string().min(1).default("article"),
+    targetCustomers: z.string().optional(),
+    geography: z.string().optional(),
+    contentStyle: z.enum(["b2b", "b2c"]).default("b2c"),
+  })
+  .strict();
 
 // ─────────────────────────────────────────────────────────────────────────
 // Keyword discovery handler - registered at module-load. The poll endpoint
@@ -182,9 +187,7 @@ registerLlmJobHandler<
 // We now show honest elapsed seconds only, plus a Cancel button.
 export function computeJobStatePayload(job: {
   status: string;
-  streamBuffer: string | null;
   errorMessage: string | null;
-  openaiResponseId: string | null;
   startedAt: Date | null;
 }): {
   status: string;
@@ -210,13 +213,15 @@ export function computeJobStatePayload(job: {
   };
 }
 
+// Responses worker never writes stream_buffer, and no client consumes this
+// legacy field. Keep zero until the response field is removed.
+export const CONTENT_LENGTH_COMPATIBILITY_VALUE = 0;
+
 export function setupContentRoutes(app: Express): void {
   // ── Generate content for an existing draft article ─────────────────────────
   //
-  // The article must already exist with status='draft'. The route
-  // verifies ownership, atomically reserves a quota slot + inserts the
-  // generation job + flips the article to status='generating' (well, the
-  // worker actually flips it on claim - see setArticleGeneratingFromDraft).
+  // The article must already exist with status='draft' or 'failed'. The
+  // actor-bound command reserves quota, inserts the job, and links the article.
   // Returns the jobId immediately; the client polls or streams.
   app.post(
     "/api/articles/:id/generate",
@@ -224,8 +229,11 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.id, user.id);
-
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const article = await content.articles.get(req.params.id);
+        if (!article) {
+          return res.status(404).json({ success: false, error: "Article not found" });
+        }
         if (article.status !== "draft" && article.status !== "failed") {
           return res.status(409).json({
             success: false,
@@ -233,22 +241,20 @@ export function setupContentRoutes(app: Express): void {
             code: "invalid_status",
           });
         }
-
-        const {
-          keywords,
-          industry,
-          type = "article",
-          targetCustomers,
-          geography,
-          contentStyle = "b2c",
-        } = req.body ?? {};
-
-        if (!keywords || typeof keywords !== "string" || !keywords.trim()) {
-          return res.status(400).json({ success: false, error: "keywords are required" });
+        const parsed = contentGenerationRequestSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          const firstIssue = parsed.error.issues[0];
+          if (firstIssue?.path[0] === "keywords") {
+            return res.status(400).json({ success: false, error: "keywords are required" });
+          }
+          if (firstIssue?.path[0] === "industry") {
+            return res.status(400).json({ success: false, error: "industry is required" });
+          }
+          return res
+            .status(400)
+            .json({ success: false, error: "Invalid content generation input" });
         }
-        if (!industry || typeof industry !== "string") {
-          return res.status(400).json({ success: false, error: "industry is required" });
-        }
+        const { keywords, industry, type, targetCustomers, geography, contentStyle } = parsed.data;
         if (!process.env.OPENAI_API_KEY) {
           return res.status(503).json({
             success: false,
@@ -267,59 +273,40 @@ export function setupContentRoutes(app: Express): void {
           contentStyle,
         };
 
-        // Persist the form-state fields onto the article so the draft preserves
-        // what the user typed, even before the worker claims the job. This also
-        // ensures a Cancel that returns the article to 'draft' shows the same
-        // form values the user submitted.
-        await db
-          .update(schema.articles)
-          .set({
-            keywords: keywords
-              .split(",")
-              .map((k: string) => k.trim())
-              .filter(Boolean),
-            industry,
-            contentType: type,
-            targetCustomers: targetCustomers ?? null,
-            geography: geography ?? null,
-            contentStyle,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.articles.id, article.id));
-
-        // Atomic check + reserve + insert.
-        const tier = resolveTier(user as any) as Tier;
-        const jobId = await withArticleQuota(user.id, tier, async (tx) => {
-          const [row] = await tx
-            .insert(schema.contentGenerationJobs)
-            .values({
-              userId: user.id,
-              brandId: article.brandId,
-              articleId: article.id,
-              status: "pending",
-              requestPayload: payload as never,
-            })
-            .returning();
-          return row.id;
+        const jobs = content.jobs;
+        const result = await jobs.enqueueGeneration({
+          articleId: req.params.id,
+          brandId: article.brandId,
+          requestPayload: payload,
+          keywords: keywords
+            .split(",")
+            .map((keyword) => keyword.trim())
+            .filter(Boolean),
+          industry,
+          contentType: type,
+          targetCustomers: targetCustomers ?? null,
+          geography: geography ?? null,
+          contentStyle,
         });
-
-        // Flip the article into 'generating' synchronously so the client UI
-        // switches to the streaming view immediately. The worker's claim
-        // (which polls every 5-60s) used to do this transition, but that
-        // left a long window where the form was still visible after the
-        // user clicked Generate. Doing it here is safe - the worker only
-        // reads articleId from the job and re-confirms ownership.
-        await db.execute(sql`
-          UPDATE public.articles
-          SET status = 'generating', job_id = ${jobId}, updated_at = now()
-          WHERE id = ${article.id}
-            AND EXISTS (
-              SELECT 1
-              FROM public.content_generation_jobs
-              WHERE id = ${jobId}
-                AND status IN ('pending', 'running')
-            )
-        `);
+        if (result.kind === "not_found") {
+          return res.status(404).json({ success: false, error: "Article not found" });
+        }
+        if (result.kind === "conflict") {
+          return res.status(409).json({
+            success: false,
+            error: `Cannot generate - article is in status '${result.status}'.`,
+            code: "invalid_status",
+          });
+        }
+        if (result.kind === "quota") {
+          return res.status(403).json({
+            success: false,
+            error: `You've reached your monthly limit of ${result.cap} articles. Upgrade at /pricing for more.`,
+            limitReached: true,
+            remaining: 0,
+          });
+        }
+        const jobId = result.jobId;
 
         // Server-side drive: progress the job without requiring an open
         // browser tab. Additive - the client /advance loop still runs as
@@ -356,14 +343,6 @@ export function setupContentRoutes(app: Express): void {
 
         return res.json({ success: true, data: { jobId, status: "pending" } });
       } catch (error) {
-        if (isUsageLimitError(error)) {
-          return res.status(403).json({
-            success: false,
-            error: error.message,
-            limitReached: true,
-            remaining: 0,
-          });
-        }
         return sendError(res, error, "Failed to enqueue content generation job");
       }
     }),
@@ -436,22 +415,9 @@ export function setupContentRoutes(app: Express): void {
           .jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
 
-        const [row] = await db
-          .select({
-            status: schema.contentGenerationJobs.status,
-            streamBuffer: schema.contentGenerationJobs.streamBuffer,
-            errorMessage: schema.contentGenerationJobs.errorMessage,
-            openaiResponseId: schema.contentGenerationJobs.openaiResponseId,
-            startedAt: schema.contentGenerationJobs.startedAt,
-          })
-          .from(schema.contentGenerationJobs)
-          .where(eq(schema.contentGenerationJobs.id, job.id))
-          .limit(1);
-        if (!row) return res.status(404).json({ success: false, error: "Job not found" });
-
         res.json({
           success: true,
-          data: computeJobStatePayload(row),
+          data: computeJobStatePayload(job),
         });
       } catch (error) {
         sendError(res, error, "Failed to read job state");
@@ -498,15 +464,12 @@ export function setupContentRoutes(app: Express): void {
 
         const deadlineMs = Date.now() + 8000;
         const outcome = await runArticleSlice(job.id, deadlineMs, claimed.advanceToken);
-
-        const after = await storage.getContentJobById(job.id, user.id);
-        const buf = (after as any)?.streamBuffer ?? "";
         res.json({
           success: outcome.status !== "failed",
           data: {
             status: outcome.status,
             done: outcome.done,
-            contentLength: typeof buf === "string" ? buf.length : 0,
+            contentLength: CONTENT_LENGTH_COMPATIBILITY_VALUE,
             errorKind: "errorKind" in outcome ? (outcome.errorKind ?? null) : null,
             errorMessage: "message" in outcome ? (outcome.message ?? null) : null,
           },
@@ -519,9 +482,8 @@ export function setupContentRoutes(app: Express): void {
 
   // ── Cancel a running job ───────────────────────────────────────────────────
   //
-  // Sets job.status='cancelled'; the worker checks this every CANCEL_CHECK_MS
-  // during the stream and aborts the OpenAI call. The worker also handles
-  // refunding the quota slot and flipping the article back to 'draft'.
+  // The actor-bound command cancels the job, refunds quota once, and resets
+  // the linked article. A worker that already holds a lease loses the race.
   app.post(
     "/api/content-jobs/:jobId/cancel",
     asyncHandler(async (req, res) => {
@@ -533,17 +495,16 @@ export function setupContentRoutes(app: Express): void {
         if (job.status !== "pending" && job.status !== "running") {
           return res.json({ success: true, data: { status: job.status, alreadyTerminal: true } });
         }
-        const cancelled = await storage.cancelContentJob(job.id);
-        if (!cancelled) {
-          const latest = await jobs.get(job.id);
+        const result = await jobs.cancel(job.id);
+        if (result.kind === "not_found") {
+          return res.status(404).json({ success: false, error: "Job not found" });
+        }
+        if (result.kind === "already_terminal") {
           return res.json({
             success: true,
-            data: { status: latest?.status ?? job.status, alreadyTerminal: true },
+            data: { status: result.status, alreadyTerminal: true },
           });
         }
-        const { refundArticleQuota } = await import("../lib/usageLimit");
-        await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
-        await storage.resetArticleForCancelledContentJob(job.id).catch(() => undefined);
         res.json({ success: true, data: { status: "cancelled" } });
       } catch (error) {
         sendError(res, error, "Failed to cancel job");
@@ -563,35 +524,19 @@ export function setupContentRoutes(app: Express): void {
       try {
         const user = requireUser(req);
         const content = contentRequestData.forActor(createRequestActor(user.id));
-        const article = await content.articles.get(req.params.articleId);
-        if (!article) {
+        const result = await content.jobs.cancelForArticle(req.params.articleId);
+        if (result.kind === "not_found") {
           return res.status(404).json({ success: false, error: "Article not found" });
         }
-        const jobId = (article as { jobId?: string | null }).jobId ?? null;
-        if (!jobId) {
-          return res.json({ success: true, data: { status: article.status, noActiveJob: true } });
+        if (result.kind === "no_active_job") {
+          return res.json({ success: true, data: { status: result.status, noActiveJob: true } });
         }
-        const job = await content.jobs.get(jobId);
-        if (!job) {
-          return res.json({ success: true, data: { status: article.status, noActiveJob: true } });
-        }
-        if (job.status !== "pending" && job.status !== "running") {
+        if (result.kind === "already_terminal") {
           return res.json({
             success: true,
-            data: { status: job.status, alreadyTerminal: true },
+            data: { status: result.status, alreadyTerminal: true },
           });
         }
-        const cancelled = await storage.cancelContentJob(job.id);
-        if (!cancelled) {
-          const latest = await content.jobs.get(job.id);
-          return res.json({
-            success: true,
-            data: { status: latest?.status ?? job.status, alreadyTerminal: true },
-          });
-        }
-        const { refundArticleQuota } = await import("../lib/usageLimit");
-        await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
-        await storage.resetArticleForCancelledContentJob(job.id).catch(() => undefined);
         res.json({ success: true, data: { status: "cancelled" } });
       } catch (error) {
         sendError(res, error, "Failed to cancel article generation");
