@@ -3275,7 +3275,7 @@ The worker (`server/contentGenerationWorker.ts`) already re-reads job status at 
 
 ## Track 26 - Foundations Plan 2: Design system enforcement + primitives (2026-05-10)
 
-**Goal:** Stop the design-token divergence across the authenticated app. Tokens in [client/src/index.css](./client/src/index.css) and [.impeccable/design.json](./.impeccable/design.json) were already correct (vermillion primary, cool off-white background, JetBrains Mono / Inter, chart-1..5 ramp, shadow tiers) - but pages bypassed them at scale. Plan 2 enforces the tokens, ships six canonical primitive components, and lands the three Plan 1 leftovers (Status-Dot adoption on 4px-stripe rows).
+**Goal:** Stop the design-token divergence across the authenticated app. Tokens in [client/src/index.css](../client/src/index.css) and [DESIGN.md](../DESIGN.md) were already correct (vermillion primary, cool off-white background, JetBrains Mono / Inter, chart-1..5 ramp, shadow tiers) - but pages bypassed them at scale. Plan 2 enforces the tokens, ships six canonical primitive components, and lands the three Plan 1 leftovers (Status-Dot adoption on 4px-stripe rows).
 
 **Status:** Complete
 
