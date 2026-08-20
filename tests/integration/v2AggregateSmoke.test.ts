@@ -71,7 +71,7 @@ if (databaseTest.kind === "ready") {
     await db.execute(sql`DELETE FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID}`);
   }
 
-  describe("Plan 4 smoke: POST /aggregate consolidates run end-to-end", () => {
+  describe("POST /aggregate consolidates a run end-to-end", () => {
     beforeEach(async () => {
       await cleanup();
       await seed();
@@ -123,7 +123,7 @@ if (databaseTest.kind === "ready") {
     });
   });
 } else {
-  describe.skip("Plan 4 smoke: POST /aggregate consolidates run end-to-end", () => {
+  describe.skip("POST /aggregate consolidates a run end-to-end", () => {
     it("requires TEST_DATABASE_URL", () => {});
   });
 }

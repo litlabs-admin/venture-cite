@@ -1,4 +1,4 @@
-// Vercel migration: tests for the Responses API-based content slice.
+// Tests for the Responses API-based content slice.
 // Mocks openai.responses.{create,retrieve}, the storage layer, and the
 // Sentry instrumentation. Verifies state transitions across /advance
 // calls without hitting OpenAI or the database.
@@ -391,7 +391,7 @@ describe("runArticleSlice (Responses API)", () => {
 });
 
 describe("/state response shape", () => {
-  it("returns elapsedSeconds when job is in_progress (Foundations Plan 1, Task 4)", async () => {
+  it("returns elapsedSeconds when the job is in_progress", async () => {
     const { computeJobStatePayload } = await import("../../server/routes/content");
     const startedAt = new Date(Date.now() - 12_000); // 12s ago
     const payload = computeJobStatePayload({

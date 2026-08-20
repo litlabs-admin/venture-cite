@@ -1,6 +1,5 @@
--- Wave 0052: Add provenance column to keyword_research so we can distinguish
--- AI-estimated metrics (current state) from measured metrics (future state once
--- a real search-volume provider is wired in). All existing rows are backfilled
+-- Add a provenance column to distinguish AI estimates from measured metrics.
+-- A search-volume provider can supply measured metrics. All existing rows are backfilled
 -- to 'ai-estimate' since they were produced by the GPT discovery flow.
 
 ALTER TABLE keyword_research

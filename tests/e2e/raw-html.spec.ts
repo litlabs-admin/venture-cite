@@ -73,21 +73,9 @@ test.describe("Raw served HTML (pre-JS, server-rendered)", () => {
   }
 
   /**
-   * Asserts EXACTLY ONE <title> and ONE <meta name="description"> inside
-   * <head>.
+   * Asserts one document title, description, and canonical link in <head>.
    *
-   * This is a regression guard, not a formality. An earlier state of this
-   * migration rendered site-wide defaults as raw JSX in the root component
-   * AND page-specific tags in each page component. React 19 hoists both and
-   * does NOT dedupe, so every public route silently shipped two titles and
-   * two descriptions - invisible in a browser, harmful to exactly the
-   * crawlability this migration exists to deliver. The fix was to move all
-   * metadata into route head() options so HeadContent merges them with
-   * defined precedence. This assertion is what keeps it that way.
-   *
-   * Scoped to <head> deliberately: the landing hero chart renders an SVG
-   * <title> ("Visibility over time") in <body> for accessibility, which is
-   * correct and must not be counted.
+   * Scope the check to <head>. The landing page has an SVG title in <body>.
    */
   function expectSingleHeadMetadata(html: string) {
     const head = html.slice(html.indexOf("<head"), html.indexOf("</head>"));

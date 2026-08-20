@@ -1,4 +1,4 @@
--- Email deliverability hardening (Wave 3.6).
+-- Email delivery status and failed-message storage.
 --
 -- 1. users.email_status: tracks whether the user's email address is
 --    deliverable. Values: 'active' (default), 'bounced', 'complained',

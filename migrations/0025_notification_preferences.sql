@@ -1,4 +1,4 @@
--- Per-user notification preferences (Wave 6.8).
+-- Per-user notification preferences.
 --
 -- Today there's a single flag (users.weekly_report_enabled) controlling
 -- the one notification type we send. The audit asks for a proper

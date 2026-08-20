@@ -1,4 +1,4 @@
-// Wave 9: orphan-run reconciliation runs once on boot to mark stale
+// Orphan-run reconciliation runs once on boot to mark stale
 // `running` rows as failed. Without it, a server crash mid-run leaves
 // the row pinned forever - every dependent page polls indefinitely and
 // the partial unique index from migration 0035 blocks new runs for
@@ -41,7 +41,7 @@ describe("reconcileOrphanCitationRuns", () => {
     const sql = queryMock.mock.calls[0][0] as string;
     expect(sql).toMatch(/UPDATE citation_runs/i);
     expect(sql).toMatch(/status\s+IN\s+\('pending',\s*'running'\)/i);
-    // Vercel migration: tightened from 15 min to 5 min so lambda-killed
+    // The limit is five minutes so lambda-stopped
     // runs are picked up faster (see citationReconciliation.ts).
     expect(sql).toMatch(/INTERVAL\s+'5 minutes'/i);
     expect(sql).toMatch(/error_message\s*=\s*'orphaned by restart'/i);

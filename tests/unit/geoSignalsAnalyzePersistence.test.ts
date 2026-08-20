@@ -1,4 +1,4 @@
-// Plan 5 Task 2: POST /api/geo-signals/analyze persistence.
+// Test POST /api/geo-signals/analyze persistence.
 //
 // Verifies that the analyze handler persists a `geo_signal_runs` row only
 // when the caller passes a brandId they actually own, and 404s (not 403)

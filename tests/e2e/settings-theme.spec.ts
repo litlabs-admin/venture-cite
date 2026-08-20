@@ -1,16 +1,14 @@
 // tests/e2e/settings-theme.spec.ts
 //
 // Covers the Settings page and the theme persistence system. This matters
-// disproportionately for the TanStack Start migration (see
-// docs/superpowers/specs/2026-07-25-tanstack-start-migration-design.md):
+// disproportionately for server rendering.
 // theme state lives in `localStorage` and is applied to `<html>` by a
 // FOUC-blocking synchronous script in client/index.html BEFORE React
 // mounts (see that file's inline <script> and client/src/lib/theme.ts's
 // header comment, point 4). Server rendering cannot read `localStorage`
 // during the server-side render pass, so this exact mechanism is where
-// hydration mismatches and dark-mode flashes will appear post-migration.
-// These tests pin down the REAL current behaviour so a future SSR
-// implementation has a concrete contract to match.
+// hydration mismatches and dark-mode flashes can appear.
+// These tests define the current behavior for server rendering.
 //
 // No login() here: this suite runs against the shared `storageState`
 // (playwright/.auth/state.json, produced once by tests/e2e/auth.setup.ts -

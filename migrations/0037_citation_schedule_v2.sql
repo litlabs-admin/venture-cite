@@ -1,4 +1,4 @@
--- Wave 9: ScheduleTab v2.
+-- Citation schedule settings.
 --
 -- Adds:
 --   * auto_citation_hour: integer 0..23 (UTC) - hour of the day the

@@ -172,7 +172,7 @@ if (databaseTest.kind === "ready") {
     await db.execute(sql`DELETE FROM brand_fact_scrape_runs WHERE brand_id = ${TEST_BRAND_ID}`);
   }
 
-  describe("Plan 6 smoke: full v2 pipeline persists facts end-to-end", () => {
+  describe("The full v2 pipeline persists facts end-to-end", () => {
     beforeEach(async () => {
       await cleanup();
       await seed();
@@ -266,7 +266,7 @@ if (databaseTest.kind === "ready") {
     }, 30_000);
   });
 } else {
-  describe.skip("Plan 6 smoke: full v2 pipeline persists facts end-to-end", () => {
+  describe.skip("The full v2 pipeline persists facts end-to-end", () => {
     it("requires TEST_DATABASE_URL", () => {});
   });
 }

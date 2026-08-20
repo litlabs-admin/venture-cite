@@ -1,4 +1,4 @@
--- Wave 9.1: recompute citation_runs aggregates from geo_rankings.
+-- Recompute citation_runs aggregates from geo_rankings.
 --
 -- The header on each History row reads citation_runs.total_cited /
 -- total_checks (cached at finalize time), while the drill-down reads
@@ -13,7 +13,7 @@
 --
 -- Safe because:
 --   * UPDATE…FROM joins on run_id and only updates matched rows, so runs
---     with no rankings (orphans / re-detect rows from earlier Wave 9
+--     with no rankings, including orphan and re-detect rows from earlier runs.
 --     pass that 0038 should have already deleted) are untouched.
 --   * total_cited as integer SUM(is_cited::int) - is_cited is stored as
 --     0/1 already, but the cast is defensive against any boolean drift.

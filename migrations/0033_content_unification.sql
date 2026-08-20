@@ -1,6 +1,6 @@
 -- 0033_content_unification.sql
 --
--- Wave 1 of the Content+Articles rebuild (see ~/.claude/plans/tidy-wandering-gem.md).
+-- Content and articles unification.
 --
 -- Unifies the three-table content model (content_drafts + content_generation_jobs +
 -- articles) into a single article-with-status model:
@@ -15,7 +15,7 @@
 --     the user's own site without fabricating a /article/<slug> URL.
 --   * Creates article_revisions for Auto-Improve history + diff/restore.
 --   * Adds streaming + cancel + refund support to content_generation_jobs.
---   * Backfills orphan articles (brand_id IS NULL) into a per-user "Personal" brand
+--   * Backfills orphan articles (brand_id IS NULL) into a per-user default brand
 --     so brand_id can become NOT NULL going forward.
 --   * Absorbs every content_drafts row into articles, then drops the table.
 --
@@ -110,7 +110,7 @@ CREATE INDEX IF NOT EXISTS article_revisions_article_idx
 --
 -- Some legacy articles were created with brand_id = NULL (allowed by the
 -- previous schema). Going forward brand_id must be NOT NULL - so for every
--- user that owns at least one orphan article we create one Personal brand
+-- user that owns at least one orphan article we create one default brand
 -- and reassign their orphans to it. Idempotent: re-runs find nothing to do.
 -- ---------------------------------------------------------------------------
 
@@ -129,7 +129,7 @@ BEGIN
     INTO has_orphans;
 
   IF has_orphans THEN
-    -- Insert one Personal brand per affected user.
+    -- Insert one default brand per affected user.
     INSERT INTO brands (id, user_id, name, company_name, industry, tone)
     SELECT
       gen_random_uuid()::text,
@@ -159,7 +159,7 @@ BEGIN
       ON existing.user_id = u.id AND existing.name = 'Personal'
     WHERE existing.id IS NULL;
 
-    -- Reassign orphan articles to that user's Personal brand.
+    -- Reassign orphan articles to that user's default brand.
     UPDATE articles a
     SET brand_id = b.id
     FROM brands b,

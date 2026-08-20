@@ -1,4 +1,4 @@
-// Coverage for Plan 4 Task 3: email verification flow + welcome email.
+// Test email verification and the welcome email.
 //
 //   1. POST /api/auth/register no longer issues a session; instead it
 //      returns { success: true, requiresVerification: true } so the
@@ -43,7 +43,7 @@ const stubs = vi.hoisted(() => ({
     emailVerified: number;
   },
   sendWelcomeEmail: vi.fn(),
-  // Plan 4 audit: tests now exercise the waitUntil dispatch path.
+  // Tests exercise the waitUntil dispatch path.
   // Collect promises so the test can await them deterministically
   // instead of relying on a setImmediate microtask flush.
   waitUntilPromises: [] as Promise<unknown>[],
@@ -56,7 +56,7 @@ vi.mock("../../server/db", () => {
     limit: () => Promise.resolve(stubs.dbUser ? [stubs.dbUser] : []),
   };
   // Drizzle chain: update().set(vals).where(cond).returning() - the
-  // Plan 4 fix to BUG #1 uses a conditional UPDATE...RETURNING to
+  // A conditional UPDATE...RETURNING prevents duplicate sends.
   // detect the race winner. Simulate that by inspecting whether the
   // gated column is currently null on the in-memory row.
   function makeUpdateChain() {

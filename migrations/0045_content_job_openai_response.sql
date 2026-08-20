@@ -1,4 +1,4 @@
--- Vercel migration: OpenAI Responses API (background mode) for content
+-- Store OpenAI Responses API background-mode data for content
 -- generation. The response runs on OpenAI's servers; we store the ID and
 -- poll openai.responses.retrieve() to check status. Decouples generation
 -- length from our 60s function ceiling.

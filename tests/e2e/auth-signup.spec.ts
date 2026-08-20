@@ -5,7 +5,7 @@ import { SEL } from "./support/selectors";
 // This deliberately does NOT complete a registration - that would create a
 // real Supabase user and send a real verification email on every run.
 // These tests only verify the forms render, validate client-side, and are
-// reachable - the parts a framework migration could silently break.
+// reachable. These paths can silently break during router changes.
 
 test.describe("Registration and password reset", () => {
   test("register page renders every field and is marked noindex", async ({ page }) => {
@@ -17,18 +17,8 @@ test.describe("Registration and password reset", () => {
     // than replacing it, so /register legitimately renders two
     // meta[name="robots"] elements.
     //
-    // React 19 hoists <title>/<meta>/<link> children rendered anywhere in
-    // the tree directly into <head> itself, so Helmet's data-rh="true"
-    // marker no longer appears on the tags it manages - react-helmet-async
-    // is expected to be removed entirely once the framework migration
-    // lands, at which point this marker disappears for good. Locate the
-    // tag by its exact page-specific content instead: a bare
-    // meta[name="robots"] locator matches both tags (a Playwright
-    // strict-mode violation) and, worse, would still find non-empty
-    // "content" text if the noindex Helmet tag were deleted, since the
-    // static fallback's content is also non-empty. Matching the exact
-    // literal content="noindex" only matches this page's own tag, never
-    // the static "index, follow, ..." fallback.
+    // Match the exact page value. The document has a second robots tag for
+    // the static crawler fallback. A broad locator can match that tag.
     await expect(page.locator('meta[name="robots"][content="noindex"]')).toHaveCount(1);
     await expect(page.locator(SEL.firstNameInput)).toBeVisible();
     await expect(page.locator(SEL.lastNameInput)).toBeVisible();
@@ -69,9 +59,7 @@ test.describe("Registration and password reset", () => {
   test("forgot-password page renders and is marked noindex", async ({ page }) => {
     await page.goto("/forgot-password");
     await expect(page).toHaveTitle(/Reset Password/i);
-    // See the register test above for why this must target the exact
-    // literal content="noindex" tag rather than a bare
-    // meta[name="robots"] locator or the now-absent data-rh="true" marker.
+    // Match the page value. A broad robots locator can match the static tag.
     await expect(page.locator('meta[name="robots"][content="noindex"]')).toHaveCount(1);
     await expect(page.locator(SEL.emailInput)).toBeVisible();
   });
@@ -79,9 +67,7 @@ test.describe("Registration and password reset", () => {
   test("verify-email page renders and is marked noindex", async ({ page }) => {
     await page.goto("/verify-email");
     await expect(page).toHaveTitle(/Verify your email/i);
-    // See the register test above for why this must target the exact
-    // literal content="noindex" tag rather than a bare
-    // meta[name="robots"] locator or the now-absent data-rh="true" marker.
+    // Match the page value. A broad robots locator can match the static tag.
     await expect(page.locator('meta[name="robots"][content="noindex"]')).toHaveCount(1);
   });
 });

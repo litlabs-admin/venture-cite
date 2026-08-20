@@ -1,8 +1,6 @@
-// One-shot migration: encrypt any plaintext Buffer access tokens that
-// pre-date the at-rest encryption rollout (Wave 1.3).
+// Encrypt plaintext Buffer access tokens from before at-rest encryption.
 //
-// Idempotent - already-encrypted rows are detected by their `enc:v1:`
-// prefix and skipped, so running this twice is a no-op.
+// The script skips values with the `enc:v1:` prefix.
 //
 // Usage:
 //   tsx scripts/encrypt-existing-buffer-tokens.ts
@@ -10,10 +8,9 @@
 // Prereqs: BUFFER_ENCRYPTION_KEY must be set in the env. Without it the
 // script refuses to run (see server/lib/tokenCipher.ts:getKey).
 //
-// In production, run this once after deploying the Wave 1.3 code change
-// and BEFORE any user re-connects Buffer (re-connection writes a freshly
-// encrypted token via the OAuth callback). Run it during a quiet window
-// to avoid racing with concurrent OAuth callbacks.
+// Back up the database before you run this script in production.
+// Run a dry run against a restored copy first.
+// Verify the encrypted and skipped counts before you use the result.
 
 import "dotenv/config";
 import "../server/env";

@@ -1,4 +1,4 @@
-// Plan 5 Task 1: geo_signal_runs storage methods.
+// Test geo_signal_runs storage methods.
 //
 // Verifies the storage contract that powers the `lastSignalsScanAt` input
 // on the recommendations engine (rule #8 `rerun-geo-signals`):

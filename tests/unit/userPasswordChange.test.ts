@@ -1,6 +1,5 @@
 // Coverage for POST /api/user/password - Settings page password
-// change with re-auth + Supabase Admin update (Foundations Plan 3,
-// Task 2).
+// change with re-authentication and a Supabase Admin update.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import express from "express";

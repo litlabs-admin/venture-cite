@@ -1,5 +1,5 @@
 -- Tier 2B orphan cleanup (phase 2): drop tables whose backing client UIs
--- were removed in earlier waves (ai-traffic, ai-sources/publication-
+-- were removed earlier (ai-traffic, ai-sources/publication-
 -- intelligence, revenue-analytics). The corresponding routes, storage
 -- methods, ownership helpers, schema definitions, and webhook handler
 -- (Shopify orders, which fed purchase_events) have all been deleted.

@@ -1,4 +1,4 @@
--- Per-user LLM cost / token tracking (Wave 3.2).
+-- Per-user LLM cost and token tracking.
 --
 -- Each row is one provider call: tokens consumed in/out, model name,
 -- est. cost in cents (computed at call time from model pricing). The

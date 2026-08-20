@@ -129,7 +129,7 @@ export default defineConfig({
           crons: [{ path: "/api/cron/daily-orchestrator", schedule: "0 6 * * *" }],
         },
       },
-      // Nitro startup plugin (Phase 2 Task 7) - runs DB migrations, the
+      // This Nitro startup plugin runs database migrations, the
       // in-process cron scheduler, autopilot resume, and Stripe setup
       // exactly once when Nitro's own generated server boots, so Render
       // doesn't silently lose them now that server/index.ts is no longer
@@ -152,7 +152,7 @@ export default defineConfig({
           }),
     }),
     tailwindcss(),
-    // Phase 2 scaffold: TanStack Start lives alongside the existing wouter
+    // TanStack Start replaces the existing wouter router.
     // SPA (see server/vite.ts) without replacing it yet. Route migration
     // starts in a later task. tanstackStart() MUST come before react() -
     // it registers the dev-time React Refresh preamble react() provides.
