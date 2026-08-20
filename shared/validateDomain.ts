@@ -1,6 +1,5 @@
 export type DomainValidationResult =
-  | { valid: true; normalized: string }
-  | { valid: false; reason: string };
+  { valid: true; normalized: string } | { valid: false; reason: string };
 
 const LABEL_REGEX = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
