@@ -68,7 +68,7 @@ export function createRequestUserRepository({
       return run(async (transaction) => {
         const [user] = await transaction
           .update(users)
-          .set(patch)
+          .set({ ...patch, updatedAt: new Date() })
           .where(eq(users.id, actor.userId))
           .returning(requestUserColumns);
         return user;

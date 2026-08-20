@@ -64,6 +64,12 @@ describeIfLocal("request database RLS foundation", () => {
     );
     await ownerPool.query(migration);
     await ownerPool.query(migration);
+    const profileTimestampMigration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0101_request_user_profile_timestamp.sql"),
+      "utf8",
+    );
+    await ownerPool.query(profileTimestampMigration);
+    await ownerPool.query(profileTimestampMigration);
 
     await ownerPool.query(
       `create role "${runtimeRole}" with

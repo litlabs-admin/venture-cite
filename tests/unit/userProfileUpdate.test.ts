@@ -12,7 +12,13 @@ const USER_ID = "11111111-1111-4111-8111-111111111111";
 
 const stubs = vi.hoisted(() => ({
   updateCalls: [] as Array<Record<string, unknown>>,
+  updateProfile: vi.fn(),
+  forActor: vi.fn(),
   user: undefined as { id: string; email: string | null } | undefined,
+}));
+
+vi.mock("../../server/data/requestData", () => ({
+  requestData: { forActor: stubs.forActor },
 }));
 
 vi.mock("../../server/db", () => {
@@ -136,8 +142,11 @@ async function call(
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   stubs.updateCalls.length = 0;
   stubs.user = { id: USER_ID, email: "u@example.com" };
+  stubs.updateProfile.mockResolvedValue({ id: USER_ID });
+  stubs.forActor.mockReturnValue({ users: { updateProfile: stubs.updateProfile } });
 });
 
 describe("PATCH /api/user/profile", () => {
@@ -150,8 +159,9 @@ describe("PATCH /api/user/profile", () => {
     });
     expect(status).toBe(200);
     expect(body?.success).toBe(true);
-    expect(stubs.updateCalls).toHaveLength(1);
-    const setPayload = stubs.updateCalls[0]!;
+    expect(stubs.forActor).toHaveBeenCalledWith({ userId: USER_ID });
+    expect(stubs.updateProfile).toHaveBeenCalledOnce();
+    const setPayload = stubs.updateProfile.mock.calls[0]![0];
     expect(setPayload.firstName).toBe("Ada");
     expect(setPayload.lastName).toBe("Lovelace");
     expect(setPayload.timezone).toBe("America/New_York");
@@ -161,10 +171,11 @@ describe("PATCH /api/user/profile", () => {
     const app = buildApp();
     const { status } = await call(app, "PATCH", "/api/user/profile", { firstName: "Grace" });
     expect(status).toBe(200);
-    expect(stubs.updateCalls).toHaveLength(1);
-    expect(stubs.updateCalls[0]!.firstName).toBe("Grace");
-    expect("lastName" in stubs.updateCalls[0]!).toBe(false);
-    expect("timezone" in stubs.updateCalls[0]!).toBe(false);
+    expect(stubs.updateProfile).toHaveBeenCalledOnce();
+    const patch = stubs.updateProfile.mock.calls[0]![0];
+    expect(patch.firstName).toBe("Grace");
+    expect("lastName" in patch).toBe(false);
+    expect("timezone" in patch).toBe(false);
   });
 
   it("rejects an invalid timezone with 400", async () => {
@@ -173,6 +184,6 @@ describe("PATCH /api/user/profile", () => {
       timezone: "Not/A_Real_Zone",
     });
     expect(status).toBe(400);
-    expect(stubs.updateCalls).toHaveLength(0);
+    expect(stubs.updateProfile).not.toHaveBeenCalled();
   });
 });

@@ -24,6 +24,9 @@ import { logger } from "../lib/logger";
 import { logAudit } from "../lib/audit";
 import { authRateKey } from "../lib/authRateKey";
 import { asyncHandler } from "../lib/routesShared";
+import { createRequestActor } from "../lib/requestActor";
+import { requestData } from "../data/requestData";
+import type { RequestUserProfilePatch } from "../data/requestUserRepository";
 import {
   NOTIFICATION_TYPES,
   getPreferences,
@@ -348,7 +351,7 @@ export function setupUserAccountRoutes(app: Express) {
         // The client always sends all three fields; if its form briefly
         // renders blank (e.g. before /auth/me hydrates), we'd overwrite
         // the user's real name with "". Treat trimmed-empty as "skip".
-        const patch: Record<string, unknown> = {};
+        const patch: RequestUserProfilePatch = {};
         if (firstName && firstName.trim().length > 0) patch.firstName = firstName.trim();
         if (lastName && lastName.trim().length > 0) patch.lastName = lastName.trim();
         if (timezone) patch.timezone = timezone;
@@ -357,9 +360,8 @@ export function setupUserAccountRoutes(app: Express) {
           return res.status(200).json({ success: true, noChange: true });
         }
 
-        patch.updatedAt = new Date();
-
-        await db.update(users).set(patch).where(eq(users.id, user.id));
+        const actor = createRequestActor(user.id);
+        await requestData.forActor(actor).users.updateProfile(patch);
         res.json({ success: true });
       } catch (err: unknown) {
         logger.error({ err }, "user.profile.update failed");
