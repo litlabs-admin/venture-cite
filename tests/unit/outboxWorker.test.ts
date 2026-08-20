@@ -57,18 +57,19 @@ function repository(command: ClaimedOutboxCommand | null): OutboxRepository {
 describe("outbox worker", () => {
   it("does nothing when no command is ready", async () => {
     const outbox = repository(null);
-    const handlers: Record<ClaimedOutboxCommand["kind"], OutboxCommandHandler> = {
-      "stripe.create_customer": vi.fn(),
-      "resend.send_email": vi.fn(),
-      "buffer.create_post": vi.fn(),
-      "openai.create_response": vi.fn(),
-      "content_cost.record": vi.fn(),
-    };
+    const handlers = { "content_cost.record": vi.fn() };
 
-    await expect(runOutboxWorkerOnce({ outbox, handlers, leaseSeconds: 120 })).resolves.toEqual({
-      kind: "idle",
+    await expect(
+      runOutboxWorkerOnce({
+        outbox,
+        handlers,
+        leaseSeconds: 120,
+      }),
+    ).resolves.toEqual({ kind: "idle" });
+    expect(outbox.claimNext).toHaveBeenCalledWith({
+      leaseSeconds: 120,
+      kinds: ["content_cost.record"],
     });
-    expect(outbox.claimNext).toHaveBeenCalledWith({ leaseSeconds: 120 });
   });
 
   it("records a sanitized success result after a handler succeeds", async () => {

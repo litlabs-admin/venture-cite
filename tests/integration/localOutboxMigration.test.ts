@@ -536,6 +536,59 @@ describeIfLocal("local transactional outbox migration", () => {
     expect(result.rows).toEqual([{ count: "1" }]);
   });
 
+  it("claims only the registered command kind with kind-first indexes", async () => {
+    await applyKindClaimMigration();
+    const indexes = await pool.query<{ indexname: string }>(
+      `SELECT indexname FROM pg_indexes
+       WHERE schemaname = $1 AND indexname LIKE 'outbox_commands_kind_%'`,
+      [schemaName],
+    );
+    expect(indexes.rows.map((row) => row.indexname).sort()).toEqual([
+      "outbox_commands_kind_claimable_idx",
+      "outbox_commands_kind_expired_lease_idx",
+    ]);
+
+    await pool.query(
+      `INSERT INTO ${quotedSchema}.outbox_commands
+       (kind, idempotency_key, aggregate_type, aggregate_id, user_id, payload,
+        payload_fingerprint, max_attempts, provider_name, provider_operation, available_at)
+       VALUES
+       ('stripe.create_customer', 'kind-filter-stripe', 'user', 'user-a', 'user-a',
+        '{"kind":"stripe.create_customer","customerRequestId":"request-1"}', 'stripe-filter', 3,
+        'stripe', 'create_customer', '1999-01-01T00:00:00Z'),
+       ('content_cost.record', 'kind-filter-cost', 'content_generation_job', 'filter-job', 'user-a',
+        '{"kind":"content_cost.record","contentJobId":"filter-job","providerResponseId":"response-1","service":"openai","model":"gpt-test","tokensIn":1,"tokensOut":2}',
+        'cost-filter', 3, 'internal', 'record_content_cost', '2000-01-01T00:00:00Z')`,
+    );
+
+    const claimed = await pool.query<{ kind: string }>(
+      `WITH candidate AS (
+         SELECT id FROM ${quotedSchema}.outbox_commands
+         WHERE kind = ANY($1::text[])
+           AND status = 'pending'
+           AND available_at <= now()
+           AND attempt_count < max_attempts
+         ORDER BY available_at, created_at
+         FOR UPDATE SKIP LOCKED LIMIT 1
+       )
+       UPDATE ${quotedSchema}.outbox_commands command
+       SET status = 'processing',
+           lease_token = gen_random_uuid(),
+           lease_expires_at = now() + interval '30 seconds',
+           started_at = now(),
+           attempt_count = attempt_count + 1
+       FROM candidate
+       WHERE command.id = candidate.id
+       RETURNING command.kind`,
+      [["content_cost.record"]],
+    );
+    expect(claimed.rows).toEqual([{ kind: "content_cost.record" }]);
+    const stripe = await pool.query<{ status: string }>(
+      `SELECT status FROM ${quotedSchema}.outbox_commands WHERE idempotency_key = 'kind-filter-stripe'`,
+    );
+    expect(stripe.rows).toEqual([{ status: "pending" }]);
+  });
+
   async function claim(id: string) {
     return pool.query<{ lease_token: string }>(
       `UPDATE ${quotedSchema}.outbox_commands
@@ -659,6 +712,14 @@ describeIfLocal("local transactional outbox migration", () => {
       .replaceAll("public.", `${quotedSchema}.`)
       .replaceAll("venturecite_outbox_worker", workerRole);
     await pool.query(customized);
+  }
+
+  async function applyKindClaimMigration(): Promise<void> {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0100_outbox_kind_claim_indexes.sql"),
+      "utf8",
+    );
+    await pool.query(source.replaceAll("public.", `${quotedSchema}.`));
   }
 });
 

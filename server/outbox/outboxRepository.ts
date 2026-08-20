@@ -60,7 +60,10 @@ export type OutboxRepository = {
     transaction: Transaction,
     input: EnqueueOutboxCommand,
   ): Promise<ClaimedOrPendingCommand>;
-  claimNext(input: { leaseSeconds: number }): Promise<ClaimedOutboxCommand | null>;
+  claimNext(input: {
+    leaseSeconds: number;
+    kinds: readonly OutboxCommandKind[];
+  }): Promise<ClaimedOutboxCommand | null>;
   renewLease(input: { id: string; leaseToken: string; leaseSeconds: number }): Promise<boolean>;
   markSucceeded(input: {
     id: string;
@@ -88,9 +91,11 @@ export type OutboxRepository = {
 export function createOutboxRepository(database: Database = db): OutboxRepository {
   return {
     enqueueInTransaction: (transaction, input) => enqueueFromDomainTransaction(transaction, input),
-    claimNext: ({ leaseSeconds }) =>
+    claimNext: ({ leaseSeconds, kinds }) =>
       withWorkerTransaction(database, async (tx) => {
         assertLeaseSeconds(leaseSeconds);
+        assertClaimKinds(kinds);
+        const claimKinds = [...kinds];
         const result = await tx.execute(sql`
         with expired_final as (
           update public.outbox_commands
@@ -99,12 +104,15 @@ export function createOutboxRepository(database: Database = db): OutboxRepositor
               dead_lettered_at = now(),
               lease_token = null, lease_expires_at = null,
               last_error_code = coalesce(last_error_code, 'attempts_exhausted')
-          where status = 'processing' and lease_expires_at < now() and (attempt_count >= max_attempts or cancellation_requested_at is not null)
+          where kind = any(${claimKinds}::text[])
+            and status = 'processing' and lease_expires_at < now() and (attempt_count >= max_attempts or cancellation_requested_at is not null)
           returning id
         ), candidate as (
           select id from public.outbox_commands
-          where (status = 'pending' and cancellation_requested_at is null and available_at <= now() and attempt_count < max_attempts)
+          where kind = any(${claimKinds}::text[])
+            and ((status = 'pending' and cancellation_requested_at is null and available_at <= now() and attempt_count < max_attempts)
              or (status = 'processing' and cancellation_requested_at is null and lease_expires_at < now() and attempt_count < max_attempts)
+            )
           order by available_at, created_at for update skip locked limit 1
         )
         update public.outbox_commands command
@@ -263,6 +271,9 @@ function assertLeaseSeconds(value: number): void {
     throw new Error(
       `Outbox leaseSeconds must be an integer from ${MIN_LEASE_SECONDS} to ${MAX_LEASE_SECONDS}`,
     );
+}
+function assertClaimKinds(kinds: readonly OutboxCommandKind[]): void {
+  if (kinds.length === 0) throw new Error("Outbox claim requires at least one command kind");
 }
 function parseClaimedOutboxCommand(value: unknown): ClaimedOutboxCommand {
   const command = parsePendingOrClaimedCommand(value);

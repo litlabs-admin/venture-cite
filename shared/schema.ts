@@ -1858,6 +1858,12 @@ export const outboxCommands = pgTable(
     index("outbox_commands_expired_lease_idx")
       .on(table.leaseExpiresAt, table.createdAt)
       .where(sql`status = 'processing'`),
+    index("outbox_commands_kind_claimable_idx")
+      .on(table.kind, table.availableAt, table.createdAt)
+      .where(sql`status = 'pending'`),
+    index("outbox_commands_kind_expired_lease_idx")
+      .on(table.kind, table.leaseExpiresAt, table.createdAt)
+      .where(sql`status = 'processing'`),
     index("outbox_commands_user_idx")
       .on(table.userId, table.createdAt)
       .where(sql`user_id is not null`),

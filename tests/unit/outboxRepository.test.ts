@@ -22,12 +22,15 @@ describe("outbox repository", () => {
     stubs.execute.mockResolvedValue({ rows: [] });
     const repository = createOutboxRepository(fakeDatabase());
 
-    await expect(repository.claimNext({ leaseSeconds: 120 })).resolves.toBeNull();
+    await expect(
+      repository.claimNext({ leaseSeconds: 120, kinds: ["content_cost.record"] }),
+    ).resolves.toBeNull();
     const statement = executedSql().find((text) => text.includes("for update skip locked")) ?? "";
     expect(statement).toContain("for update skip locked");
     expect(statement).toContain("status = 'pending'");
     expect(statement).toContain("lease_expires_at < now()");
     expect(statement).toContain("attempt_count = attempt_count + 1");
+    expect(statement).toContain("kind = any");
   });
 
   it("rejects a mismatched payload before it reaches the database", async () => {

@@ -8,7 +8,7 @@ export type OutboxCommandHandler = (input: {
   idempotencyKey: string;
   signal: AbortSignal;
 }) => Promise<OutboxProviderResult>;
-export type OutboxWorkerHandlers = Record<OutboxCommandKind, OutboxCommandHandler>;
+export type OutboxWorkerHandlers = Partial<Record<OutboxCommandKind, OutboxCommandHandler>>;
 export type OutboxWorkerOutcome =
   | { kind: "idle" }
   | { kind: "succeeded"; commandId: string }
@@ -24,7 +24,12 @@ export async function runOutboxWorkerOnce(input: {
 }): Promise<OutboxWorkerOutcome> {
   // Cancellation cannot undo a provider action already in flight.
   // Adapters must use the stable key and honor this signal before their call.
-  const command = await input.outbox.claimNext({ leaseSeconds: input.leaseSeconds });
+  const kinds = handledKinds(input.handlers);
+  if (kinds.length === 0) throw new Error("Outbox worker requires at least one handler");
+  const command = await input.outbox.claimNext({
+    leaseSeconds: input.leaseSeconds,
+    kinds,
+  });
   if (!command) return { kind: "idle" };
   const lease = maintainOutboxLease({
     outbox: input.outbox,
@@ -43,7 +48,9 @@ export async function runOutboxWorkerOnce(input: {
         ? { kind: "cancelled", commandId: command.id }
         : { kind: "lost_lease", commandId: command.id };
     }
-    const result = await input.handlers[command.kind]({
+    const handler = input.handlers[command.kind];
+    if (!handler) throw { kind: "permanent", code: "invalid_command" };
+    const result = await handler({
       command,
       idempotencyKey: command.idempotencyKey,
       signal: lease.signal,
@@ -85,6 +92,18 @@ export async function runOutboxWorkerOnce(input: {
   } finally {
     await lease.stop();
   }
+}
+
+const ALL_OUTBOX_COMMAND_KINDS = [
+  "stripe.create_customer",
+  "resend.send_email",
+  "buffer.create_post",
+  "openai.create_response",
+  "content_cost.record",
+] as const satisfies readonly OutboxCommandKind[];
+
+function handledKinds(handlers: OutboxWorkerHandlers): OutboxCommandKind[] {
+  return ALL_OUTBOX_COMMAND_KINDS.filter((kind) => handlers[kind] !== undefined);
 }
 
 export function classifyOutboxFailure(error: unknown): OutboxCommandFailure {
