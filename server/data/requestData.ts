@@ -1,30 +1,27 @@
-import { sql } from "drizzle-orm";
 import { db } from "../db";
 import type { RequestActor } from "../lib/requestActor";
+import {
+  createRequestBrandRepository,
+  type RequestBrandRepository,
+} from "./requestBrandRepository";
+import { createRequestUserRepository, type RequestUserRepository } from "./requestUserRepository";
 
-export type RequestTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type RequestRepositories = {
+  users: RequestUserRepository;
+  brands: RequestBrandRepository;
+};
 
 export type RequestData = {
-  forUser<T>(
-    actor: RequestActor,
-    work: (transaction: RequestTransaction) => Promise<T>,
-  ): Promise<T>;
+  forActor(actor: RequestActor): RequestRepositories;
 };
 
 export function createRequestData(database: typeof db): RequestData {
   return {
-    async forUser<T>(
-      actor: RequestActor,
-      work: (transaction: RequestTransaction) => Promise<T>,
-    ): Promise<T> {
-      return database.transaction(async (transaction) => {
-        await transaction.execute(sql`set local role venturecite_request`);
-        await transaction.execute(
-          sql`select set_config('venturecite.user_id', ${actor.userId}, true)`,
-        );
-        await transaction.execute(sql`set local statement_timeout = '5s'`);
-        return work(transaction);
-      });
+    forActor(actor: RequestActor): RequestRepositories {
+      return {
+        users: createRequestUserRepository({ actor, database }),
+        brands: createRequestBrandRepository({ actor, database }),
+      };
     },
   };
 }

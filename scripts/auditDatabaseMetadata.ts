@@ -1,69 +1,44 @@
-import { logger } from "../server/lib/logger";
+import { selectDatabaseMetadataAuditTarget } from "./databaseMetadataAuditTarget";
 
 const REQUIRED_CONFIRMATION = "venturecite-read-only";
 
 async function main(): Promise<void> {
+  process.env.NODE_ENV = "production";
+  selectDatabaseMetadataAuditTarget(process.env);
+  const [{ logger }, { runDatabaseMetadataAudit }] = await Promise.all([
+    import("../server/lib/logger"),
+    import("../server/lib/databaseMetadataAudit"),
+  ]);
+
   if (process.env.CONFIRM_DATABASE_METADATA_AUDIT !== REQUIRED_CONFIRMATION) {
     throw new Error(
       "Set CONFIRM_DATABASE_METADATA_AUDIT=venturecite-read-only before the metadata audit.",
     );
   }
 
-  process.env.NODE_ENV = "production";
   const { pool } = await import("../server/db");
   const client = await pool.connect();
 
   try {
-    await client.query("BEGIN READ ONLY");
-    await client.query("SET LOCAL statement_timeout = '5s'");
-
-    const role = await client.query<{
-      current_user: string;
-      rolbypassrls: boolean;
-      rolsuper: boolean;
-    }>(
-      `SELECT current_user, role.rolsuper, role.rolbypassrls
-       FROM pg_roles AS role
-       WHERE role.rolname = current_user`,
-    );
-    const tables = await client.query<{
-      rls_enabled: number;
-      rls_forced: number;
-      tables: number;
-    }>(
-      `SELECT
-         count(*)::int AS tables,
-         count(*) FILTER (WHERE relation.relrowsecurity)::int AS rls_enabled,
-         count(*) FILTER (WHERE relation.relforcerowsecurity)::int AS rls_forced
-       FROM pg_class AS relation
-       JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
-       WHERE namespace.nspname = 'public' AND relation.relkind = 'r'`,
-    );
-    const policies = await client.query<{ policies: number }>(
-      `SELECT count(*)::int AS policies
-       FROM pg_policies
-       WHERE schemaname = 'public'`,
-    );
-
-    logger.info(
-      {
-        role: role.rows[0],
-        tables: tables.rows[0],
-        policies: policies.rows[0],
-      },
-      "database metadata audit complete",
-    );
-    await client.query("ROLLBACK");
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw error;
+    const report = await runDatabaseMetadataAudit(client);
+    logger.info({ audit: report }, "database metadata audit complete");
   } finally {
     client.release();
     await pool.end();
   }
 }
 
-main().catch((error: unknown) => {
-  logger.error({ err: error }, "database metadata audit failed");
+main().catch(async () => {
+  process.env.NODE_ENV = "production";
+  try {
+    const { logger } = await import("../server/lib/logger");
+    logger.error("database metadata audit failed");
+  } catch {
+    try {
+      process.stderr.write("database metadata audit failed\n");
+    } catch {
+      // The process exit code remains the final failure signal.
+    }
+  }
   process.exitCode = 1;
 });

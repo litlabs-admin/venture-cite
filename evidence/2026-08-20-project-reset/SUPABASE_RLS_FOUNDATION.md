@@ -1,106 +1,144 @@
 # Supabase RLS foundation
 
-## Outcome
+## Current result
 
-The local database now has a restricted request role for `users` and `brands`.
+The combined local RLS and outbox run passed 35 of 35 database integration tests.
 
-No application route uses this role yet.
+Production remains read-only and unchanged.
 
-No live database change occurred.
+Migrations 0096, 0097, and 0098 remain unapplied in production.
 
-## Verified problem
+The local Supabase stack is stopped.
 
-The server creates one global PostgreSQL pool in `server/db.ts`.
+Evidence: `tests/integration/requestRlsFoundation.test.ts`, `tests/integration/contentRequestRls.test.ts`, `tests/integration/localOutboxMigration.test.ts`, `migrations/0096_request_rls_foundation.sql`, `migrations/0097_request_rls_content.sql`, and `migrations/0098_transactional_outbox.sql`.
 
-The code does not set a database role or a request user value.
+## Migration 0096
 
-RLS is active on public tables, but the current database owner can bypass it.
+Migration 0096 defines restricted access for approved columns in `users` and `brands`.
 
-Some brand writes use only a brand ID after a separate ownership check.
+The row policies match the actor value stored in the transaction.
 
-This split permits a future code defect to write another user's row.
+The migration rejects unsafe role attributes, unexpected memberships, and privileges outside the two tables.
 
-## Local design
+The request user and brand repositories set the role and actor value inside a transaction.
 
-Migration 0096 creates the `venturecite_request` role.
+Evidence: `migrations/0096_request_rls_foundation.sql:4-277`, `server/data/requestUserRepository.ts:40-77`, `server/data/requestBrandRepository.ts:113-214`, and `server/data/restrictedRequestTransaction.ts:7-23`.
 
-The role has no login access and cannot bypass RLS.
+The 0096 integration file has 13 tests.
 
-The role does not belong to `anon` or `authenticated`.
+It proves row isolation, approved writes, version checks, denied columns, transaction cleanup, and actor-bound repository facades.
 
-The role can read only approved user columns.
+Evidence: `tests/integration/requestRlsFoundation.test.ts:141-432`.
 
-The role cannot read password, Stripe, Buffer, or billing fields.
+## Migration 0097
 
-The role can read brand rows only when `user_id` matches the request user.
+Migration 0097 defines read-only request access for the content slice.
 
-The role can insert and update only approved brand columns.
+The slice includes brands, articles, article revisions, distributions, keyword research, and content jobs.
 
-The role cannot hard delete a brand.
+The policies follow brand ownership through the request actor.
 
-Migration 0096 does not grant the request role to the application login.
+The policies hide content after a brand soft delete.
 
-`requestData.forUser` starts a short transaction.
+The request role cannot write content rows.
 
-It sets the fixed request role with `SET LOCAL ROLE`.
+Evidence: `migrations/0097_request_rls_content.sql:121-307` and `tests/integration/contentRequestRls.test.ts:167-463`.
 
-It sets `venturecite.user_id` with a bound query value.
+## PostgreSQL 17 role membership
 
-PostgreSQL clears both values after commit or rollback.
+The membership tool discovers the creator of the restricted roles through `pg_auth_members`.
 
-## Local proof
+The creator must hold each restricted role with `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`.
 
-The integration test uses the local Supabase database on port 55322.
+The runtime role receives the three restricted roles with `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
 
-Ten tests pass.
+The unit tests accept this exact policy.
 
-The tests prove these facts.
+Evidence: `server/lib/requestRoleMembership.ts:126-225` and `tests/unit/requestRoleMembership.test.ts:81-181`.
 
-- A user sees only their user row.
-- A user sees only their brands.
-- A cross-user update affects zero rows.
-- All hard delete operations fail.
-- Cross-user insert and ownership changes fail with PostgreSQL code `42501`.
-- Approved profile updates work.
-- Billing-tier updates fail.
-- Password-hash reads fail.
-- The role and user value clear after commit and rollback.
-- Migration 0096 applies more than once.
-- The request role keeps all restricted role attributes.
-- The migration rejects active role members.
-- The migration rejects admin-only role members.
-- The migration rejects column access outside `users` and `brands`.
-- A separate local runtime login can use `SET LOCAL ROLE`.
+Local integration setup removes stale managed roles and memberships from a restored backup.
 
-## Release limits
+Each database `beforeAll` hook has a 60-second timeout while it holds the shared advisory lock.
 
-Do not connect live routes to this role yet.
+Evidence: `tests/integration/localRoleCleanup.ts:23-161`, `tests/integration/requestRlsFoundation.test.ts:51-106`, `tests/integration/contentRequestRls.test.ts:45-125`, and `tests/integration/localOutboxMigration.test.ts:36-65`.
 
-Do not apply migration 0096 to production yet.
+The content repositories exist.
 
-The live metadata audit must confirm the production login role and grants.
+The content routes do not use them yet.
 
-The live audit must also count brands with a null or invalid `user_id`.
+Evidence: `server/data/contentRequestData.ts:24-50` and `server/routes/content.ts`.
 
-The Supabase project CA remains a release blocker for that audit.
+## Route cutover state
 
-The legal entity and privacy email remain public-release blockers.
+The brand routes use request repositories for list, get, and update.
 
-## Security limit
+Brand create, website import, deletion preview, and delete still use legacy storage.
 
-This design protects against missing tenant filters.
+Evidence: `server/routes/brands.ts:49-78`, `server/routes/brands.ts:80-393`, and `server/routes/brands.ts:395-531`.
 
-It does not protect against arbitrary SQL under the owner connection.
+## Production limits
 
-The callback can run only trusted repository code.
+The production audit was read-only and ended with `ROLLBACK`.
 
-Future route work must use named request repositories.
+The audit found no request role and zero policies on `users` and `brands`.
 
-The owner database object must stay outside request routes.
+All 62 public relations have RLS enabled, but no relation forces RLS.
 
-## Sources
+Do not activate request routes in production before the controlled migration and role review.
 
-- [Supabase RLS guide](https://supabase.com/docs/guides/database/postgres/row-level-security)
-- [Supabase Postgres roles guide](https://supabase.com/docs/guides/database/postgres/roles)
-- [PostgreSQL row security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)
-- [PostgreSQL SET ROLE](https://www.postgresql.org/docs/current/sql-set-role.html)
+Evidence: `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md:5-42`.
+
+The request-role membership tool exists but has not run against production.
+
+The release preflight exists but has not run against production.
+
+Evidence: `scripts/configureRequestRoleMembership.ts:33-64`, `scripts/releaseEnvironmentPreflight.ts:180-259`, and `package.json`.
+
+## Remaining gates
+
+1. Obtain `DATABASE_DIRECT_URL` through the secure release channel.
+2. Obtain the four approved Stripe product and price identifiers.
+3. Obtain `RESEND_FROM_ADDRESS`.
+4. Define the least-privileged production runtime role.
+5. Run the strict metadata audit with the direct connection.
+6. Review grants, owners, RLS flags, policies, and ownership counts.
+7. Apply migrations 0096 and 0097 through the controlled release command.
+8. Run the request-role membership command in dry-run mode.
+9. Apply role membership after the final review and confirmation gate.
+10. Cut over the remaining brand routes.
+11. Cut over content routes with two-user isolation tests.
+12. Keep privacy legal placeholders deferred until final release preparation.
+
+## Security boundary
+
+This design reduces the effect of a missing tenant filter.
+
+It does not make arbitrary SQL safe under an owner connection.
+
+Request routes must use named repositories.
+
+Worker and administrator operations must remain outside request routes.
+
+## Closed review blockers
+
+The final Sol review says `SHIP`.
+
+It found no P0, P1, or P2 findings.
+
+The final review closed the seven prior foundation blockers.
+
+1. The production migration command now runs the release preflight before it imports database code.
+
+2. The request-role tool now discovers the PostgreSQL 17 creator membership and verifies the exact runtime grant policy.
+
+3. The outbox worker keeps an in-flight command leased while its provider handler runs.
+
+4. The enqueue path requires an owning user and runs only inside a domain transaction.
+
+5. The scheduler guard rejects two owners and rejects a production process with no scheduler owner.
+
+6. The outbox migration rejects worker-role drift before it repairs the role.
+
+7. The role tool verifies that the runtime and direct connections target the same database.
+
+Evidence: `scripts/migrate.ts:10-39`, `scripts/migrationRelease.ts:1-120`, `server/lib/requestRoleMembership.ts:126-314`, `server/outbox/outboxRepository.ts:88-243`, `server/outbox/outboxWorker.ts:16-86`, `server/lib/schedulerMode.ts:21-38`, `server/nitroBoot.ts:99-122`, `migrations/0098_transactional_outbox.sql:138-322`, and the related unit and integration tests.

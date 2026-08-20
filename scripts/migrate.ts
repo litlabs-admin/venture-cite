@@ -10,14 +10,14 @@
 // prefer DATABASE_DIRECT_URL when set. Local dev keeps the single
 // DATABASE_URL.
 
-import { logger } from "../server/lib/logger";
-import { assertReleaseMigrationConfirmation, isReleaseMigrationCommand } from "./migrationRelease";
+import { assertProductionMigrationReady, isReleaseMigrationCommand } from "./migrationRelease";
 
 async function main(): Promise<void> {
-  assertReleaseMigrationConfirmation({
+  assertProductionMigrationReady({
     nodeEnv: process.env.NODE_ENV,
     isReleaseCommand: isReleaseMigrationCommand(process.argv),
     confirmation: process.env.CONFIRM_PRODUCTION_MIGRATIONS,
+    environment: process.env,
   });
 
   // Swap DATABASE_URL → DATABASE_DIRECT_URL **before** importing any
@@ -25,8 +25,11 @@ async function main(): Promise<void> {
   const directUrl = process.env.DATABASE_DIRECT_URL;
   if (directUrl) {
     process.env.DATABASE_URL = directUrl;
-    logger.info("migrate: using DATABASE_DIRECT_URL for session connection");
   }
+
+  // Import application modules only after the production gate passes.
+  const { logger } = await import("../server/lib/logger");
+  if (directUrl) logger.info("migrate: using DATABASE_DIRECT_URL for session connection");
 
   const { applyMigrations } = await import("../server/lib/migrationRunner");
   const { pool } = await import("../server/db");

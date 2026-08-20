@@ -1,5 +1,21 @@
 import { z } from "zod";
 import { resolveDatabaseTlsPolicy } from "./lib/databaseTlsPolicy";
+import { parseSchedulerBoolean, resolveSchedulerMode } from "./lib/schedulerMode";
+
+const schedulerBooleanSchema = z
+  .string()
+  .optional()
+  .transform((value, context) => {
+    try {
+      return parseSchedulerBoolean(value);
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        message: error instanceof Error ? error.message : "Invalid scheduler boolean",
+      });
+      return z.NEVER;
+    }
+  });
 
 // Validates required environment variables at startup. Throws a readable
 // error (naming every missing/malformed variable) before the server starts
@@ -97,12 +113,16 @@ const envSchemaBase = z.object({
   // Buffer feature don't need to set it.
   BUFFER_ENCRYPTION_KEY: z.string().optional(),
 
-  // Set to "true" when an EXTERNAL scheduler drives
-  // POST /api/cron/daily-orchestrator, so the in-process node-cron scheduler
-  // does not run the same six jobs a second time. Required on Render free
-  // tier, where the process sleeps and the in-process scheduler is unreliable
-  // anyway. See server/nitroBoot.ts and render.yaml.
-  DISABLE_IN_PROCESS_SCHEDULER: z.string().optional(),
+  // Set to "true" only after an authenticated external scheduler drives
+  // POST /api/cron/daily-orchestrator. This stops the in-process scheduler
+  // from running the same jobs a second time. Keep this "false" on Render
+  // until the external trigger passes release verification.
+  DISABLE_IN_PROCESS_SCHEDULER: schedulerBooleanSchema,
+
+  // Set to "true" only when an external service calls the daily cron
+  // orchestrator in production. This requires the in-process scheduler to
+  // be disabled. The typed guard prevents duplicate scheduled work.
+  EXTERNAL_CRON_ORCHESTRATOR_ENABLED: schedulerBooleanSchema,
 
   // No REDDIT_* credentials. The mention scanner reads Reddit
   // unauthenticated only (public JSON + RSS fallback); the OAuth path and
@@ -118,6 +138,21 @@ const envSchema = envSchemaBase.superRefine((value, context) => {
       code: "custom",
       path: ["DATABASE_SSL_REJECT_UNAUTHORIZED"],
       message: error instanceof Error ? error.message : "Invalid database TLS configuration",
+    });
+  }
+
+  try {
+    resolveSchedulerMode({
+      nodeEnv: value.NODE_ENV,
+      isVercel: Boolean(process.env.VERCEL),
+      disableInProcessScheduler: value.DISABLE_IN_PROCESS_SCHEDULER,
+      externalCronOrchestratorEnabled: value.EXTERNAL_CRON_ORCHESTRATOR_ENABLED,
+    });
+  } catch (error) {
+    context.addIssue({
+      code: "custom",
+      path: ["EXTERNAL_CRON_ORCHESTRATOR_ENABLED"],
+      message: error instanceof Error ? error.message : "Invalid scheduler configuration",
     });
   }
 });

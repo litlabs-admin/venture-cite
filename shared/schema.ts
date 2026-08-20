@@ -17,6 +17,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import type { OutboxCommandPayload, OutboxStatus } from "./outbox";
 
 export const users = pgTable("users", {
   id: varchar("id")
@@ -454,7 +455,10 @@ export const keywordResearch = pgTable(
     discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("keyword_research_brand_id_idx").on(table.brandId)],
+  (table) => [
+    index("keyword_research_brand_id_idx").on(table.brandId),
+    index("keyword_research_article_id_idx").on(table.articleId),
+  ],
 );
 
 export const insertKeywordResearchSchema = createInsertSchema(keywordResearch).omit({
@@ -513,6 +517,8 @@ export const contentGenerationJobs = pgTable(
   (table) => [
     index("content_gen_jobs_user_status_idx").on(table.userId, table.status),
     index("content_gen_jobs_status_idx").on(table.status),
+    index("content_gen_jobs_brand_id_idx").on(table.brandId),
+    index("content_gen_jobs_article_id_idx").on(table.articleId),
   ],
 );
 
@@ -1796,6 +1802,69 @@ export const apiCosts = pgTable(
 
 export type ApiCost = typeof apiCosts.$inferSelect;
 export type InsertApiCost = typeof apiCosts.$inferInsert;
+
+// Transactional provider-command queue. Application transactions insert a
+// command with their domain changes. A separate worker leases and executes it.
+// The outbox remains private to internal worker access.
+// Migration 0098 owns SQL-only RLS, grants, state checks, and private function.
+export const outboxCommands = pgTable(
+  "outbox_commands",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    kind: text("kind").$type<OutboxCommandPayload["kind"]>().notNull(),
+    status: text("status").$type<OutboxStatus>().notNull().default("pending"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    aggregateType: text("aggregate_type").notNull(),
+    aggregateId: text("aggregate_id").notNull(),
+    userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+    brandId: varchar("brand_id").references(() => brands.id, { onDelete: "set null" }),
+    payload: jsonb("payload").$type<OutboxCommandPayload>().notNull(),
+    payloadFingerprint: text("payload_fingerprint").notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull(),
+    availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
+    leaseToken: uuid("lease_token"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    lastErrorCode: text("last_error_code"),
+    providerName: text("provider_name").notNull(),
+    providerOperation: text("provider_operation").notNull(),
+    providerResult: jsonb("provider_result"),
+    providerReference: text("provider_reference"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    deadLetteredAt: timestamp("dead_lettered_at", { withTimezone: true }),
+    cancellationRequestedAt: timestamp("cancellation_requested_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("outbox_commands_provider_idempotency_key_idx").on(
+      table.providerName,
+      table.idempotencyKey,
+    ),
+    index("outbox_commands_aggregate_idx").on(
+      table.aggregateType,
+      table.aggregateId,
+      table.createdAt,
+    ),
+    index("outbox_commands_claimable_idx")
+      .on(table.availableAt, table.createdAt)
+      .where(sql`status = 'pending'`),
+    index("outbox_commands_expired_lease_idx")
+      .on(table.leaseExpiresAt, table.createdAt)
+      .where(sql`status = 'processing'`),
+    index("outbox_commands_user_idx")
+      .on(table.userId, table.createdAt)
+      .where(sql`user_id is not null`),
+    index("outbox_commands_brand_idx")
+      .on(table.brandId, table.createdAt)
+      .where(sql`brand_id is not null`),
+  ],
+);
+
+export type OutboxCommand = typeof outboxCommands.$inferSelect;
+export type InsertOutboxCommand = typeof outboxCommands.$inferInsert;
 
 // ─── Audit log ────────────────────────────────────────────────────
 // Sensitive operations (delete, subscription change, admin action) write

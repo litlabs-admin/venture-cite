@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertProductionMigrationEnvironment,
+  assertProductionMigrationReady,
   assertReleaseMigrationConfirmation,
   isReleaseMigrationCommand,
 } from "../../scripts/migrationRelease";
@@ -48,5 +50,36 @@ describe("migration release confirmation", () => {
   it("detects the release argument", () => {
     expect(isReleaseMigrationCommand(["node", "scripts/migrate.ts", "--release"])).toBe(true);
     expect(isReleaseMigrationCommand(["node", "scripts/migrate.ts"])).toBe(false);
+  });
+
+  it("requires the full release preflight, including a non-pooler direct URL", () => {
+    expect(() => assertProductionMigrationEnvironment({})).toThrow("DATABASE_DIRECT_URL");
+    expect(() =>
+      assertProductionMigrationEnvironment({
+        DATABASE_DIRECT_URL: "postgresql://release.example.com:6543/postgres",
+      }),
+    ).toThrow("DATABASE_DIRECT_URL");
+  });
+
+  it("does not treat the legacy confirmation as a complete release gate", () => {
+    expect(() =>
+      assertProductionMigrationReady({
+        nodeEnv: "production",
+        isReleaseCommand: true,
+        confirmation: "venturecite-production",
+        environment: {},
+      }),
+    ).toThrow("DATABASE_DIRECT_URL");
+  });
+
+  it("skips the production gate outside production", () => {
+    expect(() =>
+      assertProductionMigrationReady({
+        nodeEnv: "development",
+        isReleaseCommand: false,
+        confirmation: undefined,
+        environment: {},
+      }),
+    ).not.toThrow();
   });
 });

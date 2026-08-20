@@ -19,6 +19,8 @@
     "db:audit:metadata": "tsx scripts/auditDatabaseMetadata.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:migrate:release": "cross-env NODE_ENV=production tsx scripts/migrate.ts --release",
+    "db:configure-request-roles": "cross-env NODE_ENV=production tsx scripts/configureRequestRoleMembership.ts",
+    "release:preflight": "tsx scripts/releaseEnvironmentPreflight.ts",
     "supabase:migrations:sync": "node scripts/syncSupabaseMigrations.mjs",
     "supabase:migrations:check": "node scripts/syncSupabaseMigrations.mjs --check",
     "lint": "eslint .",

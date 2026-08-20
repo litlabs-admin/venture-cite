@@ -28,6 +28,8 @@ import { MODELS } from "../lib/modelConfig";
 import { safeFetchText } from "../lib/ssrf";
 import { extractPageContent } from "../lib/pageText";
 import { requireUser } from "../lib/ownership";
+import { createRequestActor } from "../lib/requestActor";
+import { requestData } from "../data/requestData";
 import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
 import type { Tier } from "../lib/llmPricing";
 import { logAudit } from "../lib/audit";
@@ -49,7 +51,8 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const brands = await storage.getBrandsByUserId(user.id);
+        const actor = createRequestActor(user.id);
+        const brands = await requestData.forActor(actor).brands.list();
         res.json({ success: true, data: brands });
       } catch (error) {
         sendError(res, error, "Failed to fetch brands");
@@ -62,7 +65,8 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const brand = await storage.getBrandByIdForUser(req.params.id, user.id);
+        const actor = createRequestActor(user.id);
+        const brand = await requestData.forActor(actor).brands.get(req.params.id);
         if (!brand) {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
@@ -393,43 +397,48 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const existing = await storage.getBrandByIdForUser(req.params.id, user.id);
+        const actor = createRequestActor(user.id);
+        const brands = requestData.forActor(actor).brands;
+        const existing = await brands.get(req.params.id);
         if (!existing) {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
-        // insertBrandSchema strips unknown fields; .partial() lets clients
-        // omit any field. userId is never in the insert schema so it can't
-        // be forged here.
+
+        // insertBrandSchema strips unknown fields. userId is never accepted.
         const validatedData = insertBrandSchema
           .partial()
           .omit({ userId: true } as any)
           .parse(req.body);
-
-        // Optimistic locking. When the client sends
-        // `expectedVersion` (echoed from the GET it edited from), the
-        // UPDATE only matches if nobody else wrote in between.
         const expectedVersion =
           typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : null;
 
-        let brand;
         if (expectedVersion !== null) {
-          brand = await storage.updateBrandIfVersion(req.params.id, expectedVersion, validatedData);
-          if (!brand) {
+          const updated = await brands.updateIfVersion(
+            req.params.id,
+            expectedVersion,
+            validatedData,
+          );
+          if (!updated) {
+            const current = await brands.get(req.params.id);
+            if (!current) {
+              return res.status(404).json({ success: false, error: "Brand not found" });
+            }
             return res.status(409).json({
               success: false,
               error:
                 "Brand changed since you started editing. Refresh to see the latest values, then re-apply your changes.",
               code: "version_conflict",
-              current: existing,
+              current,
             });
           }
-        } else {
-          brand = await storage.updateBrand(req.params.id, validatedData);
-          if (!brand) {
-            return res.status(404).json({ success: false, error: "Brand not found" });
-          }
+          return res.json({ success: true, data: updated });
         }
-        res.json({ success: true, data: brand });
+
+        const updated = await brands.update(req.params.id, validatedData);
+        if (!updated) {
+          return res.status(404).json({ success: false, error: "Brand not found" });
+        }
+        res.json({ success: true, data: updated });
       } catch (error) {
         if (error instanceof z.ZodError) {
           return res

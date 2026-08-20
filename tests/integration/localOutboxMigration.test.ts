@@ -1,0 +1,627 @@
+import fs from "node:fs";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Pool, type PoolClient } from "pg";
+import { configureDestructiveDatabaseTest } from "../helpers/destructiveDatabaseTest";
+import {
+  LOCAL_TEST_ROLE_PREFIXES,
+  ROLE_MIGRATION_LOCK_KEY,
+  removePrefixedRoles,
+  removeRoleIfExists,
+  revokeManagedRoleMemberships,
+} from "./localRoleCleanup";
+
+const databaseTest = configureDestructiveDatabaseTest(process.env);
+const describeIfLocal =
+  databaseTest.kind === "ready" && process.env.LOCAL_SUPABASE_TEST === "1"
+    ? describe
+    : describe.skip;
+const schemaName = `local_outbox_test_${process.pid}_${Date.now()}`;
+const quotedSchema = `"${schemaName}"`;
+const privateSchemaName = `${schemaName}_private`;
+const quotedPrivateSchema = `"${privateSchemaName}"`;
+const roleSuffix = `${process.pid}_${Date.now()}`;
+const runtimeRole = `outbox_runtime_${roleSuffix}`;
+const requestRole = `outbox_request_${roleSuffix}`;
+const contentRole = `outbox_content_${roleSuffix}`;
+const workerRole = `outbox_worker_${roleSuffix}`;
+const runtimePassword = `outbox-test-${roleSuffix}`;
+
+describeIfLocal("local transactional outbox migration", () => {
+  let pool: Pool;
+  let runtimePool: Pool;
+  let lockClient: PoolClient;
+  let lockAcquired = false;
+
+  beforeAll(async () => {
+    pool = new Pool({ connectionString: localSupabaseDatabaseUrl(), max: 4, ssl: false });
+    lockClient = await pool.connect();
+    await lockClient.query("SELECT pg_advisory_lock($1, $2)", ROLE_MIGRATION_LOCK_KEY);
+    lockAcquired = true;
+    await removePrefixedRoles(lockClient, LOCAL_TEST_ROLE_PREFIXES);
+    await revokeManagedRoleMemberships(lockClient);
+    await pool.query(`CREATE SCHEMA ${quotedSchema}`);
+    await pool.query(
+      `CREATE ROLE ${runtimeRole} LOGIN PASSWORD '${runtimePassword}' NOINHERIT NOSUPERUSER NOBYPASSRLS`,
+    );
+    await pool.query(`CREATE ROLE ${requestRole} NOLOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS`);
+    await pool.query(`CREATE ROLE ${contentRole} NOLOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS`);
+    await pool.query(`CREATE TABLE ${quotedSchema}.users (id TEXT PRIMARY KEY)`);
+    await pool.query(
+      `CREATE TABLE ${quotedSchema}.brands (id TEXT PRIMARY KEY, user_id TEXT, deleted_at TIMESTAMPTZ)`,
+    );
+    await pool.query(`DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'venturecite_request') THEN
+          CREATE ROLE venturecite_request NOLOGIN;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'venturecite_content_request') THEN
+          CREATE ROLE venturecite_content_request NOLOGIN;
+        END IF;
+      END
+    $$`);
+    await applyMigration();
+    runtimePool = new Pool({ connectionString: runtimeDatabaseUrl(), max: 1, ssl: false });
+  }, 60_000);
+
+  afterAll(async () => {
+    if (!pool) return;
+    try {
+      await runtimePool?.end();
+    } finally {
+      try {
+        await pool.query(`DROP SCHEMA IF EXISTS ${quotedPrivateSchema} CASCADE`);
+        await pool.query(`DROP SCHEMA IF EXISTS ${quotedSchema} CASCADE`);
+      } finally {
+        try {
+          await removeRoleIfExists(pool, runtimeRole);
+          await removeRoleIfExists(pool, workerRole);
+          await removeRoleIfExists(pool, contentRole);
+          await removeRoleIfExists(pool, requestRole);
+        } finally {
+          try {
+            if (lockAcquired) {
+              await lockClient?.query("SELECT pg_advisory_unlock($1, $2)", ROLE_MIGRATION_LOCK_KEY);
+            }
+          } finally {
+            lockClient?.release();
+            await pool.end();
+          }
+        }
+      }
+    }
+  });
+
+  it("creates private RLS outbox constraints and claim indexes", async () => {
+    // Migration 0098 requires the new worker role to have no memberships.
+    // Verify idempotency before provisioning the controlled runtime grants.
+    await applyMigration();
+    await applyMigration();
+    await pool.query(
+      `GRANT ${requestRole}, ${contentRole}, ${workerRole} TO ${runtimeRole} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE`,
+    );
+
+    const table = await pool.query<{ relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+      `SELECT relrowsecurity, relforcerowsecurity
+       FROM pg_class
+       WHERE oid = $1::regclass`,
+      [`${schemaName}.outbox_commands`],
+    );
+    expect(table.rows).toEqual([{ relrowsecurity: true, relforcerowsecurity: true }]);
+
+    const indexes = await pool.query<{ indexname: string; indexdef: string }>(
+      `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = $1`,
+      [schemaName],
+    );
+    expect(indexes.rows.map((row) => row.indexname)).toEqual(
+      expect.arrayContaining([
+        "outbox_commands_provider_idempotency_key_idx",
+        "outbox_commands_claimable_idx",
+        "outbox_commands_expired_lease_idx",
+      ]),
+    );
+    expect(
+      indexes.rows.find((row) => row.indexname === "outbox_commands_claimable_idx")?.indexdef,
+    ).toContain("WHERE (status = 'pending'::text)");
+  });
+
+  it("allows only one concurrent claim and rejects a stale token", async () => {
+    const inserted = await pool.query<{ id: string }>(
+      `INSERT INTO ${quotedSchema}.outbox_commands (
+        kind, idempotency_key, aggregate_type, aggregate_id, payload, payload_fingerprint,
+        max_attempts, provider_name, provider_operation
+      ) VALUES (
+        'content_cost.record', 'cost:job-1:response-1', 'content_generation_job', 'job-1',
+        '{"kind":"content_cost.record"}', 'test-fingerprint', 3, 'internal', 'record_content_cost'
+      ) RETURNING id`,
+    );
+    const id = inserted.rows[0]?.id;
+    expect(id).toBeDefined();
+
+    const [first, second] = await Promise.all([claim(id ?? ""), claim(id ?? "")]);
+    const claims = [...first.rows, ...second.rows];
+    expect(claims).toHaveLength(1);
+    const token = claims[0]?.lease_token;
+    expect(token).toMatch(/^[0-9a-f-]{36}$/);
+
+    const stale = await pool.query(
+      `UPDATE ${quotedSchema}.outbox_commands
+       SET status = 'succeeded', lease_token = NULL, lease_expires_at = NULL
+       WHERE id = $1 AND lease_token = $2::uuid`,
+      [id, "00000000-0000-4000-8000-000000000009"],
+    );
+    expect(stale.rowCount).toBe(0);
+  });
+
+  it("revokes every request-facing role", async () => {
+    const grants = await pool.query<{ grantee: string }>(
+      `SELECT grantee
+       FROM information_schema.role_table_grants
+       WHERE table_schema = $1
+         AND table_name = 'outbox_commands'
+         AND grantee IN ('PUBLIC', 'anon', 'authenticated', 'venturecite_request', 'venturecite_content_request')`,
+      [schemaName],
+    );
+    expect(grants.rows).toEqual([]);
+  });
+
+  it("grants only the restricted worker role and cancels pending rows only", async () => {
+    const worker = await pool.query<{ rolcanlogin: boolean; rolbypassrls: boolean }>(
+      `SELECT rolcanlogin, rolbypassrls FROM pg_roles WHERE rolname = 'venturecite_outbox_worker'`,
+    );
+    expect(worker.rows).toEqual([{ rolcanlogin: false, rolbypassrls: false }]);
+    const rows = await pool.query<{ id: string; status: string }>(
+      `INSERT INTO ${quotedSchema}.outbox_commands (kind, idempotency_key, aggregate_type, aggregate_id, payload, payload_fingerprint, max_attempts, provider_name, provider_operation, status, lease_token, lease_expires_at)
+       VALUES
+       ('content_cost.record', 'cancel-pending', 'job', 'cancel-job', '{"kind":"content_cost.record"}', 'pending-fingerprint', 1, 'internal', 'cost', 'pending', NULL, NULL),
+       ('content_cost.record', 'cancel-processing', 'job', 'cancel-job', '{"kind":"content_cost.record"}', 'processing-fingerprint', 1, 'internal', 'cost', 'processing', gen_random_uuid(), now() + interval '2 minutes')
+       RETURNING id, status`,
+    );
+    expect(rows.rows).toHaveLength(2);
+    const cancelled = await pool.query<{ status: string }>(
+      `UPDATE ${quotedSchema}.outbox_commands
+       SET status = 'cancelled', payload = '{}'::jsonb, completed_at = now()
+       WHERE aggregate_type = 'job' AND aggregate_id = 'cancel-job' AND status = 'pending'
+       RETURNING status`,
+    );
+    expect(cancelled.rows).toEqual([{ status: "cancelled" }]);
+    const processing = await pool.query<{ status: string }>(
+      `SELECT status FROM ${quotedSchema}.outbox_commands WHERE id = $1`,
+      [rows.rows.find((row) => row.status === "processing")?.id],
+    );
+    expect(processing.rows).toEqual([{ status: "processing" }]);
+  });
+
+  it("rejects unsafe worker role drift before the migration can repair it", async () => {
+    await pool.query(`REVOKE ${workerRole} FROM ${runtimeRole}`);
+    try {
+      await pool.query(`GRANT CREATE ON SCHEMA ${quotedSchema} TO ${workerRole}`);
+      try {
+        await expect(applyMigration()).rejects.toThrow("has unexpected schema privileges");
+      } finally {
+        await pool.query(`REVOKE CREATE ON SCHEMA ${quotedSchema} FROM ${workerRole}`);
+      }
+
+      await pool.query(`ALTER ROLE ${workerRole} SET statement_timeout = '1s'`);
+      try {
+        await expect(applyMigration()).rejects.toThrow("has unsafe role attributes");
+      } finally {
+        await pool.query(`ALTER ROLE ${workerRole} RESET ALL`);
+      }
+
+      await pool.query(
+        `GRANT ${workerRole} TO ${requestRole} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE`,
+      );
+      try {
+        await expect(applyMigration()).rejects.toThrow("has unexpected role memberships");
+      } finally {
+        await pool.query(`REVOKE ${workerRole} FROM ${requestRole}`);
+      }
+
+      await pool.query(`GRANT DELETE ON ${quotedSchema}.outbox_commands TO ${workerRole}`);
+      try {
+        await expect(applyMigration()).rejects.toThrow("has unexpected relation privileges");
+      } finally {
+        await pool.query(`REVOKE DELETE ON ${quotedSchema}.outbox_commands FROM ${workerRole}`);
+      }
+
+      await expect(applyMigration()).resolves.toBeUndefined();
+    } finally {
+      await pool.query(
+        `GRANT ${workerRole} TO ${runtimeRole} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE`,
+      );
+    }
+  });
+
+  it("enforces non-owner request and worker paths under FORCE RLS", async () => {
+    await pool.query(`INSERT INTO ${quotedSchema}.users (id) VALUES ('user-a'), ('user-b')`);
+    await pool.query(
+      `INSERT INTO ${quotedSchema}.brands (id, user_id, deleted_at) VALUES ('brand-a', 'user-a', NULL), ('brand-deleted', 'user-a', now())`,
+    );
+    const payload = { kind: "stripe.create_customer", customerRequestId: "customer-a" };
+    const fingerprint = "a".repeat(64);
+
+    await runtimePool.query("BEGIN");
+    try {
+      await runtimePool.query(`SET LOCAL ROLE ${requestRole}`);
+      await runtimePool.query("SELECT set_config('venturecite.user_id', 'user-a', true)");
+      const inserted = await runtimePool.query<{ id: string }>(
+        `SELECT id FROM ${quotedPrivateSchema}.enqueue_outbox_command($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,NULL)`,
+        [
+          "stripe.create_customer",
+          "request-key",
+          "brand",
+          "brand-a",
+          "user-a",
+          "brand-a",
+          JSON.stringify(payload),
+          fingerprint,
+          3,
+          "stripe",
+          "create_customer",
+        ],
+      );
+      const id = inserted.rows[0]?.id;
+      expect(id).toBeTruthy();
+      const own = await runtimePool.query<{ command: { id: string } }>(
+        `SELECT ${quotedPrivateSchema}.get_outbox_command($1) AS command`,
+        [id],
+      );
+      expect(own.rows[0]?.command.id).toBe(id);
+      await runtimePool.query("ROLLBACK");
+      const rolledBack = await pool.query(
+        `SELECT id FROM ${quotedSchema}.outbox_commands WHERE id = $1`,
+        [id],
+      );
+      expect(rolledBack.rows).toEqual([]);
+    } catch (error) {
+      await runtimePool.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
+
+    await runtimePool.query("BEGIN");
+    try {
+      await runtimePool.query(`SET LOCAL ROLE ${requestRole}`);
+      await expect(
+        runtimePool.query(`SELECT * FROM ${quotedSchema}.outbox_commands`),
+      ).rejects.toThrow();
+    } finally {
+      await runtimePool.query("ROLLBACK").catch(() => undefined);
+    }
+
+    await runtimePool.query("BEGIN");
+    try {
+      await runtimePool.query(`SET LOCAL ROLE ${requestRole}`);
+      await runtimePool.query("SELECT set_config('venturecite.user_id', 'user-a', true)");
+      await expect(
+        runtimePool.query(
+          `SELECT id FROM ${quotedPrivateSchema}.enqueue_outbox_command($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,NULL)`,
+          [
+            "stripe.create_customer",
+            "deleted-key",
+            "brand",
+            "brand-deleted",
+            "user-a",
+            "brand-deleted",
+            JSON.stringify(payload),
+            fingerprint,
+            3,
+            "stripe",
+            "create_customer",
+          ],
+        ),
+      ).rejects.toThrow("does not belong");
+    } finally {
+      await runtimePool.query("ROLLBACK").catch(() => undefined);
+    }
+
+    await runtimePool.query("BEGIN");
+    try {
+      await runtimePool.query(`SET LOCAL ROLE ${workerRole}`);
+      await expect(
+        runtimePool.query(`SELECT count(*) FROM ${quotedSchema}.outbox_commands`),
+      ).resolves.toBeDefined();
+    } finally {
+      await runtimePool.query("ROLLBACK").catch(() => undefined);
+    }
+  });
+
+  it("rejects invalid identifier and content-cost payload values at the enqueue boundary", async () => {
+    await pool.query(`INSERT INTO ${quotedSchema}.users (id) VALUES ('outbox-validation-user')`);
+    await pool.query(
+      `INSERT INTO ${quotedSchema}.brands (id, user_id, deleted_at)
+       VALUES ('outbox-validation-brand', 'outbox-validation-user', NULL)`,
+    );
+
+    await expect(
+      enqueueAs("numeric-identifier", {
+        kind: "stripe.create_customer",
+        customerRequestId: 1,
+      }),
+    ).rejects.toThrow("invalid outbox command");
+    await expect(
+      enqueueAs("empty-identifier", {
+        kind: "stripe.create_customer",
+        customerRequestId: "",
+      }),
+    ).rejects.toThrow("invalid outbox command");
+    await expect(
+      enqueueAs("long-identifier", {
+        kind: "stripe.create_customer",
+        customerRequestId: "x".repeat(256),
+      }),
+    ).rejects.toThrow("invalid outbox command");
+
+    const validCost = {
+      kind: "content_cost.record",
+      contentJobId: "job-1",
+      providerResponseId: "response-1",
+      service: "openai",
+      model: "gpt-test",
+      tokensIn: 10,
+      tokensOut: 20,
+    };
+    await expect(enqueueAs("negative-tokens", { ...validCost, tokensIn: -1 })).rejects.toThrow(
+      "invalid outbox command",
+    );
+    await expect(enqueueAs("fractional-tokens", { ...validCost, tokensOut: 0.5 })).rejects.toThrow(
+      "invalid outbox command",
+    );
+    await expect(enqueueAs("invalid-model", { ...validCost, model: 1 })).rejects.toThrow(
+      "invalid outbox command",
+    );
+  });
+
+  it("denies renewal and completion after a lease expires", async () => {
+    const freshId = await insertPending("lease-fresh");
+    const claimed = await claimReady(freshId, "120 seconds");
+    expect(claimed).toBeTruthy();
+    const renewed = await pool.query(
+      `UPDATE ${quotedSchema}.outbox_commands
+       SET lease_expires_at = now() + interval '120 seconds'
+       WHERE id = $1 AND status = 'processing' AND cancellation_requested_at IS NULL
+         AND lease_expires_at > now() AND lease_token = $2::uuid
+       RETURNING id`,
+      [freshId, claimed],
+    );
+    expect(renewed.rowCount).toBe(1);
+    const succeeded = await pool.query(
+      `UPDATE ${quotedSchema}.outbox_commands
+       SET status = 'succeeded', payload = '{}'::jsonb, completed_at = now(),
+           lease_token = NULL, lease_expires_at = NULL
+       WHERE id = $1 AND status = 'processing' AND cancellation_requested_at IS NULL
+         AND lease_expires_at > now() AND lease_token = $2::uuid
+       RETURNING id`,
+      [freshId, claimed],
+    );
+    expect(succeeded.rowCount).toBe(1);
+
+    const expiredId = await insertPending("lease-expired");
+    const expiredToken = await claimReady(expiredId, "-1 second");
+    expect(expiredToken).toBeTruthy();
+    const renewExpired = await pool.query(
+      `UPDATE ${quotedSchema}.outbox_commands SET lease_expires_at = now() + interval '120 seconds'
+       WHERE id = $1 AND status = 'processing' AND cancellation_requested_at IS NULL
+         AND lease_expires_at > now() AND lease_token = $2::uuid RETURNING id`,
+      [expiredId, expiredToken],
+    );
+    expect(renewExpired.rowCount).toBe(0);
+    const completeExpired = await pool.query(
+      `UPDATE ${quotedSchema}.outbox_commands
+       SET status = 'succeeded', payload = '{}'::jsonb, completed_at = now(),
+           lease_token = NULL, lease_expires_at = NULL
+       WHERE id = $1 AND status = 'processing' AND cancellation_requested_at IS NULL
+         AND lease_expires_at > now() AND lease_token = $2::uuid RETURNING id`,
+      [expiredId, expiredToken],
+    );
+    expect(completeExpired.rowCount).toBe(0);
+  });
+
+  it("terminalizes an expired command at its final attempt", async () => {
+    const id = await insertPending("expired-final", { attemptCount: 1, maxAttempts: 1 });
+    await claimReady(id, "-1 second", false);
+    const claimed = await pool.query(
+      `WITH expired_final AS (
+         UPDATE ${quotedSchema}.outbox_commands
+         SET status = 'dead_letter',
+             payload = '{}'::jsonb,
+             completed_at = NULL,
+             dead_lettered_at = now(),
+             lease_token = NULL, lease_expires_at = NULL,
+             last_error_code = coalesce(last_error_code, 'attempts_exhausted')
+         WHERE status = 'processing' AND lease_expires_at < now()
+           AND (attempt_count >= max_attempts OR cancellation_requested_at IS NOT NULL)
+         RETURNING id
+       )
+       SELECT id FROM expired_final`,
+    );
+    expect(claimed.rows).toEqual([{ id }]);
+    const terminal = await pool.query<{
+      status: string;
+      last_error_code: string;
+      dead_lettered_at: Date;
+    }>(
+      `SELECT status, last_error_code, dead_lettered_at FROM ${quotedSchema}.outbox_commands WHERE id = $1`,
+      [id],
+    );
+    expect(terminal.rows[0]?.status).toBe("dead_letter");
+    expect(terminal.rows[0]?.last_error_code).toBe("attempts_exhausted");
+    expect(terminal.rows[0]?.dead_lettered_at).toBeInstanceOf(Date);
+  });
+
+  it("terminalizes a retry when cancellation was requested", async () => {
+    const id = await insertPending("cancelled-retry");
+    const token = await claimReady(id, "120 seconds");
+    await pool.query(
+      `UPDATE ${quotedSchema}.outbox_commands SET cancellation_requested_at = now()
+       WHERE id = $1 AND lease_token = $2::uuid`,
+      [id, token],
+    );
+    const rescheduled = await pool.query<{ status: string }>(
+      `UPDATE ${quotedSchema}.outbox_commands
+       SET status = CASE WHEN cancellation_requested_at IS NOT NULL OR attempt_count >= max_attempts
+                         THEN 'dead_letter' ELSE 'pending' END,
+           payload = CASE WHEN cancellation_requested_at IS NOT NULL OR attempt_count >= max_attempts
+                          THEN '{}'::jsonb ELSE payload END,
+           completed_at = NULL,
+           dead_lettered_at = CASE WHEN cancellation_requested_at IS NOT NULL OR attempt_count >= max_attempts
+                                   THEN now() ELSE NULL END,
+           lease_token = NULL, lease_expires_at = NULL
+       WHERE id = $1 AND status = 'processing' AND lease_expires_at > now()
+         AND lease_token = $2::uuid RETURNING status`,
+      [id, token],
+    );
+    expect(rescheduled.rows).toEqual([{ status: "dead_letter" }]);
+    const markedActive = await pool.query<{ count: string }>(
+      `SELECT count(*) FROM ${quotedSchema}.outbox_commands
+       WHERE cancellation_requested_at IS NOT NULL AND status IN ('pending', 'processing')`,
+    );
+    expect(markedActive.rows).toEqual([{ count: "0" }]);
+  });
+
+  it("terminalizes an expired marked processing command", async () => {
+    const inserted = await pool.query<{ id: string }>(
+      `INSERT INTO ${quotedSchema}.outbox_commands (kind, idempotency_key, aggregate_type, aggregate_id, payload, payload_fingerprint, max_attempts, attempt_count, provider_name, provider_operation, status, lease_token, lease_expires_at, cancellation_requested_at)
+       VALUES ('content_cost.record', 'marked-expired', 'job', 'marked-job', '{"kind":"content_cost.record"}', 'marked-fingerprint', 1, 1, 'internal', 'cost', 'processing', gen_random_uuid(), now() - interval '1 second', now()) RETURNING id`,
+    );
+    await pool.query(
+      `UPDATE ${quotedSchema}.outbox_commands
+       SET status = 'dead_letter', payload = '{}'::jsonb, completed_at = NULL,
+           dead_lettered_at = now(), lease_token = NULL, lease_expires_at = NULL
+       WHERE id = $1 AND status = 'processing' AND cancellation_requested_at IS NOT NULL AND lease_expires_at < now()`,
+      [inserted.rows[0]?.id],
+    );
+    const row = await pool.query<{ status: string; lease_token: string | null; payload: unknown }>(
+      `SELECT status, lease_token, payload FROM ${quotedSchema}.outbox_commands WHERE id = $1`,
+      [inserted.rows[0]?.id],
+    );
+    expect(row.rows).toEqual([{ status: "dead_letter", lease_token: null, payload: {} }]);
+  });
+
+  async function claim(id: string) {
+    return pool.query<{ lease_token: string }>(
+      `UPDATE ${quotedSchema}.outbox_commands
+       SET status = 'processing', lease_token = gen_random_uuid(),
+           lease_expires_at = now() + interval '120 seconds', attempt_count = attempt_count + 1
+       WHERE id = $1 AND status = 'pending'
+       RETURNING lease_token`,
+      [id],
+    );
+  }
+
+  async function enqueueAs(idempotencyKey: string, payload: unknown): Promise<void> {
+    await runtimePool.query("BEGIN");
+    try {
+      const kind =
+        typeof payload === "object" && payload !== null && "kind" in payload
+          ? payload.kind
+          : "stripe.create_customer";
+      await runtimePool.query(
+        `SET LOCAL ROLE ${kind === "content_cost.record" ? contentRole : requestRole}`,
+      );
+      await runtimePool.query(
+        "SELECT set_config('venturecite.user_id', 'outbox-validation-user', true)",
+      );
+      await runtimePool.query(
+        `SELECT id FROM ${quotedPrivateSchema}.enqueue_outbox_command($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,NULL)`,
+        [
+          kind,
+          idempotencyKey,
+          "content_generation_job",
+          "job-1",
+          "outbox-validation-user",
+          "outbox-validation-brand",
+          JSON.stringify(payload),
+          "a".repeat(64),
+          3,
+          "internal",
+          "record",
+        ],
+      );
+      await runtimePool.query("COMMIT");
+    } catch (error) {
+      await runtimePool.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async function insertPending(
+    idempotencyKey: string,
+    options: { attemptCount?: number; maxAttempts?: number } = {},
+  ): Promise<string> {
+    const inserted = await pool.query<{ id: string }>(
+      `INSERT INTO ${quotedSchema}.outbox_commands
+       (kind, idempotency_key, aggregate_type, aggregate_id, payload, payload_fingerprint,
+        attempt_count, max_attempts, provider_name, provider_operation)
+       VALUES ('content_cost.record', $1, 'job', $1, '{"kind":"content_cost.record"}', $2,
+               $3, $4, 'internal', 'cost') RETURNING id`,
+      [
+        idempotencyKey,
+        `${idempotencyKey}-fingerprint`,
+        options.attemptCount ?? 0,
+        options.maxAttempts ?? 3,
+      ],
+    );
+    const id = inserted.rows[0]?.id;
+    if (!id) throw new Error("Outbox test row did not insert");
+    return id;
+  }
+
+  async function claimReady(
+    id: string,
+    expiration: string,
+    incrementAttempt = true,
+  ): Promise<string | null> {
+    const increment = incrementAttempt ? ", attempt_count = attempt_count + 1" : "";
+    const claimed = await pool.query<{ lease_token: string }>(
+      `UPDATE ${quotedSchema}.outbox_commands
+       SET status = 'processing', lease_token = gen_random_uuid(),
+           lease_expires_at = now() + interval '${expiration}'${increment}
+       WHERE id = $1 AND status = 'pending' RETURNING lease_token`,
+      [id],
+    );
+    return claimed.rows[0]?.lease_token ?? null;
+  }
+
+  async function applyMigration(): Promise<void> {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0098_transactional_outbox.sql"),
+      "utf8",
+    );
+    const customized = source
+      .replace(
+        "CREATE SCHEMA IF NOT EXISTS private;",
+        `CREATE SCHEMA IF NOT EXISTS ${quotedPrivateSchema};`,
+      )
+      .replace(
+        "REVOKE ALL ON SCHEMA private FROM PUBLIC;",
+        `REVOKE ALL ON SCHEMA ${quotedPrivateSchema} FROM PUBLIC;`,
+      )
+      .replaceAll("namespace.nspname = 'public'", `namespace.nspname = '${schemaName}'`)
+      .replace("GRANT USAGE ON SCHEMA private", `GRANT USAGE ON SCHEMA ${quotedPrivateSchema}`)
+      .replace("GRANT USAGE ON SCHEMA public", `GRANT USAGE ON SCHEMA ${quotedSchema}`)
+      .replaceAll("public.", `${quotedSchema}.`)
+      .replaceAll("private.", `${quotedPrivateSchema}.`)
+      .replaceAll(
+        "venturecite outbox worker role managed by migration 0098",
+        `venturecite outbox worker role managed by migration 0098 (${workerRole})`,
+      )
+      .replaceAll("venturecite_outbox_worker", workerRole)
+      .replaceAll("venturecite_content_request", contentRole)
+      .replaceAll("venturecite_request", requestRole);
+    await pool.query(customized);
+  }
+});
+
+function localSupabaseDatabaseUrl(): string {
+  const testUrl = process.env.TEST_DATABASE_URL;
+  if (!testUrl) throw new Error("TEST_DATABASE_URL is required for local Supabase tests");
+  return testUrl;
+}
+
+function runtimeDatabaseUrl(): string {
+  const url = new URL(localSupabaseDatabaseUrl());
+  url.username = runtimeRole;
+  url.password = runtimePassword;
+  return url.toString();
+}

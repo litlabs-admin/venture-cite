@@ -1,5 +1,5 @@
 -- Source: migrations/0096_request_rls_foundation.sql
--- SHA256: f72aa9005376d700e404af61459470f940c4c13530f3115784b2d80a3963fef9
+-- SHA256: 2ee5343bb1fc8a115fa3dc54126243d7b4259c600cf1955468fca949b5a96fd4
 
 -- This migration adds an unused request role.
 -- Do not connect application routes until the production role audit passes.
@@ -32,8 +32,6 @@ begin
 end
 $$;
 
-revoke venturecite_request from current_user;
-
 do $$
 begin
   if exists (
@@ -62,6 +60,7 @@ begin
           member <> (select oid from pg_roles where rolname = current_user)
           or inherit_option
           or set_option
+          or not admin_option
         )
       )
        or member = (select oid from pg_roles where rolname = 'venturecite_request')
@@ -153,7 +152,34 @@ grant update (
   onboarding_state
 ) on public.users to venturecite_request;
 
-grant select on public.brands to venturecite_request;
+grant select (
+  id,
+  user_id,
+  name,
+  company_name,
+  industry,
+  fact_scrape_enabled,
+  description,
+  website,
+  tone,
+  target_audience,
+  products,
+  key_values,
+  unique_selling_points,
+  brand_voice,
+  sample_content,
+  name_variations,
+  logo_url,
+  auto_citation_schedule,
+  auto_citation_day,
+  auto_citation_hour,
+  auto_citation_active,
+  version,
+  monitor_mentions,
+  deleted_at,
+  created_at,
+  updated_at
+) on public.brands to venturecite_request;
 
 grant insert (
   user_id,

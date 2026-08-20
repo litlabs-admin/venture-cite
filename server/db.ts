@@ -23,14 +23,11 @@ function buildSslConfig(): PoolConfig["ssl"] {
   if (policy.mode === "custom-ca") {
     try {
       const ca = fs.readFileSync(policy.caPath, "utf8");
-      logger.info({ caPath: policy.caPath }, "db: TLS strict - verifying chain against custom CA");
+      logger.info("db: TLS strict - verifying chain against custom CA");
       return { ca, rejectUnauthorized: true };
-    } catch (err) {
-      logger.error(
-        { err, caPath: policy.caPath },
-        "db: DATABASE_CA_CERT_PATH set but file unreadable - refusing to start",
-      );
-      throw new Error(`Cannot read DATABASE_CA_CERT_PATH at ${policy.caPath}`);
+    } catch {
+      logger.error("db: DATABASE_CA_CERT_PATH set but file unreadable - refusing to start");
+      throw new Error("Cannot read DATABASE_CA_CERT_PATH");
     }
   }
 

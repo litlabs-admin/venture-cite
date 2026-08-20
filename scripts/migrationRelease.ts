@@ -1,3 +1,8 @@
+import {
+  runReleaseEnvironmentPreflight,
+  type PreflightEnvironment,
+} from "./releaseEnvironmentPreflight";
+
 const PRODUCTION_CONFIRMATION = "venturecite-production";
 
 export function isReleaseMigrationCommand(argumentsList: readonly string[]): boolean {
@@ -19,5 +24,30 @@ export function assertReleaseMigrationConfirmation(options: {
     throw new Error(
       "Set CONFIRM_PRODUCTION_MIGRATIONS=venturecite-production before a production migration.",
     );
+  }
+}
+
+export function assertProductionMigrationEnvironment(
+  environment: PreflightEnvironment = process.env,
+): void {
+  const report = runReleaseEnvironmentPreflight(environment);
+  if (report.passed) return;
+
+  const failedChecks = report.checks
+    .filter((check) => !check.passed)
+    .map((check) => check.name)
+    .join(", ");
+  throw new Error(`Release environment preflight failed: ${failedChecks}`);
+}
+
+export function assertProductionMigrationReady(options: {
+  nodeEnv: string | undefined;
+  isReleaseCommand: boolean;
+  confirmation: string | undefined;
+  environment?: PreflightEnvironment;
+}): void {
+  assertReleaseMigrationConfirmation(options);
+  if (options.nodeEnv === "production") {
+    assertProductionMigrationEnvironment(options.environment ?? process.env);
   }
 }

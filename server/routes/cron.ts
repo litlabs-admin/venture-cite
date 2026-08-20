@@ -115,12 +115,9 @@ const STEP_CAPS_MS = {
   // (every Analyze click writes a row) and schema_audits accumulates
   // one row per unique URL. Without these the tables grow unboundedly.
   "signals-retention-prune": 5_000,
-  // Both of these were registered ONLY in the in-process node-cron scheduler
-  // (server/scheduler.ts) and had no orchestrator step. That was survivable
-  // while both schedulers ran; it is not once DISABLE_IN_PROCESS_SCHEDULER is
-  // set, which is the documented Render shape - they would simply never run
-  // again, silently. tour_events would grow without bound and the fact-scrape
-  // failure alert would stop firing with no error to notice.
+  // Both of these run only in the in-process node-cron scheduler.
+  // Keep that scheduler active until an external trigger covers these steps.
+  // Otherwise tour_events grows without bound and the failure alert stops.
   "tour-events-cleanup": 5_000,
   "detect-fact-scrape-failure": 5_000,
 } as const;

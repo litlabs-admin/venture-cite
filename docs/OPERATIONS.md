@@ -4,11 +4,25 @@
 
 Run one controlled migration job before the application receives production traffic.
 
-Use `npm run db:migrate:release` for that job. Use `DATABASE_DIRECT_URL` when the runtime URL uses a transaction pooler.
+Run `npm run release:preflight` before the migration job.
+
+Use `npm run db:migrate:release` after the preflight. The command repeats the full preflight before database access.
+
+Set `DATABASE_DIRECT_URL` to a verified session URL. The command rejects a transaction pooler URL.
 
 Set `CONFIRM_PRODUCTION_MIGRATIONS=venturecite-production` before you run the production command.
 
-The release command rejects production migrations without this confirmation.
+The release command rejects production migrations without this confirmation and a passing preflight.
+
+Configure the restricted request roles after migrations and before traffic.
+
+Set `DATABASE_RUNTIME_ROLE_NAME` to the runtime login role.
+
+Run `npm run db:configure-request-roles` first in dry-run mode.
+
+Set `REQUEST_ROLE_MEMBERSHIP_MODE=apply` and `CONFIRM_REQUEST_ROLE_MEMBERSHIP=venturecite-production` to apply the grant.
+
+The command verifies the runtime connection and role attributes before it changes memberships.
 
 The build and application startup never apply migrations.
 
@@ -34,7 +48,9 @@ Use one scheduler method.
 
 For a long-lived Node host, the Nitro boot code starts the in-process scheduler.
 
-For Vercel or another external scheduler, call `POST /api/cron/daily-orchestrator` with its required secret. Set `DISABLE_IN_PROCESS_SCHEDULER` for a long-lived host.
+Render currently uses the in-process scheduler. Keep `DISABLE_IN_PROCESS_SCHEDULER=false` and `EXTERNAL_CRON_ORCHESTRATOR_ENABLED=false`.
+
+Use `POST /api/cron/daily-orchestrator` only after an authenticated external trigger passes release verification.
 
 Do not enable both methods. Duplicate work can send duplicate email and create extra AI cost.
 

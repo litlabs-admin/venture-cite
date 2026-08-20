@@ -29,8 +29,6 @@ begin
 end
 $$;
 
-revoke venturecite_request from current_user;
-
 do $$
 begin
   if exists (
@@ -59,6 +57,7 @@ begin
           member <> (select oid from pg_roles where rolname = current_user)
           or inherit_option
           or set_option
+          or not admin_option
         )
       )
        or member = (select oid from pg_roles where rolname = 'venturecite_request')
@@ -150,7 +149,34 @@ grant update (
   onboarding_state
 ) on public.users to venturecite_request;
 
-grant select on public.brands to venturecite_request;
+grant select (
+  id,
+  user_id,
+  name,
+  company_name,
+  industry,
+  fact_scrape_enabled,
+  description,
+  website,
+  tone,
+  target_audience,
+  products,
+  key_values,
+  unique_selling_points,
+  brand_voice,
+  sample_content,
+  name_variations,
+  logo_url,
+  auto_citation_schedule,
+  auto_citation_day,
+  auto_citation_hour,
+  auto_citation_active,
+  version,
+  monitor_mentions,
+  deleted_at,
+  created_at,
+  updated_at
+) on public.brands to venturecite_request;
 
 grant insert (
   user_id,

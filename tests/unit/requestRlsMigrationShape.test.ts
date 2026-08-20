@@ -1,0 +1,96 @@
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("request RLS migration shape", () => {
+  it("grants brand reads by explicit column and keeps both migration copies equal", () => {
+    const migration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0096_request_rls_foundation.sql"),
+      "utf8",
+    );
+    const supabaseMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/20260421000096_0096_request_rls_foundation.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toMatch(/grant select\s*\([^)]+\)\s*on public\.brands/is);
+    expect(migration).not.toMatch(/grant select on public\.brands/i);
+    const selectGrant = migration.match(/grant select\s*\(([^)]+)\)\s*on public\.brands/is)?.[1];
+    expect(selectGrant).toContain("id");
+    expect(selectGrant).toContain("name");
+    expect(selectGrant).toContain("deleted_at");
+    expect(selectGrant).not.toContain("autopilot_error");
+    expect(selectGrant).not.toContain("deletion_scheduled_for");
+    expect(supabaseMigration).toContain("-- Source: migrations/0096_request_rls_foundation.sql");
+    expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
+      migration,
+    );
+  });
+
+  it("keeps content request access read-only and hides deleted-brand content", () => {
+    const migration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0097_request_rls_content.sql"),
+      "utf8",
+    );
+    const supabaseMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/20260421000097_0097_request_rls_content.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).not.toMatch(/grant\s+(insert|update|delete)\b/i);
+    expect(migration).not.toMatch(/for\s+(insert|update|delete)\b/i);
+    expect(migration).toMatch(/brands_content_select[\s\S]+deleted_at is null/i);
+    expect(migration).toMatch(
+      /content_generation_jobs_content_request_select[\s\S]+brands\.deleted_at is null/i,
+    );
+    expect(migration).toMatch(/request_payload[\s\S]+error_kind/i);
+    expect(migration).not.toMatch(/grant select\s*\([^)]*openai_response_id/is);
+    expect(migration).not.toMatch(/grant select\s*\([^)]*advance_token/is);
+    expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
+      migration,
+    );
+  });
+
+  it("keeps the outbox boundary actor-bound and cancellation-safe", () => {
+    const migration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0098_transactional_outbox.sql"),
+      "utf8",
+    );
+    const supabaseMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/20260421000098_0098_transactional_outbox.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain("outbox enqueue actor is required");
+    expect(migration).toContain("outbox enqueue user is required");
+    expect(migration).toContain("outbox user does not match request actor");
+    expect(migration).toContain("outbox brand is required for this command kind");
+    expect(migration).toContain("active_role IS DISTINCT FROM required_role");
+    expect(migration).toContain("status = 'dead_letter'");
+    expect(migration).toContain("venturecite_outbox_worker has unexpected role memberships");
+    expect(migration).toContain("venturecite_outbox_worker has unexpected schema privileges");
+    expect(migration).toContain("venturecite_outbox_worker has unexpected function privileges");
+    expect(migration).toContain("venturecite_outbox_worker has unexpected relation privileges");
+    expect(migration).toContain("venturecite_outbox_worker has unexpected database privileges");
+    expect(migration).toContain("venturecite_outbox_worker has unexpected type privileges");
+    expect(migration).toContain("venturecite_outbox_worker owns unexpected database objects");
+    expect(migration).toContain("worker_role_record.rolconfig IS NOT NULL");
+    expect(migration).not.toContain("worker_role_record.rolpassword");
+    expect(migration).toContain("roleid = worker_role_oid");
+    expect(migration).toContain("member = worker_role_oid");
+    expect(migration).toContain("OR NOT admin_option");
+    expect(migration).toContain("privilege.is_grantable");
+    expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
+      migration,
+    );
+  });
+});

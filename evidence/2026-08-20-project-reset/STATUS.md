@@ -1,132 +1,160 @@
 # Project reset status
 
-## Scope
+## Evidence rules
 
-This work starts from executable code, tests, Git history, and read-only live evidence.
+This report uses executable source, tests, command output, Git state, and read-only database evidence.
 
-Existing Markdown files and code comments are not factual evidence until a check confirms them.
+Existing Markdown and comments do not prove current behavior.
 
-## Safety rules
+This report does not approve a production release.
 
-- Protect real user data.
-- Do not send test email.
-- Do not print or commit secret values.
-- Use isolated test accounts and tagged test data.
-- Require approval before a deployment or a production write.
+## Safety state
 
-## Model limits
+- Production remains read-only.
+- The production database is unchanged.
+- The production audit used one read-only transaction and ended with `ROLLBACK`.
+- No provider call, email, payment, deployment, or production migration occurred.
+- The local Supabase stack is stopped.
+- `docker ps` shows no running containers.
+- No secret value appears in this report.
 
-- Use Luna Low for file inventories.
-- Use Terra Low or Medium for setup, code, tests, and documentation.
-- Use Sol Medium for auth, billing, security, and database migration reviews.
-- Do not use High effort without a new notice.
+Evidence: `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md`, `migrations/0096_request_rls_foundation.sql`, `migrations/0097_request_rls_content.sql`, and `migrations/0098_transactional_outbox.sql`.
 
-## Current phase
+## Foundation decision
 
-The repair phase is active on `codex/project-reset-setup`.
+The final Sol review says `SHIP`.
 
-The repository contains 20 project skills, including `unslop`.
+It found no P0, P1, or P2 findings.
 
-Two subagents adapted the imported skill instructions for Codex.
+The foundation work can ship.
 
-No live system change has occurred.
+This decision does not authorize a production migration.
 
-The Buffer MCP configuration now reads `BUFFER_MCP_TOKEN` from the Windows user environment.
+Production remains read-only until the release gates pass.
 
-The repository does not contain the Buffer token.
+## Verified foundation wave
 
-Five agent profiles now define Luna Low, Terra Low, Terra Medium, Sol Medium, and Spark Low work.
+The combined local RLS and outbox run passed 35 of 35 tests.
 
-All 20 skills have automatic invocation metadata and pinned source records.
+The three integration files contain 13, 11, and 11 tests.
 
-The official skill validator passes for all 20 skills under Python 3.12.
+Evidence: `tests/integration/requestRlsFoundation.test.ts`, `tests/integration/contentRequestRls.test.ts`, and `tests/integration/localOutboxMigration.test.ts`.
 
-The stale Markdown scan found possible user data in 15 files.
+The full test run passed 211 files and skipped one file.
 
-The archive pass replaced those details with synthetic placeholders.
+It passed 1,579 tests and skipped 16 tests.
 
-Two local commits preserve all 101 stale Markdown files.
+The following checks passed:
 
-The maintained tree now removes 109 redundant Markdown files.
+- `npm run check`
+- `npm run lint`
+- `npm run format:check`
+- `npm run supabase:migrations:check`
+- `git diff --check`
 
-Six current project guides replace the old setup and architecture claims.
+Migrations 0096, 0097, and 0098 exist in both migration trees.
 
-The public privacy policy still needs the legal entity and privacy contact.
+They remain unapplied in production.
 
-The fresh static audit confirmed 14 defects or production risks.
+Evidence: `migrations/0096_request_rls_foundation.sql`, `migrations/0097_request_rls_content.sql`, `migrations/0098_transactional_outbox.sql`, and `scripts/syncSupabaseMigrations.mjs`.
 
-The type check passes.
+The request-role membership tool exists.
 
-The lint command passes with 813 warnings.
+The release environment preflight exists.
 
-The format check passes across the repository.
+Neither command has run against production.
 
-The database test setup now rejects the normal application database.
+Evidence: `scripts/configureRequestRoleMembership.ts`, `scripts/releaseEnvironmentPreflight.ts`, and `package.json`.
 
-A local Supabase stack uses separate ports 55321 through 55329.
+The outbox foundation exists.
 
-The stack is stopped after tests and keeps its restartable volumes.
+It has claim, lease, retry, cancellation, and idempotency rules.
 
-The separate Quinhex Supabase stack is also stopped and keeps its restartable volumes.
+No provider adapter is wired to the worker.
 
-The Supabase CLI is a pinned development dependency.
+Evidence: `migrations/0098_transactional_outbox.sql`, `shared/outbox.ts`, `server/outbox/outboxRepository.ts`, and `server/outbox/outboxWorker.ts`.
 
-The complete baseline and migrations 0000 through 0095 pass `supabase db reset`.
+The PostgreSQL 17 membership check discovers the role that created the restricted roles.
 
-The build and application startup do not apply migrations.
+The creator must hold each restricted role with `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`.
 
-The controlled production release command requires an explicit confirmation value.
+The runtime role receives only the three restricted roles with `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
 
-The migration runner verifies SHA-256 checksums for recorded migrations.
+The membership tests accept this exact policy.
 
-The database integration run passed 34 tests against local Supabase.
+Evidence: `server/lib/requestRoleMembership.ts:126-225` and `tests/unit/requestRoleMembership.test.ts:81-181`.
 
-The focused safety run passed 102 tests.
+Local integration setup removes stale managed roles and memberships from a restored backup.
 
-The local PostgreSQL run passed six tests.
+Each database `beforeAll` hook has a 60-second timeout while it holds the shared advisory lock.
 
-The full local test run passed 1,449 tests and skipped 16 optional tests.
+Evidence: `tests/integration/localRoleCleanup.ts:23-161`, `tests/integration/requestRlsFoundation.test.ts:51-106`, `tests/integration/contentRequestRls.test.ts:45-125`, and `tests/integration/localOutboxMigration.test.ts:36-65`.
 
-No test loaded the normal application database URL.
+The restricted route cutover covers brand list, brand get, and brand update.
 
-The dependency audit has no high or low findings.
+Brand creation, website import, deletion preview, and deletion still use the legacy storage path.
 
-Four moderate Drizzle Kit loader findings remain without a supported upgrade.
+The content routes do not use the content request repositories.
 
-The final Sol reviews confirmed that ten release repair gaps are closed.
+Evidence: `server/routes/brands.ts`, `server/data/requestData.ts`, and `server/data/contentRequestData.ts`.
 
-The review found no direct regression from those fixes.
+## Closed Sol review blockers
 
-The live landing, pricing, login, and registration pages render without browser errors.
+The final review closed the seven prior foundation blockers.
 
-The live health route remains unverified.
+1. The production migration command now runs the release preflight before it imports database code.
 
-The strict live database metadata check reached certificate verification and failed closed.
+2. The request-role tool now discovers the PostgreSQL 17 creator membership and verifies the exact runtime grant policy.
 
-The Supabase project CA must come from the project dashboard before the metadata query can run.
+3. The outbox worker keeps an in-flight command leased while its provider handler runs.
 
-No application row was queried during that failed check.
+4. The enqueue path requires an owning user and runs only inside a domain transaction.
 
-The user deferred the Supabase CA and public privacy values until release preparation.
+5. The scheduler guard rejects two owners and rejects a production process with no scheduler owner.
 
-Migration 0096 adds a local request role and users-and-brands RLS policies.
+6. The outbox migration rejects worker-role drift before it repairs the role.
 
-No live route uses this role.
+7. The role tool verifies that the runtime and direct connections target the same database.
 
-Ten local integration tests prove tenant isolation and pool cleanup.
+Evidence: `scripts/migrate.ts:10-39`, `scripts/migrationRelease.ts:1-120`, `server/lib/requestRoleMembership.ts:126-314`, `server/outbox/outboxRepository.ts:88-243`, `server/outbox/outboxWorker.ts:16-86`, `server/lib/schedulerMode.ts:21-38`, `server/nitroBoot.ts:99-122`, `migrations/0098_transactional_outbox.sql:138-322`, and the related unit and integration tests.
 
-The local RLS design and proof are in `SUPABASE_RLS_FOUNDATION.md`.
+## Missing release configuration
 
-The tour persistence test now waits for rendered controls instead of a fixed delay.
+The current release record does not contain these required values:
 
-The tour test passes with an intentional 50 ms frame delay.
+- `DATABASE_DIRECT_URL`
+- The four approved Stripe product and price identifiers
+- `RESEND_FROM_ADDRESS`
+- The least-privileged production runtime role name
 
-The VentureCite local Supabase stack is stopped and keeps its restartable volumes.
+The production audit used a supplied CA and verified TLS.
 
-## Next checks
+The CA value is not recorded here.
 
-1. Add named request repositories for users and brands.
-2. Review the live Supabase role and policy state before route activation.
-3. Configure the production database TLS settings and exact Stripe catalogue IDs.
-4. Add the approved legal entity and privacy contact before public release.
-5. Reduce the remaining lint warning debt.
+The public privacy page still has legal entity and privacy contact placeholders.
+
+Privacy placeholders remain deferred until the final release phase.
+
+Evidence: `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md`, `scripts/releaseEnvironmentPreflight.ts`, `docs/OPERATIONS.md`, and `docs/privacy-policy.md`.
+
+## Remaining production gates
+
+1. Obtain the missing release configuration through the approved secure channel.
+2. Run the read-only production metadata audit with the direct connection.
+3. Review the runtime role, grants, table owners, RLS flags, and policy counts.
+4. Run the migration preflight and backup checks.
+5. Apply migrations 0096 through 0098 through the controlled release command.
+6. Run the request-role membership command in dry-run mode.
+7. Apply request-role membership only after the final review and confirmation gate.
+8. Cut over the remaining brand operations to request repositories.
+9. Cut over the content routes with two-user cross-tenant tests.
+10. Connect the content-cost outbox event before other provider effects.
+11. Add fake-provider tests for Stripe, Resend, Buffer, and OpenAI.
+12. Replace process-local limits, leases, and worker state with database-backed state.
+13. Run local user-flow tests and an approved preview browser test.
+14. Fill the privacy placeholders during the final release phase.
+15. Run the canary, monitor it, and document rollback evidence.
+
+The seven Sol review blockers are closed.
+
+The remaining gates concern production configuration, route cutover, provider wiring, user-flow proof, privacy text, and canary release work.

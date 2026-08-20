@@ -3,10 +3,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-import { sql } from "drizzle-orm";
+import { Pool, type PoolClient } from "pg";
 import * as schema from "@shared/schema";
 import { configureDestructiveDatabaseTest } from "../helpers/destructiveDatabaseTest";
+import {
+  LOCAL_TEST_ROLE_PREFIXES,
+  ROLE_MIGRATION_LOCK_KEY,
+  removePrefixedRoles,
+  removeRoleIfExists,
+  revokeManagedRoleMemberships,
+} from "./localRoleCleanup";
 
 const databaseTest = configureDestructiveDatabaseTest(process.env);
 const describeIfLocal =
@@ -19,17 +25,39 @@ describeIfLocal("request database RLS foundation", () => {
   const userBId = randomUUID();
   const brandAId = randomUUID();
   const brandBId = randomUUID();
+  const deletedBrandId = randomUUID();
   const runtimeRole = `venturecite_rls_test_${process.pid}_${Date.now()}`;
   const runtimePassword = "local-test-only-password";
   let ownerPool: Pool;
   let requestPool: Pool;
+  let lockClient: PoolClient;
+
+  async function withRestrictedSql<T>(
+    userId: string,
+    work: (client: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    const client = await requestPool.connect();
+    try {
+      await client.query("begin");
+      await client.query("set local role venturecite_request");
+      await client.query("select set_config('venturecite.user_id', $1, true)", [userId]);
+      return await work(client);
+    } finally {
+      await client.query("rollback").catch(() => undefined);
+      client.release();
+    }
+  }
 
   beforeAll(async () => {
     ownerPool = new Pool({
       connectionString: process.env.TEST_DATABASE_URL,
-      max: 1,
+      max: 2,
       ssl: false,
     });
+    lockClient = await ownerPool.connect();
+    await lockClient.query("select pg_advisory_lock($1, $2)", ROLE_MIGRATION_LOCK_KEY);
+    await removePrefixedRoles(lockClient, LOCAL_TEST_ROLE_PREFIXES);
+    await revokeManagedRoleMemberships(lockClient);
     const migration = fs.readFileSync(
       path.resolve(process.cwd(), "migrations/0096_request_rls_foundation.sql"),
       "utf8",
@@ -48,8 +76,6 @@ describeIfLocal("request database RLS foundation", () => {
         noreplication
         nobypassrls`,
     );
-    await ownerPool.query(`grant venturecite_request to "${runtimeRole}"`);
-
     const testDatabaseUrl = process.env.TEST_DATABASE_URL;
     if (!testDatabaseUrl) throw new Error("TEST_DATABASE_URL is required for local RLS tests");
     const requestDatabaseUrl = new URL(testDatabaseUrl);
@@ -60,6 +86,7 @@ describeIfLocal("request database RLS foundation", () => {
       max: 1,
       ssl: false,
     });
+    await ownerPool.query(`grant venturecite_request to "${runtimeRole}"`);
 
     await ownerPool.query(
       `insert into public.users (id, email, first_name, access_tier)
@@ -69,25 +96,39 @@ describeIfLocal("request database RLS foundation", () => {
     await ownerPool.query(
       `insert into public.brands (id, user_id, name, company_name, industry)
        values ($1, $2, 'Brand A', 'Company A', 'Software'),
-              ($3, $4, 'Brand B', 'Company B', 'Software')`,
-      [brandAId, userAId, brandBId, userBId],
+              ($3, $4, 'Brand B', 'Company B', 'Software'),
+              ($5, $2, 'Deleted brand', 'Deleted company', 'Software')`,
+      [brandAId, userAId, brandBId, userBId, deletedBrandId],
     );
-  });
+    await ownerPool.query("update public.brands set deleted_at = now() where id = $1", [
+      deletedBrandId,
+    ]);
+  }, 60_000);
 
   afterAll(async () => {
-    if (requestPool) await requestPool.end();
-    if (ownerPool) {
-      await ownerPool.query(`delete from public.users where id = any($1::varchar[])`, [
-        [userAId, userBId],
-      ]);
-      const runtimeRoleExists = await ownerPool.query("select 1 from pg_roles where rolname = $1", [
-        runtimeRole,
-      ]);
-      if (runtimeRoleExists.rowCount === 1) {
-        await ownerPool.query(`revoke venturecite_request from "${runtimeRole}"`);
-        await ownerPool.query(`drop role "${runtimeRole}"`);
+    try {
+      if (requestPool) await requestPool.end();
+    } finally {
+      if (ownerPool) {
+        try {
+          await ownerPool.query(`delete from public.users where id = any($1::varchar[])`, [
+            [userAId, userBId],
+          ]);
+          const runtimeRoleExists = await ownerPool.query(
+            "select 1 from pg_roles where rolname = $1",
+            [runtimeRole],
+          );
+          if (runtimeRoleExists.rowCount === 1) {
+            await removeRoleIfExists(ownerPool, runtimeRole);
+          }
+        } finally {
+          await lockClient
+            ?.query("select pg_advisory_unlock($1, $2)", ROLE_MIGRATION_LOCK_KEY)
+            .catch(() => undefined);
+          lockClient?.release();
+          await ownerPool.end();
+        }
       }
-      await ownerPool.end();
     }
   });
 
@@ -182,23 +223,69 @@ describeIfLocal("request database RLS foundation", () => {
     }
   });
 
-  it("returns only the request user's row and brands", async () => {
+  it("returns only the request user's active data", async () => {
     const { createRequestActor } = await import("../../server/lib/requestActor");
     const { createRequestData } = await import("../../server/data/requestData");
     const requestData = createRequestData(drizzle(requestPool, { schema }));
 
-    const result = await requestData.forUser(createRequestActor(userAId), async (tx) => {
-      const userRows = await tx.execute<{ id: string }>(
-        sql`select id from public.users order by id`,
-      );
-      const brandRows = await tx.execute<{ id: string }>(
-        sql`select id from public.brands order by id`,
-      );
-      return { userRows: userRows.rows, brandRows: brandRows.rows };
-    });
+    const facade = requestData.forActor(createRequestActor(userAId));
+    const result = {
+      user: await facade.users.get(),
+      brands: await facade.brands.list(),
+    };
 
-    expect(result.userRows).toEqual([{ id: userAId }]);
-    expect(result.brandRows).toEqual([{ id: brandAId }]);
+    expect(result.user?.id).toBe(userAId);
+    expect(result.brands.map((brand) => brand.id)).toContain(brandAId);
+    expect(result.brands.map((brand) => brand.id)).not.toContain(brandBId);
+    expect(result.brands.map((brand) => brand.id)).not.toContain(deletedBrandId);
+  });
+
+  it("scopes user and brand repositories to the request user", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createRequestData } = await import("../../server/data/requestData");
+    const requestData = createRequestData(drizzle(requestPool, { schema }));
+
+    const facade = requestData.forActor(createRequestActor(userAId));
+    const result = {
+      user: await facade.users.get(),
+      visibleBrands: await facade.brands.list(),
+      hiddenBrand: await facade.brands.get(brandBId),
+      deletedBrand: await facade.brands.get(deletedBrandId),
+      changedBrand: await facade.brands.update(brandBId, { name: "Changed by A" }),
+      changedDeletedBrand: await facade.brands.update(deletedBrandId, {
+        name: "Changed deleted brand",
+      }),
+      createdBrand: await facade.brands.create({
+        name: "Repository brand",
+        companyName: "Repository company",
+        industry: "Software",
+      }),
+    };
+
+    expect(result.user?.id).toBe(userAId);
+    expect(result.visibleBrands.map((brand) => brand.id)).toContain(brandAId);
+    expect(result.visibleBrands.map((brand) => brand.id)).not.toContain(brandBId);
+    expect(result.hiddenBrand).toBeUndefined();
+    expect(result.deletedBrand).toBeUndefined();
+    expect(result.changedBrand).toBeUndefined();
+    expect(result.changedDeletedBrand).toBeUndefined();
+    expect(result.createdBrand.userId).toBe(userAId);
+  });
+
+  it("prevents RESET ROLE, GUC forgery, and actor overrides at the request API boundary", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createRequestData } = await import("../../server/data/requestData");
+    const requestData = createRequestData(drizzle(requestPool, { schema }));
+
+    const boundary = requestData.forActor(createRequestActor(userAId)) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(boundary.execute).toBeUndefined();
+    expect(boundary.query).toBeUndefined();
+    expect(boundary.transaction).toBeUndefined();
+    expect(boundary.actor).toBeUndefined();
+    expect(Object.keys(boundary).sort()).toEqual(["brands", "users"]);
   });
 
   it("blocks cross-user brand writes", async () => {
@@ -206,92 +293,104 @@ describeIfLocal("request database RLS foundation", () => {
     const { createRequestData } = await import("../../server/data/requestData");
     const requestData = createRequestData(drizzle(requestPool, { schema }));
 
-    const affected = await requestData.forUser(createRequestActor(userAId), async (tx) => {
-      const update = await tx.execute<{ id: string }>(sql`
-        update public.brands
-        set name = 'Changed by A'
-        where id = ${brandBId}
-        returning id
-      `);
-      return update.rowCount;
-    });
+    const facade = requestData.forActor(createRequestActor(userAId));
+    const update = await facade.brands.update(brandBId, { name: "Changed by A" });
+    const affected = update ? 1 : 0;
 
     expect(affected).toBe(0);
 
+    expect(facade.brands).not.toHaveProperty("delete");
+
     await expect(
-      requestData.forUser(createRequestActor(userAId), async (tx) => {
-        await tx.execute(sql`delete from public.brands where id = ${brandAId}`);
+      withRestrictedSql(userAId, async (client) => {
+        await client.query("delete from public.brands where id = $1", [brandAId]);
       }),
-    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    ).rejects.toMatchObject({ code: "42501" });
   });
 
   it("allows approved brand writes for the request user", async () => {
     const { createRequestActor } = await import("../../server/lib/requestActor");
     const { createRequestData } = await import("../../server/data/requestData");
     const requestData = createRequestData(drizzle(requestPool, { schema }));
-    const result = await requestData.forUser(createRequestActor(userAId), async (tx) => {
-      const inserted = await tx.execute<{ id: string }>(sql`
-        insert into public.brands (user_id, name, company_name, industry)
-        values (${userAId}, 'New brand', 'New company', 'Software')
-        returning id
-      `);
-      const insertedId = inserted.rows[0]?.id;
-      if (!insertedId) throw new Error("Brand insert returned no ID");
-      const updated = await tx.execute<{ name: string }>(sql`
-        update public.brands
-        set name = 'Updated brand'
-        where id = ${insertedId}
-        returning name
-      `);
-      return {
-        inserted: inserted.rows,
-        updated: updated.rows,
-      };
+    const facade = requestData.forActor(createRequestActor(userAId));
+    const inserted = await facade.brands.create({
+      name: "New brand",
+      companyName: "New company",
+      industry: "Software",
     });
+    const result = {
+      inserted,
+      updated: await facade.brands.update(inserted.id, { name: "Updated brand" }),
+    };
 
-    expect(result.inserted).toHaveLength(1);
-    expect(result.updated).toEqual([{ name: "Updated brand" }]);
+    expect(result.inserted.userId).toBe(userAId);
+    expect(result.updated?.name).toBe("Updated brand");
   });
 
-  it("rejects a brand insert or owner change for another user", async () => {
+  it("enforces version checks for the request user's brand writes", async () => {
     const { createRequestActor } = await import("../../server/lib/requestActor");
     const { createRequestData } = await import("../../server/data/requestData");
     const requestData = createRequestData(drizzle(requestPool, { schema }));
 
-    await expect(
-      requestData.forUser(createRequestActor(userAId), async (tx) => {
-        await tx.execute(sql`
-          insert into public.brands (user_id, name, company_name, industry)
-          values (${userBId}, 'Invalid', 'Invalid', 'Software')
-        `);
+    const facade = requestData.forActor(createRequestActor(userAId));
+    const result = {
+      stale: await facade.brands.updateIfVersion(brandAId, 1, {
+        name: "Stale write",
       }),
-    ).rejects.toMatchObject({ cause: { code: "42501" } });
+      updated: await facade.brands.updateIfVersion(brandAId, 0, {
+        name: "Versioned write",
+      }),
+    };
+
+    expect(result.stale).toBeUndefined();
+    expect(result.updated?.name).toBe("Versioned write");
+    expect(result.updated?.version).toBe(1);
+  });
+
+  it("rejects direct access to unapproved brand and user columns", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createRequestData } = await import("../../server/data/requestData");
+    const requestData = createRequestData(drizzle(requestPool, { schema }));
+
+    const facade = requestData.forActor(createRequestActor(userAId));
+    const brands = facade.brands as unknown as Record<string, unknown>;
+    expect(brands).not.toHaveProperty("setOwner");
+    expect(brands).not.toHaveProperty("setAutopilotStatus");
+    expect(facade.users).not.toHaveProperty("getPasswordHash");
 
     await expect(
-      requestData.forUser(createRequestActor(userAId), async (tx) => {
-        await tx.execute(sql`
-          update public.brands
-          set autopilot_status = 'completed'
-          where id = ${brandAId}
-        `);
+      withRestrictedSql(userAId, async (client) => {
+        await client.query(
+          `insert into public.brands (user_id, name, company_name, industry)
+           values ($1, 'Invalid', 'Invalid', 'Software')`,
+          [userBId],
+        );
       }),
-    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    ).rejects.toMatchObject({ code: "42501" });
 
     await expect(
-      requestData.forUser(createRequestActor(userAId), async (tx) => {
-        await tx.execute(sql`
-          update public.brands
-          set user_id = ${userBId}
-          where id = ${brandAId}
-        `);
+      withRestrictedSql(userAId, async (client) => {
+        await client.query(
+          "update public.brands set autopilot_status = 'completed' where id = $1",
+          [brandAId],
+        );
       }),
-    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    ).rejects.toMatchObject({ code: "42501" });
 
     await expect(
-      requestData.forUser(createRequestActor(userAId), async (tx) => {
-        await tx.execute(sql`select password_hash from public.users where id = ${userAId}`);
+      withRestrictedSql(userAId, async (client) => {
+        await client.query("update public.brands set user_id = $1 where id = $2", [
+          userBId,
+          brandAId,
+        ]);
       }),
-    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    ).rejects.toMatchObject({ code: "42501" });
+
+    await expect(
+      withRestrictedSql(userAId, async (client) => {
+        await client.query("select password_hash from public.users where id = $1", [userAId]);
+      }),
+    ).rejects.toMatchObject({ code: "42501" });
   });
 
   it("allows only approved profile columns", async () => {
@@ -299,41 +398,34 @@ describeIfLocal("request database RLS foundation", () => {
     const { createRequestData } = await import("../../server/data/requestData");
     const requestData = createRequestData(drizzle(requestPool, { schema }));
 
-    await requestData.forUser(createRequestActor(userAId), async (tx) => {
-      await tx.execute(sql`
-        update public.users
-        set first_name = 'Updated A'
-        where id = ${userAId}
-      `);
-    });
+    const facade = requestData.forActor(createRequestActor(userAId));
+    await facade.users.updateProfile({ firstName: "Updated A" });
+    expect(facade.users).not.toHaveProperty("setAccessTier");
 
     await expect(
-      requestData.forUser(createRequestActor(userAId), async (tx) => {
-        await tx.execute(sql`
-          update public.users
-          set access_tier = 'agency'
-          where id = ${userAId}
-        `);
+      withRestrictedSql(userAId, async (client) => {
+        await client.query("update public.users set access_tier = 'agency' where id = $1", [
+          userAId,
+        ]);
       }),
-    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    ).rejects.toMatchObject({ code: "42501" });
   });
 
-  it("denies missing context and clears context after commit and rollback", async () => {
+  it("keeps durable facades actor-bound and denies missing context", async () => {
     const { createRequestActor } = await import("../../server/lib/requestActor");
     const { createRequestData } = await import("../../server/data/requestData");
     const requestData = createRequestData(drizzle(requestPool, { schema }));
 
-    await requestData.forUser(createRequestActor(userAId), async (tx) => {
-      const rows = await tx.execute<{ id: string }>(sql`select id from public.brands`);
-      expect(rows.rows).toContainEqual({ id: brandAId });
-      expect(rows.rows).not.toContainEqual({ id: brandBId });
-    });
-
-    await expect(
-      requestData.forUser(createRequestActor(userBId), async () => {
-        throw new Error("force rollback");
-      }),
-    ).rejects.toThrow("force rollback");
+    const facadeA = requestData.forActor(createRequestActor(userAId));
+    const facadeB = requestData.forActor(createRequestActor(userBId));
+    const firstA = await facadeA.brands.list();
+    const rowsB = await facadeB.brands.list();
+    const secondA = await facadeA.brands.list();
+    expect(firstA.map((brand) => brand.id)).toContain(brandAId);
+    expect(rowsB.map((brand) => brand.id)).toContain(brandBId);
+    expect(rowsB.map((brand) => brand.id)).not.toContain(brandAId);
+    expect(secondA.map((brand) => brand.id)).toContain(brandAId);
+    expect(secondA.map((brand) => brand.id)).not.toContain(brandBId);
 
     const client = await requestPool.connect();
     try {
