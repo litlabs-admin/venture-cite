@@ -195,6 +195,7 @@ describe("runArticleSlice (Responses API)", () => {
         tokensOut: 500,
       },
     );
+    expect(stubs.recordSpend).not.toHaveBeenCalled();
     expect(out).toEqual({ done: true, status: "succeeded" });
   });
 

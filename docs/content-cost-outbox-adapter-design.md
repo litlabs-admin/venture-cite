@@ -26,7 +26,8 @@ Keep all other provider adapters out of scope.
 
 ## Tradeoffs
 
-Existing direct spend calls keep their current behavior until each flow moves to an outbox command.
+Content generation records its cost only through the outbox command.
+Other LLM flows keep their existing direct spend calls until their own migrations.
 The first adapter writes analytics data only and does not call a provider.
 
 ## Release note

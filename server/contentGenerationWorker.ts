@@ -22,14 +22,13 @@ import { eq } from "drizzle-orm";
 import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS } from "./lib/modelConfig";
 import { logger } from "./lib/logger";
-import { assertWithinBudget, recordSpend, isBudgetExceededError, type Tier } from "./lib/llmBudget";
+import { assertWithinBudget, isBudgetExceededError, type Tier } from "./lib/llmBudget";
 import { openaiBreaker, isCircuitOpenError } from "./lib/circuitBreaker";
 import { refundArticleQuota, type ErrorKind } from "./lib/usageLimit";
 import type { ContentGenerationJob } from "@shared/schema";
 
 import { captureAndFlush } from "./lib/sentryReport";
 import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
-import { contentCostIdempotencyKey } from "./outbox/contentCostOutboxAdapter";
 
 // Both the kick-off (responses.create) and the poll (responses.retrieve)
 // are fast HTTP calls because the heavy lifting runs on OpenAI's
@@ -416,17 +415,6 @@ export async function runArticleSlice(
     if (!finished) {
       return { done: true, status: "cancelled" };
     }
-    await recordSpend({
-      userId: job.userId,
-      service: "openai",
-      model: MODELS.contentGeneration,
-      tokensIn: result.tokensIn,
-      tokensOut: result.tokensOut,
-      idempotencyKey: contentCostIdempotencyKey({
-        contentJobId: job.id,
-        providerResponseId: result.providerResponseId,
-      }),
-    });
     logger.info({ jobId: job.id }, "content slice completed");
     return { done: true, status: "succeeded" };
   }
