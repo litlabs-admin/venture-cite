@@ -45,9 +45,24 @@ The stale Markdown scan found possible user data in 22 files.
 
 Do not commit those files before a manual privacy review.
 
+The fresh static audit confirmed 14 defects or production risks.
+
+The type check passes.
+
+The lint command passes with 813 warnings.
+
+The format check fails across many files.
+
+The database test setup is unsafe for the normal application database.
+
+The live landing, pricing, login, and registration pages render without browser errors.
+
+The live health route remains unverified.
+
 ## Next checks
 
-1. Commit the safe project setup files on the setup branch.
-2. Preserve safe stale documents in a baseline commit.
-3. Review risky stale documents for user data.
-4. Start the fresh read-only code and live-system audit.
+1. Fix the unauthenticated board read and write path.
+2. Make integration tests require an isolated database.
+3. Fix Stripe validation and webhook coordination.
+4. Fix job lease and cancellation coordination.
+5. Review the live Supabase role and policy state without user data.

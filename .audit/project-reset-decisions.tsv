@@ -7,3 +7,6 @@ ts	phase	decision	why	evidence	result
 2026-08-20T00:05:00Z	skills	adapted and validated all 20 project skills	remove Cursor rules and stale-document assumptions	.agents/skills	20 metadata files and source records passed validation
 2026-08-20T00:06:00Z	lock	left skills-lock.json unchanged	the official installer does not expose the lock hash method	skills-lock.json	avoided guessed hashes
 2026-08-20T00:07:00Z	documents	blocked risky stale files from the first snapshot	some files can contain real or uncertain user data	Markdown secret scan	manual privacy review required
+2026-08-20T00:08:00Z	audit	accepted 14 static defects and risks after direct checks	use executable evidence instead of stale documents	evidence/2026-08-20-project-reset/FRESH_AUDIT.md	findings recorded
+2026-08-20T00:09:00Z	tests	refused to rerun database integration tests	the tests load the normal database URL and delete rows	tests/integration/tourEvents.test.ts	isolated TEST_DATABASE_URL required
+2026-08-20T00:10:00Z	live	checked four public routes without a form action	confirm the public deployment before any login	https://www.venturecite.com	landing pricing login and register render
