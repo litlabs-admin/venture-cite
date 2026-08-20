@@ -1,0 +1,80 @@
+# The production scheduler.
+#
+# render.yaml sets DISABLE_IN_PROCESS_SCHEDULER=true, and it has to: the free
+# plan sleeps after ~15 minutes idle and node-cron dies with the process. That
+# left NOTHING driving scheduled work - measured on production, no brand had
+# been scanned for seven days and 17 of 36 had never been scanned at all.
+#
+# So the schedule lives here instead. GitHub Actions is already the only CI
+# this repo has, which keeps the whole thing in version control rather than in
+# someone's cron-job.org login.
+#
+# HOURLY, NOT DAILY - not a preference, daily silently loses work:
+#   1. The orchestrator runs to a wall-clock budget. A step that overruns
+#      starves the ones behind it, which are reported in skippedDueToBudget
+#      while the response still says success. Most steps roll forward on their
+#      own timestamps, so the fix is simply a next tick an hour away.
+#   2. mention-scan, listicle-scan and competitor-discovery only run on
+#      Mondays, weekly-report only on Sundays. One daily call gives each ONE
+#      attempt per week; if that attempt is starved, the job waits a week.
+#      Hourly gives 24 attempts on the right day and jobDebounce (20h window)
+#      guarantees only the first does the work.
+#
+# The request also wakes the free-tier service, which is why the ping doubles
+# as a keep-alive.
+
+name: cron
+
+on:
+  schedule:
+    # Every hour, on the hour (UTC).
+    - cron: "0 * * * *"
+  # So it can be fired by hand from the Actions tab without waiting an hour -
+  # useful right after a deploy, or to catch up a missed window.
+  workflow_dispatch:
+
+# Two ticks overlapping would double-run the day-gated jobs. The advisory locks
+# stop them interleaving, not from firing twice, so serialise here as well.
+concurrency:
+  group: cron-orchestrator
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    # The orchestrator's own budget is CRON_ORCHESTRATOR_BUDGET_MS (15 min on
+    # Render). Allow for that plus a cold start, and no more - a hung request
+    # must not hold the concurrency group past the next tick.
+    timeout-minutes: 20
+    steps:
+      - name: Trigger daily-orchestrator
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::APP_URL and CRON_SECRET repository secrets must both be set."
+            exit 1
+          fi
+
+          # --max-time below the job timeout so curl, not the runner, is what
+          # gives up: a killed runner reports no body and no status.
+          # Retries cover the free tier's cold start, which can take 30s+ and
+          # would otherwise fail the very first request after an idle period.
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            --max-time 1000 --retry 3 --retry-delay 15 --retry-connrefused \
+            -X POST "${APP_URL%/}/api/cron/daily-orchestrator" \
+            -H "Authorization: Bearer ${CRON_SECRET}")
+
+          echo "HTTP $code"
+          # The body names every step and, crucially, skippedDueToBudget - the
+          # difference between "ran" and "ran everything".
+          cat /tmp/out.json | head -c 4000; echo
+
+          # 401 means the secret does not match Render's; that must fail loudly
+          # rather than look like a quiet no-op every hour.
+          if [ "$code" != "200" ]; then
+            echo "::error::orchestrator returned $code"
+            exit 1
+          fi
