@@ -345,6 +345,13 @@ export default function Welcome() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      // A stream can end without ever sending `result` or `error` - the
+      // server process is killed mid-scrape, the connection drops, a proxy
+      // times out. The loop below used to just `break` on that and return
+      // normally, so no error was shown and the user sat on the scanning
+      // screen forever, having seen the logs stop after "Detected brand
+      // logo." This tracks whether the stream actually resolved.
+      let sawTerminalEvent = false;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -373,6 +380,8 @@ export default function Welcome() {
             continue;
           }
 
+          if (evt.type === "result" || evt.type === "error") sawTerminalEvent = true;
+
           if (evt.type === "log") {
             setLogs((prev) => [
               ...prev,
@@ -392,9 +401,19 @@ export default function Welcome() {
             } catch {
               /* noop */
             }
+            if (!sawTerminalEvent) {
+              setScrapeError("The scan ended early. Please try again.");
+            }
             return;
           }
         }
+      }
+
+      // Fell out of the read loop without an `end` event: the connection
+      // closed under us. Same treatment - say so, so the retry button is
+      // reachable instead of an animation that never finishes.
+      if (!sawTerminalEvent) {
+        setScrapeError("We lost the connection while reading your site. Please try again.");
       }
     } catch (err: any) {
       if (err?.name === "AbortError") return;

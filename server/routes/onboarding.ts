@@ -17,6 +17,7 @@ import { logger } from "../lib/logger";
 import { validateDomain } from "@shared/validateDomain";
 import { safeFetchText } from "../lib/ssrf";
 import { scrapeLogoUrl } from "../lib/logoScraper";
+import { extractPageContent, extractBodyText } from "../lib/pageText";
 import { downloadAndStoreLogo } from "../lib/logoStorage";
 import crypto from "crypto";
 import { requireUser, requireBrand, OwnershipError } from "../lib/ownership";
@@ -160,15 +161,14 @@ export function setupOnboardingRoutes(app: Express) {
           logger.warn({ err, domain }, "onboarding scrape: homepage fetch failed");
         }
 
-        const pageText = html
-          ? html
-              .replace(/<script[\s\S]*?<\/script>/gi, " ")
-              .replace(/<style[\s\S]*?<\/style>/gi, " ")
-              .replace(/<[^>]+>/g, " ")
-              .replace(/\s+/g, " ")
-              .trim()
-              .slice(0, 8_000)
-          : "";
+        // extractPageContent puts the <head> metadata (title, description,
+        // Open Graph) in front of the body text. That is what makes a
+        // client-rendered site usable: humanarc.io's body strips to 53
+        // characters, well under the threshold below, but its head carries
+        // 488 characters describing the product. Before this the page read
+        // as empty and the LLM call was skipped entirely.
+        const page = extractPageContent(html, 8_000);
+        const pageText = page.text;
 
         let logoUrl: string | null = null;
         let scrapedLogoSource: string | null = null;
@@ -188,23 +188,60 @@ export function setupOnboardingRoutes(app: Express) {
           }
         }
 
+        // Tracks whether an LLM call THREW, which is different from one that
+        // returned little. A thin site legitimately yields a thin profile and
+        // the user corrects it on the confirm screen - that is by design. A
+        // FAILED call produced the same empty object, and this endpoint
+        // reported both as success, so an OpenRouter timeout or rate limit
+        // reached the user as "we read your site and found nothing", with no
+        // error shown and nothing to retry. Measured against the real
+        // venturecite.com homepage this call takes 8.2-10.4s, so it fails
+        // often enough to matter.
+        let llmFailed = false;
+
         const callBrandLLM = async (context: string): Promise<BrandProfile> => {
           const client = getOpenrouterClient();
           if (!client) throw new Error("AI service is not configured");
-          const completion = await client.chat.completions.create({
-            model: MODELS.brandAutofill,
-            response_format: { type: "json_object" },
-            temperature: 0.3,
-            messages: [
-              { role: "system", content: BRAND_PROFILE_SYSTEM_PROMPT },
-              { role: "user", content: context },
-            ],
-            max_tokens: 1200,
-          });
-          return (
-            parseBrandProfile(completion.choices[0]?.message?.content) ??
-            brandProfileSchema.parse({})
+          const completion = await client.chat.completions.create(
+            {
+              model: MODELS.brandAutofill,
+              response_format: { type: "json_object" },
+              temperature: 0.3,
+              messages: [
+                { role: "system", content: BRAND_PROFILE_SYSTEM_PROMPT },
+                { role: "user", content: context },
+              ],
+              // Was 1200, which this prompt routinely brushes against.
+              // Measured on the real venturecite.com homepage: completion
+              // lengths of 895, 902, 1182 and 1209 tokens across four runs.
+              // Above the cap the model stops mid-JSON, finish_reason comes
+              // back "length", parseBrandProfile cannot parse the truncated
+              // object and returns null - which used to become an empty
+              // profile reported as success. That is the coin flip behind
+              // "sometimes it fills the form, sometimes every field is
+              // blank" on content-rich sites. Headroom is cheap; a silent
+              // blank confirm screen is not.
+              max_tokens: 3000,
+            },
+            // This call had no timeout at all, so a hung provider held the
+            // request open until the platform killed the whole function -
+            // which closes the SSE stream with no error event and leaves
+            // the client waiting forever. 25s matches the sibling call in
+            // routes/brands.ts and sits under vercel.json's maxDuration.
+            { signal: AbortSignal.timeout(25_000) },
           );
+          const choice = completion.choices[0];
+          const profile = parseBrandProfile(choice?.message?.content);
+          if (!profile) {
+            // Unparseable output is a failed call, not an empty website.
+            // Throwing routes it into the caller's catch, which sets
+            // llmFailed and surfaces a retryable error instead of an
+            // empty confirm screen.
+            throw new Error(
+              `brand profile unparseable (finish_reason=${choice?.finish_reason ?? "unknown"})`,
+            );
+          }
+          return profile;
         };
 
         let parsed: BrandProfile = brandProfileSchema.parse({});
@@ -214,6 +251,7 @@ export function setupOnboardingRoutes(app: Express) {
             `Website URL: ${homepageUrl}\n\nWebsite content:\n${pageText}`,
           ).catch((err) => {
             logger.warn({ err, domain }, "onboarding scrape: strategy 1 LLM failed");
+            llmFailed = true;
             return brandProfileSchema.parse({});
           });
           if (parsed.name) {
@@ -267,15 +305,7 @@ export function setupOnboardingRoutes(app: Express) {
                     timeoutMs: 8_000,
                   });
                   if (page.status >= 200 && page.status < 300) {
-                    fetched.push(
-                      page.text
-                        .replace(/<script[\s\S]*?<\/script>/gi, " ")
-                        .replace(/<style[\s\S]*?<\/style>/gi, " ")
-                        .replace(/<[^>]+>/g, " ")
-                        .replace(/\s+/g, " ")
-                        .trim()
-                        .slice(0, 4_000),
-                    );
+                    fetched.push(extractBodyText(page.text).slice(0, 4_000));
                   }
                 } catch {
                   /* skip */
@@ -290,7 +320,14 @@ export function setupOnboardingRoutes(app: Express) {
           if (sitemapText) {
             const merged = await callBrandLLM(
               `Website URL: ${homepageUrl}\n\nCombined page content:\n${pageText}\n\n${sitemapText}`,
-            ).catch(() => brandProfileSchema.parse({}));
+            ).catch((err) => {
+              logger.warn({ err, domain }, "onboarding scrape: strategy 2 LLM failed");
+              llmFailed = true;
+              return brandProfileSchema.parse({});
+            });
+            // A successful second pass clears the first pass's failure: an
+            // answer did arrive, so this is no longer an error to report.
+            if (merged.name) llmFailed = false;
             for (const [k, v] of Object.entries(merged) as [keyof BrandProfile, unknown][]) {
               const current = parsed[k];
               if (!current || (Array.isArray(current) && current.length === 0)) {
@@ -307,6 +344,36 @@ export function setupOnboardingRoutes(app: Express) {
         // exactly when the user had least evidence to catch it - the
         // output goes straight onto the "Confirm the brand" screen.
         // Thin input must present as thin so the user corrects it.
+
+        // Report a failed read as a failure. Until now every path fell
+        // through to the `result` event below, so three different outcomes
+        // arrived at the confirm screen looking identical - a logo and
+        // empty fields:
+        //   1. the page had nothing to say (correct, user fills it in),
+        //   2. the LLM call threw (an error, and retrying often works),
+        //   3. the page could not be fetched at all (an error).
+        // Only the first is a legitimate result. The other two now surface,
+        // so the user retries instead of hand-filling a form because they
+        // were told their site is empty.
+        if (llmFailed && !parsed.name) {
+          sseWrite(res, {
+            type: "error",
+            reason:
+              "We could not finish reading your site. This is usually temporary - please try again.",
+          });
+          sseWrite(res, { type: "end" });
+          res.end();
+          return;
+        }
+        if (!html) {
+          sseWrite(res, {
+            type: "error",
+            reason: `We could not reach ${domain}. Check the address is right and the site is online.`,
+          });
+          sseWrite(res, { type: "end" });
+          res.end();
+          return;
+        }
 
         const data = {
           brandName: parsed.name ?? "",

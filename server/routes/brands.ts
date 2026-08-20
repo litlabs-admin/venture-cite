@@ -26,6 +26,7 @@ import {
 } from "@shared/schema";
 import { MODELS } from "../lib/modelConfig";
 import { safeFetchText } from "../lib/ssrf";
+import { extractPageContent } from "../lib/pageText";
 import { requireUser } from "../lib/ownership";
 import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
 import type { Tier } from "../lib/llmPricing";
@@ -126,35 +127,53 @@ export function setupBrandRoutes(app: Express): void {
           return res.status(503).json({ success: false, error: "AI service is not configured" });
         }
 
+        // Three outcomes, kept distinct. `pageContent` is what the model
+        // reads; `fetchFailed` means we never got the page at all.
+        //
+        // The two "Please analyze based on the URL/domain name alone."
+        // strings that used to live here are gone. They told the model to
+        // invent a profile from a hostname, which is the same
+        // hallucination generator that was deliberately removed from the
+        // onboarding scrape (see routes/onboarding.ts). It also made this
+        // endpoint non-deterministic on any site with no readable text: at
+        // temperature 0.3 the model sometimes obeyed the prompt's grounding
+        // rule and returned {}, and sometimes guessed - so the same domain
+        // "worked" on one attempt and came back blank on the next.
         let pageContent = "";
+        let fetchFailed = false;
         try {
           const { status, text, contentType } = await safeFetchText(url, {
             maxBytes: 2 * 1024 * 1024,
             timeoutMs: 10_000,
           });
           if (status < 200 || status >= 400) {
-            pageContent = `Website at ${url} returned HTTP ${status}. Please analyze based on the URL/domain name alone.`;
+            fetchFailed = true;
           } else if (
             !contentType.includes("text/html") &&
             !contentType.includes("text/plain") &&
             !contentType.includes("application/xhtml")
           ) {
-            pageContent = `Website at ${url} returned non-HTML content. Please analyze based on the URL/domain name alone.`;
+            fetchFailed = true;
           } else {
-            pageContent = text
-              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-              .replace(/<[^>]+>/g, " ")
-              .replace(/\s+/g, " ")
-              .trim()
-              .substring(0, 8000);
+            // Shared with the onboarding scrape. Reads <head> metadata as
+            // well as body text, so a client-rendered site yields a real
+            // description instead of an empty string.
+            pageContent = extractPageContent(text, 8000).text;
           }
         } catch (fetchError: unknown) {
           const msg = fetchError instanceof Error ? fetchError.message : "fetch failed";
           if (/private|not allowed|resolve|Invalid URL|http/i.test(msg)) {
             return res.status(400).json({ success: false, error: "This URL is not allowed" });
           }
-          pageContent = `Could not fetch website content from ${url}. Please analyze based on the URL/domain name alone.`;
+          fetchFailed = true;
+        }
+
+        if (fetchFailed || pageContent.length < 40) {
+          return res.status(422).json({
+            success: false,
+            error:
+              "We could not read any content from that site. Check the address, or create the brand manually.",
+          });
         }
 
         let result: BrandProfile = brandProfileSchema.parse({});
@@ -172,17 +191,34 @@ export function setupBrandRoutes(app: Express): void {
               ],
               response_format: { type: "json_object" },
               temperature: 0.3,
+              // This call set no max_tokens at all, so it inherited the
+              // provider default. Pin it, and pin it high: the sibling call
+              // in routes/onboarding.ts was capped at 1200 and measured
+              // 895-1209 completion tokens on a real content-rich page, so
+              // the cap was truncating the JSON and producing blank forms.
+              max_tokens: 3000,
             },
             { signal: AbortSignal.timeout(25000) },
           );
 
-          const parsed = parseBrandProfile(completion.choices[0].message.content);
-          if (!parsed || !parsed.name) {
-            analysisQuality = "partial";
-            result = parsed ?? result;
-          } else {
-            result = parsed;
+          const choice = completion.choices[0];
+          const parsed = parseBrandProfile(choice?.message?.content);
+          if (!parsed) {
+            // Unparseable JSON - usually a response truncated at the token
+            // cap. A failed read, not a thin site.
+            logger.warn(
+              { url, finishReason: choice?.finish_reason },
+              "create-from-website: brand profile unparseable",
+            );
+            return res.status(502).json({
+              success: false,
+              error: "Website analysis failed. Please try again in a moment.",
+            });
           }
+          if (!parsed.name) {
+            analysisQuality = "partial";
+          }
+          result = parsed;
         } catch (aiErr: any) {
           if (aiErr?.name === "AbortError" || aiErr?.name === "TimeoutError") {
             return res.status(504).json({
@@ -190,7 +226,15 @@ export function setupBrandRoutes(app: Express): void {
               error: "Website analysis timed out. Please try again or create the brand manually.",
             });
           }
-          analysisQuality = "partial";
+          // A THROWN call is not a thin result. It used to fall through to
+          // a brand created from the hostname, so an OpenRouter outage
+          // produced a brand named "venturecite" in industry "General"
+          // that looked like a successful analysis.
+          logger.warn({ err: aiErr, url }, "create-from-website: LLM call failed");
+          return res.status(502).json({
+            success: false,
+            error: "Website analysis failed. Please try again in a moment.",
+          });
         }
 
         const brandData = {
