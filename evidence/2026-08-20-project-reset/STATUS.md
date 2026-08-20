@@ -41,9 +41,17 @@ All 20 skills now have automatic invocation metadata and pinned source records.
 
 The skill lock remains unchanged because its hash method is not available.
 
-The stale Markdown scan found possible user data in 22 files.
+The stale Markdown scan found possible user data in 15 files.
 
-Do not commit those files before a manual privacy review.
+The archive pass replaced those details with synthetic placeholders.
+
+Two local commits preserve all 101 stale Markdown files.
+
+The maintained tree now removes 109 redundant Markdown files.
+
+Six current project guides replace the old setup and architecture claims.
+
+The public privacy policy still needs the legal entity and privacy contact.
 
 The fresh static audit confirmed 14 defects or production risks.
 
@@ -89,4 +97,4 @@ The live health route remains unverified.
 2. Build a complete local database baseline.
 3. Review the live Supabase role and policy state without user data.
 4. Replace boot-time migrations with a controlled release step.
-5. Review and replace stale Markdown and comments.
+5. Add the approved legal entity and privacy contact to the public policy.

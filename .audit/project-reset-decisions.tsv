@@ -23,3 +23,6 @@ ts	phase	decision	why	evidence	result
 2026-08-20T00:21:00Z	review	fixed every final security review gap	block unsafe local commits	Sol Medium review	seven gaps closed and no direct regression found
 2026-08-20T00:22:00Z	tests	reran the full test suite after review fixes	prove the combined diff	Vitest	1390 tests pass and 37 database tests skip
 2026-08-20T00:23:00Z	git	committed four reviewed repair groups	preserve exact history before documentation cleanup	local Git history	security content tests and dependencies have separate commits
+2026-08-20T00:24:00Z	documents	archived all stale Markdown before cleanup	preserve retrievable history without live personal data	local Git history	86 safe files and 15 redacted files have snapshot commits
+2026-08-20T00:25:00Z	documents	removed redundant Markdown and rewrote maintained guides	make executable code and tests the documentation source	current documentation set	109 stale files removed and six guides updated
+2026-08-20T00:26:00Z	cleanup	removed tracked temporary scripts and a crash dump	remove unsafe one-off tools and personal artifacts	Git history	18 obsolete files removed from the working tree
