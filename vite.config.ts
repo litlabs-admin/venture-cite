@@ -23,7 +23,7 @@ const isProd = process.env.NODE_ENV === "production";
 // below and what serveStatic() expects - fixing the split without touching
 // the separate, larger decision of running Nitro's own generated server as
 // the production entry point instead of server/index.ts (which currently
-// owns migrations/scheduler/autopilot-resume/Stripe boot side effects that
+// owns scheduler/autopilot-resume/Stripe boot side effects that
 // the Nitro entry point does not call; see server/vite.ts for the rest of
 // this decision, including a real gap this does NOT fix: `vite build` with
 // tanstackStart()+nitro() active never emits a static dist/public/index.html
@@ -129,8 +129,8 @@ export default defineConfig({
           crons: [{ path: "/api/cron/daily-orchestrator", schedule: "0 6 * * *" }],
         },
       },
-      // This Nitro startup plugin runs database migrations, the
-      // in-process cron scheduler, autopilot resume, and Stripe setup
+      // This Nitro startup plugin runs the in-process cron scheduler,
+      // autopilot resume, and Stripe setup
       // exactly once when Nitro's own generated server boots, so Render
       // doesn't silently lose them now that server/index.ts is no longer
       // the production entry point. No-ops on Vercel and outside

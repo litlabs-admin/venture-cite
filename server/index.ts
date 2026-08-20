@@ -5,8 +5,8 @@
 // (dist/server/index.mjs) directly on BOTH hosts - Vercel via Nitro's vercel
 // preset, which supersedes the hand-written server/vercelEntry.ts + api/
 // entry that used to serve it (both deleted in this task).
-// Boot side-effects (migrations, scheduler, autopilot resume,
-// Stripe setup) run here in dev, AND separately in production via the
+// Boot side-effects (scheduler, autopilot resume, Stripe setup) run here
+// in development, AND separately in production via the
 // Nitro startup plugin at server/nitroBoot.ts (registered in
 // vite.config.ts's nitro({ plugins: [...] })) - the plugin no-ops unless
 // NODE_ENV=production, so the two never double-run. On Vercel the daily
@@ -18,13 +18,11 @@ import { setupVite, log } from "./vite";
 import { setupStripeProducts } from "./setupProducts";
 import { pool } from "./db";
 import { initScheduler } from "./scheduler";
-import { applyMigrations } from "./lib/migrationRunner";
 import { reconcileOrphanCitationRuns } from "./lib/citationReconciliation";
 import { resumeInFlightAutopilots } from "./lib/onboardingAutopilot";
 import { logger } from "./lib/logger";
 
 (async () => {
-  await applyMigrations();
   await reconcileOrphanCitationRuns();
 
   // The email verification flow assumes the

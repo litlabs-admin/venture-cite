@@ -1,9 +1,7 @@
-// Standalone migration runner for the Vercel build step.
+// Standalone migration runner for a controlled release step.
 //
-// Usage: `npm run db:migrate` - invoked from package.json's build script
-// before vite + esbuild. Applies any pending migrations sequentially.
-// Exits non-zero on failure so the build aborts before deploying a
-// schema-mismatched function bundle.
+// Use `npm run db:migrate` outside production.
+// Use `npm run db:migrate:release` for production.
 //
 // On Vercel the runtime DATABASE_URL points at Supabase's transaction
 // pooler (port 6543) which rotates backend connections between queries
@@ -13,8 +11,15 @@
 // DATABASE_URL.
 
 import { logger } from "../server/lib/logger";
+import { assertReleaseMigrationConfirmation, isReleaseMigrationCommand } from "./migrationRelease";
 
 async function main(): Promise<void> {
+  assertReleaseMigrationConfirmation({
+    nodeEnv: process.env.NODE_ENV,
+    isReleaseCommand: isReleaseMigrationCommand(process.argv),
+    confirmation: process.env.CONFIRM_PRODUCTION_MIGRATIONS,
+  });
+
   // Swap DATABASE_URL → DATABASE_DIRECT_URL **before** importing any
   // module that reads from process.env at load time (server/db.ts does).
   const directUrl = process.env.DATABASE_DIRECT_URL;

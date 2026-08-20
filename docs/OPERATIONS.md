@@ -4,9 +4,13 @@
 
 Run one controlled migration job before the application receives production traffic.
 
-Use `npm run db:migrate` for that job. Use `DATABASE_DIRECT_URL` when the runtime URL uses a transaction pooler.
+Use `npm run db:migrate:release` for that job. Use `DATABASE_DIRECT_URL` when the runtime URL uses a transaction pooler.
 
-Do not rely on process startup to apply production migrations. Long-lived production startup currently applies migrations, so remove or control that path before a multi-process release.
+Set `CONFIRM_PRODUCTION_MIGRATIONS=venturecite-production` before you run the production command.
+
+The release command rejects production migrations without this confirmation.
+
+The build and application startup never apply migrations.
 
 Set strict database TLS in production. Set `DATABASE_CA_CERT_PATH` or set `DATABASE_SSL_REJECT_UNAUTHORIZED=true`.
 
@@ -61,8 +65,6 @@ npm run format:check
 npm test
 ```
 
-The current build command applies database migrations first.
-
-Run `npm run build` only with an approved isolated database during pre-release checks.
+Run `npm run build` without a database connection during pre-release checks.
 
 Run `npm run test:e2e` only against an approved test environment.

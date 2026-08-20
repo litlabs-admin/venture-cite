@@ -7,6 +7,8 @@ server/public
 *.tsbuildinfo
 package-lock.json
 drizzle/meta
+supabase/.branches
+supabase/.temp
 .husky
 audit
 PHASE1_FEATURES.md

@@ -1,14 +1,13 @@
 // Auto-apply pending SQL migrations from ./migrations/*.sql.
 //
-// Vercel migration: extracted from server/index.ts so a separate
-// `npm run db:migrate` script can call it during build, instead of
-// running on every cold start. An advisory lock prevents two
-// concurrent build/boot invocations from racing.
+// The controlled release script calls this module.
+// An advisory lock prevents concurrent release jobs from racing.
 
 import { promises as fs } from "fs";
 import path from "path";
 import { pool } from "../db";
 import { logger } from "./logger";
+import { checksumMigration, classifyMigrationChecksum } from "./migrationChecksums";
 
 const APPLY_LOCK_KEY = 0x564d_4944; // "VMID" - distinct from app-level locks
 
@@ -40,23 +39,48 @@ export async function applyMigrations(): Promise<void> {
       );
     `);
 
-    const applied = await lockClient.query<{ filename: string }>(
-      "SELECT filename FROM public.schema_migrations",
+    await lockClient.query(`
+      ALTER TABLE public.schema_migrations
+      ADD COLUMN IF NOT EXISTS checksum TEXT;
+    `);
+
+    const applied = await lockClient.query<{ filename: string; checksum: string | null }>(
+      "SELECT filename, checksum FROM public.schema_migrations",
     );
-    const appliedSet = new Set(applied.rows.map((r) => r.filename));
+    const appliedByFilename = new Map(applied.rows.map((row) => [row.filename, row.checksum]));
 
     for (const f of files) {
-      if (appliedSet.has(f)) continue;
       const sqlText = await fs.readFile(path.join(dir, f), "utf8");
+      const checksum = checksumMigration(sqlText);
+      const checksumState = classifyMigrationChecksum({
+        filename: f,
+        appliedChecksum: appliedByFilename.get(f),
+        currentChecksum: checksum,
+      });
+
+      if (checksumState === "verified") {
+        continue;
+      }
+
+      if (checksumState === "legacy") {
+        await lockClient.query(
+          `UPDATE public.schema_migrations
+           SET checksum = $2
+           WHERE filename = $1 AND checksum IS NULL`,
+          [f, checksum],
+        );
+        logger.warn({ filename: f }, "applyMigrations: recorded legacy checksum");
+        continue;
+      }
 
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         await client.query(sqlText);
         await client.query(
-          `INSERT INTO public.schema_migrations (filename) VALUES ($1)
+          `INSERT INTO public.schema_migrations (filename, checksum) VALUES ($1, $2)
              ON CONFLICT (filename) DO NOTHING`,
-          [f],
+          [f, checksum],
         );
         await client.query("COMMIT");
         logger.info({ filename: f }, "applyMigrations: applied");

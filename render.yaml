@@ -1,7 +1,8 @@
 # Render Blueprint - free-tier web service.
 #
 # Derived from the actual repo state (not assumption):
-#   - `npm run build` = `db:migrate && vite build` (package.json). The old
+#   - `npm run build` only builds the application. Run the controlled
+#     migration release command before deployment traffic starts. The old
 #     esbuild step that bundled server/vercelEntry.ts into api/_bundle.js is
 #     gone, along with that entry file and the api/ directory - verified
 #     absent 2026-07-31. Nothing Vercel-specific runs in this build any more.
@@ -18,7 +19,7 @@
 #   - `/health` (server/app.ts) does a real `SELECT 1` against the DB and
 #     returns 503 if it fails - a real health check, not a static 200.
 #   - `server/nitroBoot.ts` (registered via vite.config.ts's
-#     `nitro({ plugins: [...] })`) runs DB migrations, the in-process node-cron
+#     `nitro({ plugins: [...] })`) runs the in-process node-cron
 #     scheduler, autopilot resume, and Stripe product setup exactly once per
 #     process - but ONLY when NODE_ENV=production and VERCEL is unset. Render
 #     must set NODE_ENV=production explicitly (below) or every one of those
@@ -64,10 +65,10 @@ services:
     startCommand: npm start
     healthCheckPath: /health
     envVars:
-      # ── Required: NODE_ENV gates nitroBoot's side-effects (migrations,
-      # scheduler, autopilot resume, Stripe setup). Without this exact
+      # ── Required: NODE_ENV gates nitroBoot's side-effects (scheduler,
+      # autopilot resume, Stripe setup). Without this exact
       # value, Render would boot a working HTTP server that silently never
-      # runs a migration or a scheduled job. ──
+      # runs scheduled work. ──
       - key: NODE_ENV
         value: production
       # ── Single owner of scheduled work. ──

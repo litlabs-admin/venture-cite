@@ -40,9 +40,7 @@ npm run format:check
 npm test
 ```
 
-The current build command applies database migrations before it builds the application.
-
-Run `npm run build` only with an approved isolated database until the release path changes.
+The build command does not apply database migrations.
 
 Run browser tests with the development server.
 
@@ -58,8 +56,10 @@ Do not release until Stripe has the approved Pro and Agency catalogue IDs and pr
 
 Do not release until production PostgreSQL uses strict TLS verification.
 
-Do not let each production process apply migrations. Run `npm run db:migrate` as one controlled release step.
+Do not let each production process apply migrations. Run `npm run db:migrate:release` as one controlled release step.
 
-Do not run `npm run build` with a production database URL during ordinary verification.
+Set `CONFIRM_PRODUCTION_MIGRATIONS=venturecite-production` before you run this command.
+
+Do not run the migration command with a production database URL during ordinary verification.
 
 Do not treat the current email tests as proof of email delivery. Add tests that use a safe test provider or a controlled inbox.

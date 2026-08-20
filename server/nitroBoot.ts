@@ -1,5 +1,5 @@
 // Nitro startup plugin - runs the boot side-effects that server/index.ts's
-// IIFE runs in dev (DB migrations, orphan-citation-run reconciliation,
+// IIFE runs in dev (orphan-citation-run reconciliation,
 // Stripe product setup, the in-process cron scheduler, in-flight autopilot
 // resume) exactly once on a long-lived production server process.
 //
@@ -40,8 +40,8 @@
 //
 // SKIPPED ON VERCEL: `process.env.VERCEL`, consistent with the existing
 // serverless check in server/db.ts:68 (`isServerless = !!process.env.VERCEL`).
-// Vercel is serverless (fresh process per invocation) - running migrations
-// or starting a cron scheduler per cold start would be wrong and racy, and
+// Vercel is serverless (fresh process per invocation). Starting a cron
+// scheduler per cold start would be wrong and racy, and
 // Nitro's `vercel` preset builds a per-invocation function rather than this
 // long-lived node-server entry in the first place, so this file wouldn't
 // even be reachable there in practice. The check is still explicit, not
@@ -55,7 +55,6 @@
 // server/vite.ts's vite.middlewares.
 import { setupStripeProducts } from "./setupProducts";
 import { initScheduler } from "./scheduler";
-import { applyMigrations } from "./lib/migrationRunner";
 import { reconcileOrphanCitationRuns } from "./lib/citationReconciliation";
 import { resumeInFlightAutopilots } from "./lib/onboardingAutopilot";
 import { logger } from "./lib/logger";
@@ -80,7 +79,6 @@ export default function nitroBoot(): void {
 
 async function run(): Promise<void> {
   try {
-    await applyMigrations();
     await reconcileOrphanCitationRuns();
 
     // The email verification flow assumes the
@@ -134,7 +132,7 @@ async function run(): Promise<void> {
           ? "disabled (external)"
           : "in-process",
       },
-      "nitroBoot: boot side-effects complete (migrations, orphan-citation-run reconciliation, scheduler, autopilot resume)",
+      "nitroBoot: boot side-effects complete (orphan-citation-run reconciliation, scheduler, autopilot resume)",
     );
   } catch (err) {
     // Loud, not swallowed: this is exactly the failure mode this file
@@ -142,11 +140,11 @@ async function run(): Promise<void> {
     // then exit - a container orchestrator (Render) restarts a crashed
     // process into a clean retry; a persistent failure shows up as a
     // visible crash loop in the dashboard instead of a server that quietly
-    // runs forever with no migrations, no scheduler, and no autopilot
+    // runs forever with no scheduler or autopilot
     // resume.
     logger.error(
       { err },
-      "nitroBoot: boot side-effects FAILED - exiting rather than serving traffic without migrations/scheduler",
+      "nitroBoot: boot side-effects FAILED - exiting rather than serving traffic without required startup work",
     );
     Sentry.captureException(err, { tags: { source: "nitro-boot" } });
     await Sentry.close(2_000).catch(() => {});

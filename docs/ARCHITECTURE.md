@@ -42,7 +42,9 @@ Long-lived production processes start the scheduler through `server/nitroBoot.ts
 
 Vercel uses the daily cron route instead. Do not enable both job triggers.
 
-The migration runner reads ordered SQL files from `migrations/`. It records each applied filename in `schema_migrations`.
+The migration runner reads ordered SQL files from `migrations/`. It records each filename and SHA-256 checksum in `schema_migrations`.
+
+Only the controlled release command runs the migration runner.
 
 ## Tests
 
