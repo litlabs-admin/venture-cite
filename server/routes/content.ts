@@ -1,6 +1,6 @@
 // Content generation routes.
 //
-// Wave 7 (content unification): the legacy three-table model
+// The legacy three-table model
 // (content_drafts + content_generation_jobs + articles) was collapsed into a
 // single articles table with status='draft'|'generating'|'ready'|'failed'.
 // The /api/content-drafts CRUD endpoints are gone - drafts are just articles
@@ -155,7 +155,7 @@ registerLlmJobHandler<
     return { data: savedKeywords, count: savedKeywords.length };
   },
 });
-// Foundations Plan 1, Task 4: the previous time-driven "phase label"
+// The previous time-driven "phase label"
 // (Brainstorming → Drafting → Writing → Polishing) was theatre - the
 // Responses API background mode doesn't expose intra-run progress, so
 // those labels were uncorrelated with what the model was actually doing.
@@ -193,7 +193,7 @@ export function computeJobStatePayload(job: {
 export function setupContentRoutes(app: Express): void {
   // ── Generate content for an existing draft article ─────────────────────────
   //
-  // Wave 7: the article must already exist in status='draft'. The route
+  // The article must already exist with status='draft'. The route
   // verifies ownership, atomically reserves a quota slot + inserts the
   // generation job + flips the article to status='generating' (well, the
   // worker actually flips it on claim - see setArticleGeneratingFromDraft).
@@ -523,7 +523,7 @@ export function setupContentRoutes(app: Express): void {
     }),
   );
 
-  // ── Cancel by articleId (Foundations Plan 1, Task 4) ──────────────────────
+  // ── Cancel by articleId ─────────────────────────────────────────────────
   //
   // Convenience cancel keyed by article. Finds the article's active job
   // (article.jobId) and applies the same cancel semantics as the

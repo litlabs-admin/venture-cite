@@ -1,4 +1,4 @@
-// Brand CRUD routes (Wave 5.1).
+// Brand CRUD routes.
 //
 // Extracted from server/routes.ts as part of the per-domain split.
 // The original monolith now only mounts this module via setupBrandRoutes.
@@ -80,7 +80,7 @@ export function setupBrandRoutes(app: Express): void {
       try {
         const user = requireUser(req);
 
-        // Wave 4.2: cheap pre-check for fast UX feedback. Authoritative
+        // A cheap pre-check gives fast feedback. The authoritative
         // check happens inside withBrandQuota at insert time (FOR UPDATE).
         const tier = resolveTier(user);
         const tierLimit = (usageLimits[tier] || usageLimits.free).maxBrands;
@@ -275,7 +275,7 @@ export function setupBrandRoutes(app: Express): void {
           });
 
           // Best-effort async automations: competitor discovery. Fact-sheet
-          // scraping is now handled by the v2 orchestration flow (Plan 5).
+          // The fact-sheet orchestration route handles scraping.
           waitUntil(
             (async () => {
               try {
@@ -362,7 +362,7 @@ export function setupBrandRoutes(app: Express): void {
         }
 
         // Best-effort async automations: competitor discovery. Fact-sheet
-        // scraping is now handled by the v2 orchestration flow (Plan 5).
+        // The fact-sheet orchestration route handles scraping.
         waitUntil(
           (async () => {
             try {
@@ -405,7 +405,7 @@ export function setupBrandRoutes(app: Express): void {
           .omit({ userId: true } as any)
           .parse(req.body);
 
-        // Wave 4.4: optimistic locking. When the client sends
+        // Optimistic locking. When the client sends
         // `expectedVersion` (echoed from the GET it edited from), the
         // UPDATE only matches if nobody else wrote in between.
         const expectedVersion =
@@ -441,7 +441,7 @@ export function setupBrandRoutes(app: Express): void {
     }),
   );
 
-  // Wave 6.6: pre-delete preview. Called when the user opens the delete
+  // Show a pre-delete preview when the user opens the delete
   // dialog so we can show exact counts ("this will remove 47 articles, 12
   // runs, 5 prompts"). Counts only the heaviest child tables - the FK
   // cascade sweeps many more, but surfacing every single one would be noise.
@@ -492,7 +492,7 @@ export function setupBrandRoutes(app: Express): void {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
 
-        // Wave 4.5: soft-delete with 30-day grace. The cron-driven brand
+        // Soft-delete with a 30-day grace period. The brand purge cron job
         // purge job hard-deletes after the window - at which point the FK
         // cascade clears every child row. List queries already filter
         // `deleted_at IS NULL` so the brand vanishes from the UI immediately.

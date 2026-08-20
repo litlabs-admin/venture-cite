@@ -16,7 +16,7 @@ import { sendWelcomeEmail } from "./lib/welcomeEmail";
 
 import { captureAndFlush } from "./lib/sentryReport";
 // Re-exported for callers that want to use the same keying scheme on
-// other endpoints (e.g. account-deletion in Wave 2).
+// other endpoints, such as account deletion.
 export { authRateKey };
 
 function publicUserShape(dbUser: typeof users.$inferSelect) {
@@ -331,7 +331,7 @@ const resendVerificationRateLimit = rateLimit({
 // to migrate to Redis along with the other rate-limit buckets.
 const resendVerificationLastSentAt = new Map<string, number>();
 const RESEND_MIN_GAP_MS = 60_000;
-// Plan 4 audit (BUG #6): the per-(IP, email) Map was growing unbounded.
+// The per-(IP, email) Map must not grow without a limit.
 // Evict entries older than 1 hour on every check - at that point the
 // express-rate-limit cap (3/hour) has also rolled over so the entry is
 // useless. O(n) per call, but bounded by however many requests came in
@@ -415,7 +415,7 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Plan 4 Task 3: require email verification before the account can
+      // Require email verification before the account can
       // be used. No session is issued in this response - the client
       // routes to /verify-email and waits for the confirmation link.
       const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -502,7 +502,7 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ success: false, error: "User profile not found" });
       }
 
-      // Plan 4 audit (BUG #2): the `auth.users → public.users` mirror
+      // The `auth.users → public.users` mirror
       // trigger in migration 0001 fires on `after insert or update of
       // email` only - NOT on update of `email_confirmed_at`. So after a
       // user clicks the Supabase verification link, our
@@ -531,12 +531,12 @@ export function setupAuth(app: Express) {
       }
 
       // Welcome email: fires exactly once on the user's first successful
-      // login. Plan 4 audit (BUG #13) introduced `welcomedAt` as the
+      // login. `welcomedAt` is the
       // dedicated gate - NULL means "welcome email not yet sent".
       // Existing rows backfilled to NOW() in migration 0056 so we don't
       // spam pre-existing accounts.
       //
-      // Plan 4 audit (BUG #1): two concurrent logins from the same user
+      // Two concurrent logins from the same user
       // (double-click, two tabs) could both observe welcomedAt === null
       // and both fire the email. The atomic conditional UPDATE below
       // returns the row only when this request actually flipped the
@@ -569,12 +569,12 @@ export function setupAuth(app: Express) {
         const recipientEmail = dbUser.email;
         const recipientFirstName = dbUser.firstName;
         if (recipientEmail) {
-          // Plan 4 audit (BUG #27): setImmediate is unreliable on Vercel
+          // setImmediate is unreliable on Vercel
           // serverless - the function can suspend immediately after
           // res.json() and drop the queued work. waitUntil keeps the
           // function alive past the response. Locally it's a no-op
           // shim so the promise just runs in the background.
-          // Plan 4 audit (BUG #10): also tag Sentry on failure so a
+          // Also tag Sentry on failure so a
           // dropped welcome email actually pages someone.
           waitUntil(
             sendWelcomeEmail(recipientEmail, recipientFirstName).catch((err) => {
@@ -672,7 +672,7 @@ export function setupAuth(app: Express) {
       const normalizedEmail = email.toLowerCase().trim();
       const bucketKey = `${req.ip ?? "unknown"}:${normalizedEmail}`;
       const now = Date.now();
-      // Plan 4 audit (BUG #6): evict stale entries on every call so
+      // Evict stale entries on every call so
       // the map stays bounded.
       evictStaleResendEntries(now);
       const lastSent = resendVerificationLastSentAt.get(bucketKey);
@@ -684,7 +684,7 @@ export function setupAuth(app: Express) {
       }
       resendVerificationLastSentAt.set(bucketKey, now);
 
-      // Plan 4 audit (BUG #12): pass emailRedirectTo so the
+      // Pass emailRedirectTo so the
       // verification link lands users back on our app at
       // /login?verified=1 instead of the Supabase project's default
       // Site URL.

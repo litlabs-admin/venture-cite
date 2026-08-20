@@ -1,6 +1,6 @@
 // routes.ts hosts the few cross-cutting routes (usage, user preferences,
 // waitlist, beta validation) plus the registry of per-domain setup
-// functions. Wave 5.1 split most route logic out into ./routes/*.ts
+// functions. Per-domain modules hold most route logic in ./routes/*.ts.
 // modules - anything specific to a domain (brands, content, FAQs, etc.)
 // belongs there, not here. Only imports actually referenced in this file
 // remain; the dead imports from the pre-extraction era were removed
@@ -51,7 +51,7 @@ import { setupLlmJobsRoutes } from "./routes/llmJobs";
 import { mentionsRouter } from "./routes/mentions";
 import { asyncHandler } from "./lib/asyncHandler";
 
-// Note: MAX_CONTENT_LENGTH + aiLimitMiddleware lived here pre-Wave 5.1.
+// MAX_CONTENT_LENGTH and aiLimitMiddleware now live in their route modules.
 // Both are now imported from ./lib/routesShared by the per-domain route
 // modules that actually need them.
 
@@ -97,7 +97,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email one-click unsubscribe (HMAC-token authenticated, not session).
   setupUnsubscribeRoutes(app);
 
-  // Server-side onboarding flag store (Wave 4.7).
+  // Server-side onboarding flag store.
   setupOnboardingRoutes(app);
   setupTourRoutes(app);
 
@@ -105,14 +105,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupLogoProxyRoutes(app);
   setupBoardRoutes(app);
 
-  // Brand CRUD (Wave 5.1: extracted from this file).
+  // Brand CRUD routes.
   setupBrandRoutes(app);
 
-  // Buffer social-publishing OAuth + post (Wave 5.1: extracted).
+  // Buffer social-publishing OAuth and post routes.
   setupBufferRoutes(app);
 
   // Stripe billing: publishable key + products + checkout + portal
-  // (Wave 5.1: extracted). Webhook stays in server/index.ts (raw body).
+  // The webhook stays in server/index.ts because it needs the raw body.
   setupBillingRoutes(app);
   // Sales-led Enterprise plan's counterpart to Checkout. Unauthenticated by
   // design - it exists to hear from people who have no account yet.
@@ -262,7 +262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }),
   );
 
-  // (Pre-Wave-5.1 `checkUsageLimit` helper lived here. Callers now use
+  // Callers now use
   // ./lib/usageLimit.withArticleQuota directly; the helper is gone.)
 
   // Beta invite code validation - redeems for the current authenticated user.
@@ -466,7 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             visibilityVisited: Boolean(userRow?.visibilityGuideVisitedAt),
             visibilityVisitedAt: userRow?.visibilityGuideVisitedAt ?? null,
             visibilityStarted: false,
-            // Wave 4.7: cross-device-synced onboarding flags. Empty object
+            // Cross-device onboarding flags. An empty object
             // for fresh accounts; the PATCH /api/onboarding/state endpoint
             // is what writes into this.
             onboardingState: userRow?.onboardingState ?? {},
@@ -506,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // The /api/platform-metrics endpoint was deleted along with the
   // outreach/agent dashboard pages - no frontend caller remained.
 
-  // Wave 5.1 domain splits: the rest of the routes live in per-domain
+  // The remaining routes live in per-domain
   // files under ./routes. Each mounts its own handlers; middleware above
   // (auth, ownership body/query guard, :brandId param guard) applies.
   setupContentRoutes(app);

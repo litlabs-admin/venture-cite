@@ -87,7 +87,7 @@ export async function scanBrandListicles(brandId: string): Promise<ScanReport> {
   const ambiguityWarning = brandNameWarning(brand.name);
   if (ambiguityWarning) report.warning = ambiguityWarning;
 
-  // Wave 9.4: re-verification phase. For every existing listicle whose
+  // Re-verify every existing listicle whose
   // last_verified_at is missing or older than 7 days, re-fetch the page
   // and re-run the matcher. Updates isIncluded / listPosition /
   // competitorsMentioned / lastVerifiedAt. Bounded at 50 to keep the
@@ -235,7 +235,7 @@ export async function scanBrandListicles(brandId: string): Promise<ScanReport> {
     }
 
     try {
-      // Wave 9.4: ON CONFLICT DO NOTHING via the storage helper. Returns
+      // The storage helper uses ON CONFLICT DO NOTHING. It returns
       // null when the unique index (brand_id, lower(url)) collides - i.e.
       // the same URL was inserted between our pre-dedupe read and now,
       // which can happen on concurrent scans.

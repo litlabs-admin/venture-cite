@@ -1,4 +1,4 @@
-// Analytics: crawler permissions, GEO analytics, sentiment, opportunities (Wave 5.1).
+// Analytics routes for crawler permissions, GEO analytics, sentiment, and opportunities.
 //
 // Extracted from server/routes.ts as part of the per-domain split.
 // The original monolith now only mounts this module via setupAnalyticsRoutes.
@@ -221,12 +221,12 @@ export function setupAnalyticsRoutes(app: Express): void {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
 
-        // Wave 9.2: optional ?since=<ISO> filters rankings to a fresh
+        // The optional ?since=<ISO> filters rankings to a fresh
         // citation run's window. Without this, every all-time ranking
         // counts during a fresh run, so the new run's incoming numbers
         // are statistically dwarfed by months of history. When the param
         // is missing/malformed we fall back to all-time (legacy behavior).
-        // Wave 9.3: client sends `since=all` as a sentinel for "no active
+        // The client sends `since=all` when there is no active
         // run, give me the all-time view." Treat it the same as missing.
         const sinceRaw = typeof req.query.since === "string" ? req.query.since : null;
         const sinceDate = sinceRaw && sinceRaw !== "all" ? new Date(sinceRaw) : null;
@@ -245,7 +245,7 @@ export function setupAnalyticsRoutes(app: Express): void {
         const brandPrompts = await storage.getBrandPromptsByBrandId(brand.id);
         const brandPromptIds = new Set(brandPrompts.map((p) => p.id));
 
-        // Wave 9.2: prefer the indexed (brandPromptId, since) read over
+        // Prefer the indexed (brandPromptId, since) read over
         // the all-rankings scan + post-filter. The article-tied rankings
         // are loaded separately and merged below - they aren't tied to
         // citation runs and don't suffer from the mixed-window problem.
@@ -253,7 +253,7 @@ export function setupAnalyticsRoutes(app: Express): void {
           brandPrompts.length > 0
             ? await storage.getGeoRankingsByBrandPromptIds(Array.from(brandPromptIds), sinceFilter)
             : [];
-        // Wave 9.3: indexed read with the same `since` filter as the
+        // Use the indexed read with the same `since` filter as the
         // brand-prompt path. Previously this fetched every geo_ranking
         // row globally and post-filtered in memory - both inefficient
         // and prone to mixing all-time article rankings into a fresh

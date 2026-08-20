@@ -102,7 +102,7 @@ export async function detectHallucinationsForRun(
     .map(factLine)
     .join("\n");
 
-  // Wave 8: `isCited` is matcher-authoritative (citationChecker.ts writes
+  // The matcher controls `isCited`. citationChecker.ts writes
   // isCited only when the universal matcher confirms the brand name appears
   // in the response). So fact-checking only runs on responses that genuinely
   // mention the brand - analyzer hallucinations that previously slipped

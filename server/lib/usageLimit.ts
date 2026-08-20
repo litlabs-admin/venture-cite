@@ -1,6 +1,6 @@
-// Atomic usage-limit enforcement (Wave 4.2).
+// Atomic usage-limit enforcement.
 //
-// The unsafe pattern (pre-Wave 4.2):
+// The unsafe pattern:
 //   1. SELECT count → 4 of 5 used
 //   2. enqueue / create
 //   3. UPDATE count = count + 1
@@ -105,7 +105,7 @@ export async function withArticleQuota<T>(
   });
 }
 
-// Wave 7: refund an article quota slot when a generation job ends in a
+// Refund an article quota slot when a generation job ends in a
 // transient failure (OpenAI 429/5xx, circuit open, timeout, or user-cancel)
 // so users aren't billed for infrastructure problems they can't fix.
 //
@@ -182,7 +182,7 @@ export async function withBrandQuota<T>(
     await tx.execute(sql`select id from public.users where id = ${userId} for update`);
 
     if (limits.maxBrands !== -1) {
-      // Wave 4.5: exclude soft-deleted brands from the cap so a user
+      // Exclude soft-deleted brands from the cap so a user
       // who deletes their last brand can immediately create a new one
       // (instead of being blocked for 30 days until the purge cron).
       const row = firstRow<{ count: number }>(

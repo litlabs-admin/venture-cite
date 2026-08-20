@@ -1,4 +1,4 @@
-// Brand prompts + visibility progress + citation schedule routes (Wave 5.1).
+// Brand prompts, visibility progress, and citation schedule routes.
 //
 // Extracted from server/routes.ts as part of the per-domain split.
 // Covers the brand-level citation prompt portfolio, prompt suggestions,
@@ -131,7 +131,7 @@ export function setupPromptsRoutes(app: Express): void {
   //     anything. Body omits replaceTrackedId.
   //   * Replace: tracked count is at the cap → caller must pass the id of
   //     a tracked prompt to archive in the new prompt's place.
-  // Wave 9.1: previously the route hard-required replaceTrackedId, which
+  // The route previously required replaceTrackedId, which
   // forced users to nuke an existing prompt even after deleting one to
   // make room. Bad UX - the dialog now adapts based on whether there's
   // an open slot.
@@ -522,7 +522,7 @@ export function setupPromptsRoutes(app: Express): void {
           .filter((p): p is string => typeof p === "string")
           .slice(0, DEFAULT_CITATION_PLATFORMS.length);
 
-        // Wave 9.2: reject empty platforms array. Previously the kickoff
+        // Reject an empty platforms array. Previously, the kickoff
         // would happily create a run, do zero AI calls, and finalize as
         // status='failed' with an "All platform calls failed" error
         // message - a phantom failed row in History for nothing. The
@@ -545,7 +545,7 @@ export function setupPromptsRoutes(app: Express): void {
             data: { runId: result.runId },
           });
         }
-        // Wave 9.2: bounded-retry path can still return ok=false with no
+        // The bounded-retry path can return ok=false with no
         // runId in the rare race window. Surface as a generic 500 so the
         // client toast says "Couldn't start run" rather than silently
         // dropping.
@@ -593,7 +593,7 @@ export function setupPromptsRoutes(app: Express): void {
   // Citation cadence is non-configurable: scans run weekly for every
   // active brand via the auto-citation cron in server/scheduler.ts. The
   // user-facing PATCH /citation-schedule route was removed in
-  // Foundations Plan 1 Task 11. The auto_citation_* columns remain in
+  // The auto_citation_* columns remain in
   // the schema as dormant fields.
 
   // Aggregated results for a brand's prompt runs.
@@ -613,7 +613,7 @@ export function setupPromptsRoutes(app: Express): void {
     }),
   );
 
-  // ============ Wave 8: live-update lifecycle ============
+  // ============ Live-update lifecycle ============
   //
   // Cheap "is any run live for this brand" gate. Hit by every dependent
   // page on an 8s interval; while the answer is non-empty those pages
@@ -767,7 +767,7 @@ export function setupPromptsRoutes(app: Express): void {
         }
         const rankings = await storage.getGeoRankingsByRunId(req.params.runId);
 
-        // Wave 9.2: build a prompt-text → orderIndex map so the result
+        // Build a prompt-text to orderIndex map so the result
         // accordion is in stable, user-meaningful order. With concurrency=5
         // in the runner, rankings come back in arbitrary completion order;
         // before this, the user saw "5, 1, 7, 2, …" with no consistent
@@ -872,7 +872,7 @@ export function setupPromptsRoutes(app: Express): void {
         }
         reDetectLastRunAt.set(brand.id, Date.now());
 
-        // Wave 9.1: re-detect intentionally does NOT write a citation_runs
+        // Re-detect does not write a citation_runs
         // row. An earlier pass added one to fire the live banner, but
         // History is meant to be a record of fresh AI runs - re-detect
         // re-evaluates *existing* responses and adds nothing new to the
@@ -940,7 +940,7 @@ export function setupPromptsRoutes(app: Express): void {
             }
           }
 
-          // Wave 9.1: route through the canonical aggregator. The previous
+          // Use the canonical aggregator. The previous
           // inline implementation was duplicated logic that drifted from
           // updates elsewhere; some users ended up with run headers showing
           // "2/50" while the drill-down summed to 16/50. Migration 0039

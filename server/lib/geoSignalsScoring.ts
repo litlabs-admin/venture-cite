@@ -1,4 +1,4 @@
-// GEO Signals scoring primitives (Wave 1.1).
+// GEO Signals scoring primitives.
 //
 // Pure helpers - no DB access, no Express. Imported by
 // server/routes/geoSignals.ts to compose the real 6-signal scorecard.

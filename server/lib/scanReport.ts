@@ -1,4 +1,4 @@
-// Wave 9.4: shared shape returned by listicle / wikipedia / mention
+// Shared shape returned by listicle, Wikipedia, and mention
 // scanners. Replaces the per-scanner ad-hoc { inserted: number } so the
 // route handlers can render multi-line toasts ("Found N · Inserted M ·
 // Skipped (duplicates) D · Failed F") instead of swallowing partial
@@ -22,7 +22,7 @@ export interface ScanReport {
   skippedFiltered: number;
   /** Per-failure details - rate limits, fetch errors, parse failures. */
   failed: ScanFailure[];
-  /** Wave 9.4: re-verification phase only (listicles). */
+  /** Re-verification fields apply only to listicles. */
   reverified?: number;
   lostInclusion?: number;
   /** Optional warning surfaced to the toast (e.g. ambiguous brand name). */

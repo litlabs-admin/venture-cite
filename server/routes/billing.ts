@@ -1,4 +1,4 @@
-// Stripe billing routes (Wave 5.1).
+// Stripe billing routes.
 //
 // All four endpoints proxy through to Stripe's REST API.
 // The webhook is registered separately in server/index.ts because it
@@ -108,7 +108,7 @@ async function withCheckoutLock<T>(userId: string, work: () => Promise<T>): Prom
 }
 
 export function setupBillingRoutes(app: Express): void {
-  // Foundations Plan 3 Task 2: Stripe customer-portal session for the
+  // Stripe customer-portal session for the
   // expanded Settings page. Exposed under /api/billing/* so the new
   // Settings UI has a stable contract.
   app.post(

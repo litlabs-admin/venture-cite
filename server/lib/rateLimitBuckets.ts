@@ -1,4 +1,4 @@
-// Wave 9.5 / Vercel migration: Postgres-backed token-bucket rate limits.
+// Postgres-backed token-bucket rate limits.
 //
 // Previously a process-local Map (single-instance only). On serverless,
 // per-lambda Maps make the limit per-lambda instead of global, so users

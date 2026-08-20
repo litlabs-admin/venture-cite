@@ -14,7 +14,7 @@ const resend = resendApiKey ? new Resend(resendApiKey) : null;
 const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || "VentureCite <reports@venturecite.app>";
 const APP_URL = process.env.APP_URL || "https://venturecite.app";
 
-// Plan 4 audit (BUG #8): firstName lands inside an HTML email body. A
+// firstName lands inside an HTML email body. A
 // user who registered with `firstName: "<script>"` (or worse, an
 // `<img onerror>` payload) would have attacker-controlled HTML rendered
 // in an email signed by our DKIM - brand-damage and content-spoof
@@ -52,7 +52,7 @@ export async function sendWelcomeEmail(to: string, firstName?: string | null): P
   <p style="color:#666;font-size:13px;margin-top:32px">If you have questions, just reply to this email.</p>
 </body></html>`;
 
-  // Plan 4 audit (BUG #7): Resend supports `text` alongside `html`.
+  // Resend supports `text` alongside `html`.
   // Plain-text fallback improves spam-filter scoring and keeps clients
   // that prefer text (or strip HTML aggressively) readable.
   const text = `${plainGreeting}

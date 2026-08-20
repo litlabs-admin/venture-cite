@@ -1,5 +1,4 @@
-// v2 endpoint surface - Plan 2 ships only POST /scrape-one.
-// Plans 3-5 add /search-llm, /user-enrich, /plan, /aggregate, /paste, etc.
+// The v2 endpoint surface includes POST /scrape-one.
 
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";

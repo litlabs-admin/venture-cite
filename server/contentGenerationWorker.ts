@@ -1,6 +1,6 @@
 // Content-generation slice runner.
 //
-// Vercel migration / Wave 9.5: the prior Chat Completions streaming
+// The prior Chat Completions streaming
 // worker was replaced by runArticleSlice(jobId, deadline), invoked by:
 //   - POST /api/content-jobs/:jobId/advance - user-driven, ~8s budget
 //   - the daily cron orchestrator's drain step - server-driven, longer
@@ -48,7 +48,7 @@ export type GenerationPayload = {
   industry: string;
   type: string;
   brandId?: string;
-  articleId: string; // Wave 7: required - the draft article the job will fill
+  articleId: string; // Required draft article that the job fills.
   targetCustomers?: string;
   geography?: string;
   contentStyle?: "b2b" | "b2c";

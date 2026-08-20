@@ -8,7 +8,7 @@ function getStripeKey(): string {
   return key;
 }
 
-// Wave 3.5: pin the Stripe API version explicitly so bumping the SDK
+// Pin the Stripe API version explicitly so bumping the SDK
 // package never silently changes billing behavior (parameter renames,
 // new required fields, response shape changes). When you bump this
 // string, run the Stripe webhook + checkout flow end-to-end first.

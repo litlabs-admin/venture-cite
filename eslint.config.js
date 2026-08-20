@@ -92,7 +92,7 @@ export default tseslint.config(
       },
     },
     rules: {
-      // Server is allowed console.log for now (replaced by pino in Wave 0.2)
+      // The server currently permits console.log.
       "no-console": "off",
       // Guardrail: never run user-auth (session-minting) calls on the
       // service-role client. supabase-js stores the returned session on the

@@ -218,7 +218,7 @@ export async function sendWeeklyVisibilityReport(data: WeeklyReportData): Promis
   const unsubToken = signUnsubscribeToken(data.userId, "weekly_report");
   const unsubUrl = `${APP_URL}/api/unsubscribe?token=${encodeURIComponent(unsubToken)}`;
 
-  // Wave 3.6: send via retry helper (3 retries / 1s/2s/4s backoff).
+  // Send through the retry helper with three retries and 1s, 2s, and 4s backoff.
   // Permanent errors (invalid address, etc.) bail immediately and land
   // in the DLQ; transient errors get retried; success short-circuits.
   const subject = `Your Weekly AI Visibility Report - ${totalCitedAllBrands} citation${totalCitedAllBrands === 1 ? "" : "s"}`;

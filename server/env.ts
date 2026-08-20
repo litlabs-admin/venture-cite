@@ -85,7 +85,7 @@ const envSchemaBase = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_ADDRESS: z.string().optional(),
 
-  // Stripe API version pin (Wave 3.5). Falls back to a hardcoded
+  // Stripe API version pin. Falls back to a hardcoded
   // version in stripeClient.ts. Set in deploy env if you want to
   // pin to a different version than the SDK ships with.
   STRIPE_API_VERSION: z.string().optional(),

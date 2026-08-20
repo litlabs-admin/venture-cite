@@ -8,7 +8,7 @@ import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
 
-// Wave 6.1 added a KNOWN_ROUTES allowlist here to decide 200 vs 404 for the
+// KNOWN_ROUTES decides 200 versus 404 for the
 // dev SPA-fallback and (at the time) a prod serveStatic() fallback. It
 // drifted badly (9 phantom entries for routes that no longer exist, 12 real
 // routes missing at one point) because it was a hand-maintained mirror of

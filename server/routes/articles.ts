@@ -1,6 +1,6 @@
 // Articles CRUD + revisions + distributions + geo-rankings routes.
 //
-// Wave 7: removed both /api/articles/slug/:slug routes - articles are now
+// Articles use a brand-scoped ID instead of a slug route.
 // referenced by id only. The unique slug column was dropped in migration 0033.
 // Drafts are now articles with status='draft' (the legacy content_drafts
 // table is gone), so this file owns the draft creation endpoint too.
@@ -56,7 +56,7 @@ export function setupArticlesRoutes(app: Express): void {
 
   // Create/save a ready article. brandId is verified to belong to the caller;
   // all other fields pass through the allowlist (no viewCount/citationCount).
-  // Wave 7: brandId is now required at the schema level - orphan articles
+  // The schema requires brandId, so orphan articles
   // are forbidden going forward.
   app.post(
     "/api/articles",
@@ -187,7 +187,7 @@ export function setupArticlesRoutes(app: Express): void {
           await requireBrand(update.brandId as string, user.id);
         }
 
-        // Wave 4.4: optimistic locking - see the brand-update handler for
+        // Optimistic locking prevents an older client from overwriting
         // the reasoning. Same pattern, different table.
         const expectedVersion =
           typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : null;
@@ -432,7 +432,7 @@ export function setupArticlesRoutes(app: Express): void {
         const articleContent = article.content?.substring(0, 2000) || article.title || "";
         const articleTitle = article.title ?? "Untitled";
 
-        // Wave 7: run platforms in parallel - each call writes to its own
+        // Run platforms in parallel. Each call writes to its own
         // distribution row, so they don't contend. ~2× faster on multi-platform.
         const results = await Promise.all(
           platforms.map(async (platform: string) => {

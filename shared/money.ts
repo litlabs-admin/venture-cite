@@ -1,4 +1,4 @@
-// Money helpers (Wave 4.1).
+// Money helpers.
 //
 // Storage: integer cents in *_cents columns (bigint in Postgres,
 // `number` in JS - safe up to 2^53 = ~$90 trillion).

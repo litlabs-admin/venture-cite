@@ -1,4 +1,4 @@
-// Wave 9.4: shared loader for BOFU + FAQ generation prompts. Pulls the
+// Shared loader for BOFU and FAQ generation prompts. It pulls the
 // brand row, the active fact sheet, and tracked competitor records for
 // every name in `comparedWith`, so the LLM can be grounded against real
 // facts instead of hallucinating from training data.
@@ -62,7 +62,7 @@ export function renderFactsBlock(facts: BrandFactSheet[]): string {
     const value = String(f.factValue ?? "")
       .slice(0, 500)
       .trim();
-    // TODO(spec-2 Plan 2.4): `subcategory` replaces `factCategory`.
+    // TODO: `subcategory` replaces `factCategory`.
     return `- [${f.subcategory}] ${f.factKey}: ${value}`;
   });
   return [

@@ -1,4 +1,4 @@
-// Per-user LLM token budget runtime (Wave 3.2).
+// Per-user LLM token budget runtime.
 //
 // Pure pricing math (caps, cost estimation, error class) lives in
 // llmPricing.ts so unit tests can import without booting the database

@@ -27,7 +27,7 @@ import { logger } from "./lib/logger";
   await applyMigrations();
   await reconcileOrphanCitationRuns();
 
-  // Plan 4 audit (BUG #14): our email verification flow assumes the
+  // The email verification flow assumes the
   // Supabase project-level "Enable email confirmations" toggle is ON.
   // If it's OFF, Supabase auto-confirms every account regardless of
   // the `email_confirm: false` flag we pass to admin.createUser, and

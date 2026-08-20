@@ -1,4 +1,4 @@
-// Pagination parsing helper (Wave 4.6).
+// Pagination parsing helper.
 //
 // Reads `?limit=` and `?offset=` from the request, clamps them to safe
 // ranges, and returns sensible defaults when missing. The defaults

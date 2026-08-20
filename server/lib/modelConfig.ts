@@ -7,7 +7,7 @@
 // through OpenRouter (Claude, Gemini, Perplexity, DeepSeek, Grok); the
 // ChatGPT citation check stays on the direct OpenAI client.
 //
-// Wave 3.5: OpenAI models are pinned to dated snapshots so bumping the
+// OpenAI models use dated snapshots so bumping the
 // `openai` SDK package can't silently swap us onto a newer model that
 // changes pricing, latency, or output format. To bump:
 //   1. Pick the new dated snapshot from https://platform.openai.com/docs/models

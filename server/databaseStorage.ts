@@ -142,7 +142,7 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  // Wave 4.6: list DAOs accept optional pagination. Internal callers
+  // List DAOs accept optional pagination. Internal callers
   // that need every row (analytics rollups, scheduled jobs) omit opts
   // and get the legacy "all rows" behavior. HTTP routes pass through
   // parsePagination() so unbounded responses can't escape.
@@ -254,7 +254,7 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  // Wave 4.5: every brand reader filters out soft-deleted rows so the
+  // Every brand reader filters out soft-deleted rows so the
   // UI doesn't see brands that are inside their 30-day grace window.
   // The cron-driven hard-delete (runBrandPurgeJob) eventually removes
   // them; until then they stay in the DB but invisible to the API.
@@ -305,7 +305,7 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  // Wave 4.4: optimistic-lock variant of updateBrand. Caller passes the
+  // Optimistic-lock variant of updateBrand. The caller passes the
   // version they last read; the UPDATE only matches when nobody has
   // written in between. Returns undefined when 0 rows matched - caller
   // must distinguish "not found" from "version conflict" by re-fetching.
@@ -326,7 +326,7 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  // Plan 6: atomic CAS from autopilot_status='failed' → 'pending'. The
+  // Atomically change autopilot_status from 'failed' to 'pending'. The
   // WHERE clause is what guarantees race safety - two simultaneous
   // retries both reach the UPDATE, but only one row will match the
   // "still failed" predicate; the other returns 0 rows. Caller maps
@@ -445,7 +445,7 @@ export class DatabaseStorage implements IStorage {
     return (result as unknown as { rowCount?: number }).rowCount ?? 0;
   }
 
-  // Wave 4.5: schedule a brand for deletion in 30 days. Returns the
+  // Schedule a brand for deletion in 30 days. Return the
   // updated row or undefined if the brand wasn't found / already
   // soft-deleted. Idempotent: re-scheduling preserves the original
   // grace window so a double-click doesn't extend the timer.
@@ -481,7 +481,7 @@ export class DatabaseStorage implements IStorage {
     return await q;
   }
 
-  // Wave 4.6: SQL-level scoping by brand owner so LIMIT actually means
+  // SQL scoping by brand owner makes LIMIT mean
   // "100 of your articles" instead of "100 globally then filter to yours".
   // Joins through brands so soft-deleted brands' articles are excluded.
   async getArticlesByUserId(
@@ -522,7 +522,7 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  // Wave 4.4: optimistic-lock variant of updateArticle.
+  // Optimistic-lock variant of updateArticle.
   async updateArticleIfVersion(
     id: string,
     expectedVersion: number,
@@ -797,9 +797,9 @@ export class DatabaseStorage implements IStorage {
     suggestionId: string,
     replaceTrackedId: string | null,
   ): Promise<void> {
-    // Wave 4.3: atomic swap when replacing - both updates succeed together
+    // Use an atomic swap when replacing. Both updates succeed together
     // so we can't end up with two tracked prompts (or none) for the slot.
-    // Wave 9.1: when replaceTrackedId is null, the user is filling an
+    // When replaceTrackedId is null, the user is filling an
     // empty slot (tracked count < cap) - just promote, no archive.
     await db.transaction(async (tx) => {
       if (replaceTrackedId) {
@@ -947,7 +947,7 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  // Wave 9: single-row read used by the async kickoff path. The HTTP handler
+  // The async kickoff path uses this single-row read. The HTTP handler
   // creates the row, hands the runId to a detached `runBrandPrompts(...)`,
   // and returns immediately; runBrandPrompts uses this to load it back.
   async getCitationRunById(runId: string): Promise<CitationRun | undefined> {
@@ -959,7 +959,7 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  // Wave 9.1: recompute totals + per-platform breakdown for a run by
+  // Recompute totals and a per-platform breakdown for a run by
   // reading geo_rankings live. The canonical aggregator - call this any
   // time is_cited mutates on a ranking (re-detect, future bulk fixes)
   // so the cached aggregate on citation_runs stays in sync with what the
@@ -1004,7 +1004,7 @@ export class DatabaseStorage implements IStorage {
     return { totalChecks, totalCited, citationRate };
   }
 
-  // Wave 8: lightweight "is any run live for this brand" check used by the
+  // The live-update polling hook uses this lightweight "is any run live for this brand" check.
   // live-update polling hook on every dependent page. Hits the partial
   // index on (brand_id, status) - should be O(1) regardless of run history.
   async getActiveCitationRuns(
@@ -1463,7 +1463,7 @@ export class DatabaseStorage implements IStorage {
 
   // Crash recovery - flip `running` jobs older than N minutes back to
   // `failed`. Called once on server boot so we don't have orphaned rows.
-  // Wave 7: also classifies the failure as 'timeout' (which the refund
+  // Also classify the failure as 'timeout', which the refund
   // helper considers refundable) and returns the affected jobs so the
   // caller can issue refunds + flip the linked article back to draft.
   async failStuckContentJobs(
@@ -1784,7 +1784,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // Wave 2 - per-run, per-prompt competitor citation row. Idempotent via
+  // Per-run, per-prompt competitor citation row. It is idempotent through
   // the unique index (competitor_id, run_id, brand_prompt_id, ai_platform)
   // from migration 0027, so a retried citation run updates rather than
   // duplicating.
@@ -2022,7 +2022,7 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Wave 2 - read from the per-run, per-prompt competitor_geo_rankings
+    // Read from the per-run, per-prompt competitor_geo_rankings
     // table so the leaderboard reflects actual LLM-judged citations, not
     // a coarse aggregate. One row per (competitor × platform × prompt ×
     // run); count cited rows within the window, bucket by platform.
@@ -2353,7 +2353,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // Wave 9.4: idempotent inserts for scanners. Returns the row only if
+  // Idempotent scanner inserts. Return the row only if
   // the insert actually happened (i.e. no unique-index conflict). Used
   // by the listicle / wikipedia / mention scanners to count "newly
   // inserted" vs "skipped duplicate" without a pre-read.
@@ -2395,7 +2395,7 @@ export class DatabaseStorage implements IStorage {
     return result[0] ?? null;
   }
 
-  // Wave 9.4: trigram similarity-based FAQ dedup. Returns the highest
+  // Trigram similarity-based FAQ deduplication. Return the highest
   // similarity > threshold, or null if none. Falls back to exact-match
   // when the pg_trgm extension or function is unavailable (the
   // similarity() call throws → caller catches and treats as no match).
@@ -2442,7 +2442,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============================================================
-  // Wave 9.4: tracked_content_urls + self-citation tracking.
+  // tracked_content_urls and self-citation tracking.
   // ============================================================
 
   async upsertTrackedContentUrl(insert: InsertTrackedContentUrl): Promise<TrackedContentUrl> {
@@ -2525,7 +2525,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============================================================
-  // Wave 9.4: GEO Tools header summary. Single round-trip count rollup
+  // GEO Tools header summary. A single query returns the count rollup.
   // per brand. Used by GET /api/geo-tools/summary/:brandId.
   // ============================================================
 
@@ -3816,7 +3816,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // ── Wave 7: unified-article methods (replaces the old content_drafts DAO) ──
+  // ── Unified article methods ───────────────────────────────────────────────
 
   async createDraftArticle(
     userId: string,
@@ -3928,7 +3928,7 @@ export class DatabaseStorage implements IStorage {
         title: title ?? sql`${schema.articles.title}`, // keep existing title if caller passes null
         jobId: null,
         version: sql`${schema.articles.version} + 1`,
-        // Foundations Plan 4 Task 4: this is the only path that flips
+        // This is the only path that flips
         // ai_generated=true. Manual creates (POST /api/articles) leave the
         // default false, so the AI-disclosure pill only renders for worker
         // output.
@@ -4650,7 +4650,7 @@ export class DatabaseStorage implements IStorage {
     return { rows, nextCursor };
   }
 
-  // ── Plan 1 (v2): fact_scrape_cache ──────────────────────────────────
+  // ── fact_scrape_cache ─────────────────────────────────────────────────
   async getFactScrapeCache(cacheKey: string) {
     const rows = await db
       .select({
@@ -4702,7 +4702,7 @@ export class DatabaseStorage implements IStorage {
     return (result as unknown as { rowCount: number | null }).rowCount ?? 0;
   }
 
-  // ── Plan 1 (v2): fact_scrape_logs ───────────────────────────────────
+  // ── fact_scrape_logs ──────────────────────────────────────────────────
   async insertFactScrapeLog(row: {
     runId: string;
     source:
@@ -4746,7 +4746,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(schema.factScrapeLogs.createdAt));
   }
 
-  // ── Plan 1 (v2): system_state ───────────────────────────────────────
+  // ── system_state ──────────────────────────────────────────────────────
   async getSystemState(key: string) {
     const rows = await db
       .select({ valueJson: schema.systemState.valueJson })
@@ -4770,7 +4770,7 @@ export class DatabaseStorage implements IStorage {
       });
   }
 
-  // ── Plan 6: lifecycle sweeps ─────────────────────────────────────────
+  // ── Lifecycle sweeps ──────────────────────────────────────────────────
   async deleteOldFactScrapePages(olderThanDays: number): Promise<number> {
     const result = await db.execute(sql`
       DELETE FROM brand_fact_scrape_pages

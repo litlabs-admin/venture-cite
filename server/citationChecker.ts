@@ -132,7 +132,7 @@ export async function checkForCitation(
     nameVariations: extraVariations,
   };
 
-  // Wave 8: matcher already said "yes" above. The LLM judge runs only to
+  // The matcher already said "yes" above. The LLM judge runs only to
   // enrich rank/relevance - it CANNOT flip isCited back to false. If the
   // judge says cited=false but the matcher hit, we still return
   // isCited=true (matcher wins) and discard the judge's rank/relevance.
@@ -154,7 +154,7 @@ export async function checkForCitation(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error({ msg: msg }, `[citationChecker] judge call failed -`);
-    // Wave 8: judge failure no longer flips matcher-yes to no. The
+    // A judge failure does not flip matcher-yes to no. The
     // matcher already determined the brand is named in the response; we
     // record isCited=true with no rank/relevance enrichment.
     return {
@@ -434,7 +434,7 @@ export async function runBrandPrompts(
   const brand = await storage.getBrandById(brandId);
   if (!brand) throw new Error("Brand not found");
 
-  // Wave 3.2: enforce per-user LLM budget. Cron runs and manual triggers
+  // Enforce the per-user LLM budget. Cron runs and manual triggers
   // both go through here, so blocking here covers both. brand.userId can
   // be null for orphaned/legacy rows; in that case skip the check.
   if (brand.userId) {
@@ -461,10 +461,10 @@ export async function runBrandPrompts(
     return { totalChecks: 0, totalCited: 0, rankings: [], runId: null, done: true };
 
   // Create a citation_runs row upfront so every geo_ranking can reference it.
-  // Wave 8: status='running' from creation so the live-update polling hook
+  // Set status='running' at creation so the live-update polling hook
   // on every dependent page sees the run immediately and switches into
   // refetch mode.
-  // Wave 9: if the caller already created the row (via kickoffBrandPromptsRun
+  // If the caller already created the row through kickoffBrandPromptsRun,
   // for the async POST /run path) we reuse it. The kickoff path lets the HTTP
   // handler return immediately while the run continues in the background.
   const triggeredBy = options.triggeredBy ?? "manual";
@@ -526,7 +526,7 @@ export async function runBrandPrompts(
     `[citationChecker] loaded ${competitors.length} active competitors for brand ${brandId}`,
   );
 
-  // Wave 9.4: tracked content URLs - the brand's own published BOFU/FAQ
+  // Tracked content URLs are the brand's published BOFU and FAQ
   // pages. Loaded once per run; substring-matched against each LLM
   // response below so we can stamp last_cited_at + bump
   // citation_runs.self_citation_count whenever an AI engine cites
@@ -546,7 +546,7 @@ export async function runBrandPrompts(
   // calls per run total.
   const autoDiscoveredPlatforms = new Set<string>();
 
-  // Wave 9: run-scoped variation cache. Previously we did getBrandById +
+  // Use a run-scoped variation cache. Previously, getBrandById and
   // getCompetitors once per response (~50 reads per typical run) just to
   // pick up freshly-learned variations from the analyzer. Instead, build
   // the cache once at run start and mutate it in-place when
@@ -592,7 +592,7 @@ export async function runBrandPrompts(
     }
   };
 
-  // Wave 9: per-run disagreement counter. Persisted on finalize so HistoryTab
+  // Persist a per-run disagreement counter on finalize so HistoryTab
   // can surface "matcher and analyzer disagreed on N of M checks" - useful
   // for tuning the variation list. Rate >5% suggests the brand needs more
   // user-supplied variations.
@@ -763,7 +763,7 @@ export async function runBrandPrompts(
     // The matcher reads variants live so subsequent detection calls see the
     // new forms without a deploy. User can delete unwanted variants from
     // the brand/competitor edit UI.
-    // Wave 9: append every analyzer-surfaced variant into the run-scoped
+    // Append every analyzer-surfaced variant into the run-scoped
     // cache (and persist to DB). This replaces the per-response
     // getBrandById + getCompetitors round-trip - same correctness, ~50
     // fewer reads per typical run.
@@ -778,11 +778,11 @@ export async function runBrandPrompts(
       }
     }
 
-    // Wave 8: matcher-authoritative `isCited`. Run the universal matcher -
+    // The matcher controls `isCited`. Run the universal matcher.
     // its verdict overrides the analyzer's `cited` boolean for every
     // isCited write below. Analyzer's enrichment fields (rank, relevance,
     // context, citedUrls) are still used, but only when matcher confirms.
-    // Variations come from the run-scoped cache (Wave 9) so the matcher
+    // Variations come from the run-scoped cache so the matcher
     // sees variants the analyzer just learned for THIS response without
     // a DB round-trip.
     const matcherDetection = responseText
@@ -819,7 +819,7 @@ export async function runBrandPrompts(
     const brandVerdict = analysis.tracked[brand.id] ?? null;
     const analyzerCited = Boolean(brandVerdict?.cited);
 
-    // Wave 9.4: self-citation detection. If the LLM response includes a
+    // Detect self-citations. If the LLM response includes a
     // URL we registered as user-published content (BOFU or FAQ), stamp
     // the source row's lastCitedAt and bump the run's
     // selfCitationCount. Idempotent within a single run via
@@ -913,7 +913,7 @@ export async function runBrandPrompts(
 
     // 4. Competitor citation rows - one per competitor the matcher hit on
     // this response. Absence of a row = not cited (keeps table narrow).
-    // Wave 8: matcher is authoritative for isCited; analyzer's rank/
+    // The matcher controls isCited. The analyzer's rank and
     // relevance only used when matcher agrees.
     if (responseText && !fetchError) {
       for (const comp of competitors) {
@@ -977,7 +977,7 @@ export async function runBrandPrompts(
       // competitors with discoveredBy='citation_auto'. Only when the
       // brand was cited (filters off-topic responses) and only once per
       // (runId, platform) with a per-platform cap to bound storm risk.
-      // Wave 8: each candidate is matcher-confirmed against the response
+      // The matcher confirms each candidate against the response
       // text before insert - protects against analyzer hallucinations
       // creating phantom competitor rows for brands that aren't actually
       // mentioned.
@@ -1110,7 +1110,7 @@ export async function runBrandPrompts(
     }
   };
 
-  // Wave 8/9: bump citation_runs.progress_pct so the live-update hook sees
+  // Bump citation_runs.progress_pct so the live-update hook sees
   // movement. Bump cadence: every PROGRESS_BUMP_EVERY tasks OR every
   // PROGRESS_BUMP_INTERVAL_MS, whichever comes first. The time-based path
   // ensures small runs (e.g. 3-task single-prompt re-runs) still feel live;
@@ -1213,7 +1213,7 @@ export async function runBrandPrompts(
       { ...s, rate: citationRatePct(s.cited, s.checks) },
     ]),
   );
-  // Wave 8: classify the run as succeeded / partial / failed based on what
+  // Classify the run as succeeded, partial, or failed based on what
   // actually got persisted. 'partial' = some checks went through but at
   // least one platform fully failed (every task on it errored). For now
   // we treat any run with rankings present as succeeded - the platform-
@@ -1228,7 +1228,7 @@ export async function runBrandPrompts(
     platformBreakdown,
     status: runStatus,
     progressPct: 100,
-    // Wave 9: surface a reason on HistoryTab when a run finalizes with zero
+    // Surface a reason on HistoryTab when a run finalizes with zero
     // rankings - helps users tell "0% citation rate" apart from "every API
     // call failed". The detached kickoff overwrites this if the run threw.
     ...(runStatus === "failed" && totalChecks === 0
@@ -1301,7 +1301,7 @@ export async function runBrandPrompts(
   return { totalChecks, totalCited, rankings, runId: citationRun.id, done: true };
 }
 
-// ---- Wave 9: async kickoff path ----------------------------------------
+// ---- Async kickoff path -------------------------------------------------
 //
 // `runBrandPrompts` can take 30-120s for a full run (15 prompts × 6
 // platforms). Vercel's 60s function cap forces us to bound the kickoff
@@ -1355,7 +1355,7 @@ export async function kickoffBrandPromptsRun(
       );
       return { ok: false, reason: "already_running", runId: existing.id };
     }
-    // Wave 9.2: race window - the partial unique index tripped, but
+    // The partial unique index can reject an insert in this race window, but
     // by the time we re-read active runs, the conflicting row has
     // already finalized. Retry the insert exactly once. If it still
     // collides, surface as a "race" result; the caller (route) returns
