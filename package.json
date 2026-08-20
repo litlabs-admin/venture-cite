@@ -16,6 +16,7 @@
     "check": "tsc && npm run verify:tours",
     "verify:tours": "tsx scripts/verify-tour-targets.ts",
     "db:push": "drizzle-kit push",
+    "db:audit:metadata": "tsx scripts/auditDatabaseMetadata.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:migrate:release": "cross-env NODE_ENV=production tsx scripts/migrate.ts --release",
     "supabase:migrations:sync": "node scripts/syncSupabaseMigrations.mjs",

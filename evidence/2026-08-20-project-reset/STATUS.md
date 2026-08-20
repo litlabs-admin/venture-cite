@@ -37,9 +37,9 @@ The repository does not contain the Buffer token.
 
 Five agent profiles now define Luna Low, Terra Low, Terra Medium, Sol Medium, and Spark Low work.
 
-All 20 skills now have automatic invocation metadata and pinned source records.
+All 20 skills have automatic invocation metadata and pinned source records.
 
-The skill lock remains unchanged because its hash method is not available.
+The official skill validator passes for all 20 skills under Python 3.12.
 
 The stale Markdown scan found possible user data in 15 files.
 
@@ -59,23 +59,33 @@ The type check passes.
 
 The lint command passes with 813 warnings.
 
-The format check fails across many files.
+The format check passes across the repository.
 
 The database test setup now rejects the normal application database.
 
-A local Supabase stack runs on separate ports 55321 through 55329.
+A local Supabase stack uses separate ports 55321 through 55329.
+
+The stack is stopped after tests and keeps its restartable volumes.
+
+The separate Quinhex Supabase stack is also stopped and keeps its restartable volumes.
 
 The Supabase CLI is a pinned development dependency.
 
-Migrations 0094 and 0095 passed real PostgreSQL tests.
+The complete baseline and migrations 0000 through 0095 pass `supabase db reset`.
 
-Four repair commits now preserve the reviewed code and test changes locally.
+The build and application startup do not apply migrations.
+
+The controlled production release command requires an explicit confirmation value.
+
+The migration runner verifies SHA-256 checksums for recorded migrations.
+
+The database integration run passed 34 tests against local Supabase.
 
 The focused safety run passed 102 tests.
 
 The local PostgreSQL run passed six tests.
 
-The full test run passed 1,390 tests and skipped 37 database-dependent tests.
+The full test run passed 1,408 tests and skipped 37 optional-service tests.
 
 No test loaded the normal application database URL.
 
@@ -83,7 +93,7 @@ The dependency audit has no high or low findings.
 
 Four moderate Drizzle Kit loader findings remain without a supported upgrade.
 
-The final Sol review confirmed that its seven repair gaps are closed.
+The final Sol reviews confirmed that ten release repair gaps are closed.
 
 The review found no direct regression from those fixes.
 
@@ -91,10 +101,16 @@ The live landing, pricing, login, and registration pages render without browser 
 
 The live health route remains unverified.
 
+The strict live database metadata check reached certificate verification and failed closed.
+
+The Supabase project CA must come from the project dashboard before the metadata query can run.
+
+No application row was queried during that failed check.
+
 ## Next checks
 
-1. Record the unsupported Drizzle Kit advisory until its upstream fix exists.
-2. Build a complete local database baseline.
-3. Review the live Supabase role and policy state without user data.
-4. Replace boot-time migrations with a controlled release step.
-5. Add the approved legal entity and privacy contact to the public policy.
+1. Review the live Supabase role and policy state without user data.
+2. Move one backend domain at a time to database-enforced tenant policies.
+3. Configure the production database TLS settings and exact Stripe catalogue IDs.
+4. Add the approved legal entity and privacy contact to the public policy.
+5. Reduce the remaining lint warning debt.

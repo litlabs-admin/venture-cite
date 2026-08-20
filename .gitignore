@@ -9,10 +9,7 @@ build
 out
 server/public
 *.tsbuildinfo
-# Nitro's own build output (TanStack Start). Lands under client/ today
-# because Nitro resolves it relative to Vite's `root`, not the repo root -
-# see the Phase 2 Task 2 report for why that's a live, unresolved conflict
-# with the existing `build.outDir: dist/public` convention.
+# Nitro can create `.output` under the configured Vite root.
 .output/
 
 # ─── Environment variables - NEVER commit ───────────────────────
@@ -24,9 +21,6 @@ server/public
 log.txt
 *.log
 logs/
-
-# ─── Documentation ──────────────────────────────────────────────
-# Track Markdown files. A later evidence-led pass will replace stale files.
 
 # ─── Editor / IDE ────────────────────────────────────────────────
 .vscode
@@ -115,10 +109,6 @@ brainstorms/
 *.doc
 *.pptx
 *.xlsx
-
-# Superpowers specs, plans and baselines stay LOCAL - they fall under the
-# global *.md ignore above. The handful already committed stay tracked;
-# git does not untrack a file just because it becomes ignored.
 
 # Vercel build output (generated server bundle, not source)
 api/
