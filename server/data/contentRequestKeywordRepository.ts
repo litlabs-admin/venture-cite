@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
-import { keywordResearch, type KeywordResearch } from "@shared/schema";
+import { keywordResearch, type KeywordResearch, type InsertKeywordResearch } from "@shared/schema";
 import type { db } from "../db";
 import type { RequestActor } from "../lib/requestActor";
 import type { RequestRepositoryTransaction } from "./requestRepositoryTransaction";
@@ -38,7 +38,27 @@ export type ContentRequestKeywordRepository = {
   ): Promise<ContentRequestKeyword[]>;
   listTopOpportunities(brandId: string, limit?: number): Promise<ContentRequestKeyword[]>;
   get(id: string): Promise<ContentRequestKeyword | undefined>;
+  update(id: string, patch: ContentRequestKeywordPatch): Promise<ContentRequestKeyword | undefined>;
+  delete(id: string): Promise<boolean>;
 };
+
+export type ContentRequestKeywordPatch = Partial<
+  Pick<
+    InsertKeywordResearch,
+    | "keyword"
+    | "searchVolume"
+    | "difficulty"
+    | "opportunityScore"
+    | "aiCitationPotential"
+    | "intent"
+    | "category"
+    | "competitorGap"
+    | "suggestedContentType"
+    | "relatedKeywords"
+    | "status"
+    | "contentGenerated"
+  >
+>;
 
 export function createContentRequestKeywordRepository({
   actor,
@@ -93,6 +113,30 @@ export function createContentRequestKeywordRepository({
           .where(eq(keywordResearch.id, id))
           .limit(1);
         return keyword;
+      });
+    },
+
+    update(
+      id: string,
+      patch: ContentRequestKeywordPatch,
+    ): Promise<ContentRequestKeyword | undefined> {
+      return run(async (transaction) => {
+        const [updated] = await transaction
+          .update(keywordResearch)
+          .set({ ...patch, updatedAt: new Date() })
+          .where(eq(keywordResearch.id, id))
+          .returning(contentRequestKeywordColumns);
+        return updated;
+      });
+    },
+
+    delete(id: string): Promise<boolean> {
+      return run(async (transaction) => {
+        const deleted = await transaction
+          .delete(keywordResearch)
+          .where(eq(keywordResearch.id, id))
+          .returning({ id: keywordResearch.id });
+        return deleted.length > 0;
       });
     },
   };

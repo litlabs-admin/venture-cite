@@ -65,6 +65,13 @@ describeIfLocal("content request database RLS", () => {
       path.resolve(process.cwd(), "migrations/0104_content_request_article_writes.sql"),
       "utf8",
     );
+    const distributionKeywordWritesMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "migrations/0105_content_request_distribution_keyword_writes.sql",
+      ),
+      "utf8",
+    );
     await ownerPool.query(foundationMigration);
     await ownerPool.query(contentMigration);
     await ownerPool.query(contentMigration);
@@ -72,6 +79,8 @@ describeIfLocal("content request database RLS", () => {
     await ownerPool.query(responseColumnsMigration);
     await ownerPool.query(articleWritesMigration);
     await ownerPool.query(articleWritesMigration);
+    await ownerPool.query(distributionKeywordWritesMigration);
+    await ownerPool.query(distributionKeywordWritesMigration);
 
     await ownerPool.query(
       `create role "${runtimeRole}" with
@@ -462,18 +471,80 @@ describeIfLocal("content request database RLS", () => {
     expect(afterRollback.rows[0]?.content).toBe(beforeRollback.rows[0]?.content);
   });
 
+  it("binds distribution and keyword writes to the actor and rolls back batches", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+    const batchPlatform = `Batch-${randomUUID()}`;
+
+    await expect(
+      actorA.distributions.createMany([
+        { articleId: articleAId, platform: batchPlatform, status: "pending" },
+        { articleId: articleBId, platform: batchPlatform, status: "pending" },
+      ]),
+    ).rejects.toBeDefined();
+    const rolledBack = await ownerPool.query(
+      "select id from public.distributions where platform = $1",
+      [batchPlatform],
+    );
+    expect(rolledBack.rows).toEqual([]);
+
+    const [distribution] = await actorA.distributions.createMany([
+      { articleId: articleAId, platform: `Owned-${randomUUID()}`, status: "pending" },
+    ]);
+    const updatedDistribution = await actorA.distributions.update(distribution.id, {
+      status: "success",
+      metadata: { content: "edited" },
+    });
+    expect(updatedDistribution?.status).toBe("success");
+
+    const updatedKeyword = await actorA.keywords.update(keywordAId, { category: "owned" });
+    expect(updatedKeyword?.category).toBe("owned");
+    const actorB = contentData.forActor(createRequestActor(userBId));
+    await expect(
+      actorB.keywords.update(keywordAId, { category: "cross-user" }),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      forUser(userAId, async (transaction) => {
+        await transaction.execute(
+          sql`update public.distributions set platform_post_id = 'forbidden' where id = ${distribution.id}`,
+        );
+      }),
+    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    await expect(
+      forUser(userAId, async (transaction) => {
+        await transaction.execute(sql`
+          insert into public.distributions
+            (article_id, platform, status, platform_post_id)
+          values (${articleAId}, 'Forbidden provider field', 'pending', 'forbidden')
+        `);
+      }),
+    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    await expect(
+      forUser(userAId, async (transaction) => {
+        await transaction.execute(
+          sql`update public.keyword_research set brand_id = ${brandBId} where id = ${keywordAId}`,
+        );
+      }),
+    ).rejects.toMatchObject({ cause: { code: "42501" } });
+
+    await ownerPool.query("delete from public.distributions where id = $1", [distribution.id]);
+  });
+
   it("keeps unrelated request writes denied", async () => {
     await expect(
       forUser(userAId, async (transaction) => {
         await transaction.execute(
-          sql`update public.distributions set metadata = '{}' where article_id = ${articleAId}`,
+          sql`update public.distributions set platform_post_id = 'forbidden' where article_id = ${articleAId}`,
         );
       }),
     ).rejects.toMatchObject({ cause: { code: "42501" } });
     await expect(
       forUser(userAId, async (transaction) => {
         await transaction.execute(
-          sql`delete from public.keyword_research where id = ${keywordAId}`,
+          sql`update public.keyword_research set provenance = 'forbidden' where id = ${keywordAId}`,
         );
       }),
     ).rejects.toMatchObject({ cause: { code: "42501" } });

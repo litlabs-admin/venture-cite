@@ -29,6 +29,7 @@
 //   DELETE /api/keyword-research/:id         - delete row
 
 import type { Express, Request, Response } from "express";
+import { z } from "zod";
 import { storage } from "../storage";
 import { db } from "../db";
 import * as schema from "@shared/schema";
@@ -36,13 +37,7 @@ import { resolveTier } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { MODELS } from "../lib/modelConfig";
 import { type GenerationPayload } from "../contentGenerationWorker";
-import {
-  requireUser,
-  requireBrand,
-  requireArticle,
-  requireKeywordResearch,
-  pickFields,
-} from "../lib/ownership";
+import { requireUser, requireBrand, requireArticle } from "../lib/ownership";
 import { withArticleQuota, isUsageLimitError } from "../lib/usageLimit";
 import type { Tier } from "../lib/llmPricing";
 import {
@@ -62,6 +57,29 @@ import { captureAndFlush } from "../lib/sentryReport";
 import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
 import { createRequestActor } from "../lib/requestActor";
 import { contentRequestData } from "../data/contentRequestData";
+
+const keywordUpdateSchema = z
+  .object({
+    keyword: z.string().min(1).optional(),
+    searchVolume: z.number().int().nullable().optional(),
+    difficulty: z.number().int().min(1).max(100).nullable().optional(),
+    opportunityScore: z.number().int().min(1).max(100).optional(),
+    aiCitationPotential: z.number().int().min(1).max(100).optional(),
+    intent: z
+      .enum(["informational", "commercial", "transactional", "navigational"])
+      .nullable()
+      .optional(),
+    category: z.string().nullable().optional(),
+    competitorGap: z.number().int().min(0).max(100).optional(),
+    suggestedContentType: z.string().nullable().optional(),
+    relatedKeywords: z.array(z.string()).nullable().optional(),
+    status: z.enum(["discovered"]).optional(),
+    contentGenerated: z.number().int().optional(),
+  })
+  .strict()
+  .refine((update) => Object.keys(update).length > 0, {
+    message: "At least one keyword field is required",
+  });
 
 // ─────────────────────────────────────────────────────────────────────────
 // Keyword discovery handler - registered at module-load. The poll endpoint
@@ -1043,22 +1061,16 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireKeywordResearch(req.params.id, user.id);
-        const update = pickFields(req.body, [
-          "keyword",
-          "searchVolume",
-          "difficulty",
-          "opportunityScore",
-          "aiCitationPotential",
-          "intent",
-          "category",
-          "competitorGap",
-          "suggestedContentType",
-          "relatedKeywords",
-          "status",
-          "contentGenerated",
-        ] as const);
-        const updated = await storage.updateKeywordResearch(req.params.id, update as any);
+        const actor = createRequestActor(user.id);
+        const keywords = contentRequestData.forActor(actor).keywords;
+        if (!(await keywords.get(req.params.id))) {
+          return res.status(404).json({ success: false, error: "Keyword research not found" });
+        }
+        const parsed = keywordUpdateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: "Invalid keyword update" });
+        }
+        const updated = await keywords.update(req.params.id, parsed.data);
         if (!updated) {
           return res.status(404).json({ success: false, error: "Keyword not found" });
         }
@@ -1074,8 +1086,11 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireKeywordResearch(req.params.id, user.id);
-        const deleted = await storage.deleteKeywordResearch(req.params.id);
+        const keywords = contentRequestData.forActor(createRequestActor(user.id)).keywords;
+        if (!(await keywords.get(req.params.id))) {
+          return res.status(404).json({ success: false, error: "Keyword research not found" });
+        }
+        const deleted = await keywords.delete(req.params.id);
         res.json({ success: true, deleted });
       } catch (error) {
         sendError(res, error, "Failed to delete keyword");

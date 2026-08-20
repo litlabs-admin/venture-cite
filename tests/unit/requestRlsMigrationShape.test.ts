@@ -57,6 +57,32 @@ describe("request RLS migration shape", () => {
     );
   });
 
+  it("grants only owned distribution and keyword request writes", () => {
+    const migration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "migrations/0105_content_request_distribution_keyword_writes.sql",
+      ),
+      "utf8",
+    );
+    const supabaseMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/20260421000105_0105_content_request_distribution_keyword_writes.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toMatch(/grant insert\s*\(id, article_id, platform, status, metadata\)/i);
+    expect(migration).toMatch(/grant update\s*\(status, distributed_at, metadata, error\)/i);
+    expect(migration).not.toMatch(/grant\s+(?:insert|update)\s*\([^)]*platform_post_id[^)]*\)/i);
+    expect(migration).toMatch(/grant update\s*\([\s\S]+updated_at\s*\)/i);
+    expect(migration).toMatch(/keyword_research_content_request_update[\s\S]+deleted_at is null/i);
+    expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
+      migration,
+    );
+  });
+
   it("keeps the outbox boundary actor-bound and cancellation-safe", () => {
     const migration = fs.readFileSync(
       path.resolve(process.cwd(), "migrations/0098_transactional_outbox.sql"),

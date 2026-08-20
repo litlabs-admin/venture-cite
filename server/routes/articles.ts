@@ -34,6 +34,25 @@ import { postToBuffer } from "../lib/bufferPost";
 import { createRequestActor } from "../lib/requestActor";
 import { contentRequestData } from "../data/contentRequestData";
 
+const distributionCreateSchema = z.object({
+  articleId: z.string().min(1),
+  platforms: z.array(z.string().min(1)).min(1),
+});
+
+const distributionEditSchema = z.object({ content: z.string() });
+
+const distributionFormatSchema = z.object({
+  platforms: z.array(z.string().min(1)).min(1),
+});
+
+const bufferPostSchema = z.object({ channelId: z.string().min(1) });
+
+function metadataWithContent(metadata: unknown, content: string): Record<string, unknown> {
+  const current =
+    typeof metadata === "object" && metadata !== null && !Array.isArray(metadata) ? metadata : {};
+  return { ...current, content };
+}
+
 import { logger } from "../lib/logger";
 export function setupArticlesRoutes(app: Express): void {
   const articleFields = z.object({
@@ -313,24 +332,25 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const { articleId, platforms } = req.body ?? {};
-        if (!articleId || !Array.isArray(platforms)) {
+        const parsed = distributionCreateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
           return res
             .status(400)
             .json({ success: false, error: "articleId and platforms are required" });
         }
-        const article = await requireArticle(articleId, user.id);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData
+          .forActor(actor)
+          .articles.get(parsed.data.articleId);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
 
-        const distributions = [];
-        for (const platform of platforms.slice(0, 10)) {
-          if (typeof platform !== "string") continue;
-          const distribution = await storage.createDistribution({
+        const distributions = await contentRequestData.forActor(actor).distributions.createMany(
+          parsed.data.platforms.slice(0, 10).map((platform) => ({
             articleId: article.id,
             platform,
             status: "pending",
-          });
-          distributions.push(distribution);
-        }
+          })),
+        );
 
         res.json({ success: true, data: distributions });
       } catch (error) {
@@ -364,18 +384,19 @@ export function setupArticlesRoutes(app: Express): void {
       try {
         const user = requireUser(req);
         const { distributionId } = req.params;
-        const { content } = req.body;
-        if (typeof content !== "string") {
+        const parsed = distributionEditSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
           return res.status(400).json({ success: false, error: "content is required" });
         }
-        const dist = await contentRequestData
-          .forActor(createRequestActor(user.id))
-          .distributions.get(distributionId);
+        const actor = createRequestActor(user.id);
+        const dist = await contentRequestData.forActor(actor).distributions.get(distributionId);
         if (!dist) return res.status(404).json({ success: false, error: "Distribution not found" });
 
-        const updated = await storage.updateDistribution(distributionId, {
-          metadata: { ...((dist.metadata as object) ?? {}), content },
-        });
+        const updated = await contentRequestData
+          .forActor(actor)
+          .distributions.update(distributionId, {
+            metadata: metadataWithContent(dist.metadata, parsed.data.content),
+          });
         res.json({ success: true, data: updated });
       } catch (error) {
         sendError(res, error, "Failed to update distribution");
@@ -392,12 +413,12 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.articleId, user.id);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.articleId);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
 
-        const platformsRaw = Array.isArray(req.body?.platforms) ? req.body.platforms : [];
-        const platforms = platformsRaw
-          .filter((p: unknown): p is string => typeof p === "string")
-          .slice(0, 7);
+        const parsed = distributionFormatSchema.safeParse(req.body ?? {});
+        const platforms = parsed.success ? parsed.data.platforms : [];
         if (platforms.length === 0) {
           return res.status(400).json({ success: false, error: "platforms array is required" });
         }
@@ -420,11 +441,11 @@ export function setupArticlesRoutes(app: Express): void {
         // distribution row, so they don't contend. ~2× faster on multi-platform.
         const results = await Promise.all(
           platforms.map(async (platform: string) => {
-            const distribution = await storage.createDistribution({
-              articleId: article.id,
-              platform,
-              status: "pending",
-            });
+            const created = await contentRequestData
+              .forActor(actor)
+              .distributions.createMany([{ articleId: article.id, platform, status: "pending" }]);
+            const distribution = created[0];
+            if (!distribution) throw new Error("Distribution insert returned no row");
 
             try {
               const platformPrompts: Record<string, string> = {
@@ -524,7 +545,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
                 logger.error(
                   `[distribute] ${platform} returned empty content for article ${article.id}`,
                 );
-                await storage.updateDistribution(distribution.id, {
+                await contentRequestData.forActor(actor).distributions.update(distribution.id, {
                   status: "failed",
                   error: "AI returned empty content",
                 });
@@ -535,7 +556,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
                 };
               }
 
-              await storage.updateDistribution(distribution.id, {
+              await contentRequestData.forActor(actor).distributions.update(distribution.id, {
                 status: "success",
                 distributedAt: new Date(),
                 metadata: { content: formattedContent },
@@ -548,7 +569,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
                 platformPostId: null as string | null,
               };
             } catch (apiError) {
-              await storage.updateDistribution(distribution.id, {
+              await contentRequestData.forActor(actor).distributions.update(distribution.id, {
                 status: "failed",
                 error: apiError instanceof Error ? apiError.message : "Content formatting failed",
               });
@@ -584,15 +605,15 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
         if (!distribution) {
           return res.status(404).json({ success: false, error: "not_found" });
         }
-        const { channelId } = req.body ?? {};
-        if (!channelId || typeof channelId !== "string") {
+        const parsed = bufferPostSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
           return res.status(400).json({ success: false, error: "channelId is required" });
         }
         const content = (distribution.metadata as { content?: string } | null)?.content;
         if (!content || typeof content !== "string" || !content.trim()) {
           return res.status(400).json({ success: false, error: "no_content" });
         }
-        const result = await postToBuffer(user.id, channelId, content);
+        const result = await postToBuffer(user.id, parsed.data.channelId, content);
         if (result.ok) {
           await storage.updateDistribution(distribution.id, {
             platformPostId: result.postId,
