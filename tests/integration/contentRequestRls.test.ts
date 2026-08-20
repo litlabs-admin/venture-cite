@@ -61,11 +61,17 @@ describeIfLocal("content request database RLS", () => {
       path.resolve(process.cwd(), "migrations/0103_content_request_response_columns.sql"),
       "utf8",
     );
+    const articleWritesMigration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0104_content_request_article_writes.sql"),
+      "utf8",
+    );
     await ownerPool.query(foundationMigration);
     await ownerPool.query(contentMigration);
     await ownerPool.query(contentMigration);
     await ownerPool.query(responseColumnsMigration);
     await ownerPool.query(responseColumnsMigration);
+    await ownerPool.query(articleWritesMigration);
+    await ownerPool.query(articleWritesMigration);
 
     await ownerPool.query(
       `create role "${runtimeRole}" with
@@ -324,6 +330,10 @@ describeIfLocal("content request database RLS", () => {
       path.resolve(process.cwd(), "migrations/0097_request_rls_content.sql"),
       "utf8",
     );
+    const articleWritesMigration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0104_content_request_article_writes.sql"),
+      "utf8",
+    );
 
     await ownerPool.query(`revoke venturecite_content_request from "${runtimeRole}"`);
     try {
@@ -337,25 +347,122 @@ describeIfLocal("content request database RLS", () => {
         "revoke select (id) on public.analytics from venturecite_content_request",
       );
       await ownerPool.query(`grant venturecite_content_request to "${runtimeRole}"`);
+      await ownerPool.query(articleWritesMigration);
+      await ownerPool.query(articleWritesMigration);
     }
   });
 
-  it("denies every request write even for owned content", async () => {
+  it("allows owned article and revision writes while denying cross-user and protected fields", async () => {
+    const createdArticle = await forUser(userAId, async (transaction) => {
+      const inserted = await transaction.execute<{ id: string }>(sql`
+        insert into public.articles (brand_id, title, content, status)
+        values (${brandAId}, 'Created', 'Created content', 'draft')
+        returning id
+      `);
+      const createdArticleId = inserted.rows[0]?.id;
+      if (!createdArticleId) throw new Error("Expected the article insert to return an ID");
+      await transaction.execute(sql`
+        update public.articles set title = 'Changed' where id = ${createdArticleId}
+      `);
+      await transaction.execute(sql`
+        insert into public.article_revisions (article_id, content, source, created_by)
+        values (${createdArticleId}, 'Edited', 'manual_edit', ${userAId})
+      `);
+      return createdArticleId;
+    });
+
+    const crossUserUpdate = await forUser(userBId, async (transaction) =>
+      transaction.execute(sql`
+        update public.articles set title = 'Cross-user' where id = ${createdArticle}
+        returning id
+      `),
+    );
+    expect(crossUserUpdate.rows).toEqual([]);
+
     await expect(
       forUser(userAId, async (transaction) => {
         await transaction.execute(
-          sql`update public.articles set title = 'Changed' where id = ${articleAId}`,
+          sql`update public.articles set citation_count = 99 where id = ${createdArticle}`,
         );
       }),
     ).rejects.toMatchObject({ cause: { code: "42501" } });
+
     await expect(
       forUser(userAId, async (transaction) => {
+        await transaction.execute(
+          sql`update public.article_revisions set created_at = now() where article_id = ${createdArticle}`,
+        );
+      }),
+    ).rejects.toMatchObject({ cause: { code: "42501" } });
+
+    await expect(
+      forUser(userBId, async (transaction) => {
         await transaction.execute(sql`
           insert into public.article_revisions (article_id, content, source, created_by)
-          values (${articleAId}, 'Edited', 'manual_edit', ${userAId})
+          values (${createdArticle}, 'Cross-user', 'manual_edit', ${userBId})
         `);
       }),
     ).rejects.toMatchObject({ cause: { code: "42501" } });
+
+    await ownerPool.query("delete from public.articles where id = $1", [createdArticle]);
+  });
+
+  it("supports optimistic article updates and atomic revision restores", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+
+    const restored = await actorA.revisions.restore(articleAId, "missing-revision", 0);
+    expect(restored).toEqual({ kind: "not_found" });
+
+    const revisionRows = await ownerPool.query<{ id: string }>(
+      "select id from public.article_revisions where article_id = $1 order by created_at limit 1",
+      [articleAId],
+    );
+    const revisionId = revisionRows.rows[0]?.id;
+    if (!revisionId) throw new Error("Expected a seed revision");
+
+    const restoreResult = await actorA.revisions.restore(articleAId, revisionId, 0);
+    expect(restoreResult.kind).toBe("restored");
+    if (restoreResult.kind === "restored") {
+      expect(restoreResult.article.content).toBe("Revision A");
+      expect(restoreResult.revision.source).toBe("manual_edit");
+      expect(restoreResult.revision.createdBy).toBe(userAId);
+    }
+
+    const conflict = await actorA.revisions.restore(articleAId, revisionId, 0);
+    expect(conflict.kind).toBe("conflict");
+
+    const actorB = contentData.forActor(createRequestActor(userBId));
+    await expect(actorB.articles.update(articleAId, { title: "Hidden" })).resolves.toBeUndefined();
+    await expect(actorB.revisions.restore(articleAId, revisionId)).resolves.toEqual({
+      kind: "not_found",
+    });
+
+    const beforeRollback = await ownerPool.query<{ content: string }>(
+      "select content from public.articles where id = $1",
+      [articleAId],
+    );
+    await expect(
+      forUser(userAId, async (transaction) => {
+        await transaction.execute(sql`
+          update public.articles set content = 'Should roll back' where id = ${articleAId}
+        `);
+        await transaction.execute(sql`
+          insert into public.article_revisions (article_id, content, source, created_by)
+          values (${articleAId}, 'Broken', 'invalid_source', ${userAId})
+        `);
+      }),
+    ).rejects.toBeDefined();
+    const afterRollback = await ownerPool.query<{ content: string }>(
+      "select content from public.articles where id = $1",
+      [articleAId],
+    );
+    expect(afterRollback.rows[0]?.content).toBe(beforeRollback.rows[0]?.content);
+  });
+
+  it("keeps unrelated request writes denied", async () => {
     await expect(
       forUser(userAId, async (transaction) => {
         await transaction.execute(

@@ -1,11 +1,16 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { articles, type Article } from "@shared/schema";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+  articles,
+  type Article,
+  type InsertArticle,
+  type InsertArticleRevision,
+} from "@shared/schema";
 import type { db } from "../db";
 import type { RequestActor } from "../lib/requestActor";
 import type { RequestRepositoryTransaction } from "./requestRepositoryTransaction";
 import { setRestrictedRequestContext } from "./restrictedRequestTransaction";
 
-const contentRequestArticleColumns = {
+export const contentRequestArticleColumns = {
   id: articles.id,
   brandId: articles.brandId,
   title: articles.title,
@@ -44,7 +49,46 @@ export type ContentRequestArticleRepository = {
     offset?: number;
   }): Promise<ContentRequestArticle[]>;
   get(id: string): Promise<ContentRequestArticle | undefined>;
+  createReady(input: ContentRequestArticleCreateReady): Promise<ContentRequestArticle>;
+  createDraft(input: ContentRequestArticleCreateDraft): Promise<ContentRequestArticle>;
+  update(id: string, patch: ContentRequestArticlePatch): Promise<ContentRequestArticle | undefined>;
+  updateIfVersion(
+    id: string,
+    expectedVersion: number,
+    patch: ContentRequestArticlePatch,
+  ): Promise<ContentRequestArticle | undefined>;
+  delete(id: string): Promise<boolean>;
 };
+
+export type ContentRequestArticleFields = Pick<
+  InsertArticle,
+  | "brandId"
+  | "title"
+  | "content"
+  | "excerpt"
+  | "metaDescription"
+  | "keywords"
+  | "industry"
+  | "contentType"
+  | "featuredImage"
+  | "author"
+  | "targetCustomers"
+  | "geography"
+  | "contentStyle"
+  | "externalUrl"
+  | "seoData"
+>;
+
+export type ContentRequestArticleCreateReady = ContentRequestArticleFields &
+  Required<Pick<ContentRequestArticleFields, "brandId" | "title" | "content">>;
+export type ContentRequestArticleCreateDraft = ContentRequestArticleFields &
+  Required<Pick<ContentRequestArticleFields, "brandId">>;
+export type ContentRequestArticlePatch = Partial<ContentRequestArticleFields>;
+
+const articleInsertValues = (input: ContentRequestArticleFields, status: "draft" | "ready") => ({
+  ...input,
+  status,
+});
 
 export function createContentRequestArticleRepository({
   actor,
@@ -93,6 +137,75 @@ export function createContentRequestArticleRepository({
           .where(eq(articles.id, id))
           .limit(1);
         return article;
+      });
+    },
+
+    createReady(input: ContentRequestArticleCreateReady): Promise<ContentRequestArticle> {
+      return run(async (transaction) => {
+        const [created] = await transaction
+          .insert(articles)
+          .values(articleInsertValues(input, "ready"))
+          .returning(contentRequestArticleColumns);
+        if (!created) throw new Error("Article insert returned no row");
+        return created;
+      });
+    },
+
+    createDraft(input: ContentRequestArticleCreateDraft): Promise<ContentRequestArticle> {
+      return run(async (transaction) => {
+        const [created] = await transaction
+          .insert(articles)
+          .values(articleInsertValues(input, "draft"))
+          .returning(contentRequestArticleColumns);
+        if (!created) throw new Error("Draft insert returned no row");
+        return created;
+      });
+    },
+
+    update(
+      id: string,
+      patch: ContentRequestArticlePatch,
+    ): Promise<ContentRequestArticle | undefined> {
+      return run(async (transaction) => {
+        const [updated] = await transaction
+          .update(articles)
+          .set({
+            ...patch,
+            updatedAt: new Date(),
+            version: sql`${articles.version} + 1`,
+          })
+          .where(eq(articles.id, id))
+          .returning(contentRequestArticleColumns);
+        return updated;
+      });
+    },
+
+    updateIfVersion(
+      id: string,
+      expectedVersion: number,
+      patch: ContentRequestArticlePatch,
+    ): Promise<ContentRequestArticle | undefined> {
+      return run(async (transaction) => {
+        const [updated] = await transaction
+          .update(articles)
+          .set({
+            ...patch,
+            updatedAt: new Date(),
+            version: sql`${articles.version} + 1`,
+          })
+          .where(and(eq(articles.id, id), eq(articles.version, expectedVersion)))
+          .returning(contentRequestArticleColumns);
+        return updated;
+      });
+    },
+
+    delete(id: string): Promise<boolean> {
+      return run(async (transaction) => {
+        const deleted = await transaction
+          .delete(articles)
+          .where(eq(articles.id, id))
+          .returning({ id: articles.id });
+        return deleted.length > 0;
       });
     },
   };
