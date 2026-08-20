@@ -27,6 +27,9 @@ function makeApp() {
   app.all("/api/cron/fact-scrape-backstop", (_req, res) => {
     res.status(204).end();
   });
+  app.get("/api/cron/daily-orchestrator", (_req, res) => {
+    res.status(204).end();
+  });
   return app;
 }
 
@@ -39,4 +42,12 @@ describe("fact scrape backstop global auth", () => {
       expect(response.status).toBe(204);
     },
   );
+});
+
+describe("daily orchestrator global auth", () => {
+  it("lets a GET request reach the cron secret gate", async () => {
+    const response = await request(makeApp()).get("/api/cron/daily-orchestrator");
+
+    expect(response.status).toBe(204);
+  });
 });

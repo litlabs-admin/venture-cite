@@ -272,9 +272,13 @@ async function failStaleScanJobsForOrchestrator(): Promise<{ failed: number }> {
 }
 
 export function setupCronRoutes(app: Express): void {
-  app.post(
+  app.all(
     "/api/cron/daily-orchestrator",
     asyncHandler(async (req: Request, res: Response) => {
+      if (req.method !== "GET" && req.method !== "POST") {
+        return res.status(405).json({ success: false, error: "Method not allowed" });
+      }
+
       if (!isCronAuthorized(req)) {
         return res.status(401).json({ success: false, error: "Not authorized" });
       }

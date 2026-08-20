@@ -34,6 +34,7 @@ if (databaseTest.kind === "ready") {
   // which is both the cleanup filter and the assertion scope.
   const RUN_PREFIX = "llmconc-test";
   const runId = (name: string) => `${RUN_PREFIX}-${name}`;
+  const TEST_PROVIDER = "gemini" as const;
   // The one row inserted directly rather than through acquireSlot.
   const EXPIRED_FIXTURE = `${RUN_PREFIX}-expired`;
 
@@ -67,7 +68,7 @@ if (databaseTest.kind === "ready") {
    * Starts from the CURRENT occupancy rather than assuming an empty bucket -
    * another actor may legitimately hold slots.
    */
-  async function fillBucket(provider: "openai", id: string): Promise<string[]> {
+  async function fillBucket(provider: typeof TEST_PROVIDER, id: string): Promise<string[]> {
     const limit = PROVIDER_LIMITS[provider];
     const mine: string[] = [];
     for (let i = await liveCount(provider); i < limit; i++) {
@@ -84,7 +85,7 @@ if (databaseTest.kind === "ready") {
 
     it("acquires a slot when bucket is empty", async () => {
       const id = runId("acquire");
-      const slot = await acquireSlot("openai", { runId: id });
+      const slot = await acquireSlot(TEST_PROVIDER, { runId: id });
       expect(slot).not.toBeNull();
       expect(typeof slot?.slotId).toBe("string");
       expect(await ownCount(id)).toBe(1);
@@ -92,20 +93,20 @@ if (databaseTest.kind === "ready") {
 
     it("returns null when bucket is full", async () => {
       const id = runId("full");
-      await fillBucket("openai", id);
-      expect(await liveCount("openai")).toBeGreaterThanOrEqual(PROVIDER_LIMITS.openai);
-      const slot = await acquireSlot("openai", { maxRetries: 0, runId: id });
+      await fillBucket(TEST_PROVIDER, id);
+      expect(await liveCount(TEST_PROVIDER)).toBeGreaterThanOrEqual(PROVIDER_LIMITS[TEST_PROVIDER]);
+      const slot = await acquireSlot(TEST_PROVIDER, { maxRetries: 0, runId: id });
       expect(slot).toBeNull();
     });
 
     it("releaseSlot frees the bucket", async () => {
       const id = runId("release");
-      const mine = await fillBucket("openai", id);
+      const mine = await fillBucket(TEST_PROVIDER, id);
       expect(mine.length).toBeGreaterThan(0);
-      expect(await acquireSlot("openai", { maxRetries: 0, runId: id })).toBeNull();
+      expect(await acquireSlot(TEST_PROVIDER, { maxRetries: 0, runId: id })).toBeNull();
 
       await releaseSlot(mine[0]);
-      const reacquired = await acquireSlot("openai", { maxRetries: 0, runId: id });
+      const reacquired = await acquireSlot(TEST_PROVIDER, { maxRetries: 0, runId: id });
       expect(reacquired).not.toBeNull();
     });
 
@@ -113,18 +114,18 @@ if (databaseTest.kind === "ready") {
       const id = runId("expired");
       await db.execute(sql`
       INSERT INTO llm_concurrency_slots (slot_id, provider, acquired_at, expires_at, run_id)
-      VALUES (${EXPIRED_FIXTURE}, 'openai', now() - interval '5 minutes', now() - interval '1 minute', ${id}::varchar)
+      VALUES (${EXPIRED_FIXTURE}, ${TEST_PROVIDER}::text, now() - interval '5 minutes', now() - interval '1 minute', ${id}::varchar)
     `);
       // The expired row exists but must not count toward the limit.
       expect(await ownCount(id)).toBe(0);
-      const slot = await acquireSlot("openai", { maxRetries: 0, runId: id });
+      const slot = await acquireSlot(TEST_PROVIDER, { maxRetries: 0, runId: id });
       expect(slot).not.toBeNull();
     });
 
     it("withSlot acquires, runs, and releases", async () => {
       const id = runId("ok");
       let ran = false;
-      const result = await withSlot("openai", id, async () => {
+      const result = await withSlot(TEST_PROVIDER, id, async () => {
         ran = true;
         // Exactly one slot for THIS run while the callback is in flight.
         expect(await ownCount(id)).toBe(1);
@@ -138,7 +139,7 @@ if (databaseTest.kind === "ready") {
     it("withSlot releases even if the callback throws", async () => {
       const id = runId("err");
       await expect(
-        withSlot("openai", id, async () => {
+        withSlot(TEST_PROVIDER, id, async () => {
           throw new Error("boom");
         }),
       ).rejects.toThrow("boom");

@@ -39,6 +39,11 @@ function buildSslConfig(): PoolConfig["ssl"] {
     return { rejectUnauthorized: true };
   }
 
+  if (policy.mode === "no-tls") {
+    logger.info("db: TLS disabled for a non-production loopback database");
+    return false;
+  }
+
   return { rejectUnauthorized: false };
 }
 

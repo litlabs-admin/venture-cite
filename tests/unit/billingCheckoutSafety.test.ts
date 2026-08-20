@@ -21,6 +21,7 @@ const stubs = vi.hoisted(() => ({
   updateUserStripeInfo: vi.fn(),
   priceRetrieve: vi.fn(),
   subscriptionsList: vi.fn(),
+  subscriptionsUpdate: vi.fn(),
   checkoutCreate: vi.fn(),
   checkoutList: vi.fn(),
   checkoutExpire: vi.fn(),
@@ -38,7 +39,7 @@ vi.mock("../../server/storage", () => ({
 vi.mock("../../server/stripeClient", () => ({
   getUncachableStripeClient: async () => ({
     prices: { retrieve: stubs.priceRetrieve },
-    subscriptions: { list: stubs.subscriptionsList, update: vi.fn() },
+    subscriptions: { list: stubs.subscriptionsList, update: stubs.subscriptionsUpdate },
     checkout: {
       sessions: {
         create: stubs.checkoutCreate,
@@ -99,6 +100,7 @@ beforeEach(() => {
   stubs.getUser.mockResolvedValue({ id: USER_ID, stripeCustomerId: "cus_123" });
   stubs.priceRetrieve.mockResolvedValue(validPrice());
   stubs.subscriptionsList.mockResolvedValue({ data: [] });
+  stubs.subscriptionsUpdate.mockResolvedValue({ id: "sub_current" });
   stubs.checkoutCreate.mockResolvedValue({ url: "https://checkout.stripe.test/session" });
   stubs.checkoutList.mockResolvedValue({ data: [] });
   stubs.checkoutExpire.mockResolvedValue({});
@@ -236,6 +238,27 @@ describe("POST /api/stripe/checkout safety", () => {
       expect.not.objectContaining({ subscription_data: expect.anything() }),
       expect.any(Object),
     );
+  });
+
+  it("updates a past-due subscription instead of creating a second subscription", async () => {
+    stubs.subscriptionsList.mockResolvedValue({
+      data: [
+        {
+          id: "sub_current",
+          status: "past_due",
+          items: { data: [{ id: "si_current", price: { id: "price_agency" } }] },
+        },
+      ],
+    });
+
+    const response = await fetchCheckout({ priceId: "price_pro" });
+
+    expect(response.status).toBe(200);
+    expect(stubs.subscriptionsUpdate).toHaveBeenCalledWith(
+      "sub_current",
+      expect.objectContaining({ items: [{ id: "si_current", price: "price_pro" }] }),
+    );
+    expect(stubs.checkoutCreate).not.toHaveBeenCalled();
   });
 
   it("does not grant a second trial when the user row records prior subscription history", async () => {

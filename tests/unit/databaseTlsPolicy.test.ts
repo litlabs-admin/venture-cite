@@ -45,16 +45,33 @@ describe("database TLS policy", () => {
     });
   });
 
-  it("allows permissive TLS in development and tests", () => {
-    const databaseUrl = "postgresql://user:secret@localhost/postgres";
+  it("disables TLS for loopback development and test databases", () => {
+    const databaseUrl = "postgresql://user:secret@127.0.0.1:55322/postgres";
 
     expect(
       resolveDatabaseTlsPolicy({ NODE_ENV: "development", DATABASE_URL: databaseUrl }),
-    ).toEqual({ mode: "permissive", rejectUnauthorized: false });
+    ).toEqual({ mode: "no-tls" });
     expect(resolveDatabaseTlsPolicy({ NODE_ENV: "test", DATABASE_URL: databaseUrl })).toEqual({
-      mode: "permissive",
-      rejectUnauthorized: false,
+      mode: "no-tls",
     });
+  });
+
+  it("keeps TLS enabled for non-loopback development databases", () => {
+    expect(
+      resolveDatabaseTlsPolicy({
+        NODE_ENV: "development",
+        DATABASE_URL: "postgresql://user:secret@db.example.com/postgres",
+      }),
+    ).toEqual({ mode: "permissive", rejectUnauthorized: false });
+  });
+
+  it("does not allow loopback production databases without certificate verification", () => {
+    expect(() =>
+      resolveDatabaseTlsPolicy({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://user:secret@127.0.0.1:55322/postgres",
+      }),
+    ).toThrow("Production database TLS requires certificate verification");
   });
 
   it("rejects URL settings that replace the verified TLS object", () => {

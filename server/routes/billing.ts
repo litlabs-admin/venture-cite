@@ -90,6 +90,10 @@ function stripeCustomerRecoveryKey(userId: string): string {
   return createHash("sha256").update(`venturecite:stripe-customer:${userId}`).digest("hex");
 }
 
+function hasSubscriptionEntitlement(status: import("stripe").Stripe.Subscription.Status): boolean {
+  return status === "active" || status === "trialing" || status === "past_due";
+}
+
 const checkoutLocks = new Map<string, Promise<void>>();
 
 async function withCheckoutLock<T>(userId: string, work: () => Promise<T>): Promise<T> {
@@ -336,8 +340,8 @@ export function setupBillingRoutes(app: Express): void {
           });
           trialEligible = trialEligible && existing.data.length === 0;
 
-          const current = existing.data.find(
-            (x) => x.status === "active" || x.status === "trialing",
+          const current = existing.data.find((subscription) =>
+            hasSubscriptionEntitlement(subscription.status),
           );
           if (current) {
             const item = current.items.data[0];

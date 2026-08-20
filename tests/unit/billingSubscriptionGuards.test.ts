@@ -35,8 +35,14 @@ function checkoutBody(): string {
 describe("duplicate-subscription guard", () => {
   it("treats a trialing subscription as existing, not just an active one", () => {
     const body = checkoutBody();
+    const helper = billing.slice(
+      billing.indexOf("function hasSubscriptionEntitlement"),
+      billing.indexOf("const checkoutLocks"),
+    );
     expect(body).toContain('status: "all"');
-    expect(body).toContain('x.status === "trialing"');
+    expect(body).toContain("hasSubscriptionEntitlement(subscription.status)");
+    expect(helper).toContain('status === "trialing"');
+    expect(helper).toContain('status === "past_due"');
     // The original bug: filtering the LIST call down to active only.
     expect(body).not.toContain('status: "active",\n            limit: 10,');
   });

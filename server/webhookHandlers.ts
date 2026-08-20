@@ -40,6 +40,10 @@ function tierFromProduct(product: Stripe.Product | undefined): string | null {
   return tier in usageLimits ? tier : null;
 }
 
+function hasSubscriptionEntitlement(status: Stripe.Subscription.Status): boolean {
+  return status === "active" || status === "trialing" || status === "past_due";
+}
+
 /**
  * True when this invoice failed because the bank wants the cardholder to
  * authenticate (3DS), rather than because the card was declined.
@@ -301,6 +305,38 @@ export class WebhookHandlers {
           const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
           const user = await storage.getUserByStripeCustomerId(customerId);
           if (!user) break;
+
+          if (user.stripeSubscriptionId && user.stripeSubscriptionId !== sub.id) {
+            logger.info(
+              { userId: user.id, deletedSubscriptionId: sub.id },
+              "stripe: ignored deletion of a stale subscription",
+            );
+            break;
+          }
+
+          const subscriptions = await stripe.subscriptions.list({
+            customer: customerId,
+            status: "all",
+            limit: 20,
+          });
+          const replacement = subscriptions.data.find(
+            (candidate) => candidate.id !== sub.id && hasSubscriptionEntitlement(candidate.status),
+          );
+          if (replacement) {
+            await lease.assertOwned();
+            await storage.updateUserStripeInfo(user.id, {
+              stripeSubscriptionId: replacement.id,
+              trialEndsAt:
+                replacement.status === "trialing" && replacement.trial_end
+                  ? new Date(replacement.trial_end * 1000)
+                  : null,
+            });
+            logger.info(
+              { userId: user.id, subscriptionId: replacement.id },
+              "stripe: kept access through another entitled subscription",
+            );
+            break;
+          }
 
           const previousTier = user.accessTier;
           // readonly, not "free": free is a legacy grant (a brand + 5 articles)

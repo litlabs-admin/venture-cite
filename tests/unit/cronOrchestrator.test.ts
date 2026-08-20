@@ -175,10 +175,11 @@ async function callOrchestrator(
   app: express.Express,
   headers: Record<string, string> = {},
   url = "/api/cron/daily-orchestrator",
+  method: "GET" | "POST" | "PUT" = "POST",
 ): Promise<{ status: number; body: any }> {
   return new Promise((resolve, reject) => {
     const req = {
-      method: "POST",
+      method,
       url,
       headers: {
         host: "localhost",
@@ -258,6 +259,34 @@ describe("cron orchestrator", () => {
     expect(body).toMatchObject({ success: true, results: expect.any(Array) });
     expect(stubs.runAccountPurgeJob).toHaveBeenCalled();
     expect(stubs.runAutoCitationJob).toHaveBeenCalled();
+  });
+
+  it("accepts an authenticated GET from Vercel Cron", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+    const { status, body } = await callOrchestrator(
+      app,
+      { authorization: "Bearer secret" },
+      "/api/cron/daily-orchestrator",
+      "GET",
+    );
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ success: true, results: expect.any(Array) });
+  });
+
+  it("rejects unsupported methods before it runs scheduled work", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+    const { status } = await callOrchestrator(
+      app,
+      { authorization: "Bearer secret" },
+      "/api/cron/daily-orchestrator",
+      "PUT",
+    );
+
+    expect(status).toBe(405);
+    expect(stubs.runAccountPurgeJob).not.toHaveBeenCalled();
   });
 
   it("accepts the x-cron-secret header for manual triggers", async () => {
