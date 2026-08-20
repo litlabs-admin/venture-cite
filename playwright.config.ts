@@ -1,12 +1,54 @@
 // playwright.config.ts
 import { defineConfig, devices } from "@playwright/test";
-import { STORAGE_STATE } from "./tests/e2e/support/auth";
+
+const STORAGE_STATE = "playwright/.auth/state.json";
 
 // The app listens on PORT (default 5000 - see server/index.ts:53).
 // NOTE: data-testid attributes are stripped when NODE_ENV=production
 // (vite.config.ts:29-33), so e2e MUST run against the dev server.
 const PORT = process.env.PORT || "5000";
 const BASE_URL = process.env.E2E_BASE_URL || `http://localhost:${PORT}`;
+const USE_LOCAL_FAKE_CONTENT_PROVIDER = !process.env.E2E_BASE_URL;
+const LOCAL_FLOW_SPECS =
+  /(?:article-flow|content-generation-fake|distribution-flow|brand-deletion-safety)\.spec\.ts/;
+
+function isLoopbackUrl(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
+export function buildLocalFlowServerCommand(baseUrl: string): string {
+  if (!isLoopbackUrl(baseUrl)) {
+    throw new Error(`Local E2E requires a loopback base URL, received: ${baseUrl}`);
+  }
+  return [
+    "cross-env",
+    "NODE_ENV=development",
+    "CONTENT_GENERATION_PROVIDER=fake",
+    `CONTENT_GENERATION_FAKE_BASE_URL=${baseUrl}`,
+    "DISABLE_IN_PROCESS_SCHEDULER=true",
+    "DISABLE_STARTUP_AUTOPILOT=true",
+    "DISABLE_STRIPE_SETUP=true",
+    "STRIPE_PRODUCT_SYNC=false",
+    "STRIPE_SECRET_KEY=",
+    "STRIPE_WEBHOOK_SECRET=",
+    "OPENAI_API_KEY=local-e2e-disabled",
+    "OPENROUTER_API_KEY=",
+    "RESEND_API_KEY=",
+    "RESEND_FROM_ADDRESS=",
+    "SENTRY_DSN=http://local@127.0.0.1:9/1",
+    "VITE_SENTRY_DSN=http://local@127.0.0.1:9/1",
+    "npm run dev",
+  ].join(" ");
+}
+
+if (USE_LOCAL_FAKE_CONTENT_PROVIDER && !isLoopbackUrl(BASE_URL)) {
+  throw new Error(`Local E2E requires a loopback base URL, received: ${BASE_URL}`);
+}
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -29,6 +71,7 @@ export default defineConfig({
     { name: "setup", testMatch: /auth\.setup\.ts/ },
     {
       name: "chromium",
+      testIgnore: LOCAL_FLOW_SPECS,
       use: { ...devices["Desktop Chrome"], storageState: STORAGE_STATE },
       // NOTE: the correct Playwright TestProject option is "dependencies",
       // not "dependsOn" - the latter is silently ignored (not a recognized
@@ -42,13 +85,22 @@ export default defineConfig({
       // dropped entirely and STORAGE_STATE was never produced (ENOENT).
       dependencies: ["setup"],
     },
+    {
+      name: "local-flows",
+      testMatch: LOCAL_FLOW_SPECS,
+      use: { ...devices["Desktop Chrome"] },
+    },
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: "npm run dev",
+        // Local E2E runs use a deterministic provider. The server rejects
+        // this mode unless its base URL is a loopback URL.
+        command: USE_LOCAL_FAKE_CONTENT_PROVIDER
+          ? buildLocalFlowServerCommand(BASE_URL)
+          : "npm run dev",
         url: BASE_URL,
-        reuseExistingServer: true,
+        reuseExistingServer: false,
         timeout: 180_000,
         stdout: "pipe",
         stderr: "pipe",

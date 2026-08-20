@@ -51,6 +51,7 @@ import { captureAndFlush } from "../lib/sentryReport";
 import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
 import { createRequestActor } from "../lib/requestActor";
 import { contentRequestData } from "../data/contentRequestData";
+import { usesFakeContentGenerationProvider } from "../lib/contentGenerationProvider";
 
 const keywordUpdateSchema = z
   .object({
@@ -255,7 +256,7 @@ export function setupContentRoutes(app: Express): void {
             .json({ success: false, error: "Invalid content generation input" });
         }
         const { keywords, industry, type, targetCustomers, geography, contentStyle } = parsed.data;
-        if (!process.env.OPENAI_API_KEY) {
+        if (!process.env.OPENAI_API_KEY && !usesFakeContentGenerationProvider()) {
           return res.status(503).json({
             success: false,
             error: "Content generation is not available. OpenAI API key is not configured.",
@@ -666,7 +667,7 @@ export function setupContentRoutes(app: Express): void {
         });
       }
 
-      if (!process.env.OPENAI_API_KEY) {
+      if (!process.env.OPENAI_API_KEY || process.env.CONTENT_GENERATION_PROVIDER === "fake") {
         return res.status(503).json({
           success: false,
           error: "Keyword suggestions are not available. OpenAI API key is not configured.",

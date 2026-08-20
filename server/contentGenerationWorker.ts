@@ -13,13 +13,11 @@
 // finalize the article when status="completed". Single LLM call per
 // article; no continuation prompts, no token streaming, no seams.
 
-import OpenAI from "openai";
 import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { resolveTier } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { attachAiLogger } from "./lib/aiLogger";
 import { MODELS } from "./lib/modelConfig";
 import { logger } from "./lib/logger";
 import { assertWithinBudget, isBudgetExceededError, type Tier } from "./lib/llmBudget";
@@ -28,6 +26,10 @@ import { refundArticleQuota, type ErrorKind } from "./lib/usageLimit";
 import type { ContentGenerationJob } from "@shared/schema";
 
 import { captureAndFlush } from "./lib/sentryReport";
+import {
+  createContentGenerationProvider,
+  type ContentGenerationProviderOptions,
+} from "./lib/contentGenerationProvider";
 import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
 
 // Both the kick-off (responses.create) and the poll (responses.retrieve)
@@ -36,12 +38,7 @@ import { LLM_CALL_TIMEOUT_MS } from "./lib/factAgent/v2/vercelBudget";
 // from the legacy worker that streamed the full response inline. We
 // now inherit LLM_CALL_TIMEOUT_MS so the slice stays under the
 // Vercel function ceiling (10s Hobby / 60s Pro).
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  timeout: LLM_CALL_TIMEOUT_MS,
-  maxRetries: 1,
-});
-attachAiLogger(openai);
+const contentProvider = createContentGenerationProvider();
 
 export type GenerationPayload = {
   keywords: string;
@@ -81,7 +78,10 @@ type SliceResult =
   | { kind: "deadline"; partialContent: string }
   | { kind: "cancelled" };
 
-function providerRequestOptions(deadlineMs: number, idempotencyKey?: string) {
+function providerRequestOptions(
+  deadlineMs: number,
+  idempotencyKey?: string,
+): ContentGenerationProviderOptions {
   const remainingMs = deadlineMs - Date.now();
   if (remainingMs <= 0) {
     const err: Error & { name?: string } = new Error("Content job slice deadline elapsed");
@@ -95,7 +95,7 @@ function providerRequestOptions(deadlineMs: number, idempotencyKey?: string) {
   };
 }
 
-function cleanupRequestOptions(deadlineMs: number) {
+function cleanupRequestOptions(deadlineMs: number): ContentGenerationProviderOptions {
   return {
     timeout: Math.max(1, Math.min(LLM_CALL_TIMEOUT_MS, deadlineMs - Date.now())),
     maxRetries: 0,
@@ -170,7 +170,7 @@ async function runJobToCompletionOrDeadline(
     });
 
     const response = await openaiBreaker.run(() =>
-      openai.responses.create(
+      contentProvider.create(
         {
           model: MODELS.contentGeneration as string,
           input: promptText,
@@ -184,7 +184,7 @@ async function runJobToCompletionOrDeadline(
     const linked = await storage.updateContentJobResponseId(job.id, advanceToken, response.id);
     if (!linked) {
       try {
-        await openai.responses.cancel(response.id, cleanupRequestOptions(executionDeadline));
+        await contentProvider.cancel(response.id, cleanupRequestOptions(executionDeadline));
       } catch (err) {
         logger.warn(
           { err, jobId: job.id, responseId: response.id },
@@ -199,11 +199,7 @@ async function runJobToCompletionOrDeadline(
 
   // Subsequent /advance calls: poll OpenAI for completion.
   const response = await openaiBreaker.run(() =>
-    openai.responses.retrieve(
-      existingResponseId,
-      undefined,
-      providerRequestOptions(executionDeadline),
-    ),
+    contentProvider.retrieve(existingResponseId, providerRequestOptions(executionDeadline)),
   );
 
   if (response.status === "completed") {

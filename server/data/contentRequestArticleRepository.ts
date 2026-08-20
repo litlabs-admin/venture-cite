@@ -98,6 +98,12 @@ async function insertArticle(
 ): Promise<ContentRequestArticle> {
   const id = randomUUID();
   const values = articleInsertValues(input, status);
+  const keywords = values.keywords
+    ? sql`ARRAY[${sql.join(
+        values.keywords.map((keyword) => sql`${keyword}`),
+        sql`, `,
+      )}]::text[]`
+    : sql`NULL`;
   await transaction.execute(sql`
     INSERT INTO public.articles (
       id, brand_id, title, content, excerpt, meta_description, keywords,
@@ -105,7 +111,7 @@ async function insertArticle(
       geography, content_style, external_url, seo_data
     ) VALUES (
       ${id}, ${values.brandId}, ${values.title ?? ""}, ${values.content ?? ""},
-      ${values.excerpt ?? null}, ${values.metaDescription ?? null}, ${values.keywords ?? null},
+      ${values.excerpt ?? null}, ${values.metaDescription ?? null}, ${keywords},
       ${values.industry ?? null}, ${values.contentType ?? null}, ${values.featuredImage ?? null},
       ${values.author ?? null}, ${status}, ${values.targetCustomers ?? null},
       ${values.geography ?? null}, ${values.contentStyle ?? null}, ${values.externalUrl ?? null},

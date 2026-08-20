@@ -21,6 +21,7 @@ import { initScheduler } from "./scheduler";
 import { reconcileOrphanCitationRuns } from "./lib/citationReconciliation";
 import { resumeInFlightAutopilots } from "./lib/onboardingAutopilot";
 import { logger } from "./lib/logger";
+import { devListenHost, startupAutopilotEnabled, stripeSetupEnabled } from "./lib/localFlowSafety";
 
 (async () => {
   await reconcileOrphanCitationRuns();
@@ -37,7 +38,7 @@ import { logger } from "./lib/logger";
       "Also configure the project's Site URL (post-confirmation redirect) under Authentication → URL Configuration.",
   );
 
-  if (process.env.STRIPE_SECRET_KEY) {
+  if (stripeSetupEnabled(process.env)) {
     setupStripeProducts().catch((err) => {
       logger.error({ err }, "Stripe product setup failed");
       Sentry.captureException(err, { tags: { source: "stripe-setup" } });
@@ -46,8 +47,16 @@ import { logger } from "./lib/logger";
 
   const server = await prepareApp();
 
-  initScheduler();
-  void resumeInFlightAutopilots();
+  if (process.env.DISABLE_IN_PROCESS_SCHEDULER !== "true") {
+    initScheduler();
+  } else {
+    logger.info("local dev: in-process scheduler disabled");
+  }
+  if (startupAutopilotEnabled(process.env)) {
+    void resumeInFlightAutopilots();
+  } else {
+    logger.info("local fake provider: startup autopilot resume disabled");
+  }
 
   if (app.get("env") === "development") {
     await setupVite(app, server);
@@ -64,7 +73,7 @@ import { logger } from "./lib/logger";
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);
-  server.listen(port, "0.0.0.0", () => {
+  server.listen(port, devListenHost(process.env.CONTENT_GENERATION_PROVIDER), () => {
     log(`serving on port ${port}`);
   });
 
