@@ -144,6 +144,12 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # Production fails startup without certificate verification.
+      # Prefer the Supabase CA certificate path on the deployed service.
+      - key: DATABASE_CA_CERT_PATH
+        sync: false
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
@@ -151,6 +157,15 @@ services:
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Checkout rejects every price unless these exact IDs match Stripe.
+      - key: STRIPE_PRO_PRODUCT_ID
+        sync: false
+      - key: STRIPE_PRO_PRICE_ID
+        sync: false
+      - key: STRIPE_AGENCY_PRODUCT_ID
+        sync: false
+      - key: STRIPE_AGENCY_PRICE_ID
         sync: false
       - key: OPENAI_API_KEY
         sync: false

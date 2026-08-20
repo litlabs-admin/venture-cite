@@ -198,6 +198,10 @@ const PUBLIC_API_ROUTES = new Set<string>([
   "GET /api/logo-proxy",
   // Daily cron orchestrator - self-auths via CRON_SECRET (Vercel migration).
   "POST /api/cron/daily-orchestrator",
+  // The fact scrape backstop uses the same CRON_SECRET gate in cron.ts.
+  // Vercel sends GET. Manual tools can send POST.
+  "GET /api/cron/fact-scrape-backstop",
+  "POST /api/cron/fact-scrape-backstop",
   // Public pricing catalogue. /pricing is a marketing page served to logged-
   // OUT visitors, so gating these two made it fall back to the hardcoded
   // defaultPlans - which carry no priceId, so the subscribe button dead-ended
@@ -215,13 +219,6 @@ const PUBLIC_API_ROUTES = new Set<string>([
   // have an account yet, so requiring a session would mean only existing
   // customers could ask about it. Writes nothing but a log line and an email.
   "POST /api/enterprise-inquiry",
-  // Public work board at /internal-page. The page itself has no sign-in, so
-  // its storage must be reachable without a token. The write route replaces
-  // one `system_state` row and validates the shape and the size, so it cannot
-  // be used to store arbitrary bulk data. Gate the PUT if the board must ever
-  // become read-only for the public.
-  "GET /api/board",
-  "PUT /api/board",
 ]);
 
 export const requireAuthForApi: RequestHandler = (req, res, next) => {
@@ -397,13 +394,10 @@ export function setupAuth(app: Express) {
           });
           const resendErr = (result as { error?: unknown } | undefined)?.error;
           if (resendErr) {
-            logger.warn(
-              { err: resendErr, email: normalizedEmail },
-              "auth: register signup-email send failed",
-            );
+            logger.warn({ err: resendErr }, "auth: register signup-email send failed");
           }
         } catch (err) {
-          logger.warn({ err, email: normalizedEmail }, "auth: register signup-email send threw");
+          logger.warn({ err }, "auth: register signup-email send threw");
         }
       };
 
@@ -452,17 +446,14 @@ export function setupAuth(app: Express) {
         // this also closes the previous account-enumeration leak.
         if (alreadyExists) {
           await sendSignupEmail();
-          logger.info(
-            { email: normalizedEmail },
-            "auth: register on existing unverified account - resent verification",
-          );
+          logger.info("auth: register on existing unverified account - resent verification");
           return res.json({ success: true, requiresVerification: true, email: normalizedEmail });
         }
 
         // Genuine failure - log it (the old code returned this only to
         // the client and never logged it, so production 400s had no
         // diagnosable reason).
-        logger.warn({ err: createErr, email: normalizedEmail }, "auth: register createUser failed");
+        logger.warn({ err: createErr }, "auth: register createUser failed");
         return res.status(400).json({
           success: false,
           error: createErr?.message || "Failed to create account",

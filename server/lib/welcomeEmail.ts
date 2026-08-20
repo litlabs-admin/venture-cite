@@ -77,12 +77,12 @@ If you have questions, just reply to this email.`;
     });
     const errObj = (result as { error?: { message?: string } }).error;
     if (errObj) {
-      logger.warn({ err: errObj, to }, "welcome email send returned error");
+      logger.warn({ err: errObj }, "welcome email send returned error");
       return false;
     }
     return true;
   } catch (err) {
-    logger.warn({ err, to }, "welcome email send threw");
+    logger.warn({ err }, "welcome email send threw");
     return false;
   }
 }

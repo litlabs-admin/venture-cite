@@ -20,7 +20,30 @@ describe("sanitizeLogBody", () => {
     expect(sanitizeLogBody("hello")).toBe("hello");
   });
 
-  it("redacts password / token / apiKey fields", () => {
+  it("scrubs an email address from a nested short string", () => {
+    const out = sanitizeLogBody({
+      response: { detail: "Delivery to person@example.com failed" },
+    }) as {
+      response: { detail: string };
+    };
+
+    expect(out.response.detail).toBe("Delivery to [redacted] failed");
+  });
+
+  it("scrubs an email address from an error message and stack", () => {
+    const error = new Error("Delivery to person@example.com failed");
+    error.stack = "Error: Delivery to person@example.com failed";
+
+    const out = sanitizeLogBody({ err: error }) as {
+      err: { name: string; message: string; stack: string };
+    };
+
+    expect(out.err.name).toBe("Error");
+    expect(out.err.message).toBe("Delivery to [redacted] failed");
+    expect(out.err.stack).toBe("Error: Delivery to [redacted] failed");
+  });
+
+  it("redacts credentials and personal data fields", () => {
     const out = sanitizeLogBody({
       email: "x@y.z",
       password: "supersecret",
@@ -34,7 +57,7 @@ describe("sanitizeLogBody", () => {
       passwordHash: "$2b$...",
     }) as Record<string, string>;
 
-    expect(out.email).toBe("x@y.z");
+    expect(out.email).toBe("[redacted]");
     expect(out.password).toBe("[redacted]");
     expect(out.token).toBe("[redacted]");
     expect(out.access_token).toBe("[redacted]");
@@ -51,7 +74,7 @@ describe("sanitizeLogBody", () => {
       user: { profile: { password: "p", email: "e@x.com" } },
     }) as { user: { profile: Record<string, string> } };
     expect(out.user.profile.password).toBe("[redacted]");
-    expect(out.user.profile.email).toBe("e@x.com");
+    expect(out.user.profile.email).toBe("[redacted]");
   });
 
   it("caps array length to 10 entries", () => {
@@ -65,7 +88,10 @@ describe("sanitizeLogBody", () => {
     const deep: Record<string, unknown> = { a: { b: { c: { d: { e: "leaf" } } } } };
     const out = sanitizeLogBody(deep) as Record<string, unknown>;
     // Depth: top is depth 0; a→1; a.b→2; a.b.c→3; a.b.c.d → depth>3 ⇒ truncated
-    expect((((out.a as any).b as any).c as any).d).toBe("[truncated]");
+    const a = out.a as Record<string, unknown>;
+    const b = a.b as Record<string, unknown>;
+    const c = b.c as Record<string, unknown>;
+    expect(c.d).toBe("[truncated]");
   });
 
   it("handles empty objects and arrays", () => {
@@ -73,7 +99,7 @@ describe("sanitizeLogBody", () => {
     expect(sanitizeLogBody([])).toEqual([]);
   });
 
-  it("preserves non-sensitive nested structures within depth limit", () => {
+  it("preserves non-contact name fields", () => {
     const input = {
       brand: { id: "b1", name: "Acme" },
     };

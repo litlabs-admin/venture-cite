@@ -1,17 +1,4 @@
-// Public work board storage.
-//
-// The board at /internal-page is public and has no sign-in. It used to keep its
-// state in the visitor's own localStorage, so a change was permanent for that
-// one browser only, and a different browser saw the seed again. The board is a
-// shared roadmap, so the state belongs on the server.
-//
-// STORAGE: one row in `system_state`, a generic key and JSONB table that
-// already exists. No migration is needed.
-//
-// SECURITY: the write route is open, exactly like the page. Anyone who reaches
-// the URL can replace the board. The payload is size-capped and shape-checked,
-// so it cannot be used to store arbitrary bulk data. Put the write behind
-// `isAuthenticated` if the board must become read-only for the public.
+// Internal board storage. Administrators can read and replace the shared board.
 
 import type { Express } from "express";
 import { eq } from "drizzle-orm";
@@ -19,6 +6,7 @@ import { db } from "../db";
 import { systemState } from "@shared/schema";
 import { asyncHandler } from "../lib/routesShared";
 import { logger } from "../lib/logger";
+import { isAdmin } from "../auth";
 
 const KEY = "internal-board";
 const MAX_TICKETS = 500;
@@ -68,10 +56,9 @@ function clean(input: unknown): Ticket[] | null {
 }
 
 export function setupBoardRoutes(app: Express) {
-  // Read the board. Returns null when nobody has saved one yet, so the client
-  // knows to show its seed instead of an empty board.
   app.get(
     "/api/board",
+    isAdmin,
     asyncHandler(async (_req, res) => {
       const [row] = await db.select().from(systemState).where(eq(systemState.key, KEY)).limit(1);
       res.json({
@@ -81,10 +68,9 @@ export function setupBoardRoutes(app: Express) {
     }),
   );
 
-  // Replace the board. The whole list is sent every time, because a drag can
-  // change several rows at once and a partial update would race.
   app.put(
     "/api/board",
+    isAdmin,
     asyncHandler(async (req, res) => {
       const tickets = clean((req.body as { tickets?: unknown } | undefined)?.tickets);
       if (!tickets) {

@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 // ─── Internal board ──────────────────────────────────────────────────────────
 // A private kanban for the team. It holds the work we found in the codebase
 // audit, plus anything we add later.
 //
-// PUBLIC: this page has no authentication gate. Anyone with the URL can read
-// and edit the board. It holds no customer data.
-//
-// STORAGE: the board lives on the server, in one `system_state` row. Every
-// visitor reads and writes the same board, so a change is permanent and shared.
+// Administrators can read and edit this shared board.
 //
 // ponytail: one row in a table that already exists, not a new table. The board
 // needs no migration and no schema decision.
@@ -247,8 +244,7 @@ const SEED: Ticket[] = [
 // first board anyone sees.
 async function loadFromServer(): Promise<Ticket[] | null> {
   try {
-    const res = await fetch("/api/board");
-    if (!res.ok) return null;
+    const res = await apiRequest("GET", "/api/board");
     const body = (await res.json()) as { tickets: Ticket[] | null };
     return body.tickets && body.tickets.length ? body.tickets : null;
   } catch {
@@ -258,12 +254,8 @@ async function loadFromServer(): Promise<Ticket[] | null> {
 
 async function saveToServer(tickets: Ticket[]): Promise<boolean> {
   try {
-    const res = await fetch("/api/board", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tickets }),
-    });
-    return res.ok;
+    await apiRequest("PUT", "/api/board", { tickets });
+    return true;
   } catch {
     return false;
   }

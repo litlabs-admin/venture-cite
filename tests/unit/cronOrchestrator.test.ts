@@ -174,11 +174,12 @@ function buildApp(): express.Express {
 async function callOrchestrator(
   app: express.Express,
   headers: Record<string, string> = {},
+  url = "/api/cron/daily-orchestrator",
 ): Promise<{ status: number; body: any }> {
   return new Promise((resolve, reject) => {
     const req = {
       method: "POST",
-      url: "/api/cron/daily-orchestrator",
+      url,
       headers: {
         host: "localhost",
         "content-type": "application/json",
@@ -264,6 +265,32 @@ describe("cron orchestrator", () => {
     const app = buildApp();
     const { status } = await callOrchestrator(app, { "x-cron-secret": "secret" });
     expect(status).toBe(200);
+  });
+
+  it("accepts the cron secret on the fact scrape backstop", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+    const { status } = await callOrchestrator(
+      app,
+      { authorization: "Bearer secret" },
+      "/api/cron/fact-scrape-backstop",
+    );
+
+    expect(status).toBe(200);
+    expect(stubs.runFactScrapeBackstop).toHaveBeenCalledOnce();
+  });
+
+  it("rejects the wrong secret on the fact scrape backstop", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+    const { status } = await callOrchestrator(
+      app,
+      { authorization: "Bearer wrong" },
+      "/api/cron/fact-scrape-backstop",
+    );
+
+    expect(status).toBe(401);
+    expect(stubs.runFactScrapeBackstop).not.toHaveBeenCalled();
   });
 
   it("includes per-step results with ok/error fields", async () => {

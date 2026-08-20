@@ -3,6 +3,7 @@ import { Pool, type PoolConfig, types as pgTypes } from "pg";
 import fs from "node:fs";
 import * as schema from "@shared/schema";
 import { logger } from "./lib/logger";
+import { resolveDatabaseTlsPolicy } from "./lib/databaseTlsPolicy";
 
 // Force `TIMESTAMP WITHOUT TIME ZONE` (oid 1114) to be parsed as UTC, not as
 // the Node process's local time. Without this, a DB value of "2026-05-05
@@ -17,47 +18,27 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 
-// TLS strategy:
-//
-// 1. If DATABASE_CA_CERT_PATH is set, read the PEM and verify the server
-//    certificate chain against it. This is the strict, recommended setup
-//    for production - Supabase publishes their pooler root CA and you
-//    download it once into the deploy environment.
-// 2. Else if DATABASE_SSL_REJECT_UNAUTHORIZED=true, verify against Node's
-//    default CA bundle (works for some hosted Postgres setups; usually
-//    fails for Supabase pooler).
-// 3. Else fall back to permissive TLS - the connection is still encrypted
-//    in transit but the cert chain is not verified. Acceptable for dev;
-//    a logger.warn reminder fires at boot in production so this doesn't
-//    silently persist into a real deployment.
 function buildSslConfig(): PoolConfig["ssl"] {
-  const caPath = process.env.DATABASE_CA_CERT_PATH;
-  if (caPath) {
+  const policy = resolveDatabaseTlsPolicy(process.env);
+  if (policy.mode === "custom-ca") {
     try {
-      const ca = fs.readFileSync(caPath, "utf8");
-      logger.info({ caPath }, "db: TLS strict - verifying chain against custom CA");
+      const ca = fs.readFileSync(policy.caPath, "utf8");
+      logger.info({ caPath: policy.caPath }, "db: TLS strict - verifying chain against custom CA");
       return { ca, rejectUnauthorized: true };
     } catch (err) {
       logger.error(
-        { err, caPath },
+        { err, caPath: policy.caPath },
         "db: DATABASE_CA_CERT_PATH set but file unreadable - refusing to start",
       );
-      throw new Error(`Cannot read DATABASE_CA_CERT_PATH at ${caPath}`);
+      throw new Error(`Cannot read DATABASE_CA_CERT_PATH at ${policy.caPath}`);
     }
   }
 
-  if (process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true") {
+  if (policy.mode === "default-ca") {
     logger.info("db: TLS strict - verifying against Node default CA bundle");
     return { rejectUnauthorized: true };
   }
 
-  if (process.env.NODE_ENV === "production") {
-    logger.warn(
-      "db: TLS chain verification disabled. Set DATABASE_CA_CERT_PATH (preferred) " +
-        "or DATABASE_SSL_REJECT_UNAUTHORIZED=true to harden. Connection is still " +
-        "encrypted in transit.",
-    );
-  }
   return { rejectUnauthorized: false };
 }
 

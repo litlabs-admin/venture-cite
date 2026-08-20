@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resolveDatabaseTlsPolicy } from "./lib/databaseTlsPolicy";
 
 // Validates required environment variables at startup. Throws a readable
 // error (naming every missing/malformed variable) before the server starts
@@ -18,7 +19,7 @@ const resolvedAppUrl =
   (process.env.NODE_ENV === "production" ? undefined : "http://localhost:5000");
 if (resolvedAppUrl) process.env.APP_URL = resolvedAppUrl;
 
-const envSchema = z.object({
+const envSchemaBase = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.string().optional(),
   APP_URL: z.string().url(),
@@ -41,6 +42,10 @@ const envSchema = z.object({
   // loudly and specifically at the point of use.
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_PRO_PRODUCT_ID: z.string().startsWith("prod_").optional(),
+  STRIPE_PRO_PRICE_ID: z.string().startsWith("price_").optional(),
+  STRIPE_AGENCY_PRODUCT_ID: z.string().startsWith("prod_").optional(),
+  STRIPE_AGENCY_PRICE_ID: z.string().startsWith("price_").optional(),
 
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
 
@@ -65,9 +70,7 @@ const envSchema = z.object({
   VITE_SENTRY_DSN: z.string().url().optional(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).optional(),
 
-  // Postgres TLS hardening (see server/db.ts for the precedence order).
-  // Both optional - without them, the pool falls back to permissive TLS
-  // (still encrypted, no chain verification) with a boot warning in prod.
+  // Production requires one certificate verification option.
   DATABASE_CA_CERT_PATH: z.string().optional(),
   DATABASE_SSL_REJECT_UNAUTHORIZED: z.enum(["true", "false"]).optional(),
 
@@ -105,6 +108,18 @@ const envSchema = z.object({
   // unauthenticated only (public JSON + RSS fallback); the OAuth path and
   // these four vars were removed together. Re-declaring them here would
   // advertise a configuration that nothing reads.
+});
+
+const envSchema = envSchemaBase.superRefine((value, context) => {
+  try {
+    resolveDatabaseTlsPolicy(value);
+  } catch (error) {
+    context.addIssue({
+      code: "custom",
+      path: ["DATABASE_SSL_REJECT_UNAUTHORIZED"],
+      message: error instanceof Error ? error.message : "Invalid database TLS configuration",
+    });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

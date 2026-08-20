@@ -27,15 +27,41 @@ const SENSITIVE_KEYS = new Set([
   "secret",
   "apiKey",
   "api_key",
+  "email",
+  "firstName",
+  "lastName",
+  "fullName",
+  "company",
+  "organization",
+  "contactEmail",
+  "contactName",
+  "contactCompany",
+  "recipientEmail",
 ]);
+const EMAIL_ADDRESS = /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/g;
+
+function sanitizeLogString(value: string): string {
+  const scrubbed = value.replace(EMAIL_ADDRESS, "[redacted]");
+  return scrubbed.length > 200 ? scrubbed.slice(0, 197) + "…" : scrubbed;
+}
+
+function isLogRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
 // Strip sensitive values, truncate long strings, cap recursion. Used by the
 // dev-mode request logger which may dump arbitrary response bodies.
 export function sanitizeLogBody(value: unknown, depth = 0): unknown {
   if (depth > 3) return "[truncated]";
   if (value === null || value === undefined) return value;
-  if (typeof value === "string") {
-    return value.length > 200 ? value.slice(0, 197) + "…" : value;
+  if (typeof value === "string") return sanitizeLogString(value);
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: sanitizeLogString(value.message),
+      stack: value.stack ? sanitizeLogString(value.stack) : undefined,
+      cause: value.cause ? sanitizeLogBody(value.cause, depth + 1) : undefined,
+    };
   }
   if (typeof value !== "object") return value;
   if (Array.isArray(value)) {
@@ -79,6 +105,26 @@ const baseOptions: LoggerOptions = {
       "*.secret",
       "*.apiKey",
       "*.api_key",
+      "email",
+      "firstName",
+      "lastName",
+      "fullName",
+      "company",
+      "organization",
+      "contactEmail",
+      "contactName",
+      "contactCompany",
+      "recipientEmail",
+      "*.email",
+      "*.firstName",
+      "*.lastName",
+      "*.fullName",
+      "*.company",
+      "*.organization",
+      "*.contactEmail",
+      "*.contactName",
+      "*.contactCompany",
+      "*.recipientEmail",
       "req.headers.authorization",
       "req.headers.cookie",
     ],
@@ -90,6 +136,17 @@ const baseOptions: LoggerOptions = {
   mixin() {
     const ctx = requestContext.getStore();
     return ctx ? { requestId: ctx.requestId, userId: ctx.userId } : {};
+  },
+  formatters: {
+    log(fields) {
+      const sanitized = sanitizeLogBody(fields);
+      return isLogRecord(sanitized) ? sanitized : {};
+    },
+  },
+  serializers: {
+    err(error) {
+      return sanitizeLogBody(pino.stdSerializers.err(error));
+    },
   },
   base: {
     service: "venturecite",
