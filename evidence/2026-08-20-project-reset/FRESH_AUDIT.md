@@ -63,11 +63,13 @@ The format command also scans stale Markdown and temporary files.
 
 ### Tests
 
-Status: fail in this environment.
+Status: pass.
 
-`npm test` reached integration tests that require PostgreSQL.
+`npm test` passed 1,390 tests.
 
-The database connection failed before several assertions ran.
+The run skipped 37 tests that require an isolated database.
+
+No test loaded the normal application database URL.
 
 The CI workflow does not create a PostgreSQL service.
 
@@ -335,6 +337,18 @@ Use stable provider idempotency keys.
 
 Record each provider result before a retry.
 
+### Deferred content cost outbox
+
+The content completion transaction stores the job, article, and revision.
+
+The worker records the provider cost after that transaction.
+
+A process crash in this gap can omit one cost record.
+
+The later outbox wave must store the cost event in the completion transaction.
+
+The outbox consumer must write each cost record once.
+
 ### Phase 5: Replace process-local coordination
 
 Move rate limits, leases, and queues to database-backed primitives.
@@ -343,11 +357,55 @@ Use conditional state changes and lease tokens.
 
 ## Unproven areas
 
-- The live deployment host is not confirmed.
+- The live deployment uses `https://www.venturecite.com`.
 - The live database policy state is not confirmed.
 - The deployed commit is not confirmed.
-- The public page behavior is not checked in a browser.
+- The landing, pricing, login, and registration pages rendered in the browser.
 - The authenticated application flow is not checked.
 - The email safety controls are not checked against the live configuration.
 
 Do not use this report as release approval until those checks finish.
+
+## Repair status on the setup branch
+
+These repairs are local. They are not deployed.
+
+- Board reads and writes require an administrator.
+- Destructive tests require an explicit isolated database.
+- Stripe redirects use the configured application origin.
+- Checkout validates the plan amount and monthly interval.
+- Prior Stripe subscription history blocks a second trial.
+- Stripe customer creation uses idempotency and recovery keys.
+- Stripe webhooks use renewable token claims.
+- Content jobs use token leases and guarded transitions.
+- Content success updates the job, article, and revision in one transaction.
+- Cron backstop requests use the cron secret gate.
+- Tour events and tour state verify brand ownership.
+- Logs and Sentry remove contact data.
+- Production database connections require certificate verification.
+
+The local Supabase stack uses Docker on ports 55321 through 55329.
+
+Real PostgreSQL tests passed for migrations 0094 and 0095.
+
+The tests use one temporary schema and remove it after each run.
+
+The focused safety run passed 102 tests and skipped 13 database tests.
+
+The local PostgreSQL run passed six additional tests.
+
+The full test run passed 1,390 tests and skipped 37 database-dependent tests.
+
+The TypeScript and tour checks passed.
+
+The lint command passed with errors suppressed only by its existing warning policy.
+
+The dependency audit has no high or low findings.
+
+Four moderate findings remain in the current Drizzle Kit loader chain.
+
+The final Sol review found seven repair gaps.
+
+The repair pass fixed all seven gaps before any local commit.
+
+The review found no direct regression after the fixes.

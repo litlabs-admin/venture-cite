@@ -10,3 +10,16 @@ ts	phase	decision	why	evidence	result
 2026-08-20T00:08:00Z	audit	accepted 14 static defects and risks after direct checks	use executable evidence instead of stale documents	evidence/2026-08-20-project-reset/FRESH_AUDIT.md	findings recorded
 2026-08-20T00:09:00Z	tests	refused to rerun database integration tests	the tests load the normal database URL and delete rows	tests/integration/tourEvents.test.ts	isolated TEST_DATABASE_URL required
 2026-08-20T00:10:00Z	live	checked four public routes without a form action	confirm the public deployment before any login	https://www.venturecite.com	landing pricing login and register render
+2026-08-20T00:11:00Z	repair	secured the internal board	prevent public reads and writes	focused route tests	administrator checks pass
+2026-08-20T00:12:00Z	tests	required an isolated destructive database	protect live user data	destructive database guard	unsafe targets fail closed
+2026-08-20T00:13:00Z	billing	added checkout and webhook guards	prevent redirect abuse duplicate trials and concurrent webhooks	focused Stripe tests	billing safety tests pass
+2026-08-20T00:14:00Z	workers	added token-protected content transitions	prevent duplicate and stale job writes	focused content tests	content race tests pass
+2026-08-20T00:15:00Z	privacy	removed contact data from telemetry	protect user data	logger and Sentry tests	privacy tests pass
+2026-08-20T00:16:00Z	database	required production certificate verification	prevent unverified database connections	TLS policy tests	production fails closed
+2026-08-20T00:17:00Z	local	started a separate Supabase Docker stack	test migrations without live data	local ports 55321 through 55329	local database is healthy
+2026-08-20T00:18:00Z	local	tested migrations 0094 and 0095 on PostgreSQL	prove SQL and claim behavior	temporary local schema	six tests pass and schema is removed
+2026-08-20T00:19:00Z	tests	isolated all destructive database tests	prevent accidental production database access	full Vitest run	1381 tests pass and 37 database tests skip
+2026-08-20T00:20:00Z	dependencies	kept the current Drizzle Kit version	avoid an unsupported security downgrade	dependency audit	no high or low findings and four moderate loader findings remain
+2026-08-20T00:21:00Z	review	fixed every final security review gap	block unsafe local commits	Sol Medium review	seven gaps closed and no direct regression found
+2026-08-20T00:22:00Z	tests	reran the full test suite after review fixes	prove the combined diff	Vitest	1390 tests pass and 37 database tests skip
+2026-08-20T00:23:00Z	git	committed four reviewed repair groups	preserve exact history before documentation cleanup	local Git history	security content tests and dependencies have separate commits

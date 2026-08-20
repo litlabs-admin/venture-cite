@@ -23,7 +23,7 @@ Existing Markdown files and code comments are not factual evidence until a check
 
 ## Current phase
 
-The setup phase is active on `codex/project-reset-setup`.
+The repair phase is active on `codex/project-reset-setup`.
 
 The repository contains 20 project skills, including `unslop`.
 
@@ -53,7 +53,31 @@ The lint command passes with 813 warnings.
 
 The format check fails across many files.
 
-The database test setup is unsafe for the normal application database.
+The database test setup now rejects the normal application database.
+
+A local Supabase stack runs on separate ports 55321 through 55329.
+
+The Supabase CLI is a pinned development dependency.
+
+Migrations 0094 and 0095 passed real PostgreSQL tests.
+
+Four repair commits now preserve the reviewed code and test changes locally.
+
+The focused safety run passed 102 tests.
+
+The local PostgreSQL run passed six tests.
+
+The full test run passed 1,390 tests and skipped 37 database-dependent tests.
+
+No test loaded the normal application database URL.
+
+The dependency audit has no high or low findings.
+
+Four moderate Drizzle Kit loader findings remain without a supported upgrade.
+
+The final Sol review confirmed that its seven repair gaps are closed.
+
+The review found no direct regression from those fixes.
 
 The live landing, pricing, login, and registration pages render without browser errors.
 
@@ -61,8 +85,8 @@ The live health route remains unverified.
 
 ## Next checks
 
-1. Fix the unauthenticated board read and write path.
-2. Make integration tests require an isolated database.
-3. Fix Stripe validation and webhook coordination.
-4. Fix job lease and cancellation coordination.
-5. Review the live Supabase role and policy state without user data.
+1. Record the unsupported Drizzle Kit advisory until its upstream fix exists.
+2. Build a complete local database baseline.
+3. Review the live Supabase role and policy state without user data.
+4. Replace boot-time migrations with a controlled release step.
+5. Review and replace stale Markdown and comments.
