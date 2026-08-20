@@ -116,7 +116,7 @@ const STAGE_BLURBS: Record<string, string> = {
 };
 
 // -----------------------------------------------------------------------------
-// Cross-tab state reducer (Wave 1.5). Keyed by `${brandId}|${articleId}`. When
+// Cross-tab state reducer. It uses `${brandId}|${articleId}` as its key. When
 // the user switches articles, the active slice swaps to a fresh empty object,
 // so stale results from the previous article don't linger on the stat cards.
 // -----------------------------------------------------------------------------
@@ -429,7 +429,7 @@ export default function GeoSignals() {
     // Use the article's own `externalUrl` - where the user told us it
     // actually lives on their site. The previous code synthesised
     // `${brand.website}/articles/${slug}`, but `slug` was removed from
-    // the articles table during Wave 7 unification (the column comment
+    // the articles table during its unification. The column comment
     // in shared/schema.ts says "Replaces the old slug-based fake URL").
     // Every auto-fill became `…/articles/undefined`, which then audited
     // a 404, then cached "no schemas found" under the wrong hash key -

@@ -1,4 +1,4 @@
-// Account settings page (Wave 2.2/2.3).
+// Account settings page.
 //
 // Today this hosts only the GDPR-self-service blocks: account deletion
 // + data export. Future settings (notifications, integrations, billing)

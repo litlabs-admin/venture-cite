@@ -29,9 +29,9 @@ export function ArrowRightIcon({ size = 14, className }: IconProps) {
 }
 
 // Card 02 checklist checkbox tick (index.html:2489 and identical siblings).
-// Source ships it as a draw-in animation (pathLength=1, stroke-dasharray=1,
-// stroke-dashoffset=1, transitioning on a hover/interaction trigger this
-// rebuild doesn't wire up per the simplify-choreography rule) - rendered
+// The source uses a draw-in animation with pathLength, stroke-dasharray,
+// and stroke-dashoffset set to 1. This component does not connect the trigger.
+// This item renders
 // here at its settled/resting dashoffset of 1, i.e. undrawn, matching the
 // checklist's unchecked resting state.
 export function ChecklistTickIcon() {

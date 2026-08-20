@@ -36,7 +36,7 @@ export default function DeleteBrandDialog({ brandId, brandName, isPending, onCon
   const [typed, setTyped] = useState("");
   const matches = typed.trim() === brandName.trim();
 
-  // Wave 6.6: fetch counts of affected child rows the moment the dialog
+  // Fetch counts of affected child rows when the dialog
   // opens. Keeps the request out of the list view's render path so scrolling
   // through brands doesn't fire N preview calls.
   const { data: previewData, isLoading: previewLoading } = useQuery<{

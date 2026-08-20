@@ -235,7 +235,7 @@ const SEED: Ticket[] = [
     column: "doing",
   }),
 
-  // Group 6: strengths worth protecting. Do not lose these in a rebuild.
+  // Keep these strengths during future changes.
 ];
 
 // The board lives on the server, in one `system_state` row. Every visitor sees

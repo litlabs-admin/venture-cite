@@ -1,4 +1,4 @@
-// Mentions rebuild (0050) - Task 19.2
+// Mention detail sheet.
 // Detail panel for a single BrandMention.  Opens as a right-side Sheet on
 // desktop and a bottom Sheet on mobile (<768 px) per spec §3.12.E.
 

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useActiveCitationRuns } from "./useActiveCitationRuns";
 
-// Wave 9 fix: TanStack Query merges `refetchInterval` defaults at observer
+// TanStack Query merges `refetchInterval` defaults at the observer
 // creation time, not on already-mounted observers. The previous incarnation
 // of this hook called `queryClient.setQueryDefaults(...)` after a run started
 // - which silently did nothing for any page already on screen, so dependent

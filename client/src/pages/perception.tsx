@@ -61,8 +61,7 @@ function Chip({ children, tone }: { children: React.ReactNode; tone: "praised" |
 }
 
 /** Category score column: large text-stat number over a full-width bar,
- *  matching the reference's layout (bar BENEATH the label, not beside it -
- *  see docs/optimize-perception-reference.md "Rebuild decisions"). Null axes
+ *  matching the reference's layout. The bar is below the label. Null axes
  *  never draw a bar or a fabricated number - a dash and no track. */
 function CategoryScoreColumn({ label, value }: { label: string; value: number | null }) {
   return (

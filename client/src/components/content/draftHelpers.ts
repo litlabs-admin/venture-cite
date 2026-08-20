@@ -1,4 +1,4 @@
-// Wave 7: drafts are unified into the articles table. The shape we render
+// Drafts use the articles table. The displayed shape
 // in the DraftToolbar dropdown is just the article row, status-aware.
 
 import type { Article } from "@shared/schema";

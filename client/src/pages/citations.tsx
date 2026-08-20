@@ -53,7 +53,7 @@ export default function Citations() {
   } = usePrompts(selectedBrandId);
   const prompts = promptsData?.data || [];
 
-  // Wave 9: POST /run is now async (returns ~100ms with runId). Completion
+  // POST /run is asynchronous and returns a runId. Completion
   // arrives via the polling /citation-runs/state channel + active-runs gate;
   // the mutation toast just confirms the run started. Two-tab races receive
   // 409 with the existing runId - surfaced as an "already running" toast
@@ -77,7 +77,7 @@ export default function Citations() {
           queryClient.invalidateQueries({
             queryKey: ["/api/brands", selectedBrandId, "citation-runs/active"],
           });
-          // Wave 9.2: also seed pendingRunId from the existing run so the
+          // Also seed pendingRunId from the existing run so the
           // banner appears instantly rather than waiting up to 8s for the
           // gate to confirm.
           if (body?.data?.runId) setPendingRunId(body.data.runId);
@@ -90,7 +90,7 @@ export default function Citations() {
           queryClient.invalidateQueries({
             queryKey: ["/api/brands", selectedBrandId, "citation-runs/active"],
           });
-          // Wave 9.2: optimistic banner. The polling gate still has up to
+          // Show an optimistic banner. The polling gate still has up to
           // 8s of latency before it sees the new run; pendingRunId fills
           // the gap so the banner shows in ~200ms. Cleared by the effect
           // below once the gate confirms.
@@ -143,7 +143,7 @@ export default function Citations() {
   };
   const backfillMutation = { ...backfillMutationImpl, mutate: runBackfill };
 
-  // Wave 8/9: live-update lifecycle. The status-gate hook tells us whether
+  // The live-update lifecycle uses the status-gate hook to tell us whether
   // any citation run is in flight; useCitationLiveRefresh fires a one-shot
   // invalidate when the gate flips active→idle so the page picks up final
   // numbers. Per-query polling (refetchInterval) is wired inside ResultsTab
@@ -154,7 +154,7 @@ export default function Citations() {
     [...promptKeys.history(selectedBrandId)],
   ]);
 
-  // Wave 9: keep the rotating loading messages cycling for the entire run,
+  // Keep the rotating loading messages cycling for the entire run,
   // not just the (now ~100ms) kickoff request. Run is async - once the
   // mutation resolves the UI relies entirely on `hasActive` for in-flight
   // state, so the messages should follow the same signal.
@@ -178,7 +178,7 @@ export default function Citations() {
     totalCited: number;
   } | null>(null);
 
-  // Wave 9.2: optimistic banner. The active-runs gate polls every 8s, so
+  // Show an optimistic banner. The active-runs gate polls every eight seconds, so
   // the first ~8s after clicking Run had no banner - looked like nothing
   // happened. `pendingRunId` is seeded from the kickoff response and
   // displayed alongside `hasActive`. Cleared the moment the gate query
@@ -196,7 +196,7 @@ export default function Citations() {
     setPendingRunId(null);
   }, [selectedBrandId]);
 
-  // Wave 9.2: clear pendingRunId once the active-runs gate confirms it
+  // Clear pendingRunId once the active-runs gate confirms it
   // OR after a 30s safety timeout (run never registered).
   useEffect(() => {
     if (!pendingRunId) return;
@@ -312,12 +312,12 @@ export default function Citations() {
 
   // Pick the most recent in-flight run as the one we surface on screen.
   // active-runs is sorted desc by startedAt server-side.
-  // Wave 9: progressPct comes from the active-runs gate when the
+  // progressPct comes from the active-runs gate when the
   // /citation-runs/state poll hasn't delivered an update yet, but
   // totalChecks/totalCited stay unset (we hide the count line below
   // until the state poll fills them in, instead of showing a misleading
   // "0 cited / 0 checks so far").
-  // Wave 9.2: when pendingRunId is set but the gate hasn't seen the
+  // When pendingRunId is set but the gate has not seen the
   // run yet (the ~8s window between kickoff and the next gate poll),
   // synthesize a 0% headline so the banner shows immediately.
   const headlineRun = activeRuns[0];
@@ -339,7 +339,7 @@ export default function Citations() {
               totalCited: 0,
             }
           : null;
-  // Wave 9.2: banner gating needs to include pendingRunId so the
+  // Banner gating includes pendingRunId so the
   // optimistic banner appears in the gap between kickoff and the gate
   // confirming. `hasActive` lags up to 8s.
   const showBanner = hasActive || !!pendingRunId;
@@ -503,7 +503,7 @@ export default function Citations() {
                     </>
                   )}
                 </Button>
-                {/* Wave 9: secondary actions in an overflow menu so the
+                {/* Secondary actions use an overflow menu so the
                     primary Run Check button has clear visual hierarchy.
                     Re-check stored is read-mostly and rarely needed. */}
                 <DropdownMenu>

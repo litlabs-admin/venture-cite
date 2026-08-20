@@ -57,7 +57,7 @@ export default function Register() {
       return result;
     },
     onSuccess: async (data) => {
-      // Plan 4 Task 3: register no longer issues a session. Instead the
+      // Register no longer issues a session. Instead the
       // server flags requiresVerification and we route the user to the
       // /verify-email screen until they click the link Supabase sent.
       if (data?.requiresVerification) {

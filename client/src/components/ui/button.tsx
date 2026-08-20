@@ -43,7 +43,7 @@ const buttonVariants = cva(
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
         lg: "h-11 rounded-md px-8",
-        // Wave 6.3: 44×44 meets Apple HIG + WCAG 2.5.5 touch target size
+        // 44×44 meets the Apple HIG and WCAG 2.5.5 touch-target size.
         // (icon buttons were 40×40, which fails tap reliability on mobile).
         icon: "h-11 w-11",
       },

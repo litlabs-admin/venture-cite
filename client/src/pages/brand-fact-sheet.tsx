@@ -31,19 +31,19 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { EmptyState } from "@/components/foundations/EmptyState";
 import { ErrorState } from "@/components/ui/error-state";
 
-// Plan 2.3 hook - consume only.
+// Scrape run stream hook.
 import { useScrapeRunStream } from "@/hooks/useScrapeRunStream";
 
 import { ManualPasteCard } from "@/components/fact-sheet/ManualPasteCard";
 
-// Plan 2.4 components.
+// Fact-sheet components.
 import { ConflictPair, type ConflictPairData } from "@/components/fact-sheet/ConflictPair";
 import { FactRow, type ResolvedFact } from "@/components/fact-sheet/FactRow";
 import { DomainGroupHeader } from "@/components/fact-sheet/DomainGroupHeader";
 import { DOMAINS, DOMAIN_LABELS, type Domain } from "@/components/fact-sheet/domainIcons";
 import { formatRelativeTime, daysSince } from "@/lib/formatRelativeTime";
 
-// Plan 2.5 components.
+// Scrape-state components.
 import { PauseToggle } from "@/components/fact-sheet/PauseToggle";
 import { ScrapePagesPanel } from "@/components/fact-sheet/ScrapePagesPanel";
 import {
@@ -52,13 +52,13 @@ import {
 } from "@/components/fact-sheet/ScrapeFailureState";
 import type { BrandFactScrapePage } from "@shared/schema";
 
-// Response shape from Plan 2.3 GET /api/brand-fact-sheet/diff
+// Response shape from GET /api/brand-fact-sheet/diff.
 type DiffResponse = {
   conflicts: Partial<Record<Domain, ConflictPairData[]>>;
   resolved: ResolvedFact[];
 };
 
-// Response shape from Plan 2.3 GET /api/brand-fact-sheet/runs?brandId=…
+// Response shape from GET /api/brand-fact-sheet/runs?brandId=…
 type ScrapeRun = {
   id: string;
   brandId: string;
@@ -82,7 +82,7 @@ type ScrapeRun = {
   errorMessage?: string | null;
 };
 
-// Response shape from Plan 2.3 GET /api/brand-fact-sheet/runs/:runId
+// Response shape from GET /api/brand-fact-sheet/runs/:runId.
 type ScrapeRunDetailResponse = {
   success: boolean;
   run: ScrapeRun & { errorMessage?: string | null };
@@ -164,7 +164,7 @@ export default function BrandFactSheet() {
       });
     },
     onError: (err: unknown) => {
-      // /full-rescrape returns the same structured 409 shape as /plan
+      // /full-rescrape returns the same structured 409 error response.
       // (cooldown / already_running / cost cap). For already_running just
       // let the runs poll surface the existing run; otherwise show why.
       const body =
@@ -249,7 +249,7 @@ export default function BrandFactSheet() {
   const latestCompleted = latestCompletedQuery.data?.run ?? null;
 
   /* ---------- SSE: live progress for active run ----------
-   * Plan 2.3 hook is parameter-less; call .start(runId) when an active run
+   * The hook has no parameters. Call .start(runId) when an active run
    * appears and .stop() on cleanup / when the run changes. Derive progress
    * fields from the event stream.
    */
@@ -464,14 +464,14 @@ export default function BrandFactSheet() {
           ? "text-muted-foreground"
           : "text-foreground";
 
-  /* ---------- pause state (Plan 2.5 Task 6) ---------- */
+  /* ---------- pause state ---------- */
   const brandFactScrapeEnabled = selectedBrand?.factScrapeEnabled ?? true;
   const [scrapeEnabled, setScrapeEnabled] = useState(true);
   useEffect(() => {
     setScrapeEnabled(brandFactScrapeEnabled);
   }, [brandFactScrapeEnabled]);
 
-  /* ---------- per-page panel data (Plan 2.5 Task 8) ----------
+  /* ---------- per-page panel data ----------
    * While streaming: derive from SSE `page` events (latest-by-url wins).
    * After completion: pull from the run-detail endpoint.
    */
@@ -522,7 +522,7 @@ export default function BrandFactSheet() {
       ? "Auto-scraping paused."
       : null;
 
-  /* ---------- terminal-failure detection (Plan 2.5 Task 9) ----------
+  /* ---------- terminal-failure detection ----------
    * Mixed-success (some pages done, some failed) does NOT render the failure
    * banner - only `failed`/`timeout` runs with an explicit error_kind do.
    */
@@ -653,7 +653,7 @@ export default function BrandFactSheet() {
             </PanelRow>
           )}
 
-          {/* PER-PAGE PANEL - Plan 2.5 Task 8 */}
+          {/* Per-page panel. */}
           {(stream.isStreaming || displayPages.length > 0) && activeRunId ? (
             <PanelRow cols={1}>
               <Panel width="wide" border="last">
@@ -667,7 +667,7 @@ export default function BrandFactSheet() {
             </PanelRow>
           ) : null}
 
-          {/* TERMINAL FAILURE STATE - Plan 2.5 Task 9 */}
+          {/* Terminal failure state. */}
           {isTerminalFailure && latestRun ? (
             <PanelRow cols={1}>
               <Panel width="wide" border="last">
@@ -780,7 +780,6 @@ export default function BrandFactSheet() {
           </div>
 
           {/* RESOLVED FACTS - Task 10 */}
-          {/* TODO(spec-2 Plan 2.5): delta indicators (new / changed / removed) - needs prior-run comparison query */}
           <PanelRow cols={1} last>
             <Panel
               width="wide"
@@ -930,7 +929,7 @@ export default function BrandFactSheet() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit dialog (carried over from prior implementation; valueType editor is Plan 2.5) */}
+      {/* Edit dialog. */}
       <Dialog open={!!editingFact} onOpenChange={(open) => !open && setEditingFact(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>

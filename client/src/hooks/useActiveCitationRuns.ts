@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 // every dependent page - when `hasActive` is true, those pages bump their
 // dependent queries onto a 6 s refetch interval (via useCitationLiveRefresh).
 //
-// Wave 9 idle-aware backoff: a brand that's not running anything still mounts
+// Use idle-aware backoff. A brand with no run still mounts
 // this hook on every dependent page. With ~6 dependent hooks on screen, a
 // fixed 8 s poll = 45 req/min/user of pure overhead. We back off after
 // consecutive empty polls and pause completely when the tab is hidden.
@@ -19,7 +19,7 @@ import { apiRequest } from "@/lib/queryClient";
 // TanStack dedupes by query key, so all pages on the same brand share one
 // underlying poll regardless of how many hooks call this.
 //
-// Wave 9.2: empty-streak counter is module-scoped, keyed by brandId. Was
+// The empty-streak counter is module-scoped and keyed by brandId. It was
 // per-component (`useRef`); the home page calls this hook 7+ times via
 // useDashboardQueries observers, each with its own ref → each maintaining
 // its own backoff schedule. TanStack dedupes the *fetch* but the polling

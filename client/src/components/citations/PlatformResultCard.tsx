@@ -18,7 +18,7 @@ export type PlatformResult = {
   // newly-added name variation. Rank is null on these rows because the
   // original LLM run didn't see the brand, so we have no honest rank signal.
   reDetectedAt?: string | null;
-  // Wave 9: optional - when present, lets the "Open in chat" link send the
+  // This optional value lets the "Open in chat" link send the
   // user directly to a fresh chat with the same prompt pre-filled.
   prompt?: string;
   /** Phase 3: list of URLs the LLM cited in its response. Null on
@@ -26,11 +26,11 @@ export type PlatformResult = {
   citedUrls?: string[] | null;
 };
 
-// Wave 9: known-platform palette (shared single source) stays explicit so the
+// The known-platform palette stays explicit so the
 // brand colors look right; everything else falls back to a stable hash → HSL
 // so a 6th / 7th platform doesn't render as plain grey.
 
-// Wave 9: inline color hash for unknown platforms. djb2-ish - stable across
+// This inline color hash handles unknown platforms. It stays stable across
 // renders, distributes hues evenly. Returns CSS variables so the same
 // value works for bg/text/border with consistent opacity.
 function hashHue(s: string): number {
@@ -39,7 +39,7 @@ function hashHue(s: string): number {
   return Math.abs(h) % 360;
 }
 
-// Wave 9 → theme tokens: unknown platforms are categorical data (like the
+// Theme tokens handle unknown platforms as categorical data, like the
 // known-platform badges), so they draw from the chart-1…chart-5 ramp
 // instead of a raw hashed HSL value that couldn't follow the theme.
 // Class names must stay string literals (not template-interpolated) so
@@ -67,7 +67,7 @@ function colorClassForPlatform(platform: string): string {
   return `bg-muted ${CHART_TEXT_CLASSES[idx]} ${CHART_BORDER_CLASSES[idx]}`;
 }
 
-// Wave 9: deep-link templates. ChatGPT supports ?q=... on the share URL,
+// These deep-link templates use the ChatGPT share URL query parameter.
 // Claude only opens the home page so we fall back to clipboard, etc.
 // `null` = no deep link, just copy-to-clipboard.
 const PLATFORM_DEEP_LINKS: Record<string, ((prompt: string) => string) | null> = {
@@ -92,7 +92,7 @@ export function PlatformResultCard({
   const [expanded, setExpanded] = useState(false);
   const { toast } = useToast();
   const colorClass = colorClassForPlatform(result.platform);
-  // Wave 9: detect transport failures (rate-limit, network blip etc.) so
+  // Detect transport failures, such as rate limits and network failures, so
   // we surface them inline as an error pill rather than burying them
   // behind the expand toggle. The citation pipeline writes
   // "Check failed: <reason>" into snippet on failure.
@@ -161,7 +161,7 @@ export function PlatformResultCard({
         </span>
       </div>
 
-      {/* Wave 9: failure pill. Previously, a "Check failed: rate limited"
+      {/* The failure pill shows a "Check failed: rate limited" message.
           snippet was hidden behind an expand toggle - the user had no
           way to see WHY the platform didn't respond without clicking
           through. Show it inline + tinted red so it's unmissable. */}
@@ -190,7 +190,7 @@ export function PlatformResultCard({
               )}
               {expanded ? "Hide full response" : "Show full response"}
             </button>
-            {/* Wave 9: copy + open-in-chat actions. Only render when
+            {/* Copy and open-in-chat actions render only when
                 expanded so they don't add visual noise to the collapsed
                 row. */}
             {expanded && (
@@ -270,7 +270,7 @@ export function PlatformResultCard({
           )}
         </div>
       ) : !isError && result.snippet ? (
-        // Wave 9: snippet without fullResponse and not an error → unusual
+        // A snippet without fullResponse or an error is unusual.
         // legacy state. Show inline so the user sees what was captured.
         <div className="px-3 py-2 border-t text-caption text-muted-foreground italic">
           {result.snippet}
