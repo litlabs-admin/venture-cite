@@ -1,0 +1,6 @@
+interface:
+  display_name: "Idempotent Operations"
+  short_description: "Design safe retryable operations"
+  default_prompt: "Use $principle-make-operations-idempotent to make this operation safe to retry."
+policy:
+  allow_implicit_invocation: true

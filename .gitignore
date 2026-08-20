@@ -25,16 +25,8 @@ log.txt
 *.log
 logs/
 
-# ─── Documentation / notes - kept local, never pushed ──────────
-*.md
-!README.md
-!docs/privacy-policy.md
-!docs/phase1_goals.md
-!docs/phase1_completion.md
-!docs/phase2_goals.md
-!docs/phase2_completion.md
-# Operational, not notes - needed by anyone deploying this.
-!docs/deploy-runbook.md
+# ─── Documentation ──────────────────────────────────────────────
+# Track Markdown files. A later evidence-led pass will replace stale files.
 
 # ─── Editor / IDE ────────────────────────────────────────────────
 .vscode
@@ -113,8 +105,10 @@ replit.nix
 attached_assets/
 .VSCodeCounter/
 brainstorms/
-.agents/
-.codex/
+# Track project skills and shared Codex configuration.
+# Keep local Codex state and overrides outside Git.
+.codex/*.local.toml
+.codex/state/
 # Office documents - scripts, decks and sheets are working material,
 # and a binary blob in git diffs as one unreadable line anyway.
 *.docx

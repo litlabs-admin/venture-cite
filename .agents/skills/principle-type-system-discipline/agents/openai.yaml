@@ -1,0 +1,6 @@
+interface:
+  display_name: "Type System Discipline"
+  short_description: "Make invalid states hard to represent"
+  default_prompt: "Use $principle-type-system-discipline to review the types and invariants."
+policy:
+  allow_implicit_invocation: true

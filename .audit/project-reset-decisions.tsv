@@ -1,0 +1,9 @@
+ts	phase	decision	why	evidence	result
+2026-08-20T00:00:00Z	setup	created a separate setup branch	protect the live main branch	git branch codex/project-reset-setup	branch active
+2026-08-20T00:01:00Z	skills	installed the approved project skills	make the selected workflows available in this repository	.agents/skills	20 skill folders present
+2026-08-20T00:02:00Z	safety	kept live systems read-only during setup	protect real users and external services	current task tool history	no live writes made
+2026-08-20T00:03:00Z	secrets	moved the Buffer token to a Windows user environment variable	remove the secret from repository files	.codex/config.toml	tracked config contains only BUFFER_MCP_TOKEN reference
+2026-08-20T00:04:00Z	agents	added five controlled project agent profiles	use low effort by default and reserve Sol Medium for sensitive reviews	.codex/agents	TOML parser accepted all profiles
+2026-08-20T00:05:00Z	skills	adapted and validated all 20 project skills	remove Cursor rules and stale-document assumptions	.agents/skills	20 metadata files and source records passed validation
+2026-08-20T00:06:00Z	lock	left skills-lock.json unchanged	the official installer does not expose the lock hash method	skills-lock.json	avoided guessed hashes
+2026-08-20T00:07:00Z	documents	blocked risky stale files from the first snapshot	some files can contain real or uncertain user data	Markdown secret scan	manual privacy review required

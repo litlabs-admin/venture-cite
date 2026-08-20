@@ -1,0 +1,6 @@
+interface:
+  display_name: "TypeScript Practices"
+  short_description: "Apply safe and clear TypeScript patterns"
+  default_prompt: "Use $typescript-best-practices when reading or changing TypeScript code."
+policy:
+  allow_implicit_invocation: true

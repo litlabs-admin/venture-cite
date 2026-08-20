@@ -1,0 +1,6 @@
+interface:
+  display_name: "How It Works"
+  short_description: "Explain code flow and module ownership"
+  default_prompt: "Use $how to explain how this subsystem works before changes."
+policy:
+  allow_implicit_invocation: true
