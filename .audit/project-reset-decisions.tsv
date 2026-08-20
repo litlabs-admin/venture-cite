@@ -26,3 +26,7 @@ ts	phase	decision	why	evidence	result
 2026-08-20T00:24:00Z	documents	archived all stale Markdown before cleanup	preserve retrievable history without live personal data	local Git history	86 safe files and 15 redacted files have snapshot commits
 2026-08-20T00:25:00Z	documents	removed redundant Markdown and rewrote maintained guides	make executable code and tests the documentation source	current documentation set	109 stale files removed and six guides updated
 2026-08-20T00:26:00Z	cleanup	removed tracked temporary scripts and a crash dump	remove unsafe one-off tools and personal artifacts	Git history	18 obsolete files removed from the working tree
+2026-08-20T08:00:00Z	release	deferred the Supabase CA and privacy values	continue safe local work without a live write	user approval	production audit and deployment remain blocked
+2026-08-20T08:01:00Z	database	added a local request role and tenant policies	make missing ownership filters fail in PostgreSQL	ten local RLS tests	users and brands stay isolated across commit rollback and pool reuse
+2026-08-20T08:02:00Z	tests	replaced a fixed tour wait with rendered-control polling	remove full-suite timing failures	50 millisecond frame-delay test	13 tour tests and 1449 full-suite tests pass
+2026-08-20T08:03:00Z	local	stopped the VentureCite Supabase stack	avoid idle Docker use after verification	Supabase CLI	local volumes remain restartable

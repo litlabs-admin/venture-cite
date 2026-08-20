@@ -85,7 +85,7 @@ The focused safety run passed 102 tests.
 
 The local PostgreSQL run passed six tests.
 
-The full test run passed 1,408 tests and skipped 37 optional-service tests.
+The full local test run passed 1,449 tests and skipped 16 optional tests.
 
 No test loaded the normal application database URL.
 
@@ -107,10 +107,26 @@ The Supabase project CA must come from the project dashboard before the metadata
 
 No application row was queried during that failed check.
 
+The user deferred the Supabase CA and public privacy values until release preparation.
+
+Migration 0096 adds a local request role and users-and-brands RLS policies.
+
+No live route uses this role.
+
+Ten local integration tests prove tenant isolation and pool cleanup.
+
+The local RLS design and proof are in `SUPABASE_RLS_FOUNDATION.md`.
+
+The tour persistence test now waits for rendered controls instead of a fixed delay.
+
+The tour test passes with an intentional 50 ms frame delay.
+
+The VentureCite local Supabase stack is stopped and keeps its restartable volumes.
+
 ## Next checks
 
-1. Review the live Supabase role and policy state without user data.
-2. Move one backend domain at a time to database-enforced tenant policies.
+1. Add named request repositories for users and brands.
+2. Review the live Supabase role and policy state before route activation.
 3. Configure the production database TLS settings and exact Stripe catalogue IDs.
-4. Add the approved legal entity and privacy contact to the public policy.
+4. Add the approved legal entity and privacy contact before public release.
 5. Reduce the remaining lint warning debt.
