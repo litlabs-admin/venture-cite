@@ -114,6 +114,11 @@ describeIfLocal("content request database RLS", () => {
         login password '${runtimePassword}' noinherit nosuperuser nocreatedb
         nocreaterole noreplication nobypassrls`,
     );
+    // The production direct role receives these admin grants in the controlled
+    // release step. The local Supabase fixture must model that state explicitly.
+    await ownerPool.query(
+      "grant venturecite_request, venturecite_content_request, venturecite_outbox_worker to current_user with inherit false, set false, admin true",
+    );
     const testDatabaseUrl = process.env.TEST_DATABASE_URL;
     if (!testDatabaseUrl) throw new Error("TEST_DATABASE_URL is required for local RLS tests");
     const requestDatabaseUrl = new URL(testDatabaseUrl);
