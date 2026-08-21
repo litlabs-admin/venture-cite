@@ -20,7 +20,7 @@ The data-backed preview branch uses a production snapshot for storage checks onl
 
 The data-backed branch contains 46 users, 45 brands, and 29 articles.
 
-Both preview paths contain 111 application migration rows with non-null checksums through `0110_request_brand_soft_delete.sql`.
+Both preview paths contain 112 application migration rows with non-null checksums through `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
 
 The data-backed ownership checks found no orphaned article, brand, or job rows.
 
@@ -32,7 +32,9 @@ No production write occurred.
 
 The empty preview migration runner completed on 2026-08-22 through the branch session pooler with strict TLS. It used `0093_stripe_owned_trial.sql` as the approved preview baseline and applied no new migration.
 
-A follow-up query found 111 application migration rows with non-null checksums through `0110_request_brand_soft_delete.sql`.
+A follow-up query found 112 application migration rows with non-null checksums through `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
+
+Migration 0111 revokes Data API execution for the security-definer `public.handle_new_user()` trigger function after the function replacement in migration 0093. The empty preview runner applied it. The data-backed preview received the same idempotent SQL through the authenticated Management API because its copied pooler password was stale.
 
 A local preview-only server connected to the empty branch and returned HTTP 200 from `/health` and `/`. The check used fake generation and disabled email, billing setup, and scheduling. The server was stopped after verification.
 
@@ -61,6 +63,8 @@ Migration 0108 adds request-safe distribution provider state.
 Migration 0109 records the quota period used by each content-generation reservation.
 
 Migration 0110 grants the request role the two columns required to schedule an owned brand soft delete.
+
+Migration 0111 revokes public, anon, and authenticated execution on the auth trigger function.
 
 The repositories bind one actor to one restricted transaction. They do not expose the raw transaction.
 

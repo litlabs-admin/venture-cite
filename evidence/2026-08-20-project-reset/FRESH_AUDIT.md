@@ -32,7 +32,7 @@ The data-backed branch uses a production snapshot for storage checks. It is ephe
 
 The data-backed branch contains 46 users, 45 brands, and 29 articles.
 
-The preview application ledger contains 111 checked migration rows through `0110_request_brand_soft_delete.sql`.
+The preview application ledger contains 112 checked migration rows through `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
 
 The preview checks found no orphaned article, brand, or job ownership rows.
 
@@ -40,7 +40,7 @@ The preview checks found protected migration ledgers, enabled RLS, and the three
 
 No provider call, email, payment, or production write occurred.
 
-The empty preview migration runner completed with strict TLS and the approved `0093_stripe_owned_trial.sql` baseline. It applied no new migration. A follow-up ledger query found 111 rows with non-null checksums through `0110_request_brand_soft_delete.sql`.
+The empty preview migration runner completed with strict TLS and the approved `0093_stripe_owned_trial.sql` baseline. It applied migration 0111. A follow-up ledger query found 112 rows with non-null checksums through `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
 
 A local preview-only server returned HTTP 200 from `/health` and `/`. It used fake generation and disabled email, billing setup, and scheduling. The server was stopped after verification.
 
@@ -115,8 +115,8 @@ The empty migration preview and the separate data-backed preview are created and
 
 The backup and restore procedure, controlled migrations, role dry run, role application, canary, and monitoring remain pending.
 
-The data-backed preview advisor reported leaked-password protection and RLS initialization-plan warnings.
-Review these warnings before production release.
+The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Migration 0111 removed the public and authenticated execution grants from `public.handle_new_user()` in both previews.
+Review the Auth setting and RLS warnings before production release.
 
 The privacy legal entity and contact values remain deferred until the final release phase.
 
