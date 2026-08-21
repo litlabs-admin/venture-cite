@@ -56,9 +56,9 @@ The local browser run passed five of five flows in 1 minute:
 
 The final browser run made no live OpenAI call. Local fake mode disables live OpenAI access.
 
-The final full test run passed 203 files and 1,547 tests.
+The latest full test run passed 203 files and 1,551 tests.
 
-Nineteen files and 87 tests skipped under their configured conditions.
+Nineteen files and 89 tests skipped under their configured conditions.
 
 These final checks passed:
 
@@ -101,7 +101,7 @@ Provider-wide outbox conversion is not a release gate for this reset wave.
 
 ## Remaining gates
 
-1. Authenticate the Supabase CLI and load the approved release values securely.
+1. Load the approved release values securely.
 2. Configure the verified preview branches with test-provider values.
 3. Deploy and verify a preview without production access.
 4. Run the read-only production preflight and metadata audit.

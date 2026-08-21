@@ -6,7 +6,8 @@ The latest local RLS and outbox run passed 37 of 37 database integration tests.
 
 Production remains read-only and unchanged.
 
-Migrations 0096, 0097, and 0098 remain unapplied in production.
+The read-only production audit recorded migrations 0096 through 0107 as unapplied.
+This branch has not run migrations 0108 through 0110 against production.
 
 The local Supabase stack is stopped.
 
@@ -102,14 +103,16 @@ Evidence: `scripts/configureRequestRoleMembership.ts:33-64`, `scripts/releaseEnv
 2. Obtain the four approved Stripe product and price identifiers.
 3. Obtain `RESEND_FROM_ADDRESS`.
 4. Define the least-privileged production runtime role.
-5. Run the strict metadata audit with the direct connection.
-6. Review grants, owners, RLS flags, policies, and ownership counts.
-7. Apply migrations 0096 through 0110 through the controlled release command.
-8. Run the request-role membership command in dry-run mode.
-9. Apply role membership after the final review and confirmation gate.
-10. Run two-user tests for brand creation, website import, deletion preview, and soft delete.
-11. Verify worker-only storage paths remain outside request routes.
-12. Keep privacy legal placeholders deferred until final release preparation.
+5. Set a secure HTTPS `APP_URL`.
+6. Run the strict metadata audit with the direct connection.
+7. Review grants, owners, RLS flags, policies, and ownership counts.
+8. Verify the production backup and restore plan.
+9. Apply migrations 0096 through 0110 through the controlled release command.
+10. Run the request-role membership command in dry-run mode.
+11. Apply role membership after the final review and confirmation gate.
+12. Run two-user tests for brand creation, website import, deletion preview, and soft delete.
+13. Verify worker-only storage paths remain outside request routes.
+14. Keep privacy legal placeholders deferred until final release preparation.
 
 ## Security boundary
 

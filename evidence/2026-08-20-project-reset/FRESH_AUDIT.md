@@ -50,7 +50,7 @@ The local browser run passed five of five flows with fake generation.
 
 The flows covered article editing, generation success, generation cancellation, distribution, and tenant isolation.
 
-The latest full test run passed 203 files and 1,547 tests.
+The latest full test run passed 203 files and 1,551 tests.
 
 These checks passed:
 
@@ -111,9 +111,9 @@ The privacy legal entity and contact values remain deferred until the final rele
 
 ## Release order
 
-1. Authenticate the Supabase CLI.
-2. Load the approved release values securely.
-3. Keep the verified empty and data-backed previews isolated from users and providers.
+1. Load the approved release values securely.
+2. Keep the verified empty and data-backed previews isolated from users and providers.
+3. Configure and verify a preview with test-provider values.
 4. Run the production read-only preflight and metadata audit.
 5. Verify backup and restore.
 6. Apply migrations 0096 through 0110 through the controlled release command.
