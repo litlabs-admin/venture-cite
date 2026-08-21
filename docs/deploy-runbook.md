@@ -60,6 +60,10 @@ Apply the role memberships only after the dry run passes.
 
 Record the applied migration names and checksums in the release record.
 
+The release runner reconciles matching Supabase migration rows before it executes SQL.
+
+Stop the release if the Supabase ledger is missing a root file or has a checksum mismatch.
+
 ## Deployment gates
 
 1. Deploy the application after the migration and role steps pass.

@@ -28,6 +28,12 @@ The command configures the request, content-request, and outbox-worker roles.
 
 The build and application startup never apply migrations.
 
+On Supabase, the release runner first compares the root migration files with `supabase_migrations.schema_migrations`.
+
+It records matching files in `public.schema_migrations` and skips SQL that Supabase already applied.
+
+It stops before SQL execution when a file is missing or its checksum differs.
+
 Set strict database TLS in production. Set `DATABASE_CA_CERT_PATH` or set `DATABASE_SSL_REJECT_UNAUTHORIZED=true`.
 
 Remove TLS query parameters from `DATABASE_URL` when you enable certificate verification.
