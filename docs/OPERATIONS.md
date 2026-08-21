@@ -24,6 +24,8 @@ Set `REQUEST_ROLE_MEMBERSHIP_MODE=apply` and `CONFIRM_REQUEST_ROLE_MEMBERSHIP=ve
 
 The command verifies the runtime connection and role attributes before it changes memberships.
 
+The command configures the request, content-request, and outbox-worker roles.
+
 The build and application startup never apply migrations.
 
 Set strict database TLS in production. Set `DATABASE_CA_CERT_PATH` or set `DATABASE_SSL_REJECT_UNAUTHORIZED=true`.
@@ -70,6 +72,8 @@ Check structured logs and Sentry after a release.
 
 The migration runner has no down-migration command. Test every migration against a production-like copy before release. Prepare a restore plan before a destructive schema change.
 
+Do not use the current Vercel preview until it has an isolated Supabase database and test provider configuration.
+
 ## Checks
 
 Run these checks before release.
@@ -84,3 +88,5 @@ npm test
 Run `npm run build` without a database connection during pre-release checks.
 
 Run `npm run test:e2e` only against an approved test environment.
+
+Use [deploy-runbook.md](deploy-runbook.md) for the ordered release procedure.

@@ -2,7 +2,7 @@
 
 The browser tests use Playwright and live in `tests/e2e/`.
 
-Run the suite with this command.
+Run the account-based suite with this command.
 
 ```sh
 npm run test:e2e
@@ -10,23 +10,43 @@ npm run test:e2e
 
 Playwright starts `npm run dev` unless `E2E_BASE_URL` is set.
 
-The suite uses one Chromium project and one worker. The setup project signs in once and stores its state in the Playwright auth file.
+The local product-flow project uses one Chromium worker.
 
 The application uses a Supabase Bearer token in local storage. It does not use an authentication cookie.
 
-## Required test setup
+## Local product-flow setup
 
-Use a dedicated test account with at least one brand.
+Start the local Supabase stack first.
 
-Use a database that the test account can change.
+Set these local values without copying them into a tracked file:
 
-Use provider keys that cannot charge money or send mail to real users.
+- `E2E_LOCAL_APP_URL`
+- `E2E_LOCAL_DATABASE_URL`
+- `E2E_LOCAL_ADMIN_DATABASE_URL`
+- `E2E_LOCAL_SUPABASE_URL`
+- `E2E_LOCAL_SUPABASE_ANON_KEY`
+- `E2E_LOCAL_SUPABASE_SERVICE_ROLE_KEY`
+- `E2E_LOCAL_FAKE_GENERATION=1`
 
-The tests create and remove an article fixture for the URL edit test. Do not use a shared production account.
+Run only the isolated local project.
+
+```sh
+npm run test:e2e:local
+```
+
+The local flow creates isolated users and removes them after the run.
+
+The flow uses the deterministic fake content provider.
+
+The local launcher rejects production and non-loopback targets.
+
+Do not use a production account, database, or provider key.
 
 ## Scope
 
-The suite checks public pages, authentication pages, billing validation, onboarding, navigation, theme changes, tours, form validation, redirects, raw HTML, and URL state.
+The suite checks public pages, authentication, navigation, forms, billing validation, and product flows.
+
+The product flows cover article editing, revisions, fake generation, cancellation, distribution, deletion, and cross-tenant denial.
 
 The billing test checks request validation. It does not prove a completed Stripe payment.
 

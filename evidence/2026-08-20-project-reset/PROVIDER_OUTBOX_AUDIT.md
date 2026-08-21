@@ -2,96 +2,84 @@
 
 Date: 2026-08-21
 
-## Scope
+## Current decision
 
-This audit classifies provider calls by their current application contract.
+Use the outbox only when the application can return a durable asynchronous state.
 
-The audit uses executable call sites and current route behavior as evidence.
+Keep provider calls synchronous when the current HTTP response needs the provider result or URL.
 
-No provider call, production write, or deployment occurred during this audit.
+No provider call or production write occurred during this audit.
 
-## Implement now
+## Implemented outbox paths
 
 ### Generic OpenAI jobs
 
-The generic `llm_jobs` flow already returns a job identifier before completion.
+The `llm_jobs` transaction stores the job and an OpenAI kickoff command together.
 
-Move only its OpenAI Responses kickoff into the transactional outbox.
+The outbox handler starts the provider response with a stable idempotency key.
 
-Keep response retrieval and finalization direct because the provider response identifier makes those reads repeatable.
+Response retrieval and finalization use the stored provider response identifier.
 
-Evidence: `server/lib/llmJobs.ts` and the two current generic job callers.
+Evidence: `server/lib/llmJobs.ts`, `server/outbox/openAiLlmJobAdapter.ts`, and migration 0102.
 
 ### Content cost records
 
-The article completion transaction now creates one content-cost outbox command.
+The content completion transaction stores one content-cost command.
 
-The bounded drain records the cost with a database uniqueness constraint.
+The content-cost drain records one `api_costs` row per outbox idempotency key.
 
-Evidence: `server/outbox/contentCostOutboxAdapter.ts`, `server/outbox/contentCostOutboxDrain.ts`, and migrations 0099 through 0100.
+The database-backed test submits the same key twice and proves that one row exists.
 
-## Keep synchronous
+Evidence: `server/outbox/contentCostOutboxAdapter.ts`, `server/outbox/contentCostOutboxDrain.ts`, migrations 0099 and 0100, and `tests/integration/localContentCostIdempotency.test.ts`.
+
+## Synchronous provider paths
 
 ### Stripe
 
-Keep checkout, customer recovery, subscription changes, and billing portal sessions synchronous.
+Checkout, customer recovery, subscription changes, and billing portal sessions remain synchronous.
 
-These routes need provider objects or URLs before they can return a valid response.
+These routes need a provider object or URL before they return.
 
-Keep Stripe catalog synchronization as an explicit administration operation.
-
-Do not add a Stripe outbox adapter until a route contract can return a pending operation.
-
-Evidence: `server/routes/billing.ts`, `server/webhookHandlers.ts`, and the Stripe catalog synchronization code.
+Stripe catalog synchronization remains an explicit administration operation.
 
 ### Buffer
 
-Keep direct Buffer posts synchronous.
+Buffer posting remains synchronous.
 
-The API returns the provider post identifier and updates the distribution state immediately.
-
-An outbox conversion requires a new pending distribution contract first.
-
-Evidence: `server/routes/buffer.ts` and the article distribution route.
+The route returns the provider post identifier and updates the distribution state in the same request flow.
 
 ### OpenAI and OpenRouter response routes
 
-Keep routes that need an LLM result in the current HTTP response synchronous.
+Routes that need model output in the current response remain synchronous.
 
-This group includes assistant streaming, formatting, analysis, suggestions, onboarding, and fact extraction.
+This group includes streaming, formatting, analysis, suggestions, onboarding, and fact extraction.
 
-Do not move these calls until each route has an explicit job state and polling contract.
+Local fake-provider mode now blocks live OpenAI access during browser verification.
 
-Evidence: the provider call sites under `server/routes/` and `server/lib/`.
+## Deferred provider paths
 
-## Defer with a required design
+### Article generation provider kickoff
 
-### Article content generation
+The request command path now owns enqueue, advance, cancel, quota, and article state transitions.
 
-Defer the `content_generation_jobs` OpenAI kickoff.
+The OpenAI content worker still calls the provider directly.
 
-Its lease, cancellation, quota, article state, and deadline rules form one separate protocol.
-
-Design and test that complete protocol before an outbox conversion.
-
-Evidence: `server/contentGenerationWorker.ts`, `server/routes/content.ts`, and the content job storage methods.
+Do not move this provider call until one outbox design preserves its lease, deadline, cancellation, and response-link rules.
 
 ### Email delivery
 
-The welcome email is a suitable future outbox candidate.
+Email delivery remains direct.
 
-Weekly reports, weekly digests, and billing emails are also suitable after the application stores durable intent snapshots.
+Do not add it to the outbox until each email has a durable intent, recipient snapshot, template version, retention rule, and cancellation rule.
 
-Each intent needs a deterministic identifier, recipient snapshot, template version, retention rule, and cancellation rule.
+### Stripe and Buffer
 
-Persist enterprise inquiries before the application moves their email delivery into the outbox.
+Do not add these providers to the outbox until their routes return a pending operation instead of an immediate provider result.
 
-Evidence: the welcome, scheduled report, billing email, and enterprise inquiry call sites.
+## Release decision
 
-## Decision
+The current outbox scope is complete for generic OpenAI kickoff and content-cost recording.
 
-Implement one provider wave now: the generic `llm_jobs` OpenAI kickoff.
+Provider-wide outbox conversion is not a release requirement for this wave.
 
-Do not create a general provider framework.
-
-Add each later adapter only after its route or workflow has a durable asynchronous contract.
+Production remains unchanged.

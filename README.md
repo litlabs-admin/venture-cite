@@ -48,18 +48,26 @@ Run browser tests with the development server.
 npm run test:e2e
 ```
 
-The browser suite needs a configured test account. It also needs a test database and test provider keys. See [tests/e2e/README.md](tests/e2e/README.md).
+The local browser suite creates isolated test users. It uses local Supabase and a fake content provider.
 
-## Release blockers
+See [tests/e2e/README.md](tests/e2e/README.md) for the safety rules.
+
+## Release rules
 
 Do not release until Stripe has the approved Pro and Agency catalogue IDs and prices.
 
 Do not release until production PostgreSQL uses strict TLS verification.
 
-Do not let each production process apply migrations. Run `npm run db:migrate:release` as one controlled release step.
+Do not let an application process apply migrations. Run `npm run db:migrate:release` as one controlled release step.
 
 Set `CONFIRM_PRODUCTION_MIGRATIONS=venturecite-production` before you run this command.
 
-Do not run the migration command with a production database URL during ordinary verification.
+Run `npm run release:preflight` before a release.
 
-Do not treat the current email tests as proof of email delivery. Add tests that use a safe test provider or a controlled inbox.
+Use a direct PostgreSQL session URL for migrations. Do not use a transaction pooler URL.
+
+Configure the three restricted runtime roles after the migration step.
+
+Do not deploy a preview with production database or provider variables.
+
+Production remains read-only until the release gates in [docs/deploy-runbook.md](docs/deploy-runbook.md) pass.

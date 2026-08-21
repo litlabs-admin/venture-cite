@@ -41,13 +41,23 @@ The build creates a Nitro server under `dist/server`. The production command run
 
 Keep schema changes in `shared/schema.ts` and add the next SQL file in `migrations/`.
 
-Run migrations with `npm run db:migrate` in a controlled release step.
+Run production migrations with `npm run db:migrate:release` in a controlled release step.
 
 The runner records filenames in `public.schema_migrations`. It uses a PostgreSQL advisory lock and one transaction per file.
 
+Request routes use actor-bound repositories and restricted PostgreSQL roles for migrated domains.
+
+Do not pass a raw transaction through a request boundary.
+
+Keep worker-only fields outside request projections.
+
 Production database TLS must verify certificates. Set `DATABASE_CA_CERT_PATH` or `DATABASE_SSL_REJECT_UNAUTHORIZED=true`.
 
-Do not run the in-process scheduler with an external daily orchestrator. Set `DISABLE_IN_PROCESS_SCHEDULER` when an external scheduler calls the cron API.
+Do not run the in-process scheduler with an external daily orchestrator.
+
+Render currently uses the in-process scheduler.
+
+Keep `DISABLE_IN_PROCESS_SCHEDULER=false` and `EXTERNAL_CRON_ORCHESTRATOR_ENABLED=false` on Render.
 
 ## Verification
 
@@ -62,4 +72,4 @@ npm test
 
 For a UI change, run `npm run dev` and test the affected user path.
 
-For a release change, read [docs/OPERATIONS.md](docs/OPERATIONS.md).
+For a release change, read [docs/deploy-runbook.md](docs/deploy-runbook.md).

@@ -5,11 +5,9 @@
 // had resolved. useTourState yields `{}` until then, and an empty state is
 // indistinguishable from "this user has never seen any tour".
 //
-// Production evidence (admin@venturecite.com, read 2026-07-30): the row held
-// `global: { v: 2, skippedAt: "2026-07-29T19:18:01.391Z" }` and global-welcome
-// still auto-fired 7 times the following day. Lifetime: 133 auto-fires, 6
-// completions, 21 skips. The PATCH was always landing - it was never read in
-// time.
+// A production incident showed repeated tour starts after the user skipped
+// the tour. The PATCH succeeded, but the next eligibility check ran before
+// the application loaded the stored state.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";

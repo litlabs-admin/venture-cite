@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   devListenHost,
+  liveOpenAIEnabled,
   LOCAL_FAKE_HOST,
   NORMAL_DEV_HOST,
   startupAutopilotEnabled,
@@ -29,6 +30,12 @@ describe("local flow startup safety", () => {
         DISABLE_STARTUP_AUTOPILOT: "true",
         DISABLE_STRIPE_SETUP: "true",
         STRIPE_SECRET_KEY: "configured-test-key",
+      }),
+    ).toBe(false);
+    expect(
+      liveOpenAIEnabled({
+        CONTENT_GENERATION_PROVIDER: "fake",
+        OPENAI_API_KEY: "local-placeholder",
       }),
     ).toBe(false);
   });

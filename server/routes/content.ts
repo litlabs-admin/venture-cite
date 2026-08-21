@@ -33,7 +33,7 @@ import { z } from "zod";
 import { storage } from "../storage";
 import { MODELS } from "../lib/modelConfig";
 import { type GenerationPayload } from "../contentGenerationWorker";
-import { requireUser, requireBrand, requireArticle } from "../lib/ownership";
+import { requireUser, requireBrand } from "../lib/ownership";
 import {
   openai,
   aiLimitMiddleware,
@@ -50,6 +50,7 @@ import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
 import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
 import { createRequestActor } from "../lib/requestActor";
+import { liveOpenAIEnabled } from "../lib/localFlowSafety";
 import { contentRequestData } from "../data/contentRequestData";
 import { usesFakeContentGenerationProvider } from "../lib/contentGenerationProvider";
 
@@ -84,6 +85,13 @@ const contentGenerationRequestSchema = z
     targetCustomers: z.string().optional(),
     geography: z.string().optional(),
     contentStyle: z.enum(["b2b", "b2c"]).default("b2c"),
+  })
+  .strict();
+
+const articleImproveRequestSchema = z
+  .object({
+    instructions: z.string().optional(),
+    expectedVersion: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -214,9 +222,9 @@ export function computeJobStatePayload(job: {
   };
 }
 
-// Responses worker never writes stream_buffer, and no client consumes this
-// legacy field. Keep zero until the response field is removed.
-export const CONTENT_LENGTH_COMPATIBILITY_VALUE = 0;
+export function contentLengthForResponse(article: { content: string | null } | undefined): number {
+  return article?.content?.length ?? 0;
+}
 
 export function setupContentRoutes(app: Express): void {
   // ── Generate content for an existing draft article ─────────────────────────
@@ -377,9 +385,8 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const job = await contentRequestData
-          .forActor(createRequestActor(user.id))
-          .jobs.get(req.params.jobId);
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const job = await content.jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
         res.json({
           success: true,
@@ -411,9 +418,8 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req: Request, res: Response) => {
       try {
         const user = requireUser(req);
-        const job = await contentRequestData
-          .forActor(createRequestActor(user.id))
-          .jobs.get(req.params.jobId);
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const job = await content.jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
 
         res.json({
@@ -440,9 +446,8 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const job = await contentRequestData
-          .forActor(createRequestActor(user.id))
-          .jobs.get(req.params.jobId);
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const job = await content.jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
         if (job.status !== "pending" && job.status !== "running") {
           return res.json({
@@ -465,12 +470,15 @@ export function setupContentRoutes(app: Express): void {
 
         const deadlineMs = Date.now() + 8000;
         const outcome = await runArticleSlice(job.id, deadlineMs, claimed.advanceToken);
+        const updatedArticle = job.articleId
+          ? await content.articles.get(job.articleId)
+          : undefined;
         res.json({
           success: outcome.status !== "failed",
           data: {
             status: outcome.status,
             done: outcome.done,
-            contentLength: CONTENT_LENGTH_COMPATIBILITY_VALUE,
+            contentLength: contentLengthForResponse(updatedArticle),
             errorKind: "errorKind" in outcome ? (outcome.errorKind ?? null) : null,
             errorMessage: "message" in outcome ? (outcome.message ?? null) : null,
           },
@@ -558,7 +566,15 @@ export function setupContentRoutes(app: Express): void {
       try {
         const user = requireUser(req);
         const actor = createRequestActor(user.id);
-        const article = await requireArticle(req.params.id, user.id);
+        const content = contentRequestData.forActor(actor);
+        const parsed = articleImproveRequestSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: "Invalid improve input" });
+        }
+        const article = await content.articles.get(req.params.id);
+        if (!article) {
+          return res.status(404).json({ success: false, error: "Article not found" });
+        }
         if (!article.content) {
           return res
             .status(400)
@@ -570,17 +586,15 @@ export function setupContentRoutes(app: Express): void {
             error: `Article exceeds ${MAX_CONTENT_LENGTH} characters.`,
           });
         }
-        if (!process.env.OPENAI_API_KEY) {
+        if (!liveOpenAIEnabled(process.env)) {
           return res.status(503).json({
             success: false,
             error: "Auto-Improve is not available. OpenAI API key is not configured.",
           });
         }
 
-        const instructions =
-          typeof req.body?.instructions === "string" ? req.body.instructions : null;
-        const expectedVersion =
-          typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : null;
+        const instructions = parsed.data.instructions ?? null;
+        const expectedVersion = parsed.data.expectedVersion;
 
         // Snapshot the current content as a revision before we overwrite it.
         // The new content will get its own revision after the rewrite succeeds.
@@ -609,12 +623,15 @@ export function setupContentRoutes(app: Express): void {
         // Optimistic-lock: if the caller passed expectedVersion, only write
         // when the row hasn't moved. Returns 409 otherwise.
         let updated;
-        if (expectedVersion !== null) {
-          updated = await storage.updateArticleIfVersion(article.id, expectedVersion, {
+        if (expectedVersion !== undefined) {
+          updated = await content.articles.updateIfVersion(article.id, expectedVersion, {
             content: improved,
-          } as any);
+          });
           if (!updated) {
-            const current = await contentRequestData.forActor(actor).articles.get(article.id);
+            const current = await content.articles.get(article.id);
+            if (!current) {
+              return res.status(404).json({ success: false, error: "Article not found" });
+            }
             return res.status(409).json({
               success: false,
               error:
@@ -624,22 +641,23 @@ export function setupContentRoutes(app: Express): void {
             });
           }
         } else {
-          updated = await storage.updateArticle(article.id, { content: improved } as any);
+          updated = await content.articles.update(article.id, { content: improved });
+          if (!updated) {
+            return res.status(404).json({ success: false, error: "Article not found" });
+          }
         }
 
         // Persist both the before-snapshot (so users can revert) and the new
         // revision (so the diff viewer has both sides indexed).
-        await storage.createRevision({
+        await content.revisions.create({
           articleId: article.id,
           content: beforeContent,
           source: "manual_edit",
-          createdBy: user.id,
         });
-        await storage.createRevision({
+        await content.revisions.create({
           articleId: article.id,
           content: improved,
           source: "auto_improve",
-          createdBy: user.id,
         });
 
         res.json({
@@ -731,7 +749,20 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       const { industry } = req.query;
 
-      if (!process.env.OPENAI_API_KEY) {
+      if (!liveOpenAIEnabled(process.env)) {
+        if (process.env.CONTENT_GENERATION_PROVIDER === "fake") {
+          return res.json({
+            success: true,
+            topics: [
+              {
+                topic: "Local product research",
+                description: "A deterministic topic for the local test flow",
+                category: "Local test",
+              },
+            ],
+            fallback: true,
+          });
+        }
         return res.status(503).json({
           success: false,
           error: "Popular topics feature is not available. OpenAI API key is not configured.",

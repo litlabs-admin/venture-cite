@@ -74,10 +74,34 @@ describe("request RLS migration shape", () => {
     );
 
     expect(migration).toMatch(/grant insert\s*\(id, article_id, platform, status, metadata\)/i);
+    expect(migration).toMatch(
+      /grant select\s*\([\s\S]*platform_post_id[\s\S]*platform_url[\s\S]*error[\s\S]*\)\s*on public\.distributions/is,
+    );
     expect(migration).toMatch(/grant update\s*\(status, distributed_at, metadata, error\)/i);
     expect(migration).not.toMatch(/grant\s+(?:insert|update)\s*\([^)]*platform_post_id[^)]*\)/i);
     expect(migration).toMatch(/grant update\s*\([\s\S]+updated_at\s*\)/i);
     expect(migration).toMatch(/keyword_research_content_request_update[\s\S]+deleted_at is null/i);
+    expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
+      migration,
+    );
+  });
+
+  it("grants the article response fields used by the request repository", () => {
+    const migration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0107_content_request_article_response_columns.sql"),
+      "utf8",
+    );
+    const supabaseMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/20260421000107_0107_content_request_article_response_columns.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toMatch(
+      /grant select\s*\([\s\S]*citation_count[\s\S]*human_score[\s\S]*passes_ai_detection[\s\S]*\)\s*on public\.articles/is,
+    );
     expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
       migration,
     );
@@ -145,6 +169,16 @@ describe("request RLS migration shape", () => {
     expect(migration).toContain("INTO brand_row");
     expect(migration).toContain("status = 'generating'");
     expect(migration).toContain("articles_used_this_month = articles_used_this_month + 1");
+    expect(migration).toContain("WHEN 'pro' THEN 0");
+    expect(migration).toContain("WHEN 'agency' THEN 40");
+    expect(migration.indexOf("FROM public.users AS users")).toBeLessThan(
+      migration.indexOf("INTO brand_row"),
+    );
+    expect(migration.indexOf("INTO brand_row")).toBeLessThan(
+      migration.indexOf(
+        "FROM public.articles AS articles\n   WHERE articles.id = p_article_id\n   FOR UPDATE",
+      ),
+    );
     expect(migration).toContain("refunded_at");
     expect(migration).toContain("job_id = p_job_id");
     expect(migration).not.toContain("openai_response_id");

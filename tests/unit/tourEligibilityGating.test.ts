@@ -1,12 +1,10 @@
 // REGRESSION GUARD: a tour must never be evaluated against a not-yet-loaded
 // tour state.
 //
-// Measured from production (admin@venturecite.com, 2026-07-30): the account
-// had `global: { v: 2, skippedAt: "2026-07-29T19:18:01.391Z" }` persisted and
-// STILL logged 7 `tour_auto_fired` events for global-welcome the next day -
-// 133 auto-fires against 6 completions and 21 skips in total. The writes were
-// always landing. The orchestrator simply asked `shouldAutoFire` before
-// /api/tours/state resolved, and `useTourState` yields `{}` until it does.
+// A production incident showed that stored skipped state did not prevent
+// repeated tour starts. The writes succeeded. The orchestrator called
+// `shouldAutoFire` before `/api/tours/state` resolved. `useTourState` returns
+// `{}` until the request completes.
 //
 // An empty state is indistinguishable from "never seen it", which is the
 // whole bug: these assertions document that shouldAutoFire CANNOT tell the

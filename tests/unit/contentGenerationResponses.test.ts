@@ -399,9 +399,10 @@ describe("runArticleSlice (Responses API)", () => {
 });
 
 describe("/state response shape", () => {
-  it("keeps the legacy contentLength field at zero", async () => {
-    const { CONTENT_LENGTH_COMPATIBILITY_VALUE } = await import("../../server/routes/content");
-    expect(CONTENT_LENGTH_COMPATIBILITY_VALUE).toBe(0);
+  it("returns the post-slice article content length", async () => {
+    const { contentLengthForResponse } = await import("../../server/routes/content");
+    expect(contentLengthForResponse({ content: "generated article" })).toBe(17);
+    expect(contentLengthForResponse(undefined)).toBe(0);
   });
 
   it("returns elapsedSeconds when the job is in_progress", async () => {

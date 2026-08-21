@@ -179,7 +179,11 @@ beforeEach(() => {
   stubs.forActor.mockReset();
   stubs.forActor.mockReturnValue({
     articles: { get: stubs.getArticle },
-    jobs: { get: stubs.getContentJobById, cancelForArticle: stubs.cancelForArticle },
+    jobs: {
+      get: stubs.getContentJobById,
+      cancel: stubs.cancelContentJob,
+      cancelForArticle: stubs.cancelForArticle,
+    },
   });
   stubs.cancelForArticle.mockReset();
   stubs.cancelForArticle.mockResolvedValue({ kind: "cancelled", status: "cancelled" });
@@ -239,5 +243,30 @@ describe("POST /api/content/:articleId/cancel", () => {
     expect(status).toBe(200);
     expect(body).toMatchObject({ data: { status: "succeeded", alreadyTerminal: true } });
     expect(stubs.setArticleDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/content-jobs/:jobId/cancel", () => {
+  it("maps a successful actor-bound cancellation command", async () => {
+    stubs.getContentJobById.mockResolvedValue({ id: JOB_ID, status: "running" });
+    stubs.cancelContentJob.mockResolvedValue({ kind: "cancelled", status: "cancelled" });
+
+    const app = buildApp();
+    const { status, body } = await call(app, "POST", `/api/content-jobs/${JOB_ID}/cancel`);
+
+    expect(status).toBe(200);
+    expect(body).toEqual({ success: true, data: { status: "cancelled" } });
+    expect(stubs.cancelContentJob).toHaveBeenCalledWith(JOB_ID);
+  });
+
+  it("maps a command race that loses ownership to 404", async () => {
+    stubs.getContentJobById.mockResolvedValue({ id: JOB_ID, status: "running" });
+    stubs.cancelContentJob.mockResolvedValue({ kind: "not_found" });
+
+    const app = buildApp();
+    const { status, body } = await call(app, "POST", `/api/content-jobs/${JOB_ID}/cancel`);
+
+    expect(status).toBe(404);
+    expect(body).toEqual({ success: false, error: "Job not found" });
   });
 });

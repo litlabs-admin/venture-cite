@@ -76,6 +76,10 @@ describeIfLocal("content request database RLS", () => {
       path.resolve(process.cwd(), "migrations/0106_content_request_generation_commands.sql"),
       "utf8",
     );
+    const articleResponseColumnsMigration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0107_content_request_article_response_columns.sql"),
+      "utf8",
+    );
     await ownerPool.query(foundationMigration);
     await ownerPool.query(contentMigration);
     await ownerPool.query(contentMigration);
@@ -87,6 +91,8 @@ describeIfLocal("content request database RLS", () => {
     await ownerPool.query(distributionKeywordWritesMigration);
     await ownerPool.query(generationCommandsMigration);
     await ownerPool.query(generationCommandsMigration);
+    await ownerPool.query(articleResponseColumnsMigration);
+    await ownerPool.query(articleResponseColumnsMigration);
 
     await ownerPool.query(
       `create role "${runtimeRole}" with

@@ -24,6 +24,12 @@ Supabase validates Bearer tokens. The API denies protected requests without a to
 
 The server checks a supplied `brandId` against the authenticated user. A failed ownership check returns 404.
 
+Migrated request domains also use restricted PostgreSQL roles and RLS.
+
+The request repositories open short actor-bound transactions. They do not expose the raw transaction.
+
+Migrations 0096 through 0107 define the current restricted access, outbox, and request-command work.
+
 ## External services
 
 Stripe provides prices, checkout, customer portal access, and webhooks.
@@ -45,6 +51,10 @@ Vercel uses the daily cron route instead. Do not enable both job triggers.
 The migration runner reads ordered SQL files from `migrations/`. It records each filename and SHA-256 checksum in `schema_migrations`.
 
 Only the controlled release command runs the migration runner.
+
+The transactional outbox stores durable internal commands. It uses leases, retries, cancellation, and idempotency keys.
+
+Content completion records cost through the outbox. Generic LLM jobs can also enqueue provider work.
 
 ## Tests
 

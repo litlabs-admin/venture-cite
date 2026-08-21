@@ -1,5 +1,9 @@
 // playwright.config.ts
 import { defineConfig, devices } from "@playwright/test";
+import {
+  localE2EOwnerDatabaseUrl,
+  localE2ESupabaseEnvironment,
+} from "./tests/e2e/support/local-database-access";
 
 const STORAGE_STATE = "playwright/.auth/state.json";
 
@@ -19,6 +23,14 @@ function isLoopbackUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function definedEnvironment(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined,
+    ),
+  );
 }
 
 export function buildLocalFlowServerCommand(baseUrl: string): string {
@@ -42,7 +54,7 @@ export function buildLocalFlowServerCommand(baseUrl: string): string {
     "RESEND_FROM_ADDRESS=",
     "SENTRY_DSN=http://local@127.0.0.1:9/1",
     "VITE_SENTRY_DSN=http://local@127.0.0.1:9/1",
-    "npm run dev",
+    "npx tsx scripts/prepareLocalE2EDatabase.ts && npm run dev",
   ].join(" ");
 }
 
@@ -52,6 +64,7 @@ if (USE_LOCAL_FAKE_CONTENT_PROVIDER && !isLoopbackUrl(BASE_URL)) {
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  globalTeardown: "./tests/e2e/support/global-teardown.ts",
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
@@ -99,6 +112,27 @@ export default defineConfig({
         command: USE_LOCAL_FAKE_CONTENT_PROVIDER
           ? buildLocalFlowServerCommand(BASE_URL)
           : "npm run dev",
+        env: USE_LOCAL_FAKE_CONTENT_PROVIDER
+          ? {
+              ...definedEnvironment(),
+              ...localE2ESupabaseEnvironment(process.env),
+              DATABASE_URL: localE2EOwnerDatabaseUrl(process.env.E2E_LOCAL_DATABASE_URL),
+              CONTENT_GENERATION_PROVIDER: "fake",
+              CONTENT_GENERATION_FAKE_BASE_URL: BASE_URL,
+              DISABLE_IN_PROCESS_SCHEDULER: "true",
+              DISABLE_STARTUP_AUTOPILOT: "true",
+              DISABLE_STRIPE_SETUP: "true",
+              STRIPE_PRODUCT_SYNC: "false",
+              STRIPE_SECRET_KEY: "",
+              STRIPE_WEBHOOK_SECRET: "",
+              OPENAI_API_KEY: "local-e2e-disabled",
+              OPENROUTER_API_KEY: "",
+              RESEND_API_KEY: "",
+              RESEND_FROM_ADDRESS: "",
+              SENTRY_DSN: "http://local@127.0.0.1:9/1",
+              VITE_SENTRY_DSN: "http://local@127.0.0.1:9/1",
+            }
+          : definedEnvironment(),
         url: BASE_URL,
         reuseExistingServer: false,
         timeout: 180_000,

@@ -28,19 +28,28 @@ export async function revokeManagedRoleMemberships(connection: QueryConnection):
   const result = await connection.query<{
     granted_role: string;
     member_role: string;
+    grantor_role: string;
   }>(
-    `select granted.rolname as granted_role, member.rolname as member_role
+    `select granted.rolname as granted_role, member.rolname as member_role,
+            grantor.rolname as grantor_role
      from pg_auth_members as membership
      join pg_roles as granted on granted.oid = membership.roleid
      join pg_roles as member on member.oid = membership.member
+     join pg_roles as grantor on grantor.oid = membership.grantor
      where granted.rolname = any($1::text[])
-       and member.oid <> (select oid from pg_roles where rolname = current_user)
+       and (
+         member.oid <> (select oid from pg_roles where rolname = current_user)
+         or (
+           membership.grantor = (select oid from pg_roles where rolname = current_user)
+           and (membership.inherit_option or membership.set_option or not membership.admin_option)
+         )
+       )
      order by granted.rolname, member.rolname`,
     [MANAGED_ROLE_NAMES],
   );
   for (const membership of result.rows) {
     await connection.query(
-      `revoke ${quoteIdentifier(membership.granted_role)} from ${quoteIdentifier(membership.member_role)}`,
+      `revoke ${quoteIdentifier(membership.granted_role)} from ${quoteIdentifier(membership.member_role)} granted by ${quoteIdentifier(membership.grantor_role)}`,
     );
   }
 }

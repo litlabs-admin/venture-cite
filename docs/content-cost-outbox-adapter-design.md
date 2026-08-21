@@ -5,11 +5,15 @@
 Content generation commits the article and then records LLM spend in a separate operation.
 That gap can lose the cost event after a successful article commit.
 
-## Usage
+## Implemented flow
 
-The completion transaction will enqueue one `content_cost.record` command with the content job ID, provider response ID, model, service, and token counts.
-The outbox worker will pass the command to a content-cost handler.
-The handler will write one `api_costs` row using the outbox idempotency key.
+The completion transaction enqueues one `content_cost.record` command.
+
+The command contains the job ID, provider response ID, model, service, and token counts.
+
+The outbox drain passes the command to the content-cost handler.
+
+The handler writes one `api_costs` row with the outbox idempotency key.
 
 ## Shape
 
@@ -20,19 +24,18 @@ The database unique key owns duplicate convergence.
 
 ## Decision
 
-Add a stable idempotency key to API cost rows.
+API cost rows have a stable idempotency key.
 Use `content-cost:{contentJobId}:{providerResponseId}` for the first adapter.
-Keep all other provider adapters out of scope.
+Other provider adapters remain separate changes.
 
 ## Tradeoffs
 
-Content generation records its cost only through the outbox command.
+Content generation records its cost through the outbox command.
 Other LLM flows keep their existing direct spend calls until their own migrations.
 The first adapter writes analytics data only and does not call a provider.
 
 ## Release note
 
-Migration 0099 creates a regular unique index inside the release transaction.
-Run this migration during a low-write period because PostgreSQL can pause cost inserts during the index scan.
-The unique index uses a regular transactional build.
-Schedule migration 0099 during a controlled release because index creation can lock writes.
+Migration 0099 creates the unique idempotency index inside the release transaction.
+
+Run this migration during a low-write period. The index build can pause cost inserts.

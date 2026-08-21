@@ -55,10 +55,13 @@ function metadataWithContent(metadata: unknown, content: string): Record<string,
 
 import { logger } from "../lib/logger";
 export function setupArticlesRoutes(app: Express): void {
+  const nonEmptyText = z.string().refine((value) => value.trim().length > 0, {
+    message: "Value cannot be empty",
+  });
   const articleFields = z.object({
     brandId: z.string().min(1).optional(),
-    title: z.string().min(1).optional(),
-    content: z.string().min(1).optional(),
+    title: nonEmptyText.optional(),
+    content: nonEmptyText.optional(),
     excerpt: z.string().nullable().optional(),
     metaDescription: z.string().nullable().optional(),
     keywords: z.array(z.string()).nullable().optional(),
@@ -67,11 +70,15 @@ export function setupArticlesRoutes(app: Express): void {
     featuredImage: z.string().nullable().optional(),
     author: z.string().nullable().optional(),
     externalUrl: z.string().nullable().optional(),
+    targetCustomers: z.string().nullable().optional(),
+    geography: z.string().nullable().optional(),
+    contentStyle: z.string().nullable().optional(),
+    seoData: z.json().nullable().optional(),
   });
   const readyArticleSchema = articleFields.extend({
     brandId: z.string().min(1),
-    title: z.string().min(1),
-    content: z.string().min(1),
+    title: nonEmptyText,
+    content: nonEmptyText,
   });
   const draftArticleSchema = articleFields.extend({ brandId: z.string().min(1) });
   const updateArticleSchema = articleFields

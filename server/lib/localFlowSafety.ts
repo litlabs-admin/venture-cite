@@ -7,6 +7,7 @@ export type LocalStartupEnvironment = Partial<
     | "CONTENT_GENERATION_PROVIDER"
     | "DISABLE_STARTUP_AUTOPILOT"
     | "DISABLE_STRIPE_SETUP"
+    | "OPENAI_API_KEY"
     | "STRIPE_SECRET_KEY"
   >
 >;
@@ -21,4 +22,8 @@ export function startupAutopilotEnabled(env: LocalStartupEnvironment): boolean {
 
 export function stripeSetupEnabled(env: LocalStartupEnvironment): boolean {
   return env.DISABLE_STRIPE_SETUP !== "true" && Boolean(env.STRIPE_SECRET_KEY);
+}
+
+export function liveOpenAIEnabled(env: LocalStartupEnvironment): boolean {
+  return env.CONTENT_GENERATION_PROVIDER !== "fake" && Boolean(env.OPENAI_API_KEY);
 }

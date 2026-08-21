@@ -1,177 +1,104 @@
 # Supabase migration report
 
-## Current state
+Date: 2026-08-21
+
+## Current architecture
 
 VentureCite uses Supabase Auth, Storage, and PostgreSQL.
 
-The Express server uses a PostgreSQL pool and Drizzle.
+The Express server uses Drizzle and a PostgreSQL pool.
 
-The reset now has three new migration waves.
+Migrations 0096 through 0107 define the current restricted access and command work.
 
-Migration 0096 adds request access for users and brands.
+The root migration files and Supabase copies pass the migration sync check.
 
-Migration 0097 adds read-only request access for content tables.
+## Migration groups
 
-Migration 0098 adds the transactional outbox foundation.
+### Request roles and row-level security
 
-The root SQL files and Supabase SQL copies pass the migration sync check.
+Migration 0096 restricts user and brand access.
 
-Evidence: `migrations/0096_request_rls_foundation.sql`, `migrations/0097_request_rls_content.sql`, `migrations/0098_transactional_outbox.sql`, `supabase/migrations/`, and `scripts/syncSupabaseMigrations.mjs`.
+Migration 0097 restricts content reads.
 
-## Applied state
+Migration 0101 adds the request-safe profile timestamp.
 
-The local foundation tests apply the new migrations to an isolated local database.
+Migration 0103 adds request-safe content response columns.
 
-The production migration record is unchanged.
+Migration 0104 adds article and revision commands.
 
-Migrations 0096, 0097, and 0098 remain unapplied in production.
+Migration 0105 adds distribution and keyword commands.
 
-No production write occurred.
+Migration 0106 adds generation enqueue, advance, and cancellation commands.
 
-Evidence: `tests/integration/requestRlsFoundation.test.ts`, `tests/integration/contentRequestRls.test.ts`, `tests/integration/localOutboxMigration.test.ts`, and `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md`.
+Migration 0107 adds request-safe article response columns without changing migration 0104.
 
-The combined local RLS and outbox run passed 35 of 35 tests.
+The repositories bind one actor to one restricted transaction. They do not expose the raw transaction.
 
-The three integration files contain 13, 11, and 11 tests.
+### Transactional outbox
 
-The full test run passed 211 files and skipped one file.
+Migration 0098 creates the private outbox, worker role, state rules, leases, retries, cancellation, and idempotency keys.
 
-It passed 1,579 tests and skipped 16 tests.
+Migrations 0099 and 0100 add content-cost convergence and claim indexes.
 
-## Migration 0096
+Migration 0102 adds the generic OpenAI job kickoff command.
 
-Migration 0096 defines restricted user and brand columns, actor-bound policies, and no hard delete path.
+## Local database proof
 
-The request user and brand repositories use the policy inside short transactions.
+The combined local PostgreSQL run passed 50 of 50 tests.
 
-Evidence: `migrations/0096_request_rls_foundation.sql:105-277`, `server/data/requestUserRepository.ts:40-77`, and `server/data/requestBrandRepository.ts:113-214`.
+It covered these suites:
 
-## Migration 0097
+- Request row-level security foundation
+- Content request row-level security
+- Transactional outbox migration and role behavior
+- Content-cost database idempotency
 
-Migration 0097 enables RLS for the content slice.
+The tests use the fixed local Supabase target and a shared advisory lock.
 
-It gives request access to selected read columns only.
+The cleanup code removes stale test grants without removing the required creator administration grant.
 
-It leaves content writes to controlled worker code.
+The local browser run also passed five of five product flows against local Supabase.
 
-Evidence: `migrations/0097_request_rls_content.sql:121-307` and `tests/integration/contentRequestRls.test.ts:345-463`.
+The final full test run passed 201 files and 1,536 tests.
 
-## Migration 0098
+TypeScript, ESLint, Prettier, migration sync, whitespace validation, and the production build passed.
 
-Migration 0098 creates an RLS-protected outbox with idempotency, leases, retries, cancellation, and dead-letter states.
+## Production state
 
-The outbox repository and worker exist.
+The production database has none of migrations 0096 through 0107 applied.
 
-No Stripe, Resend, Buffer, or OpenAI provider adapter is wired to the worker.
+The previous production metadata audit used strict TLS and one read-only transaction.
 
-The content-cost event is not connected to the content completion transaction.
+It ended with `ROLLBACK` and returned catalog facts only.
 
-Evidence: `migrations/0098_transactional_outbox.sql:1-224`, `server/outbox/outboxRepository.ts:90-355`, `server/outbox/outboxWorker.ts:1-129`, and `server/contentGenerationWorker.ts`.
+No production database write occurred.
 
-## Route cutover
+## Controlled release tools
 
-Only brand list, brand get, and brand update use the restricted request repository.
+The release preflight checks the direct connection, certificate authority certificate, application origin, provider configuration, scheduler mode, and runtime role name.
 
-Brand creation, website import, deletion preview, and deletion still use the legacy storage path.
+The migration command requires the production confirmation value and a passing preflight.
 
-Content routes still use the legacy storage path.
+The role command verifies PostgreSQL 17, the runtime and direct database identity, role attributes, and all restricted-role memberships.
 
-Evidence: `server/routes/brands.ts:49-78`, `server/routes/brands.ts:80-393`, `server/routes/brands.ts:395-531`, and `server/data/contentRequestData.ts:36-50`.
+The role command grants only `SET` membership to the application runtime role.
 
-## Production audit
-
-The production audit used strict TLS, one read-only transaction, and `ROLLBACK`.
-
-It returned catalog facts and aggregate ownership counts only.
-
-It did not read or change application rows.
-
-It found 62 public relations with RLS enabled, no forced-RLS relations, zero policies on `users` and `brands`, and no public table or column grants.
-
-It found no missing or unknown brand owner.
-
-Evidence: `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md:5-31`.
-
-## Release tools
-
-The migration runner, request-role membership tool, and release preflight exist.
-
-They have not run against production.
-
-The release command requires an explicit confirmation value.
-
-Evidence: `scripts/migrate.ts`, `scripts/configureRequestRoleMembership.ts:33-64`, `scripts/releaseEnvironmentPreflight.ts:180-259`, and `docs/OPERATIONS.md:3-29`.
-
-The PostgreSQL 17 membership tool discovers the creator of the restricted roles through `pg_auth_members`.
-
-It requires creator memberships with `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`.
-
-It grants the runtime role with `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
-
-The unit tests accept this exact policy.
-
-Evidence: `server/lib/requestRoleMembership.ts:126-225` and `tests/unit/requestRoleMembership.test.ts:81-181`.
-
-Local integration setup removes stale managed roles and memberships from a restored backup.
-
-Each database `beforeAll` hook has a 60-second timeout while it holds the shared advisory lock.
-
-Evidence: `tests/integration/localRoleCleanup.ts:23-161`, `tests/integration/requestRlsFoundation.test.ts:51-106`, `tests/integration/contentRequestRls.test.ts:45-125`, and `tests/integration/localOutboxMigration.test.ts:36-65`.
-
-## Missing configuration
-
-The current release record lacks `DATABASE_DIRECT_URL`.
-
-It lacks the four approved Stripe product and price identifiers.
-
-It lacks `RESEND_FROM_ADDRESS`.
-
-It lacks the least-privileged production runtime role name.
-
-The production audit used a supplied CA and verified TLS.
-
-Privacy legal entity and contact placeholders remain deferred until final release preparation.
-
-Evidence: `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md:44-50`, `scripts/releaseEnvironmentPreflight.ts:190-220`, and `docs/privacy-policy.md:1-14`.
+These commands have not run against production.
 
 ## Safe release order
 
-1. Obtain missing release configuration through the secure release channel.
-2. Run the strict read-only metadata audit with the direct connection.
-3. Review role, owner, grant, policy, and ownership facts.
-4. Run migration preflight and backup checks.
-5. Apply migrations 0096 through 0098 with the controlled release command.
-6. Run request-role membership in dry-run mode.
-7. Apply role membership after the final review and confirmation gate.
-8. Cut over the remaining brand and content routes.
-9. Connect content cost to the outbox completion transaction.
-10. Add fake-provider tests and then provider adapters.
-11. Replace process-local coordination with database-backed state.
-12. Run local flows, preview browser checks, canary monitoring, and rollback checks.
-13. Fill privacy placeholders in the final release phase.
+1. Complete the full local gate run and production build.
+2. Commit the verified wave.
+3. Create an isolated Supabase preview database.
+4. Configure test-only provider values for the preview.
+5. Deploy and verify the preview.
+6. Run the production release preflight.
+7. Run the read-only production metadata audit with the direct connection.
+8. Confirm the backup and rollback plan.
+9. Apply migrations 0096 through 0107 through the controlled migration command.
+10. Run the role command in dry-run mode.
+11. Apply role memberships through the confirmation gate.
+12. Run the canary and monitor errors.
+13. Add the verified privacy values and review the public page last.
 
 Production stays read-only until every gate passes.
-
-## Closed Sol review blockers
-
-The final Sol review says `SHIP`.
-
-It found no P0, P1, or P2 findings.
-
-The final review closed the seven prior foundation blockers.
-
-1. The production migration command now runs the release preflight before it imports database code.
-
-2. The request-role tool now discovers the PostgreSQL 17 creator membership and verifies the exact runtime grant policy.
-
-3. The outbox worker keeps an in-flight command leased while its provider handler runs.
-
-4. The enqueue path requires an owning user and runs only inside a domain transaction.
-
-5. The scheduler guard rejects two owners and rejects a production process with no scheduler owner.
-
-6. The outbox migration rejects worker-role drift before it repairs the role.
-
-7. The role tool verifies that the runtime and direct connections target the same database.
-
-Evidence: `scripts/migrate.ts:10-39`, `scripts/migrationRelease.ts:1-120`, `server/lib/requestRoleMembership.ts:126-314`, `server/outbox/outboxRepository.ts:88-243`, `server/outbox/outboxWorker.ts:16-86`, `server/lib/schedulerMode.ts:21-38`, `server/nitroBoot.ts:99-122`, `migrations/0098_transactional_outbox.sql:138-322`, and the related unit and integration tests.

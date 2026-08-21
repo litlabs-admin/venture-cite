@@ -115,3 +115,4 @@ api/
 
 # Local secret drops (webhook signing secrets etc) - never commit these
 *.local.txt
+.vercel
