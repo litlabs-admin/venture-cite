@@ -8,7 +8,7 @@ VentureCite uses Supabase Auth, Storage, and PostgreSQL.
 
 The Express server uses Drizzle and a PostgreSQL pool.
 
-Migrations 0096 through 0109 define the current restricted access, command, provider-state, and quota-period work.
+Migrations 0096 through 0110 define the current restricted access, command, provider-state, quota-period, and brand soft-delete work.
 
 The root migration files and Supabase copies pass the migration sync check.
 
@@ -20,7 +20,7 @@ The data-backed preview branch uses a production snapshot for storage checks onl
 
 The data-backed branch contains 46 users, 45 brands, and 29 articles.
 
-Both preview paths contain 110 application migration rows with non-null checksums through `0109_content_generation_quota_period.sql`.
+Both preview paths contain 111 application migration rows with non-null checksums through `0110_request_brand_soft_delete.sql`.
 
 The data-backed ownership checks found no orphaned article, brand, or job rows.
 
@@ -51,6 +51,8 @@ Migration 0107 adds request-safe article response columns without changing migra
 Migration 0108 adds request-safe distribution provider state.
 
 Migration 0109 records the quota period used by each content-generation reservation.
+
+Migration 0110 grants the request role the two columns required to schedule an owned brand soft delete.
 
 The repositories bind one actor to one restricted transaction. They do not expose the raw transaction.
 
@@ -85,7 +87,7 @@ TypeScript, ESLint, Prettier, migration sync, whitespace validation, and the pro
 
 ## Production state
 
-The read-only production audit recorded migrations 0096 through 0107 as unapplied. This branch has not run migrations 0108 or 0109 against production. Recheck the production ledger before release.
+The read-only production audit recorded migrations 0096 through 0107 as unapplied. This branch has not run migrations 0108 through 0110 against production. Recheck the production ledger before release.
 
 The previous production metadata audit used strict TLS and one read-only transaction.
 
@@ -115,7 +117,7 @@ These commands have not run against production.
 6. Run the production release preflight.
 7. Run the read-only production metadata audit with the direct connection.
 8. Confirm the backup and rollback plan.
-9. Apply migrations 0096 through 0109 through the controlled migration command.
+9. Apply migrations 0096 through 0110 through the controlled migration command.
 10. Run the role command in dry-run mode.
 11. Apply role memberships through the confirmation gate.
 12. Run the canary and monitor errors.

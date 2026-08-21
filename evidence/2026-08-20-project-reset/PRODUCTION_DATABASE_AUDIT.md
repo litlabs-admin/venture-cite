@@ -31,6 +31,8 @@ It did not return user rows, brand rows, identifiers, emails, role names, URLs, 
 
 ## Decision
 
+This decision records the production state before the current branch added migration 0110 and the brand request-route cutover.
+
 Do not activate request repositories in production under the current deployment.
 
 Complete the local route cutover and cross-user tests first.

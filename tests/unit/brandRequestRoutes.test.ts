@@ -14,6 +14,8 @@ const { authState, requestDataMock, repositories } = vi.hoisted(() => {
   const brands = {
     get: vi.fn(),
     list: vi.fn(),
+    createWithQuota: vi.fn(),
+    softDelete: vi.fn(),
     update: vi.fn(),
     updateIfVersion: vi.fn(),
   };
@@ -154,6 +156,87 @@ describe("request-scoped brand routes", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true, data: updated });
     expect(repositories.brands.update).toHaveBeenCalledWith("brand-a", { name: "Changed" });
+  });
+
+  it("creates a brand through the actor-bound repository and quota lock", async () => {
+    repositories.brands.list.mockResolvedValue([]);
+    const created = { id: "brand-new", userId: user.id, name: "New brand" };
+    repositories.brands.createWithQuota.mockResolvedValue(created);
+
+    const response = await request(makeApp()).post("/api/brands").send({
+      name: "New brand",
+      companyName: "New company",
+      industry: "Software",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: created });
+    expect(repositories.brands.createWithQuota).toHaveBeenCalledWith(
+      {
+        name: "New brand",
+        companyName: "New company",
+        industry: "Software",
+        factScrapeEnabled: undefined,
+        description: undefined,
+        website: undefined,
+        tone: undefined,
+        targetAudience: undefined,
+        products: undefined,
+        keyValues: undefined,
+        uniqueSellingPoints: undefined,
+        brandVoice: undefined,
+        sampleContent: undefined,
+        nameVariations: undefined,
+        logoUrl: undefined,
+      },
+      1,
+    );
+  });
+
+  it("returns a limit response when the actor-bound quota check rejects creation", async () => {
+    repositories.brands.list.mockResolvedValue([]);
+    const { RequestBrandQuotaError } = await import("../../server/data/requestBrandRepository");
+    repositories.brands.createWithQuota.mockRejectedValue(new RequestBrandQuotaError(1));
+
+    const response = await request(makeApp()).post("/api/brands").send({
+      name: "Over limit",
+      companyName: "Over limit company",
+      industry: "Software",
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({ success: false, limitReached: true });
+    expect(response.body.error).toContain("free plan allows 1");
+  });
+
+  it("soft-deletes an owned brand through the actor-bound repository", async () => {
+    const existing = { id: "brand-a", userId: user.id, name: "A" };
+    const deleted = {
+      ...existing,
+      deletedAt: new Date("2026-08-22T00:00:00.000Z"),
+      deletionScheduledFor: new Date("2026-08-23T00:00:00.000Z"),
+    };
+    repositories.brands.get.mockResolvedValue(existing);
+    repositories.brands.softDelete.mockResolvedValue(deleted);
+
+    const response = await request(makeApp()).delete("/api/brands/brand-a");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      scheduledFor: "2026-08-23T00:00:00.000Z",
+    });
+    expect(repositories.brands.softDelete).toHaveBeenCalledWith("brand-a");
+  });
+
+  it("does not soft-delete a brand hidden from the actor", async () => {
+    repositories.brands.get.mockResolvedValue(undefined);
+
+    const response = await request(makeApp()).delete("/api/brands/brand-owned-by-another-user");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ success: false, error: "Brand not found" });
+    expect(repositories.brands.softDelete).not.toHaveBeenCalled();
   });
 
   it("returns 404 when an update target is not visible to the actor", async () => {

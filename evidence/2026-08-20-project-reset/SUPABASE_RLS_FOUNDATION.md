@@ -72,7 +72,9 @@ Evidence: `server/data/contentRequestData.ts:24-50` and `server/routes/content.t
 
 The brand routes use request repositories for list, get, and update.
 
-Brand create, website import, deletion preview, and delete still use legacy storage.
+Brand create and website import use the actor-bound request repository with an atomic quota check.
+
+Deletion ownership and soft-delete scheduling use the actor-bound request repository. Deletion preview counts still use owner-side aggregate reads after ownership validation.
 
 Evidence: `server/routes/brands.ts:49-78`, `server/routes/brands.ts:80-393`, and `server/routes/brands.ts:395-531`.
 
@@ -102,11 +104,11 @@ Evidence: `scripts/configureRequestRoleMembership.ts:33-64`, `scripts/releaseEnv
 4. Define the least-privileged production runtime role.
 5. Run the strict metadata audit with the direct connection.
 6. Review grants, owners, RLS flags, policies, and ownership counts.
-7. Apply migrations 0096 and 0097 through the controlled release command.
+7. Apply migrations 0096 through 0110 through the controlled release command.
 8. Run the request-role membership command in dry-run mode.
 9. Apply role membership after the final review and confirmation gate.
-10. Cut over the remaining brand routes.
-11. Cut over content routes with two-user isolation tests.
+10. Run two-user tests for brand creation, website import, deletion preview, and soft delete.
+11. Verify worker-only storage paths remain outside request routes.
 12. Keep privacy legal placeholders deferred until final release preparation.
 
 ## Security boundary

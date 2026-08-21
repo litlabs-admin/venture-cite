@@ -32,7 +32,7 @@ The data-backed branch uses a production snapshot for storage checks. It is ephe
 
 The data-backed branch contains 46 users, 45 brands, and 29 articles.
 
-The preview application ledger contains 110 checked migration rows through `0109_content_generation_quota_period.sql`.
+The preview application ledger contains 111 checked migration rows through `0110_request_brand_soft_delete.sql`.
 
 The preview checks found no orphaned article, brand, or job ownership rows.
 
@@ -67,7 +67,9 @@ Evidence: `.audit/project-reset-decisions.tsv`, `tests/integration/`, `tests/e2e
 
 Actor-bound repositories handle user profiles, brands, articles, revisions, distributions, keywords, and content jobs.
 
-Brand creation, website import, deletion preview, and deletion still use the legacy owner path.
+Brand creation and website import now use the actor-bound request repository with an atomic brand quota check.
+
+Deletion ownership checks and soft-delete scheduling now use the actor-bound request repository. Deletion preview counts still use owner-side aggregate reads after the ownership check.
 
 The repositories open restricted transactions and do not return raw transactions to request routes.
 
@@ -89,7 +91,7 @@ The request role does not exist in production.
 
 The runtime login has broader privileges than the target least-privileged role.
 
-The read-only production audit recorded migrations 0096 through 0107 as unapplied. This branch has not run migrations 0108 or 0109 against production. Recheck the production ledger before release.
+The read-only production audit recorded migrations 0096 through 0107 as unapplied. This branch has not run migrations 0108 through 0110 against production. Recheck the production ledger before release.
 
 Do not activate the request-role routes in production before the controlled migration and role gates pass.
 
@@ -114,7 +116,7 @@ The privacy legal entity and contact values remain deferred until the final rele
 3. Keep the verified empty and data-backed previews isolated from users and providers.
 4. Run the production read-only preflight and metadata audit.
 5. Verify backup and restore.
-6. Apply migrations 0096 through 0109 through the controlled release command.
+6. Apply migrations 0096 through 0110 through the controlled release command.
 7. Run the role membership dry run.
 8. Apply the role memberships through the confirmation gate.
 9. Run the production canary and monitor errors.

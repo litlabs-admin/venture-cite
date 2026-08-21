@@ -70,6 +70,12 @@ describeIfLocal("request database RLS foundation", () => {
     );
     await ownerPool.query(profileTimestampMigration);
     await ownerPool.query(profileTimestampMigration);
+    const brandSoftDeleteMigration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0110_request_brand_soft_delete.sql"),
+      "utf8",
+    );
+    await ownerPool.query(brandSoftDeleteMigration);
+    await ownerPool.query(brandSoftDeleteMigration);
 
     await ownerPool.query(
       `create role "${runtimeRole}" with
@@ -455,5 +461,21 @@ describeIfLocal("request database RLS foundation", () => {
     } finally {
       client.release();
     }
+  });
+
+  it("soft-deletes only an active brand owned by the actor", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createRequestData } = await import("../../server/data/requestData");
+    const requestData = createRequestData(drizzle(requestPool, { schema }));
+
+    const facade = requestData.forActor(createRequestActor(userAId));
+    const deleted = await facade.brands.softDelete(brandAId, 1);
+    expect(deleted?.id).toBe(brandAId);
+    expect(deleted?.deletedAt).toBeInstanceOf(Date);
+    expect(deleted?.deletionScheduledFor).toBeInstanceOf(Date);
+    expect(await facade.brands.get(brandAId)).toBeUndefined();
+    expect(
+      await requestData.forActor(createRequestActor(userBId)).brands.softDelete(brandAId),
+    ).toBeUndefined();
   });
 });

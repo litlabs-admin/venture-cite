@@ -29,11 +29,18 @@ const requestBrandColumns = {
   autoCitationActive: brands.autoCitationActive,
   version: brands.version,
   monitorMentions: brands.monitorMentions,
+  deletedAt: brands.deletedAt,
   createdAt: brands.createdAt,
   updatedAt: brands.updatedAt,
 };
 
+const requestBrandSoftDeleteColumns = {
+  ...requestBrandColumns,
+  deletionScheduledFor: brands.deletionScheduledFor,
+};
+
 export type RequestBrand = Pick<Brand, keyof typeof requestBrandColumns>;
+export type RequestBrandSoftDeleted = Pick<Brand, keyof typeof requestBrandSoftDeleteColumns>;
 
 const requestBrandInsertColumns = [
   ["name", "name"],
@@ -102,6 +109,8 @@ export type RequestBrandRepository = {
   list(): Promise<RequestBrand[]>;
   get(id: string): Promise<RequestBrand | undefined>;
   create(brand: RequestBrandCreate): Promise<RequestBrand>;
+  createWithQuota(brand: RequestBrandCreate, maxBrands: number): Promise<RequestBrand>;
+  softDelete(id: string, graceDays?: number): Promise<RequestBrandSoftDeleted | undefined>;
   update(id: string, patch: RequestBrandPatch): Promise<RequestBrand | undefined>;
   updateIfVersion(
     id: string,
@@ -109,6 +118,16 @@ export type RequestBrandRepository = {
     patch: RequestBrandPatch,
   ): Promise<RequestBrand | undefined>;
 };
+
+export class RequestBrandQuotaError extends Error {
+  readonly cap: number;
+
+  constructor(cap: number) {
+    super(`Brand limit reached. Your plan allows ${cap} active brands.`);
+    this.name = "RequestBrandQuotaError";
+    this.cap = cap;
+  }
+}
 
 export function createRequestBrandRepository({
   actor,
@@ -144,37 +163,51 @@ export function createRequestBrandRepository({
     },
 
     create(brand: RequestBrandCreate): Promise<RequestBrand> {
+      return run((transaction) => insertBrand(transaction, actor.userId, brand));
+    },
+
+    createWithQuota(brand: RequestBrandCreate, maxBrands: number): Promise<RequestBrand> {
+      if (!Number.isInteger(maxBrands) || maxBrands < -1) {
+        throw new Error("Brand quota must be -1 or a non-negative integer");
+      }
       return run(async (transaction) => {
-        const values = [
-          { column: "user_id", value: actor.userId },
-          ...requestBrandInsertColumns.map(([column, property]) => ({
-            column,
-            value: property === "tone" ? (brand.tone ?? "professional") : brand[property],
-          })),
-        ].filter((entry) => entry.value !== undefined);
-        const inserted = await transaction.execute<{ id: string }>(sql`
-          insert into ${sql.identifier("public")}.${sql.identifier("brands")}
-          (${sql.join(
-            values.map((entry) => sql.identifier(entry.column)),
-            sql`, `,
-          )})
-          values (${sql.join(
-            // Bind every value as a parameter. Direct interpolation expands
-            // array fields into SQL tuples instead of PostgreSQL arrays.
-            values.map((entry) => sql.param(entry.value)),
-            sql`, `,
-          )})
-          returning ${brands.id}
+        await transaction.execute(sql`
+          select id
+          from public.users
+          where id = ${actor.userId}
+          for update
         `);
-        const createdId = inserted.rows[0]?.id;
-        if (!createdId) throw new Error("Brand insert returned no ID");
-        const [created] = await transaction
-          .select(requestBrandColumns)
-          .from(brands)
-          .where(and(eq(brands.id, createdId), isNull(brands.deletedAt)))
-          .limit(1);
-        if (!created) throw new Error("Brand insert returned no row");
-        return created;
+        if (maxBrands !== -1) {
+          const countResult = await transaction.execute<{ count: number }>(sql`
+            select count(id)::int as count
+            from public.brands
+            where user_id = ${actor.userId}
+              and deleted_at is null
+          `);
+          const count = Number(countResult.rows[0]?.count ?? 0);
+          if (count >= maxBrands) throw new RequestBrandQuotaError(maxBrands);
+        }
+        return insertBrand(transaction, actor.userId, brand);
+      });
+    },
+
+    softDelete(id: string, graceDays = 30): Promise<RequestBrandSoftDeleted | undefined> {
+      if (!Number.isInteger(graceDays) || graceDays < 1 || graceDays > 365) {
+        throw new Error("Brand deletion grace period must be between 1 and 365 days");
+      }
+      const scheduledFor = new Date(Date.now() + graceDays * 24 * 60 * 60 * 1000);
+      return run(async (transaction) => {
+        const [deleted] = await transaction
+          .update(brands)
+          .set({
+            deletedAt: new Date(),
+            deletionScheduledFor: scheduledFor,
+            updatedAt: new Date(),
+            version: sql`${brands.version} + 1`,
+          })
+          .where(and(eq(brands.id, id), eq(brands.userId, actor.userId), isNull(brands.deletedAt)))
+          .returning(requestBrandSoftDeleteColumns);
+        return deleted;
       });
     },
 
@@ -187,7 +220,7 @@ export function createRequestBrandRepository({
             updatedAt: new Date(),
             version: sql`${brands.version} + 1`,
           })
-          .where(and(eq(brands.id, id), isNull(brands.deletedAt)))
+          .where(and(eq(brands.id, id), eq(brands.userId, actor.userId), isNull(brands.deletedAt)))
           .returning(requestBrandColumns);
         return updated;
       });
@@ -207,11 +240,53 @@ export function createRequestBrandRepository({
             version: sql`${brands.version} + 1`,
           })
           .where(
-            and(eq(brands.id, id), eq(brands.version, expectedVersion), isNull(brands.deletedAt)),
+            and(
+              eq(brands.id, id),
+              eq(brands.userId, actor.userId),
+              eq(brands.version, expectedVersion),
+              isNull(brands.deletedAt),
+            ),
           )
           .returning(requestBrandColumns);
         return updated;
       });
     },
   };
+}
+
+async function insertBrand(
+  transaction: RequestRepositoryTransaction,
+  userId: string,
+  brand: RequestBrandCreate,
+): Promise<RequestBrand> {
+  const values = [
+    { column: "user_id", value: userId },
+    ...requestBrandInsertColumns.map(([column, property]) => ({
+      column,
+      value: property === "tone" ? (brand.tone ?? "professional") : brand[property],
+    })),
+  ].filter((entry) => entry.value !== undefined);
+  const inserted = await transaction.execute<{ id: string }>(sql`
+    insert into ${sql.identifier("public")}.${sql.identifier("brands")}
+    (${sql.join(
+      values.map((entry) => sql.identifier(entry.column)),
+      sql`, `,
+    )})
+    values (${sql.join(
+      // Bind every value as a parameter. Direct interpolation expands
+      // array fields into SQL tuples instead of PostgreSQL arrays.
+      values.map((entry) => sql.param(entry.value)),
+      sql`, `,
+    )})
+    returning ${brands.id}
+  `);
+  const createdId = inserted.rows[0]?.id;
+  if (!createdId) throw new Error("Brand insert returned no ID");
+  const [created] = await transaction
+    .select(requestBrandColumns)
+    .from(brands)
+    .where(and(eq(brands.id, createdId), isNull(brands.deletedAt)))
+    .limit(1);
+  if (!created) throw new Error("Brand insert returned no row");
+  return created;
 }
