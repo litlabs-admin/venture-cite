@@ -28,7 +28,7 @@ Migrated request domains also use restricted PostgreSQL roles and RLS.
 
 The request repositories open short actor-bound transactions. They do not expose the raw transaction.
 
-Migrations 0096 through 0107 define the current restricted access, outbox, and request-command work.
+Migrations 0096 through 0109 define the current restricted access, outbox, request-command, provider-state, and quota-period work.
 
 ## External services
 

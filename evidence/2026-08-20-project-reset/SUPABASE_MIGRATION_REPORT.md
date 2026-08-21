@@ -8,7 +8,7 @@ VentureCite uses Supabase Auth, Storage, and PostgreSQL.
 
 The Express server uses Drizzle and a PostgreSQL pool.
 
-Migrations 0096 through 0107 define the current restricted access and command work.
+Migrations 0096 through 0109 define the current restricted access, command, provider-state, and quota-period work.
 
 The root migration files and Supabase copies pass the migration sync check.
 
@@ -32,6 +32,10 @@ Migration 0106 adds generation enqueue, advance, and cancellation commands.
 
 Migration 0107 adds request-safe article response columns without changing migration 0104.
 
+Migration 0108 adds request-safe distribution provider state.
+
+Migration 0109 records the quota period used by each content-generation reservation.
+
 The repositories bind one actor to one restricted transaction. They do not expose the raw transaction.
 
 ### Transactional outbox
@@ -44,7 +48,7 @@ Migration 0102 adds the generic OpenAI job kickoff command.
 
 ## Local database proof
 
-The combined local PostgreSQL run passed 50 of 50 tests.
+The latest local PostgreSQL run passed 37 of 37 tests.
 
 It covered these suites:
 
@@ -59,13 +63,13 @@ The cleanup code removes stale test grants without removing the required creator
 
 The local browser run also passed five of five product flows against local Supabase.
 
-The final full test run passed 201 files and 1,536 tests.
+The final full test run passed 202 files and 1,542 tests.
 
 TypeScript, ESLint, Prettier, migration sync, whitespace validation, and the production build passed.
 
 ## Production state
 
-The production database has none of migrations 0096 through 0107 applied.
+The read-only production audit recorded migrations 0096 through 0107 as unapplied. This branch has not run migrations 0108 or 0109 against production. Recheck the production ledger before release.
 
 The previous production metadata audit used strict TLS and one read-only transaction.
 
@@ -95,7 +99,7 @@ These commands have not run against production.
 6. Run the production release preflight.
 7. Run the read-only production metadata audit with the direct connection.
 8. Confirm the backup and rollback plan.
-9. Apply migrations 0096 through 0107 through the controlled migration command.
+9. Apply migrations 0096 through 0109 through the controlled migration command.
 10. Run the role command in dry-run mode.
 11. Apply role memberships through the confirmation gate.
 12. Run the canary and monitor errors.

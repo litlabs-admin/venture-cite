@@ -14,7 +14,7 @@ The public privacy page still has deferred legal entity and privacy contact plac
 
 ## Implemented work
 
-Migrations 0096 through 0107 define the restricted request roles, transactional outbox, provider kickoff, and content command paths.
+Migrations 0096 through 0109 define the restricted request roles, transactional outbox, provider kickoff, content commands, provider state, and quota-period handling.
 
 Every root migration has a synchronized Supabase migration copy.
 
@@ -72,6 +72,7 @@ Development now rejects remote Supabase and provider settings before startup. No
 The combined review found four release issues. The final worktree fixes each issue:
 
 - Migration 0107 preserves the immutable migration 0104 checksum.
+- Migrations 0108 and 0109 are synchronized with their root migration files.
 - Local E2E grants use the local administrator and revoke only their own grants.
 - The local Playwright project forces the fixed loopback Supabase API and explicit local keys.
 - Fake-provider mode blocks the article-improvement OpenAI call.
@@ -82,7 +83,7 @@ The production metadata audit used strict Transport Layer Security (TLS) and one
 
 The audit ended with `ROLLBACK`. It did not read application rows.
 
-Migrations 0096 through 0107 remain unapplied in production.
+The read-only production audit recorded migrations 0096 through 0107 as unapplied. This branch has not run migrations 0108 or 0109 against production. Recheck the production ledger before release.
 
 The request-role membership command and release preflight have not run against production.
 
