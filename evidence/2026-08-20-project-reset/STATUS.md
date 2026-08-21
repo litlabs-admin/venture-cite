@@ -54,7 +54,7 @@ The local browser run passed five of five flows in 1 minute:
 
 The final browser run made no live OpenAI call. Local fake mode disables live OpenAI access.
 
-The final full test run passed 201 files and 1,537 tests.
+The final full test run passed 202 files and 1,542 tests.
 
 Nineteen files and 87 tests skipped under their configured conditions.
 
@@ -66,6 +66,8 @@ These final checks passed:
 - Supabase migration synchronization
 - Git whitespace validation
 - The production build with Sentry upload disabled
+
+Development now rejects remote Supabase and provider settings before startup. Non-production email delivery is disabled unless explicitly enabled.
 
 The combined review found four release issues. The final worktree fixes each issue:
 
