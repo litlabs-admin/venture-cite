@@ -30,12 +30,21 @@ Do not use production credentials for this suite.
 ## Preview gates
 
 1. Create an isolated Supabase project or branch.
-2. Use Stripe test keys and test catalogue identifiers.
-3. Disable real Resend delivery.
-4. Use fake or test AI providers.
-5. Deploy the preview.
-6. Run the browser product flows.
-7. Verify that no preview variable targets production.
+2. Set `STRIPE_PRODUCT_SYNC=false`.
+3. Use Stripe test keys and test catalogue identifiers only when checkout testing needs them.
+4. Leave `RESEND_API_KEY` and `BUFFER_ENCRYPTION_KEY` unset.
+5. Set `CONTENT_GENERATION_PROVIDER=fake` only with `NODE_ENV=development` and a loopback base URL.
+6. Set `DISABLE_STARTUP_AUTOPILOT=true` and `DISABLE_STRIPE_SETUP=true` for local flow tests.
+7. Use fake or test AI providers.
+8. Deploy the preview with the isolated database and preview-only secrets.
+9. Run the browser product flows.
+10. Verify that no preview variable targets production.
+
+The fake content provider accepts only `http://localhost`, `http://127.0.0.1`, or `http://[::1]`.
+
+The application has no fake Resend or Buffer adapter. Unset those credentials when testing a preview.
+
+Stripe test mode grants test entitlements but never charges a card. Do not treat it as production billing proof.
 
 ## Production read-only gates
 
