@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { resolveDatabaseTlsPolicy } from "./lib/databaseTlsPolicy";
 import { remoteDevelopmentServiceNames } from "./lib/environmentSafety";
+import { isCustomOrmPreviewLedgerMode } from "./lib/migrationLedgerPolicy";
 import { parseSchedulerBoolean, resolveSchedulerMode } from "./lib/schedulerMode";
 
 const schedulerBooleanSchema = z
@@ -46,6 +47,14 @@ const envSchemaBase = z.object({
   // Development refuses remote databases and provider keys by default.
   // Set this only for a deliberate, isolated development session.
   ALLOW_REMOTE_DEVELOPMENT_SERVICES: z.enum(["true", "false"]).optional(),
+  // This is only for the isolated Supabase preview branch. It skips the
+  // platform ledger check while the application ledger remains mandatory.
+  SUPABASE_CUSTOM_ORM_PREVIEW: z.enum(["true", "false"]).optional(),
+  // The last root migration already present in the branch source schema.
+  SUPABASE_CUSTOM_ORM_PREVIEW_BASELINE: z
+    .string()
+    .regex(/\.sql$/)
+    .optional(),
 
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
@@ -144,6 +153,15 @@ const envSchema = envSchemaBase.superRefine((value, context) => {
       path: [name],
       message:
         "Development requires loopback services and no provider keys. Set ALLOW_REMOTE_DEVELOPMENT_SERVICES=true only for an approved isolated session.",
+    });
+  }
+
+  if (value.SUPABASE_CUSTOM_ORM_PREVIEW === "true" && !isCustomOrmPreviewLedgerMode(value)) {
+    context.addIssue({
+      code: "custom",
+      path: ["SUPABASE_CUSTOM_ORM_PREVIEW"],
+      message:
+        "SUPABASE_CUSTOM_ORM_PREVIEW=true requires development mode, remote-service opt-in, and a baseline filename.",
     });
   }
 

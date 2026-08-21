@@ -1,6 +1,6 @@
 # VentureCite current audit
 
-Date: 2026-08-21
+Date: 2026-08-22
 
 ## Evidence rules
 
@@ -22,6 +22,24 @@ Non-production email delivery is disabled unless explicitly enabled.
 
 Evidence: `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md`, `server/lib/environmentSafety.ts`, `server/env.ts`, `server/emailService.ts`, and `server/lib/welcomeEmail.ts`.
 
+## Supabase preview verification
+
+The empty preview branch is `venturecite-reset-preview`.
+
+The data-backed preview branch is `venturecite-reset-data-preview`.
+
+The data-backed branch uses a production snapshot for storage checks. It is ephemeral and has no user access.
+
+The data-backed branch contains 46 users, 45 brands, and 29 articles.
+
+The preview application ledger contains 110 checked migration rows through `0109_content_generation_quota_period.sql`.
+
+The preview checks found no orphaned article, brand, or job ownership rows.
+
+The preview checks found protected migration ledgers, enabled RLS, and the three restricted request roles.
+
+No provider call, email, payment, or production write occurred.
+
 ## Local verification
 
 The latest local PostgreSQL integration run passed 37 of 37 tests.
@@ -32,7 +50,7 @@ The local browser run passed five of five flows with fake generation.
 
 The flows covered article editing, generation success, generation cancellation, distribution, and tenant isolation.
 
-The latest full test run passed 202 files and 1,542 tests.
+The latest full test run passed 203 files and 1,547 tests.
 
 These checks passed:
 
@@ -79,11 +97,11 @@ Evidence: `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md`.
 
 ## Release gaps
 
-The Supabase CLI is installed but has no access token.
+The Supabase CLI is installed and authenticated for the approved project.
 
 The release environment still lacks the runtime role, direct database URL, Stripe catalogue values, Resend sender, and secure HTTPS application URL.
 
-An isolated preview database and test-provider configuration are still required.
+The empty migration preview and the separate data-backed preview are created and verified. A deployed preview with test-provider values remains pending.
 
 The backup and restore procedure, controlled migrations, role dry run, role application, canary, and monitoring remain pending.
 
@@ -93,7 +111,7 @@ The privacy legal entity and contact values remain deferred until the final rele
 
 1. Authenticate the Supabase CLI.
 2. Load the approved release values securely.
-3. Create and verify the isolated preview.
+3. Keep the verified empty and data-backed previews isolated from users and providers.
 4. Run the production read-only preflight and metadata audit.
 5. Verify backup and restore.
 6. Apply migrations 0096 through 0109 through the controlled release command.

@@ -35,21 +35,35 @@ Set `ALLOW_REMOTE_DEVELOPMENT_SERVICES=true` only for an approved isolated sessi
 
 ## Preview gates
 
-1. Create an isolated Supabase project or branch.
-2. Set `STRIPE_PRODUCT_SYNC=false`.
-3. Use Stripe test keys and test catalogue identifiers only when checkout testing needs them.
-4. Leave `RESEND_API_KEY` and `BUFFER_ENCRYPTION_KEY` unset.
-5. Set `EMAIL_DELIVERY_ENABLED=false`.
-6. Set `CONTENT_GENERATION_PROVIDER=fake` only with `NODE_ENV=development` and a loopback base URL.
-7. Set `DISABLE_STARTUP_AUTOPILOT=true` and `DISABLE_STRIPE_SETUP=true` for local flow tests.
-8. Use fake or test AI providers.
-9. Deploy the preview with the isolated database and preview-only secrets.
-10. Run the browser product flows.
-11. Verify that no preview variable targets production.
+1. Use the approved `venturecite-reset-preview` branch for empty-schema migration tests.
+2. Use the approved `venturecite-reset-data-preview` branch for storage checks with copied data.
+3. Use the branch session pooler URL for application migrations.
+4. Set `NODE_ENV=development` and `ALLOW_REMOTE_DEVELOPMENT_SERVICES=true` only in that migration shell.
+5. Set `SUPABASE_CUSTOM_ORM_PREVIEW=true` only for the application migration runner.
+6. Set `SUPABASE_CUSTOM_ORM_PREVIEW_BASELINE` from the source branch ledger.
+7. Use `0093_stripe_owned_trial.sql` for the current production baseline.
+8. Run `npm run db:migrate`, never the production release command.
+9. Keep `SUPABASE_CUSTOM_ORM_PREVIEW` unset or false for normal preview application tests.
+10. Set `STRIPE_PRODUCT_SYNC=false`.
+11. Use Stripe test keys and test catalogue identifiers only when checkout testing needs them.
+12. Leave `RESEND_API_KEY` and `BUFFER_ENCRYPTION_KEY` unset.
+13. Set `EMAIL_DELIVERY_ENABLED=false`.
+14. Set `CONTENT_GENERATION_PROVIDER=fake` only with `NODE_ENV=development` and a loopback base URL.
+15. Set `DISABLE_STARTUP_AUTOPILOT=true` and `DISABLE_STRIPE_SETUP=true` for local flow tests.
+16. Use fake or test AI providers.
+17. Deploy the preview with the isolated database and preview-only secrets.
+18. Run the browser product flows.
+19. Verify that no preview variable targets production.
 
 The fake content provider accepts only `http://localhost`, `http://127.0.0.1`, or `http://[::1]`.
 
 The application has no fake Resend or Buffer adapter. Unset those credentials when testing a preview.
+
+The preview flag seeds only the known application baseline. The runner still checks checksums, applies later migrations, and holds an advisory lock.
+
+The preview flag skips only the Supabase platform ledger reconciliation. The application ledger and TLS checks remain active.
+
+Never set `SUPABASE_CUSTOM_ORM_PREVIEW=true` in production. Use `--with-data` only for the approved data-preview storage checks. Never deploy that branch, expose it to users, or use it for provider calls. Never use `supabase db reset --linked`.
 
 Stripe test mode grants test entitlements but never charges a card. Do not treat it as production billing proof.
 

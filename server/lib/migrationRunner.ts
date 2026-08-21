@@ -9,6 +9,7 @@ import type { PoolClient } from "pg";
 import { pool } from "../db";
 import { logger } from "./logger";
 import { checksumMigration, classifyMigrationChecksum } from "./migrationChecksums";
+import { isCustomOrmPreviewLedgerMode } from "./migrationLedgerPolicy";
 
 const APPLY_LOCK_KEY = 0x564d_4944; // "VMID" - distinct from app-level locks
 const SUPABASE_LEDGER_CHECKSUM_PATTERN = /(?:^|\n)-- SHA256:\s*([0-9a-f]{64})/i;
@@ -23,6 +24,58 @@ type SupabaseMigrationLedgerRow = {
   name: string;
   firstStatement: string | null;
 };
+
+type ApplicationMigrationLedgerRow = {
+  filename: string;
+  checksum: string | null;
+};
+
+async function seedCustomOrmPreviewLedger(
+  lockClient: PoolClient,
+  migrationFiles: readonly MigrationFile[],
+  baselineFilename: string,
+): Promise<void> {
+  const baselineIndex = migrationFiles.findIndex(
+    (migration) => migration.filename === baselineFilename,
+  );
+  if (baselineIndex < 0) {
+    throw new Error(
+      `Supabase preview migration baseline is not present in root migrations: ${baselineFilename}`,
+    );
+  }
+
+  const baselineFiles = migrationFiles.slice(0, baselineIndex + 1);
+  const existingResult = await lockClient.query<ApplicationMigrationLedgerRow>(
+    "SELECT filename, checksum FROM public.schema_migrations",
+  );
+  const existingByFilename = new Map(
+    existingResult.rows.map((row) => [row.filename, row.checksum]),
+  );
+  for (const migration of baselineFiles) {
+    const existingChecksum = existingByFilename.get(migration.filename);
+    if (existingChecksum !== undefined && existingChecksum !== null) {
+      if (existingChecksum !== migration.checksum) {
+        throw new Error(`Migration checksum mismatch for ${migration.filename}`);
+      }
+    }
+  }
+
+  for (const migration of baselineFiles) {
+    await lockClient.query(
+      `
+        INSERT INTO public.schema_migrations (filename, checksum)
+        VALUES ($1, $2)
+        ON CONFLICT (filename) DO UPDATE
+        SET checksum = COALESCE(public.schema_migrations.checksum, EXCLUDED.checksum)
+      `,
+      [migration.filename, migration.checksum],
+    );
+  }
+  logger.warn(
+    { baselineFilename, count: baselineFiles.length },
+    "applyMigrations: seeded the application ledger from the approved preview schema baseline",
+  );
+}
 
 async function reconcileSupabaseMigrationLedger(
   lockClient: PoolClient,
@@ -130,7 +183,20 @@ export async function applyMigrations(): Promise<void> {
         return { filename, sqlText, checksum: checksumMigration(sqlText) };
       }),
     );
-    await reconcileSupabaseMigrationLedger(lockClient, migrationFiles);
+    if (process.env.SUPABASE_CUSTOM_ORM_PREVIEW === "true") {
+      const baselineFilename = process.env.SUPABASE_CUSTOM_ORM_PREVIEW_BASELINE;
+      if (!isCustomOrmPreviewLedgerMode(process.env) || !baselineFilename?.trim()) {
+        throw new Error(
+          "SUPABASE_CUSTOM_ORM_PREVIEW=true requires development mode, remote-service opt-in, and SUPABASE_CUSTOM_ORM_PREVIEW_BASELINE.",
+        );
+      }
+      await seedCustomOrmPreviewLedger(lockClient, migrationFiles, baselineFilename.trim());
+      logger.warn(
+        "applyMigrations: skipping Supabase platform ledger reconciliation for the approved preview branch",
+      );
+    } else {
+      await reconcileSupabaseMigrationLedger(lockClient, migrationFiles);
+    }
 
     const applied = await lockClient.query<{ filename: string; checksum: string | null }>(
       "SELECT filename, checksum FROM public.schema_migrations",

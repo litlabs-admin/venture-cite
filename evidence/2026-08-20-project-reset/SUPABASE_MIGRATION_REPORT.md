@@ -1,6 +1,6 @@
 # Supabase migration report
 
-Date: 2026-08-21
+Date: 2026-08-22
 
 ## Current architecture
 
@@ -11,6 +11,22 @@ The Express server uses Drizzle and a PostgreSQL pool.
 Migrations 0096 through 0109 define the current restricted access, command, provider-state, and quota-period work.
 
 The root migration files and Supabase copies pass the migration sync check.
+
+## Preview database verification
+
+The empty preview branch supports schema migration tests from the production baseline.
+
+The data-backed preview branch uses a production snapshot for storage checks only.
+
+The data-backed branch contains 46 users, 45 brands, and 29 articles.
+
+Both preview paths contain 110 application migration rows with non-null checksums through `0109_content_generation_quota_period.sql`.
+
+The data-backed ownership checks found no orphaned article, brand, or job rows.
+
+The preview checks found enabled RLS, protected migration ledgers, and the three restricted request roles.
+
+No production write occurred.
 
 ## Migration groups
 
@@ -63,7 +79,7 @@ The cleanup code removes stale test grants without removing the required creator
 
 The local browser run also passed five of five product flows against local Supabase.
 
-The final full test run passed 202 files and 1,542 tests.
+The final full test run passed 203 files and 1,547 tests.
 
 TypeScript, ESLint, Prettier, migration sync, whitespace validation, and the production build passed.
 
@@ -93,9 +109,9 @@ These commands have not run against production.
 
 1. Complete the full local gate run and production build.
 2. Commit the verified wave.
-3. Create an isolated Supabase preview database.
-4. Configure test-only provider values for the preview.
-5. Deploy and verify the preview.
+3. Use the verified empty and data-backed Supabase preview branches.
+4. Configure test-only provider values for a preview deployment.
+5. Deploy and verify the preview without production access.
 6. Run the production release preflight.
 7. Run the read-only production metadata audit with the direct connection.
 8. Confirm the backup and rollback plan.

@@ -1,6 +1,6 @@
 # Project reset status
 
-Date: 2026-08-21
+Date: 2026-08-22
 
 ## Scope and safety
 
@@ -54,7 +54,7 @@ The local browser run passed five of five flows in 1 minute:
 
 The final browser run made no live OpenAI call. Local fake mode disables live OpenAI access.
 
-The final full test run passed 202 files and 1,542 tests.
+The final full test run passed 203 files and 1,547 tests.
 
 Nineteen files and 87 tests skipped under their configured conditions.
 
@@ -87,7 +87,7 @@ The read-only production audit recorded migrations 0096 through 0107 as unapplie
 
 The request-role membership command and release preflight have not run against production.
 
-The current Vercel preview shares major production variables. Do not deploy it until the preview has isolated Supabase and test-provider values.
+The current Vercel preview shares major production variables. Do not deploy it until it uses isolated Supabase and test-provider values.
 
 ## Provider scope
 
@@ -100,8 +100,8 @@ Provider-wide outbox conversion is not a release gate for this reset wave.
 ## Remaining gates
 
 1. Authenticate the Supabase CLI and load the approved release values securely.
-2. Create an isolated preview database and test-provider configuration.
-3. Deploy and verify the preview without production access.
+2. Configure the verified preview branches with test-provider values.
+3. Deploy and verify a preview without production access.
 4. Run the read-only production preflight and metadata audit.
 5. Confirm the production backup and restore plan.
 6. Apply migrations through the controlled release command.
