@@ -91,6 +91,9 @@ The request-role membership command and release preflight have not run against p
 
 The current Vercel preview shares major production variables. Do not deploy it until it uses isolated Supabase and test-provider values.
 
+The data-backed preview advisor reported leaked-password protection and RLS initialization-plan warnings.
+Review these warnings before production release.
+
 ## Provider scope
 
 Generic OpenAI kickoff and content-cost recording use the transactional outbox.

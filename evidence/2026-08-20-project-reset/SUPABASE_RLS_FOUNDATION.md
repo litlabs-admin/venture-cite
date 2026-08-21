@@ -97,6 +97,12 @@ The release preflight exists but has not run against production.
 
 Evidence: `scripts/configureRequestRoleMembership.ts:33-64`, `scripts/releaseEnvironmentPreflight.ts:180-259`, and `package.json`.
 
+The data-backed preview advisor returned warnings for leaked-password protection and RLS initialization plans.
+
+The current policy SQL already wraps actor settings in statement-scoped `SELECT` expressions.
+
+Review the Supabase Auth setting and the advisor output before production release.
+
 ## Remaining gates
 
 1. Obtain `DATABASE_DIRECT_URL` through the secure release channel.
@@ -104,15 +110,16 @@ Evidence: `scripts/configureRequestRoleMembership.ts:33-64`, `scripts/releaseEnv
 3. Obtain `RESEND_FROM_ADDRESS`.
 4. Define the least-privileged production runtime role.
 5. Set a secure HTTPS `APP_URL`.
-6. Run the strict metadata audit with the direct connection.
-7. Review grants, owners, RLS flags, policies, and ownership counts.
-8. Verify the production backup and restore plan.
-9. Apply migrations 0096 through 0110 through the controlled release command.
-10. Run the request-role membership command in dry-run mode.
-11. Apply role membership after the final review and confirmation gate.
-12. Run two-user tests for brand creation, website import, deletion preview, and soft delete.
-13. Verify worker-only storage paths remain outside request routes.
-14. Keep privacy legal placeholders deferred until final release preparation.
+6. Review Supabase Auth leaked-password protection and advisor warnings.
+7. Run the strict metadata audit with the direct connection.
+8. Review grants, owners, RLS flags, policies, and ownership counts.
+9. Verify the production backup and restore plan.
+10. Apply migrations 0096 through 0110 through the controlled release command.
+11. Run the request-role membership command in dry-run mode.
+12. Apply role membership after the final review and confirmation gate.
+13. Run two-user tests for brand creation, website import, deletion preview, and soft delete.
+14. Verify worker-only storage paths remain outside request routes.
+15. Keep privacy legal placeholders deferred until final release preparation.
 
 ## Security boundary
 

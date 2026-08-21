@@ -107,6 +107,9 @@ The empty migration preview and the separate data-backed preview are created and
 
 The backup and restore procedure, controlled migrations, role dry run, role application, canary, and monitoring remain pending.
 
+The data-backed preview advisor reported leaked-password protection and RLS initialization-plan warnings.
+Review these warnings before production release.
+
 The privacy legal entity and contact values remain deferred until the final release phase.
 
 ## Release order
