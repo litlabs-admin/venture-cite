@@ -44,6 +44,12 @@ export async function applyMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS checksum TEXT;
     `);
 
+    // The ledger is internal release state. Keep it out of the public Data API.
+    await lockClient.query(`
+      ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY;
+      REVOKE ALL ON TABLE public.schema_migrations FROM anon, authenticated;
+    `);
+
     const applied = await lockClient.query<{ filename: string; checksum: string | null }>(
       "SELECT filename, checksum FROM public.schema_migrations",
     );
