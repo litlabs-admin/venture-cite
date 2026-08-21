@@ -2,7 +2,7 @@
 
 ## Current result
 
-The combined local RLS and outbox run passed 35 of 35 database integration tests.
+The latest local RLS and outbox run passed 37 of 37 database integration tests.
 
 Production remains read-only and unchanged.
 
