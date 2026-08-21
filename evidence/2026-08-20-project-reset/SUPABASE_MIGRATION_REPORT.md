@@ -8,7 +8,7 @@ VentureCite uses Supabase Auth, Storage, and PostgreSQL.
 
 The Express server uses Drizzle and a PostgreSQL pool.
 
-Migrations 0096 through 0110 define the current restricted access, command, provider-state, quota-period, and brand soft-delete work.
+Migrations 0096 through 0111 define the current restricted access, command, provider-state, quota-period, brand soft-delete, and auth-trigger access work.
 
 The root migration files and Supabase copies pass the migration sync check.
 
@@ -131,7 +131,7 @@ These commands have not run against production.
 6. Run the production release preflight.
 7. Run the read-only production metadata audit with the direct connection.
 8. Confirm the backup and rollback plan.
-9. Apply migrations 0096 through 0110 through the controlled migration command.
+9. Apply migrations 0094 through 0111 through the controlled migration command.
 10. Run the role command in dry-run mode.
 11. Apply role memberships through the confirmation gate.
 12. Run the canary and monitor errors.

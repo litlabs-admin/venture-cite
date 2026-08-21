@@ -118,7 +118,7 @@ Review the Supabase Auth setting and the remaining RLS advisor output before pro
 7. Run the strict metadata audit with the direct connection.
 8. Review grants, owners, RLS flags, policies, and ownership counts.
 9. Verify the production backup and restore plan.
-10. Apply migrations 0096 through 0110 through the controlled release command.
+10. Apply migrations 0094 through 0111 through the controlled release command.
 11. Run the request-role membership command in dry-run mode.
 12. Apply role membership after the final review and confirmation gate.
 13. Run two-user tests for brand creation, website import, deletion preview, and soft delete.

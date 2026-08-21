@@ -127,7 +127,7 @@ The privacy legal entity and contact values remain deferred until the final rele
 3. Configure and verify a preview with test-provider values.
 4. Run the production read-only preflight and direct-session metadata audit.
 5. Verify backup and restore.
-6. Apply migrations 0096 through 0110 through the controlled release command.
+6. Apply migrations 0094 through 0111 through the controlled release command.
 7. Run the role membership dry run.
 8. Apply the role memberships through the confirmation gate.
 9. Run the production canary and monitor errors.
