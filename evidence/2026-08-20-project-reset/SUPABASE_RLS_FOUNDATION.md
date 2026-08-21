@@ -62,11 +62,11 @@ Each database `beforeAll` hook has a 60-second timeout while it holds the shared
 
 Evidence: `tests/integration/localRoleCleanup.ts:23-161`, `tests/integration/requestRlsFoundation.test.ts:51-106`, `tests/integration/contentRequestRls.test.ts:45-125`, and `tests/integration/localOutboxMigration.test.ts:36-65`.
 
-The content repositories exist.
+The content routes use the actor-bound repositories for article, revision, distribution, job, and keyword request paths.
 
-The content routes do not use them yet.
+Keyword discovery finalization, competitor reads, and worker slice claims still use owner-side storage because they run outside the request transaction.
 
-Evidence: `server/data/contentRequestData.ts:24-50` and `server/routes/content.ts`.
+Evidence: `server/data/contentRequestData.ts:24-50` and `server/routes/content.ts:241-1075`.
 
 ## Route cutover state
 
