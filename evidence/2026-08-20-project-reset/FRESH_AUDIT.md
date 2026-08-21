@@ -95,7 +95,9 @@ The request role does not exist in production.
 
 The runtime login has broader privileges than the target least-privileged role.
 
-The read-only production audit recorded migrations 0096 through 0107 as unapplied. This branch has not run migrations 0108 through 0110 against production. Recheck the production ledger before release.
+The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0110` remain absent. No production migration ran.
+
+The current login is `postgres`, with RLS bypass and nine granted roles. The request role does not exist. The direct-session audit could not connect from this workstation, so the release environment still needs `DATABASE_DIRECT_URL` and a network path to the direct endpoint.
 
 Do not activate the request-role routes in production before the controlled migration and role gates pass.
 
@@ -123,7 +125,7 @@ The privacy legal entity and contact values remain deferred until the final rele
 1. Load the approved release values securely.
 2. Keep the verified empty and data-backed previews isolated from users and providers.
 3. Configure and verify a preview with test-provider values.
-4. Run the production read-only preflight and metadata audit.
+4. Run the production read-only preflight and direct-session metadata audit.
 5. Verify backup and restore.
 6. Apply migrations 0096 through 0110 through the controlled release command.
 7. Run the role membership dry run.

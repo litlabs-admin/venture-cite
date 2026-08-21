@@ -95,7 +95,9 @@ TypeScript, ESLint, Prettier, migration sync, whitespace validation, and the pro
 
 ## Production state
 
-The read-only production audit recorded migrations 0096 through 0107 as unapplied. This branch has not run migrations 0108 through 0110 against production. Recheck the production ledger before release.
+The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0110` remain absent. No production migration ran.
+
+The direct-session audit could not connect from this workstation. The release environment still needs `DATABASE_DIRECT_URL` and a network path to the direct endpoint.
 
 The previous production metadata audit used strict TLS and one read-only transaction.
 

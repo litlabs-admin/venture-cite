@@ -6,8 +6,8 @@ The latest local RLS and outbox run passed 37 of 37 database integration tests.
 
 Production remains read-only and unchanged.
 
-The read-only production audit recorded migrations 0096 through 0107 as unapplied.
-This branch has not run migrations 0108 through 0110 against production.
+The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums.
+Migrations `0094` through `0110` remain absent from production.
 
 The local Supabase stack is stopped.
 
@@ -96,6 +96,8 @@ The request-role membership tool exists but has not run against production.
 The release preflight exists but has not run against production.
 
 Evidence: `scripts/configureRequestRoleMembership.ts:33-64`, `scripts/releaseEnvironmentPreflight.ts:180-259`, and `package.json`.
+
+The direct-session audit could not connect from this workstation. The Management API recheck did not write data and does not replace the direct-session release gate.
 
 The data-backed preview advisor returned warnings for leaked-password protection and RLS initialization plans.
 

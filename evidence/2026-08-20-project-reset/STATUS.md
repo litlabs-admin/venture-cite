@@ -85,7 +85,9 @@ The production metadata audit used strict Transport Layer Security (TLS) and one
 
 The audit ended with `ROLLBACK`. It did not read application rows.
 
-The read-only production audit recorded migrations 0096 through 0107 as unapplied. This branch has not run migrations 0108 through 0110 against production. Recheck the production ledger before release.
+The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0110` remain absent. No production migration ran.
+
+The direct-session audit could not connect from this workstation. The release environment still needs `DATABASE_DIRECT_URL` and a network path to the direct database endpoint.
 
 The request-role membership command and release preflight have not run against production.
 
@@ -113,7 +115,7 @@ Provider-wide outbox conversion is not a release gate for this reset wave.
 1. Load the approved release values securely.
 2. Configure the verified preview branches with test-provider values.
 3. Deploy and verify a Vercel preview without production access.
-4. Run the read-only production preflight and metadata audit.
+4. Run the read-only production preflight and direct-session metadata audit.
 5. Confirm the production backup and restore plan.
 6. Apply migrations through the controlled release command.
 7. Configure the restricted role memberships through the confirmed command.

@@ -14,6 +14,18 @@ It returned catalog facts and aggregate ownership counts only.
 
 It did not return user rows, brand rows, identifiers, emails, role names, URLs, or secret values.
 
+## Current metadata recheck
+
+On 2026-08-22, the direct-session audit was attempted with the supplied CA certificate. This workstation could not open the direct database host, so the script stopped before any query.
+
+The authenticated Supabase Management API then ran SELECT-only metadata queries. It confirmed 62 public relations, 62 relations with RLS, zero policies on `users` and `brands`, and no `venturecite_request` role.
+
+The production application ledger currently has 94 rows through `0093_stripe_owned_trial.sql`. All 94 rows have no checksum. Migrations `0094` through `0110` remain absent.
+
+The current login is `postgres`. It can bypass RLS, create roles, create databases, and holds nine granted roles. The only public function is `handle_new_user()`. It is security definer, sets `search_path=public`, and grants execution only to `postgres` and `service_role`.
+
+These Management API checks did not write data. The direct-session audit, backup proof, and release preflight remain required gates.
+
 ## Results
 
 - The public schema has 62 relations.
@@ -47,6 +59,6 @@ Create a least-privileged runtime login before the last production rollout.
 
 `DATABASE_DIRECT_URL` is absent from the secure local environment source.
 
-The direct-connection audit cannot run until the release environment provides that value.
+The direct-connection audit cannot run until the release environment provides that value and the release host can reach the direct database endpoint.
 
 Do not copy a database URL into a command, report, or Git file.
