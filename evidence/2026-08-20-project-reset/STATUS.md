@@ -89,13 +89,15 @@ The current Management API metadata check found 94 production migration rows thr
 
 The direct-session audit could not connect from this workstation. The release environment still needs `DATABASE_DIRECT_URL` and a network path to the direct database endpoint.
 
+The production Supabase advisor reports one `auth_leaked_password_protection` warning. The Auth dashboard must enable leaked-password protection before release.
+
 The request-role membership command and release preflight have not run against production.
 
 The current Vercel preview shares major production variables. Do not deploy it until it uses isolated Supabase and test-provider values.
 
 The local `.env` uses `RESEND_FROM_EMAIL`. The application and preflight require `RESEND_FROM_ADDRESS`.
 
-The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Migration 0111 removed the public and authenticated execution grants from `public.handle_new_user()` in both previews.
+The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Production also reports one leaked-password protection warning. Migration 0111 removed the public and authenticated execution grants from `public.handle_new_user()` in both previews.
 Review the Auth setting and RLS warnings before production release.
 
 The data-backed preview matches production aggregate counts for users, brands, and articles: 46, 45, and 29. This is a storage-copy check. It is not the formal production backup and restore proof.

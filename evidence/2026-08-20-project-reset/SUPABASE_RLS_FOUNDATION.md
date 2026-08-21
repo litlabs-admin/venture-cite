@@ -99,7 +99,7 @@ Evidence: `scripts/configureRequestRoleMembership.ts:33-64`, `scripts/releaseEnv
 
 The direct-session audit could not connect from this workstation. The Management API recheck did not write data and does not replace the direct-session release gate.
 
-The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings.
+The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Production reports one leaked-password protection warning.
 
 Migration 0111 revokes public, anon, and authenticated execution on `public.handle_new_user()` after the function replacement in migration 0093. Both previews now grant that function only to `postgres` and `service_role`.
 

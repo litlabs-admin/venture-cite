@@ -26,6 +26,8 @@ The current login is `postgres`. It can bypass RLS, create roles, create databas
 
 These Management API checks did not write data. The direct-session audit, backup proof, and release preflight remain required gates.
 
+The production Supabase advisor reports one `auth_leaked_password_protection` warning. This Auth setting remains a release gate.
+
 ## Results
 
 - The public schema has 62 relations.

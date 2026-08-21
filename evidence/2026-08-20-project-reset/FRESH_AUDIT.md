@@ -101,6 +101,8 @@ The current Management API metadata check found 94 production migration rows thr
 
 The current login is `postgres`, with RLS bypass and nine granted roles. The request role does not exist. The direct-session audit could not connect from this workstation, so the release environment still needs `DATABASE_DIRECT_URL` and a network path to the direct endpoint.
 
+The production Supabase advisor reports one `auth_leaked_password_protection` warning. The Auth dashboard must enable leaked-password protection before release.
+
 Do not activate the request-role routes in production before the controlled migration and role gates pass.
 
 Evidence: `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md`.
@@ -117,7 +119,7 @@ The empty migration preview and the separate data-backed preview are created and
 
 The formal backup and restore procedure, controlled migrations, role dry run, role application, canary, and monitoring remain pending. The data-backed branch provides a storage-copy check only.
 
-The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Migration 0111 removed the public and authenticated execution grants from `public.handle_new_user()` in both previews.
+The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Production also reports one leaked-password protection warning. Migration 0111 removed the public and authenticated execution grants from `public.handle_new_user()` in both previews.
 Review the Auth setting and RLS warnings before production release.
 
 The privacy legal entity and contact values remain deferred until the final release phase.
