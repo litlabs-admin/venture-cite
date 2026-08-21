@@ -27,18 +27,25 @@ Run the local product-flow suite against local Supabase.
 
 Do not use production credentials for this suite.
 
+Development rejects remote database, Supabase, OpenAI, OpenRouter, Resend, and Stripe settings by default.
+
+Use loopback services and fake generation for local tests.
+
+Set `ALLOW_REMOTE_DEVELOPMENT_SERVICES=true` only for an approved isolated session.
+
 ## Preview gates
 
 1. Create an isolated Supabase project or branch.
 2. Set `STRIPE_PRODUCT_SYNC=false`.
 3. Use Stripe test keys and test catalogue identifiers only when checkout testing needs them.
 4. Leave `RESEND_API_KEY` and `BUFFER_ENCRYPTION_KEY` unset.
-5. Set `CONTENT_GENERATION_PROVIDER=fake` only with `NODE_ENV=development` and a loopback base URL.
-6. Set `DISABLE_STARTUP_AUTOPILOT=true` and `DISABLE_STRIPE_SETUP=true` for local flow tests.
-7. Use fake or test AI providers.
-8. Deploy the preview with the isolated database and preview-only secrets.
-9. Run the browser product flows.
-10. Verify that no preview variable targets production.
+5. Set `EMAIL_DELIVERY_ENABLED=false`.
+6. Set `CONTENT_GENERATION_PROVIDER=fake` only with `NODE_ENV=development` and a loopback base URL.
+7. Set `DISABLE_STARTUP_AUTOPILOT=true` and `DISABLE_STRIPE_SETUP=true` for local flow tests.
+8. Use fake or test AI providers.
+9. Deploy the preview with the isolated database and preview-only secrets.
+10. Run the browser product flows.
+11. Verify that no preview variable targets production.
 
 The fake content provider accepts only `http://localhost`, `http://127.0.0.1`, or `http://[::1]`.
 

@@ -4,9 +4,10 @@ import { signUnsubscribeToken } from "./lib/unsubscribeToken";
 import { withEmailRetry } from "./lib/emailRetry";
 import { db } from "./db";
 import { users, emailFailures } from "@shared/schema";
+import { isEmailDeliveryEnabled } from "./lib/environmentSafety";
 import { logger } from "./lib/logger";
 
-const resendApiKey = process.env.RESEND_API_KEY;
+const resendApiKey = isEmailDeliveryEnabled(process.env) ? process.env.RESEND_API_KEY : undefined;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || "VentureCite <reports@venturecite.app>";

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { resolveDatabaseTlsPolicy } from "./lib/databaseTlsPolicy";
+import { remoteDevelopmentServiceNames } from "./lib/environmentSafety";
 import { parseSchedulerBoolean, resolveSchedulerMode } from "./lib/schedulerMode";
 
 const schedulerBooleanSchema = z
@@ -42,6 +43,10 @@ const envSchemaBase = z.object({
 
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 
+  // Development refuses remote databases and provider keys by default.
+  // Set this only for a deliberate, isolated development session.
+  ALLOW_REMOTE_DEVELOPMENT_SERVICES: z.enum(["true", "false"]).optional(),
+
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
 
@@ -64,6 +69,7 @@ const envSchemaBase = z.object({
   STRIPE_AGENCY_PRICE_ID: z.string().startsWith("price_").optional(),
 
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
+  CONTENT_GENERATION_PROVIDER: z.enum(["fake", "openai"]).optional(),
 
   // Optional - features degrade if absent, but shouldn't block boot.
   // OPENROUTER_API_KEY is optional in core, but REQUIRED at runtime for the
@@ -100,6 +106,7 @@ const envSchemaBase = z.object({
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_ADDRESS: z.string().optional(),
+  EMAIL_DELIVERY_ENABLED: z.enum(["true", "false"]).optional(),
 
   // Stripe API version pin. Falls back to a hardcoded
   // version in stripeClient.ts. Set in deploy env if you want to
@@ -131,6 +138,15 @@ const envSchemaBase = z.object({
 });
 
 const envSchema = envSchemaBase.superRefine((value, context) => {
+  for (const name of remoteDevelopmentServiceNames(value)) {
+    context.addIssue({
+      code: "custom",
+      path: [name],
+      message:
+        "Development requires loopback services and no provider keys. Set ALLOW_REMOTE_DEVELOPMENT_SERVICES=true only for an approved isolated session.",
+    });
+  }
+
   try {
     resolveDatabaseTlsPolicy(value);
   } catch (error) {

@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { isEmailDeliveryEnabled } from "./environmentSafety";
 import { logger } from "./logger";
 
 // One-shot welcome email sent the first time a user successfully logs in
@@ -8,7 +9,7 @@ import { logger } from "./logger";
 // ones. Send failures are swallowed by the caller (welcome email is a
 // nice-to-have, not a blocker for login).
 
-const resendApiKey = process.env.RESEND_API_KEY;
+const resendApiKey = isEmailDeliveryEnabled(process.env) ? process.env.RESEND_API_KEY : undefined;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || "VentureCite <reports@venturecite.app>";
