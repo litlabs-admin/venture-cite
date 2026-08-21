@@ -80,6 +80,17 @@ describeIfLocal("content request database RLS", () => {
       path.resolve(process.cwd(), "migrations/0107_content_request_article_response_columns.sql"),
       "utf8",
     );
+    const distributionProviderStateMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "migrations/0108_content_request_distribution_provider_state.sql",
+      ),
+      "utf8",
+    );
+    const quotaPeriodMigration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0109_content_generation_quota_period.sql"),
+      "utf8",
+    );
     await ownerPool.query(foundationMigration);
     await ownerPool.query(contentMigration);
     await ownerPool.query(contentMigration);
@@ -93,6 +104,10 @@ describeIfLocal("content request database RLS", () => {
     await ownerPool.query(generationCommandsMigration);
     await ownerPool.query(articleResponseColumnsMigration);
     await ownerPool.query(articleResponseColumnsMigration);
+    await ownerPool.query(distributionProviderStateMigration);
+    await ownerPool.query(distributionProviderStateMigration);
+    await ownerPool.query(quotaPeriodMigration);
+    await ownerPool.query(quotaPeriodMigration);
 
     await ownerPool.query(
       `create role "${runtimeRole}" with
@@ -521,10 +536,25 @@ describeIfLocal("content request database RLS", () => {
     await expect(
       forUser(userAId, async (transaction) => {
         await transaction.execute(
-          sql`update public.distributions set platform_post_id = 'forbidden' where id = ${distribution.id}`,
+          sql`update public.distributions set platform_post_id = 'owned-provider' where id = ${distribution.id}`,
         );
       }),
-    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    ).resolves.toBeUndefined();
+    const ownedProviderState = await ownerPool.query<{ platform_post_id: string | null }>(
+      "select platform_post_id from public.distributions where id = $1",
+      [distribution.id],
+    );
+    expect(ownedProviderState.rows).toEqual([{ platform_post_id: "owned-provider" }]);
+    await forUser(userAId, async (transaction) => {
+      await transaction.execute(
+        sql`update public.distributions set platform_post_id = 'foreign-attempt' where article_id = ${articleBId}`,
+      );
+    });
+    const foreignProviderState = await ownerPool.query<{ platform_post_id: string | null }>(
+      "select platform_post_id from public.distributions where article_id = $1",
+      [articleBId],
+    );
+    expect(foreignProviderState.rows).toEqual([{ platform_post_id: "provider-b" }]);
     await expect(
       forUser(userAId, async (transaction) => {
         await transaction.execute(sql`
@@ -549,7 +579,7 @@ describeIfLocal("content request database RLS", () => {
     await expect(
       forUser(userAId, async (transaction) => {
         await transaction.execute(
-          sql`update public.distributions set platform_post_id = 'forbidden' where article_id = ${articleAId}`,
+          sql`update public.distributions set article_id = ${articleBId} where article_id = ${articleAId}`,
         );
       }),
     ).rejects.toMatchObject({ cause: { code: "42501" } });
@@ -598,7 +628,9 @@ describeIfLocal("content request database RLS", () => {
 
     const distribution = await forUser(userAId, async (transaction) =>
       transaction.execute(sql`
-        select platform_post_id from public.distributions where article_id = ${articleAId}
+        select platform_post_id from public.distributions
+         where article_id = ${articleAId}
+         order by platform_post_id
       `),
     );
     expect(distribution.rows).toEqual([{ platform_post_id: "provider-a" }]);
@@ -720,7 +752,7 @@ describeIfLocal("content request database RLS", () => {
       geography: null,
       contentStyle: "b2c",
     });
-    expect(result).toEqual({ kind: "quota", cap: 0 });
+    expect(result).toEqual({ kind: "quota", cap: schema.usageLimits.pro.articlesPerMonth });
     await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
     await ownerPool.query("update public.users set access_tier = 'free' where id = $1", [userAId]);
   });
@@ -871,6 +903,10 @@ describeIfLocal("content request database RLS", () => {
     const oldJobId = oldJob.rows[0]?.id;
     if (!oldJobId) throw new Error("Expected an old job");
     await ownerPool.query(
+      "update public.content_generation_jobs set quota_reservation_period = null where id = $1",
+      [oldJobId],
+    );
+    await ownerPool.query(
       "update public.articles set status = 'generating', job_id = $2 where id = $1",
       [draft.id, oldJobId],
     );
@@ -898,6 +934,60 @@ describeIfLocal("content request database RLS", () => {
     expect(afterCancel.rows).toEqual([
       { used: 1, refunded_at: null, article_status: "draft", article_job_id: null },
     ]);
+
+    await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
+    await ownerPool.query(
+      "update public.users set articles_used_this_month = 0, usage_reset_date = null where id = $1",
+      [userAId],
+    );
+  });
+
+  it("does not refund a reservation after the usage period changes", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createContentRequestData } = await import("../../server/data/contentRequestData");
+    const contentData = createContentRequestData(drizzle(requestPool, { schema }));
+    const actorA = contentData.forActor(createRequestActor(userAId));
+    await ownerPool.query(
+      "update public.users set articles_used_this_month = 0, usage_reset_date = now() where id = $1",
+      [userAId],
+    );
+    const draft = await actorA.articles.createDraft({ brandId: brandAId });
+    const created = await actorA.jobs.enqueueGeneration({
+      articleId: draft.id,
+      brandId: brandAId,
+      requestPayload: { keywords: "period", industry: "Software" },
+      keywords: ["period"],
+      industry: "Software",
+      contentType: "article",
+      targetCustomers: null,
+      geography: null,
+      contentStyle: "b2c",
+    });
+    if (created.kind !== "created") throw new Error("Expected a created job");
+
+    const reservation = await ownerPool.query<{ recorded: boolean }>(
+      `select quota_reservation_period is not null as recorded
+         from public.content_generation_jobs where id = $1`,
+      [created.jobId],
+    );
+    expect(reservation.rows).toEqual([{ recorded: true }]);
+
+    await ownerPool.query(
+      "update public.users set usage_reset_date = now() + interval '1 month' where id = $1",
+      [userAId],
+    );
+    expect(await actorA.jobs.cancel(created.jobId)).toEqual({
+      kind: "cancelled",
+      status: "cancelled",
+    });
+    const afterCancel = await ownerPool.query<{ used: number; refundedAt: Date | null }>(
+      `select users.articles_used_this_month as used, jobs.refunded_at as "refundedAt"
+         from public.users
+         join public.content_generation_jobs as jobs on jobs.id = $2
+        where users.id = $1`,
+      [userAId, created.jobId],
+    );
+    expect(afterCancel.rows).toEqual([{ used: 1, refundedAt: null }]);
 
     await ownerPool.query("delete from public.articles where id = $1", [draft.id]);
     await ownerPool.query(

@@ -500,6 +500,9 @@ export const contentGenerationJobs = pgTable(
     streamBuffer: text("stream_buffer").default(""),
     errorKind: text("error_kind"), // 'budget'|'circuit'|'openai_5xx'|'openai_429'|'timeout'|'invalid_input'|'unknown'
     refundedAt: timestamp("refunded_at"),
+    // The usage period that received this reservation. Refunds must match
+    // this value so an old job cannot reduce a newer period's quota.
+    quotaReservationPeriod: timestamp("quota_reservation_period"),
     // Vercel migration: per-call slice lock. /advance updates this when
     // it claims the job for an 8s slice; concurrent advance calls bail.
     lastAdvanceStartedAt: timestamp("last_advance_started_at"),

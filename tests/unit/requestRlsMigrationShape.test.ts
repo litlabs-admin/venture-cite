@@ -190,4 +190,25 @@ describe("request RLS migration shape", () => {
       migration,
     );
   });
+
+  it("records the quota period for safe refunds", () => {
+    const migration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0109_content_generation_quota_period.sql"),
+      "utf8",
+    );
+    const supabaseMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/20260421000109_0109_content_generation_quota_period.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain("quota_reservation_period");
+    expect(migration).toContain("content_generation_job_quota_period");
+    expect(migration).toContain("IS NOT DISTINCT FROM user_row.usage_reset_date");
+    expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
+      migration,
+    );
+  });
 });

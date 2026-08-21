@@ -33,6 +33,7 @@ import { aiLimitMiddleware, openai, sendError, asyncHandler } from "../lib/route
 import { postToBuffer } from "../lib/bufferPost";
 import { createRequestActor } from "../lib/requestActor";
 import { contentRequestData } from "../data/contentRequestData";
+import { requestData } from "../data/requestData";
 
 const distributionCreateSchema = z.object({
   articleId: z.string().min(1),
@@ -437,7 +438,9 @@ export function setupArticlesRoutes(app: Express): void {
           });
         }
 
-        const brand = article.brandId ? await storage.getBrandById(article.brandId) : null;
+        const brand = article.brandId
+          ? await requestData.forActor(actor).brands.get(article.brandId)
+          : null;
         // 2000-char prompt cap - keeps the per-platform LLM call cheap. TODO:
         // make this brand-config or per-platform if we ever want long-form
         // distribution copy.
@@ -606,9 +609,9 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const distribution = await contentRequestData
-          .forActor(createRequestActor(user.id))
-          .distributions.get(req.params.distributionId);
+        const actor = createRequestActor(user.id);
+        const distributions = contentRequestData.forActor(actor).distributions;
+        const distribution = await distributions.get(req.params.distributionId);
         if (!distribution) {
           return res.status(404).json({ success: false, error: "not_found" });
         }
@@ -622,7 +625,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
         }
         const result = await postToBuffer(user.id, parsed.data.channelId, content);
         if (result.ok) {
-          await storage.updateDistribution(distribution.id, {
+          await distributions.update(distribution.id, {
             platformPostId: result.postId,
             status: "scheduled",
             distributedAt: new Date(),

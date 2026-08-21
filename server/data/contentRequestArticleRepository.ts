@@ -1,11 +1,5 @@
-import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import {
-  articles,
-  type Article,
-  type InsertArticle,
-  type InsertArticleRevision,
-} from "@shared/schema";
+import { articles, type Article, type InsertArticle } from "@shared/schema";
 import type { db } from "../db";
 import type { RequestActor } from "../lib/requestActor";
 import type { RequestRepositoryTransaction } from "./requestRepositoryTransaction";
@@ -86,42 +80,61 @@ export type ContentRequestArticleCreateDraft = ContentRequestArticleFields &
   Required<Pick<ContentRequestArticleFields, "brandId">>;
 export type ContentRequestArticlePatch = Partial<ContentRequestArticleFields>;
 
-const articleInsertValues = (input: ContentRequestArticleFields, status: "draft" | "ready") => ({
-  ...input,
-  status,
-});
+const articleInsertColumns = [
+  ["brand_id", "brandId"],
+  ["title", "title"],
+  ["content", "content"],
+  ["excerpt", "excerpt"],
+  ["meta_description", "metaDescription"],
+  ["keywords", "keywords"],
+  ["industry", "industry"],
+  ["content_type", "contentType"],
+  ["featured_image", "featuredImage"],
+  ["author", "author"],
+  ["target_customers", "targetCustomers"],
+  ["geography", "geography"],
+  ["content_style", "contentStyle"],
+  ["external_url", "externalUrl"],
+  ["seo_data", "seoData"],
+] as const satisfies ReadonlyArray<readonly [string, keyof ContentRequestArticleFields]>;
+
+const articleInsertDefaults: Partial<Record<keyof ContentRequestArticleFields, unknown>> = {
+  title: "",
+  content: "",
+  author: "GEO Platform",
+  contentStyle: "b2c",
+};
 
 async function insertArticle(
   transaction: RequestRepositoryTransaction,
   input: ContentRequestArticleFields,
   status: "draft" | "ready",
 ): Promise<ContentRequestArticle> {
-  const id = randomUUID();
-  const values = articleInsertValues(input, status);
-  const keywords = values.keywords
-    ? sql`ARRAY[${sql.join(
-        values.keywords.map((keyword) => sql`${keyword}`),
-        sql`, `,
-      )}]::text[]`
-    : sql`NULL`;
-  await transaction.execute(sql`
-    INSERT INTO public.articles (
-      id, brand_id, title, content, excerpt, meta_description, keywords,
-      industry, content_type, featured_image, author, status, target_customers,
-      geography, content_style, external_url, seo_data
-    ) VALUES (
-      ${id}, ${values.brandId}, ${values.title ?? ""}, ${values.content ?? ""},
-      ${values.excerpt ?? null}, ${values.metaDescription ?? null}, ${keywords},
-      ${values.industry ?? null}, ${values.contentType ?? null}, ${values.featuredImage ?? null},
-      ${values.author ?? null}, ${status}, ${values.targetCustomers ?? null},
-      ${values.geography ?? null}, ${values.contentStyle ?? null}, ${values.externalUrl ?? null},
-      ${values.seoData ?? null}
-    )
+  const values: Array<{ column: string; value: unknown }> = articleInsertColumns
+    .map(([column, property]) => ({
+      column,
+      value: input[property] === undefined ? articleInsertDefaults[property] : input[property],
+    }))
+    .filter((entry) => entry.value !== undefined);
+  values.push({ column: "status", value: status });
+  const inserted = await transaction.execute<{ id: string }>(sql`
+    insert into ${sql.identifier("public")}.${sql.identifier("articles")}
+    (${sql.join(
+      values.map((entry) => sql.identifier(entry.column)),
+      sql`, `,
+    )})
+    values (${sql.join(
+      values.map((entry) => sql`${entry.value}`),
+      sql`, `,
+    )})
+    returning ${articles.id}
   `);
+  const createdId = inserted.rows[0]?.id;
+  if (!createdId) throw new Error("Article insert returned no ID");
   const [created] = await transaction
     .select(contentRequestArticleColumns)
     .from(articles)
-    .where(eq(articles.id, id))
+    .where(eq(articles.id, createdId))
     .limit(1);
   if (!created) throw new Error("Article insert returned no row");
   return created;

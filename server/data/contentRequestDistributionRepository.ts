@@ -41,7 +41,7 @@ export type ContentRequestDistributionCreate = Pick<
 >;
 
 export type ContentRequestDistributionPatch = Partial<
-  Pick<InsertDistribution, "status" | "distributedAt" | "metadata" | "error">
+  Pick<InsertDistribution, "status" | "distributedAt" | "platformPostId" | "metadata" | "error">
 >;
 
 export function createContentRequestDistributionRepository({

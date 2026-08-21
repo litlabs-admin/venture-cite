@@ -514,7 +514,7 @@ export function setupContentRoutes(app: Express): void {
             data: { status: result.status, alreadyTerminal: true },
           });
         }
-        res.json({ success: true, data: { status: "cancelled" } });
+        res.json({ success: true, data: { status: result.status } });
       } catch (error) {
         sendError(res, error, "Failed to cancel job");
       }
@@ -546,7 +546,7 @@ export function setupContentRoutes(app: Express): void {
             data: { status: result.status, alreadyTerminal: true },
           });
         }
-        res.json({ success: true, data: { status: "cancelled" } });
+        res.json({ success: true, data: { status: result.status } });
       } catch (error) {
         sendError(res, error, "Failed to cancel article generation");
       }
