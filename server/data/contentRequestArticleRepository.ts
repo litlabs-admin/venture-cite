@@ -124,7 +124,9 @@ async function insertArticle(
       sql`, `,
     )})
     values (${sql.join(
-      values.map((entry) => sql`${entry.value}`),
+      // Bind every value as a parameter. Direct interpolation expands arrays
+      // into SQL tuples instead of PostgreSQL array parameters.
+      values.map((entry) => sql.param(entry.value)),
       sql`, `,
     )})
     returning ${articles.id}

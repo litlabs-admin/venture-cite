@@ -159,7 +159,9 @@ export function createRequestBrandRepository({
             sql`, `,
           )})
           values (${sql.join(
-            values.map((entry) => sql`${entry.value}`),
+            // Bind every value as a parameter. Direct interpolation expands
+            // array fields into SQL tuples instead of PostgreSQL arrays.
+            values.map((entry) => sql.param(entry.value)),
             sql`, `,
           )})
           returning ${brands.id}

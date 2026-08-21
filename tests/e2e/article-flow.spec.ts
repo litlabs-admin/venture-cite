@@ -147,7 +147,14 @@ test.describe("local article CRUD", () => {
       await dialog.getByRole("button", { name: "Edit", exact: true }).click();
       await dialog.locator("input").fill(editedTitle);
       await dialog.getByTestId("markdown-editor-textarea").fill(editedContent);
+      const saveResponsePromise = page.waitForResponse(
+        (response) =>
+          response.request().method() === "PUT" &&
+          response.url() === `${account.appUrl}/api/articles/${articleId}`,
+      );
       await dialog.getByRole("button", { name: "Save", exact: true }).click();
+      const saveResponse = await saveResponsePromise;
+      expect(saveResponse.status()).toBe(200);
 
       const reloadResponse = await request.get(`${account.appUrl}/api/articles/${articleId}`, {
         headers,
