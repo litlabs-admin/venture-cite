@@ -96,6 +96,10 @@ The local `.env` uses `RESEND_FROM_EMAIL`. The application and preflight require
 The data-backed preview advisor reported leaked-password protection and RLS initialization-plan warnings.
 Review these warnings before production release.
 
+The empty preview migration runner completed on 2026-08-22 with strict TLS and the approved `0093_stripe_owned_trial.sql` baseline. It applied no new migration and left 111 checked rows through `0110_request_brand_soft_delete.sql`.
+
+A local preview-only server then returned HTTP 200 from `/health` and `/`. It used the empty preview, fake generation, disabled email, disabled billing setup, and disabled scheduling. The server was stopped after verification.
+
 ## Provider scope
 
 Generic OpenAI kickoff and content-cost recording use the transactional outbox.
@@ -108,7 +112,7 @@ Provider-wide outbox conversion is not a release gate for this reset wave.
 
 1. Load the approved release values securely.
 2. Configure the verified preview branches with test-provider values.
-3. Deploy and verify a preview without production access.
+3. Deploy and verify a Vercel preview without production access.
 4. Run the read-only production preflight and metadata audit.
 5. Confirm the production backup and restore plan.
 6. Apply migrations through the controlled release command.

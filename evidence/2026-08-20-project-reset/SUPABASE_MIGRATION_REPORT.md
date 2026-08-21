@@ -28,6 +28,14 @@ The preview checks found enabled RLS, protected migration ledgers, and the three
 
 No production write occurred.
 
+## Preview migration and server check
+
+The empty preview migration runner completed on 2026-08-22 through the branch session pooler with strict TLS. It used `0093_stripe_owned_trial.sql` as the approved preview baseline and applied no new migration.
+
+A follow-up query found 111 application migration rows with non-null checksums through `0110_request_brand_soft_delete.sql`.
+
+A local preview-only server connected to the empty branch and returned HTTP 200 from `/health` and `/`. The check used fake generation and disabled email, billing setup, and scheduling. The server was stopped after verification.
+
 ## Migration groups
 
 ### Request roles and row-level security

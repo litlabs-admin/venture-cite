@@ -40,6 +40,10 @@ The preview checks found protected migration ledgers, enabled RLS, and the three
 
 No provider call, email, payment, or production write occurred.
 
+The empty preview migration runner completed with strict TLS and the approved `0093_stripe_owned_trial.sql` baseline. It applied no new migration. A follow-up ledger query found 111 rows with non-null checksums through `0110_request_brand_soft_delete.sql`.
+
+A local preview-only server returned HTTP 200 from `/health` and `/`. It used fake generation and disabled email, billing setup, and scheduling. The server was stopped after verification.
+
 ## Local verification
 
 The latest local PostgreSQL integration run passed 37 of 37 tests.
@@ -105,7 +109,7 @@ The release environment still lacks the runtime role, direct database URL, Strip
 
 The local `.env` uses `RESEND_FROM_EMAIL`. The application and preflight require `RESEND_FROM_ADDRESS`.
 
-The empty migration preview and the separate data-backed preview are created and verified. A deployed preview with test-provider values remains pending.
+The empty migration preview and the separate data-backed preview are created and verified. A Vercel preview with test-provider values remains pending.
 
 The backup and restore procedure, controlled migrations, role dry run, role application, canary, and monitoring remain pending.
 
