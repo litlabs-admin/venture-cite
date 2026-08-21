@@ -24,6 +24,8 @@ Both preview paths contain 112 application migration rows with non-null checksum
 
 The data-backed ownership checks found no orphaned article, brand, or job rows.
 
+The data-backed preview matches production aggregate counts for users, brands, and articles: 46, 45, and 29. This validates the copied storage snapshot for the checked tables. It does not replace a formal backup and restore test.
+
 The preview checks found enabled RLS, protected migration ledgers, and the three restricted request roles.
 
 No production write occurred.

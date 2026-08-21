@@ -98,6 +98,8 @@ The local `.env` uses `RESEND_FROM_EMAIL`. The application and preflight require
 The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Migration 0111 removed the public and authenticated execution grants from `public.handle_new_user()` in both previews.
 Review the Auth setting and RLS warnings before production release.
 
+The data-backed preview matches production aggregate counts for users, brands, and articles: 46, 45, and 29. This is a storage-copy check. It is not the formal production backup and restore proof.
+
 The empty preview migration runner completed on 2026-08-22 with strict TLS and the approved `0093_stripe_owned_trial.sql` baseline. It applied migration 0111 and left 112 checked rows through `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
 
 A local preview-only server then returned HTTP 200 from `/health` and `/`. It used the empty preview, fake generation, disabled email, disabled billing setup, and disabled scheduling. The server was stopped after verification.

@@ -32,6 +32,8 @@ The data-backed branch uses a production snapshot for storage checks. It is ephe
 
 The data-backed branch contains 46 users, 45 brands, and 29 articles.
 
+On 2026-08-22, aggregate counts matched production for users, brands, and articles. The data-backed preview had 46 users, 45 brands, and 29 articles. Production had the same counts. The preview also had the expected additional migration rows.
+
 The preview application ledger contains 112 checked migration rows through `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
 
 The preview checks found no orphaned article, brand, or job ownership rows.
@@ -113,7 +115,7 @@ The local `.env` uses `RESEND_FROM_EMAIL`. The application and preflight require
 
 The empty migration preview and the separate data-backed preview are created and verified. A Vercel preview with test-provider values remains pending.
 
-The backup and restore procedure, controlled migrations, role dry run, role application, canary, and monitoring remain pending.
+The formal backup and restore procedure, controlled migrations, role dry run, role application, canary, and monitoring remain pending. The data-backed branch provides a storage-copy check only.
 
 The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Migration 0111 removed the public and authenticated execution grants from `public.handle_new_user()` in both previews.
 Review the Auth setting and RLS warnings before production release.
