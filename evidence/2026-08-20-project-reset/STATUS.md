@@ -91,6 +91,8 @@ The request-role membership command and release preflight have not run against p
 
 The current Vercel preview shares major production variables. Do not deploy it until it uses isolated Supabase and test-provider values.
 
+The local `.env` uses `RESEND_FROM_EMAIL`. The application and preflight require `RESEND_FROM_ADDRESS`.
+
 The data-backed preview advisor reported leaked-password protection and RLS initialization-plan warnings.
 Review these warnings before production release.
 

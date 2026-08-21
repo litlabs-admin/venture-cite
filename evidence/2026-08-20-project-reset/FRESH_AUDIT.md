@@ -103,6 +103,8 @@ The Supabase CLI is installed and authenticated for the approved project.
 
 The release environment still lacks the runtime role, direct database URL, Stripe catalogue values, Resend sender, and secure HTTPS application URL.
 
+The local `.env` uses `RESEND_FROM_EMAIL`. The application and preflight require `RESEND_FROM_ADDRESS`.
+
 The empty migration preview and the separate data-backed preview are created and verified. A deployed preview with test-provider values remains pending.
 
 The backup and restore procedure, controlled migrations, role dry run, role application, canary, and monitoring remain pending.
