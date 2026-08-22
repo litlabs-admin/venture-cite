@@ -93,7 +93,7 @@ The production Supabase advisor reports one `auth_leaked_password_protection` wa
 
 The request-role membership command and release preflight have not run against production.
 
-The current Vercel preview shares major production variables. Do not deploy it until it uses isolated Supabase and test-provider values.
+An earlier Vercel preview configuration shared major production variables. The current Vercel environment is unverified because no authenticated Vercel session is available. Do not deploy until the preview uses isolated Supabase and test-provider values.
 
 The local `.env` uses `RESEND_FROM_EMAIL`. The application and preflight require `RESEND_FROM_ADDRESS`.
 
