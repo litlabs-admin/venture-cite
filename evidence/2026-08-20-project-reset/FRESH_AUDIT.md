@@ -40,6 +40,8 @@ The preview checks found no orphaned article, brand, or job ownership rows.
 
 The preview checks found protected migration ledgers, enabled RLS, and the three restricted request roles.
 
+The data-backed preview Auth health endpoint returned HTTP 200. An anonymous Data API request for brands returned an empty result because no public read policy exists. The check exposed no copied brand rows.
+
 No provider call, email, payment, or production write occurred.
 
 The empty preview migration runner completed with strict TLS and the approved `0093_stripe_owned_trial.sql` baseline. It applied migration 0111. A follow-up ledger query found 112 rows with non-null checksums through `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
