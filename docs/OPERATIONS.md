@@ -78,7 +78,7 @@ Check structured logs and Sentry after a release.
 
 The migration runner has no down-migration command. Test every migration against a production-like copy before release. Prepare a restore plan before a destructive schema change.
 
-Do not use the current Vercel preview until it has an isolated Supabase database and test provider configuration.
+Do not use a Vercel preview until its Supabase database and provider configuration are verified as isolated from production.
 
 ## Checks
 

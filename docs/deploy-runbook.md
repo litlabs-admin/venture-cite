@@ -4,7 +4,7 @@
 
 Keep production read-only until every pre-release gate passes.
 
-Do not deploy the current Vercel preview with production variables.
+Do not deploy a Vercel preview with production variables. Verify the preview database and provider settings first.
 
 Create an isolated Supabase preview database and test provider configuration first.
 
