@@ -32,6 +32,24 @@ Legacy routes and system workers still require the current application-owner con
 
 The dedicated login stays dormant until those paths use actor-bound repositories or a separate worker connection.
 
+Migration 0112 is a temporary compatibility step for the current application connection.
+
+It adds one self-granted membership row for each restricted role.
+
+Each new row has `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
+
+The existing direct-role admin rows remain `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`.
+
+Revoke this temporary membership option before changing `DATABASE_URL` to `venturecite_runtime`.
+
+Do not treat migration 0112 as the runtime-role cutover.
+
+Migration 0113 changes the evaluation form for 21 request-context RLS policies.
+
+It keeps each policy role, command, access test, and write test unchanged.
+
+After migration 0113, run the Supabase advisors and compare all policy definitions with the release record.
+
 The build and application startup never apply migrations.
 
 Production releases use `public.schema_migrations` as the application migration ledger.

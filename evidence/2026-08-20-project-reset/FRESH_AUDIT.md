@@ -24,13 +24,19 @@ The controlled production release then applied migrations 0094 through 0111.
 
 No production data was deleted.
 
-No provider call, email, payment, Buffer post, push notification, or deployment occurred.
+No provider call, email, payment, Buffer post, or push notification occurred.
+
+Commit `f8acec7` was pushed to `main` and triggered the configured automatic deployment.
+
+Six post-push health checks returned HTTP 200 with `db: true`.
+
+The Render dashboard session was unavailable, so platform deployment status remains unverified.
 
 ## Production database
 
-Production now has 112 checked rows in `public.schema_migrations`.
+Production now has 114 checked rows in `public.schema_migrations`.
 
-The latest migration is `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
+The latest migration is `0113_rls_current_setting_initplan.sql`.
 
 Production has 46 users, 45 brands, and 29 articles.
 
@@ -62,11 +68,35 @@ The live `/health` endpoint returned HTTP 200.
 
 The health response reported `db: true`.
 
-The authenticated read-only canary remains pending.
+The authenticated read-only canary passed for brands, the dashboard, and articles.
 
-The canary must avoid writes, provider calls, email, payment, Buffer, and push actions.
+The brands page returned the six brands owned by the approved canary account.
 
-The production advisor reports one Auth security warning and 21 request-policy performance warnings.
+The dashboard and articles page loaded without browser errors or warnings.
+
+The canary made no write, provider, email, payment, Buffer, or push request.
+
+The production advisor now reports only the Auth leaked-password warning.
+
+Migration 0112 now defines a temporary compatibility grant for the current application connection.
+
+The migration adds one self-granted row for each restricted role.
+
+Each new row has `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
+
+The existing direct-role admin rows remain unchanged.
+
+The new self-grant explicitly sets `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
+
+Migration 0112 is applied in production.
+
+Migration 0113 is applied in production.
+
+All 21 audited policies now use the initialization-plan expression form.
+
+No audited policy uses the old expression form.
+
+Revoke the temporary option before the runtime `DATABASE_URL` cutover.
 
 ## Local verification
 
@@ -74,11 +104,11 @@ The local PostgreSQL integration run passed 37 of 37 tests.
 
 The local browser run passed five of five safe flows with fake generation.
 
-The constrained full test run passed 203 files and 1,556 tests.
+The full test run passed 204 files and 1,561 active tests.
 
 TypeScript, lint, changed-file formatting, migration synchronization, whitespace, and the production build passed.
 
-The full repository format check still reports 220 baseline files outside this release diff.
+The full repository format check still reports 216 baseline files outside this release diff.
 
 ## Current application state
 
@@ -92,12 +122,9 @@ Stripe, Resend, Buffer, and synchronous model routes remain direct by design.
 
 ## Remaining work
 
-1. Run the authenticated canary against safe read paths.
-2. Review live errors after the canary.
-3. Enable leaked-password protection in Supabase Auth.
-4. Plan the request-policy performance fixes as a separate migration.
-5. Resolve owner access for legacy routes and system workers.
-6. Decide and test the runtime role cutover.
-7. Add verified privacy values last.
+1. Enable leaked-password protection in Supabase Auth.
+2. Move legacy routes and system workers from owner access.
+3. Test and perform the runtime role cutover.
+4. Add verified privacy values last.
 
 The privacy legal entity and contact values remain pending.

@@ -3,6 +3,40 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("request RLS migration shape", () => {
+  it("temporarily enables SET for the current application connection only", () => {
+    const migration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0112_transitional_request_role_set_option.sql"),
+      "utf8",
+    );
+    const supabaseMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/20260421000112_0112_transitional_request_role_set_option.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "Revoke this membership option after DATABASE_URL uses venturecite_runtime.",
+    );
+    expect(migration).toContain("AND member_role.rolname = current_user");
+    expect(migration).toContain("WHERE member_role.rolname = role_name");
+    expect(migration).toContain("IF reverse_membership_count <> 0");
+    expect(migration).toContain("is a member of another role");
+    expect(migration).toContain(
+      "EXECUTE format(\n        'GRANT %I TO %I WITH ADMIN FALSE, INHERIT FALSE, SET TRUE',",
+    );
+    expect(migration).not.toMatch(/TO current_user/i);
+    expect(migration).toContain("IF self_grant_count = 0");
+    expect(migration).toContain("safe_self_grant_count <> self_grant_count");
+    expect(migration).toContain("membership_count <> original_admin_count + self_grant_count");
+    expect(migration).not.toContain("WITH INHERIT FALSE, SET TRUE, ADMIN TRUE");
+    expect(migration).not.toMatch(/^\s*REVOKE\b/im);
+    expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
+      migration,
+    );
+  });
+
   it("grants brand reads by explicit column and keeps both migration copies equal", () => {
     const migration = fs.readFileSync(
       path.resolve(process.cwd(), "migrations/0096_request_rls_foundation.sql"),

@@ -94,6 +94,14 @@ Keep the dedicated login dormant until local production-mode startup and authent
 
 Record the applied migration names and checksums in the release record.
 
+For migration 0113, compare all 21 policy roles, commands, access tests, and write tests with the reviewed migration.
+
+Run the Supabase advisors after migration 0113.
+
+Before the runtime-role cutover, revoke each temporary self-grant from migration 0112.
+
+Confirm that no direct-role self-grant remains after the revocation.
+
 The release runner verifies `public.schema_migrations` before it executes pending SQL.
 
 Treat `supabase_migrations.schema_migrations` as a separate ledger for Supabase CLI changes.

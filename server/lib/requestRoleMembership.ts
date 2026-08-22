@@ -22,6 +22,7 @@ type RestrictedRoleAttributes = RoleAttributes & { rolname: string };
 type Membership = {
   role_name: string;
   member_name: string;
+  grantor_name: string;
   inherit_option: boolean;
   set_option: boolean;
   admin_option: boolean;
@@ -124,6 +125,7 @@ function assertAuditedMembership(
   }
 
   const directCounts = new Map<string, number>();
+  const directSelfGrantCounts = new Map<string, number>();
   const runtimeCounts = new Map<string, number>();
   for (const membership of rows) {
     if (!restrictedRoles.includes(membership.role_name as (typeof restrictedRoles)[number])) {
@@ -131,10 +133,20 @@ function assertAuditedMembership(
     }
 
     if (membership.member_name === directRoleName) {
-      if (membership.inherit_option || membership.set_option || !membership.admin_option) {
-        throw new Error("The restricted role membership does not match the release policy");
+      if (membership.grantor_name === directRoleName) {
+        if (membership.inherit_option || !membership.set_option || membership.admin_option) {
+          throw new Error("The restricted role membership does not match the release policy");
+        }
+        directSelfGrantCounts.set(
+          membership.role_name,
+          (directSelfGrantCounts.get(membership.role_name) ?? 0) + 1,
+        );
+      } else {
+        if (membership.inherit_option || membership.set_option || !membership.admin_option) {
+          throw new Error("The restricted role membership does not match the release policy");
+        }
+        directCounts.set(membership.role_name, (directCounts.get(membership.role_name) ?? 0) + 1);
       }
-      directCounts.set(membership.role_name, (directCounts.get(membership.role_name) ?? 0) + 1);
       continue;
     }
 
@@ -151,7 +163,10 @@ function assertAuditedMembership(
 
   if (
     restrictedRoles.some(
-      (roleName) => directCounts.get(roleName) !== 1 || (runtimeCounts.get(roleName) ?? 0) > 1,
+      (roleName) =>
+        directCounts.get(roleName) !== 1 ||
+        (directSelfGrantCounts.get(roleName) ?? 0) > 1 ||
+        (runtimeCounts.get(roleName) ?? 0) > 1,
     )
   ) {
     throw new Error("The restricted role membership does not match the release policy");
@@ -165,7 +180,8 @@ function assertExactMembership(
 ): void {
   assertAuditedMembership(rows, runtimeRoleName, directRoleName);
   if (
-    rows.length !== restrictedRoles.length * 2 ||
+    rows.length < restrictedRoles.length * 2 ||
+    rows.length > restrictedRoles.length * 3 ||
     restrictedRoles.some(
       (roleName) =>
         rows.some(
@@ -283,10 +299,11 @@ async function verifyMembership({
   directRoleName: string;
 }): Promise<void> {
   const memberships = await direct.query<Membership>(
-    `SELECT granted.rolname AS role_name, member.rolname AS member_name, membership.inherit_option, membership.set_option, membership.admin_option
+    `SELECT granted.rolname AS role_name, member.rolname AS member_name, grantor.rolname AS grantor_name, membership.inherit_option, membership.set_option, membership.admin_option
      FROM pg_auth_members AS membership
      JOIN pg_roles AS granted ON granted.oid = membership.roleid
      JOIN pg_roles AS member ON member.oid = membership.member
+     JOIN pg_roles AS grantor ON grantor.oid = membership.grantor
      WHERE granted.rolname = ANY($1) OR member.rolname = ANY($1) OR member.rolname = $2
      ORDER BY granted.rolname, member.rolname`,
     [restrictedRoles, runtimeRoleName],
@@ -304,10 +321,11 @@ async function auditMembership({
   directRoleName: string;
 }): Promise<void> {
   const memberships = await direct.query<Membership>(
-    `SELECT granted.rolname AS role_name, member.rolname AS member_name, membership.inherit_option, membership.set_option, membership.admin_option
+    `SELECT granted.rolname AS role_name, member.rolname AS member_name, grantor.rolname AS grantor_name, membership.inherit_option, membership.set_option, membership.admin_option
      FROM pg_auth_members AS membership
      JOIN pg_roles AS granted ON granted.oid = membership.roleid
-      JOIN pg_roles AS member ON member.oid = membership.member
+     JOIN pg_roles AS member ON member.oid = membership.member
+     JOIN pg_roles AS grantor ON grantor.oid = membership.grantor
      WHERE granted.rolname = ANY($1) OR member.rolname = ANY($1) OR member.rolname = $2
      ORDER BY granted.rolname, member.rolname`,
     [restrictedRoles, runtimeRoleName],

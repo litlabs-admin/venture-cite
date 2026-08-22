@@ -95,9 +95,11 @@ The cleanup code removes stale test grants without removing the required creator
 
 The local browser run also passed five of five product flows against local Supabase.
 
-The latest full test run passed 203 files and 1,551 tests.
+The latest full test run passed 204 files and 1,561 active tests.
 
-TypeScript, ESLint, Prettier, migration sync, whitespace validation, and the production build passed.
+TypeScript, ESLint, changed-file Prettier, migration sync, whitespace validation, and the production build passed.
+
+The full repository Prettier check still reports 216 baseline files.
 
 ## Production state
 

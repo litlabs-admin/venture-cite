@@ -11,6 +11,7 @@ type Query = { text: string; values?: readonly unknown[] };
 type AuditedMembership = {
   role_name: string;
   member_name: string;
+  grantor_name?: string;
   inherit_option: boolean;
   set_option: boolean;
   admin_option: boolean;
@@ -41,9 +42,18 @@ const safeRestrictedRoles = [
 const creatorMemberships = safeRestrictedRoles.map(({ rolname }) => ({
   role_name: rolname,
   member_name: "postgres",
+  grantor_name: "supabase_admin",
   inherit_option: false,
   set_option: false,
   admin_option: true,
+}));
+const safeSelfMemberships = safeRestrictedRoles.map(({ rolname }) => ({
+  role_name: rolname,
+  member_name: "postgres",
+  grantor_name: "postgres",
+  inherit_option: false,
+  set_option: true,
+  admin_option: false,
 }));
 
 function createClient(rows: unknown[][]): RequestRoleMembershipClient & { queries: Query[] } {
@@ -69,10 +79,20 @@ function createClient(rows: unknown[][]): RequestRoleMembershipClient & { querie
           ] as T[],
         };
       }
+      const responseRows =
+        text.startsWith("SELECT") || text.startsWith("SHOW") ? (rows.shift() ?? []) : [];
+      const normalizedRows = text.includes("FROM pg_auth_members")
+        ? responseRows.map((row) => ({
+            ...(row as Record<string, unknown>),
+            grantor_name:
+              (row as Record<string, unknown>).grantor_name ??
+              ((row as Record<string, unknown>).member_name === "postgres"
+                ? "supabase_admin"
+                : "postgres"),
+          }))
+        : responseRows;
       return {
-        rows: (text.startsWith("SELECT") || text.startsWith("SHOW")
-          ? (rows.shift() ?? [])
-          : []) as T[],
+        rows: normalizedRows as T[],
       };
     },
   };
@@ -135,6 +155,7 @@ describe("request role membership", () => {
       creatorMemberships,
       [
         ...creatorMemberships,
+        ...safeSelfMemberships,
         {
           role_name: "venturecite_request",
           member_name: "venturecite_runtime",
@@ -209,6 +230,7 @@ describe("request role membership", () => {
       safeRestrictedRoles,
       [
         ...creatorMemberships,
+        ...safeSelfMemberships,
         {
           role_name: "unexpected_role",
           member_name: "venturecite_runtime",
@@ -226,6 +248,49 @@ describe("request role membership", () => {
         direct: unsafeDirect,
       }),
     ).rejects.toThrow("The runtime role has an unexpected membership");
+  });
+
+  it("accepts one safe direct self-grant in a dry-run audit", async () => {
+    const runtime = createClient([[{ current_user: "venturecite_runtime" }]]);
+    const direct = createClient([
+      [{ server_version_num: "170000" }],
+      [safeDirectRole],
+      [safeRuntimeRole],
+      safeRestrictedRoles,
+      [...creatorMemberships, ...safeSelfMemberships],
+    ]);
+
+    await expect(
+      runRequestRoleMembership({
+        mode: "dry-run",
+        runtimeRoleName: "venturecite_runtime",
+        runtime,
+        direct,
+      }),
+    ).resolves.toEqual({ mode: "dry-run", changed: false });
+  });
+
+  it("rejects duplicate direct self-grants", async () => {
+    const duplicateSelfGrant = {
+      ...safeSelfMemberships[0],
+      grantor_name: "postgres",
+    };
+    const direct = createClient([
+      [{ server_version_num: "170000" }],
+      [safeDirectRole],
+      [safeRuntimeRole],
+      safeRestrictedRoles,
+      [...creatorMemberships, ...safeSelfMemberships, duplicateSelfGrant],
+    ]);
+
+    await expect(
+      runRequestRoleMembership({
+        mode: "dry-run",
+        runtimeRoleName: "venturecite_runtime",
+        runtime: createClient([[{ current_user: "venturecite_runtime" }]]),
+        direct,
+      }),
+    ).rejects.toThrow("The restricted role membership does not match the release policy");
   });
 
   it("rejects a restricted role granted to any runtime other than the configured runtime", async () => {

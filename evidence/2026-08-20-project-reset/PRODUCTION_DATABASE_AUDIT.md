@@ -36,9 +36,9 @@ The release used one transaction per migration and a PostgreSQL advisory lock.
 
 The release completed without a migration error.
 
-Production now has 112 checked application-ledger rows.
+Production now has 114 checked application-ledger rows.
 
-The latest application migration is `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
+The latest application migration is `0113_rls_current_setting_initplan.sql`.
 
 Production has 46 users, 45 brands, and 29 articles.
 
@@ -72,11 +72,29 @@ The live `/health` endpoint returned HTTP 200.
 
 The health response reported `db: true`.
 
-An authenticated application canary remains pending.
+The authenticated application canary passed for brands, the dashboard, and articles.
 
 The post-release advisor reports one disabled leaked-password protection warning.
 
-It also reports 21 request-policy initialization warnings.
+It reports no database performance warning.
+
+Migration 0112 defines a temporary compatibility grant for the current application connection.
+
+The migration adds one self-granted row for each restricted role.
+
+Each new row has `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
+
+The existing direct-role admin rows remain unchanged.
+
+The new self-grant explicitly sets `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
+
+Migration 0112 is applied in production.
+
+Migration 0113 is applied in production.
+
+All 21 audited policies use the initialization-plan expression form.
+
+Revoke the temporary option before changing `DATABASE_URL` to `venturecite_runtime`.
 
 ## Safety result
 
@@ -90,16 +108,17 @@ No payment was created or captured.
 
 No Buffer post or push notification occurred.
 
-No deployment occurred.
+Commit `f8acec7` was pushed to `main` and triggered the configured automatic deployment.
+
+Six post-push health checks returned HTTP 200 with `db: true`.
+
+The Render dashboard session was unavailable, so platform deployment status remains unverified.
 
 The privacy legal entity and contact values remain pending.
 
 ## Remaining release gates
 
-1. Run the authenticated canary against safe read paths.
-2. Review the canary and production error logs.
-3. Enable leaked-password protection in the Supabase Auth settings.
-4. Plan the 21 request-policy performance changes as a separate migration.
-5. Decide whether legacy routes and workers can use restricted access.
-6. Configure the runtime login only after that review.
-7. Add verified privacy values last.
+1. Enable leaked-password protection in the Supabase Auth settings.
+2. Move legacy routes and workers from owner access.
+3. Configure the runtime login only after that work.
+4. Add verified privacy values last.
