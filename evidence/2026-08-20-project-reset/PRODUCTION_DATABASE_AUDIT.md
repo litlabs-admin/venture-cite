@@ -2,65 +2,104 @@
 
 ## Scope
 
-The audit ran on 2026-08-20 through the configured production `DATABASE_URL`.
+The audit ran against the VentureCite production Supabase project.
 
-The supplied Supabase CA verified the TLS connection.
+The release used the approved CA certificate and strict TLS verification.
 
-The audit used one read-only transaction and a five-second statement timeout.
+Read-only checks did not return user rows, brand rows, identifiers, emails, or secret values.
 
-The audit ended with `ROLLBACK`.
+The release created fresh logical backups before applying migrations.
 
-It returned catalog facts and aggregate ownership counts only.
+## Backup and restore proof
 
-It did not return user rows, brand rows, identifiers, emails, role names, URLs, or secret values.
+The release created fresh schema, role, full-data, Auth-data, and public-data backups.
 
-## Current metadata recheck
+The release recorded SHA-256 hashes for the backup files in the secure backup directory.
 
-On 2026-08-22, the direct-session audit was attempted with the supplied CA certificate. This workstation could not open the direct database host, so the script stopped before any query.
+The release restored the production schema and public data into an isolated PostgreSQL container.
 
-The authenticated Supabase Management API then ran SELECT-only metadata queries. It confirmed 62 public relations, 62 relations with RLS, zero policies on `users` and `brands`, and no `venturecite_request` role.
+The isolated restore preserved 46 users, 45 brands, 29 articles, and zero brand-owner orphans.
 
-The production application ledger currently has 94 rows through `0093_stripe_owned_trial.sql`. All 94 rows have no checksum. Migrations `0094` through `0111` remain absent.
+The isolated restore applied migrations 0094 through 0111 successfully.
 
-The current login is `postgres`. It can bypass RLS, create roles, create databases, and holds nine granted roles. The only public function is `handle_new_user()`. It is security definer, sets `search_path=public`, and grants execution only to `postgres` and `service_role`.
+The isolated restore ended with 112 application migration rows and three restricted roles.
 
-These Management API checks did not write data. The direct-session audit, backup proof, and release preflight remain required gates.
+The restore made no provider calls, emails, payments, Buffer posts, push notifications, or deployment.
 
-The production Supabase advisor reports one `auth_leaked_password_protection` warning. This Auth setting remains a release gate.
+## Controlled production release
 
-## Results
+The controlled release applied migrations 0094 through 0111 to production.
 
-- The public schema has 62 relations.
-- All 62 relations have RLS enabled.
-- No relation forces RLS.
-- All 62 relations have an owner that can bypass RLS.
-- The runtime login can bypass RLS.
-- The runtime login can create roles and databases.
-- `users` has RLS enabled and zero policies.
-- `brands` has RLS enabled and zero policies.
-- The public schema has no PUBLIC table or column grants.
-- The `venturecite_request` role does not exist in production.
-- No brand has a missing owner.
-- No brand refers to an unknown user.
+The release used the application ledger in `public.schema_migrations`.
 
-## Decision
+The release used one transaction per migration and a PostgreSQL advisory lock.
 
-This decision records the production state before the current branch added migration 0110 and the brand request-route cutover.
+The release completed without a migration error.
 
-Do not activate request repositories in production under the current deployment.
+Production now has 112 checked application-ledger rows.
 
-Complete the local route cutover and cross-user tests first.
+The latest application migration is `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
 
-Apply migrations through a controlled release only after the final review.
+Production has 46 users, 45 brands, and 29 articles.
 
-Keep worker and administrator access separate from request repositories.
+No brand has a missing owner.
 
-Create a least-privileged runtime login before the last production rollout.
+Production has three restricted roles.
 
-## Open item
+The restricted roles have no unsafe owner or database creation privileges.
 
-`DATABASE_DIRECT_URL` is absent from the secure local environment source.
+## Runtime login
 
-The direct-connection audit cannot run until the release environment provides that value and the release host can reach the direct database endpoint.
+The release created the `venturecite_runtime` login.
 
-Do not copy a database URL into a command, report, or Git file.
+The role membership dry run passed.
+
+The role membership apply command passed.
+
+The post-apply membership audit passed.
+
+A production-mode local boot showed that this login cannot replace the current owner connection yet.
+
+Legacy routes and system workers still need owner access.
+
+The deployment did not switch to `venturecite_runtime`.
+
+The current evidence does not claim a runtime cutover.
+
+## Live health check
+
+The live `/health` endpoint returned HTTP 200.
+
+The health response reported `db: true`.
+
+An authenticated application canary remains pending.
+
+The post-release advisor reports one disabled leaked-password protection warning.
+
+It also reports 21 request-policy initialization warnings.
+
+## Safety result
+
+No production data was deleted.
+
+No production provider call occurred.
+
+No email was sent.
+
+No payment was created or captured.
+
+No Buffer post or push notification occurred.
+
+No deployment occurred.
+
+The privacy legal entity and contact values remain pending.
+
+## Remaining release gates
+
+1. Run the authenticated canary against safe read paths.
+2. Review the canary and production error logs.
+3. Enable leaked-password protection in the Supabase Auth settings.
+4. Plan the 21 request-policy performance changes as a separate migration.
+5. Decide whether legacy routes and workers can use restricted access.
+6. Configure the runtime login only after that review.
+7. Add verified privacy values last.

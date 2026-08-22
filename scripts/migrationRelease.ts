@@ -1,4 +1,5 @@
 import {
+  runMigrationBootstrapPreflight,
   runReleaseEnvironmentPreflight,
   type PreflightEnvironment,
 } from "./releaseEnvironmentPreflight";
@@ -7,6 +8,19 @@ const PRODUCTION_CONFIRMATION = "venturecite-production";
 
 export function isReleaseMigrationCommand(argumentsList: readonly string[]): boolean {
   return argumentsList.includes("--release");
+}
+
+export function isBootstrapMigrationCommand(argumentsList: readonly string[]): boolean {
+  return argumentsList.includes("--bootstrap");
+}
+
+export function migrationLedgerModeForCommand(options: {
+  nodeEnv: string | undefined;
+  isReleaseCommand: boolean;
+}): "application-only" | "reconcile-supabase" {
+  return options.nodeEnv === "production" && options.isReleaseCommand
+    ? "application-only"
+    : "reconcile-supabase";
 }
 
 export function assertReleaseMigrationConfirmation(options: {
@@ -29,8 +43,11 @@ export function assertReleaseMigrationConfirmation(options: {
 
 export function assertProductionMigrationEnvironment(
   environment: PreflightEnvironment = process.env,
+  bootstrap = false,
 ): void {
-  const report = runReleaseEnvironmentPreflight(environment);
+  const report = bootstrap
+    ? runMigrationBootstrapPreflight(environment)
+    : runReleaseEnvironmentPreflight(environment);
   if (report.passed) return;
 
   const failedChecks = report.checks
@@ -43,11 +60,18 @@ export function assertProductionMigrationEnvironment(
 export function assertProductionMigrationReady(options: {
   nodeEnv: string | undefined;
   isReleaseCommand: boolean;
+  isBootstrapCommand?: boolean;
   confirmation: string | undefined;
   environment?: PreflightEnvironment;
 }): void {
+  if (options.isBootstrapCommand && options.nodeEnv !== "production") {
+    throw new Error("Migration bootstrap requires NODE_ENV=production.");
+  }
   assertReleaseMigrationConfirmation(options);
   if (options.nodeEnv === "production") {
-    assertProductionMigrationEnvironment(options.environment ?? process.env);
+    assertProductionMigrationEnvironment(
+      options.environment ?? process.env,
+      options.isBootstrapCommand ?? false,
+    );
   }
 }

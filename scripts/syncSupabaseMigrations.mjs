@@ -18,6 +18,13 @@ function hash(text) {
   return createHash("sha256").update(text, "utf8").digest("hex");
 }
 
+function comparisonHash(text) {
+  const normalizedText = text
+    .replace(/\r\n?/g, "\n")
+    .replace(/^-- SHA256: [0-9a-f]{64}$/m, "-- SHA256: <platform-neutral>");
+  return hash(normalizedText);
+}
+
 function fail(message) {
   throw new Error(`Supabase migration sync: ${message}`);
 }
@@ -79,9 +86,11 @@ function generateBaselineSql(tempDirectory) {
 
 async function ensureFile(destination, contents) {
   if (existsSync(destination)) {
-    const existingHash = hash(await readFile(destination, "utf8"));
-    if (existingHash !== hash(contents))
+    const existingHash = comparisonHash(await readFile(destination, "utf8"));
+    const expectedHash = comparisonHash(contents);
+    if (existingHash !== expectedHash) {
       fail(`immutable file differs: ${path.relative(repositoryRoot, destination)}`);
+    }
     return;
   }
   if (checkOnly) fail(`missing file: ${path.relative(repositoryRoot, destination)}`);

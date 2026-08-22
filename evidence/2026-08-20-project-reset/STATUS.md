@@ -4,133 +4,84 @@ Date: 2026-08-22
 
 ## Scope and safety
 
-This report uses current source, tests, command output, Git state, and read-only production metadata.
+This report uses current source, test output, Git state, and verified production checks.
 
-Production remains unchanged. No production migration, provider call, email, payment, preview deployment, or release occurred.
+The production backup completed before the migration release.
 
-The local Supabase stack completed final verification and is stopped. Its local backup remains available for restart.
+The isolated restore proved that migrations 0094 through 0111 preserve current application rows.
 
-The public privacy page still has deferred legal entity and privacy contact placeholders.
+The controlled production release completed without data loss.
+
+No provider call, email, payment, Buffer post, push notification, or deployment occurred.
+
+The local Supabase stack and its Docker containers are stopped.
+
+The privacy page still has deferred legal entity and contact placeholders.
 
 ## Implemented work
 
-Migrations 0096 through 0111 define the restricted request roles, transactional outbox, provider kickoff, content commands, provider state, quota-period handling, request-scoped brand soft delete, and auth-trigger access control.
+Migrations 0094 through 0111 now run in production.
 
-Every root migration has a synchronized Supabase migration copy.
+The production application ledger has 112 checked rows.
 
-Actor-bound repositories now handle these request paths:
+Actor-bound repositories handle user profiles, brands, articles, revisions, distributions, keywords, and content jobs.
 
-- User profile reads and updates
-- Brand list, get, and update
-- Article and revision reads and writes
-- Distribution and keyword reads and writes
-- Content generation enqueue, advance, cancel, and state reads
+Brand creation and website import use an atomic brand quota check.
 
-Brand creation and website import now use the actor-bound request repository with an atomic brand quota check.
+Deletion checks enforce ownership before soft-delete scheduling.
 
-Deletion ownership checks and soft-delete scheduling now use the actor-bound request repository. Deletion preview counts still use owner-side aggregate reads after the ownership check.
-
-The request repositories do not expose a raw transaction. Each method opens one restricted transaction and closes it before return.
-
-The content-cost command now enters the outbox inside the content completion transaction. The drain records one `api_costs` row per idempotency key.
-
-The generic `llm_jobs` flow also uses the transactional outbox for provider kickoff.
-
-Stripe, Resend, Buffer, and synchronous language-model routes keep their existing contracts. They do not use the outbox.
-
-## Verified local results
-
-The latest local PostgreSQL integration run passed 37 of 37 tests.
-
-It covered request-role isolation, content-role isolation, outbox behavior, and content-cost idempotency.
-
-The database-backed content-cost test called `recordSpend` twice with one key. PostgreSQL stored one `api_costs` row.
-
-The local browser run passed five of five flows in 1 minute:
-
-- Article create and edit
-- Content generation success with the fake provider
-- Content generation cancellation with the fake provider
-- Distribution create, update, and reload
-- Brand deletion safety
-
-The final browser run made no live OpenAI call. Local fake mode disables live OpenAI access.
-
-The full test run passed 203 files and 1,551 tests with two workers.
-
-The default worker pool had two startup timeouts. The constrained rerun had no test errors.
-
-Nineteen files and 89 tests skipped under their configured conditions.
-
-These final checks passed:
-
-- TypeScript and tour-target verification
-- ESLint with zero errors
-- Prettier
-- Supabase migration synchronization
-- Git whitespace validation
-- The production build with Sentry upload disabled
-
-Development now rejects remote Supabase and provider settings before startup. Non-production email delivery is disabled unless explicitly enabled.
-
-The combined review found four release issues. The final worktree fixes each issue:
-
-- Migration 0107 preserves the immutable migration 0104 checksum.
-- Migrations 0108 through 0111 are synchronized with their root migration files.
-- Local E2E grants use the local administrator and revoke only their own grants.
-- The local Playwright project forces the fixed loopback Supabase API and explicit local keys.
-- Fake-provider mode blocks the article-improvement OpenAI call.
-
-## Production release state
-
-The production metadata audit used strict Transport Layer Security (TLS) and one read-only transaction.
-
-The audit ended with `ROLLBACK`. It did not read application rows.
-
-The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0111` remain absent. No production migration ran.
-
-The direct-session audit could not connect from this workstation. The release environment still needs `DATABASE_DIRECT_URL` and a network path to the direct database endpoint.
-
-The production Supabase advisor reports one `auth_leaked_password_protection` warning. The Auth dashboard must enable leaked-password protection before release.
-
-The request-role membership command and release preflight have not run against production.
-
-An earlier Vercel preview configuration shared major production variables. The current Vercel environment is unverified because no authenticated Vercel session is available. Do not deploy until the preview uses isolated Supabase and test-provider values.
-
-The local `.env` uses `RESEND_FROM_EMAIL`. The application and preflight require `RESEND_FROM_ADDRESS`.
-
-The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Production also reports one leaked-password protection warning. Migration 0111 removed the public and authenticated execution grants from `public.handle_new_user()` in both previews.
-Review the Auth setting and RLS warnings before production release.
-
-The data-backed preview matches production aggregate counts for users, brands, and articles: 46, 45, and 29. This is a storage-copy check. It is not the formal production backup and restore proof.
-
-The empty preview migration runner completed on 2026-08-22 with strict TLS and the approved `0093_stripe_owned_trial.sql` baseline. It applied migration 0111 and left 112 checked rows through `0111_revoke_handle_new_user_execute_after_function_replace.sql`.
-
-A local preview-only server then returned HTTP 200 from `/health` and `/`. It used the empty preview, fake generation, disabled email, disabled billing setup, and disabled scheduling. The server was stopped after verification.
-
-The final browser suite used the local loopback Supabase database. It did not use the production database because the flows create and delete test data.
-
-The local Supabase stack and Docker Desktop are stopped after verification.
-
-## Provider scope
+Restricted transactions do not cross request boundaries.
 
 Generic OpenAI kickoff and content-cost recording use the transactional outbox.
 
-Stripe, Resend, Buffer, and synchronous language-model routes remain direct by design.
+Stripe, Resend, Buffer, and synchronous model routes keep their existing direct contracts.
 
-Provider-wide outbox conversion is not a release gate for this reset wave.
+## Verified local results
 
-## Deferred production release gates
+The local PostgreSQL integration run passed 37 of 37 tests.
 
-1. Load the approved release values securely.
-2. Configure the verified preview branches with test-provider values.
-3. Run the read-only production preflight and direct-session metadata audit.
-4. Confirm the production backup and restore plan.
-5. Apply migrations through the controlled release command.
-6. Configure the restricted role memberships through the confirmed command.
-7. Run the production canary and monitor errors.
-8. Add the verified privacy values and review the rendered page last.
+The local browser run passed five of five safe flows with fake generation.
 
-Vercel deployment, live Stripe, Resend, and Buffer checks are outside this release wave.
+The constrained full test run passed 203 files and 1,556 tests.
 
-Production stays read-only until every pre-release gate passes.
+The checks passed for TypeScript, lint, changed-file formatting, migration synchronization, whitespace, and the production build.
+
+The full repository format check still reports 220 baseline files outside this release diff.
+
+The local browser run did not call OpenAI or other live providers.
+
+## Verified production results
+
+Production has 46 users, 45 brands, and 29 articles.
+
+Production has zero brand-owner orphans.
+
+Production has 112 checked application migration rows through migration 0111.
+
+Production has three restricted roles.
+
+The `venturecite_runtime` login exists.
+
+The membership dry run, apply command, and post-apply audit passed.
+
+A production-mode local boot showed that the runtime login cannot replace the current owner connection yet.
+
+Legacy routes and system workers still need owner access.
+
+The live `/health` endpoint returned HTTP 200 with `db: true`.
+
+The authenticated read-only canary remains pending.
+
+The production advisor reports one Auth security warning and 21 request-policy performance warnings.
+
+## Remaining work
+
+1. Run the authenticated canary against safe read paths.
+2. Review live errors after the canary.
+3. Enable leaked-password protection in Supabase Auth.
+4. Plan the request-policy performance fixes as a separate migration.
+5. Resolve owner access for legacy routes and system workers.
+6. Decide and test the runtime role cutover.
+7. Add verified privacy values last.
+
+The privacy values require user-provided legal entity and contact details.

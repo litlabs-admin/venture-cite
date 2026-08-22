@@ -1,9 +1,15 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { rootCertificates } from "node:tls";
 import { describe, expect, it } from "vitest";
 import {
   assertProductionMigrationEnvironment,
   assertProductionMigrationReady,
   assertReleaseMigrationConfirmation,
+  isBootstrapMigrationCommand,
   isReleaseMigrationCommand,
+  migrationLedgerModeForCommand,
 } from "../../scripts/migrationRelease";
 
 describe("migration release confirmation", () => {
@@ -52,7 +58,72 @@ describe("migration release confirmation", () => {
     expect(isReleaseMigrationCommand(["node", "scripts/migrate.ts"])).toBe(false);
   });
 
-  it("requires the full release preflight, including a non-pooler direct URL", () => {
+  it("detects the bootstrap argument", () => {
+    expect(isBootstrapMigrationCommand(["node", "scripts/migrate.ts", "--bootstrap"])).toBe(true);
+    expect(isBootstrapMigrationCommand(["node", "scripts/migrate.ts"])).toBe(false);
+  });
+
+  it("rejects bootstrap outside production", () => {
+    expect(() =>
+      assertProductionMigrationReady({
+        nodeEnv: "development",
+        isReleaseCommand: true,
+        isBootstrapCommand: true,
+        confirmation: "venturecite-production",
+        environment: {},
+      }),
+    ).toThrow("NODE_ENV=production");
+  });
+
+  it("uses the application ledger for every production release", () => {
+    expect(migrationLedgerModeForCommand({ nodeEnv: "production", isReleaseCommand: true })).toBe(
+      "application-only",
+    );
+    expect(migrationLedgerModeForCommand({ nodeEnv: "development", isReleaseCommand: false })).toBe(
+      "reconcile-supabase",
+    );
+  });
+
+  it("allows a confirmed bootstrap with strict TLS and a session pooler", () => {
+    const directory = mkdtempSync(join(tmpdir(), "venturecite-migration-bootstrap-"));
+    const certificatePath = join(directory, "certificate.pem");
+    writeFileSync(certificatePath, rootCertificates[0]);
+    try {
+      expect(() =>
+        assertProductionMigrationReady({
+          nodeEnv: "production",
+          isReleaseCommand: true,
+          isBootstrapCommand: true,
+          confirmation: "venturecite-production",
+          environment: {
+            DATABASE_CA_CERT_PATH: certificatePath,
+            DATABASE_DIRECT_URL:
+              "postgresql://postgres:secret@aws-0-region.pooler.supabase.com:5432/postgres",
+          },
+        }),
+      ).not.toThrow();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a transaction pooler during bootstrap", () => {
+    expect(() =>
+      assertProductionMigrationReady({
+        nodeEnv: "production",
+        isReleaseCommand: true,
+        isBootstrapCommand: true,
+        confirmation: "venturecite-production",
+        environment: {
+          DATABASE_CA_CERT_PATH: "missing-certificate",
+          DATABASE_DIRECT_URL:
+            "postgresql://postgres:secret@aws-0-region.pooler.supabase.com:6543/postgres",
+        },
+      }),
+    ).toThrow("DATABASE_DIRECT_URL");
+  });
+
+  it("requires the full release preflight, including an approved direct session URL", () => {
     expect(() => assertProductionMigrationEnvironment({})).toThrow("DATABASE_DIRECT_URL");
     expect(() =>
       assertProductionMigrationEnvironment({

@@ -10,12 +10,20 @@
 // prefer DATABASE_DIRECT_URL when set. Local dev keeps the single
 // DATABASE_URL.
 
-import { assertProductionMigrationReady, isReleaseMigrationCommand } from "./migrationRelease";
+import {
+  assertProductionMigrationReady,
+  isBootstrapMigrationCommand,
+  isReleaseMigrationCommand,
+  migrationLedgerModeForCommand,
+} from "./migrationRelease";
 
 async function main(): Promise<void> {
+  const isBootstrapCommand = isBootstrapMigrationCommand(process.argv);
+  const isReleaseCommand = isReleaseMigrationCommand(process.argv);
   assertProductionMigrationReady({
     nodeEnv: process.env.NODE_ENV,
-    isReleaseCommand: isReleaseMigrationCommand(process.argv),
+    isReleaseCommand,
+    isBootstrapCommand,
     confirmation: process.env.CONFIRM_PRODUCTION_MIGRATIONS,
     environment: process.env,
   });
@@ -35,7 +43,12 @@ async function main(): Promise<void> {
   const { pool } = await import("../server/db");
 
   try {
-    await applyMigrations();
+    await applyMigrations({
+      ledgerMode: migrationLedgerModeForCommand({
+        nodeEnv: process.env.NODE_ENV,
+        isReleaseCommand,
+      }),
+    });
     logger.info("migrate: complete");
   } catch (err) {
     logger.error({ err }, "migrate: failed");

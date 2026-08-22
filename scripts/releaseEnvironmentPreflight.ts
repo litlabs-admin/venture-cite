@@ -56,11 +56,12 @@ function postgresUrlClass(value: string | undefined): { formatClass: string; pas
     }
     const hostName = url.hostname.toLowerCase();
     const isPoolerHost = /(^|[.-])(pooler|pgbouncer|supavisor)([.-]|$)/.test(hostName);
-    if (["6432", "6543"].includes(url.port) || isPoolerHost) {
+    if (["6432", "6543"].includes(url.port) || (isPoolerHost && url.port !== "5432")) {
       return { formatClass: "transaction-pooler-url", passed: false };
     }
-    return hasTlsParameter
-      ? { formatClass: "tls-query-parameter", passed: false }
+    if (hasTlsParameter) return { formatClass: "tls-query-parameter", passed: false };
+    return isPoolerHost
+      ? { formatClass: "session-pooler-url", passed: true }
       : { formatClass: "postgres-url", passed: true };
   } catch {
     return { formatClass: "invalid", passed: false };
@@ -252,6 +253,25 @@ export function runReleaseEnvironmentPreflight(
   const appUrl = valueOf(environment, "APP_URL");
   add("APP_URL", appUrl, appOriginClass(appUrl));
   return { passed: checks.every((entry) => entry.passed), checks };
+}
+
+export function runMigrationBootstrapPreflight(
+  environment: PreflightEnvironment = process.env,
+): ReleaseEnvironmentPreflight {
+  const databaseCa = valueOf(environment, "DATABASE_CA_CERT_PATH");
+  const directUrl = valueOf(environment, "DATABASE_DIRECT_URL");
+  const databaseCaResult = certificateClass(databaseCa);
+  const directUrlResult = postgresUrlClass(directUrl);
+  const checks = [
+    check(
+      "DATABASE_CA_CERT_PATH",
+      databaseCa,
+      databaseCaResult.formatClass,
+      databaseCaResult.passed,
+    ),
+    check("DATABASE_DIRECT_URL", directUrl, directUrlResult.formatClass, directUrlResult.passed),
+  ];
+  return { passed: checks.every((item) => item.passed), checks };
 }
 
 function main(): void {

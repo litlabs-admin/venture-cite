@@ -30,6 +30,8 @@ type ApplicationMigrationLedgerRow = {
   checksum: string | null;
 };
 
+export type MigrationLedgerMode = "reconcile-supabase" | "application-only";
+
 async function seedCustomOrmPreviewLedger(
   lockClient: PoolClient,
   migrationFiles: readonly MigrationFile[],
@@ -138,7 +140,11 @@ async function reconcileSupabaseMigrationLedger(
   );
 }
 
-export async function applyMigrations(): Promise<void> {
+export async function applyMigrations(
+  options: {
+    ledgerMode?: MigrationLedgerMode;
+  } = {},
+): Promise<void> {
   const dir = path.resolve(process.cwd(), "migrations");
   let files: string[];
   try {
@@ -194,8 +200,12 @@ export async function applyMigrations(): Promise<void> {
       logger.warn(
         "applyMigrations: skipping Supabase platform ledger reconciliation for the approved preview branch",
       );
-    } else {
+    } else if (options.ledgerMode !== "application-only") {
       await reconcileSupabaseMigrationLedger(lockClient, migrationFiles);
+    } else {
+      logger.warn(
+        "applyMigrations: using the application ledger for a controlled production release",
+      );
     }
 
     const applied = await lockClient.query<{ filename: string; checksum: string | null }>(

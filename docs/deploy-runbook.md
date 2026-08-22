@@ -88,11 +88,17 @@ Run `npm run db:configure-request-roles` in dry-run mode.
 
 Apply the role memberships only after the dry run passes.
 
+Do not cut over `DATABASE_URL` while legacy routes or system workers still use the application-owner connection.
+
+Keep the dedicated login dormant until local production-mode startup and authenticated route canaries pass.
+
 Record the applied migration names and checksums in the release record.
 
-The release runner reconciles matching Supabase migration rows before it executes SQL.
+The release runner verifies `public.schema_migrations` before it executes pending SQL.
 
-Stop the release if the Supabase ledger is missing a root file or has a checksum mismatch.
+Treat `supabase_migrations.schema_migrations` as a separate ledger for Supabase CLI changes.
+
+Use `npm run db:migrate:bootstrap` only when the dedicated runtime role does not exist.
 
 ## Deployment gates
 

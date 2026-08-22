@@ -26,13 +26,21 @@ The command verifies the runtime connection and role attributes before it change
 
 The command configures the request, content-request, and outbox-worker roles.
 
+Do not replace the production `DATABASE_URL` with the dedicated runtime login yet.
+
+Legacy routes and system workers still require the current application-owner connection.
+
+The dedicated login stays dormant until those paths use actor-bound repositories or a separate worker connection.
+
 The build and application startup never apply migrations.
 
-On Supabase, the release runner first compares the root migration files with `supabase_migrations.schema_migrations`.
+Production releases use `public.schema_migrations` as the application migration ledger.
 
-It records matching files in `public.schema_migrations` and skips SQL that Supabase already applied.
+The runner verifies recorded checksums before it executes pending application migrations.
 
-It stops before SQL execution when a file is missing or its checksum differs.
+The independent `supabase_migrations.schema_migrations` ledger records Supabase CLI changes.
+
+The bootstrap command permits the first controlled release before the dedicated runtime role exists.
 
 Set strict database TLS in production. Set `DATABASE_CA_CERT_PATH` or set `DATABASE_SSL_REJECT_UNAUTHORIZED=true`.
 

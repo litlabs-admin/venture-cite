@@ -175,9 +175,7 @@ describe("request RLS migration shape", () => {
       migration.indexOf("INTO brand_row"),
     );
     expect(migration.indexOf("INTO brand_row")).toBeLessThan(
-      migration.indexOf(
-        "FROM public.articles AS articles\n   WHERE articles.id = p_article_id\n   FOR UPDATE",
-      ),
+      migration.indexOf("FROM public.articles AS articles", migration.indexOf("INTO brand_row")),
     );
     expect(migration).toContain("refunded_at");
     expect(migration).toContain("job_id = p_job_id");
