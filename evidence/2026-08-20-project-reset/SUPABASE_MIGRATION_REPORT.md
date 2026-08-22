@@ -101,7 +101,7 @@ TypeScript, ESLint, Prettier, migration sync, whitespace validation, and the pro
 
 ## Production state
 
-The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0110` remain absent. No production migration ran.
+The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0111` remain absent. No production migration ran.
 
 The direct-session audit could not connect from this workstation. The release environment still needs `DATABASE_DIRECT_URL` and a network path to the direct endpoint.
 

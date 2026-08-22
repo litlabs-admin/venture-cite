@@ -56,7 +56,9 @@ The local browser run passed five of five flows in 1 minute:
 
 The final browser run made no live OpenAI call. Local fake mode disables live OpenAI access.
 
-The latest full test run passed 203 files and 1,551 tests.
+The full test run passed 203 files and 1,551 tests with two workers.
+
+The default worker pool had two startup timeouts. The constrained rerun had no test errors.
 
 Nineteen files and 89 tests skipped under their configured conditions.
 
@@ -85,7 +87,7 @@ The production metadata audit used strict Transport Layer Security (TLS) and one
 
 The audit ended with `ROLLBACK`. It did not read application rows.
 
-The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0110` remain absent. No production migration ran.
+The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0111` remain absent. No production migration ran.
 
 The direct-session audit could not connect from this workstation. The release environment still needs `DATABASE_DIRECT_URL` and a network path to the direct database endpoint.
 
@@ -106,6 +108,10 @@ The empty preview migration runner completed on 2026-08-22 with strict TLS and t
 
 A local preview-only server then returned HTTP 200 from `/health` and `/`. It used the empty preview, fake generation, disabled email, disabled billing setup, and disabled scheduling. The server was stopped after verification.
 
+The final browser suite used the local loopback Supabase database. It did not use the production database because the flows create and delete test data.
+
+The local Supabase stack and Docker Desktop are stopped after verification.
+
 ## Provider scope
 
 Generic OpenAI kickoff and content-cost recording use the transactional outbox.
@@ -114,16 +120,17 @@ Stripe, Resend, Buffer, and synchronous language-model routes remain direct by d
 
 Provider-wide outbox conversion is not a release gate for this reset wave.
 
-## Remaining gates
+## Deferred production release gates
 
 1. Load the approved release values securely.
 2. Configure the verified preview branches with test-provider values.
-3. Deploy and verify a Vercel preview without production access.
-4. Run the read-only production preflight and direct-session metadata audit.
-5. Confirm the production backup and restore plan.
-6. Apply migrations through the controlled release command.
-7. Configure the restricted role memberships through the confirmed command.
-8. Run the production canary and monitor errors.
-9. Add the verified privacy values and review the rendered page last.
+3. Run the read-only production preflight and direct-session metadata audit.
+4. Confirm the production backup and restore plan.
+5. Apply migrations through the controlled release command.
+6. Configure the restricted role memberships through the confirmed command.
+7. Run the production canary and monitor errors.
+8. Add the verified privacy values and review the rendered page last.
+
+Vercel deployment, live Stripe, Resend, and Buffer checks are outside this release wave.
 
 Production stays read-only until every pre-release gate passes.

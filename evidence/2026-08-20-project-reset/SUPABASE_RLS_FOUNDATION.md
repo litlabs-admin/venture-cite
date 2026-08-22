@@ -7,7 +7,7 @@ The latest local RLS and outbox run passed 37 of 37 database integration tests.
 Production remains read-only and unchanged.
 
 The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums.
-Migrations `0094` through `0110` remain absent from production.
+Migrations `0094` through `0111` remain absent from production.
 
 The local Supabase stack is stopped.
 

@@ -20,7 +20,7 @@ On 2026-08-22, the direct-session audit was attempted with the supplied CA certi
 
 The authenticated Supabase Management API then ran SELECT-only metadata queries. It confirmed 62 public relations, 62 relations with RLS, zero policies on `users` and `brands`, and no `venturecite_request` role.
 
-The production application ledger currently has 94 rows through `0093_stripe_owned_trial.sql`. All 94 rows have no checksum. Migrations `0094` through `0110` remain absent.
+The production application ledger currently has 94 rows through `0093_stripe_owned_trial.sql`. All 94 rows have no checksum. Migrations `0094` through `0111` remain absent.
 
 The current login is `postgres`. It can bypass RLS, create roles, create databases, and holds nine granted roles. The only public function is `handle_new_user()`. It is security definer, sets `search_path=public`, and grants execution only to `postgres` and `service_role`.
 

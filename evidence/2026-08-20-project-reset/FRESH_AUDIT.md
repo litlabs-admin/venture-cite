@@ -99,7 +99,7 @@ The request role does not exist in production.
 
 The runtime login has broader privileges than the target least-privileged role.
 
-The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0110` remain absent. No production migration ran.
+The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums. Migrations `0094` through `0111` remain absent. No production migration ran.
 
 The current login is `postgres`, with RLS bypass and nine granted roles. The request role does not exist. The direct-session audit could not connect from this workstation, so the release environment still needs `DATABASE_DIRECT_URL` and a network path to the direct endpoint.
 
