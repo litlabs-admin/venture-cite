@@ -2,34 +2,55 @@
 
 ## Current result
 
-The latest local RLS and outbox run passed 37 of 37 database integration tests.
+Production now contains migrations through `0113_rls_current_setting_initplan.sql`.
 
-Production remains read-only and unchanged.
+The production migration ledger contains 114 checked rows.
 
-The current Management API metadata check found 94 production migration rows through `0093_stripe_owned_trial.sql`, with no checksums.
-Migrations `0094` through `0111` remain absent from production.
+Production contains 46 users, 45 brands, and 29 articles.
 
-The local Supabase stack is stopped.
+The ownership audit found zero brand-owner orphans.
 
-Evidence: `tests/integration/requestRlsFoundation.test.ts`, `tests/integration/contentRequestRls.test.ts`, `tests/integration/localOutboxMigration.test.ts`, `migrations/0096_request_rls_foundation.sql`, `migrations/0097_request_rls_content.sql`, and `migrations/0098_transactional_outbox.sql`.
+The authenticated read-only canary passed for brands, the dashboard, and articles.
+
+The approved canary account saw its six owned brands.
+
+The canary produced no writes, emails, payments, provider calls, Buffer posts, or push notifications.
+
+The Supabase advisor has no database performance warning.
+
+One Auth warning remains because leaked-password protection is disabled.
+
+The `venturecite_runtime` login and restricted-role memberships exist.
+
+The application still uses the owner connection for legacy routes and system workers.
+
+The runtime connection cutover remains deferred.
+
+The privacy legal entity and contact values remain deferred until the final release phase.
+
+## Historical preview checkpoints
+
+Earlier preview reports recorded a 94-row production ledger and missing migrations through `0111`.
+
+Those values describe the pre-release state.
+
+They do not describe the current production database.
+
+Earlier preview reports also recorded 112 rows through `0111` after isolated restore.
+
+That result remains useful as restore evidence, but it is not the current production result.
 
 ## Migration 0096
 
-Migration 0096 defines restricted access for approved columns in `users` and `brands`.
+Migration 0096 restricts approved columns in `users` and `brands`.
 
-The row policies match the actor value stored in the transaction.
+The policies match the actor value stored in the transaction.
 
-The migration rejects unsafe role attributes, unexpected memberships, and privileges outside the two tables.
+The migration rejects unsafe role attributes, unexpected memberships, and privileges outside the approved tables.
 
-The request user and brand repositories set the role and actor value inside a transaction.
+The request user and brand repositories set the role and actor value inside one transaction.
 
-Evidence: `migrations/0096_request_rls_foundation.sql:4-277`, `server/data/requestUserRepository.ts:40-77`, `server/data/requestBrandRepository.ts:113-214`, and `server/data/restrictedRequestTransaction.ts:7-23`.
-
-The 0096 integration file has 13 tests.
-
-It proves row isolation, approved writes, version checks, denied columns, transaction cleanup, and actor-bound repository facades.
-
-Evidence: `tests/integration/requestRlsFoundation.test.ts:141-432`.
+Evidence: `migrations/0096_request_rls_foundation.sql`, `server/data/requestUserRepository.ts`, `server/data/requestBrandRepository.ts`, and `server/data/restrictedRequestTransaction.ts`.
 
 ## Migration 0097
 
@@ -43,118 +64,77 @@ The policies hide content after a brand soft delete.
 
 The request role cannot write content rows.
 
-Evidence: `migrations/0097_request_rls_content.sql:121-307` and `tests/integration/contentRequestRls.test.ts:167-463`.
+Evidence: `migrations/0097_request_rls_content.sql` and `tests/integration/contentRequestRls.test.ts`.
 
-## PostgreSQL 17 role membership
+## Later request migrations
 
-The membership tool discovers the creator of the restricted roles through `pg_auth_members`.
+Migrations 0101 through 0110 add request-safe profile, content, command, provider-state, quota, and soft-delete access.
 
-The creator must hold each restricted role with `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`.
+Migration 0111 revokes public, anonymous, and authenticated execution on `public.handle_new_user()`.
 
-The runtime role receives the three restricted roles with `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
+Migration 0112 adds a temporary compatibility grant for the current application connection.
 
-The unit tests accept this exact policy.
+Each self-grant has `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
 
-Evidence: `server/lib/requestRoleMembership.ts:126-225` and `tests/unit/requestRoleMembership.test.ts:81-181`.
+The original creator memberships remain unchanged.
 
-Local integration setup removes stale managed roles and memberships from a restored backup.
+Migration 0113 changes 21 audited policy expressions to cache `current_setting` once per statement.
 
-Each database `beforeAll` hook has a 60-second timeout while it holds the shared advisory lock.
+It preserves policy roles, commands, and access predicates.
 
-Evidence: `tests/integration/localRoleCleanup.ts:23-161`, `tests/integration/requestRlsFoundation.test.ts:51-106`, `tests/integration/contentRequestRls.test.ts:45-125`, and `tests/integration/localOutboxMigration.test.ts:36-65`.
+Evidence: `migrations/0112_transitional_request_role_set_option.sql`, `migrations/0113_rls_current_setting_initplan.sql`, and `evidence/2026-08-20-project-reset/RLS_INITPLAN_MIGRATION_0113.md`.
 
-The content routes use the actor-bound repositories for article, revision, distribution, job, and keyword request paths.
+## PostgreSQL role membership
 
-Keyword discovery finalization, competitor reads, and worker slice claims still use owner-side storage because they run outside the request transaction.
+The membership tool checks the creator of each restricted role through `pg_auth_members`.
 
-Evidence: `server/data/contentRequestData.ts:24-50` and `server/routes/content.ts:241-1075`.
+The creator membership must use `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`.
 
-## Route cutover state
+The temporary self-grant uses `ADMIN FALSE`, `INHERIT FALSE`, and `SET TRUE`.
 
-The brand routes use request repositories for list, get, and update.
+The unit tests enforce this policy.
 
-Brand create and website import use the actor-bound request repository with an atomic quota check.
+The runtime role remains separate from the current owner connection.
 
-Deletion ownership and soft-delete scheduling use the actor-bound request repository. Deletion preview counts still use owner-side aggregate reads after ownership validation.
+The application must revoke the temporary option before changing `DATABASE_URL` to `venturecite_runtime`.
 
-Evidence: `server/routes/brands.ts:49-78`, `server/routes/brands.ts:80-393`, and `server/routes/brands.ts:395-531`.
+Evidence: `server/lib/requestRoleMembership.ts` and `tests/unit/requestRoleMembership.test.ts`.
 
-## Production limits
+## Request and worker boundaries
 
-The production audit was read-only and ended with `ROLLBACK`.
+Actor-bound repositories handle the migrated request paths.
 
-The audit found no request role and zero policies on `users` and `brands`.
+They do not return raw transactions across request boundaries.
 
-All 62 public relations have RLS enabled, but no relation forces RLS.
+The content routes use actor-bound repositories for article, revision, distribution, job, and keyword request paths.
 
-Do not activate request routes in production before the controlled migration and role review.
+Keyword discovery finalization, competitor reads, and worker claims still use owner-side storage.
 
-Evidence: `evidence/2026-08-20-project-reset/PRODUCTION_DATABASE_AUDIT.md:5-42`.
+Those paths run outside the request transaction.
 
-The request-role membership tool exists but has not run against production.
+Generic OpenAI kickoff and content-cost recording use the transactional outbox.
 
-The release preflight exists but has not run against production.
+Stripe, Resend, Buffer, and synchronous model routes keep their existing direct contracts.
 
-Evidence: `scripts/configureRequestRoleMembership.ts:33-64`, `scripts/releaseEnvironmentPreflight.ts:180-259`, and `package.json`.
+## Verification
 
-The direct-session audit could not connect from this workstation. The Management API recheck did not write data and does not replace the direct-session release gate.
+The local PostgreSQL integration run passed 37 of 37 tests.
 
-The empty preview advisor now reports 21 RLS initialization-plan warnings and no public security-definer warning. The data-backed preview reports one leaked-password protection warning and 21 RLS initialization-plan warnings. Production reports one leaked-password protection warning.
+The local browser run passed five of five safe flows with fake generation.
 
-Migration 0111 revokes public, anon, and authenticated execution on `public.handle_new_user()` after the function replacement in migration 0093. Both previews now grant that function only to `postgres` and `service_role`.
+The full test run passed 204 files and 1,561 active tests.
 
-The current policy SQL already wraps actor settings in statement-scoped `SELECT` expressions.
+TypeScript, lint, changed-file formatting, migration synchronization, whitespace, and the production build passed.
 
-Review the Supabase Auth setting and the remaining RLS advisor output before production release.
+The full repository format check still reports 216 baseline files outside this release diff.
 
-## Remaining gates
+## Open work
 
-1. Obtain `DATABASE_DIRECT_URL` through the secure release channel.
-2. Obtain the four approved Stripe product and price identifiers.
-3. Obtain `RESEND_FROM_ADDRESS`.
-4. Define the least-privileged production runtime role.
-5. Set a secure HTTPS `APP_URL`.
-6. Review Supabase Auth leaked-password protection and advisor warnings.
-7. Run the strict metadata audit with the direct connection.
-8. Review grants, owners, RLS flags, policies, and ownership counts.
-9. Verify the production backup and restore plan.
-10. Apply migrations 0094 through 0111 through the controlled release command.
-11. Run the request-role membership command in dry-run mode.
-12. Apply role membership after the final review and confirmation gate.
-13. Run two-user tests for brand creation, website import, deletion preview, and soft delete.
-14. Verify worker-only storage paths remain outside request routes.
-15. Keep privacy legal placeholders deferred until final release preparation.
+1. Enable leaked-password protection in Supabase Auth.
+2. Move legacy routes and system workers from owner access.
+3. Test and perform the runtime role cutover after that refactor.
+4. Add verified privacy values last.
 
-## Security boundary
+The current release is safe without the runtime cutover because the application still uses the owner connection.
 
-This design reduces the effect of a missing tenant filter.
-
-It does not make arbitrary SQL safe under an owner connection.
-
-Request routes must use named repositories.
-
-Worker and administrator operations must remain outside request routes.
-
-## Closed review blockers
-
-The final Sol review says `SHIP`.
-
-It found no P0, P1, or P2 findings.
-
-The final review closed the seven prior foundation blockers.
-
-1. The production migration command now runs the release preflight before it imports database code.
-
-2. The request-role tool now discovers the PostgreSQL 17 creator membership and verifies the exact runtime grant policy.
-
-3. The outbox worker keeps an in-flight command leased while its provider handler runs.
-
-4. The enqueue path requires an owning user and runs only inside a domain transaction.
-
-5. The scheduler guard rejects two owners and rejects a production process with no scheduler owner.
-
-6. The outbox migration rejects worker-role drift before it repairs the role.
-
-7. The role tool verifies that the runtime and direct connections target the same database.
-
-Evidence: `scripts/migrate.ts:10-39`, `scripts/migrationRelease.ts:1-120`, `server/lib/requestRoleMembership.ts:126-314`, `server/outbox/outboxRepository.ts:88-243`, `server/outbox/outboxWorker.ts:16-86`, `server/lib/schedulerMode.ts:21-38`, `server/nitroBoot.ts:99-122`, `migrations/0098_transactional_outbox.sql:138-322`, and the related unit and integration tests.
+The temporary compatibility grant must remain until the cutover is complete.
