@@ -146,11 +146,13 @@ The full repository format check still reports 209 baseline files outside this r
 
 ## Open work
 
-1. Commit and push the verified code and evidence changes to `main`.
+1. Verify the automatic Render deployment after the live link or dashboard access is available.
 2. Enable leaked-password protection in Supabase Auth.
 3. Move the remaining legacy routes and system workers from owner access.
 4. Test and perform the runtime role cutover after that refactor.
 5. Add verified privacy values last.
+
+The local RLS integration test needs a stable Docker host port before it can run.
 
 The current release is safe without the runtime cutover because the application still uses the owner connection.
 

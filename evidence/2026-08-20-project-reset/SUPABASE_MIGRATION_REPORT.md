@@ -142,17 +142,19 @@ Read-only checks confirmed strict TLS, the application ledger, role attributes, 
 
 No provider call, email, payment, Buffer post, or push notification occurred.
 
-The code commit has not been pushed to `main` in this checkpoint.
+Commit `23fc4c9` is pushed to remote `main`.
 
 The Render dashboard session remains unavailable, so platform deployment status is unverified.
 
 ## Open work
 
-1. Commit and push the verified code and evidence changes to `main`.
+1. Verify the automatic Render deployment after the live link or dashboard access is available.
 2. Enable leaked-password protection in Supabase Auth.
 3. Move the remaining legacy routes and system workers from owner access.
 4. Test and perform the runtime role cutover.
 5. Add verified privacy values last.
+
+The local RLS integration test needs a stable Docker host port before it can run.
 
 The privacy legal entity and contact values remain pending.
 
