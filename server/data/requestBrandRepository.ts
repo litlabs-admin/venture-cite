@@ -1,5 +1,12 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { brands, type Brand, type InsertBrand } from "@shared/schema";
+import {
+  articles,
+  brandPrompts,
+  brands,
+  citationRuns,
+  type Brand,
+  type InsertBrand,
+} from "@shared/schema";
 import type { db } from "../db";
 import type { RequestActor } from "../lib/requestActor";
 import type { RequestRepositoryTransaction } from "./requestRepositoryTransaction";
@@ -41,6 +48,12 @@ const requestBrandSoftDeleteColumns = {
 
 export type RequestBrand = Pick<Brand, keyof typeof requestBrandColumns>;
 export type RequestBrandSoftDeleted = Pick<Brand, keyof typeof requestBrandSoftDeleteColumns>;
+
+export type RequestBrandDeletionPreview = {
+  articles: number;
+  prompts: number;
+  citationRuns: number;
+};
 
 const requestBrandInsertColumns = [
   ["name", "name"],
@@ -108,6 +121,7 @@ export type RequestBrandPatch = Partial<
 export type RequestBrandRepository = {
   list(): Promise<RequestBrand[]>;
   get(id: string): Promise<RequestBrand | undefined>;
+  deletionPreview(id: string): Promise<RequestBrandDeletionPreview | undefined>;
   create(brand: RequestBrandCreate): Promise<RequestBrand>;
   createWithQuota(brand: RequestBrandCreate, maxBrands: number): Promise<RequestBrand>;
   softDelete(id: string, graceDays?: number): Promise<RequestBrandSoftDeleted | undefined>;
@@ -136,13 +150,17 @@ export function createRequestBrandRepository({
   actor: RequestActor;
   database: typeof db;
 }): RequestBrandRepository {
-  const run = <T>(
+  const runWithRole = <T>(
+    role: "venturecite_request" | "venturecite_content_request",
     operation: (transaction: RequestRepositoryTransaction) => Promise<T>,
   ): Promise<T> =>
     database.transaction(async (transaction) => {
-      await setRestrictedRequestContext({ actor, role: "venturecite_request", transaction });
+      await setRestrictedRequestContext({ actor, role, transaction });
       return operation(transaction);
     });
+  const run = <T>(
+    operation: (transaction: RequestRepositoryTransaction) => Promise<T>,
+  ): Promise<T> => runWithRole("venturecite_request", operation);
 
   return {
     list(): Promise<RequestBrand[]> {
@@ -159,6 +177,36 @@ export function createRequestBrandRepository({
           .where(and(eq(brands.id, id), isNull(brands.deletedAt)))
           .limit(1);
         return brand;
+      });
+    },
+
+    deletionPreview(id: string): Promise<RequestBrandDeletionPreview | undefined> {
+      return runWithRole("venturecite_content_request", async (transaction) => {
+        const [brand] = await transaction
+          .select({ id: brands.id })
+          .from(brands)
+          .where(and(eq(brands.id, id), isNull(brands.deletedAt)))
+          .limit(1);
+        if (!brand) return undefined;
+
+        const [articleRow] = await transaction
+          .select({ n: sql<number>`count(*)::int` })
+          .from(articles)
+          .where(eq(articles.brandId, id));
+        const [promptRow] = await transaction
+          .select({ n: sql<number>`count(*)::int` })
+          .from(brandPrompts)
+          .where(eq(brandPrompts.brandId, id));
+        const [runRow] = await transaction
+          .select({ n: sql<number>`count(*)::int` })
+          .from(citationRuns)
+          .where(eq(citationRuns.brandId, id));
+
+        return {
+          articles: articleRow?.n ?? 0,
+          prompts: promptRow?.n ?? 0,
+          citationRuns: runRow?.n ?? 0,
+        };
       });
     },
 

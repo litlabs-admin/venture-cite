@@ -13,17 +13,7 @@
 
 import type { Express } from "express";
 import { z } from "zod";
-import { sql } from "drizzle-orm";
-import { db } from "../db";
-import { storage } from "../storage";
-import {
-  articles,
-  brandPrompts,
-  citationRuns,
-  insertBrandSchema,
-  usageLimits,
-  resolveTier,
-} from "@shared/schema";
+import { insertBrandSchema, usageLimits, resolveTier } from "@shared/schema";
 import { MODELS } from "../lib/modelConfig";
 import { safeFetchText } from "../lib/ssrf";
 import { extractPageContent } from "../lib/pageText";
@@ -469,33 +459,16 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const brand = await requestData
+        const preview = await requestData
           .forActor(createRequestActor(user.id))
-          .brands.get(req.params.id);
-        if (!brand) {
+          .brands.deletionPreview(req.params.id);
+        if (!preview) {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
-        const brandId = req.params.id;
-        const [articleRow] = await db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(articles)
-          .where(sql`${articles.brandId} = ${brandId}`);
-        const [promptRow] = await db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(brandPrompts)
-          .where(sql`${brandPrompts.brandId} = ${brandId}`);
-        const [runRow] = await db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(citationRuns)
-          .where(sql`${citationRuns.brandId} = ${brandId}`);
 
         res.json({
           success: true,
-          data: {
-            articles: articleRow?.n ?? 0,
-            prompts: promptRow?.n ?? 0,
-            citationRuns: runRow?.n ?? 0,
-          },
+          data: preview,
         });
       } catch (error) {
         sendError(res, error, "Failed to preview deletion");

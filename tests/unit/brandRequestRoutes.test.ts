@@ -13,6 +13,7 @@ const otherUser = { id: "22222222-2222-4222-8222-222222222222", accessTier: "fre
 const { authState, requestDataMock, repositories } = vi.hoisted(() => {
   const brands = {
     get: vi.fn(),
+    deletionPreview: vi.fn(),
     list: vi.fn(),
     createWithQuota: vi.fn(),
     softDelete: vi.fn(),
@@ -144,6 +145,35 @@ describe("request-scoped brand routes", () => {
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ success: false, error: "Brand not found" });
     expect(repositories.brands.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns an owned brand deletion preview", async () => {
+    repositories.brands.deletionPreview.mockResolvedValue({
+      articles: 2,
+      prompts: 3,
+      citationRuns: 4,
+    });
+
+    const response = await request(makeApp()).get("/api/brands/brand-a/deletion-preview");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: { articles: 2, prompts: 3, citationRuns: 4 },
+    });
+    expect(repositories.brands.deletionPreview).toHaveBeenCalledWith("brand-a");
+  });
+
+  it("returns 404 when an actor cannot read a deletion preview", async () => {
+    repositories.brands.deletionPreview.mockResolvedValue(undefined);
+
+    const response = await request(makeApp()).get(
+      "/api/brands/brand-owned-by-another-user/deletion-preview",
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ success: false, error: "Brand not found" });
+    expect(repositories.brands.deletionPreview).toHaveBeenCalledWith("brand-owned-by-another-user");
   });
 
   it("updates an accessible brand without a version", async () => {

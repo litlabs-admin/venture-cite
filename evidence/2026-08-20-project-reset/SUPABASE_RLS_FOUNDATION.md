@@ -2,11 +2,11 @@
 
 ## Current result
 
-Production now contains migrations through `0113_rls_current_setting_initplan.sql`.
+Production now contains migrations through `0114_request_brand_deletion_preview.sql`.
 
-The production migration ledger contains 114 checked rows.
+The production migration ledger contains 115 checked rows.
 
-Production contains 46 users, 45 brands, and 29 articles.
+Production contains 46 users, 44 brands, 31 articles, 1,154 brand prompts, and 416 citation runs.
 
 The ownership audit found zero brand-owner orphans.
 
@@ -84,6 +84,16 @@ It preserves policy roles, commands, and access predicates.
 
 Evidence: `migrations/0112_transitional_request_role_set_option.sql`, `migrations/0113_rls_current_setting_initplan.sql`, and `evidence/2026-08-20-project-reset/RLS_INITPLAN_MIGRATION_0113.md`.
 
+Migration 0114 moves the brand deletion preview into the content request role.
+
+It grants only `brand_id` on `brand_prompts` and `citation_runs`.
+
+It enables RLS and hides rows that do not belong to the transaction actor.
+
+The production canary confirmed owned visibility and cross-user denial.
+
+Evidence: `migrations/0114_request_brand_deletion_preview.sql`, `server/data/requestBrandRepository.ts`, and `tests/integration/contentRequestRls.test.ts`.
+
 ## PostgreSQL role membership
 
 The membership tool checks the creator of each restricted role through `pg_auth_members`.
@@ -106,7 +116,7 @@ Actor-bound repositories handle the migrated request paths.
 
 They do not return raw transactions across request boundaries.
 
-The content routes use actor-bound repositories for article, revision, distribution, job, and keyword request paths.
+The content routes use actor-bound repositories for article, revision, distribution, job, keyword, and brand deletion preview paths.
 
 Keyword discovery finalization, competitor reads, and worker claims still use owner-side storage.
 
@@ -118,22 +128,29 @@ Stripe, Resend, Buffer, and synchronous model routes keep their existing direct 
 
 ## Verification
 
-The local PostgreSQL integration run passed 37 of 37 tests.
+The current focused unit run passed 31 tests.
+
+The full test run passed 204 files and 1,565 tests with one worker.
+
+The local PostgreSQL integration fixture now covers the 0114 ownership cases.
+
+Its last run was blocked because the Docker host port proxy terminated local connections.
 
 The local browser run passed five of five safe flows with fake generation.
 
-The full test run passed 204 files and 1,561 active tests.
+TypeScript, tour checks, lint, changed-file formatting, migration synchronization, whitespace checks, and the production build passed.
 
-TypeScript, lint, changed-file formatting, migration synchronization, whitespace, and the production build passed.
+Lint reported 790 existing warnings and zero errors.
 
-The full repository format check still reports 216 baseline files outside this release diff.
+The full repository format check still reports 209 baseline files outside this release diff.
 
 ## Open work
 
-1. Enable leaked-password protection in Supabase Auth.
-2. Move legacy routes and system workers from owner access.
-3. Test and perform the runtime role cutover after that refactor.
-4. Add verified privacy values last.
+1. Commit and push the verified code and evidence changes to `main`.
+2. Enable leaked-password protection in Supabase Auth.
+3. Move the remaining legacy routes and system workers from owner access.
+4. Test and perform the runtime role cutover after that refactor.
+5. Add verified privacy values last.
 
 The current release is safe without the runtime cutover because the application still uses the owner connection.
 

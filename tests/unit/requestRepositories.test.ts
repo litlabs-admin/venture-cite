@@ -168,6 +168,21 @@ describe("request brand repository", () => {
     expect(calls.set).toHaveBeenCalledWith(expect.objectContaining({ name: "Changed" }));
     expect(USER_B_ID).not.toBe(USER_A_ID);
   });
+
+  it("uses the content request role for deletion preview counts", async () => {
+    const { database, calls } = createTransaction([{ id: "brand-a" }]);
+    const repository = createRequestBrandRepository({
+      actor: createRequestActor(USER_A_ID),
+      database: database as never,
+    });
+
+    await repository.deletionPreview("brand-a");
+
+    const statements = calls.execute.mock.calls.map(
+      ([value]) => new PgDialect().sqlToQuery(value as SQL).sql,
+    );
+    expect(statements).toContain("set local role venturecite_content_request");
+  });
 });
 
 describe("request data boundary", () => {

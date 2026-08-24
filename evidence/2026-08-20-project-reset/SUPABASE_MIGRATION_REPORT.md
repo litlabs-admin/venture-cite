@@ -1,6 +1,6 @@
 # Supabase migration report
 
-Date: 2026-08-22
+Date: 2026-08-25
 
 ## Current architecture
 
@@ -8,17 +8,17 @@ VentureCite uses Supabase Auth, Storage, and PostgreSQL.
 
 The Express server uses Drizzle and a PostgreSQL pool.
 
-Production now contains migrations through `0113_rls_current_setting_initplan.sql`.
+Production now contains migrations through `0114_request_brand_deletion_preview.sql`.
 
 The root migration files and Supabase copies pass the migration synchronization check.
 
 ## Current production state
 
-Production contains 114 checked rows in `public.schema_migrations`.
+Production contains 115 checked rows in `public.schema_migrations`.
 
-The latest application migration is `0113_rls_current_setting_initplan.sql`.
+The latest application migration is `0114_request_brand_deletion_preview.sql`.
 
-Production contains 46 users, 45 brands, and 29 articles.
+The latest read-only production check found 46 users, 44 brands, 31 articles, 1,154 brand prompts, and 416 citation runs.
 
 The ownership audit found zero brand-owner orphans.
 
@@ -38,21 +38,27 @@ The runtime cutover remains deferred until those paths change.
 
 ## Backup and restore proof
 
-The release created schema, role, full-data, Auth-data, and public-data backups before production migration.
+The fresh release backup is in `C:\Users\yoges\OneDrive\Documents\venturecite-secrets\prod-release-20260824-045958`.
 
-The release recorded SHA-256 hashes in the secure backup directory.
+The backup contains non-empty schema, public-data, and role files.
 
-An isolated restore preserved 46 users, 45 brands, 29 articles, and zero brand-owner orphans.
+The backup SHA-256 hashes are recorded outside the repository.
 
-The isolated restore applied migrations 0094 through 0111 without error.
+The backup snapshot contained 46 users, 45 brands, 30 articles, 1,154 brand prompts, and 394 citation runs.
 
-The restore made no provider calls, emails, payments, Buffer posts, push notifications, or deployment.
+A hashed primary-key comparison found all 46 users unchanged.
 
-The isolated restore ended with 112 checked application rows through migration 0111.
+It found one backup-only brand, one current-only article, and 22 current-only citation runs.
 
-That row count is historical restore evidence.
+The audit log records one `brand.delete.completed`, one article creation, and 22 citation runs after the backup.
 
-It does not replace the current production count of 114 rows through migration 0113.
+This proves that production changed after the backup.
+
+The migration did not restore, delete, or modify application rows.
+
+The backup is valid for restore planning, but it is not a current production snapshot.
+
+Earlier isolated-restore evidence remains historical and does not replace the current production counts.
 
 ## Migration groups
 
@@ -74,6 +80,12 @@ It preserves the policy roles, commands, and access predicates.
 
 The production advisor now reports no database performance warning.
 
+Migration 0114 moves the brand deletion preview into the actor-bound content request role.
+
+It grants only `brand_id` on `brand_prompts` and `citation_runs`.
+
+It enables RLS and checks ownership through the transaction actor.
+
 One Auth warning remains because leaked-password protection is disabled.
 
 ## Historical preview checkpoints
@@ -86,19 +98,27 @@ The data-backed branch matched the checked counts of 46 users, 45 brands, and 29
 
 The preview report recorded 112 checked rows through migration 0111.
 
-The current production release later applied migrations 0112 and 0113.
+The current production release later applied migrations 0112 through 0114.
 
 No earlier preview claim about a 94-row production ledger or missing migrations remains current.
 
 ## Verification
 
-The local PostgreSQL integration run passed 37 of 37 tests.
+The current focused unit run passed 31 tests.
+
+The full test run passed 204 files and 1,565 tests with one worker.
+
+The local PostgreSQL integration fixture now covers the 0114 ownership cases.
+
+Its last run was blocked because the Docker host port proxy terminated local connections.
 
 The local browser run passed five of five safe flows with fake generation.
 
-The full test run passed 204 files and 1,561 active tests.
+TypeScript, tour checks, lint, changed-file formatting, migration synchronization, whitespace checks, and the production build passed.
 
-TypeScript, lint, changed-file formatting, migration synchronization, whitespace, and the production build passed.
+Lint reported 790 existing warnings and zero errors.
+
+The full repository format check still reports 209 baseline files outside this release diff.
 
 The live health endpoint returned HTTP 200 with `db: true`.
 
@@ -108,30 +128,31 @@ The browser reported no error or warning during the final canary.
 
 The canary made no write, provider, email, payment, Buffer, or push request.
 
-The full repository format check still reports 216 baseline files outside this release diff.
-
 ## Controlled release result
 
 The release used the production backup and the application migration ledger.
 
 The release used one transaction per migration and a PostgreSQL advisory lock.
 
-The release completed without a migration error.
+The guarded bootstrap release applied migration 0114 without a migration error.
 
-No production data was deleted.
+The migration changed privileges and policies only.
+
+Read-only checks confirmed strict TLS, the application ledger, role attributes, RLS, and cross-user denial.
 
 No provider call, email, payment, Buffer post, or push notification occurred.
 
-The configured automatic deployment was triggered by the push to `main`.
+The code commit has not been pushed to `main` in this checkpoint.
 
-The Render dashboard session was unavailable, so platform deployment status remains unverified.
+The Render dashboard session remains unavailable, so platform deployment status is unverified.
 
 ## Open work
 
-1. Enable leaked-password protection in Supabase Auth.
-2. Move legacy routes and system workers from owner access.
-3. Test and perform the runtime role cutover.
-4. Add verified privacy values last.
+1. Commit and push the verified code and evidence changes to `main`.
+2. Enable leaked-password protection in Supabase Auth.
+3. Move the remaining legacy routes and system workers from owner access.
+4. Test and perform the runtime role cutover.
+5. Add verified privacy values last.
 
 The privacy legal entity and contact values remain pending.
 

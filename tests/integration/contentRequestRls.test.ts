@@ -33,6 +33,10 @@ describeIfLocal("content request database RLS", () => {
   const articleBId = randomUUID();
   const keywordAId = randomUUID();
   const keywordBId = randomUUID();
+  const brandPromptAId = randomUUID();
+  const brandPromptBId = randomUUID();
+  const citationRunAId = randomUUID();
+  const citationRunBId = randomUUID();
   const jobAId = randomUUID();
   const jobBId = randomUUID();
   const runtimeRole = `venturecite_content_rls_${process.pid}_${Date.now()}`;
@@ -55,6 +59,10 @@ describeIfLocal("content request database RLS", () => {
     );
     const contentMigration = fs.readFileSync(
       path.resolve(process.cwd(), "migrations/0097_request_rls_content.sql"),
+      "utf8",
+    );
+    const brandDeletionPreviewMigration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0114_request_brand_deletion_preview.sql"),
       "utf8",
     );
     const responseColumnsMigration = fs.readFileSync(
@@ -92,8 +100,15 @@ describeIfLocal("content request database RLS", () => {
       "utf8",
     );
     await ownerPool.query(foundationMigration);
+    // The local database may already include 0114 after a full migration reset.
+    // Revoke its later grants before replaying the historical 0097 audit.
+    await ownerPool.query(
+      "revoke all privileges on public.brand_prompts, public.citation_runs from venturecite_content_request",
+    );
     await ownerPool.query(contentMigration);
     await ownerPool.query(contentMigration);
+    await ownerPool.query(brandDeletionPreviewMigration);
+    await ownerPool.query(brandDeletionPreviewMigration);
     await ownerPool.query(responseColumnsMigration);
     await ownerPool.query(responseColumnsMigration);
     await ownerPool.query(articleWritesMigration);
@@ -169,6 +184,16 @@ describeIfLocal("content request database RLS", () => {
       [keywordAId, brandAId, keywordBId, brandBId],
     );
     await ownerPool.query(
+      `insert into public.brand_prompts (id, brand_id, prompt)
+       values ($1, $2, 'prompt-a'), ($3, $4, 'prompt-b')`,
+      [brandPromptAId, brandAId, brandPromptBId, brandBId],
+    );
+    await ownerPool.query(
+      `insert into public.citation_runs (id, brand_id)
+       values ($1, $2), ($3, $4)`,
+      [citationRunAId, brandAId, citationRunBId, brandBId],
+    );
+    await ownerPool.query(
       `insert into public.content_generation_jobs
         (id, user_id, brand_id, article_id, request_payload, openai_response_id)
        values ($1, $2, $3, $4, '{}'::jsonb, 'provider-a'),
@@ -221,7 +246,9 @@ describeIfLocal("content request database RLS", () => {
         [
           "article_revisions",
           "articles",
+          "brand_prompts",
           "brands",
+          "citation_runs",
           "content_generation_jobs",
           "distributions",
           "keyword_research",
@@ -232,7 +259,9 @@ describeIfLocal("content request database RLS", () => {
     expect(result.rows).toEqual([
       { relname: "article_revisions", relrowsecurity: true },
       { relname: "articles", relrowsecurity: true },
+      { relname: "brand_prompts", relrowsecurity: true },
       { relname: "brands", relrowsecurity: true },
+      { relname: "citation_runs", relrowsecurity: true },
       { relname: "content_generation_jobs", relrowsecurity: true },
       { relname: "distributions", relrowsecurity: true },
       { relname: "keyword_research", relrowsecurity: true },
@@ -331,6 +360,29 @@ describeIfLocal("content request database RLS", () => {
     expect((await facadeA.articles.list()).map((article) => article.id)).toEqual([articleAId]);
     expect((await facadeB.articles.list()).map((article) => article.id)).toEqual([articleBId]);
     expect((await facadeA.articles.list()).map((article) => article.id)).toEqual([articleAId]);
+  });
+
+  it("scopes brand deletion previews to the request actor", async () => {
+    const { createRequestActor } = await import("../../server/lib/requestActor");
+    const { createRequestBrandRepository } =
+      await import("../../server/data/requestBrandRepository");
+    const database = drizzle(requestPool, { schema });
+    const repositoryA = createRequestBrandRepository({
+      actor: createRequestActor(userAId),
+      database,
+    });
+    const repositoryB = createRequestBrandRepository({
+      actor: createRequestActor(userBId),
+      database,
+    });
+
+    await expect(repositoryA.deletionPreview(brandAId)).resolves.toEqual({
+      articles: 1,
+      prompts: 1,
+      citationRuns: 1,
+    });
+    await expect(repositoryA.deletionPreview(brandBId)).resolves.toBeUndefined();
+    await expect(repositoryB.deletionPreview(randomUUID())).resolves.toBeUndefined();
   });
 
   it("returns no content when the restricted role has no actor context", async () => {

@@ -91,6 +91,33 @@ describe("request RLS migration shape", () => {
     );
   });
 
+  it("grants the deletion preview only its foreign-key columns", () => {
+    const migration = fs.readFileSync(
+      path.resolve(process.cwd(), "migrations/0114_request_brand_deletion_preview.sql"),
+      "utf8",
+    );
+    const supabaseMigration = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/migrations/20260421000114_0114_request_brand_deletion_preview.sql",
+      ),
+      "utf8",
+    );
+
+    expect(migration).toMatch(
+      /grant select \(brand_id\)\s+on public\.brand_prompts to venturecite_content_request/i,
+    );
+    expect(migration).toMatch(
+      /grant select \(brand_id\)\s+on public\.citation_runs to venturecite_content_request/i,
+    );
+    expect(migration).not.toMatch(/grant select \([^)]*\bid\b[^)]*\)/i);
+    expect(migration).toContain("brand_prompts_content_request_select");
+    expect(migration).toContain("citation_runs_content_request_select");
+    expect(supabaseMigration.replace(/^-- Source:.*\r?\n-- SHA256:.*\r?\n\r?\n/, "")).toBe(
+      migration,
+    );
+  });
+
   it("grants only owned distribution and keyword request writes", () => {
     const migration = fs.readFileSync(
       path.resolve(
