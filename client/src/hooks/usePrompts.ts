@@ -47,11 +47,79 @@ export const promptKeys = {
   // `history`, which is the brand-level list of citation runs.
   scoreHistory: (brandId: string | null | undefined) =>
     ["/api/brand-prompts", brandId, "prompt-history"] as const,
+  detail: (brandId: string | null | undefined, promptId: string | null | undefined) =>
+    ["/api/brand-prompts", brandId, "prompts", promptId] as const,
+  tags: (brandId: string | null | undefined) => ["/api/brand-prompts", brandId, "tags"] as const,
+  promptTagsMap: (brandId: string | null | undefined) =>
+    ["/api/brand-prompts", brandId, "prompt-tags"] as const,
+  audiences: (brandId: string | null | undefined) =>
+    ["/api/brand-prompts", brandId, "audiences"] as const,
+  promptAudienceMap: (brandId: string | null | undefined) =>
+    ["/api/brand-prompts", brandId, "prompt-audiences"] as const,
+  setHealth: (brandId: string | null | undefined) =>
+    ["/api/brand-prompts", brandId, "set-health"] as const,
+  phrasings: (brandId: string | null | undefined, promptId: string | null | undefined) =>
+    ["/api/brand-prompts", brandId, "prompts", promptId, "phrasings"] as const,
 };
 
 // ============ Response shapes (server/routes/prompts.ts) ============
 
 type PromptListResponse = { success: boolean; data: BrandPrompt[] };
+
+export type PromptTag = {
+  id: string;
+  brandId: string;
+  name: string;
+  color: string | null;
+  createdAt: string;
+  /** Only present on the list endpoint (GET .../tags), not on attach/detach responses. */
+  promptCount?: number;
+};
+
+export type PromptAudience = {
+  id: string;
+  brandId: string;
+  name: string;
+  description: string | null;
+  funnelStage: "TOFU" | "MOFU" | "BOFU" | null;
+  generatedBy: "ai" | "manual";
+  createdAt: string;
+  /** Only present on the list endpoint (GET .../audiences). */
+  promptCount?: number;
+  /** Average score across member prompts with a score, or null if none have
+   *  one yet - never a fabricated average. Only present on the list endpoint. */
+  score?: number | null;
+};
+
+export type PromptSetHealthRun = {
+  id: string;
+  brandId: string;
+  score: number | null;
+  verdict: string | null;
+  topFix: { title: string; description: string; duplicatePromptIds: string[] } | null;
+  issues: string[];
+  workingWell: string[];
+  createdAt: string;
+};
+
+export type PhrasingPlatformResult = {
+  platform: string;
+  isCited: boolean;
+  rank: number | null;
+  relevance: number | null;
+  error?: string;
+};
+
+export type PromptPhrasingTest = {
+  id: string;
+  brandPromptId: string;
+  phrasing: string;
+  rationale: string | null;
+  results: PhrasingPlatformResult[] | null;
+  createdAt: string;
+};
+
+export type PromptDetail = BrandPrompt & { tagIds: string[] };
 
 export type PlatformResultShape = {
   platform: string;
@@ -62,6 +130,15 @@ export type PlatformResultShape = {
   fullResponse: string | null;
   checkedAt: string;
   reDetectedAt: string | null;
+  citingOutletUrl?: string | null;
+  citingOutletName?: string | null;
+  citedUrls?: string[];
+  sourceType?: string | null;
+  /** Ranked list of brands the model actually named in its answer, derived
+   *  from the same matcher used elsewhere in the app (first-mention order)
+   *  - never an LLM guess. [] when neither the brand nor a tracked
+   *  competitor was named. */
+  topAnswers?: { name: string; isBrand: boolean }[];
 };
 
 export type PromptResultsData = {
@@ -77,10 +154,17 @@ export type PromptResultsData = {
     prompt: string;
     rationale: string | null;
     platforms: PlatformResultShape[];
+    /** Distinct citation runs that have checked this prompt, ever. */
+    reportCount: number;
+    lastCheckedAt: string | null;
   }>;
   totalChecks: number;
   totalCited: number;
   citationRate: number;
+  /** Brand-wide "cited N times" count per URL, across every prompt's
+   *  history - not just the current prompt. */
+  sourceCounts: Record<string, number>;
+  brandDomain: string | null;
 };
 
 export type CitationRunEntry = {
@@ -237,6 +321,215 @@ export function usePromptScoreHistory(brandId: string | null | undefined) {
       return r.json();
     },
     enabled: !!brandId,
+  });
+}
+
+/** Single-prompt fetch for the /prompts/$promptId detail page. */
+export function usePrompt(brandId: string | null | undefined, promptId: string | null | undefined) {
+  return useQuery<{ success: boolean; data: PromptDetail }>({
+    queryKey: promptKeys.detail(brandId, promptId),
+    queryFn: async () => {
+      const r = await apiRequest("GET", `/api/brand-prompts/${brandId}/prompts/${promptId}`);
+      return r.json();
+    },
+    enabled: !!brandId && !!promptId,
+  });
+}
+
+export function usePromptTags(brandId: string | null | undefined) {
+  return useQuery<{ success: boolean; data: PromptTag[] }>({
+    queryKey: promptKeys.tags(brandId),
+    queryFn: async () => {
+      const r = await apiRequest("GET", `/api/brand-prompts/${brandId}/tags`);
+      return r.json();
+    },
+    enabled: !!brandId,
+  });
+}
+
+/** { promptId: tagId[] } for every tagged prompt - powers the table's Tags
+ *  chip column without a per-row fetch. */
+export function usePromptTagsMap(brandId: string | null | undefined) {
+  return useQuery<{ success: boolean; data: Record<string, string[]> }>({
+    queryKey: promptKeys.promptTagsMap(brandId),
+    queryFn: async () => {
+      const r = await apiRequest("GET", `/api/brand-prompts/${brandId}/prompt-tags`);
+      return r.json();
+    },
+    enabled: !!brandId,
+  });
+}
+
+export function usePromptAudiences(brandId: string | null | undefined) {
+  return useQuery<{ success: boolean; data: PromptAudience[] }>({
+    queryKey: promptKeys.audiences(brandId),
+    queryFn: async () => {
+      const r = await apiRequest("GET", `/api/brand-prompts/${brandId}/audiences`);
+      return r.json();
+    },
+    enabled: !!brandId,
+  });
+}
+
+/** { promptId: audienceId[] } for every prompt with an audience. */
+export function usePromptAudienceMap(brandId: string | null | undefined) {
+  return useQuery<{ success: boolean; data: Record<string, string[]> }>({
+    queryKey: promptKeys.promptAudienceMap(brandId),
+    queryFn: async () => {
+      const r = await apiRequest("GET", `/api/brand-prompts/${brandId}/prompt-audiences`);
+      return r.json();
+    },
+    enabled: !!brandId,
+  });
+}
+
+export function useGenerateAudiences(brandId: string | null | undefined) {
+  return useMutation({
+    mutationFn: async () => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${brandId}/audiences/generate`, {});
+      return { status: r.status, body: await r.json() };
+    },
+    onSuccess: ({ body }) => {
+      if (body.success) {
+        queryClient.invalidateQueries({ queryKey: promptKeys.audiences(brandId) });
+        queryClient.invalidateQueries({ queryKey: promptKeys.promptAudienceMap(brandId) });
+      }
+    },
+  });
+}
+
+export function usePromptAudienceMutations(brandId: string | null | undefined) {
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: promptKeys.audiences(brandId) });
+    queryClient.invalidateQueries({ queryKey: promptKeys.promptAudienceMap(brandId) });
+  };
+
+  const create = useMutation({
+    mutationFn: async (input: {
+      name: string;
+      description?: string | null;
+      funnelStage?: string | null;
+    }) => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${brandId}/audiences`, input);
+      return { status: r.status, body: await r.json() };
+    },
+    onSuccess: ({ body }) => body.success && invalidate(),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (audienceId: string) => {
+      const r = await apiRequest("DELETE", `/api/brand-prompts/${brandId}/audiences/${audienceId}`);
+      return r.json();
+    },
+    onSuccess: (data) => data.success && invalidate(),
+  });
+
+  const attach = useMutation({
+    mutationFn: async ({ promptId, audienceId }: { promptId: string; audienceId: string }) => {
+      const r = await apiRequest(
+        "POST",
+        `/api/brand-prompts/${brandId}/prompts/${promptId}/audiences`,
+        { audienceId },
+      );
+      return r.json();
+    },
+    onSuccess: (data) => data.success && invalidate(),
+  });
+
+  const detach = useMutation({
+    mutationFn: async ({ promptId, audienceId }: { promptId: string; audienceId: string }) => {
+      const r = await apiRequest(
+        "DELETE",
+        `/api/brand-prompts/${brandId}/prompts/${promptId}/audiences/${audienceId}`,
+      );
+      return r.json();
+    },
+    onSuccess: (data) => data.success && invalidate(),
+  });
+
+  return { create, remove, attach, detach };
+}
+
+export function useSetHealth(brandId: string | null | undefined) {
+  return useQuery<{ success: boolean; data: PromptSetHealthRun | null }>({
+    queryKey: promptKeys.setHealth(brandId),
+    queryFn: async () => {
+      const r = await apiRequest("GET", `/api/brand-prompts/${brandId}/set-health`);
+      return r.json();
+    },
+    enabled: !!brandId,
+  });
+}
+
+export function useRunSetHealth(brandId: string | null | undefined) {
+  return useMutation({
+    mutationFn: async () => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${brandId}/set-health/run`, {});
+      return { status: r.status, body: await r.json() };
+    },
+    onSuccess: ({ body }) => {
+      if (body.success)
+        queryClient.setQueryData(promptKeys.setHealth(brandId), { success: true, data: body.data });
+    },
+  });
+}
+
+export function usePhrasings(
+  brandId: string | null | undefined,
+  promptId: string | null | undefined,
+) {
+  return useQuery<{ success: boolean; data: PromptPhrasingTest[] }>({
+    queryKey: promptKeys.phrasings(brandId, promptId),
+    queryFn: async () => {
+      const r = await apiRequest(
+        "GET",
+        `/api/brand-prompts/${brandId}/prompts/${promptId}/phrasings`,
+      );
+      return r.json();
+    },
+    enabled: !!brandId && !!promptId,
+  });
+}
+
+export function useGeneratePhrasings(
+  brandId: string | null | undefined,
+  promptId: string | null | undefined,
+) {
+  return useMutation({
+    mutationFn: async () => {
+      const r = await apiRequest(
+        "POST",
+        `/api/brand-prompts/${brandId}/prompts/${promptId}/phrasings/generate`,
+        {},
+      );
+      return { status: r.status, body: await r.json() };
+    },
+    onSuccess: ({ body }) => {
+      if (body.success) {
+        queryClient.invalidateQueries({ queryKey: promptKeys.phrasings(brandId, promptId) });
+      }
+    },
+  });
+}
+
+export function useAnalyzePhrasing(
+  brandId: string | null | undefined,
+  promptId: string | null | undefined,
+) {
+  return useMutation({
+    mutationFn: async (phrasingId: string) => {
+      const r = await apiRequest(
+        "POST",
+        `/api/brand-prompts/${brandId}/phrasings/${phrasingId}/analyze`,
+        {},
+      );
+      return { status: r.status, body: await r.json() };
+    },
+    onSuccess: ({ body }) => {
+      if (body.success) {
+        queryClient.invalidateQueries({ queryKey: promptKeys.phrasings(brandId, promptId) });
+      }
+    },
   });
 }
 
@@ -509,4 +802,118 @@ export function useBackfillPrompts(brandId: string | null | undefined) {
       }
     },
   });
+}
+
+// ============ Prompts rebuild: pause + tags ============
+
+/** The ON/OFF toggle. Optimistic for the same reason useSetPromptStatus is -
+ *  the dot IS the feedback. */
+export function useTogglePromptPaused(brandId: string | null | undefined) {
+  return useMutation({
+    mutationFn: async ({ promptId, paused }: { promptId: string; paused: boolean }) => {
+      const r = await apiRequest(
+        "PATCH",
+        `/api/brand-prompts/${brandId}/prompts/${promptId}/pause`,
+        { paused },
+      );
+      return { status: r.status, body: await r.json() };
+    },
+    onMutate: async ({ promptId, paused }) => {
+      const keys = [promptKeys.list(brandId), promptKeys.listAll(brandId)];
+      await Promise.all(keys.map((key) => queryClient.cancelQueries({ queryKey: key })));
+      const snapshots = keys.map(
+        (key) => [key, queryClient.getQueryData<PromptListResponse>(key)] as const,
+      );
+      for (const [key, prev] of snapshots) {
+        if (!prev?.data) continue;
+        queryClient.setQueryData(key, {
+          ...prev,
+          data: prev.data.map((p) => (p.id === promptId ? { ...p, paused } : p)),
+        });
+      }
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => {
+      for (const [key, prev] of ctx?.snapshots ?? []) {
+        if (prev) queryClient.setQueryData(key, prev);
+      }
+    },
+    onSettled: () => invalidatePromptSet(brandId),
+  });
+}
+
+export function usePromptTagMutations(brandId: string | null | undefined) {
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: promptKeys.tags(brandId) });
+    queryClient.invalidateQueries({ queryKey: promptKeys.promptTagsMap(brandId) });
+  };
+
+  const create = useMutation({
+    mutationFn: async (input: { name: string; color?: string | null }) => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${brandId}/tags`, input);
+      return { status: r.status, body: await r.json() };
+    },
+    onSuccess: ({ body }) => body.success && invalidate(),
+  });
+
+  const update = useMutation({
+    mutationFn: async ({
+      tagId,
+      ...input
+    }: {
+      tagId: string;
+      name?: string;
+      color?: string | null;
+    }) => {
+      const r = await apiRequest("PATCH", `/api/brand-prompts/${brandId}/tags/${tagId}`, input);
+      return r.json();
+    },
+    onSuccess: (data) => data.success && invalidate(),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (tagId: string) => {
+      const r = await apiRequest("DELETE", `/api/brand-prompts/${brandId}/tags/${tagId}`);
+      return r.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        invalidate();
+        invalidatePromptSet(brandId);
+      }
+    },
+  });
+
+  const attach = useMutation({
+    mutationFn: async ({ promptId, tagId }: { promptId: string; tagId: string }) => {
+      const r = await apiRequest("POST", `/api/brand-prompts/${brandId}/prompts/${promptId}/tags`, {
+        tagId,
+      });
+      return r.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        invalidate();
+        invalidatePromptSet(brandId);
+      }
+    },
+  });
+
+  const detach = useMutation({
+    mutationFn: async ({ promptId, tagId }: { promptId: string; tagId: string }) => {
+      const r = await apiRequest(
+        "DELETE",
+        `/api/brand-prompts/${brandId}/prompts/${promptId}/tags/${tagId}`,
+      );
+      return r.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        invalidate();
+        invalidatePromptSet(brandId);
+      }
+    },
+  });
+
+  return { create, update, remove, attach, detach };
 }

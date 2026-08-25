@@ -1,7 +1,6 @@
-import OpenAI from "openai";
 import { z } from "zod";
-import { attachAiLogger } from "./aiLogger";
 import { MODELS } from "./modelConfig";
+import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
 import { parseLLMJson, LLMParseError } from "./llmParse";
 import { logger } from "./logger";
 import { matchEntity, type TrackedEntity as MatcherEntity } from "./brandMatcher";
@@ -12,18 +11,20 @@ import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 // the N+1 per-entity judge loop (brand judge + one judge per competitor +
 // separate auto-discovery pass). See plan file: tidy-wandering-gem.md - Wave A.
 //
-// Cost: one gpt-4o-mini call per response (~$0.0003 with typical inputs).
-// A full citation run with 30 prompts × 5 platforms = 150 analyzer calls.
+// Cost: one call per response. A full citation run with 30 prompts × 5
+// platforms = 150 analyzer calls.
 
-const analyzerClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  timeout: LLM_CALL_TIMEOUT_MS,
-  maxRetries: 1,
-});
-attachAiLogger(analyzerClient);
-
-const ANALYZER_MODEL = MODELS.misc;
+const ANALYZER_MODEL = MODELS.citationBrandExtraction;
 const MAX_RESPONSE_CHARS = 8000;
+// Post-parse trim targets only, from here down - NOT schema validators.
+// A parsed-but-oversized response gets trimmed to these via .slice() after
+// zod has already accepted it. The schema itself imposes no length/count
+// ceilings on these fields anymore (see brandEntrySchema below): a strict
+// zod .max() previously REJECTED THE ENTIRE MULTI-BRAND PAYLOAD whenever
+// one brand exceeded it (e.g. 4 citedUrls when capped at 3) - real, richly
+// detailed responses were being thrown away over a single oversized field
+// we were going to trim anyway. Validate shape (string/number/boolean),
+// not size.
 const MAX_BRANDS_PER_RESPONSE = 25;
 const MAX_VARIANTS_PER_BRAND = 5;
 const MAX_URLS_PER_BRAND = 3;
@@ -39,16 +40,16 @@ export interface TrackedEntity {
 }
 
 const brandEntrySchema = z.object({
-  variants: z.array(z.string().min(1).max(120)).max(MAX_VARIANTS_PER_BRAND),
+  variants: z.array(z.string().min(1)),
   cited: z.boolean(),
   rank: z.number().int().positive().nullable(),
   relevance: z.number().min(0).max(100),
-  context: z.string().max(1200).default(""),
-  citedUrls: z.array(z.string().max(400)).max(MAX_URLS_PER_BRAND).default([]),
+  context: z.string().default(""),
+  citedUrls: z.array(z.string()).default([]),
 });
 
 const analyzerOutputSchema = z.object({
-  brands: z.record(z.string().min(1).max(160), brandEntrySchema),
+  brands: z.record(z.string().min(1), brandEntrySchema),
 });
 
 export type BrandAnalysis = z.infer<typeof brandEntrySchema> & { name: string };
@@ -82,11 +83,12 @@ const SYSTEM_PROMPT = `You analyse one AI-chatbot response to a user question. Y
 Rules:
 - Include ONLY real company/product/service brands. Exclude generic category terms ("CRM software", "PR agency"), publications ("Forbes", "TechCrunch"), and generic English words that only coincidentally match a brand name.
 - A brand is "cited" if it is explicitly referenced by name, domain, or unambiguous description AS AN ANSWER or CONTRIBUTOR to the user question. Being named only as an aside, comparison target, or disclaimer counts as NOT cited. Generic words matching a brand name by coincidence (e.g. "the notion of X" when a brand called "Notion" exists) are NOT cited.
-- "variants" is every surface form the brand appears as in the response (name, domain, alternate casing). Up to 5.
+- "variants" is every surface form the brand appears as in the response (name, domain, alternate casing). Up to 5 - if there are more, keep the 5 most distinct.
 - "rank" is the 1-indexed position of the brand's first appearance inside an ordered or numbered list/ranking in the response. If the brand is not inside such a list, use null.
 - "relevance" is 0-100: how favourably and directly this brand is presented in answering the user question. 100 = top recommendation with explicit endorsement; 50 = mentioned neutrally; 0 = mentioned negatively or in passing.
-- "context" is a short snippet (max ~200 chars) from the response showing HOW the brand was referenced.
-- "citedUrls" is any source URLs the response attributes to this brand (e.g. "according to hubspot.com/blog/..."). Empty array if none.
+- "context" is a short snippet (max ~150 chars) from the response showing HOW the brand was referenced. Keep it tight - a full paragraph is not needed.
+- "citedUrls" is any source URLs the response attributes to this brand (e.g. "according to hubspot.com/blog/..."). Up to 3 - if there are more, keep the 3 most specific. Empty array if none.
+- If the response names more than 20 brands, return only the 20 most prominent (highest-ranked or most-discussed) - never truncate mid-brand, just include fewer complete entries.
 
 Return JSON ONLY in this exact shape:
 {
@@ -119,8 +121,9 @@ export async function analyzeResponse(params: {
   };
 
   if (!responseText || responseText.length < 40) return emptyResult;
-  if (!process.env.OPENAI_API_KEY) {
-    logger.warn("responseAnalyzer: OPENAI_API_KEY missing - skipping analysis");
+  const client = getOpenrouterClient();
+  if (!client) {
+    logger.warn("responseAnalyzer: OPENROUTER_API_KEY missing - skipping analysis");
     return emptyResult;
   }
 
@@ -140,11 +143,24 @@ Respond with JSON only.`;
 
   let parsed: z.infer<typeof analyzerOutputSchema>;
   try {
-    const completion = await analyzerClient.chat.completions.create({
+    const completion = await client.chat.completions.create({
       model: ANALYZER_MODEL,
       temperature: 0,
       response_format: { type: "json_object" },
-      max_tokens: 1400,
+      // 2026-08-25: bumped from 1400. Brand-dense responses (e.g. "list
+      // the top PR agencies for X") name 10-15+ brands; each needs its own
+      // variants/context/citedUrls in the JSON schema output, and 1400
+      // tokens routinely got the response cut off mid-object - the API
+      // returns a truncated, unparseable JSON string rather than an error,
+      // so this silently produced mentionedBrands: [] for exactly the
+      // responses with the MOST brands to show. A first bump to 4000
+      // still truncated one worst-case response in live testing. Sized
+      // this one with real headroom: ~20 brands (the prompt's own cap,
+      // added alongside this bump) × ~200 tokens/entry (5 variants +
+      // ~150-char context + 3 citedUrls + JSON punctuation) ≈ 4000 tokens
+      // of actual content, so 6000 leaves ~50% margin instead of landing
+      // right back at the edge.
+      max_tokens: 6000,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMsg },

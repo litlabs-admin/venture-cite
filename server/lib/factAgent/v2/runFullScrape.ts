@@ -62,6 +62,7 @@ export interface FullScrapeBrandInput {
 // with a single env flip. Pro default = 25 s; Hobby = ~6 s.
 import { LLM_CALL_TIMEOUT_MS } from "./vercelBudget";
 import { applyFactSheetToBrand } from "./brandProfileWriteback";
+import { recordSiteHealthScanHistory } from "../../siteHealthHistory";
 
 // Build provider clients lazily; same pattern as factSheetV2.ts. A
 // missing OPENROUTER_API_KEY just disables the Claude fallback rather
@@ -653,6 +654,11 @@ export async function runFullScrapeForBrand(
               "runFullScrape: brand profile write-back failed (non-fatal)",
             );
           }
+          // One site_health_scan_history row per completed scan - this is
+          // the ONE place a scrape run's success is known, which is exactly
+          // the event the Optimize page's History tab needs to chart.
+          // recordSiteHealthScanHistory never throws.
+          await recordSiteHealthScanHistory(brand.id, activeRunId);
         }
         await flushEvents();
       } catch (callbackErr) {

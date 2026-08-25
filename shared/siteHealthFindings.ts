@@ -56,6 +56,29 @@ export interface SiteHealthFindingsPage {
   factCount: number;
 }
 
+/** Which structural (crawl-derived, not content-scan) finding ids a single
+ *  page trips - used by both computeSiteHealthFindings' aggregate filters
+ *  below and the Pages tab's per-row "what's wrong" column, so the two
+ *  views can never disagree about which pages are failing/thin. Content
+ *  findings (meta tags, OG, readability, ...) are NOT included here - those
+ *  come from scanPagesForFindings, which re-fetches HTML and is too
+ *  expensive to run per Pages-tab row on every load. */
+export function pageFindingIds(page: SiteHealthFindingsPage): string[] {
+  const ids: string[] = [];
+  const failing =
+    (page.statusCode !== null && page.statusCode >= 400) ||
+    (page.statusCode === null && page.errorKind !== null);
+  if (failing) ids.push("failed-pages");
+  const thin =
+    !failing &&
+    page.statusCode !== null &&
+    page.statusCode >= 200 &&
+    page.statusCode < 300 &&
+    page.factCount === 0;
+  if (thin) ids.push("thin-content");
+  return ids;
+}
+
 export function computeSiteHealthFindings(
   health: SiteHealthFindingsHealth | null | undefined,
   pages: SiteHealthFindingsPage[],
@@ -117,11 +140,7 @@ export function computeSiteHealthFindings(
 
   const totalPages = pages.length;
   if (totalPages > 0) {
-    const failing = pages.filter(
-      (p) =>
-        (p.statusCode !== null && p.statusCode >= 400) ||
-        (p.statusCode === null && p.errorKind !== null),
-    );
+    const failing = pages.filter((p) => pageFindingIds(p).includes("failed-pages"));
     if (failing.length > 0) {
       const points = Math.round((failing.length / totalPages) * 30);
       findings.push({
@@ -135,10 +154,7 @@ export function computeSiteHealthFindings(
       });
     }
 
-    const thin = pages.filter(
-      (p) =>
-        p.statusCode !== null && p.statusCode >= 200 && p.statusCode < 300 && p.factCount === 0,
-    );
+    const thin = pages.filter((p) => pageFindingIds(p).includes("thin-content"));
     if (thin.length > 0) {
       const points = Math.round((thin.length / totalPages) * 30);
       findings.push({

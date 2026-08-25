@@ -81,3 +81,29 @@ export const CONTENT_LIMITS = {
 // with that file - if you add/remove a step there, update this number.
 // ---------------------------------------------------------------------------
 export const VISIBILITY_CHECKLIST_TOTAL = 57;
+
+// ---------------------------------------------------------------------------
+// Tracked-prompt limits (server/routes/prompts.ts, client Prompts UI).
+// Was a bare `const TRACKED_PROMPTS_CAP = 10` duplicated independently in
+// server/routes/prompts.ts and PromptsTab.tsx - centralized here so the two
+// can't drift. Flat per-brand cap, not tier-dependent (no plan check exists
+// for this today).
+// ---------------------------------------------------------------------------
+export const TRACKED_PROMPTS_CAP = 10;
+
+// ---------------------------------------------------------------------------
+// AI-generated audience grouping (server/lib/audienceGenerator.ts). Same
+// per-brand-cooldown reasoning as PERCEPTION_COOLDOWN_MS
+// (server/routes/dashboard.ts) - the underlying evidence (tracked prompts +
+// their scores) only changes when prompts are edited or a citation run
+// lands, so re-generating sooner just spends an LLM call to reproduce
+// nearly the same grouping.
+// ---------------------------------------------------------------------------
+export const AUDIENCE_GENERATION_COOLDOWN_MS = 60 * 60 * 1000;
+
+// ---------------------------------------------------------------------------
+// Prompt Set Health audit (server/lib/promptSetHealthAuditor.ts). Same
+// per-brand-cooldown reasoning as PERCEPTION_COOLDOWN_MS /
+// AUDIENCE_GENERATION_COOLDOWN_MS above.
+// ---------------------------------------------------------------------------
+export const SET_HEALTH_COOLDOWN_MS = 60 * 60 * 1000;

@@ -453,10 +453,16 @@ export async function runBrandPrompts(
     ...(Array.isArray(brand.nameVariations) ? brand.nameVariations : []),
   ].filter((s) => typeof s === "string" && s.trim().length > 0);
   const allPrompts = await storage.getBrandPromptsByBrandId(brandId);
+  // Paused is orthogonal to status="tracked" (see shared/schema.ts) - a
+  // paused prompt still counts against the cap and still shows in the
+  // tracked list, but is skipped by the next run specifically. An explicit
+  // promptIds selection (e.g. re-running one prompt by hand) still honors a
+  // pause - the toggle exists so a paused prompt is never asked at all.
+  const runnable = allPrompts.filter((p) => !p.paused);
   const prompts =
     options.promptIds && options.promptIds.length > 0
-      ? allPrompts.filter((p) => options.promptIds!.includes(p.id))
-      : allPrompts;
+      ? runnable.filter((p) => options.promptIds!.includes(p.id))
+      : runnable;
   if (prompts.length === 0)
     return { totalChecks: 0, totalCited: 0, rankings: [], runId: null, done: true };
 
@@ -1078,6 +1084,13 @@ export async function runBrandPrompts(
       ? `${structuredCitations.join(" ")} ${responseText}`
       : responseText;
     const citedUrls = extractCitedUrls(citedUrlsInput);
+    // Every brand the analyzer found in THIS response - not just the
+    // tracked brand/competitors, which each get their own narrower row
+    // elsewhere. Powers the prompt-detail page's full "Top Answers" list.
+    // Capped generously; the analyzer itself already caps at 25.
+    const mentionedBrands = analysis.brands
+      .slice(0, 15)
+      .map((b) => ({ name: b.name, cited: b.cited, rank: b.rank }));
     try {
       const row = await storage.createGeoRanking({
         articleId: null,
@@ -1095,6 +1108,7 @@ export async function runBrandPrompts(
         authorityScore,
         relevanceScore: relevance,
         sentiment: brandSentiment,
+        mentionedBrands,
         checkedAt: new Date(),
       } as any);
       rankings.push(row);

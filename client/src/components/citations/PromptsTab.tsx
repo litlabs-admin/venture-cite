@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useLoadingMessages } from "@/hooks/use-loading-messages";
 import type { Brand, BrandPrompt } from "@shared/schema";
+import { TRACKED_PROMPTS_CAP } from "@shared/constants";
 import { PromptsTable, type PromptRowModel } from "@/components/citations/PromptsTable";
 import {
   usePromptSuggestions,
@@ -46,7 +47,9 @@ import {
 // The tracked cap is enforced server-side on every write path; the UI mirrors
 // it so affordances disable before a request would be refused.
 
-const TRACKED_CAP = 10;
+// Was a bare local literal, duplicated independently in server/routes/prompts.ts.
+// Both now import the same value from @shared/constants.
+const TRACKED_CAP = TRACKED_PROMPTS_CAP;
 
 type MutationBody = { success: boolean; error?: string; data?: unknown };
 

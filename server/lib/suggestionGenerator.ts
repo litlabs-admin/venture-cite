@@ -85,7 +85,9 @@ const STOPWORDS = new Set([
   "this",
 ]);
 
-function tokenize(s: string): Set<string> {
+// Exported for reuse by promptSetHealthAuditor.ts's duplicate pre-pass -
+// same similarity notion, no reason to reimplement it.
+export function tokenize(s: string): Set<string> {
   return new Set(
     s
       .toLowerCase()
@@ -94,7 +96,7 @@ function tokenize(s: string): Set<string> {
   );
 }
 
-function jaccard(a: Set<string>, b: Set<string>): number {
+export function jaccard(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 || b.size === 0) return 0;
   let overlap = 0;
   Array.from(a).forEach((tok) => {

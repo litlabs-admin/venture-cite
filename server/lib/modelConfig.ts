@@ -53,16 +53,24 @@ export const MODELS = {
   // ── Track AI Citations (citations page) ───────────────────────────
   // Prompt portfolio generator - 15 strategic questions per brand.
   brandPromptGeneration: ANALYSIS_MODEL,
+  // Audiences tab (server/lib/audienceGenerator.ts) - groups tracked
+  // prompts into named audiences with a funnel stage.
+  audienceGeneration: ANALYSIS_MODEL,
+  // Set Health audit (server/lib/promptSetHealthAuditor.ts).
+  promptSetHealth: ANALYSIS_MODEL,
   // Competitor discovery - both the profile inference and the
   // citation-mining pass. Both call sites must use this key: they share
   // one OpenRouter client, so a bare OpenAI snapshot name would 404.
   competitorDiscovery: ANALYSIS_MODEL,
-  // No `citationChatGPT` key: the ChatGPT citation check needs a
-  // web-grounded model, so it uses `gpt-4o-mini-search-preview`, declared
-  // directly on CITATION_MODELS.ChatGPT below. A key here holding the
-  // non-search snapshot was read by nothing and stated the wrong model -
-  // the same "edit the obvious place, change nothing" trap that let the
-  // DeepSeek slug 404 in production.
+  // ChatGPT citation check (CITATION_MODELS.ChatGPT below). Was
+  // `gpt-4o-mini-search-preview` via the direct OpenAI client - that
+  // snapshot was deprecated (404 as of 2026-08-25), which meant every
+  // ChatGPT citation check had been silently failing and recording
+  // "not cited". Moved onto the same OpenRouter slug as the other
+  // analysis-tier calls, with the web-search plugin attached
+  // (webSearchTool: true below) since this slug doesn't do its own
+  // retrieval the way search-preview did.
+  citationChatGPT: ANALYSIS_MODEL,
   // The other five platforms go through OpenRouter. Slugs verified
   // against https://openrouter.ai/api/v1/models on 2026-04-16 - edit here
   // if OpenRouter renames or deprecates any of them.
@@ -78,6 +86,13 @@ export const MODELS = {
   // against https://openrouter.ai/api/v1/models before editing.
   citationDeepSeek: "deepseek/deepseek-v4-flash",
   citationGrok: "x-ai/grok-4.3",
+  // Cross-platform brand-extraction analyzer (server/lib/responseAnalyzer.ts)
+  // - runs once per citation-check response, on EVERY platform's answer,
+  // extracting every brand it names (tracked or not) with rank/relevance.
+  // Moved from a direct-OpenAI gpt-4o-mini call onto the same OpenRouter
+  // analysis-tier slug as the rest of this file for stronger extraction
+  // quality, at the user's request.
+  citationBrandExtraction: ANALYSIS_MODEL,
 
   // ── Distribute Content (articles page → distribute dialog) ────────
   // Rewrites an article for LinkedIn, Medium, Reddit.
@@ -97,10 +112,15 @@ export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 // answers with LIVE WEB GROUNDING, queried as itself, deterministically.
 // Slugs + token prices + the facts below verified 2026-05-27 against the
 // OpenAI / OpenRouter model + docs pages.
-//   - ChatGPT: OpenAI `gpt-4o-mini-search-preview` via the direct OpenAI
-//     client. Search-preview models do their own retrieval and REJECT
-//     all sampling params (temperature/top_p/penalties) → returns a
-//     400 if `temperature` is sent, so supportsTemperature:false.
+//   - ChatGPT: was OpenAI `gpt-4o-mini-search-preview` via the direct
+//     OpenAI client (search-preview models do their own retrieval and
+//     REJECT sampling params). That snapshot was deprecated (404 as of
+//     2026-08-25 - every ChatGPT citation check had been silently
+//     failing and recording "not cited"). Moved onto the same
+//     OpenRouter `openai/gpt-5.6-luna` slug used by the analysis-tier
+//     calls (MODELS.citationChatGPT), same web-search plugin as
+//     Claude/Gemini/DeepSeek/Grok below - this slug has no built-in
+//     retrieval of its own.
 //   - Claude / Gemini / DeepSeek / Grok: clean OpenRouter slug + the documented
 //     `plugins:[{id:"web", max_results:5}]` extension on the OpenAI-compatible
 //     chat-completions request. (Per https://openrouter.ai/docs/guides/features/plugins/web-search
@@ -122,7 +142,7 @@ export interface CitationModelConfig {
   pricingModel: string;
   supportsTemperature: boolean;
   // Attach the openrouter:web_search server tool. False for engines that
-  // ground natively (ChatGPT search-preview, Perplexity sonar).
+  // ground natively (Perplexity sonar).
   webSearchTool: boolean;
 }
 // Slugs live in MODELS above - this map adds only the per-platform
@@ -131,11 +151,11 @@ export interface CitationModelConfig {
 // fix applied to MODELS.citationX now reaches the citation runner too.
 export const CITATION_MODELS: Record<string, CitationModelConfig> = {
   ChatGPT: {
-    client: "openai",
-    model: "gpt-4o-mini-search-preview",
-    pricingModel: "gpt-4o-mini-search-preview",
-    supportsTemperature: false,
-    webSearchTool: false,
+    client: "openrouter",
+    model: MODELS.citationChatGPT,
+    pricingModel: MODELS.citationChatGPT,
+    supportsTemperature: true,
+    webSearchTool: true,
   },
   Claude: {
     client: "openrouter",

@@ -13,6 +13,10 @@ import {
   type InsertGeoRanking,
   type BrandPrompt,
   type InsertBrandPrompt,
+  type PromptTag,
+  type PromptAudience,
+  type PromptSetHealthRun,
+  type PromptPhrasingTest,
   type VisibilityProgress,
   type GeoSignalRun,
   type InsertGeoSignalRun,
@@ -176,7 +180,63 @@ export interface IStorage {
     id: string,
     status: "tracked" | "archived",
   ): Promise<BrandPrompt | undefined>;
+  getBrandPromptById(id: string): Promise<BrandPrompt | undefined>;
+  setBrandPromptPaused(id: string, paused: boolean): Promise<BrandPrompt | undefined>;
   reorderBrandPrompts(brandId: string, orderedIds: string[]): Promise<void>;
+  // Prompt tags
+  getPromptTagsByBrandId(brandId: string): Promise<PromptTag[]>;
+  getPromptTagCounts(brandId: string): Promise<Record<string, number>>;
+  createPromptTag(t: { brandId: string; name: string; color?: string | null }): Promise<PromptTag>;
+  updatePromptTag(
+    id: string,
+    update: { name?: string; color?: string | null },
+  ): Promise<PromptTag | undefined>;
+  deletePromptTag(id: string): Promise<void>;
+  getTagIdsByPromptId(promptId: string): Promise<string[]>;
+  /** { brandPromptId: tagId[] } for every tagged prompt in the brand - one
+   *  query for the table's Tags column, instead of N single-prompt lookups. */
+  getPromptTagsMapByBrandId(brandId: string): Promise<Record<string, string[]>>;
+  attachPromptTag(promptId: string, tagId: string): Promise<void>;
+  detachPromptTag(promptId: string, tagId: string): Promise<void>;
+  // Prompt audiences
+  getPromptAudiencesByBrandId(brandId: string): Promise<PromptAudience[]>;
+  getPromptAudienceCounts(brandId: string): Promise<Record<string, number>>;
+  createPromptAudience(a: {
+    brandId: string;
+    name: string;
+    description?: string | null;
+    funnelStage?: string | null;
+    generatedBy?: "ai" | "manual";
+  }): Promise<PromptAudience>;
+  deletePromptAudience(id: string): Promise<void>;
+  getAudienceIdsByPromptId(promptId: string): Promise<string[]>;
+  /** { brandPromptId: audienceId[] } for every prompt in the brand - one
+   *  query, same shape as getPromptTagsMapByBrandId. */
+  getPromptAudienceMapByBrandId(brandId: string): Promise<Record<string, string[]>>;
+  attachPromptAudience(promptId: string, audienceId: string): Promise<void>;
+  detachPromptAudience(promptId: string, audienceId: string): Promise<void>;
+  /** createdAt of the most recent AI-generated audience batch for this
+   *  brand, or null if none exists yet - backs the generation cooldown. */
+  getLatestAiAudienceCreatedAt(brandId: string): Promise<Date | null>;
+  // Prompt set health
+  getLatestSetHealthRun(brandId: string): Promise<PromptSetHealthRun | undefined>;
+  createSetHealthRun(run: {
+    brandId: string;
+    score: number | null;
+    verdict: string | null;
+    topFix: unknown;
+    issues: unknown[];
+    workingWell: string[];
+  }): Promise<PromptSetHealthRun>;
+  // Prompt phrasing tests
+  getPhrasingTestsByPromptId(promptId: string): Promise<PromptPhrasingTest[]>;
+  getPhrasingTestById(id: string): Promise<PromptPhrasingTest | undefined>;
+  createPhrasingTest(t: {
+    brandPromptId: string;
+    phrasing: string;
+    rationale?: string | null;
+  }): Promise<PromptPhrasingTest>;
+  setPhrasingTestResults(id: string, results: unknown): Promise<PromptPhrasingTest | undefined>;
   getMaxBrandPromptOrderIndex(brandId: string): Promise<number>;
   // Wave 9.1: replaceTrackedId is optional now. Pass null to add the
   // suggestion as a new tracked prompt without archiving anything (only

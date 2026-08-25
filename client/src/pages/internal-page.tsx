@@ -1,75 +1,77 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { FileText, LayoutDashboard, Megaphone, Search, SquareCode, UserRound } from "lucide-react";
+import { Board } from "./internal/Board";
+import { Dashboard } from "./internal/Dashboard";
+import {
+  SEED_AEO,
+  SEED_BEN,
+  SEED_CONTENT,
+  SEED_ENGINEERING_IMPORTED,
+  SEED_MARKETING,
+} from "./internal/seedTasks";
+import type { BoardId, Ticket } from "./internal/types";
 
-// ─── Internal board ──────────────────────────────────────────────────────────
-// A private kanban for the team. It holds the work we found in the codebase
-// audit, plus anything we add later.
+// ─── Internal workspace ──────────────────────────────────────────────────────
+// A private workspace for the team: a KPI dashboard plus five kanban boards.
 //
 // PUBLIC: this page has no authentication gate. Anyone with the URL can read
-// and edit the board. It holds no customer data.
+// and edit every board, and can read the dashboard. That is a deliberate
+// choice, carried over from the original board. It is why /api/internal/kpis
+// returns aggregate counts only and never per-user rows - see that route.
 //
-// STORAGE: the board lives on the server, in one `system_state` row. Every
-// visitor reads and writes the same board, so a change is permanent and shared.
+// STORAGE: each board is its own `system_state` row (server/routes/board.ts).
+// Every visitor reads and writes the same rows, so a change is permanent and
+// shared. Boards save independently, so editing Marketing cannot clobber
+// Engineering.
 //
-// ponytail: one row in a table that already exists, not a new table. The board
-// needs no migration and no schema decision.
-//
-// The seed list below comes from a full read of the codebase on 2026-08-10.
-// Each seeded ticket names the file that proves it. Nothing here is a guess.
+// The engineering seed below comes from a full read of the codebase on
+// 2026-08-10. Each seeded ticket names the file that proves it. Nothing there
+// is a guess. The other four boards are seeded from "Venture Task Tracker.xlsx"
+// (see internal/seedTasks.ts).
 
-export type Column = "backlog" | "next" | "doing" | "blocked" | "done";
-export type Kind = "feature" | "upgrade";
-export type Weight = "high" | "medium" | "low";
+type ViewId = "dashboard" | BoardId;
 
-export interface Ticket {
-  id: string;
-  title: string;
-  detail: string;
-  kind: Kind;
-  weight: Weight;
-  area: string;
-  evidence: string;
-  column: Column;
-  order: number;
-}
-
-const COLUMNS: { key: Column; label: string }[] = [
-  { key: "backlog", label: "Backlog" },
-  { key: "next", label: "Next" },
-  { key: "doing", label: "In progress" },
-  { key: "blocked", label: "Blocked" },
-  { key: "done", label: "Done" },
+const NAV: { id: ViewId; label: string; icon: typeof LayoutDashboard }[] = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "engineering", label: "Engineering tasks", icon: SquareCode },
+  { id: "marketing", label: "Marketing", icon: Megaphone },
+  { id: "content", label: "Content", icon: FileText },
+  { id: "aeo", label: "AEO/GEO/SEO", icon: Search },
+  { id: "ben", label: "Ben's Personal Content", icon: UserRound },
 ];
 
-const KIND_LABEL: Record<Kind, string> = {
-  feature: "New feature",
-  upgrade: "Upgrade",
-};
-
-// Warm ramp only. Every colour is a token, never a literal.
-const KIND_SWATCH: Record<Kind, string> = {
-  feature: "var(--brand-accent)",
-  upgrade: "var(--success-accent)",
-};
-
-const WEIGHT_LABEL: Record<Weight, string> = { high: "High", medium: "Medium", low: "Low" };
-
-const SAVE_LABEL: Record<"idle" | "saving" | "saved" | "failed", string> = {
-  idle: "shared board",
-  saving: "saving...",
-  saved: "saved for everyone",
-  failed: "save failed",
+const BLURB: Record<BoardId, string> = {
+  engineering:
+    "Product and platform work. The seeded tickets came from a full codebase read and each names the file that proves it; the spreadsheet's engineering rows are mixed in and carry a brand tag.",
+  marketing:
+    "Campaigns, ads, outreach, launch activity and lead follow-up across all three brands.",
+  content: "Articles, video, creatives, case studies and the content calendar.",
+  aeo: "Answer-engine, generative-engine and search visibility work — the GEO outreach and citation-tracking thread.",
+  ben: "Ben's personal brand: topic plans, scripts, reels and thought-leadership posts.",
 };
 
 let seedCounter = 0;
-function seed(t: Omit<Ticket, "id" | "order" | "column"> & { column?: Column }): Ticket {
-  return { ...t, id: `seed-${++seedCounter}`, order: seedCounter, column: t.column ?? "backlog" };
+function seed(
+  t: Pick<Ticket, "title" | "detail" | "kind" | "weight" | "area" | "evidence"> & {
+    column?: Ticket["column"];
+  },
+): Ticket {
+  seedCounter += 1;
+  return {
+    ...t,
+    id: `seed-${seedCounter}`,
+    order: seedCounter,
+    column: t.column ?? "backlog",
+    brand: "",
+    assignee: "",
+    status: "",
+    link: "",
+    notes: "",
+  };
 }
 
-// ─── The seed board ──────────────────────────────────────────────────────────
-// Group 1: defects the audit proved. These are the cheapest wins.
-const SEED: Ticket[] = [
-  // Group 2: the measurement gaps. These change what the product can say.
+// ─── The engineering seed ────────────────────────────────────────────────────
+const SEED_AUDIT: Ticket[] = [
   seed({
     title: "Explain one question, end to end",
     detail:
@@ -127,8 +129,6 @@ const SEED: Ticket[] = [
     area: "Citations",
     evidence: "client/src/pages/citations.tsx",
   }),
-
-  // Group 3: the work loop. Nothing today turns a finding into a job.
   seed({
     title: "Turn findings into a work queue",
     detail:
@@ -156,8 +156,6 @@ const SEED: Ticket[] = [
     area: "Content",
     evidence: "server/routes/articles.ts",
   }),
-
-  // Group 4: data we do not collect yet.
   seed({
     title: "Count real AI crawler visits",
     detail:
@@ -187,8 +185,6 @@ const SEED: Ticket[] = [
     evidence: "no equivalent exists",
     column: "doing",
   }),
-
-  // Group 5: platform and reach.
   seed({
     title: "Make every view shareable with a link",
     detail:
@@ -237,430 +233,94 @@ const SEED: Ticket[] = [
     evidence: "server/routes/buffer.ts is the only connector",
     column: "doing",
   }),
-
-  // Group 6: strengths worth protecting. Do not lose these in a rebuild.
 ];
 
-// The board lives on the server, in one `system_state` row. Every visitor sees
-// the same board, and a change survives a refresh, a new browser and a deploy.
-// The server returns null when nobody has saved yet, so the seed above is the
-// first board anyone sees.
-async function loadFromServer(): Promise<Ticket[] | null> {
-  try {
-    const res = await fetch("/api/board");
-    if (!res.ok) return null;
-    const body = (await res.json()) as { tickets: Ticket[] | null };
-    return body.tickets && body.tickets.length ? body.tickets : null;
-  } catch {
-    return null;
-  }
-}
+const SEED_ENGINEERING: Ticket[] = [...SEED_AUDIT, ...SEED_ENGINEERING_IMPORTED];
 
-async function saveToServer(tickets: Ticket[]): Promise<boolean> {
-  try {
-    const res = await fetch("/api/board", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tickets }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const SEEDS: Record<BoardId, Ticket[]> = {
+  engineering: SEED_ENGINEERING,
+  marketing: SEED_MARKETING,
+  content: SEED_CONTENT,
+  aeo: SEED_AEO,
+  ben: SEED_BEN,
+};
+
+const VIEW_KEY = "internal-page-view";
 
 export default function InternalPage() {
-  const [tickets, setTickets] = useState<Ticket[]>(SEED);
-  const [ready, setReady] = useState(false);
-  const [query, setQuery] = useState("");
-  const [kindFilter, setKindFilter] = useState<Kind | "all">("all");
-  const [editing, setEditing] = useState<Ticket | null>(null);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
-  // A ref, not state. dragstart and drop can land in the same render, and a
-  // state value read inside the drop handler would still be null.
-  const dragRef = useRef<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  // Remembering the tab means a refresh does not throw you back to Dashboard
+  // mid-edit. Guarded because a stored value can outlive a renamed tab.
+  const [view, setView] = useState<ViewId>(() => {
+    if (typeof window === "undefined") return "dashboard";
+    const saved = window.localStorage.getItem(VIEW_KEY);
+    return NAV.some((n) => n.id === saved) ? (saved as ViewId) : "dashboard";
+  });
 
-  // Read the shared board once on mount.
   useEffect(() => {
-    let alive = true;
-    void loadFromServer().then((fromServer) => {
-      if (!alive) return;
-      if (fromServer) setTickets(fromServer);
-      setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+    window.localStorage.setItem(VIEW_KEY, view);
+  }, [view]);
 
-  // Write the whole board back after a change. The save is debounced, so a
-  // drag that touches several cards makes one request, not several.
-  useEffect(() => {
-    if (!ready) return;
-    setSaveState("saving");
-    const timer = setTimeout(() => {
-      void saveToServer(tickets).then((ok) => setSaveState(ok ? "saved" : "failed"));
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [tickets, ready]);
-
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return tickets.filter((t) => {
-      if (kindFilter !== "all" && t.kind !== kindFilter) return false;
-      if (!q) return true;
-      return `${t.title} ${t.detail} ${t.area} ${t.evidence}`.toLowerCase().includes(q);
-    });
-  }, [tickets, query, kindFilter]);
-
-  const move = useCallback((id: string, column: Column) => {
-    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, column } : t)));
-  }, []);
-
-  function save(next: Ticket) {
-    setTickets((prev) =>
-      prev.some((t) => t.id === next.id)
-        ? prev.map((t) => (t.id === next.id ? next : t))
-        : [...prev, next],
-    );
-    setEditing(null);
-  }
-
-  function remove(id: string) {
-    setTickets((prev) => prev.filter((t) => t.id !== id));
-    setEditing(null);
-  }
-
-  function exportJson() {
-    const blob = new Blob([JSON.stringify(tickets, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `internal-board-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function importJson(file: File) {
-    file.text().then((text) => {
-      try {
-        const parsed = JSON.parse(text) as Ticket[];
-        if (Array.isArray(parsed)) setTickets(parsed);
-      } catch {
-        // A bad file must not empty the board.
-      }
-    });
-  }
-
-  const counts = useMemo(() => {
-    const open = tickets.filter((t) => t.column !== "done").length;
-    const shipped = tickets.filter((t) => t.column === "done").length;
-    return { total: tickets.length, open, shipped };
-  }, [tickets]);
+  const active = useMemo(() => NAV.find((n) => n.id === view) ?? NAV[0], [view]);
 
   return (
-    <div className="flex h-full flex-col bg-vc-page">
-      <header className="border-b border-vc-default px-6 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold text-vc-primary">Internal board</h1>
-            <p className="mt-1 text-xs text-vc-tertiary">
-              {counts.total} items · {counts.open} open · {counts.shipped} shipped ·{" "}
-              {SAVE_LABEL[saveState]}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-vc-default px-2.5 text-xs text-vc-secondary transition-colors hover:border-vc-hover hover:text-vc-primary"
-            >
-              <Upload className="h-3.5 w-3.5" /> Import
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])}
-            />
-            <button
-              type="button"
-              onClick={exportJson}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-vc-default px-2.5 text-xs text-vc-secondary transition-colors hover:border-vc-hover hover:text-vc-primary"
-            >
-              <Download className="h-3.5 w-3.5" /> Export
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setEditing({
-                  id: `t-${Date.now()}`,
-                  title: "",
-                  detail: "",
-                  kind: "feature",
-                  weight: "medium",
-                  area: "",
-                  evidence: "",
-                  column: "backlog",
-                  order: Date.now(),
-                })
-              }
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-vc-accent px-3 text-xs font-medium text-white transition-colors hover:bg-vc-accent-hover"
-            >
-              <Plus className="h-3.5 w-3.5" /> New ticket
-            </button>
-          </div>
+    <div className="flex h-screen bg-vc-page">
+      <nav className="flex w-14 shrink-0 flex-col border-r border-vc-default bg-vc-muted lg:w-60">
+        <div className="border-b border-vc-default px-3 py-4 lg:px-4">
+          <span className="hidden text-sm font-semibold text-vc-primary lg:block">
+            Venture internal
+          </span>
+          <span className="block text-center text-sm font-semibold text-vc-primary lg:hidden">
+            V
+          </span>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-vc-tertiary" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tickets"
-              className="h-8 w-56 rounded-md border border-vc-default bg-transparent pl-7 pr-2 text-xs text-vc-primary outline-none placeholder:text-vc-placeholder focus:border-vc-accent"
-            />
-          </div>
-          {(["all", "feature", "upgrade"] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setKindFilter(k)}
-              className={`h-8 rounded-md border px-2.5 text-xs transition-colors ${
-                kindFilter === k
-                  ? "border-vc-accent bg-vc-accent-subtle text-vc-accent"
-                  : "border-vc-default text-vc-tertiary hover:border-vc-hover hover:text-vc-primary"
-              }`}
-            >
-              {k === "all" ? "All" : KIND_LABEL[k]}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <div className="flex flex-1 gap-3 overflow-x-auto p-4">
-        {COLUMNS.map((col) => {
-          const items = visible.filter((t) => t.column === col.key);
-          return (
-            <section
-              key={col.key}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => {
-                if (dragRef.current) move(dragRef.current, col.key);
-                dragRef.current = null;
-              }}
-              className="flex w-[300px] shrink-0 flex-col rounded-lg border border-vc-default bg-vc-muted"
-            >
-              <div className="flex items-center justify-between border-b border-vc-default px-3 py-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-vc-label">
-                  {col.label}
-                </span>
-                <span className="text-xs text-vc-tertiary">{items.length}</span>
-              </div>
-              <div className="flex-1 space-y-2 overflow-y-auto p-2">
-                {items.map((t) => (
-                  <article
-                    key={t.id}
-                    draggable
-                    onDragStart={() => (dragRef.current = t.id)}
-                    onDragEnd={() => (dragRef.current = null)}
-                    onClick={() => setEditing(t)}
-                    className="cursor-pointer rounded-md border border-vc-default bg-vc-surface p-2.5 transition-colors hover:border-vc-hover"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ background: KIND_SWATCH[t.kind] }}
-                      />
-                      <span className="text-xs uppercase tracking-wider text-vc-label">
-                        {KIND_LABEL[t.kind]}
-                      </span>
-                      <span className="ml-auto text-xs text-vc-tertiary">
-                        {WEIGHT_LABEL[t.weight]}
-                      </span>
-                    </div>
-                    <h3 className="mt-1.5 text-sm font-medium leading-snug text-vc-primary">
-                      {t.title}
-                    </h3>
-                    {t.area && <p className="mt-1 text-xs text-vc-tertiary">{t.area}</p>}
-                  </article>
-                ))}
-                {!items.length && (
-                  <p className="px-1 py-6 text-center text-xs text-vc-tertiary">Nothing here</p>
-                )}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-
-      {editing && (
-        <TicketDialog
-          ticket={editing}
-          onSave={save}
-          onDelete={remove}
-          onClose={() => setEditing(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function TicketDialog({
-  ticket,
-  onSave,
-  onDelete,
-  onClose,
-}: {
-  ticket: Ticket;
-  onSave: (t: Ticket) => void;
-  onDelete: (id: string) => void;
-  onClose: () => void;
-}) {
-  const [draft, setDraft] = useState<Ticket>(ticket);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const field =
-    "w-full rounded-md border border-vc-default bg-transparent px-2 py-1.5 text-sm text-vc-primary outline-none focus:border-vc-accent";
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[85vh] w-[560px] overflow-y-auto rounded-lg border border-vc-default bg-vc-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between">
-          <h2 className="text-sm font-semibold text-vc-primary">Ticket</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-vc-tertiary hover:text-vc-primary"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          <label className="block">
-            <span className="text-xs uppercase tracking-wider text-vc-label">Title</span>
-            <input
-              className={`${field} mt-1`}
-              value={draft.title}
-              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-xs uppercase tracking-wider text-vc-label">Detail</span>
-            <textarea
-              className={`${field} mt-1 min-h-[110px]`}
-              value={draft.detail}
-              onChange={(e) => setDraft({ ...draft, detail: e.target.value })}
-            />
-          </label>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-xs uppercase tracking-wider text-vc-label">Kind</span>
-              <select
-                className={`${field} mt-1`}
-                value={draft.kind}
-                onChange={(e) => setDraft({ ...draft, kind: e.target.value as Kind })}
+        <div className="flex-1 space-y-0.5 overflow-y-auto p-2">
+          {NAV.map((item) => {
+            const Icon = item.icon;
+            const on = item.id === view;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setView(item.id)}
+                title={item.label}
+                aria-current={on ? "page" : undefined}
+                className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs transition-colors ${
+                  on
+                    ? "bg-vc-accent-subtle font-medium text-vc-accent"
+                    : "text-vc-secondary hover:bg-vc-surface hover:text-vc-primary"
+                }`}
               >
-                {(Object.keys(KIND_LABEL) as Kind[]).map((k) => (
-                  <option key={k} value={k}>
-                    {KIND_LABEL[k]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs uppercase tracking-wider text-vc-label">Weight</span>
-              <select
-                className={`${field} mt-1`}
-                value={draft.weight}
-                onChange={(e) => setDraft({ ...draft, weight: e.target.value as Weight })}
-              >
-                {(Object.keys(WEIGHT_LABEL) as Weight[]).map((w) => (
-                  <option key={w} value={w}>
-                    {WEIGHT_LABEL[w]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs uppercase tracking-wider text-vc-label">Area</span>
-              <input
-                className={`${field} mt-1`}
-                value={draft.area}
-                onChange={(e) => setDraft({ ...draft, area: e.target.value })}
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs uppercase tracking-wider text-vc-label">Column</span>
-              <select
-                className={`${field} mt-1`}
-                value={draft.column}
-                onChange={(e) => setDraft({ ...draft, column: e.target.value as Column })}
-              >
-                {COLUMNS.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <label className="block">
-            <span className="text-xs uppercase tracking-wider text-vc-label">Evidence</span>
-            <input
-              className={`${field} mt-1`}
-              value={draft.evidence}
-              placeholder="The file that proves it"
-              onChange={(e) => setDraft({ ...draft, evidence: e.target.value })}
-            />
-          </label>
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="hidden truncate lg:block">{item.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="mt-5 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => onDelete(draft.id)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-vc-default px-2.5 text-xs text-vc-tertiary transition-colors hover:text-[color:var(--negative)]"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> Delete
-          </button>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-8 rounded-md border border-vc-default px-3 text-xs text-vc-secondary transition-colors hover:border-vc-hover"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!draft.title.trim()}
-              onClick={() => onSave(draft)}
-              className="h-8 rounded-md bg-vc-accent px-3 text-xs font-medium text-white transition-colors hover:bg-vc-accent-hover disabled:opacity-50"
-            >
-              Save
-            </button>
-          </div>
+        <div className="hidden border-t border-vc-default px-4 py-3 lg:block">
+          <p className="text-[11px] leading-relaxed text-vc-tertiary">
+            Shared and public. Every edit is saved for everyone.
+          </p>
         </div>
-      </div>
+      </nav>
+
+      <main className="min-w-0 flex-1 overflow-hidden">
+        {view === "dashboard" ? (
+          <Dashboard />
+        ) : (
+          <Board
+            // Remounting per board keeps each board's local state (search,
+            // filters, drag) from leaking into the next one.
+            key={view}
+            boardId={view}
+            title={active.label}
+            blurb={BLURB[view]}
+            seed={SEEDS[view]}
+            newKind={view === "engineering" ? "feature" : "task"}
+          />
+        )}
+      </main>
     </div>
   );
 }

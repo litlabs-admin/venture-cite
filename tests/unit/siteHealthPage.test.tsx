@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // The page renders router links via dashboard-panel primitives (CCLink) and
@@ -24,6 +24,7 @@ import SiteHealthDetailPage, { type SiteHealthPage } from "@/pages/site-health";
 const HEALTH_KEY = "/api/dashboard/site-health/brand-1";
 const PAGES_KEY = "/api/dashboard/site-health/brand-1/pages";
 const CONTENT_FINDINGS_KEY = "/api/dashboard/site-health/brand-1/content-findings";
+const FINDING_STATUS_KEY = "/api/dashboard/site-health/brand-1/finding-status";
 
 function renderWithData(healthData: unknown, pagesData?: unknown, contentFindingsData?: unknown) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -40,6 +41,7 @@ function renderWithData(healthData: unknown, pagesData?: unknown, contentFinding
       ? { success: true, data: contentFindingsData }
       : { success: true, data: { findings: [] } },
   );
+  qc.setQueryData([FINDING_STATUS_KEY], { success: true, data: [] });
   return render(
     <QueryClientProvider client={qc}>
       <SiteHealthDetailPage />
@@ -72,6 +74,7 @@ const pageRows: SiteHealthPage[] = [
     contentType: null,
     factCount: 0,
     severity: "critical",
+    findingIds: ["failed-pages"],
   },
   {
     url: "https://example.com/missing",
@@ -81,11 +84,12 @@ const pageRows: SiteHealthPage[] = [
     contentType: "text/html",
     factCount: 0,
     severity: "high",
+    findingIds: ["failed-pages"],
   },
 ];
 
 describe("SiteHealthDetailPage - full data", () => {
-  it("renders the score, meta rows, and grouped issues", () => {
+  it("renders the score and meta rows", () => {
     renderWithData(fullHealth, { runId: "run-1", pages: pageRows });
 
     expect(screen.getByText("Acme Corp")).toBeTruthy();
@@ -94,22 +98,44 @@ describe("SiteHealthDetailPage - full data", () => {
     // audited sample (10) - the audited count appears as the stat's caption.
     expect(screen.getByText("53")).toBeTruthy();
     expect(screen.getByText("10 audited")).toBeTruthy();
-    expect(screen.getByText("https://example.com/broken")).toBeTruthy();
-    expect(screen.getByText("https://example.com/missing")).toBeTruthy();
   });
 
-  // The Open Issues and Platform tiles were removed from this page, along with
-  // the tab strip. Asserted as absent rather than deleted, so the removal is
-  // guarded: Open Issues restated the findings list's own count as a metric,
-  // and the issue rows above are still the real assertion that issues render.
-  it("no longer renders the Open Issues tile, the Platform tile or the tab strip", () => {
+  // Full parity rebuild: raw page URLs are no longer listed inline on the
+  // Findings tab (that was the removed IssueGroup component) - they live
+  // behind the checks table's finding drawer now, GROUPED by path prefix
+  // (matching the reference product's own "Where it shows up" pattern),
+  // not as a flat URL list. Opening a row's drawer is the real assertion
+  // that affected-URL data still reaches the UI.
+  it("shows affected pages grouped by path prefix inside the finding drawer, not inline", () => {
+    renderWithData(fullHealth, { runId: "run-1", pages: pageRows });
+
+    expect(screen.queryByText("https://example.com/broken")).toBeNull();
+    expect(screen.queryByText("/broken/*")).toBeNull();
+    const failedRowButton = screen
+      .getAllByText(/failed to crawl/i)
+      .map((el) => el.closest("button"))
+      .find((btn): btn is HTMLButtonElement => !!btn);
+    fireEvent.click(failedRowButton!);
+    // pageRows has one page under /broken and one under /missing - two
+    // distinct top-level segments, so two separate path groups, each 1 page.
+    expect(screen.getByText("/broken/*")).toBeTruthy();
+    expect(screen.getByText("/missing/*")).toBeTruthy();
+  });
+
+  // The Open Issues and Platform tiles stay removed - Open Issues restated
+  // the findings list's own count as a metric, and there's still no Platform
+  // tile anywhere on this page. The tab strip is BACK (Findings/Pages/History,
+  // full parity rebuild) - this now asserts presence, not absence.
+  it("still has no Open Issues or Platform tile, and now has the Findings/Pages/History tab strip", () => {
     renderWithData(fullHealth, { runId: "run-1", pages: pageRows });
 
     expect(screen.queryByText("Open Issues")).toBeNull();
-    expect(screen.queryByText("6")).toBeNull();
     expect(screen.queryByText("Platform")).toBeNull();
     expect(screen.queryByText("Next.js")).toBeNull();
-    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByRole("tablist")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Findings" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Pages" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "History" })).toBeTruthy();
   });
 });
 

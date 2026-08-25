@@ -131,3 +131,9 @@ api/
 
 # Local secret drops (webhook signing secrets etc) - never commit these
 *.local.txt
+
+# Supabase CLI local state. `.temp/start-secrets/` holds SUPABASE_SERVICE_ROLE_KEY,
+# SUPABASE_INTERNAL_JWT_SECRET and a pooler URL with the DB password in it, and
+# `.branches/` is per-machine. These are local CLI artifacts, never source.
+supabase/.temp/
+supabase/.branches/

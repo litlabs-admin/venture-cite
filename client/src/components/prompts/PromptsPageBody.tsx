@@ -1,0 +1,540 @@
+import { useMemo, useState } from "react";
+import { Loader2, Sparkles, RefreshCw, X, HeartPulse } from "lucide-react";
+import { SetHealthDrawer } from "./SetHealthDrawer";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useLoadingMessages } from "@/hooks/use-loading-messages";
+import type { Brand, BrandPrompt } from "@shared/schema";
+import { TRACKED_PROMPTS_CAP } from "@shared/constants";
+import { PromptsTable, type PromptRowModel } from "./PromptsTable";
+import {
+  usePromptSuggestions,
+  useAllPrompts,
+  usePromptResults,
+  usePromptScoreHistory,
+  usePromptTags,
+  usePromptTagsMap,
+  usePromptTagMutations,
+  useGeneratePrompts,
+  useResetPrompts,
+  useRefreshSuggestions,
+  useAcceptSuggestion,
+  useDismissSuggestion,
+  useEditPrompt,
+  useArchivePrompt,
+  useCreatePrompt,
+  useReorderPrompts,
+  useTogglePromptPaused,
+} from "@/hooks/usePrompts";
+
+// ─── Prompts page body ───────────────────────────────────────────────────
+// A fork of client/src/components/citations/PromptsTab.tsx (same dialogs,
+// toasts, mutation wiring - copied forward rather than shared, per the plan's
+// routing decision: citations.tsx's embedded tab stays untouched as a lighter
+// secondary surface, this is the full /prompts page). The only real
+// differences: uses the rebuilt prompts/PromptsTable (Tags/sparkline/Score/
+// Δ/On columns), and wires tags + the pause toggle that table needs.
+
+const TRACKED_CAP = TRACKED_PROMPTS_CAP;
+
+type MutationBody = { success: boolean; error?: string; data?: unknown };
+
+export function PromptsPageBody({
+  selectedBrandId,
+  selectedBrand,
+  prompts,
+  promptsLoading,
+  hasPrompts,
+  promptsAgeLabel,
+}: {
+  selectedBrandId: string;
+  selectedBrand: Brand | undefined;
+  prompts: BrandPrompt[];
+  promptsLoading: boolean;
+  hasPrompts: boolean;
+  promptsAgeLabel: string | null;
+}) {
+  const { toast } = useToast();
+
+  const { data: suggestionsData } = usePromptSuggestions(selectedBrandId);
+  const suggestions = suggestionsData?.data ?? [];
+  const { data: allPromptsData } = useAllPrompts(selectedBrandId);
+  const tablePrompts = allPromptsData?.data ?? prompts;
+  const { data: historyData } = usePromptScoreHistory(selectedBrandId);
+  const { data: resultsData } = usePromptResults(selectedBrandId);
+  const { data: tagsData } = usePromptTags(selectedBrandId);
+  const { data: tagsMapData } = usePromptTagsMap(selectedBrandId);
+
+  const generate = useGeneratePrompts(selectedBrandId);
+  const reset = useResetPrompts(selectedBrandId);
+  const refreshSuggestions = useRefreshSuggestions(selectedBrandId);
+  const acceptSuggestion = useAcceptSuggestion(selectedBrandId);
+  const dismissSuggestion = useDismissSuggestion(selectedBrandId);
+  const editPrompt = useEditPrompt(selectedBrandId);
+  const archivePrompt = useArchivePrompt(selectedBrandId);
+  const createPrompt = useCreatePrompt(selectedBrandId);
+  const reorder = useReorderPrompts(selectedBrandId);
+  const togglePaused = useTogglePromptPaused(selectedBrandId);
+  const tagMutations = usePromptTagMutations(selectedBrandId);
+
+  const [archiving, setArchiving] = useState<BrandPrompt | null>(null);
+  const [healthOpen, setHealthOpen] = useState(false);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [accepting, setAccepting] = useState<BrandPrompt | null>(null);
+  const [acceptReplaceId, setAcceptReplaceId] = useState("");
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetConfirmed, setResetConfirmed] = useState(false);
+
+  const generateMessage = useLoadingMessages(generate.isPending, [
+    "Analyzing your brand...",
+    "Reviewing published articles...",
+    "Crafting strategic citation prompts...",
+    "Scoring each prompt for AI visibility...",
+    "Finalizing your portfolio...",
+  ]);
+
+  const historyById = useMemo(
+    () => Object.fromEntries((historyData?.data ?? []).map((h) => [h.promptId, h])),
+    [historyData],
+  );
+
+  const blindSpotIds = useMemo(() => {
+    const out = new Set<string>();
+    for (const row of resultsData?.data?.byPrompt ?? []) {
+      if (row.platforms.length > 0 && row.platforms.every((p) => !p.isCited)) out.add(row.promptId);
+    }
+    return out;
+  }, [resultsData]);
+
+  const rows: PromptRowModel[] = useMemo(
+    () => tablePrompts.map((p) => ({ prompt: p })),
+    [tablePrompts],
+  );
+
+  const notify = (d: MutationBody, okTitle: string, failTitle: string) =>
+    toast(
+      d.success
+        ? { title: okTitle }
+        : { title: failTitle, description: d.error, variant: "destructive" },
+    );
+
+  function create(text: string) {
+    createPrompt.mutate(text, {
+      onSuccess: ({ body }) => {
+        if (body.success) toast({ title: "Prompt added" });
+        else if (body.error === "tracked_set_full")
+          toast({
+            title: "Tracked set is full",
+            description: `Archive one to free a slot (cap ${TRACKED_CAP}).`,
+            variant: "destructive",
+          });
+        else if (body.error === "duplicate_prompt")
+          toast({ title: "Already tracked", description: "That prompt is already in the list." });
+        else
+          toast({ title: "Couldn't add prompt", description: body.error, variant: "destructive" });
+      },
+      onError: (e: Error) =>
+        toast({ title: "Couldn't add prompt", description: e.message, variant: "destructive" }),
+    });
+  }
+
+  function createMany(texts: string[]) {
+    const room = TRACKED_CAP - prompts.length;
+    const accepted = texts.slice(0, Math.max(0, room));
+    if (accepted.length === 0) {
+      toast({
+        title: "No room",
+        description: `You're at the cap of ${TRACKED_CAP} prompts.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    void accepted
+      .reduce<Promise<void>>(
+        (chain, text) =>
+          chain.then(
+            () =>
+              new Promise<void>((resolve) => {
+                createPrompt.mutate(text, { onSettled: () => resolve() });
+              }),
+          ),
+        Promise.resolve(),
+      )
+      .then(() => {
+        const skipped = texts.length - accepted.length;
+        toast({
+          title: `Added ${accepted.length} prompt${accepted.length === 1 ? "" : "s"}`,
+          description: skipped > 0 ? `${skipped} skipped - tracked set is full.` : undefined,
+        });
+      });
+  }
+
+  function exportCsv() {
+    const header = ["Prompt", "Score", "Change", "Runs", "Status", "Paused", "Added", "Blind spot"];
+    const body = rows.map((r) => {
+      const h = historyById[r.prompt.id];
+      return [
+        r.prompt.prompt,
+        h?.score ?? "",
+        h?.delta ?? "",
+        h?.runs ?? 0,
+        r.prompt.status,
+        r.prompt.paused ? "yes" : "no",
+        r.prompt.createdAt ? new Date(r.prompt.createdAt).toISOString().slice(0, 10) : "",
+        blindSpotIds.has(r.prompt.id) ? "yes" : "no",
+      ];
+    });
+    const csv = [header, ...body]
+      .map((line) =>
+        line
+          .map((v) => {
+            const s = String(v ?? "");
+            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+          })
+          .join(","),
+      )
+      .join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `prompts-${(selectedBrand?.name ?? "brand").replace(/\W+/g, "-").toLowerCase()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  if (!hasPrompts && !promptsLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center px-8 py-16 text-center">
+        <Sparkles className="mb-3 h-6 w-6 text-vc-hover" aria-hidden />
+        <p className="mb-1 text-[15px] font-medium text-vc-primary">No prompts yet</p>
+        <p className="mb-4 max-w-md text-caption text-vc-tertiary">
+          Generate {TRACKED_CAP} citation prompts tailored to {selectedBrand?.name ?? "your brand"},
+          then refine them. The same set is re-checked on every run so trends stay comparable.
+        </p>
+        <Button
+          disabled={generate.isPending}
+          onClick={() =>
+            generate.mutate(undefined, {
+              onSuccess: (d: MutationBody) =>
+                notify(d, "Prompts generated", "Couldn't generate prompts"),
+            })
+          }
+        >
+          {generate.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {generateMessage}
+            </>
+          ) : (
+            `Generate ${TRACKED_CAP} citation prompts`
+          )}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-0 flex-col">
+      <div className="flex items-center gap-2.5 border-b border-vc-accent/10 bg-vc-accent-subtle/30 px-4 py-2 sm:px-8">
+        <p className="flex-1 text-caption leading-snug text-vc-secondary">
+          Prompts are the questions people ask AI. The same set is re-checked on every run, so
+          scores stay comparable week to week
+          {promptsAgeLabel ? ` - seeded ${promptsAgeLabel}` : ""}.
+        </p>
+        <button
+          type="button"
+          onClick={() => setHealthOpen(true)}
+          className="flex flex-shrink-0 items-center gap-1 text-data font-medium text-vc-accent transition-colors hover:text-vc-accent-hover"
+        >
+          <HeartPulse className="h-3 w-3" aria-hidden />
+          Set Health
+        </button>
+        <button
+          type="button"
+          onClick={() => setResetOpen(true)}
+          className="flex flex-shrink-0 items-center gap-1 text-data font-medium text-vc-accent transition-colors hover:text-vc-accent-hover"
+        >
+          <RefreshCw className="h-3 w-3" aria-hidden />
+          Reset all
+        </button>
+      </div>
+
+      <SetHealthDrawer
+        open={healthOpen}
+        onOpenChange={setHealthOpen}
+        selectedBrandId={selectedBrandId}
+        prompts={tablePrompts}
+      />
+
+      <PromptsTable
+        rows={rows}
+        tags={tagsData?.data ?? []}
+        tagsByPrompt={tagsMapData?.data ?? {}}
+        scoreHistoryByPrompt={historyById}
+        suggestionCount={suggestions.length}
+        cap={TRACKED_CAP}
+        createPending={createPrompt.isPending}
+        onEdit={(p, text) =>
+          editPrompt.mutate(
+            { promptId: p.id, text },
+            { onSuccess: (d: MutationBody) => notify(d, "Prompt updated", "Update failed") },
+          )
+        }
+        onArchive={(p) => setArchiving(p)}
+        onReorder={(ids) => reorder.mutate(ids)}
+        onCreate={create}
+        onCreateMany={createMany}
+        onSuggest={() => setSuggestionsOpen(true)}
+        onExport={exportCsv}
+        onTogglePaused={(promptId, paused) => togglePaused.mutate({ promptId, paused })}
+        onAttachTag={(promptId, tagId) => tagMutations.attach.mutate({ promptId, tagId })}
+        onDetachTag={(promptId, tagId) => tagMutations.detach.mutate({ promptId, tagId })}
+      />
+
+      {/* Archive confirm */}
+      <AlertDialog open={!!archiving} onOpenChange={(o) => !o && setArchiving(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this prompt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It drops out of future runs. Past results are kept, so archiving does not erase
+              history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!archiving) return;
+                archivePrompt.mutate(archiving.id, {
+                  onSuccess: (d: MutationBody) =>
+                    notify(d, "Prompt archived", "Couldn't archive prompt"),
+                });
+                setArchiving(null);
+              }}
+            >
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset confirm */}
+      <AlertDialog
+        open={resetOpen}
+        onOpenChange={(o) => {
+          setResetOpen(o);
+          if (!o) setResetConfirmed(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset tracked prompts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This archives every tracked prompt and pending suggestion, then generates a fresh set
+              of {TRACKED_CAP}. Past citation history is preserved, but week-over-week trends
+              restart.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <label className="mt-2 flex cursor-pointer items-start gap-2 text-caption">
+            <input
+              type="checkbox"
+              checked={resetConfirmed}
+              onChange={(e) => setResetConfirmed(e.target.checked)}
+            />
+            I understand this replaces the tracked set.
+          </label>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!resetConfirmed}
+              onClick={() => {
+                reset.mutate(undefined, {
+                  onSuccess: (d: MutationBody) => notify(d, "Prompts reset", "Reset failed"),
+                });
+                setResetOpen(false);
+              }}
+            >
+              Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Suggestion ideas */}
+      <Dialog open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Prompt ideas</DialogTitle>
+            <DialogDescription>
+              AI-generated suggestions based on your brand and the gaps in your current set.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-1 overflow-y-auto">
+            {suggestions.length === 0 ? (
+              <p className="py-6 text-center text-caption text-muted-foreground">
+                No suggestions right now. Refresh to generate a new batch.
+              </p>
+            ) : (
+              suggestions.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-start gap-3 rounded border border-vc-default px-3 py-2"
+                >
+                  <div className="flex-1">
+                    <p className="text-body text-vc-primary">{s.prompt}</p>
+                    {s.rationale && (
+                      <p className="mt-0.5 text-data italic text-vc-tertiary">{s.rationale}</p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setAccepting(s);
+                      setAcceptReplaceId("");
+                    }}
+                  >
+                    Accept
+                  </Button>
+                  <button
+                    type="button"
+                    aria-label="Dismiss suggestion"
+                    className="p-1 text-vc-text-muted transition-colors hover:text-vc-secondary"
+                    onClick={() => dismissSuggestion.mutate(s.id)}
+                  >
+                    <X className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={refreshSuggestions.isPending}
+              onClick={() =>
+                refreshSuggestions.mutate(undefined, {
+                  onSuccess: (d: MutationBody) =>
+                    notify(d, "Suggestions refreshed", "Couldn't refresh suggestions"),
+                })
+              }
+            >
+              {refreshSuggestions.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Refreshing
+                </>
+              ) : (
+                "Refresh ideas"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Accept a suggestion */}
+      <Dialog open={!!accepting} onOpenChange={(o) => !o && setAccepting(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {prompts.length < TRACKED_CAP
+                ? "Add this prompt to your tracked set?"
+                : "Replace which tracked prompt?"}
+            </DialogTitle>
+            <DialogDescription>
+              {prompts.length < TRACKED_CAP
+                ? `You have ${TRACKED_CAP - prompts.length} open slot${
+                    TRACKED_CAP - prompts.length === 1 ? "" : "s"
+                  } - accepting just adds it. Future runs will include it.`
+                : `Your tracked set is at the cap of ${TRACKED_CAP}. Pick an existing prompt to archive so this one can take its slot.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {accepting && (
+            <div className="rounded border border-vc-accent/30 bg-vc-accent-subtle/40 p-3">
+              <p className="mb-1 text-label font-semibold uppercase tracking-wider text-vc-accent">
+                {prompts.length < TRACKED_CAP ? "Will be added" : "New (will be tracked)"}
+              </p>
+              <p className="text-body text-vc-primary">{accepting.prompt}</p>
+            </div>
+          )}
+
+          {prompts.length >= TRACKED_CAP && (
+            <div className="max-h-64 space-y-1 overflow-y-auto">
+              {prompts.map((p, i) => (
+                <label
+                  key={p.id}
+                  className={`flex cursor-pointer items-start gap-2 rounded border p-2 text-body transition-colors hover:bg-muted/40 ${
+                    acceptReplaceId === p.id
+                      ? "border-destructive bg-destructive/10"
+                      : "border-vc-default"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="replaceTracked"
+                    checked={acceptReplaceId === p.id}
+                    onChange={() => setAcceptReplaceId(p.id)}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="mr-2 text-vc-text-muted">#{i + 1}</span>
+                    {p.prompt}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAccepting(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={prompts.length >= TRACKED_CAP && !acceptReplaceId}
+              onClick={() => {
+                if (!accepting) return;
+                const atCap = prompts.length >= TRACKED_CAP;
+                if (atCap && !acceptReplaceId) return;
+                acceptSuggestion.mutate(
+                  {
+                    suggestionId: accepting.id,
+                    replaceTrackedId: atCap ? acceptReplaceId : null,
+                  },
+                  {
+                    onSuccess: (d: MutationBody) =>
+                      notify(d, "Suggestion accepted", "Couldn't accept suggestion"),
+                  },
+                );
+                setAccepting(null);
+              }}
+            >
+              {prompts.length < TRACKED_CAP ? "Add to tracked set" : "Confirm swap"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

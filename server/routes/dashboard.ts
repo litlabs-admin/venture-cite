@@ -25,8 +25,8 @@ import {
 } from "../lib/crawlerAccess";
 import { logger } from "../lib/logger";
 import { db } from "../db";
-import { sql, desc, eq } from "drizzle-orm";
-import { brandFactScrapePages, brandPerceptionRuns } from "@shared/schema";
+import { sql, desc, eq, and } from "drizzle-orm";
+import { brandFactScrapePages, brandPerceptionRuns, siteHealthFindingStatus } from "@shared/schema";
 import { aiLimitMiddleware } from "../lib/routesShared";
 import { runPerceptionScoring } from "../lib/perceptionRun";
 import { detectPlatform } from "../lib/platformDetect";
@@ -35,6 +35,8 @@ import { safeFetchText } from "../lib/ssrf";
 import { withOriginLimit } from "../lib/originConcurrency";
 import { scanPagesForFindings } from "../lib/siteHealthContentScan";
 import type { SiteHealthFinding } from "@shared/siteHealthFindings";
+import { pageFindingIds } from "@shared/siteHealthFindings";
+import { listSiteHealthScanHistory } from "../lib/siteHealthHistory";
 
 // Platforms we surface on the dashboard. Only platforms in this list
 // are rendered as rows - matches the set we actually query via
@@ -545,48 +547,13 @@ async function computeSiteHealth(website: string | null): Promise<SiteHealthCach
 //   and 3 unknown ones scores identically to a site with only those same 2
 //   files ever probed, not as "3 missing".
 // ---------------------------------------------------------------------------
-const DISCOVERY_WEIGHTS = { robotsTxt: 10, sitemapXml: 15, llmsTxt: 10 } as const;
-
-export function scoreSiteHealth(params: {
-  website: string | null;
-  discovery: {
-    robotsTxt: boolean | null;
-    sitemapXml: boolean | null;
-    llmsTxt: boolean | null;
-  };
-  crawlers: { total: number; allowed: number };
-  crawl: { pagesFetched: number; pagesFailed: number } | null; // null = no crawl run
-  pending?: boolean; // true = compute hasn't finished - never scored
-}): number | null {
-  const { website, discovery, crawlers, crawl, pending } = params;
-
-  if (pending) return null;
-  if (!website && !crawl) return null;
-
-  let earned = 0;
-  let attainable = 0;
-
-  for (const key of Object.keys(DISCOVERY_WEIGHTS) as (keyof typeof DISCOVERY_WEIGHTS)[]) {
-    const value = discovery[key];
-    if (value === null || value === undefined) continue; // unknown - excluded, not zeroed
-    attainable += DISCOVERY_WEIGHTS[key];
-    if (value) earned += DISCOVERY_WEIGHTS[key];
-  }
-
-  attainable += 35;
-  earned += crawlers.total > 0 ? Math.round((crawlers.allowed / crawlers.total) * 35) : 0;
-
-  if (crawl) {
-    attainable += 30;
-    const denom = crawl.pagesFetched + crawl.pagesFailed;
-    if (denom > 0) {
-      earned += Math.round((crawl.pagesFetched / denom) * 30);
-    }
-  }
-
-  if (attainable === 0) return null;
-  return Math.round((earned / attainable) * 100);
-}
+// Moved to server/lib/scoreSiteHealth.ts (pure, no module-scope side
+// effects) so server/lib/siteHealthHistory.ts can call it from inside the
+// fact-scrape worker without dragging this whole route file - and its
+// module-scope OpenAI client construction - into the scraper's dependency
+// graph. Re-exported here for backward compatibility with existing imports.
+export { scoreSiteHealth } from "../lib/scoreSiteHealth";
+import { scoreSiteHealth } from "../lib/scoreSiteHealth";
 
 // ---------------------------------------------------------------------------
 // Per-page severity for the Site Health detail page - SAME rules as the
@@ -1314,11 +1281,149 @@ export function setupDashboardRoutes(app: Express): void {
           contentType: r.contentType,
           factCount: r.factCount,
           severity: pageSeverity(r),
+          // Structural findings only (failed-pages/thin-content) - content
+          // findings (meta tags, OG, readability...) require re-fetching
+          // HTML per page and are too expensive to run per row here; those
+          // stay scoped to the Findings tab's content-findings endpoint.
+          findingIds: pageFindingIds(r),
         }));
 
         res.json({ success: true, data: { runId: latestRun.id, pages } });
       } catch (error) {
         sendError(res, error, "Failed to load site health pages");
+      }
+    }),
+  );
+
+  // ==========================================================================
+  // GET /api/dashboard/site-health/:brandId/history
+  // Newest-first scan history for the History tab (trend chart + scan log).
+  // Read-only, no LLM. Empty array (never 404/500) until the brand's first
+  // scrape run completes AFTER this endpoint shipped - existing brands will
+  // see an empty trend until their next scan, which is expected: there is no
+  // way to retroactively know what an untracked past score was.
+  // ==========================================================================
+  app.get(
+    "/api/dashboard/site-health/:brandId/history",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const rows = await listSiteHealthScanHistory(brand.id, 50);
+        res.json({
+          success: true,
+          data: {
+            scans: rows.map((r) => ({
+              id: r.id,
+              runId: r.runId,
+              score: r.score,
+              pagesCrawled: r.pagesCrawled,
+              pagesFailed: r.pagesFailed,
+              issues: {
+                critical: r.issuesCritical,
+                high: r.issuesHigh,
+                medium: r.issuesMedium,
+                low: r.issuesLow,
+              },
+              createdAt: r.createdAt.toISOString(),
+            })),
+          },
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to load site health history");
+      }
+    }),
+  );
+
+  // ==========================================================================
+  // Site health finding status - "Mark in progress" / "Ignore" / "Mark fixed"
+  // on the finding drawer. Keyed by the finding's stable check-type id, not a
+  // scan run, so status survives a rescan. A finding never touched has no
+  // row and reads as "untouched" - GET never fabricates a default.
+  // ==========================================================================
+  app.get(
+    "/api/dashboard/site-health/:brandId/finding-status",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const rows = await db
+          .select({
+            findingId: siteHealthFindingStatus.findingId,
+            status: siteHealthFindingStatus.status,
+            updatedAt: siteHealthFindingStatus.updatedAt,
+          })
+          .from(siteHealthFindingStatus)
+          .where(eq(siteHealthFindingStatus.brandId, brand.id));
+
+        res.json({
+          success: true,
+          data: rows.map((r) => ({ ...r, updatedAt: r.updatedAt.toISOString() })),
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to load finding status");
+      }
+    }),
+  );
+
+  const FINDING_STATUS_VALUES = ["in_progress", "ignored", "fixed"] as const;
+
+  app.put(
+    "/api/dashboard/site-health/:brandId/finding-status/:findingId",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const { findingId } = req.params;
+        const status = req.body?.status;
+        if (!FINDING_STATUS_VALUES.includes(status)) {
+          return res.status(400).json({
+            success: false,
+            error: `status must be one of: ${FINDING_STATUS_VALUES.join(", ")}`,
+          });
+        }
+
+        const userId = requireUser(req).id;
+        await db
+          .insert(siteHealthFindingStatus)
+          .values({ brandId: brand.id, findingId, status, updatedBy: userId })
+          .onConflictDoUpdate({
+            target: [siteHealthFindingStatus.brandId, siteHealthFindingStatus.findingId],
+            set: { status, updatedAt: new Date(), updatedBy: userId },
+          });
+
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to update finding status");
+      }
+    }),
+  );
+
+  // "Untouched" has no row by definition - clearing status means deleting it,
+  // not writing a third state.
+  app.delete(
+    "/api/dashboard/site-health/:brandId/finding-status/:findingId",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const { findingId } = req.params;
+        await db
+          .delete(siteHealthFindingStatus)
+          .where(
+            and(
+              eq(siteHealthFindingStatus.brandId, brand.id),
+              eq(siteHealthFindingStatus.findingId, findingId),
+            ),
+          );
+
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to clear finding status");
       }
     }),
   );

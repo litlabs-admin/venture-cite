@@ -31,7 +31,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 export const DEST = {
   report: { to: "/report" },
   citations: { to: "/monitor", search: { tab: "citations" } },
-  prompts: { to: "/monitor", search: { tab: "citations", ptab: "prompts" } },
+  // Full trakkr-parity page (Tags/sparkline/Score/Δ/On columns, a real
+  // /prompts/$promptId detail page). The lighter embedded table at
+  // /monitor?tab=citations&ptab=prompts still exists for citations.tsx's
+  // own flow, but this is the canonical destination now.
+  prompts: { to: "/prompts" },
   promptResults: { to: "/monitor", search: { tab: "citations", ptab: "results" } },
   competitors: { to: "/monitor", search: { tab: "competitors" } },
   mentions: { to: "/monitor", search: { tab: "mentions" } },

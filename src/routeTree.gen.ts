@@ -41,6 +41,7 @@ import { Route as AppLoginRouteImport } from './routes/_app/login'
 import { Route as AppMonitorRouteImport } from './routes/_app/monitor'
 import { Route as AppOpportunitiesRouteImport } from './routes/_app/opportunities'
 import { Route as AppPerceptionRouteImport } from './routes/_app/perception'
+import { Route as AppPromptsRouteImport } from './routes/_app/prompts'
 import { Route as AppRegisterRouteImport } from './routes/_app/register'
 import { Route as AppReportRouteImport } from './routes/_app/report'
 import { Route as AppResetPasswordRouteImport } from './routes/_app/reset-password'
@@ -53,6 +54,8 @@ import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as WebhooksSplatRouteImport } from './routes/webhooks/$'
 import { Route as AppAdminScrapeRouteImport } from './routes/_app/admin.scrape'
 import { Route as AppContentArticleIdRouteImport } from './routes/_app/content.$articleId'
+import { Route as AppPromptsIndexRouteImport } from './routes/_app/prompts.index'
+import { Route as AppPromptsPromptIdRouteImport } from './routes/_app/prompts.$promptId'
 import { Route as AppAdminScrapeRunIdRouteImport } from './routes/_app/admin.scrape.$runId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -214,6 +217,11 @@ const AppPerceptionRoute = AppPerceptionRouteImport.update({
   path: '/perception',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPromptsRoute = AppPromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppRegisterRoute = AppRegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -274,6 +282,16 @@ const AppContentArticleIdRoute = AppContentArticleIdRouteImport.update({
   path: '/$articleId',
   getParentRoute: () => AppContentRoute,
 } as any)
+const AppPromptsIndexRoute = AppPromptsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppPromptsRoute,
+} as any)
+const AppPromptsPromptIdRoute = AppPromptsPromptIdRouteImport.update({
+  id: '/$promptId',
+  path: '/$promptId',
+  getParentRoute: () => AppPromptsRoute,
+} as any)
 const AppAdminScrapeRunIdRoute = AppAdminScrapeRunIdRouteImport.update({
   id: '/$runId',
   path: '/$runId',
@@ -312,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/monitor': typeof AppMonitorRoute
   '/opportunities': typeof AppOpportunitiesRoute
   '/perception': typeof AppPerceptionRoute
+  '/prompts': typeof AppPromptsRouteWithChildren
   '/register': typeof AppRegisterRoute
   '/report': typeof AppReportRoute
   '/reset-password': typeof AppResetPasswordRoute
@@ -324,6 +343,8 @@ export interface FileRoutesByFullPath {
   '/webhooks/$': typeof WebhooksSplatRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
+  '/prompts/$promptId': typeof AppPromptsPromptIdRoute
+  '/prompts/': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
 }
 export interface FileRoutesByTo {
@@ -370,6 +391,8 @@ export interface FileRoutesByTo {
   '/webhooks/$': typeof WebhooksSplatRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
+  '/prompts/$promptId': typeof AppPromptsPromptIdRoute
+  '/prompts': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
 }
 export interface FileRoutesById {
@@ -406,6 +429,7 @@ export interface FileRoutesById {
   '/_app/monitor': typeof AppMonitorRoute
   '/_app/opportunities': typeof AppOpportunitiesRoute
   '/_app/perception': typeof AppPerceptionRoute
+  '/_app/prompts': typeof AppPromptsRouteWithChildren
   '/_app/register': typeof AppRegisterRoute
   '/_app/report': typeof AppReportRoute
   '/_app/reset-password': typeof AppResetPasswordRoute
@@ -418,6 +442,8 @@ export interface FileRoutesById {
   '/webhooks/$': typeof WebhooksSplatRoute
   '/_app/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/_app/content/$articleId': typeof AppContentArticleIdRoute
+  '/_app/prompts/$promptId': typeof AppPromptsPromptIdRoute
+  '/_app/prompts/': typeof AppPromptsIndexRoute
   '/_app/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
 }
 export interface FileRouteTypes {
@@ -454,6 +480,7 @@ export interface FileRouteTypes {
     | '/monitor'
     | '/opportunities'
     | '/perception'
+    | '/prompts'
     | '/register'
     | '/report'
     | '/reset-password'
@@ -466,6 +493,8 @@ export interface FileRouteTypes {
     | '/webhooks/$'
     | '/admin/scrape'
     | '/content/$articleId'
+    | '/prompts/$promptId'
+    | '/prompts/'
     | '/admin/scrape/$runId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -512,6 +541,8 @@ export interface FileRouteTypes {
     | '/webhooks/$'
     | '/admin/scrape'
     | '/content/$articleId'
+    | '/prompts/$promptId'
+    | '/prompts'
     | '/admin/scrape/$runId'
   id:
     | '__root__'
@@ -547,6 +578,7 @@ export interface FileRouteTypes {
     | '/_app/monitor'
     | '/_app/opportunities'
     | '/_app/perception'
+    | '/_app/prompts'
     | '/_app/register'
     | '/_app/report'
     | '/_app/reset-password'
@@ -559,6 +591,8 @@ export interface FileRouteTypes {
     | '/webhooks/$'
     | '/_app/admin/scrape'
     | '/_app/content/$articleId'
+    | '/_app/prompts/$promptId'
+    | '/_app/prompts/'
     | '/_app/admin/scrape/$runId'
   fileRoutesById: FileRoutesById
 }
@@ -800,6 +834,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPerceptionRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/prompts': {
+      id: '/_app/prompts'
+      path: '/prompts'
+      fullPath: '/prompts'
+      preLoaderRoute: typeof AppPromptsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/register': {
       id: '/_app/register'
       path: '/register'
@@ -884,6 +925,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContentArticleIdRouteImport
       parentRoute: typeof AppContentRoute
     }
+    '/_app/prompts/': {
+      id: '/_app/prompts/'
+      path: '/'
+      fullPath: '/prompts/'
+      preLoaderRoute: typeof AppPromptsIndexRouteImport
+      parentRoute: typeof AppPromptsRoute
+    }
+    '/_app/prompts/$promptId': {
+      id: '/_app/prompts/$promptId'
+      path: '/$promptId'
+      fullPath: '/prompts/$promptId'
+      preLoaderRoute: typeof AppPromptsPromptIdRouteImport
+      parentRoute: typeof AppPromptsRoute
+    }
     '/_app/admin/scrape/$runId': {
       id: '/_app/admin/scrape/$runId'
       path: '/$runId'
@@ -904,6 +959,20 @@ const AppContentRouteChildren: AppContentRouteChildren = {
 
 const AppContentRouteWithChildren = AppContentRoute._addFileChildren(
   AppContentRouteChildren,
+)
+
+interface AppPromptsRouteChildren {
+  AppPromptsPromptIdRoute: typeof AppPromptsPromptIdRoute
+  AppPromptsIndexRoute: typeof AppPromptsIndexRoute
+}
+
+const AppPromptsRouteChildren: AppPromptsRouteChildren = {
+  AppPromptsPromptIdRoute: AppPromptsPromptIdRoute,
+  AppPromptsIndexRoute: AppPromptsIndexRoute,
+}
+
+const AppPromptsRouteWithChildren = AppPromptsRoute._addFileChildren(
+  AppPromptsRouteChildren,
 )
 
 interface AppAdminScrapeRouteChildren {
@@ -944,6 +1013,7 @@ interface AppRouteChildren {
   AppMonitorRoute: typeof AppMonitorRoute
   AppOpportunitiesRoute: typeof AppOpportunitiesRoute
   AppPerceptionRoute: typeof AppPerceptionRoute
+  AppPromptsRoute: typeof AppPromptsRouteWithChildren
   AppRegisterRoute: typeof AppRegisterRoute
   AppReportRoute: typeof AppReportRoute
   AppResetPasswordRoute: typeof AppResetPasswordRoute
@@ -981,6 +1051,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMonitorRoute: AppMonitorRoute,
   AppOpportunitiesRoute: AppOpportunitiesRoute,
   AppPerceptionRoute: AppPerceptionRoute,
+  AppPromptsRoute: AppPromptsRouteWithChildren,
   AppRegisterRoute: AppRegisterRoute,
   AppReportRoute: AppReportRoute,
   AppResetPasswordRoute: AppResetPasswordRoute,

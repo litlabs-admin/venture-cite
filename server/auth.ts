@@ -222,6 +222,23 @@ const PUBLIC_API_ROUTES = new Set<string>([
   // become read-only for the public.
   "GET /api/board",
   "PUT /api/board",
+  // Multi-board routes (engineering/marketing/content/aeo/ben). This set is
+  // matched by exact "METHOD /path" string (see requireAuthForApi below), so
+  // each :boardId value must be listed individually rather than relying on a
+  // prefix match.
+  "GET /api/board/engineering",
+  "PUT /api/board/engineering",
+  "GET /api/board/marketing",
+  "PUT /api/board/marketing",
+  "GET /api/board/content",
+  "PUT /api/board/content",
+  "GET /api/board/aeo",
+  "PUT /api/board/aeo",
+  "GET /api/board/ben",
+  "PUT /api/board/ben",
+  // Internal KPI dashboard - aggregate counts only, see
+  // server/routes/internalKpis.ts for the no-PII guarantee.
+  "GET /api/internal/kpis",
 ]);
 
 export const requireAuthForApi: RequestHandler = (req, res, next) => {

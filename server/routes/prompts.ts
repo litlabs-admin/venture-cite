@@ -16,15 +16,24 @@ import {
 import {
   kickoffBrandPromptsRun,
   advanceCitationRun,
+  runPlatformCitationCheck,
   DEFAULT_CITATION_PLATFORMS,
 } from "../citationChecker";
 import { generateBrandPrompts } from "../lib/promptGenerator";
 import { generateSuggestedPrompts } from "../lib/suggestionGenerator";
+import { generatePromptAudiences } from "../lib/audienceGenerator";
+import { runPromptSetHealthAudit } from "../lib/promptSetHealthAuditor";
+import { generatePhrasings } from "../lib/phrasingGenerator";
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
-import { detectBrandAndCompetitors, matchEntity } from "../lib/brandMatcher";
+import { detectBrandAndCompetitors, matchEntity, extractDomain } from "../lib/brandMatcher";
 import { logger } from "../lib/logger";
 import { buildPromptScoreHistory, resolvePoints } from "../lib/promptScoreHistory";
 import { waitUntil } from "@vercel/functions";
+import {
+  TRACKED_PROMPTS_CAP,
+  AUDIENCE_GENERATION_COOLDOWN_MS,
+  SET_HEALTH_COOLDOWN_MS,
+} from "@shared/constants";
 
 export function setupPromptsRoutes(app: Express): void {
   // ============ BRAND-LEVEL CITATION PROMPT PORTFOLIO ============
@@ -135,7 +144,8 @@ export function setupPromptsRoutes(app: Express): void {
   // forced users to nuke an existing prompt even after deleting one to
   // make room. Bad UX - the dialog now adapts based on whether there's
   // an open slot.
-  const TRACKED_PROMPTS_CAP = 10;
+  // TRACKED_PROMPTS_CAP imported from @shared/constants (was a bare local
+  // literal duplicated independently here and in PromptsTab.tsx).
   app.post(
     "/api/brand-prompts/:brandId/suggestions/:suggestionId/accept",
     asyncHandler(async (req, res) => {
@@ -341,6 +351,546 @@ export function setupPromptsRoutes(app: Express): void {
         res.json({ success: true, data: updated });
       } catch (error) {
         sendError(res, error, "Failed to update prompt");
+      }
+    }),
+  );
+
+  // ON/OFF toggle. Orthogonal to status - a paused prompt stays tracked (still
+  // counts against the cap) but citationChecker.ts's next run skips it.
+  app.patch(
+    "/api/brand-prompts/:brandId/prompts/:promptId/pause",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const paused = req.body?.paused;
+        if (typeof paused !== "boolean") {
+          return res.status(400).json({ success: false, error: "paused (boolean) required" });
+        }
+        const row = await storage.getBrandPromptById(req.params.promptId);
+        if (!row || row.brandId !== brand.id || row.status !== "tracked") {
+          return res.status(404).json({ success: false, error: "Tracked prompt not found" });
+        }
+        const updated = await storage.setBrandPromptPaused(row.id, paused);
+        res.json({ success: true, data: updated });
+      } catch (error) {
+        sendError(res, error, "Failed to update prompt paused state");
+      }
+    }),
+  );
+
+  // Single-prompt fetch for the /prompts/$promptId detail page - the list
+  // endpoint below returns every prompt, which the detail page shouldn't
+  // have to fetch and filter client-side just to render one row's metadata.
+  app.get(
+    "/api/brand-prompts/:brandId/prompts/:promptId",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const row = await storage.getBrandPromptById(req.params.promptId);
+        if (!row || row.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Prompt not found" });
+        }
+        const tagIds = await storage.getTagIdsByPromptId(row.id);
+        res.json({ success: true, data: { ...row, tagIds } });
+      } catch (error) {
+        sendError(res, error, "Failed to load prompt");
+      }
+    }),
+  );
+
+  // ============ PROMPT TAGS ============
+
+  // Bulk promptId -> tagId[] map for the table's Tags column - one query
+  // instead of N single-prompt lookups.
+  app.get(
+    "/api/brand-prompts/:brandId/prompt-tags",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const map = await storage.getPromptTagsMapByBrandId(brand.id);
+        res.json({ success: true, data: map });
+      } catch (error) {
+        sendError(res, error, "Failed to load prompt tags");
+      }
+    }),
+  );
+
+  app.get(
+    "/api/brand-prompts/:brandId/tags",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const [tags, counts] = await Promise.all([
+          storage.getPromptTagsByBrandId(brand.id),
+          storage.getPromptTagCounts(brand.id),
+        ]);
+        res.json({
+          success: true,
+          data: tags.map((t) => ({ ...t, promptCount: counts[t.id] ?? 0 })),
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to load tags");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/brand-prompts/:brandId/tags",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+        if (!name) return res.status(400).json({ success: false, error: "name required" });
+        if (name.length > 40) {
+          return res.status(400).json({ success: false, error: "name too long (max 40 chars)" });
+        }
+        const existing = await storage.getPromptTagsByBrandId(brand.id);
+        if (existing.some((t) => t.name.toLowerCase() === name.toLowerCase())) {
+          return res.status(409).json({ success: false, error: "duplicate_tag" });
+        }
+        const color = typeof req.body?.color === "string" ? req.body.color : null;
+        const tag = await storage.createPromptTag({ brandId: brand.id, name, color });
+        res.json({ success: true, data: tag });
+      } catch (error) {
+        sendError(res, error, "Failed to create tag");
+      }
+    }),
+  );
+
+  app.patch(
+    "/api/brand-prompts/:brandId/tags/:tagId",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const tags = await storage.getPromptTagsByBrandId(brand.id);
+        const tag = tags.find((t) => t.id === req.params.tagId);
+        if (!tag) return res.status(404).json({ success: false, error: "Tag not found" });
+        const update: { name?: string; color?: string | null } = {};
+        if (typeof req.body?.name === "string" && req.body.name.trim()) {
+          update.name = req.body.name.trim().slice(0, 40);
+        }
+        if ("color" in (req.body ?? {})) update.color = req.body.color ?? null;
+        const updated = await storage.updatePromptTag(tag.id, update);
+        res.json({ success: true, data: updated });
+      } catch (error) {
+        sendError(res, error, "Failed to update tag");
+      }
+    }),
+  );
+
+  app.delete(
+    "/api/brand-prompts/:brandId/tags/:tagId",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const tags = await storage.getPromptTagsByBrandId(brand.id);
+        if (!tags.some((t) => t.id === req.params.tagId)) {
+          return res.status(404).json({ success: false, error: "Tag not found" });
+        }
+        await storage.deletePromptTag(req.params.tagId);
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to delete tag");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/brand-prompts/:brandId/prompts/:promptId/tags",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const tagId = req.body?.tagId;
+        if (typeof tagId !== "string" || !tagId) {
+          return res.status(400).json({ success: false, error: "tagId required" });
+        }
+        const [prompt, tags] = await Promise.all([
+          storage.getBrandPromptById(req.params.promptId),
+          storage.getPromptTagsByBrandId(brand.id),
+        ]);
+        if (!prompt || prompt.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Prompt not found" });
+        }
+        if (!tags.some((t) => t.id === tagId)) {
+          return res.status(404).json({ success: false, error: "Tag not found" });
+        }
+        await storage.attachPromptTag(prompt.id, tagId);
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to attach tag");
+      }
+    }),
+  );
+
+  app.delete(
+    "/api/brand-prompts/:brandId/prompts/:promptId/tags/:tagId",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const prompt = await storage.getBrandPromptById(req.params.promptId);
+        if (!prompt || prompt.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Prompt not found" });
+        }
+        await storage.detachPromptTag(prompt.id, req.params.tagId);
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to detach tag");
+      }
+    }),
+  );
+
+  // ============ PROMPT AUDIENCES ============
+
+  app.get(
+    "/api/brand-prompts/:brandId/prompt-audiences",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const map = await storage.getPromptAudienceMapByBrandId(brand.id);
+        res.json({ success: true, data: map });
+      } catch (error) {
+        sendError(res, error, "Failed to load prompt audiences");
+      }
+    }),
+  );
+
+  app.get(
+    "/api/brand-prompts/:brandId/audiences",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const [audiences, counts, map] = await Promise.all([
+          storage.getPromptAudiencesByBrandId(brand.id),
+          storage.getPromptAudienceCounts(brand.id),
+          storage.getPromptAudienceMapByBrandId(brand.id),
+        ]);
+        // Coverage/score/trend are computed from real member-prompt data,
+        // never fabricated: score history is joined in below so the client
+        // doesn't need a second round trip per audience.
+        const allPrompts = await storage.getBrandPromptsByBrandId(brand.id, { status: "all" });
+        const promptIds = allPrompts.map((p) => p.id);
+        const rankings = await storage.getGeoRankingsByBrandPromptIds(promptIds);
+        const history = buildPromptScoreHistory(promptIds, rankings, resolvePoints(undefined));
+        const historyByPromptId = new Map(history.map((h) => [h.promptId, h]));
+
+        const data = audiences.map((a) => {
+          const memberIds = Object.entries(map)
+            .filter(([, audienceIds]) => audienceIds.includes(a.id))
+            .map(([promptId]) => promptId);
+          const scores = memberIds
+            .map((id) => historyByPromptId.get(id)?.score)
+            .filter((s): s is number => typeof s === "number");
+          const score =
+            scores.length > 0
+              ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length)
+              : null;
+          return {
+            ...a,
+            promptCount: counts[a.id] ?? 0,
+            score,
+          };
+        });
+        res.json({ success: true, data });
+      } catch (error) {
+        sendError(res, error, "Failed to load audiences");
+      }
+    }),
+  );
+
+  // AI-generate audiences from the tracked prompt set. Cost safeguard
+  // mirrors PERCEPTION_COOLDOWN_MS (server/routes/dashboard.ts): the
+  // underlying evidence only changes when prompts are edited or a new
+  // citation run lands, so re-generating sooner just reproduces the same
+  // grouping for another LLM call.
+  app.post(
+    "/api/brand-prompts/:brandId/audiences/generate",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+
+        const lastAi = await storage.getLatestAiAudienceCreatedAt(brand.id);
+        if (lastAi) {
+          const ageMs = Date.now() - lastAi.getTime();
+          if (ageMs < AUDIENCE_GENERATION_COOLDOWN_MS) {
+            const retryAfterSec = Math.ceil((AUDIENCE_GENERATION_COOLDOWN_MS - ageMs) / 1000);
+            res.setHeader("Retry-After", String(retryAfterSec));
+            return res.status(429).json({
+              success: false,
+              error: "Audiences were generated recently. Try again later.",
+              retryAfterSeconds: retryAfterSec,
+            });
+          }
+        }
+
+        const result = await generatePromptAudiences(brand.id);
+        if (result.error && result.saved.length === 0) {
+          return res.status(502).json({ success: false, error: result.error });
+        }
+        res.json({ success: true, data: result.saved });
+      } catch (error) {
+        sendError(res, error, "Failed to generate audiences");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/brand-prompts/:brandId/audiences",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+        if (!name) return res.status(400).json({ success: false, error: "name required" });
+        if (name.length > 60) {
+          return res.status(400).json({ success: false, error: "name too long (max 60 chars)" });
+        }
+        const existing = await storage.getPromptAudiencesByBrandId(brand.id);
+        if (existing.some((a) => a.name.toLowerCase() === name.toLowerCase())) {
+          return res.status(409).json({ success: false, error: "duplicate_audience" });
+        }
+        const funnelStageRaw = req.body?.funnelStage;
+        const funnelStage = ["TOFU", "MOFU", "BOFU"].includes(funnelStageRaw)
+          ? funnelStageRaw
+          : null;
+        const description =
+          typeof req.body?.description === "string" ? req.body.description.trim() || null : null;
+        const audience = await storage.createPromptAudience({
+          brandId: brand.id,
+          name,
+          description,
+          funnelStage,
+          generatedBy: "manual",
+        });
+        res.json({ success: true, data: audience });
+      } catch (error) {
+        sendError(res, error, "Failed to create audience");
+      }
+    }),
+  );
+
+  app.delete(
+    "/api/brand-prompts/:brandId/audiences/:audienceId",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const audiences = await storage.getPromptAudiencesByBrandId(brand.id);
+        if (!audiences.some((a) => a.id === req.params.audienceId)) {
+          return res.status(404).json({ success: false, error: "Audience not found" });
+        }
+        await storage.deletePromptAudience(req.params.audienceId);
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to delete audience");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/brand-prompts/:brandId/prompts/:promptId/audiences",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const audienceId = req.body?.audienceId;
+        if (typeof audienceId !== "string" || !audienceId) {
+          return res.status(400).json({ success: false, error: "audienceId required" });
+        }
+        const [prompt, audiences] = await Promise.all([
+          storage.getBrandPromptById(req.params.promptId),
+          storage.getPromptAudiencesByBrandId(brand.id),
+        ]);
+        if (!prompt || prompt.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Prompt not found" });
+        }
+        if (!audiences.some((a) => a.id === audienceId)) {
+          return res.status(404).json({ success: false, error: "Audience not found" });
+        }
+        await storage.attachPromptAudience(prompt.id, audienceId);
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to attach audience");
+      }
+    }),
+  );
+
+  app.delete(
+    "/api/brand-prompts/:brandId/prompts/:promptId/audiences/:audienceId",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const prompt = await storage.getBrandPromptById(req.params.promptId);
+        if (!prompt || prompt.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Prompt not found" });
+        }
+        await storage.detachPromptAudience(prompt.id, req.params.audienceId);
+        res.json({ success: true });
+      } catch (error) {
+        sendError(res, error, "Failed to detach audience");
+      }
+    }),
+  );
+
+  // ============ SET HEALTH AUDIT ============
+
+  app.get(
+    "/api/brand-prompts/:brandId/set-health",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const run = await storage.getLatestSetHealthRun(brand.id);
+        res.json({ success: true, data: run ?? null });
+      } catch (error) {
+        sendError(res, error, "Failed to load set health");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/brand-prompts/:brandId/set-health/run",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+
+        const recent = await storage.getLatestSetHealthRun(brand.id);
+        if (recent?.createdAt) {
+          const ageMs = Date.now() - new Date(recent.createdAt).getTime();
+          if (ageMs < SET_HEALTH_COOLDOWN_MS) {
+            const retryAfterSec = Math.ceil((SET_HEALTH_COOLDOWN_MS - ageMs) / 1000);
+            res.setHeader("Retry-After", String(retryAfterSec));
+            return res.status(429).json({
+              success: false,
+              error: "Set Health was audited recently. Try again later.",
+              retryAfterSeconds: retryAfterSec,
+            });
+          }
+        }
+
+        const run = await runPromptSetHealthAudit(brand.id);
+        res.json({ success: true, data: run });
+      } catch (error) {
+        sendError(res, error, "Failed to run set health audit");
+      }
+    }),
+  );
+
+  // ============ PHRASINGS ============
+  // Exploratory rephrasings of one tracked prompt - deliberately NOT written
+  // into geo_rankings (see migration 0099's comment), so these never affect
+  // the tracked prompt's own Score/Δ/sparkline.
+
+  app.get(
+    "/api/brand-prompts/:brandId/prompts/:promptId/phrasings",
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const prompt = await storage.getBrandPromptById(req.params.promptId);
+        if (!prompt || prompt.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Prompt not found" });
+        }
+        const tests = await storage.getPhrasingTestsByPromptId(prompt.id);
+        res.json({ success: true, data: tests });
+      } catch (error) {
+        sendError(res, error, "Failed to load phrasings");
+      }
+    }),
+  );
+
+  app.post(
+    "/api/brand-prompts/:brandId/prompts/:promptId/phrasings/generate",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const prompt = await storage.getBrandPromptById(req.params.promptId);
+        if (!prompt || prompt.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Prompt not found" });
+        }
+        const generated = await generatePhrasings(brand, prompt.prompt);
+        if (generated.length === 0) {
+          return res.status(502).json({ success: false, error: "AI returned no usable phrasings" });
+        }
+        const saved = await Promise.all(
+          generated.map((p) =>
+            storage.createPhrasingTest({
+              brandPromptId: prompt.id,
+              phrasing: p.text,
+              rationale: p.rationale,
+            }),
+          ),
+        );
+        res.json({ success: true, data: saved });
+      } catch (error) {
+        sendError(res, error, "Failed to generate phrasings");
+      }
+    }),
+  );
+
+  // Runs one citation check per platform (6 in parallel) for one phrasing.
+  app.post(
+    "/api/brand-prompts/:brandId/phrasings/:phrasingId/analyze",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const test = await storage.getPhrasingTestById(req.params.phrasingId);
+        if (!test) return res.status(404).json({ success: false, error: "Phrasing not found" });
+        const prompt = await storage.getBrandPromptById(test.brandPromptId);
+        if (!prompt || prompt.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Phrasing not found" });
+        }
+
+        const nameVariations = Array.isArray(brand.nameVariations)
+          ? (brand.nameVariations as string[])
+          : [];
+        const results = await Promise.all(
+          DEFAULT_CITATION_PLATFORMS.map(async (platform) => {
+            try {
+              const r = await runPlatformCitationCheck(
+                platform,
+                test.phrasing,
+                brand,
+                brand.name,
+                nameVariations,
+                brand.website ?? undefined,
+                user.id,
+              );
+              return {
+                platform,
+                isCited: r.isCited,
+                rank: r.rank,
+                relevance: r.relevance,
+              };
+            } catch (err: any) {
+              return { platform, isCited: false, rank: null, relevance: null, error: err?.message };
+            }
+          }),
+        );
+
+        const updated = await storage.setPhrasingTestResults(test.id, results);
+        res.json({ success: true, data: updated });
+      } catch (error) {
+        sendError(res, error, "Failed to analyze phrasing");
       }
     }),
   );
@@ -1046,6 +1596,9 @@ export function setupPromptsRoutes(app: Express): void {
         const rankings = await storage.getGeoRankingsByBrandPromptIds(promptIds, sinceDate);
 
         // Keep only the latest row per (promptId, platform) so re-runs don't inflate counts.
+        // (Rank movement over time is already computed by
+        // usePromptScoreHistory/promptScoreHistory.ts's byPlatform - not
+        // duplicated here.)
         const latestByKey = new Map<string, (typeof rankings)[number]>();
         for (const r of rankings) {
           const key = `${r.brandPromptId}__${r.aiPlatform}`;
@@ -1053,6 +1606,42 @@ export function setupPromptsRoutes(app: Express): void {
           if (!existing || r.checkedAt > existing.checkedAt) latestByKey.set(key, r);
         }
         const latest = Array.from(latestByKey.values());
+
+        const brandDomain = brand.website ? extractDomain(brand.website) : null;
+
+        // Real "Top Answers" per model, straight from data the citation
+        // check already computes: citationChecker.ts's per-response
+        // analyzer call (responseAnalyzer.ts) extracts EVERY brand an LLM
+        // response names - not just tracked competitors - with a
+        // 1-indexed rank when the response presented an ordered list, and
+        // stores the full list on the row itself (geo_rankings.mentioned_brands,
+        // migration 0100). Rows written before that column existed have
+        // mentionedBrands === null; those render an empty Top Answers list
+        // rather than a partial/fabricated one - re-running the check
+        // populates it.
+        function topAnswersFor(mentionedBrands: unknown): { name: string; isBrand: boolean }[] {
+          if (!Array.isArray(mentionedBrands)) return [];
+          const entries = mentionedBrands
+            .filter(
+              (b): b is { name: string; cited: boolean; rank: number | null } =>
+                b && typeof b.name === "string" && b.cited === true,
+            )
+            .map((b) => ({
+              name: b.name,
+              isBrand: b.name.trim().toLowerCase() === brand.name.trim().toLowerCase(),
+              rank: typeof b.rank === "number" ? b.rank : null,
+            }));
+          // Ranked entries first (by rank ascending), then unranked ones in
+          // whatever order the analyzer returned them - never inventing an
+          // order the model didn't actually present.
+          entries.sort((a, b) => {
+            if (a.rank !== null && b.rank !== null) return a.rank - b.rank;
+            if (a.rank !== null) return -1;
+            if (b.rank !== null) return 1;
+            return 0;
+          });
+          return entries.map(({ name, isBrand }) => ({ name, isBrand }));
+        }
 
         const platformMap = new Map<
           string,
@@ -1069,10 +1658,29 @@ export function setupPromptsRoutes(app: Express): void {
           fullResponse: string | null;
           checkedAt: Date;
           reDetectedAt: Date | null;
+          // Sources cited for the prompt-detail page's "Sources cited"
+          // section - already stored on geo_rankings, just not projected
+          // into this response before now.
+          citingOutletUrl: string | null;
+          citingOutletName: string | null;
+          citedUrls: string[];
+          sourceType: string | null;
+          // Ranked list of brands the model actually named in its answer,
+          // derived from the same matcher re-detect-all uses - never an
+          // LLM guess. [] when the response named neither the brand nor any
+          // tracked competitor.
+          topAnswers: { name: string; isBrand: boolean }[];
         };
         const promptMap = new Map<
           string,
-          { promptId: string; prompt: string; rationale: string | null; platforms: PlatformEntry[] }
+          {
+            promptId: string;
+            prompt: string;
+            rationale: string | null;
+            platforms: PlatformEntry[];
+            reportCount: number;
+            lastCheckedAt: Date | null;
+          }
         >();
         for (const p of prompts)
           promptMap.set(p.id, {
@@ -1080,7 +1688,42 @@ export function setupPromptsRoutes(app: Express): void {
             prompt: p.prompt,
             rationale: p.rationale,
             platforms: [],
+            reportCount: 0,
+            lastCheckedAt: null,
           });
+
+        // reportCount/lastCheckedAt come from the FULL rankings set (every
+        // check ever recorded), not just the latest-per-platform rows below.
+        const runIdsByPrompt = new Map<string, Set<string>>();
+        for (const r of rankings) {
+          if (!r.brandPromptId) continue;
+          const row = promptMap.get(r.brandPromptId);
+          if (!row) continue;
+          if (r.runId) {
+            (
+              runIdsByPrompt.get(r.brandPromptId) ??
+              runIdsByPrompt.set(r.brandPromptId, new Set()).get(r.brandPromptId)!
+            ).add(r.runId);
+          }
+          if (!row.lastCheckedAt || r.checkedAt > row.lastCheckedAt)
+            row.lastCheckedAt = r.checkedAt;
+        }
+        for (const [promptId, runIds] of Array.from(runIdsByPrompt)) {
+          const row = promptMap.get(promptId);
+          if (row) row.reportCount = runIds.size;
+        }
+
+        // Brand-wide "cited N times" count for the Sources section - counts
+        // every appearance of a URL across this brand's whole ranking
+        // history (within the same since-window as everything else here),
+        // not just this one prompt.
+        const sourceCounts: Record<string, number> = {};
+        for (const r of rankings) {
+          const urls = new Set<string>();
+          if (r.citingOutletUrl) urls.add(r.citingOutletUrl);
+          if (Array.isArray(r.citedUrls)) for (const u of r.citedUrls) urls.add(u);
+          for (const u of Array.from(urls)) sourceCounts[u] = (sourceCounts[u] ?? 0) + 1;
+        }
 
         // citationContext is stored as "{snippet}\n\n||| RAW_RESPONSE |||\n{full}"
         // (current format) or "{snippet}\n\n--- RAW RESPONSE ---\n{full}" (older
@@ -1123,14 +1766,20 @@ export function setupPromptsRoutes(app: Express): void {
             const promptRow = promptMap.get(r.brandPromptId);
             if (promptRow) {
               const { snippet, fullResponse } = splitContext(r.citationContext);
+              const rank = typeof r.rank === "number" && r.rank > 0 ? r.rank : null;
               promptRow.platforms.push({
                 platform: r.aiPlatform,
                 isCited: r.isCited === 1,
-                rank: typeof r.rank === "number" && r.rank > 0 ? r.rank : null,
+                rank,
                 snippet,
                 fullResponse,
                 checkedAt: r.checkedAt,
                 reDetectedAt: (r as any).reDetectedAt ?? null,
+                citingOutletUrl: r.citingOutletUrl ?? null,
+                citingOutletName: r.citingOutletName ?? null,
+                citedUrls: Array.isArray(r.citedUrls) ? r.citedUrls : [],
+                sourceType: r.sourceType ?? null,
+                topAnswers: topAnswersFor((r as any).mentionedBrands),
               });
             }
           }
@@ -1146,7 +1795,15 @@ export function setupPromptsRoutes(app: Express): void {
 
         res.json({
           success: true,
-          data: { byPlatform, byPrompt, totalChecks, totalCited, citationRate },
+          data: {
+            byPlatform,
+            byPrompt,
+            totalChecks,
+            totalCited,
+            citationRate,
+            sourceCounts,
+            brandDomain,
+          },
         });
       } catch (error) {
         sendError(res, error, "Failed to fetch brand prompt results");

@@ -624,6 +624,12 @@ export const brandPrompts = pgTable(
     category: text("category"),
     funnelStage: text("funnel_stage"), // "TOFU" | "MOFU" | "BOFU"
     region: text("region").default("global").notNull(),
+    // ON/OFF toggle (migration 0096). Orthogonal to `status` - a paused prompt
+    // is still "tracked" (still counts against TRACKED_PROMPTS_CAP, still
+    // shows in the tracked list) but is skipped by citationChecker.ts's next
+    // run. Not a new status value: archiving still means "out of the tracked
+    // set entirely", pausing means "tracked but temporarily not being asked".
+    paused: boolean("paused").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -638,6 +644,169 @@ export const insertBrandPromptSchema = createInsertSchema(brandPrompts).omit({
 });
 export type BrandPrompt = typeof brandPrompts.$inferSelect;
 export type InsertBrandPrompt = z.infer<typeof insertBrandPromptSchema>;
+
+// ── Prompt tags (migration 0096) ────────────────────────────────────────
+// Real entity + join, not a text[] column on brand_prompts - the Tags tab
+// renames/recolors/deletes a tag across every prompt that uses it, which a
+// bare array column can't do without rewriting every row.
+export const promptTags = pgTable(
+  "prompt_tags",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // Null renders a neutral vc-muted chip rather than a fabricated color.
+    color: text("color"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("prompt_tags_brand_id_idx").on(table.brandId),
+    uniqueIndex("prompt_tags_brand_name_uq").on(table.brandId, sql`lower(${table.name})`),
+  ],
+);
+export type PromptTag = typeof promptTags.$inferSelect;
+export type InsertPromptTag = typeof promptTags.$inferInsert;
+
+export const brandPromptTags = pgTable(
+  "brand_prompt_tags",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandPromptId: varchar("brand_prompt_id")
+      .notNull()
+      .references(() => brandPrompts.id, { onDelete: "cascade" }),
+    tagId: varchar("tag_id")
+      .notNull()
+      .references(() => promptTags.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("brand_prompt_tags_prompt_id_idx").on(table.brandPromptId),
+    index("brand_prompt_tags_tag_id_idx").on(table.tagId),
+    uniqueIndex("brand_prompt_tags_prompt_tag_uq").on(table.brandPromptId, table.tagId),
+  ],
+);
+export type BrandPromptTag = typeof brandPromptTags.$inferSelect;
+export type InsertBrandPromptTag = typeof brandPromptTags.$inferInsert;
+
+// ── Prompt audiences (migration 0097) ───────────────────────────────────
+// Real entity + join, same shape as prompt_tags/brand_prompt_tags above -
+// an audience groups prompts the same way a tag does, but carries a funnel
+// stage and (when AI-generated) a rationale for why each prompt belongs.
+// funnelStage reuses brand_prompts.funnel_stage's existing TOFU/MOFU/BOFU
+// vocabulary rather than inventing a second enum - the client maps those to
+// Awareness/Consideration/Decision as display labels only.
+export const promptAudiences = pgTable(
+  "prompt_audiences",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    funnelStage: text("funnel_stage"), // "TOFU" | "MOFU" | "BOFU"
+    generatedBy: text("generated_by").default("manual").notNull(), // "ai" | "manual"
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("prompt_audiences_brand_id_idx").on(table.brandId),
+    uniqueIndex("prompt_audiences_brand_name_uq").on(table.brandId, sql`lower(${table.name})`),
+  ],
+);
+export type PromptAudience = typeof promptAudiences.$inferSelect;
+export type InsertPromptAudience = typeof promptAudiences.$inferInsert;
+
+export const brandPromptAudiences = pgTable(
+  "brand_prompt_audiences",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandPromptId: varchar("brand_prompt_id")
+      .notNull()
+      .references(() => brandPrompts.id, { onDelete: "cascade" }),
+    audienceId: varchar("audience_id")
+      .notNull()
+      .references(() => promptAudiences.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("brand_prompt_audiences_prompt_id_idx").on(table.brandPromptId),
+    index("brand_prompt_audiences_audience_id_idx").on(table.audienceId),
+    uniqueIndex("brand_prompt_audiences_prompt_audience_uq").on(
+      table.brandPromptId,
+      table.audienceId,
+    ),
+  ],
+);
+export type BrandPromptAudience = typeof brandPromptAudiences.$inferSelect;
+export type InsertBrandPromptAudience = typeof brandPromptAudiences.$inferInsert;
+
+// ── Prompt set health audit (migration 0098) ────────────────────────────
+// One row per audit run. score/verdict are nullable and null together when
+// there isn't enough evidence to judge - same "zero-evidence returns null,
+// never a fabricated number" rule as brand_perception_runs.
+export const promptSetHealthRuns = pgTable(
+  "prompt_set_health_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    score: integer("score"),
+    verdict: text("verdict"),
+    // { title, description, duplicatePromptIds } - duplicatePromptIds come
+    // from the deterministic Jaccard pre-pass, never LLM-invented ids.
+    topFix: jsonb("top_fix"),
+    issues: jsonb("issues")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    workingWell: text("working_well")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("prompt_set_health_runs_brand_created_idx").on(table.brandId, table.createdAt.desc()),
+  ],
+);
+export type PromptSetHealthRun = typeof promptSetHealthRuns.$inferSelect;
+export type InsertPromptSetHealthRun = typeof promptSetHealthRuns.$inferInsert;
+
+// ── Prompt phrasing tests (migration 0099) ──────────────────────────────
+// Deliberately NOT written into geo_rankings - phrasing variants are
+// exploratory, not the tracked prompt's real history; mixing them in would
+// corrupt the Score/Δ/sparkline columns, which read from geo_rankings only.
+export const promptPhrasingTests = pgTable(
+  "prompt_phrasing_tests",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    brandPromptId: varchar("brand_prompt_id")
+      .notNull()
+      .references(() => brandPrompts.id, { onDelete: "cascade" }),
+    phrasing: text("phrasing").notNull(),
+    rationale: text("rationale"),
+    // Per-platform {platform, isCited, rank, relevance}[] - null until
+    // "Analyze" has run for this phrasing, mirroring
+    // runPlatformCitationCheck's own return shape.
+    results: jsonb("results"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("prompt_phrasing_tests_prompt_id_idx").on(table.brandPromptId)],
+);
+export type PromptPhrasingTest = typeof promptPhrasingTests.$inferSelect;
+export type InsertPromptPhrasingTest = typeof promptPhrasingTests.$inferInsert;
 
 // Per-brand AI Visibility Checklist progress. One row per completed step so
 // toggling is a simple insert/delete instead of a JSON read-modify-write.
@@ -942,6 +1111,13 @@ export const geoRankings = pgTable(
     // null on these rows since the LLM rank pass didn't see them as cited.
     reDetectedAt: timestamp("re_detected_at"),
     metadata: jsonb("metadata"),
+    // Every brand the citation-check analyzer (responseAnalyzer.ts) found
+    // in THIS specific response - not just the tracked brand/competitors.
+    // [{name, cited, rank}], ordered as the analyzer returned them.
+    // Migration 0100. Null on rows written before this column existed -
+    // the prompt-detail page's "Top Answers" renders nothing for those
+    // rather than a fabricated backfill.
+    mentionedBrands: jsonb("mentioned_brands"),
   },
   (table) => [
     index("geo_rankings_article_id_idx").on(table.articleId),
@@ -2157,3 +2333,60 @@ export const brandPerceptionRuns = pgTable(
 export type BrandPerceptionRun = typeof brandPerceptionRuns.$inferSelect;
 export type InsertBrandPerceptionRun = typeof brandPerceptionRuns.$inferInsert;
 export type SystemState = typeof systemState.$inferSelect;
+
+// ── Site health scan history (migration 0094) ──────────────────────────
+// Mirrors migrations/0094_site_health_scan_history.sql exactly. One row per
+// COMPLETED fact-scrape run (see server/lib/siteHealthHistory.ts), never
+// one per dashboard page load - a cache hit must never fabricate a point.
+export const siteHealthScanHistory = pgTable(
+  "site_health_scan_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    // brand_fact_scrape_runs.id is varchar (see its own definition above),
+    // not a native uuid column - matched here, not "uuid", or the FK fails.
+    runId: varchar("run_id").references(() => brandFactScrapeRuns.id, { onDelete: "set null" }),
+    score: integer("score"),
+    pagesCrawled: integer("pages_crawled"),
+    pagesFailed: integer("pages_failed"),
+    issuesCritical: integer("issues_critical").notNull().default(0),
+    issuesHigh: integer("issues_high").notNull().default(0),
+    issuesMedium: integer("issues_medium").notNull().default(0),
+    issuesLow: integer("issues_low").notNull().default(0),
+    discovery: jsonb("discovery"),
+    crawlers: jsonb("crawlers"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("site_health_scan_history_brand_created_idx").on(table.brandId, table.createdAt.desc()),
+  ],
+);
+export type SiteHealthScanHistoryRow = typeof siteHealthScanHistory.$inferSelect;
+export type InsertSiteHealthScanHistoryRow = typeof siteHealthScanHistory.$inferInsert;
+
+// ── Site health finding status (migration 0095) ────────────────────────
+// One row per (brand, finding id) the user has touched via "Mark in
+// progress" / "Ignore" / "Mark fixed" - untouched findings have no row,
+// never a fabricated default. finding_id is the stable check-type id
+// (e.g. "missing-robots-txt"), so status survives a rescan.
+export const siteHealthFindingStatus = pgTable(
+  "site_health_finding_status",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    findingId: text("finding_id").notNull(),
+    status: text("status").notNull().default("in_progress"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: varchar("updated_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    index("site_health_finding_status_brand_idx").on(table.brandId),
+    uniqueIndex("site_health_finding_status_brand_finding_uq").on(table.brandId, table.findingId),
+  ],
+);
+export type SiteHealthFindingStatusRow = typeof siteHealthFindingStatus.$inferSelect;
+export type InsertSiteHealthFindingStatusRow = typeof siteHealthFindingStatus.$inferInsert;

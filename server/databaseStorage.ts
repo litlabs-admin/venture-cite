@@ -33,6 +33,10 @@ import {
   type InsertGeoRanking,
   type BrandPrompt,
   type InsertBrandPrompt,
+  type PromptTag,
+  type PromptAudience,
+  type PromptSetHealthRun,
+  type PromptPhrasingTest,
   type GeoSignalRun,
   type InsertGeoSignalRun,
   type ContentGenerationJob,
@@ -756,6 +760,302 @@ export class DatabaseStorage implements IStorage {
       .update(schema.brandPrompts)
       .set({ status, isActive: status === "tracked" ? 1 : 0 })
       .where(eq(schema.brandPrompts.id, id))
+      .returning();
+    return row;
+  }
+
+  async getBrandPromptById(id: string): Promise<BrandPrompt | undefined> {
+    const [row] = await db.select().from(schema.brandPrompts).where(eq(schema.brandPrompts.id, id));
+    return row;
+  }
+
+  /** The ON/OFF toggle. Orthogonal to status - does not touch isActive/status
+   *  at all, see the column comment in shared/schema.ts. */
+  async setBrandPromptPaused(id: string, paused: boolean): Promise<BrandPrompt | undefined> {
+    const [row] = await db
+      .update(schema.brandPrompts)
+      .set({ paused })
+      .where(eq(schema.brandPrompts.id, id))
+      .returning();
+    return row;
+  }
+
+  async getPromptTagsByBrandId(brandId: string): Promise<PromptTag[]> {
+    return db
+      .select()
+      .from(schema.promptTags)
+      .where(eq(schema.promptTags.brandId, brandId))
+      .orderBy(asc(schema.promptTags.name));
+  }
+
+  /** { tagId: count of tracked/archived prompts currently wearing it }. */
+  async getPromptTagCounts(brandId: string): Promise<Record<string, number>> {
+    const rows = await db
+      .select({
+        tagId: schema.brandPromptTags.tagId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(schema.brandPromptTags)
+      .innerJoin(schema.promptTags, eq(schema.promptTags.id, schema.brandPromptTags.tagId))
+      .where(eq(schema.promptTags.brandId, brandId))
+      .groupBy(schema.brandPromptTags.tagId);
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.tagId] = r.count;
+    return out;
+  }
+
+  async createPromptTag(t: {
+    brandId: string;
+    name: string;
+    color?: string | null;
+  }): Promise<PromptTag> {
+    const [row] = await db
+      .insert(schema.promptTags)
+      .values({ brandId: t.brandId, name: t.name, color: t.color ?? null })
+      .returning();
+    return row;
+  }
+
+  async updatePromptTag(
+    id: string,
+    update: { name?: string; color?: string | null },
+  ): Promise<PromptTag | undefined> {
+    const [row] = await db
+      .update(schema.promptTags)
+      .set(update)
+      .where(eq(schema.promptTags.id, id))
+      .returning();
+    return row;
+  }
+
+  async deletePromptTag(id: string): Promise<void> {
+    await db.delete(schema.promptTags).where(eq(schema.promptTags.id, id));
+  }
+
+  async getTagIdsByPromptId(promptId: string): Promise<string[]> {
+    const rows = await db
+      .select({ tagId: schema.brandPromptTags.tagId })
+      .from(schema.brandPromptTags)
+      .where(eq(schema.brandPromptTags.brandPromptId, promptId));
+    return rows.map((r) => r.tagId);
+  }
+
+  async getPromptTagsMapByBrandId(brandId: string): Promise<Record<string, string[]>> {
+    const rows = await db
+      .select({
+        brandPromptId: schema.brandPromptTags.brandPromptId,
+        tagId: schema.brandPromptTags.tagId,
+      })
+      .from(schema.brandPromptTags)
+      .innerJoin(schema.promptTags, eq(schema.promptTags.id, schema.brandPromptTags.tagId))
+      .where(eq(schema.promptTags.brandId, brandId));
+    const out: Record<string, string[]> = {};
+    for (const r of rows) {
+      (out[r.brandPromptId] ??= []).push(r.tagId);
+    }
+    return out;
+  }
+
+  async attachPromptTag(promptId: string, tagId: string): Promise<void> {
+    await db
+      .insert(schema.brandPromptTags)
+      .values({ brandPromptId: promptId, tagId })
+      .onConflictDoNothing();
+  }
+
+  async detachPromptTag(promptId: string, tagId: string): Promise<void> {
+    await db
+      .delete(schema.brandPromptTags)
+      .where(
+        and(
+          eq(schema.brandPromptTags.brandPromptId, promptId),
+          eq(schema.brandPromptTags.tagId, tagId),
+        ),
+      );
+  }
+
+  async getPromptAudiencesByBrandId(brandId: string): Promise<PromptAudience[]> {
+    return db
+      .select()
+      .from(schema.promptAudiences)
+      .where(eq(schema.promptAudiences.brandId, brandId))
+      .orderBy(asc(schema.promptAudiences.name));
+  }
+
+  async getPromptAudienceCounts(brandId: string): Promise<Record<string, number>> {
+    const rows = await db
+      .select({
+        audienceId: schema.brandPromptAudiences.audienceId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(schema.brandPromptAudiences)
+      .innerJoin(
+        schema.promptAudiences,
+        eq(schema.promptAudiences.id, schema.brandPromptAudiences.audienceId),
+      )
+      .where(eq(schema.promptAudiences.brandId, brandId))
+      .groupBy(schema.brandPromptAudiences.audienceId);
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.audienceId] = r.count;
+    return out;
+  }
+
+  async createPromptAudience(a: {
+    brandId: string;
+    name: string;
+    description?: string | null;
+    funnelStage?: string | null;
+    generatedBy?: "ai" | "manual";
+  }): Promise<PromptAudience> {
+    const [row] = await db
+      .insert(schema.promptAudiences)
+      .values({
+        brandId: a.brandId,
+        name: a.name,
+        description: a.description ?? null,
+        funnelStage: a.funnelStage ?? null,
+        generatedBy: a.generatedBy ?? "manual",
+      })
+      .returning();
+    return row;
+  }
+
+  async deletePromptAudience(id: string): Promise<void> {
+    await db.delete(schema.promptAudiences).where(eq(schema.promptAudiences.id, id));
+  }
+
+  async getAudienceIdsByPromptId(promptId: string): Promise<string[]> {
+    const rows = await db
+      .select({ audienceId: schema.brandPromptAudiences.audienceId })
+      .from(schema.brandPromptAudiences)
+      .where(eq(schema.brandPromptAudiences.brandPromptId, promptId));
+    return rows.map((r) => r.audienceId);
+  }
+
+  async getPromptAudienceMapByBrandId(brandId: string): Promise<Record<string, string[]>> {
+    const rows = await db
+      .select({
+        brandPromptId: schema.brandPromptAudiences.brandPromptId,
+        audienceId: schema.brandPromptAudiences.audienceId,
+      })
+      .from(schema.brandPromptAudiences)
+      .innerJoin(
+        schema.promptAudiences,
+        eq(schema.promptAudiences.id, schema.brandPromptAudiences.audienceId),
+      )
+      .where(eq(schema.promptAudiences.brandId, brandId));
+    const out: Record<string, string[]> = {};
+    for (const r of rows) {
+      (out[r.brandPromptId] ??= []).push(r.audienceId);
+    }
+    return out;
+  }
+
+  async attachPromptAudience(promptId: string, audienceId: string): Promise<void> {
+    await db
+      .insert(schema.brandPromptAudiences)
+      .values({ brandPromptId: promptId, audienceId })
+      .onConflictDoNothing();
+  }
+
+  async detachPromptAudience(promptId: string, audienceId: string): Promise<void> {
+    await db
+      .delete(schema.brandPromptAudiences)
+      .where(
+        and(
+          eq(schema.brandPromptAudiences.brandPromptId, promptId),
+          eq(schema.brandPromptAudiences.audienceId, audienceId),
+        ),
+      );
+  }
+
+  async getLatestAiAudienceCreatedAt(brandId: string): Promise<Date | null> {
+    const [row] = await db
+      .select({ createdAt: schema.promptAudiences.createdAt })
+      .from(schema.promptAudiences)
+      .where(
+        and(
+          eq(schema.promptAudiences.brandId, brandId),
+          eq(schema.promptAudiences.generatedBy, "ai"),
+        ),
+      )
+      .orderBy(desc(schema.promptAudiences.createdAt))
+      .limit(1);
+    return row?.createdAt ?? null;
+  }
+
+  async getLatestSetHealthRun(brandId: string): Promise<PromptSetHealthRun | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.promptSetHealthRuns)
+      .where(eq(schema.promptSetHealthRuns.brandId, brandId))
+      .orderBy(desc(schema.promptSetHealthRuns.createdAt))
+      .limit(1);
+    return row;
+  }
+
+  async createSetHealthRun(run: {
+    brandId: string;
+    score: number | null;
+    verdict: string | null;
+    topFix: unknown;
+    issues: unknown[];
+    workingWell: string[];
+  }): Promise<PromptSetHealthRun> {
+    const [row] = await db
+      .insert(schema.promptSetHealthRuns)
+      .values({
+        brandId: run.brandId,
+        score: run.score,
+        verdict: run.verdict,
+        topFix: run.topFix as any,
+        issues: run.issues as any,
+        workingWell: run.workingWell,
+      })
+      .returning();
+    return row;
+  }
+
+  async getPhrasingTestsByPromptId(promptId: string): Promise<PromptPhrasingTest[]> {
+    return db
+      .select()
+      .from(schema.promptPhrasingTests)
+      .where(eq(schema.promptPhrasingTests.brandPromptId, promptId))
+      .orderBy(desc(schema.promptPhrasingTests.createdAt));
+  }
+
+  async getPhrasingTestById(id: string): Promise<PromptPhrasingTest | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.promptPhrasingTests)
+      .where(eq(schema.promptPhrasingTests.id, id));
+    return row;
+  }
+
+  async createPhrasingTest(t: {
+    brandPromptId: string;
+    phrasing: string;
+    rationale?: string | null;
+  }): Promise<PromptPhrasingTest> {
+    const [row] = await db
+      .insert(schema.promptPhrasingTests)
+      .values({
+        brandPromptId: t.brandPromptId,
+        phrasing: t.phrasing,
+        rationale: t.rationale ?? null,
+      })
+      .returning();
+    return row;
+  }
+
+  async setPhrasingTestResults(
+    id: string,
+    results: unknown,
+  ): Promise<PromptPhrasingTest | undefined> {
+    const [row] = await db
+      .update(schema.promptPhrasingTests)
+      .set({ results: results as any })
+      .where(eq(schema.promptPhrasingTests.id, id))
       .returning();
     return row;
   }
