@@ -1,4 +1,4 @@
-// Wave 9: orphan-run reconciliation.
+// Orphan-run reconciliation.
 //
 // Without this, a server crash mid-`runBrandPrompts` leaves the citation_runs
 // row pinned at status='running' forever. Every dependent page then sees

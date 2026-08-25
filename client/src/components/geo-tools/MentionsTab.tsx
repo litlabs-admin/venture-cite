@@ -1,4 +1,4 @@
-// MentionsTab - Task 20, Mentions Rebuild plan.
+// Mentions tab.
 // Spec §3.12. Composition layer: wires useMentions hook to the Mentions UI.
 //
 // Layout (top to bottom):

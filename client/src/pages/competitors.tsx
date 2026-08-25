@@ -91,7 +91,7 @@ export default function CompetitorsPage() {
     : Infinity;
   const shouldPollForDiscovery = selectedBrandAgeMs < 120_000;
 
-  // Wave 9: live-refresh during citation runs. Hook returns the cadence we
+  // Live refresh during citation runs. The hook returns the cadence that we
   // thread directly into useQuery. Competitor list also has a discovery
   // poll (3s) for new brands; we take the faster of the two when both are
   // active.

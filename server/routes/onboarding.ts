@@ -1,4 +1,4 @@
-// Server-side onboarding state (Wave 4.7).
+// Server-side onboarding state.
 //
 // Single endpoint that merges keys into users.onboarding_state. The
 // allowlist below defines the only fields that the client can write -

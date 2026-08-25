@@ -1,4 +1,4 @@
-// Competitors + misc scans + robots/sitemap (Wave 5.1).
+// Competitor, scan, robots, and sitemap routes.
 //
 // Extracted from server/routes.ts as part of the per-domain split.
 // Publication-intelligence routes were removed (Tier 2B orphan cleanup).
@@ -44,7 +44,7 @@ export function setupPublicationsRoutes(app: Express): void {
 
   // `POST /api/brand-facts/scrape/:brandId` removed in Spec 2 §4.10 - replaced
   // by the slice-resumable `POST /api/brand-fact-sheet/runs` (server/routes/factSheet.ts).
-  // Plan 2.4 rewires the frontend Re-scrape button to the new endpoint.
+  // The Re-scrape button uses the fact-sheet run endpoint.
 
   // Mention routes moved to server/routes/mentions.ts (mentions rebuild)
 
@@ -87,7 +87,7 @@ export function setupPublicationsRoutes(app: Express): void {
           // withActivity = competitors (not brand rows) with ≥1 cited row in
           // the window. Exposed alongside totalTracked so the UI can render
           // "15 tracked · 14 with activity" instead of a single misleading
-          // count. See Wave B.2 in the plan.
+          // count.
           const withActivity = leaderboard.filter((r) => !r.isOwn && r.totalCitations > 0).length;
           return res.json({
             success: true,

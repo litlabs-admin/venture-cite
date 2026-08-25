@@ -1,4 +1,23 @@
 import { z } from "zod";
+import { resolveDatabaseTlsPolicy } from "./lib/databaseTlsPolicy";
+import { remoteDevelopmentServiceNames } from "./lib/environmentSafety";
+import { isCustomOrmPreviewLedgerMode } from "./lib/migrationLedgerPolicy";
+import { parseSchedulerBoolean, resolveSchedulerMode } from "./lib/schedulerMode";
+
+const schedulerBooleanSchema = z
+  .string()
+  .optional()
+  .transform((value, context) => {
+    try {
+      return parseSchedulerBoolean(value);
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        message: error instanceof Error ? error.message : "Invalid scheduler boolean",
+      });
+      return z.NEVER;
+    }
+  });
 
 // Validates required environment variables at startup. Throws a readable
 // error (naming every missing/malformed variable) before the server starts
@@ -18,12 +37,24 @@ const resolvedAppUrl =
   (process.env.NODE_ENV === "production" ? undefined : "http://localhost:5000");
 if (resolvedAppUrl) process.env.APP_URL = resolvedAppUrl;
 
-const envSchema = z.object({
+const envSchemaBase = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.string().optional(),
   APP_URL: z.string().url(),
 
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+
+  // Development refuses remote databases and provider keys by default.
+  // Set this only for a deliberate, isolated development session.
+  ALLOW_REMOTE_DEVELOPMENT_SERVICES: z.enum(["true", "false"]).optional(),
+  // This is only for the isolated Supabase preview branch. It skips the
+  // platform ledger check while the application ledger remains mandatory.
+  SUPABASE_CUSTOM_ORM_PREVIEW: z.enum(["true", "false"]).optional(),
+  // The last root migration already present in the branch source schema.
+  SUPABASE_CUSTOM_ORM_PREVIEW_BASELINE: z
+    .string()
+    .regex(/\.sql$/)
+    .optional(),
 
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
@@ -41,8 +72,13 @@ const envSchema = z.object({
   // loudly and specifically at the point of use.
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_PRO_PRODUCT_ID: z.string().startsWith("prod_").optional(),
+  STRIPE_PRO_PRICE_ID: z.string().startsWith("price_").optional(),
+  STRIPE_AGENCY_PRODUCT_ID: z.string().startsWith("prod_").optional(),
+  STRIPE_AGENCY_PRICE_ID: z.string().startsWith("price_").optional(),
 
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
+  CONTENT_GENERATION_PROVIDER: z.enum(["fake", "openai"]).optional(),
 
   // Optional - features degrade if absent, but shouldn't block boot.
   // OPENROUTER_API_KEY is optional in core, but REQUIRED at runtime for the
@@ -65,9 +101,7 @@ const envSchema = z.object({
   VITE_SENTRY_DSN: z.string().url().optional(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).optional(),
 
-  // Postgres TLS hardening (see server/db.ts for the precedence order).
-  // Both optional - without them, the pool falls back to permissive TLS
-  // (still encrypted, no chain verification) with a boot warning in prod.
+  // Production requires one certificate verification option.
   DATABASE_CA_CERT_PATH: z.string().optional(),
   DATABASE_SSL_REJECT_UNAUTHORIZED: z.enum(["true", "false"]).optional(),
 
@@ -81,8 +115,9 @@ const envSchema = z.object({
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_ADDRESS: z.string().optional(),
+  EMAIL_DELIVERY_ENABLED: z.enum(["true", "false"]).optional(),
 
-  // Stripe API version pin (Wave 3.5). Falls back to a hardcoded
+  // Stripe API version pin. Falls back to a hardcoded
   // version in stripeClient.ts. Set in deploy env if you want to
   // pin to a different version than the SDK ships with.
   STRIPE_API_VERSION: z.string().optional(),
@@ -94,17 +129,66 @@ const envSchema = z.object({
   // Buffer feature don't need to set it.
   BUFFER_ENCRYPTION_KEY: z.string().optional(),
 
-  // Set to "true" when an EXTERNAL scheduler drives
-  // POST /api/cron/daily-orchestrator, so the in-process node-cron scheduler
-  // does not run the same six jobs a second time. Required on Render free
-  // tier, where the process sleeps and the in-process scheduler is unreliable
-  // anyway. See server/nitroBoot.ts and render.yaml.
-  DISABLE_IN_PROCESS_SCHEDULER: z.string().optional(),
+  // Set to "true" only after an authenticated external scheduler drives
+  // POST /api/cron/daily-orchestrator. This stops the in-process scheduler
+  // from running the same jobs a second time. Keep this "false" on Render
+  // until the external trigger passes release verification.
+  DISABLE_IN_PROCESS_SCHEDULER: schedulerBooleanSchema,
+
+  // Set to "true" only when an external service calls the daily cron
+  // orchestrator in production. This requires the in-process scheduler to
+  // be disabled. The typed guard prevents duplicate scheduled work.
+  EXTERNAL_CRON_ORCHESTRATOR_ENABLED: schedulerBooleanSchema,
 
   // No REDDIT_* credentials. The mention scanner reads Reddit
   // unauthenticated only (public JSON + RSS fallback); the OAuth path and
   // these four vars were removed together. Re-declaring them here would
   // advertise a configuration that nothing reads.
+});
+
+const envSchema = envSchemaBase.superRefine((value, context) => {
+  for (const name of remoteDevelopmentServiceNames(value)) {
+    context.addIssue({
+      code: "custom",
+      path: [name],
+      message:
+        "Development requires loopback services and no provider keys. Set ALLOW_REMOTE_DEVELOPMENT_SERVICES=true only for an approved isolated session.",
+    });
+  }
+
+  if (value.SUPABASE_CUSTOM_ORM_PREVIEW === "true" && !isCustomOrmPreviewLedgerMode(value)) {
+    context.addIssue({
+      code: "custom",
+      path: ["SUPABASE_CUSTOM_ORM_PREVIEW"],
+      message:
+        "SUPABASE_CUSTOM_ORM_PREVIEW=true requires development mode, remote-service opt-in, and a baseline filename.",
+    });
+  }
+
+  try {
+    resolveDatabaseTlsPolicy(value);
+  } catch (error) {
+    context.addIssue({
+      code: "custom",
+      path: ["DATABASE_SSL_REJECT_UNAUTHORIZED"],
+      message: error instanceof Error ? error.message : "Invalid database TLS configuration",
+    });
+  }
+
+  try {
+    resolveSchedulerMode({
+      nodeEnv: value.NODE_ENV,
+      isVercel: Boolean(process.env.VERCEL),
+      disableInProcessScheduler: value.DISABLE_IN_PROCESS_SCHEDULER,
+      externalCronOrchestratorEnabled: value.EXTERNAL_CRON_ORCHESTRATOR_ENABLED,
+    });
+  } catch (error) {
+    context.addIssue({
+      code: "custom",
+      path: ["EXTERNAL_CRON_ORCHESTRATOR_ENABLED"],
+      message: error instanceof Error ? error.message : "Invalid scheduler configuration",
+    });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

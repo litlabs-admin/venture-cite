@@ -1,6 +1,6 @@
-// Wave 8: matcher is the authority for `isCited`. The citation judge can
+// The matcher determines `isCited`. The citation judge can
 // still run for enrichment (rank / relevance), but cannot flip the verdict.
-// These tests cover the legacy `checkForCitation` path - the main Wave A
+// These tests cover the legacy `checkForCitation` path. The main
 // path inside `runBrandPrompts` is integration-tested separately because it
 // touches real DB + storage layers.
 

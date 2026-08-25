@@ -1,0 +1,6 @@
+interface:
+  display_name: "Diagnosing Bugs"
+  short_description: "Diagnose hard bugs and regressions"
+  default_prompt: "Use $diagnosing-bugs to reproduce and diagnose this failure."
+policy:
+  allow_implicit_invocation: true

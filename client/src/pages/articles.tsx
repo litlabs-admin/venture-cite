@@ -1,4 +1,4 @@
-// Articles list page (Wave 7 rebuild).
+// Articles list page.
 //
 // Status-aware: shows status badges for non-ready rows, brand chips on every
 // card, derived excerpts when missing, formatted view counts, +N more

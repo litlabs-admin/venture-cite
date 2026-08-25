@@ -1,4 +1,4 @@
--- Foundations Plan 3 Task 2: add timezone column for the expanded
+-- Add a timezone column for the expanded
 -- Settings page profile form. firstName/lastName already exist on
 -- the users table from earlier migrations.
 

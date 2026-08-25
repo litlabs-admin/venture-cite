@@ -1,4 +1,4 @@
--- Wave 9: prevent duplicate concurrent citation runs for the same brand.
+-- Prevent concurrent duplicate citation runs for one brand.
 --
 -- Without this, a user clicking "Run Check" from two tabs within the
 -- 8-second poll window of useActiveCitationRuns can start two parallel

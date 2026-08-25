@@ -13,11 +13,8 @@ import { sendOutreachEmailViaResend } from "../emailService";
 // Deliberately unauthenticated. The whole point is to hear from people who do
 // not have an account yet, so requiring a login would defeat it.
 //
-// The submission is LOGGED before the email is attempted, and the log line is
-// the durable record. Resend can be unconfigured (no RESEND_API_KEY in a dev
-// or preview environment) or simply fail, and a lead that only ever existed
-// inside a failed HTTP call is a lead lost - the person is not going to fill
-// the form in twice.
+// The log records only the event and message size. The notification email
+// contains the enquiry details. Logs and error reports must not contain them.
 
 const INQUIRY_TO = process.env.ENTERPRISE_INQUIRY_TO || "info@venturecite.com";
 
@@ -76,12 +73,7 @@ export function setupEnterpriseInquiryRoutes(app: Express): void {
         return res.status(400).json({ success: false, error: "That email doesn't look right." });
       }
 
-      // The record of the lead. Written first and unconditionally, so a
-      // failure to send the notification never loses the enquiry itself.
-      logger.info(
-        { name, email, company, messageLength: message.length },
-        "enterprise-inquiry received",
-      );
+      logger.info({ messageLength: message.length }, "enterprise-inquiry received");
 
       try {
         await sendOutreachEmailViaResend({
@@ -95,14 +87,10 @@ export function setupEnterpriseInquiryRoutes(app: Express): void {
           ].join(""),
         });
       } catch (err) {
-        // Reported, not surfaced. The enquiry is already in the log above, so
-        // telling the visitor it failed would send them away for no reason -
-        // but this must page someone, or leads rot silently in a log nobody
-        // reads.
-        logger.error({ err, email }, "enterprise-inquiry: notification email failed");
+        // Report the failure without the submitted contact details.
+        logger.error({ err }, "enterprise-inquiry: notification email failed");
         captureAndFlush(err, {
           tags: { source: "enterprise-inquiry" },
-          extra: { email, company },
         });
       }
 

@@ -1,4 +1,4 @@
-// AI intelligence: mentions, hallucinations, citation quality, brand facts, portfolio, sources, traffic, prompt tests, metrics, alerts (Wave 5.1).
+// AI intelligence routes for mentions, citations, brand facts, sources, traffic, prompts, metrics, and alerts.
 //
 // Extracted from server/routes.ts as part of the per-domain split. The
 // original monolith now only mounts this module via setupIntelligenceRoutes.

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Create Verification Skill"
+  short_description: "Create a user-facing verification workflow"
+  default_prompt: "Use $create-verification-skill to create a runnable feature verification workflow."
+policy:
+  allow_implicit_invocation: true

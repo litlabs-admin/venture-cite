@@ -1,7 +1,6 @@
 // User account self-service endpoints (GDPR-driven).
 //
-// First per-domain route file under server/routes/ - Wave 5 will split
-// the 7000-line monolithic server/routes.ts the same way.
+// User account routes live in a per-domain module.
 //
 // Endpoints:
 //   POST /api/user/delete        - schedule deletion (Art. 17, soft-first)
@@ -25,6 +24,9 @@ import { logger } from "../lib/logger";
 import { logAudit } from "../lib/audit";
 import { authRateKey } from "../lib/authRateKey";
 import { asyncHandler } from "../lib/routesShared";
+import { createRequestActor } from "../lib/requestActor";
+import { requestData } from "../data/requestData";
+import type { RequestUserProfilePatch } from "../data/requestUserRepository";
 import {
   NOTIFICATION_TYPES,
   getPreferences,
@@ -276,7 +278,7 @@ export function setupUserAccountRoutes(app: Express) {
     }),
   );
 
-  // Notification preferences (Wave 6.8).
+  // Notification preferences.
   app.get(
     "/api/user/notification-preferences",
     asyncHandler(async (req, res) => {
@@ -304,7 +306,7 @@ export function setupUserAccountRoutes(app: Express) {
     }),
   );
 
-  // Foundations Plan 3 Task 2: profile update (firstName, lastName,
+  // Profile update for firstName, lastName, and
   // timezone). Partial body allowed - only sent fields are written.
   app.patch(
     "/api/user/profile",
@@ -349,7 +351,7 @@ export function setupUserAccountRoutes(app: Express) {
         // The client always sends all three fields; if its form briefly
         // renders blank (e.g. before /auth/me hydrates), we'd overwrite
         // the user's real name with "". Treat trimmed-empty as "skip".
-        const patch: Record<string, unknown> = {};
+        const patch: RequestUserProfilePatch = {};
         if (firstName && firstName.trim().length > 0) patch.firstName = firstName.trim();
         if (lastName && lastName.trim().length > 0) patch.lastName = lastName.trim();
         if (timezone) patch.timezone = timezone;
@@ -358,9 +360,8 @@ export function setupUserAccountRoutes(app: Express) {
           return res.status(200).json({ success: true, noChange: true });
         }
 
-        patch.updatedAt = new Date();
-
-        await db.update(users).set(patch).where(eq(users.id, user.id));
+        const actor = createRequestActor(user.id);
+        await requestData.forActor(actor).users.updateProfile(patch);
         res.json({ success: true });
       } catch (err: unknown) {
         logger.error({ err }, "user.profile.update failed");
@@ -370,7 +371,7 @@ export function setupUserAccountRoutes(app: Express) {
     }),
   );
 
-  // Foundations Plan 3 Task 2: password change. Re-auths the user by
+  // Password change. Re-authenticate the user by
   // signing in with the current password against a fresh user-context
   // Supabase client (the admin client can't verify passwords), then
   // updates via the admin API.

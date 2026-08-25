@@ -123,7 +123,7 @@ export const queryClient = new QueryClient({
       // with imperative setQueryData/refetch in mutations.
       refetchOnWindowFocus: false,
       staleTime: 30_000,
-      // Wave 6.5: retry transient failures with exponential backoff. 401s
+      // Retry transient failures with exponential backoff. 401s
       // should not retry (user lost session - re-retrying just hammers the
       // endpoint). 4xx in general is a client error; retrying won't help.
       // Only retry on network errors and 5xx.

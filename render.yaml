@@ -1,7 +1,8 @@
 # Render Blueprint - free-tier web service.
 #
 # Derived from the actual repo state (not assumption):
-#   - `npm run build` = `db:migrate && vite build` (package.json). The old
+#   - `npm run build` only builds the application. Run the controlled
+#     migration release command before deployment traffic starts. The old
 #     esbuild step that bundled server/vercelEntry.ts into api/_bundle.js is
 #     gone, along with that entry file and the api/ directory - verified
 #     absent 2026-07-31. Nothing Vercel-specific runs in this build any more.
@@ -18,7 +19,7 @@
 #   - `/health` (server/app.ts) does a real `SELECT 1` against the DB and
 #     returns 503 if it fails - a real health check, not a static 200.
 #   - `server/nitroBoot.ts` (registered via vite.config.ts's
-#     `nitro({ plugins: [...] })`) runs DB migrations, the in-process node-cron
+#     `nitro({ plugins: [...] })`) runs the in-process node-cron
 #     scheduler, autopilot resume, and Stripe product setup exactly once per
 #     process - but ONLY when NODE_ENV=production and VERCEL is unset. Render
 #     must set NODE_ENV=production explicitly (below) or every one of those
@@ -32,15 +33,9 @@
 #   - Free-tier Render does NOT support Cron Job resources (a paid feature)
 #     - there is deliberately no `- type: cron` service below. Do not add one
 #     on this plan; it will fail to deploy or silently require an upgrade.
-#     Scheduled work (weekly reports, purges, citation scans, etc.) on Render
-#     currently relies on nitroBoot's in-process node-cron scheduler
-#     (server/scheduler.ts), which only runs at all because this is a
-#     long-lived process - that scheduler has NOTHING to do with Render's
-#     paid Cron Job product. If the user's external scheduler is ALSO going
-#     to hit POST /api/cron/daily-orchestrator on this Render service, that
-#     would run the same job set twice (in-process scheduler + externally
-#     triggered orchestrator) - see docs/deploy-runbook.md, flagged there as
-#     a decision the user needs to make, not resolved here.
+#     Scheduled work remains owned by nitroBoot's in-process node-cron
+#     scheduler (server/scheduler.ts). The external orchestrator stays
+#     disabled until an authenticated trigger has been proven end to end.
 #
 # NOTE ON REDDIT: there are no REDDIT_* variables to set. The mention
 # scanner reads Reddit unauthenticated only (public JSON + RSS); the OAuth
@@ -64,51 +59,19 @@ services:
     startCommand: npm start
     healthCheckPath: /health
     envVars:
-      # ── Required: NODE_ENV gates nitroBoot's side-effects (migrations,
-      # scheduler, autopilot resume, Stripe setup). Without this exact
+      # ── Required: NODE_ENV gates nitroBoot's side-effects (scheduler,
+      # autopilot resume, Stripe setup). Without this exact
       # value, Render would boot a working HTTP server that silently never
-      # runs a migration or a scheduled job. ──
+      # runs scheduled work. ──
       - key: NODE_ENV
         value: production
       # ── Single owner of scheduled work. ──
-      # Six jobs are registered BOTH in the in-process node-cron scheduler
-      # and in POST /api/cron/daily-orchestrator: account-purge,
-      # auto-citation, brand-purge, listicle-scan, mention-scan and
-      # weekly-report. With both live they each run twice - duplicate weekly
-      # report EMAILS to real users, and duplicate LLM spend on citation and
-      # mention scans. The advisory locks do not prevent this: they stop two
-      # runners overlapping, not one firing 15 minutes after the other.
-      #
-      # On this free plan the in-process scheduler is not viable regardless -
-      # the service sleeps after ~15 minutes idle and node-cron dies with it.
-      # So the external scheduler owns scheduling, and this flag switches the
-      # in-process one off. If you ever move to a paid always-on plan and
-      # drop the external scheduler, set this to false instead.
-      #
-      # ── CALL THE ORCHESTRATOR HOURLY, NOT DAILY. ──
-      # Not a preference - daily silently loses work, for two reasons:
-      #
-      # 1. BUDGET. The orchestrator's wall-clock budget is CRON_TOTAL_BUDGET_MS,
-      #    derived from VERCEL_FUNCTION_BUDGET_MS (unset here => 60s default,
-      #    so 57s). The per-step caps in STEP_CAPS_MS sum to ~411s, and
-      #    v2-monthly-fact-refresh alone may take 50s of the 57. On a busy tick
-      #    the later steps are SKIPPED - reported in `skippedDueToBudget`, but
-      #    the response still says success:true. Most steps roll forward via
-      #    their own lastXxxAt timestamps, so the next tick picks them up.
-      #    Hourly means "next tick" is an hour away rather than a day.
-      #
-      # 2. DAY-GATED WORK. mention-scan, listicle-scan and competitor-discovery
-      #    run only when isMonday; weekly-report-legacy only when isSunday. A
-      #    single daily call gives each ONE attempt per week - if that attempt
-      #    is starved by budget, the job waits a full week. Hourly gives 24
-      #    attempts on the correct day, and server/lib/jobDebounce.ts (20h
-      #    window on both) guarantees only the first one does the work.
-      #
-      # Hourly also restores auto-citation's real cadence: the in-process
-      # scheduler ran it at "0 * * * *", and the orchestrator is now its only
-      # trigger. Its debounce window is 45min, deliberately under the hour.
+      # Render uses the in-process scheduler because no authenticated
+      # external trigger has passed its release gate.
       - key: DISABLE_IN_PROCESS_SCHEDULER
-        value: "true"
+        value: "false"
+      - key: EXTERNAL_CRON_ORCHESTRATOR_ENABLED
+        value: "false"
       # Orchestrator wall-clock budget. Defaults to ~58s, derived from Vercel's
       # 60s function ceiling - a limit that does not exist here. This is a
       # long-lived node server, and the orchestrator is a plain HTTP request.
@@ -144,6 +107,12 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # Production fails startup without certificate verification.
+      # Prefer the Supabase CA certificate path on the deployed service.
+      - key: DATABASE_CA_CERT_PATH
+        sync: false
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
@@ -151,6 +120,15 @@ services:
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Checkout rejects every price unless these exact IDs match Stripe.
+      - key: STRIPE_PRO_PRODUCT_ID
+        sync: false
+      - key: STRIPE_PRO_PRICE_ID
+        sync: false
+      - key: STRIPE_AGENCY_PRODUCT_ID
+        sync: false
+      - key: STRIPE_AGENCY_PRICE_ID
         sync: false
       - key: OPENAI_API_KEY
         sync: false

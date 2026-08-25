@@ -1,4 +1,4 @@
-// Wave 9.4: full-content view + publish lifecycle for BOFU pieces.
+// Full-content view and publish lifecycle for BOFU pieces.
 // Replaces the previous geo-tools card body which only rendered a
 // 500-char preview in a 160px scroll area - generated content was in
 // the DB but invisible to the user. This sheet exposes the whole

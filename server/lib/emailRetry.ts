@@ -1,4 +1,4 @@
-// Email retry helper (Wave 3.6).
+// Email retry helper.
 //
 // Wraps the Resend send call with bounded retries + exponential backoff.
 // On final failure, the caller is expected to write a row to

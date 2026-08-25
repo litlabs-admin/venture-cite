@@ -1,4 +1,4 @@
--- Wave 9.3: enforce one alert_settings row per (brand_id, alert_type).
+-- Enforce one alert_settings row per (brand_id, alert_type).
 -- Historically the schema only had a brand_id index, so double-clicking
 -- the create button (or two browser tabs racing) produced duplicate
 -- rows that each fired their own notification on every event.

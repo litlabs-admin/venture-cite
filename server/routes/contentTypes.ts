@@ -1,4 +1,4 @@
-// Content types: listicles, wikipedia, BOFU, FAQs (Wave 5.1).
+// Content type routes for listicles, Wikipedia, BOFU, and FAQs.
 //
 // Extracted verbatim from server/routes.ts as part of the per-domain
 // split. Route handler bodies are byte-identical to the monolith; only
@@ -150,7 +150,7 @@ registerLlmJobHandler<
     };
   },
 });
-// Wave 9.4: keep tracked_content_urls in sync with bofu_content / faq_items
+// Keep tracked_content_urls in sync with bofu_content and faq_items.
 // publishedUrl. Called from PATCH handlers; defensive against partial inputs.
 async function syncTrackedContentUrl(
   sourceType: "bofu" | "faq",
@@ -189,7 +189,7 @@ export function setupContentTypesRoutes(app: Express): void {
     "keyword",
     "searchVolume",
     "domainAuthority",
-    // Wave 9.4: outreach lifecycle.
+    // Outreach lifecycle.
     "outreachStatus",
     "outreachNotes",
     "metadata",
@@ -233,7 +233,7 @@ export function setupContentTypesRoutes(app: Express): void {
     }),
   );
 
-  // Create a listicle - brandId must belong to caller. Wave 9.4: use
+  // Create a listicle. brandId must belong to the caller. Use
   // tryInsertListicle so the unique (brand_id, lower(url)) index is the
   // arbiter; manual entry returns 409 if the URL is already tracked.
   app.post(
@@ -273,7 +273,7 @@ export function setupContentTypesRoutes(app: Express): void {
         if (update.brandId && typeof update.brandId === "string") {
           await requireBrand(update.brandId, user.id);
         }
-        // Wave 9.4: validate outreach status transitions. Categorical
+        // Validate outreach status transitions. Categorical
         // column, not a strict state machine - users can correct mistakes
         // by moving back to any prior state.
         if (update.outreachStatus !== undefined) {
@@ -351,7 +351,7 @@ export function setupContentTypesRoutes(app: Express): void {
         }
 
         const { scanBrandListicles } = await import("../lib/listicleScanner");
-        // Wave 9.4: full ScanReport - includes reverified/lostInclusion +
+        // A full ScanReport includes reverified, lostInclusion, and
         // multi-line failure list so the toast can surface partial failures.
         const report = await scanBrandListicles(brand.id);
         const listicles = await storage.getListicles(brand.id);
@@ -409,7 +409,7 @@ export function setupContentTypesRoutes(app: Express): void {
     "metadata",
   ] as const;
 
-  // Create Wikipedia mention - brandId must belong to caller. Wave 9.4:
+  // Create a Wikipedia mention. brandId must belong to the caller.
   // tryInsert so manual-add surfaces a 409 instead of duplicating.
   app.post(
     "/api/wikipedia",
@@ -595,7 +595,7 @@ export function setupContentTypesRoutes(app: Express): void {
         if (update.brandId && typeof update.brandId === "string") {
           await requireBrand(update.brandId, user.id);
         }
-        // Wave 9.4: when the user marks the piece as published (toggles
+        // When the user marks the piece as published, this toggles
         // the publishedAt timestamp), accept either the explicit value or
         // a "publish now" sentinel. publishedUrl can be cleared by sending
         // null or "".
@@ -624,7 +624,7 @@ export function setupContentTypesRoutes(app: Express): void {
         await requireBofuContent(req.params.id, user.id);
         const deleted = await storage.deleteBofuContent(req.params.id);
         if (!deleted) return res.status(404).json({ success: false, error: "Content not found" });
-        // Wave 9.4: remove from tracked content registry (no-op if it
+        // Remove it from the tracked content registry. This is a no-op if it
         // wasn't published).
         await storage.deleteTrackedContentUrlBySource("bofu", req.params.id).catch(() => {});
         res.json({ success: true });
@@ -647,7 +647,7 @@ export function setupContentTypesRoutes(app: Express): void {
         }
         await requireBrand(brandId, user.id);
 
-        // Wave 9.4: load full grounding context - fact sheet + ALL
+        // Load the full grounding context: fact sheet and all
         // tracked competitors (was: comparedWith[0] only). The fact-sheet
         // block + per-competitor verified data goes into the prompt so
         // the LLM stops inventing comparison features.
@@ -875,7 +875,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
         if (update.publishedAt && typeof update.publishedAt === "string") {
           update.publishedAt = new Date(update.publishedAt);
         }
-        // Wave 9.4: recompute aiSurfaceScore deterministically when the
+        // Recompute aiSurfaceScore deterministically when the
         // question or answer changes. The legacy LLM-self-scored field
         // produced inconsistent values; this gives a stable signal.
         if (update.question !== undefined || update.answer !== undefined) {
@@ -929,7 +929,7 @@ This is bottom-of-funnel content designed to convert and get cited by AI.`;
         const user = requireUser(req);
         const faq = await requireFaq(req.params.id, user.id);
 
-        // Wave 9.4: pull the full grounding context (fact sheet) so the
+        // Load the full grounding context from the fact sheet so the
         // optimizer can hedge against unverified claims rather than
         // inventing them.
         const ctx = faq.brandId ? await loadBrandGenerationContext(faq.brandId, []) : null;
@@ -980,7 +980,7 @@ Return ONLY valid JSON. Do not include an aiSurfaceScore field - it is computed 
 
         const finalQuestion = optimized.question || faq.question;
         const finalAnswer = optimized.answer || faq.answer;
-        // Wave 9.4: deterministic score; LLM's number is ignored.
+        // Use a deterministic score. Ignore the LLM's number.
         const aiSurfaceScore = computeAiSurfaceScore({
           question: finalQuestion,
           answer: finalAnswer,
@@ -1012,7 +1012,7 @@ Return ONLY valid JSON. Do not include an aiSurfaceScore field - it is computed 
       try {
         const user = requireUser(req);
         await requireBrand(req.params.brandId, user.id);
-        // Wave 9.4: ownership-checked above; pull grounding context.
+        // Ownership is checked above. Load the grounding context.
         const ctx = await loadBrandGenerationContext(req.params.brandId, []);
         if (!ctx) return res.status(404).json({ success: false, error: "Brand not found" });
         const { brand, facts } = ctx;
@@ -1109,7 +1109,7 @@ Return ONLY the JSON object (no prose, no markdown fences). Do NOT include any a
   );
 
   // ============================================================
-  // Wave 9.4: GEO Tools header summary endpoint.
+  // GEO Tools header summary endpoint.
   // ============================================================
   app.get(
     "/api/geo-tools/summary/:brandId",
@@ -1126,7 +1126,7 @@ Return ONLY the JSON object (no prose, no markdown fences). Do NOT include any a
   );
 
   // ============================================================
-  // Wave 9.4: Wikipedia draft-text helper. NPOV-tuned 2-3 sentence
+  // Wikipedia draft-text helper. It returns a neutral two- or three-sentence
   // mention the user can paste into the Wikipedia edit form.
   // ============================================================
   app.post(

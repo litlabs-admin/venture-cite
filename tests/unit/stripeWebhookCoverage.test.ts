@@ -25,6 +25,10 @@ function handledEvents(): string[] {
 }
 
 describe("stripe webhook coverage", () => {
+  it("checks claim ownership before each event side effect", () => {
+    expect(handlers).toContain("await lease.assertOwned()");
+  });
+
   it("handles every event the billing lifecycle depends on", () => {
     const handled = new Set(handledEvents());
     // Sanity-check the regex itself, so this cannot pass vacuously.

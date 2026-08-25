@@ -82,12 +82,42 @@ import {
   type SentimentCache,
 } from "@shared/schema";
 
+export type ClaimedContentGenerationJob = ContentGenerationJob & {
+  advanceToken: string;
+  advanceLeaseExpiresAt: Date;
+};
+
+export type ContentJobTerminalUpdate = {
+  status: "succeeded" | "failed" | "cancelled";
+  completedAt: Date;
+  errorMessage?: string | null;
+  errorKind?: string | null;
+};
+
+export type CompletedContentJob = {
+  content: string;
+  title: string;
+};
+
+export type CompletedContentJobCost = {
+  providerResponseId: string;
+  service: string;
+  model: string | null;
+  tokensIn: number;
+  tokensOut: number;
+};
+
+export type FailedContentJob = {
+  errorKind: string;
+  errorMessage: string;
+};
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
-  // Wave 4.6: optional pagination. Omit opts for the (legacy) "give me
+  // Optional pagination. Omit opts to return all rows.
   // everything" behavior used by analytics rollups; pass { limit, offset }
   // from HTTP routes so unbounded responses can't escape.
   getCitations(opts?: { limit?: number; offset?: number }): Promise<Citation[]>;
@@ -107,7 +137,7 @@ export interface IStorage {
   getBrandById(id: string): Promise<Brand | undefined>;
   getBrandByIdForUser(id: string, userId: string): Promise<Brand | undefined>;
   updateBrand(id: string, brand: Partial<InsertBrand>): Promise<Brand | undefined>;
-  // Wave 4.4: optimistic-lock variant. Caller passes the version they
+  // Optimistic-lock variant. The caller passes the version that it
   // last read; returns undefined if the row's version no longer matches
   // (someone else wrote in between) - caller surfaces 409 Conflict.
   updateBrandIfVersion(
@@ -116,10 +146,10 @@ export interface IStorage {
     brand: Partial<InsertBrand>,
   ): Promise<Brand | undefined>;
   deleteBrand(id: string): Promise<boolean>;
-  // Wave 4.5: schedules deletion in `graceDays` days. The application
+  // Schedule deletion in `graceDays` days. The application
   // layer calls this; the cron-driven hard-delete uses deleteBrand.
   softDeleteBrand(id: string, graceDays?: number): Promise<Brand | undefined>;
-  // Plan 6: atomic compare-and-swap from autopilot_status='failed' →
+  // Atomically change autopilot_status from 'failed' to
   // 'pending'. Returns true if the row transitioned, false if another
   // caller already won the race (or the row was no longer failed).
   // Powers the autopilot-retry endpoint's race-safe re-fire.
@@ -128,7 +158,7 @@ export interface IStorage {
   // Article methods
   createArticle(article: InsertArticle): Promise<Article>;
   getArticles(opts?: { limit?: number; offset?: number }): Promise<Article[]>;
-  // Wave 4.6: SQL-scoped to user's non-soft-deleted brands. Use this
+  // SQL scopes this to the user's non-soft-deleted brands. Use this
   // from HTTP routes instead of getArticles().filter(...) so LIMIT
   // applies to the user's slice.
   getArticlesByUserId(
@@ -137,7 +167,7 @@ export interface IStorage {
   ): Promise<Article[]>;
   getArticleById(id: string): Promise<Article | undefined>;
   updateArticle(id: string, article: Partial<InsertArticle>): Promise<Article | undefined>;
-  // Wave 4.4: optimistic-lock variant.
+  // Optimistic-lock variant.
   updateArticleIfVersion(
     id: string,
     expectedVersion: number,
@@ -238,7 +268,7 @@ export interface IStorage {
   }): Promise<PromptPhrasingTest>;
   setPhrasingTestResults(id: string, results: unknown): Promise<PromptPhrasingTest | undefined>;
   getMaxBrandPromptOrderIndex(brandId: string): Promise<number>;
-  // Wave 9.1: replaceTrackedId is optional now. Pass null to add the
+  // replaceTrackedId is optional. Pass null to add the
   // suggestion as a new tracked prompt without archiving anything (only
   // valid when current tracked count < cap; route enforces).
   promoteSuggestionToTracked(suggestionId: string, replaceTrackedId: string | null): Promise<void>;
@@ -265,10 +295,10 @@ export interface IStorage {
   createCitationRun(run: InsertCitationRun): Promise<CitationRun>;
   updateCitationRun(id: string, update: Partial<CitationRun>): Promise<CitationRun | undefined>;
   getCitationRunsByBrandId(brandId: string, limit?: number): Promise<CitationRun[]>;
-  // Wave 9: read a single run by id (used by the async kickoff to hand the
+  // Read a single run by ID. The async kickoff uses this to hand the
   // pre-created row over to runBrandPrompts via options.runId).
   getCitationRunById(runId: string): Promise<CitationRun | undefined>;
-  // Wave 9.1: recompute totals + breakdown for a single run from
+  // Recompute totals and a breakdown for one run from
   // geo_rankings. The canonical aggregator - every code path that mutates
   // is_cited on a ranking should call this so the run header stays in
   // sync with the drill-down. Returns the new totals for the caller's
@@ -278,7 +308,7 @@ export interface IStorage {
     totalCited: number;
     citationRate: number;
   }>;
-  // Wave 8: live-update lifecycle
+  // Live-update lifecycle.
   getActiveCitationRuns(
     brandId: string,
   ): Promise<Array<{ id: string; startedAt: Date; progressPct: number; status: string }>>;
@@ -323,14 +353,39 @@ export interface IStorage {
   claimContentJobForSlice(
     id: string,
     sliceBudgetSeconds: number,
+  ): Promise<ClaimedContentGenerationJob | undefined>;
+  finishContentJobSlice(
+    id: string,
+    advanceToken: string,
+    update: ContentJobTerminalUpdate,
   ): Promise<ContentGenerationJob | undefined>;
+  completeContentJobSlice(
+    id: string,
+    advanceToken: string,
+    article: CompletedContentJob,
+    cost: CompletedContentJobCost,
+  ): Promise<boolean>;
+  failContentJobSlice(
+    id: string,
+    advanceToken: string,
+    failure: FailedContentJob,
+  ): Promise<boolean>;
+  renewContentJobSliceLease(id: string, advanceToken: string): Promise<boolean>;
+  releaseContentJobSliceLease(id: string, advanceToken: string): Promise<boolean>;
+  cancelContentJob(id: string): Promise<ContentGenerationJob | undefined>;
+  resetArticleForCancelledContentJob(id: string): Promise<boolean>;
+  setArticleGeneratingForContentJob(id: string, advanceToken: string): Promise<boolean>;
   // Pending or running jobs whose advance lock has expired. Used by the
   // daily cron orchestrator to drain orphaned generations.
   listAdvanceablePendingJobs(limit: number): Promise<ContentGenerationJob[]>;
   // Vercel migration: link an OpenAI Responses run to a content job.
   // Idempotent - passing the same id is a no-op. Used by runArticleSlice's
   // first call to record which OpenAI run owns this job.
-  updateContentJobResponseId(jobId: string, openaiResponseId: string): Promise<void>;
+  updateContentJobResponseId(
+    jobId: string,
+    advanceToken: string,
+    openaiResponseId: string,
+  ): Promise<boolean>;
   getActiveContentJob(userId: string): Promise<ContentGenerationJob | undefined>;
   getRecentCompletedContentJob(userId: string): Promise<ContentGenerationJob | undefined>;
   failStuckContentJobs(
@@ -352,7 +407,7 @@ export interface IStorage {
   deleteCompetitor(id: string): Promise<boolean>;
   ignoreCompetitor(id: string): Promise<boolean>;
 
-  // Per-run, per-prompt competitor citation detail (Wave 2 - symmetric
+  // Per-run, per-prompt competitor citation detail. It uses a symmetric
   // with geo_rankings for the brand).
   createCompetitorGeoRanking(row: InsertCompetitorGeoRanking): Promise<CompetitorGeoRanking>;
   getCompetitorGeoRankings(
@@ -439,20 +494,20 @@ export interface IStorage {
   ): Promise<BrandMention | undefined>;
   deleteBrandMention(id: string): Promise<boolean>;
 
-  // Wave 9.4: idempotent inserts (ON CONFLICT DO NOTHING). Return null
+  // Idempotent inserts use ON CONFLICT DO NOTHING. Return null
   // when the row would have collided with a unique constraint, so
   // scanners can count "newly inserted" vs "already had it" without a
   // pre-read.
   tryInsertListicle(insert: InsertListicle): Promise<Listicle | null>;
   tryInsertWikipediaMention(insert: InsertWikipediaMention): Promise<WikipediaMention | null>;
   tryInsertBrandMention(insert: InsertBrandMention): Promise<BrandMention | null>;
-  // Wave 9.4: trigram (or fallback exact-match) similarity for FAQ dedup.
+  // Use trigram similarity or exact-match fallback for FAQ deduplication.
   findSimilarFaqQuestion(
     brandId: string,
     question: string,
     threshold?: number,
   ): Promise<{ id: string; question: string; similarity: number } | null>;
-  // Wave 9.4: tracked content URL CRUD + self-citation stamping.
+  // Tracked content URL CRUD and self-citation stamping.
   upsertTrackedContentUrl(insert: InsertTrackedContentUrl): Promise<TrackedContentUrl>;
   deleteTrackedContentUrlBySource(sourceType: "bofu" | "faq", sourceId: string): Promise<boolean>;
   getTrackedContentUrlsByBrandId(brandId: string): Promise<TrackedContentUrl[]>;
@@ -620,7 +675,7 @@ export interface IStorage {
   dismissFact(factId: string): Promise<BrandFactSheet | null>;
 
   /** SSE incremental read: list facts inserted by `runId` whose `id > sinceId`,
-   *  ordered by id ASC, capped at `limit`. Consumed by Plan 2.3's SSE polling
+   *  ordered by id ASC, capped at `limit`. The SSE polling route consumes it.
    *  loop to emit `event: fact` per new row since the last tick. */
   listFactsByRunIdSince(
     runId: string,
@@ -720,7 +775,7 @@ export interface IStorage {
   ): Promise<CommunityPost | undefined>;
   deleteCommunityPost(id: string): Promise<boolean>;
 
-  // Wave 7: drafts are now articles with status='draft'. The methods below
+  // Drafts are articles with status='draft'. The methods below
   // power the unified flow.
   createDraftArticle(
     userId: string,
@@ -876,7 +931,7 @@ export interface IStorage {
   recordTourEvents(events: import("@shared/schema").InsertTourEvent[]): Promise<number>;
   deleteOldTourEvents(olderThan: Date): Promise<number>;
 
-  // ── Plan 1 (v2): cache + observability + concurrency + system state ──
+  // ── Cache, observability, concurrency, and system state ───────────────
   getFactScrapeCache(
     cacheKey: string,
   ): Promise<{ cacheKey: string; valueJson: unknown; expiresAt: Date } | null>;

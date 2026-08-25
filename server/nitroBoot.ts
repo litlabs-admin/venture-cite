@@ -1,5 +1,5 @@
 // Nitro startup plugin - runs the boot side-effects that server/index.ts's
-// IIFE runs in dev (DB migrations, orphan-citation-run reconciliation,
+// IIFE runs in dev (orphan-citation-run reconciliation,
 // Stripe product setup, the in-process cron scheduler, in-flight autopilot
 // resume) exactly once on a long-lived production server process.
 //
@@ -40,8 +40,8 @@
 //
 // SKIPPED ON VERCEL: `process.env.VERCEL`, consistent with the existing
 // serverless check in server/db.ts:68 (`isServerless = !!process.env.VERCEL`).
-// Vercel is serverless (fresh process per invocation) - running migrations
-// or starting a cron scheduler per cold start would be wrong and racy, and
+// Vercel is serverless (fresh process per invocation). Starting a cron
+// scheduler per cold start would be wrong and racy, and
 // Nitro's `vercel` preset builds a per-invocation function rather than this
 // long-lived node-server entry in the first place, so this file wouldn't
 // even be reachable there in practice. The check is still explicit, not
@@ -55,19 +55,14 @@
 // server/vite.ts's vite.middlewares.
 import { setupStripeProducts } from "./setupProducts";
 import { initScheduler } from "./scheduler";
-import { applyMigrations } from "./lib/migrationRunner";
 import { reconcileOrphanCitationRuns } from "./lib/citationReconciliation";
 import { resumeInFlightAutopilots } from "./lib/onboardingAutopilot";
 import { logger } from "./lib/logger";
 import { Sentry } from "./instrument";
+import { env } from "./env";
+import { resolveSchedulerMode } from "./lib/schedulerMode";
 
 let started = false;
-
-/** Accepts the usual spellings so "1"/"yes"/"TRUE" don't silently no-op. */
-function isTruthyEnv(v: string | undefined): boolean {
-  if (!v) return false;
-  return ["1", "true", "yes", "on"].includes(v.trim().toLowerCase());
-}
 
 export default function nitroBoot(): void {
   if (process.env.VERCEL) return;
@@ -80,10 +75,9 @@ export default function nitroBoot(): void {
 
 async function run(): Promise<void> {
   try {
-    await applyMigrations();
     await reconcileOrphanCitationRuns();
 
-    // Plan 4 audit (BUG #14): our email verification flow assumes the
+    // The email verification flow assumes the
     // Supabase project-level "Enable email confirmations" toggle is ON.
     // If it's OFF, Supabase auto-confirms every account regardless of
     // the `email_confirm: false` flag we pass to admin.createUser, and
@@ -102,23 +96,16 @@ async function run(): Promise<void> {
       });
     }
 
-    // DISABLE_IN_PROCESS_SCHEDULER exists for the "external scheduler" shape.
-    //
-    // Six jobs are registered BOTH here (node-cron) and in the daily
-    // orchestrator endpoint: account-purge, auto-citation, brand-purge,
-    // listicle-scan, mention-scan, weekly-report. If an external scheduler
-    // calls POST /api/cron/daily-orchestrator while this in-process cron is
-    // also live, each of those runs twice - duplicate report emails and
-    // duplicate LLM spend. The advisory locks do not help: they stop two
-    // runners overlapping, not one firing 15 minutes after the other.
-    //
-    // On Render's free plan the process sleeps after ~15 minutes idle, which
-    // takes this scheduler down with it - so that deployment MUST drive the
-    // orchestrator externally and set this flag. See render.yaml.
-    //
-    // server/lib/jobDebounce.ts is the belt to this braces: it guards the
-    // three costly jobs even if both triggers are somehow live at once.
-    if (isTruthyEnv(process.env.DISABLE_IN_PROCESS_SCHEDULER)) {
+    // The in-process scheduler remains the Render owner until an
+    // authenticated external trigger passes the release gate.
+    // The startup guard still rejects two scheduler owners.
+    const schedulerMode = resolveSchedulerMode({
+      nodeEnv: env.NODE_ENV,
+      isVercel: Boolean(process.env.VERCEL),
+      disableInProcessScheduler: env.DISABLE_IN_PROCESS_SCHEDULER,
+      externalCronOrchestratorEnabled: env.EXTERNAL_CRON_ORCHESTRATOR_ENABLED,
+    });
+    if (schedulerMode === "external") {
       logger.info(
         "nitroBoot: in-process scheduler DISABLED by DISABLE_IN_PROCESS_SCHEDULER - " +
           "scheduled work must be driven by POST /api/cron/daily-orchestrator",
@@ -130,11 +117,9 @@ async function run(): Promise<void> {
 
     logger.info(
       {
-        scheduler: isTruthyEnv(process.env.DISABLE_IN_PROCESS_SCHEDULER)
-          ? "disabled (external)"
-          : "in-process",
+        scheduler: schedulerMode === "external" ? "disabled (external)" : "in-process",
       },
-      "nitroBoot: boot side-effects complete (migrations, orphan-citation-run reconciliation, scheduler, autopilot resume)",
+      "nitroBoot: boot side-effects complete (orphan-citation-run reconciliation, scheduler, autopilot resume)",
     );
   } catch (err) {
     // Loud, not swallowed: this is exactly the failure mode this file
@@ -142,11 +127,11 @@ async function run(): Promise<void> {
     // then exit - a container orchestrator (Render) restarts a crashed
     // process into a clean retry; a persistent failure shows up as a
     // visible crash loop in the dashboard instead of a server that quietly
-    // runs forever with no migrations, no scheduler, and no autopilot
+    // runs forever with no scheduler or autopilot
     // resume.
     logger.error(
       { err },
-      "nitroBoot: boot side-effects FAILED - exiting rather than serving traffic without migrations/scheduler",
+      "nitroBoot: boot side-effects FAILED - exiting rather than serving traffic without required startup work",
     );
     Sentry.captureException(err, { tags: { source: "nitro-boot" } });
     await Sentry.close(2_000).catch(() => {});

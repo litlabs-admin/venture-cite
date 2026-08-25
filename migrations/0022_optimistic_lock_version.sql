@@ -1,4 +1,4 @@
--- Optimistic-lock version columns (Wave 4.4).
+-- Optimistic-lock version columns.
 --
 -- Pattern: every row carries an integer `version`. Reads return the
 -- current version; writes must include `WHERE version = $expected` and

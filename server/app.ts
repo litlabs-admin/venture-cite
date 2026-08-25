@@ -7,7 +7,7 @@
 //                                   server and by `npm run dev`'s own Vite
 //                                   middleware for page/SSR requests)
 //
-// Boot side-effects (migrations, scheduler, autopilot resume, Stripe
+// Boot side-effects (scheduler, autopilot resume, Stripe
 // setup) are kicked from server/index.ts on local dev, and from the Nitro
 // startup plugin (server/nitroBoot.ts, registered in vite.config.ts) in
 // built production - see that file for why it's safe for both to exist

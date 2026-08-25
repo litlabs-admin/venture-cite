@@ -1,4 +1,4 @@
-// Foundations Plan 4 Task 4: small disclosure pill mounted on article
+// Small disclosure pill mounted on article
 // surfaces whose body was produced by the content-generation worker. The
 // `aiGenerated` flag is set by storage.setArticleReady; manual creates
 // stay false and so render nothing.

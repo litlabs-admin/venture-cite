@@ -100,6 +100,31 @@ export function AuthenticatedBareRoute({ component: Component }: { component: Co
   );
 }
 
+export function AdminBareRoute({ component: Component }: { component: ComponentType }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  if (isLoading) {
+    return <RouteSpinner />;
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = "/login";
+    return null;
+  }
+
+  if (!user?.isAdmin) {
+    return <Navigate to="/dashboard" />;
+  }
+
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<RouteSpinner />}>
+        <Component />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 export function FirstRunGate({ component: Component }: { component: ComponentType }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   // The /api/brands response is { success: true, data: Brand[] }.

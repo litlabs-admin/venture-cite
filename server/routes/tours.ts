@@ -142,6 +142,14 @@ export function setupTourRoutes(app: Express): void {
       }
 
       const data = parsed.data;
+      const brandId = "brandId" in data ? data.brandId : undefined;
+      if (typeof brandId === "string") {
+        const brand = await storage.getBrandByIdForUser(brandId, userId);
+        if (!brand) {
+          return res.status(404).json({ success: false, error: "Brand not found" });
+        }
+      }
+
       const args =
         data.op === "suppress" || data.op === "unsuppress"
           ? { tourId: data.tourId, timestamp: new Date().toISOString() }
@@ -173,6 +181,20 @@ export function setupTourRoutes(app: Express): void {
           error: "Invalid events batch.",
           details: parsed.error.flatten(),
         });
+      }
+
+      const brandIds = [
+        ...new Set(
+          parsed.data.events
+            .map((event) => event.brandId)
+            .filter((brandId): brandId is string => typeof brandId === "string"),
+        ),
+      ];
+      const ownedBrands = await Promise.all(
+        brandIds.map((brandId) => storage.getBrandByIdForUser(brandId, userId)),
+      );
+      if (ownedBrands.some((brand) => !brand)) {
+        return res.status(404).json({ success: false, error: "Brand not found" });
       }
 
       // occurredAt is untrusted client input. Clamp it: a far-future

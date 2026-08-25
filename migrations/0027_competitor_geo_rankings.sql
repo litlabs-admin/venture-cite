@@ -1,6 +1,6 @@
--- Wave 2 + Wave 3: Give competitor citation detection the same fidelity
--- as brand citation detection (per-run, per-prompt, per-platform rows with
--- LLM-judged rank + relevance + snippet) AND let AI citations feed the
+-- Store competitor citation details with each run, prompt, and platform.
+-- The records include LLM-assessed rank, relevance, and snippets.
+-- AI citations also feed the
 -- unified brand_mentions table.
 --
 -- The old `competitor_citation_snapshots` table stored only an aggregate

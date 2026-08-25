@@ -1,15 +1,14 @@
 // Every job the in-process scheduler registers MUST also exist as a step in
 // the daily orchestrator.
 //
-// DISABLE_IN_PROCESS_SCHEDULER (the documented Render shape) switches the
-// node-cron scheduler off entirely and makes POST /api/cron/daily-orchestrator
-// the only trigger for scheduled work. Any job registered ONLY in the
-// scheduler then stops running - with no error, no failed step and no log
-// line, because nothing is left to report it.
+// An external-owner deployment sets DISABLE_IN_PROCESS_SCHEDULER and makes
+// POST /api/cron/daily-orchestrator the only trigger for scheduled work.
+// Render keeps that flag false until an authenticated external trigger passes
+// release verification. Any job registered ONLY in the scheduler would then
+// stop running with no error, failed step, or log line.
 //
-// That is exactly what happened to tour-events-cleanup (tour_events would
-// grow without bound) and detect-fact-scrape-failure (alerting silently off).
-// Both were scheduler-only. This test is the reason the next one gets caught.
+// This check prevents a scheduler-only job from disappearing when an
+// external-owner deployment becomes active.
 //
 // Deliberately a source-text check rather than a runtime one: importing
 // server/scheduler.ts pulls in the DB, Supabase and Resend clients, and the

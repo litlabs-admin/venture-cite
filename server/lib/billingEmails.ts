@@ -32,9 +32,9 @@ function shell(heading: string, body: string, cta?: { href: string; label: strin
 async function send(to: string, subject: string, html: string, kind: string): Promise<void> {
   try {
     await sendOutreachEmailViaResend({ to, subject, html });
-    logger.info({ to, kind }, "billing email sent");
+    logger.info({ kind }, "billing email sent");
   } catch (err) {
-    logger.error({ err, to, kind }, "billing email failed");
+    logger.error({ err, kind }, "billing email failed");
     captureAndFlush(err, { tags: { source: "billing-email" }, extra: { kind } });
   }
 }

@@ -1,4 +1,4 @@
-// Foundations Plan 4 Task 4: AI disclosure column + pill.
+// Test the AI disclosure column and pill.
 //
 // Verifies the storage contract that the AI-disclosure pill depends on:
 //   1. setArticleReady (the only worker path that flips status→ready) sets

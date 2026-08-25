@@ -1,0 +1,6 @@
+interface:
+  display_name: "Unslop Writing"
+  short_description: "Remove artificial writing patterns"
+  default_prompt: "Use $unslop to remove artificial writing patterns from this text."
+policy:
+  allow_implicit_invocation: true

@@ -1,6 +1,6 @@
 // Content generation routes.
 //
-// Wave 7 (content unification): the legacy three-table model
+// The legacy three-table model
 // (content_drafts + content_generation_jobs + articles) was collapsed into a
 // single articles table with status='draft'|'generating'|'ready'|'failed'.
 // The /api/content-drafts CRUD endpoints are gone - drafts are just articles
@@ -29,22 +29,11 @@
 //   DELETE /api/keyword-research/:id         - delete row
 
 import type { Express, Request, Response } from "express";
+import { z } from "zod";
 import { storage } from "../storage";
-import { db } from "../db";
-import * as schema from "@shared/schema";
-import { resolveTier } from "@shared/schema";
-import { eq } from "drizzle-orm";
 import { MODELS } from "../lib/modelConfig";
 import { type GenerationPayload } from "../contentGenerationWorker";
-import {
-  requireUser,
-  requireBrand,
-  requireArticle,
-  requireKeywordResearch,
-  pickFields,
-} from "../lib/ownership";
-import { withArticleQuota, isUsageLimitError } from "../lib/usageLimit";
-import type { Tier } from "../lib/llmPricing";
+import { requireUser, requireBrand } from "../lib/ownership";
 import {
   openai,
   aiLimitMiddleware,
@@ -60,6 +49,51 @@ import { acquireOrWait, secondsUntilAvailable } from "../lib/rateLimitBuckets";
 import { logger } from "../lib/logger";
 import { captureAndFlush } from "../lib/sentryReport";
 import { enqueueLlmJob, registerLlmJobHandler } from "../lib/llmJobs";
+import { createRequestActor } from "../lib/requestActor";
+import { liveOpenAIEnabled } from "../lib/localFlowSafety";
+import { contentRequestData } from "../data/contentRequestData";
+import { usesFakeContentGenerationProvider } from "../lib/contentGenerationProvider";
+
+const keywordUpdateSchema = z
+  .object({
+    keyword: z.string().min(1).optional(),
+    searchVolume: z.number().int().nullable().optional(),
+    difficulty: z.number().int().min(1).max(100).nullable().optional(),
+    opportunityScore: z.number().int().min(1).max(100).optional(),
+    aiCitationPotential: z.number().int().min(1).max(100).optional(),
+    intent: z
+      .enum(["informational", "commercial", "transactional", "navigational"])
+      .nullable()
+      .optional(),
+    category: z.string().nullable().optional(),
+    competitorGap: z.number().int().min(0).max(100).optional(),
+    suggestedContentType: z.string().nullable().optional(),
+    relatedKeywords: z.array(z.string()).nullable().optional(),
+    status: z.enum(["discovered"]).optional(),
+    contentGenerated: z.number().int().optional(),
+  })
+  .strict()
+  .refine((update) => Object.keys(update).length > 0, {
+    message: "At least one keyword field is required",
+  });
+
+const contentGenerationRequestSchema = z
+  .object({
+    keywords: z.string().refine((value) => value.trim().length > 0),
+    industry: z.string().refine((value) => value.trim().length > 0),
+    type: z.string().min(1).default("article"),
+    targetCustomers: z.string().optional(),
+    geography: z.string().optional(),
+    contentStyle: z.enum(["b2b", "b2c"]).default("b2c"),
+  })
+  .strict();
+
+const articleImproveRequestSchema = z
+  .object({
+    instructions: z.string().optional(),
+    expectedVersion: z.number().int().nonnegative().optional(),
+  })
+  .strict();
 
 // ─────────────────────────────────────────────────────────────────────────
 // Keyword discovery handler - registered at module-load. The poll endpoint
@@ -155,16 +189,14 @@ registerLlmJobHandler<
     return { data: savedKeywords, count: savedKeywords.length };
   },
 });
-// Foundations Plan 1, Task 4: the previous time-driven "phase label"
+// The previous time-driven "phase label"
 // (Brainstorming → Drafting → Writing → Polishing) was theatre - the
 // Responses API background mode doesn't expose intra-run progress, so
 // those labels were uncorrelated with what the model was actually doing.
 // We now show honest elapsed seconds only, plus a Cancel button.
 export function computeJobStatePayload(job: {
   status: string;
-  streamBuffer: string | null;
   errorMessage: string | null;
-  openaiResponseId: string | null;
   startedAt: Date | null;
 }): {
   status: string;
@@ -190,13 +222,15 @@ export function computeJobStatePayload(job: {
   };
 }
 
+export function contentLengthForResponse(article: { content: string | null } | undefined): number {
+  return article?.content?.length ?? 0;
+}
+
 export function setupContentRoutes(app: Express): void {
   // ── Generate content for an existing draft article ─────────────────────────
   //
-  // Wave 7: the article must already exist in status='draft'. The route
-  // verifies ownership, atomically reserves a quota slot + inserts the
-  // generation job + flips the article to status='generating' (well, the
-  // worker actually flips it on claim - see setArticleGeneratingFromDraft).
+  // The article must already exist with status='draft' or 'failed'. The
+  // actor-bound command reserves quota, inserts the job, and links the article.
   // Returns the jobId immediately; the client polls or streams.
   app.post(
     "/api/articles/:id/generate",
@@ -204,8 +238,11 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.id, user.id);
-
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const article = await content.articles.get(req.params.id);
+        if (!article) {
+          return res.status(404).json({ success: false, error: "Article not found" });
+        }
         if (article.status !== "draft" && article.status !== "failed") {
           return res.status(409).json({
             success: false,
@@ -213,23 +250,21 @@ export function setupContentRoutes(app: Express): void {
             code: "invalid_status",
           });
         }
-
-        const {
-          keywords,
-          industry,
-          type = "article",
-          targetCustomers,
-          geography,
-          contentStyle = "b2c",
-        } = req.body ?? {};
-
-        if (!keywords || typeof keywords !== "string" || !keywords.trim()) {
-          return res.status(400).json({ success: false, error: "keywords are required" });
+        const parsed = contentGenerationRequestSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          const firstIssue = parsed.error.issues[0];
+          if (firstIssue?.path[0] === "keywords") {
+            return res.status(400).json({ success: false, error: "keywords are required" });
+          }
+          if (firstIssue?.path[0] === "industry") {
+            return res.status(400).json({ success: false, error: "industry is required" });
+          }
+          return res
+            .status(400)
+            .json({ success: false, error: "Invalid content generation input" });
         }
-        if (!industry || typeof industry !== "string") {
-          return res.status(400).json({ success: false, error: "industry is required" });
-        }
-        if (!process.env.OPENAI_API_KEY) {
+        const { keywords, industry, type, targetCustomers, geography, contentStyle } = parsed.data;
+        if (!process.env.OPENAI_API_KEY && !usesFakeContentGenerationProvider()) {
           return res.status(503).json({
             success: false,
             error: "Content generation is not available. OpenAI API key is not configured.",
@@ -247,52 +282,40 @@ export function setupContentRoutes(app: Express): void {
           contentStyle,
         };
 
-        // Persist the form-state fields onto the article so the draft preserves
-        // what the user typed, even before the worker claims the job. This also
-        // ensures a Cancel that returns the article to 'draft' shows the same
-        // form values the user submitted.
-        await db
-          .update(schema.articles)
-          .set({
-            keywords: keywords
-              .split(",")
-              .map((k: string) => k.trim())
-              .filter(Boolean),
-            industry,
-            contentType: type,
-            targetCustomers: targetCustomers ?? null,
-            geography: geography ?? null,
-            contentStyle,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.articles.id, article.id));
-
-        // Atomic check + reserve + insert.
-        const tier = resolveTier(user as any) as Tier;
-        const jobId = await withArticleQuota(user.id, tier, async (tx) => {
-          const [row] = await tx
-            .insert(schema.contentGenerationJobs)
-            .values({
-              userId: user.id,
-              brandId: article.brandId,
-              articleId: article.id,
-              status: "pending",
-              requestPayload: payload as never,
-            })
-            .returning();
-          return row.id;
+        const jobs = content.jobs;
+        const result = await jobs.enqueueGeneration({
+          articleId: req.params.id,
+          brandId: article.brandId,
+          requestPayload: payload,
+          keywords: keywords
+            .split(",")
+            .map((keyword) => keyword.trim())
+            .filter(Boolean),
+          industry,
+          contentType: type,
+          targetCustomers: targetCustomers ?? null,
+          geography: geography ?? null,
+          contentStyle,
         });
-
-        // Flip the article into 'generating' synchronously so the client UI
-        // switches to the streaming view immediately. The worker's claim
-        // (which polls every 5-60s) used to do this transition, but that
-        // left a long window where the form was still visible after the
-        // user clicked Generate. Doing it here is safe - the worker only
-        // reads articleId from the job and re-confirms ownership.
-        await db
-          .update(schema.articles)
-          .set({ status: "generating", jobId, updatedAt: new Date() })
-          .where(eq(schema.articles.id, article.id));
+        if (result.kind === "not_found") {
+          return res.status(404).json({ success: false, error: "Article not found" });
+        }
+        if (result.kind === "conflict") {
+          return res.status(409).json({
+            success: false,
+            error: `Cannot generate - article is in status '${result.status}'.`,
+            code: "invalid_status",
+          });
+        }
+        if (result.kind === "quota") {
+          return res.status(403).json({
+            success: false,
+            error: `You've reached your monthly limit of ${result.cap} articles. Upgrade at /pricing for more.`,
+            limitReached: true,
+            remaining: 0,
+          });
+        }
+        const jobId = result.jobId;
 
         // Server-side drive: progress the job without requiring an open
         // browser tab. Additive - the client /advance loop still runs as
@@ -310,7 +333,11 @@ export function setupContentRoutes(app: Express): void {
                 const claimed = await storage.claimContentJobForSlice(jobId, 12);
                 if (claimed) {
                   const sliceDeadlineMs = Math.min(driveDeadlineMs, Date.now() + 10_000);
-                  const outcome = await runArticleSlice(jobId, sliceDeadlineMs);
+                  const outcome = await runArticleSlice(
+                    jobId,
+                    sliceDeadlineMs,
+                    claimed.advanceToken,
+                  );
                   if (outcome.done) break;
                 }
                 // The OpenAI Responses run is background:true - it needs
@@ -325,14 +352,6 @@ export function setupContentRoutes(app: Express): void {
 
         return res.json({ success: true, data: { jobId, status: "pending" } });
       } catch (error) {
-        if (isUsageLimitError(error)) {
-          return res.status(403).json({
-            success: false,
-            error: error.message,
-            limitReached: true,
-            remaining: 0,
-          });
-        }
         return sendError(res, error, "Failed to enqueue content generation job");
       }
     }),
@@ -345,11 +364,12 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const active = await storage.getActiveContentJob(user.id);
+        const jobs = contentRequestData.forActor(createRequestActor(user.id)).jobs;
+        const active = await jobs.getActive();
         if (active) {
           return res.json({ success: true, data: { ...active, type: "active" } });
         }
-        const recent = await storage.getRecentCompletedContentJob(user.id);
+        const recent = await jobs.getRecentCompleted(new Date(Date.now() - 24 * 60 * 60 * 1000));
         if (recent) {
           return res.json({ success: true, data: { ...recent, type: "completed" } });
         }
@@ -365,7 +385,8 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const job = await storage.getContentJobById(req.params.jobId, user.id);
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const job = await content.jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
         res.json({
           success: true,
@@ -397,25 +418,13 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req: Request, res: Response) => {
       try {
         const user = requireUser(req);
-        const job = await storage.getContentJobById(req.params.jobId, user.id);
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const job = await content.jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
-
-        const [row] = await db
-          .select({
-            status: schema.contentGenerationJobs.status,
-            streamBuffer: schema.contentGenerationJobs.streamBuffer,
-            errorMessage: schema.contentGenerationJobs.errorMessage,
-            openaiResponseId: schema.contentGenerationJobs.openaiResponseId,
-            startedAt: schema.contentGenerationJobs.startedAt,
-          })
-          .from(schema.contentGenerationJobs)
-          .where(eq(schema.contentGenerationJobs.id, job.id))
-          .limit(1);
-        if (!row) return res.status(404).json({ success: false, error: "Job not found" });
 
         res.json({
           success: true,
-          data: computeJobStatePayload(row),
+          data: computeJobStatePayload(job),
         });
       } catch (error) {
         sendError(res, error, "Failed to read job state");
@@ -437,7 +446,8 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const job = await storage.getContentJobById(req.params.jobId, user.id);
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const job = await content.jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
         if (job.status !== "pending" && job.status !== "running") {
           return res.json({
@@ -459,16 +469,16 @@ export function setupContentRoutes(app: Express): void {
         }
 
         const deadlineMs = Date.now() + 8000;
-        const outcome = await runArticleSlice(job.id, deadlineMs);
-
-        const after = await storage.getContentJobById(job.id, user.id);
-        const buf = (after as any)?.streamBuffer ?? "";
+        const outcome = await runArticleSlice(job.id, deadlineMs, claimed.advanceToken);
+        const updatedArticle = job.articleId
+          ? await content.articles.get(job.articleId)
+          : undefined;
         res.json({
           success: outcome.status !== "failed",
           data: {
             status: outcome.status,
             done: outcome.done,
-            contentLength: typeof buf === "string" ? buf.length : 0,
+            contentLength: contentLengthForResponse(updatedArticle),
             errorKind: "errorKind" in outcome ? (outcome.errorKind ?? null) : null,
             errorMessage: "message" in outcome ? (outcome.message ?? null) : null,
           },
@@ -481,42 +491,37 @@ export function setupContentRoutes(app: Express): void {
 
   // ── Cancel a running job ───────────────────────────────────────────────────
   //
-  // Sets job.status='cancelled'; the worker checks this every CANCEL_CHECK_MS
-  // during the stream and aborts the OpenAI call. The worker also handles
-  // refunding the quota slot and flipping the article back to 'draft'.
+  // The actor-bound command cancels the job, refunds quota once, and resets
+  // the linked article. A worker that already holds a lease loses the race.
   app.post(
     "/api/content-jobs/:jobId/cancel",
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const job = await storage.getContentJobById(req.params.jobId, user.id);
+        const jobs = contentRequestData.forActor(createRequestActor(user.id)).jobs;
+        const job = await jobs.get(req.params.jobId);
         if (!job) return res.status(404).json({ success: false, error: "Job not found" });
         if (job.status !== "pending" && job.status !== "running") {
           return res.json({ success: true, data: { status: job.status, alreadyTerminal: true } });
         }
-        await storage.updateContentJob(job.id, {
-          status: "cancelled",
-          completedAt: new Date(),
-        } as any);
-        // The worker will notice on its next tick and refund + reset the
-        // article. But if the job never made it to 'running' (claim hadn't
-        // happened yet) we should refund + reset here - otherwise the article
-        // sits in 'draft' but the quota stays consumed.
-        if (job.status === "pending") {
-          const { refundArticleQuota } = await import("../lib/usageLimit");
-          await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
-          if (job.articleId) {
-            await storage.setArticleDraft(job.articleId).catch(() => undefined);
-          }
+        const result = await jobs.cancel(job.id);
+        if (result.kind === "not_found") {
+          return res.status(404).json({ success: false, error: "Job not found" });
         }
-        res.json({ success: true, data: { status: "cancelled" } });
+        if (result.kind === "already_terminal") {
+          return res.json({
+            success: true,
+            data: { status: result.status, alreadyTerminal: true },
+          });
+        }
+        res.json({ success: true, data: { status: result.status } });
       } catch (error) {
         sendError(res, error, "Failed to cancel job");
       }
     }),
   );
 
-  // ── Cancel by articleId (Foundations Plan 1, Task 4) ──────────────────────
+  // ── Cancel by articleId ─────────────────────────────────────────────────
   //
   // Convenience cancel keyed by article. Finds the article's active job
   // (article.jobId) and applies the same cancel semantics as the
@@ -527,34 +532,21 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.articleId, user.id);
-        const jobId = (article as { jobId?: string | null }).jobId ?? null;
-        if (!jobId) {
-          return res.json({ success: true, data: { status: article.status, noActiveJob: true } });
+        const content = contentRequestData.forActor(createRequestActor(user.id));
+        const result = await content.jobs.cancelForArticle(req.params.articleId);
+        if (result.kind === "not_found") {
+          return res.status(404).json({ success: false, error: "Article not found" });
         }
-        const job = await storage.getContentJobById(jobId, user.id);
-        if (!job) {
-          return res.json({ success: true, data: { status: article.status, noActiveJob: true } });
+        if (result.kind === "no_active_job") {
+          return res.json({ success: true, data: { status: result.status, noActiveJob: true } });
         }
-        if (job.status !== "pending" && job.status !== "running") {
+        if (result.kind === "already_terminal") {
           return res.json({
             success: true,
-            data: { status: job.status, alreadyTerminal: true },
+            data: { status: result.status, alreadyTerminal: true },
           });
         }
-        const wasPending = job.status === "pending";
-        await storage.updateContentJob(job.id, {
-          status: "cancelled",
-          completedAt: new Date(),
-        } as never);
-        if (wasPending) {
-          const { refundArticleQuota } = await import("../lib/usageLimit");
-          await refundArticleQuota(user.id, job.id, "cancelled").catch(() => undefined);
-          if (job.articleId) {
-            await storage.setArticleDraft(job.articleId).catch(() => undefined);
-          }
-        }
-        res.json({ success: true, data: { status: "cancelled" } });
+        res.json({ success: true, data: { status: result.status } });
       } catch (error) {
         sendError(res, error, "Failed to cancel article generation");
       }
@@ -573,7 +565,16 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.id, user.id);
+        const actor = createRequestActor(user.id);
+        const content = contentRequestData.forActor(actor);
+        const parsed = articleImproveRequestSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: "Invalid improve input" });
+        }
+        const article = await content.articles.get(req.params.id);
+        if (!article) {
+          return res.status(404).json({ success: false, error: "Article not found" });
+        }
         if (!article.content) {
           return res
             .status(400)
@@ -585,17 +586,15 @@ export function setupContentRoutes(app: Express): void {
             error: `Article exceeds ${MAX_CONTENT_LENGTH} characters.`,
           });
         }
-        if (!process.env.OPENAI_API_KEY) {
+        if (!liveOpenAIEnabled(process.env)) {
           return res.status(503).json({
             success: false,
             error: "Auto-Improve is not available. OpenAI API key is not configured.",
           });
         }
 
-        const instructions =
-          typeof req.body?.instructions === "string" ? req.body.instructions : null;
-        const expectedVersion =
-          typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : null;
+        const instructions = parsed.data.instructions ?? null;
+        const expectedVersion = parsed.data.expectedVersion;
 
         // Snapshot the current content as a revision before we overwrite it.
         // The new content will get its own revision after the rewrite succeeds.
@@ -624,12 +623,15 @@ export function setupContentRoutes(app: Express): void {
         // Optimistic-lock: if the caller passed expectedVersion, only write
         // when the row hasn't moved. Returns 409 otherwise.
         let updated;
-        if (expectedVersion !== null) {
-          updated = await storage.updateArticleIfVersion(article.id, expectedVersion, {
+        if (expectedVersion !== undefined) {
+          updated = await content.articles.updateIfVersion(article.id, expectedVersion, {
             content: improved,
-          } as any);
+          });
           if (!updated) {
-            const current = await storage.getArticleById(article.id);
+            const current = await content.articles.get(article.id);
+            if (!current) {
+              return res.status(404).json({ success: false, error: "Article not found" });
+            }
             return res.status(409).json({
               success: false,
               error:
@@ -639,22 +641,23 @@ export function setupContentRoutes(app: Express): void {
             });
           }
         } else {
-          updated = await storage.updateArticle(article.id, { content: improved } as any);
+          updated = await content.articles.update(article.id, { content: improved });
+          if (!updated) {
+            return res.status(404).json({ success: false, error: "Article not found" });
+          }
         }
 
         // Persist both the before-snapshot (so users can revert) and the new
         // revision (so the diff viewer has both sides indexed).
-        await storage.createRevision({
+        await content.revisions.create({
           articleId: article.id,
           content: beforeContent,
           source: "manual_edit",
-          createdBy: user.id,
         });
-        await storage.createRevision({
+        await content.revisions.create({
           articleId: article.id,
           content: improved,
           source: "auto_improve",
-          createdBy: user.id,
         });
 
         res.json({
@@ -682,7 +685,7 @@ export function setupContentRoutes(app: Express): void {
         });
       }
 
-      if (!process.env.OPENAI_API_KEY) {
+      if (!process.env.OPENAI_API_KEY || process.env.CONTENT_GENERATION_PROVIDER === "fake") {
         return res.status(503).json({
           success: false,
           error: "Keyword suggestions are not available. OpenAI API key is not configured.",
@@ -746,7 +749,20 @@ export function setupContentRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       const { industry } = req.query;
 
-      if (!process.env.OPENAI_API_KEY) {
+      if (!liveOpenAIEnabled(process.env)) {
+        if (process.env.CONTENT_GENERATION_PROVIDER === "fake") {
+          return res.json({
+            success: true,
+            topics: [
+              {
+                topic: "Local product research",
+                description: "A deterministic topic for the local test flow",
+                category: "Local test",
+              },
+            ],
+            fallback: true,
+          });
+        }
         return res.status(503).json({
           success: false,
           error: "Popular topics feature is not available. OpenAI API key is not configured.",
@@ -977,10 +993,12 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
         await requireBrand(brandId, user.id);
         const { status, category } = req.query;
 
-        const keywords = await storage.getKeywordResearch(brandId, {
-          status: status as string,
-          category: category as string,
-        });
+        const keywords = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .keywords.list(brandId, {
+            status: typeof status === "string" ? status : undefined,
+            category: typeof category === "string" ? category : undefined,
+          });
 
         res.json({
           success: true,
@@ -1001,7 +1019,9 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
         await requireBrand(brandId, user.id);
         const limit = parseInt(req.query.limit as string) || 10;
 
-        const keywords = await storage.getTopKeywordOpportunities(brandId, limit);
+        const keywords = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .keywords.listTopOpportunities(brandId, limit);
 
         res.json({
           success: true,
@@ -1018,22 +1038,16 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireKeywordResearch(req.params.id, user.id);
-        const update = pickFields(req.body, [
-          "keyword",
-          "searchVolume",
-          "difficulty",
-          "opportunityScore",
-          "aiCitationPotential",
-          "intent",
-          "category",
-          "competitorGap",
-          "suggestedContentType",
-          "relatedKeywords",
-          "status",
-          "contentGenerated",
-        ] as const);
-        const updated = await storage.updateKeywordResearch(req.params.id, update as any);
+        const actor = createRequestActor(user.id);
+        const keywords = contentRequestData.forActor(actor).keywords;
+        if (!(await keywords.get(req.params.id))) {
+          return res.status(404).json({ success: false, error: "Keyword research not found" });
+        }
+        const parsed = keywordUpdateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          return res.status(400).json({ success: false, error: "Invalid keyword update" });
+        }
+        const updated = await keywords.update(req.params.id, parsed.data);
         if (!updated) {
           return res.status(404).json({ success: false, error: "Keyword not found" });
         }
@@ -1049,8 +1063,11 @@ Find keywords that would help this brand get cited by AI search engines. Priorit
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireKeywordResearch(req.params.id, user.id);
-        const deleted = await storage.deleteKeywordResearch(req.params.id);
+        const keywords = contentRequestData.forActor(createRequestActor(user.id)).keywords;
+        if (!(await keywords.get(req.params.id))) {
+          return res.status(404).json({ success: false, error: "Keyword research not found" });
+        }
+        const deleted = await keywords.delete(req.params.id);
         res.json({ success: true, deleted });
       } catch (error) {
         sendError(res, error, "Failed to delete keyword");

@@ -1,4 +1,4 @@
-// GEO signals analysis / chunk / schema / pipeline routes (Wave 1 rebuild).
+// GEO signals analysis, chunk, schema, and pipeline routes.
 //
 // Honest scoring: 6-signal scorecard backed by real embedding similarity,
 // stopword-filtered term coverage, structural extractability, and

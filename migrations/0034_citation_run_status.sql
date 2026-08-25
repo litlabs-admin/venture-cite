@@ -1,6 +1,6 @@
 -- 0034_citation_run_status.sql
 --
--- Wave 8 (citation live updates).
+-- Citation run status for live updates.
 --
 -- Adds explicit lifecycle columns to citation_runs so the app can tell
 -- "is a run in flight for this brand" without inferring it from

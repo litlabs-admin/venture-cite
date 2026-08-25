@@ -1,13 +1,13 @@
--- Wave 9.2: fix two issues with Wave 9 schedule v2 + history aggregates.
+-- Correct citation schedules and history aggregates.
 --
 -- (a) auto_citation_hour default was 9 (UTC), but the legacy auto-citation
---     cron fired at 06:00 UTC. Combined with the Wave 9 hour gate inside
+--     cron fired at 06:00 UTC. Combined with the hour gate inside
 --     isBrandDueForCitation (`currentHour >= autoCitationHour`), every
 --     existing brand still on the migration default got silently skipped:
 --     the cron fired at 06, 6 < 9 → skipped, and the cron didn't run again
 --     until tomorrow's 06:00 (still skipped). They effectively never ran.
 --     Backfill any row still at 9 to 0 (run as soon as the day matches).
---     Users who picked 9 explicitly via the Wave 9 ScheduleTab UI will be
+--     Users who explicitly picked 9 in the schedule UI will be
 --     rare; if they did, this migration will reset them. The new cron is
 --     hourly (changed in server/scheduler.ts), so future hour picks all
 --     the way to 23 actually fire.

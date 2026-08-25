@@ -1,4 +1,4 @@
--- Foundations Plan 4 Task 3: track the user's first verified login so the
+-- Track the user's first verified login so the
 -- backend can fire a one-time welcome email. Backfill existing rows to
 -- "now" so test accounts and previously-registered users don't suddenly
 -- receive a welcome email on their next login. Going forward, new rows

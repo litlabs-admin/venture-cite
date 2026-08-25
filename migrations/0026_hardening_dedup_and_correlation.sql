@@ -1,4 +1,4 @@
--- Wave 0: Hardening migration for Agent / Competitor / Hallucination features.
+-- Add integrity safeguards for agents, competitors, and hallucinations.
 --
 -- Adds:
 --   * Unique indexes to close race windows in dedup logic (competitors,
@@ -8,8 +8,9 @@
 --   * Soft-delete + ignore tombstone for competitors.
 --   * CHECK constraints to stop arbitrary status/severity strings.
 --
--- Safe to run on production: preflight DELETE statements dedupe existing
--- rows before index creation so CREATE UNIQUE INDEX doesn't fail.
+-- This migration deletes duplicate rows before it creates unique indexes.
+-- Back up production data first. Test the migration on a restored copy.
+-- Verify the retained rows and index counts after the migration.
 
 -- ────────────────────────────────────────────────────────────────────────
 -- competitors: soft-delete, ignore flag, last-seen tracking

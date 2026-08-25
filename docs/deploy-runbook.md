@@ -1,267 +1,126 @@
-# Deploy runbook - Render + Vercel from one build
+# Deployment runbook
 
-One codebase, one Vite/Nitro build, two hosts. Nitro (the Vite plugin wired
-in `vite.config.ts`) auto-detects its target preset from the build
-environment: no `VERCEL` env var → `node-server` (Render runs this
-directly); `VERCEL=1` (set automatically by Vercel's build containers) →
-the `vercel` preset, which writes Vercel's Build Output API v3 tree
-(`.vercel/output`) directly. No `preset` is pinned in `vite.config.ts`, so
-the same `vite build` invocation targets whichever host runs it.
+## Safety boundary
 
-This doc is deliberately short. Anything longer belongs in code comments
-next to the code it explains (see `vite.config.ts`, `server/nitroBoot.ts`,
-`server/db.ts`, `server/env.ts` - all already carry detailed "why" comments
-for the decisions summarized here).
+Keep production read-only until every pre-release gate passes.
 
-## What was proven with a real command, this session
+Do not deploy a Vercel preview with production variables. Verify the preview database and provider settings first.
 
-- `VERCEL=1 NODE_ENV=production npx vite build` (run from an isolated copy
-  of the repo - the live worktree had an in-progress, unrelated syntax
-  error in `client/src/pages/articles.tsx` from concurrent work at build
-  time) produced a real `.vercel/output` tree: `config.json`,
-  `functions/__server.func/` (a single Node function, `.vc-config.json`
-  shows `runtime: nodejs24.x`, no `maxDuration`/`memory` set), and
-  `static/` (all prerendered/static assets, `robots.txt`, `sitemap.xml`,
-  `llms.txt`, `favicon.png`).
-- The generated `config.json` routes are exactly: cache-control headers on
-  `/assets/(.*)`, `{ "handle": "filesystem" }`, then a catch-all
-  `"/(.*)" -> "/__server"`. Every request that isn't a static file lands in
-  the single server function, which is TanStack Start's own router -
-  including the three server routes (`src/routes/api/$.ts`,
-  `src/routes/webhooks/$.ts`, `src/routes/health.ts`) that already forward
-  into the existing Express app.
-- Read Nitro's own Vercel-preset source directly
-  (`node_modules/nitro/dist/_presets.mjs`, `generateBuildConfig()` and the
-  function-config writer above it): `config.json` is built purely from
-  `nitro.options.vercel?.config` / `nitro.options.vercel?.functions` /
-  `nitro.options.scheduledTasks` - **it never reads the repo's root
-  `vercel.json` at all.**
-- A separate, already-existing `dist/{nitro.json,public,server}` build
-  (no `VERCEL` env var, `node-server` preset) has `dist/nitro.json`
-  confirming `"preset": "node-server"`, `"serverEntry": "server/index.mjs"`.
-  `dist/server/index.mjs` contains
-  `process.env.NITRO_PORT ?? process.env.PORT` for the listen port, and
-  passes `hostname: host` where `host` is `undefined` unless
-  `NITRO_HOST`/`HOST` is set - Node/srvx's default in that case is to
-  listen on all interfaces. Render-compatible as-is.
+Create an isolated Supabase preview database and test provider configuration first.
 
-## What was reasoned from documentation/source, not deployed
+Do not send test email to real users.
 
-- Vercel's own Build Output API v3 schema (`vercel.com/docs/build-output-api/v3/configuration`)
-  does list `crons` as a supported `config.json` property. Vercel's cron
-  troubleshooting KB tells users to check `.vercel/output/config.json` for
-  the `crons` array as the way to confirm a cron registered - it does not
-  describe a fallback to the root `vercel.json` once Build Output API is
-  in play. Combined with the source-level fact above (Nitro never reads
-  `vercel.json`), this is strong but not 100%-certain evidence - the only
-  way to fully close it is a real deploy (see "Crons verdict" below).
+## Local gates
 
-## Vercel: `vercel.json` and `api/index.ts` verdict
+Run these commands from a clean worktree.
 
-**`api/index.ts` - deleted.** It was an 8-line stub re-exporting a
-hand-bundled `api/_bundle.js` (produced by `package.json`'s `build` script
-via a separate `esbuild server/vercelEntry.ts ...` step), built to work
-around two problems with hand-deploying Express on Vercel
-(node-file-trace not resolving extensionless ESM imports; `vercel.json`'s
-function-glob validation running before `buildCommand`). Nitro's `vercel`
-preset does its own bundling/tracing as part of the Nitro build and does
-not use or need this stub - proven above: the real `.vercel/output/functions/__server.func/`
-directory is a complete, self-contained function with its own `index.mjs`,
-`_libs/`, `_ssr/`, `_chunks/`, and a `node_modules/` for native deps
-(`import-in-the-middle`, etc.), built entirely by Nitro. `api/index.ts` had
-no other importer in the codebase (confirmed by grep) - safe to delete.
-
-**`vercel.json` - trimmed, not deleted.** Kept: `buildCommand` (still a
-real, respected Vercel project setting - Build Output API doesn't change
-_how the build command is invoked_, only how its output is interpreted)
-and `crons` (kept as a defense-in-depth attempt - see verdict below; costs
-nothing to leave in). Removed: `outputDirectory`, `functions`, `rewrites`
-
-- all three describe how to interpret a conventional (non-Build-Output-API)
-  build, which Vercel bypasses entirely once `.vercel/output` exists. Kept
-  before trimming, deprecated by the real build tree above: the routing
-  `vercel.json`'s `rewrites` used to declare (`/api/*`, `/health`,
-  `/webhooks/*` → `/api/index`) is now handled _inside_ the single Nitro
-  function by TanStack Start's own file-based router, matching the shape of
-  the three `src/routes/{api,webhooks}/$.ts` + `health.ts` server routes
-  already in the tree.
-
-Current `vercel.json`:
-
-```json
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run build",
-  "crons": [{ "path": "/api/cron/daily-orchestrator", "schedule": "0 6 * * *" }]
-}
+```sh
+npm run check
+npm run lint
+npm run format:check
+npm test
+npm run supabase:migrations:check
+npm run build
 ```
 
-## Crons verdict: **likely broken as configured - do not assume it works**
+Run the local product-flow suite against local Supabase.
 
-The real `VERCEL=1` build's `.vercel/output/config.json` came out with
-**no `crons` key at all**, because `vite.config.ts`'s `nitro({...})` call
-today doesn't pass through `vercel: { config: { crons: [...] } }` and
-doesn't use Nitro's own `scheduledTasks` feature - and Nitro's build never
-reads the root `vercel.json`'s `crons` array to fill that gap (source-read,
-not guessed - see above). Vercel's own troubleshooting guidance treats
-`.vercel/output/config.json`'s `crons` property as the thing to check, with
-no documented vercel.json fallback once Build Output API is active.
+Do not use production credentials for this suite.
 
-**What would fully settle it:** either (a) a real `vercel deploy`
-(`--prebuilt` against the `.vercel/output` this doc already produced, or a
-normal git-triggered deploy) followed by checking the Vercel dashboard's
-Project → Cron Jobs tab for a registered `/api/cron/daily-orchestrator`
-entry, or (b) contacting Vercel support/docs for an explicit statement
-that root `vercel.json` crons are merged into Build-Output-API deployments.
-Neither was done - this task's scope was configuration and local proof
-only, no deploys.
+Development rejects remote database, Supabase, OpenAI, OpenRouter, Resend, and Stripe settings by default.
 
-**The fix, if the deploy check confirms it's broken (recommended
-regardless, since it's the documented, Nitro-native mechanism and doesn't
-depend on an unconfirmed vercel.json fallback):** in `vite.config.ts`'s
-`nitro({...})` call, add
+Use loopback services and fake generation for local tests.
 
-```ts
-vercel: {
-  config: {
-    crons: [{ path: "/api/cron/daily-orchestrator", schedule: "0 6 * * *" }],
-  },
-},
-```
+Set `ALLOW_REMOTE_DEVELOPMENT_SERVICES=true` only for an approved isolated session.
 
-This is a `vite.config.ts` change, out of this task's file scope - flagged
-here for whoever owns that file next, not made silently.
+## Preview gates
 
-## Render: `render.yaml`
+1. Use the approved `venturecite-reset-preview` branch for empty-schema migration tests.
+2. Use the approved `venturecite-reset-data-preview` branch for storage checks with copied data.
+3. Use the branch session pooler URL for application migrations.
+4. Set `NODE_ENV=development` and `ALLOW_REMOTE_DEVELOPMENT_SERVICES=true` only in that migration shell.
+5. Set `SUPABASE_CUSTOM_ORM_PREVIEW=true` only for the application migration runner.
+6. Set `SUPABASE_CUSTOM_ORM_PREVIEW_BASELINE` from the source branch ledger.
+7. Use `0093_stripe_owned_trial.sql` for the current production baseline.
+8. Run `npm run db:migrate`, never the production release command.
+9. Keep `SUPABASE_CUSTOM_ORM_PREVIEW` unset or false for normal preview application tests.
+10. Set `STRIPE_PRODUCT_SYNC=false`.
+11. Use Stripe test keys and test catalogue identifiers only when checkout testing needs them.
+12. Leave `RESEND_API_KEY` and `BUFFER_ENCRYPTION_KEY` unset.
+13. Set `EMAIL_DELIVERY_ENABLED=false`.
+14. Set `CONTENT_GENERATION_PROVIDER=fake` only with `NODE_ENV=development` and a loopback base URL.
+15. Set `DISABLE_STARTUP_AUTOPILOT=true` and `DISABLE_STRIPE_SETUP=true` for local flow tests.
+16. Use fake or test AI providers.
+17. Deploy the preview with the isolated database and preview-only secrets.
+18. Run the browser product flows.
+19. Verify that no preview variable targets production.
 
-See the fully-commented `render.yaml` at the repo root for the actual
-build/start commands, health check, Node version, and env var list with
-the reasoning inline. Summary:
+The fake content provider accepts only `http://localhost`, `http://127.0.0.1`, or `http://[::1]`.
 
-| Setting           | Value                     | Why                                                                                                                                                                                                                                                                                                                               |
-| ----------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `buildCommand`    | `npm ci && npm run build` | Matches the repo's actual `npm run build` (`db:migrate && vite build && esbuild ...`); the esbuild step is dead weight now that `api/index.ts` is gone, but package.json is out of scope for this change - flagged for cleanup.                                                                                                   |
-| `startCommand`    | `npm start`               | Already points at Nitro's generated `dist/server/index.mjs`, not the old esbuild bundle.                                                                                                                                                                                                                                          |
-| `healthCheckPath` | `/health`                 | Real DB check (`SELECT 1`), 200/503 - not a static stub.                                                                                                                                                                                                                                                                          |
-| `NODE_VERSION`    | `24.11.1`                 | The exact version used for every real build this session (`node -v`). No `.nvmrc`/`engines` field exists in the repo to infer this from otherwise.                                                                                                                                                                                |
-| `NODE_ENV`        | `production`              | **Load-bearing.** `server/nitroBoot.ts` (migrations, in-process scheduler, autopilot resume, Stripe setup) is a no-op unless `NODE_ENV=production` _and_ `VERCEL` is unset. Render doesn't set `NODE_ENV` on its own - this must be explicit or the service boots healthy and silently never runs a migration or a scheduled job. |
-| `plan`            | `free`                    | Per the task - see limitations below.                                                                                                                                                                                                                                                                                             |
+The application has no fake Resend or Buffer adapter. Unset those credentials when testing a preview.
 
-### Free tier - what it cannot do (stated plainly, not worked around)
+The preview flag seeds only the known application baseline. The runner still checks checksums, applies later migrations, and holds an advisory lock.
 
-- **Idle spin-down.** A free web service with no inbound HTTP traffic for
-  ~15 minutes spins down; the next request pays a cold-start penalty
-  (10s+, plus `nitroBoot`'s migration/scheduler-init work runs again on
-  every fresh boot). The user has already confirmed a plan for an
-  external uptime ping - not implemented here.
-- **No Cron Job resource.** Render's Cron Job product is a paid feature;
-  `render.yaml` deliberately has no `- type: cron` service. Do not add
-  one on the free plan.
-- **Scheduling on Render today actually comes from `nitroBoot`'s
-  in-process `node-cron` scheduler** (`server/scheduler.ts`), which only
-  exists because Render runs a long-lived Node process (unlike Vercel's
-  serverless functions). This is a real, working mechanism on the free
-  plan - it is not blocked by the "no Cron Job resource" limitation above,
-  those are two different things. **Open question for the user:** if the
-  planned external scheduler also calls
-  `POST /api/cron/daily-orchestrator` against the Render URL (the same
-  endpoint Vercel's cron hits), Render would run that job set **twice** -
-  once from the in-process scheduler, once from the external trigger. Pick
-  one per host; this wasn't resolved here because it's a product decision,
-  not a config bug.
+The preview flag skips only the Supabase platform ledger reconciliation. The application ledger and TLS checks remain active.
 
-## Env vars - full reference
+Never set `SUPABASE_CUSTOM_ORM_PREVIEW=true` in production. Use `--with-data` only for the approved data-preview storage checks. Never deploy that branch, expose it to users, or use it for provider calls. Never use `supabase db reset --linked`.
 
-Derived from `server/env.ts` (the Zod-validated schema) plus a direct grep
-of every `process.env.*` / `import.meta.env.*` read across `server/`,
-`src/`, and `client/src/` - not from `.env`/`.env.example` alone, since
-this repo has previously had vars defined in `.env` that no code actually
-read. The authoritative, per-var version lives in `.env.example` (every
-entry below now has a matching documented line there); this table is the
-condensed cross-reference. No values are reproduced anywhere in this repo
-or this doc - see the Render dashboard / Vercel project settings for the
-real secrets.
+Stripe test mode grants test entitlements but never charges a card. Do not treat it as production billing proof.
 
-**Required at boot** (`server/env.ts` throws and the process refuses to
-start if any are missing/invalid): `DATABASE_URL`, `SUPABASE_URL`,
-`SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
-`OPENAI_API_KEY`, `APP_URL` (auto-resolved from `VERCEL_URL` on Vercel;
-**must be set explicitly on Render** - no `RENDER_EXTERNAL_URL` fallback
-exists in the code, confirmed by reading `server/env.ts`).
+## Production read-only gates
 
-**Host-injected, do not set manually:**
+1. Take a database backup and verify the restore procedure.
+2. Run `npm run release:preflight`.
+3. Run the metadata audit through the direct session URL.
+4. Review roles, grants, RLS flags, policies, and ownership counts.
+5. Verify strict TLS with the approved Supabase CA.
+6. Verify the runtime and direct URLs target the same database.
 
-- Vercel: `VERCEL`, `VERCEL_URL`, `VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA`.
-- Render: `PORT` (Nitro reads it automatically).
+Do not log database URLs, role names, CA paths, or secret values.
 
-**Build-time only** (baked into the client bundle by Vite; changing them
-requires a rebuild, not just a redeploy of the same artifact):
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY`,
-`VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`, `VITE_TOUR_ENGINE_ENABLED`,
-plus the Sentry-source-map-upload set consumed by `vite.config.ts` itself
-(not shipped to the client): `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`,
-`SENTRY_PROJECT`, `SENTRY_RELEASE`.
+## Migration and role gates
 
-**Runtime, host-specific:**
+Set the explicit migration confirmation in the secure release shell.
 
-- `VERCEL_FUNCTION_BUDGET_MS` - Vercel only. Drives every derived timeout
-  in `server/lib/factAgent/v2/vercelBudget.ts`. Defaults to 60000 (Pro
-  assumption) - **set to `10000` explicitly on Vercel Hobby**, or budgets
-  will assume 60s of runway the platform doesn't actually grant, and the
-  function gets hard-killed mid-step instead of returning cleanly. This
-  matters more than it did before this task, now that `vercel.json`'s
-  `functions.maxDuration: 60` is dead config too (superseded by Build
-  Output API, and never carried over into the generated
-  `.vc-config.json` - confirmed empirically, that file has no
-  `maxDuration`/`memory` key in the real build).
-- `AUTO_CITATION_CRON`, `COMPETITOR_DISCOVERY_CRON`, `MENTION_SCAN_CRON`,
-  `LISTICLE_SCAN_CRON`, `ACCOUNT_PURGE_CRON`, `BRAND_PURGE_CRON`,
-  `TOUR_EVENTS_CLEANUP_CRON`, `DETECT_FACT_SCRAPE_FAILURE_CRON`,
-  `WEEKLY_CATCHUP_CRON`, `WEEKLY_REPORT_CRON`,
-  `WEEKLY_MAX_BRANDS_PER_USER` - Render only (the in-process scheduler
-  that reads them never starts on Vercel).
+Run `npm run db:migrate:release` once.
 
-**Everything else is optional** and either has a safe default or degrades
-a specific feature: `OPENROUTER_API_KEY`, `STRIPE_PUBLISHABLE_KEY`,
-`SESSION_SECRET`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `LOG_LEVEL`,
-`DATABASE_CA_CERT_PATH`, `DATABASE_SSL_REJECT_UNAUTHORIZED`,
-`EMAIL_UNSUBSCRIBE_SECRET`, `RESEND_WEBHOOK_SECRET`, `RESEND_API_KEY`,
-`RESEND_FROM_ADDRESS`, `STRIPE_API_VERSION`, `BUFFER_ENCRYPTION_KEY`,
-`REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`/`REDDIT_USERNAME`/`REDDIT_PASSWORD`,
-`EXTRA_CORS_ORIGINS`, `CRON_SECRET` (technically optional per the schema,
-but the cron HTTP endpoint fails closed with no way to call it if unset -
-treat as required if either host's scheduled work needs to run),
-`JINA_API_KEY`, `FACT_AGENT_JINA_ENABLED`, `FACT_AGENT_LLM_URL_RANKER`,
-`FACT_AGENT_WIKIDATA_ENABLED`.
+Run `npm run db:configure-request-roles` in dry-run mode.
 
-**Findings from this audit, not previously documented:**
+Apply the role memberships only after the dry run passes.
 
-- Read-but-undocumented before this change (now added to `.env.example`
-  and this table): `EXTRA_CORS_ORIGINS`, `CRON_SECRET`, all nine `*_CRON`
-  overrides plus `WEEKLY_MAX_BRANDS_PER_USER`, `JINA_API_KEY`,
-  `FACT_AGENT_JINA_ENABLED`, `FACT_AGENT_LLM_URL_RANKER`,
-  `FACT_AGENT_WIKIDATA_ENABLED`, `VERCEL_FUNCTION_BUDGET_MS`,
-  `VITE_SENTRY_ENVIRONMENT`, `VITE_TOUR_ENGINE_ENABLED`, `SENTRY_ORG`,
-  `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`, `SENTRY_RELEASE`,
-  `STRIPE_PUBLISHABLE_KEY`, `SESSION_SECRET` (mentioned only in a comment
-  before this change, no entry line of its own).
-- Defined-but-effectively-unused-in-app-runtime: `E2E_TEST_EMAIL`,
-  `E2E_TEST_PASSWORD` - real, but only consumed by
-  `tests/e2e/support/auth.ts` (Playwright). Not needed by either deploy
-  target; keep them out of Render/Vercel env config.
+Do not cut over `DATABASE_URL` while legacy routes or system workers still use the application-owner connection.
 
-## Boot side-effects - same host-branching pattern, now doubly load-bearing
+Keep the dedicated login dormant until local production-mode startup and authenticated route canaries pass.
 
-`server/nitroBoot.ts` explicitly no-ops unless `NODE_ENV=production &&
-!process.env.VERCEL`. That means:
+Record the applied migration names and checksums in the release record.
 
-- **Render**: must set `NODE_ENV=production` (done in `render.yaml`) for
-  migrations/scheduler/autopilot-resume/Stripe-setup to run at all.
-- **Vercel**: relies entirely on the daily cron orchestrator
-  (`/api/cron/daily-orchestrator`) for the equivalent jobs - which is
-  exactly the endpoint whose Vercel cron registration this doc could not
-  fully confirm (see "Crons verdict" above). If that cron silently isn't
-  registered, Vercel gets neither the in-process scheduler (correctly, by
-  design - Vercel is serverless) **nor** the daily orchestrator. Confirming
-  the crons verdict with a real deploy is the single highest-value
-  follow-up from this task.
+For migration 0113, compare all 21 policy roles, commands, access tests, and write tests with the reviewed migration.
+
+Run the Supabase advisors after migration 0113.
+
+Before the runtime-role cutover, revoke each temporary self-grant from migration 0112.
+
+Confirm that no direct-role self-grant remains after the revocation.
+
+The release runner verifies `public.schema_migrations` before it executes pending SQL.
+
+Treat `supabase_migrations.schema_migrations` as a separate ledger for Supabase CLI changes.
+
+Use `npm run db:migrate:bootstrap` only when the dedicated runtime role does not exist.
+
+## Deployment gates
+
+1. Deploy the application after the migration and role steps pass.
+2. Check `GET /health`.
+3. Test sign-in with an approved test account.
+4. Test one brand and article path.
+5. Test generation, cancellation, and distribution with safe inputs.
+6. Test Stripe checkout with the approved production catalogue.
+7. Check logs and Sentry for new errors.
+8. Stop the release if an ownership, billing, or migration check fails.
+
+## Final privacy gate
+
+Add the verified legal entity and privacy contact address last.
+
+Review the rendered public privacy page before the production release.

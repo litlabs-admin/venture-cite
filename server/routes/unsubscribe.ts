@@ -1,4 +1,4 @@
-// One-click email unsubscribe endpoint (Wave 2.4).
+// One-click email unsubscribe endpoint.
 //
 // Reached from the List-Unsubscribe header in transactional emails. The
 // HMAC-signed token in the URL authenticates the user, so this route is

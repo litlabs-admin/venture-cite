@@ -9,11 +9,7 @@ export class AgentTaskExecutionError extends Error {
   constructor(
     message: string,
     public readonly code:
-      | "unknown_type"
-      | "invalid_input"
-      | "not_claimable"
-      | "handler_failed"
-      | "not_found",
+      "unknown_type" | "invalid_input" | "not_claimable" | "handler_failed" | "not_found",
     public readonly task?: AgentTask,
   ) {
     super(message);

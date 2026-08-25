@@ -1,4 +1,4 @@
-// Plan 6 Task 2: POST /api/onboarding/autopilot-retry.
+// Test POST /api/onboarding/autopilot-retry.
 //
 // Verifies the retry route only re-fires the autopilot when the caller owns
 // the brand AND the brand is in the "failed" state. 404 (not 403) on

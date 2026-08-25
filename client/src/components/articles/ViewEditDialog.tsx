@@ -1,4 +1,4 @@
-// View / Edit / Improve / Versions dialog for a single article (Wave 7).
+// View, edit, improve, and version dialog for a single article.
 //
 // Replaces the legacy <Textarea>-only editor inside articles.tsx. Uses the
 // shared <MarkdownEditor> (split-pane editor + preview), always sends

@@ -1,4 +1,4 @@
--- Vercel migration: client-driven /advance for content generation.
+-- Add client-driven /advance for content generation.
 --
 -- The previous polling worker is replaced by a per-call slice that runs
 -- for ~8s and persists progress. last_advance_started_at gates concurrent

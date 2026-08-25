@@ -1,4 +1,4 @@
-// Lightweight in-process circuit breaker (Wave 3.7).
+// Lightweight in-process circuit breaker.
 //
 // State machine:
 //   closed   - all calls pass through; failures counted in sliding window

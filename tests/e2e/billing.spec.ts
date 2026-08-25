@@ -127,7 +127,7 @@ test.describe("Billing", () => {
     }) => {
       // KNOWN BUG - the 500 itself is not desired behavior, pinned here on
       // purpose so this Phase 0 gate catches any accidental change during
-      // the framework migration. The `stripe` Postgres schema is NOT being
+      // router changes. The `stripe` Postgres schema is NOT being
       // created/fixed by this change - see below.
       //
       // server/routes/billing.ts's checkout handler runs

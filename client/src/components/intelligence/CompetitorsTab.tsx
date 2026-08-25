@@ -30,7 +30,7 @@ interface LeaderboardEntry {
 export default function CompetitorsTab({ selectedBrandId }: { selectedBrandId: string }) {
   const { toast } = useToast();
 
-  // Wave 9.3: scope both queries to the active brand. Previously these
+  // Scope both queries to the active brand. Previously these
   // omitted brandId entirely, so the server's no-brand-id branch
   // aggregated leaderboards across every brand the user owned and
   // mixed multi-brand competitor lists into the panel - switching

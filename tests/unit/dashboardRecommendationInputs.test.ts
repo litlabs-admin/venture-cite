@@ -1,4 +1,4 @@
-// Plan 5 Task 3: dashboard recommendations input plumbing.
+// Test dashboard recommendation inputs.
 //
 // Verifies the `GET /api/brands/:brandId/recommendations` handler:
 //   - Plumbs `storage.getLastGeoSignalSummary(brandId)` -> state.lastSignalsScanAt.

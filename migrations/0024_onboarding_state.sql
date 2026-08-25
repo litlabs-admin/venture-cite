@@ -1,4 +1,4 @@
--- Server-side onboarding state (Wave 4.7).
+-- Server-side onboarding state.
 --
 -- Today the 3 onboarding UIs (GuidedOnboarding, OnboardingChecklist,
 -- SidebarOnboarding) all persist their "user has seen X" / "user
@@ -15,8 +15,7 @@
 --     "sidebarSeenAt": "2026-04-21T..."
 --   }
 --
--- Future Wave 6 will consolidate the three UIs into one server-driven
--- component; this column is the data substrate for that.
+-- This column keeps the state for the current onboarding interfaces.
 
 alter table public.users
   add column if not exists onboarding_state jsonb default '{}'::jsonb not null;

@@ -10,8 +10,9 @@
 // itself, and `onComplete` - the sole caller of markCompleted - never ran.
 // Nothing was written, and the tour reappeared on every single page load.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { runTour } from "@/tours/engine/shepherdAdapter";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runTour as startShepherdTour } from "@/tours/engine/shepherdAdapter";
+import type { RunningTour } from "@/tours/engine/shepherdAdapter";
 import { globalWelcomeTour } from "@/tours/global-welcome.tour";
 import type { TourConfig, TourContext } from "@/tours/types";
 
@@ -36,16 +37,39 @@ function anchor(tourId: string): HTMLElement {
 }
 
 /** Click the button with the given label in the visible Shepherd step. */
-function clickButton(label: string): boolean {
-  const btn = [...document.querySelectorAll<HTMLElement>(".shepherd-button")].find(
+function findButton(label: string): HTMLElement | undefined {
+  return [...document.querySelectorAll<HTMLElement>(".shepherd-button")].find(
     (b) => b.textContent?.trim() === label,
   );
-  if (!btn) return false;
+}
+
+async function waitForButton(label: string): Promise<HTMLElement> {
+  return vi.waitFor(
+    () => {
+      const button = findButton(label);
+      if (!button) throw new Error(`Tour button not ready: ${label}`);
+      return button;
+    },
+    { timeout: 2_000, interval: 10 },
+  );
+}
+
+async function clickButton(label: string): Promise<boolean> {
+  const btn = await waitForButton(label);
   btn.click();
   return true;
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 20));
+
+const runningTours = new Set<RunningTour>();
+type RunOptions = Parameters<typeof startShepherdTour>[0];
+
+function runTour(options: RunOptions): RunningTour {
+  const running = startShepherdTour(options);
+  runningTours.add(running);
+  return running;
+}
 
 /** Step ids the engine dropped because their target wasn't on screen. */
 function droppedStepIds(): string[] {
@@ -61,9 +85,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Shepherd starts the tour inside rAF; happy-dom has it, but keep it prompt.
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-    setTimeout(() => cb(0), 0);
+    setTimeout(() => cb(0), 50);
     return 0;
   });
+});
+
+afterEach(() => {
+  for (const running of runningTours) running.cancel("test_cleanup");
+  runningTours.clear();
 });
 
 // Two steps; the SECOND one's anchor is deliberately never added to the DOM,
@@ -89,7 +118,7 @@ describe("tour completion persists when a tail step's target is missing", () => 
 
     // Before the fix this button read "Next": the sole rendered step sat at
     // config index 0 while the "last" index was 1.
-    expect(clickButton("Done")).toBe(true);
+    expect(await clickButton("Done")).toBe(true);
     await flush();
 
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -104,7 +133,8 @@ describe("tour completion persists when a tail step's target is missing", () => 
     // Skip is for "I don't want the REST of this" - meaningless when the
     // step in front of you is the last one. Previously it appeared here
     // because the count came from config, not from what rendered.
-    expect(clickButton("Skip")).toBe(false);
+    await waitForButton("Done");
+    expect(findButton("Skip")).toBeUndefined();
   });
 });
 
@@ -129,9 +159,9 @@ describe("tour completion persists when every step renders", () => {
     });
     await flush();
 
-    expect(clickButton("Next")).toBe(true);
+    expect(await clickButton("Next")).toBe(true);
     await flush();
-    expect(clickButton("Done")).toBe(true);
+    expect(await clickButton("Done")).toBe(true);
     await flush();
 
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -167,7 +197,12 @@ describe("every terminal path settles exactly once", () => {
     runTour({ config: twoStep, ctx, mode: "auto", buffer, ...h });
     await flush();
 
-    document.querySelector<HTMLElement>(".shepherd-cancel-icon")?.click();
+    const cancelIcon = await vi.waitFor(() => {
+      const icon = document.querySelector<HTMLElement>(".shepherd-cancel-icon");
+      if (!icon) throw new Error("Tour cancel button not ready");
+      return icon;
+    });
+    cancelIcon.click();
     await flush();
 
     expect(h.onSkip).toHaveBeenCalledTimes(1);
@@ -182,7 +217,7 @@ describe("every terminal path settles exactly once", () => {
     runTour({ config: twoStep, ctx, mode: "auto", buffer, ...h });
     await flush();
 
-    expect(clickButton("Skip")).toBe(true);
+    expect(await clickButton("Skip")).toBe(true);
     await flush();
 
     // The button records intent and calls tour.cancel(); the cancel handler
@@ -198,7 +233,7 @@ describe("every terminal path settles exactly once", () => {
     runTour({ config: twoStep, ctx, mode: "auto", buffer, ...h });
     await flush();
 
-    expect(clickButton("Don't show again")).toBe(true);
+    expect(await clickButton("Don't show again")).toBe(true);
     await flush();
 
     expect(h.onSkipForever).toHaveBeenCalledTimes(1);
@@ -232,9 +267,9 @@ describe("every terminal path settles exactly once", () => {
     runTour({ config: twoStep, ctx, mode: "manual", buffer, ...h });
     await flush();
 
-    clickButton("Next");
+    await clickButton("Next");
     await flush();
-    clickButton("Done");
+    await clickButton("Done");
     await flush();
 
     expect(h.onComplete).not.toHaveBeenCalled();
@@ -287,11 +322,11 @@ describe("global-welcome degrades to the mobile path below the lg breakpoint", (
 
     // intro (anchorless) -> mobile-nav -> chatbot. The five nav.* steps and
     // brand-selector drop out.
-    expect(clickButton("Next")).toBe(true);
+    expect(await clickButton("Next")).toBe(true);
     await flush();
-    expect(clickButton("Next")).toBe(true);
+    expect(await clickButton("Next")).toBe(true);
     await flush();
-    expect(clickButton("Done")).toBe(true);
+    expect(await clickButton("Done")).toBe(true);
     await flush();
 
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -387,7 +422,7 @@ describe("findByTourId prefers a visible duplicate", () => {
 
     // If the hidden copy had won, nothing would render and this would be
     // a no-show instead of a completable tour.
-    expect(clickButton("Done")).toBe(true);
+    expect(await clickButton("Done")).toBe(true);
     await flush();
     expect(onComplete).toHaveBeenCalledTimes(1);
   });

@@ -9,10 +9,7 @@ build
 out
 server/public
 *.tsbuildinfo
-# Nitro's own build output (TanStack Start). Lands under client/ today
-# because Nitro resolves it relative to Vite's `root`, not the repo root -
-# see the Phase 2 Task 2 report for why that's a live, unresolved conflict
-# with the existing `build.outDir: dist/public` convention.
+# Nitro can create `.output` under the configured Vite root.
 .output/
 
 # ─── Environment variables - NEVER commit ───────────────────────
@@ -24,17 +21,6 @@ server/public
 log.txt
 *.log
 logs/
-
-# ─── Documentation / notes - kept local, never pushed ──────────
-*.md
-!README.md
-!docs/privacy-policy.md
-!docs/phase1_goals.md
-!docs/phase1_completion.md
-!docs/phase2_goals.md
-!docs/phase2_completion.md
-# Operational, not notes - needed by anyone deploying this.
-!docs/deploy-runbook.md
 
 # ─── Editor / IDE ────────────────────────────────────────────────
 .vscode
@@ -113,8 +99,10 @@ replit.nix
 attached_assets/
 .VSCodeCounter/
 brainstorms/
-.agents/
-.codex/
+# Track project skills and shared Codex configuration.
+# Keep local Codex state and overrides outside Git.
+.codex/*.local.toml
+.codex/state/
 # Office documents - scripts, decks and sheets are working material,
 # and a binary blob in git diffs as one unreadable line anyway.
 *.docx
@@ -122,15 +110,12 @@ brainstorms/
 *.pptx
 *.xlsx
 
-# Superpowers specs, plans and baselines stay LOCAL - they fall under the
-# global *.md ignore above. The handful already committed stay tracked;
-# git does not untrack a file just because it becomes ignored.
-
 # Vercel build output (generated server bundle, not source)
 api/
 
 # Local secret drops (webhook signing secrets etc) - never commit these
 *.local.txt
+.vercel
 
 # Supabase CLI local state. `.temp/start-secrets/` holds SUPABASE_SERVICE_ROLE_KEY,
 # SUPABASE_INTERNAL_JWT_SECRET and a pooler URL with the DB password in it, and

@@ -10,17 +10,25 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import express from "express";
 
+const USER_ID = "11111111-1111-4111-8111-111111111111";
+
 const stubs = vi.hoisted(() => ({
   getDistributionById: vi.fn(),
-  updateDistribution: vi.fn(),
+  updateOwnedDistribution: vi.fn(),
   requireArticle: vi.fn(),
   postToBuffer: vi.fn(),
+  forActor: vi.fn(),
 }));
 
 vi.mock("../../server/storage", () => ({
   storage: {
     getDistributionById: stubs.getDistributionById,
-    updateDistribution: stubs.updateDistribution,
+  },
+}));
+
+vi.mock("../../server/data/contentRequestData", () => ({
+  contentRequestData: {
+    forActor: stubs.forActor,
   },
 }));
 
@@ -76,7 +84,7 @@ function buildApp(): express.Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    (req as any).user = { id: "user-1" };
+    (req as any).user = { id: USER_ID };
     next();
   });
   setupArticlesRoutes(app);
@@ -130,6 +138,12 @@ async function call(
 
 beforeEach(() => {
   for (const fn of Object.values(stubs)) (fn as any).mockReset?.();
+  stubs.forActor.mockReturnValue({
+    distributions: {
+      get: stubs.getDistributionById,
+      update: stubs.updateOwnedDistribution,
+    },
+  });
 });
 
 describe("POST /api/distributions/:distributionId/buffer-post", () => {
@@ -150,8 +164,9 @@ describe("POST /api/distributions/:distributionId/buffer-post", () => {
 
     expect(status).toBe(200);
     expect(body).toEqual({ success: true, data: { platformPostId: "buffer-post-abc" } });
-    expect(stubs.postToBuffer).toHaveBeenCalledWith("user-1", "ch-123", "Hello world");
-    expect(stubs.updateDistribution).toHaveBeenCalledWith(
+    expect(stubs.postToBuffer).toHaveBeenCalledWith(USER_ID, "ch-123", "Hello world");
+    expect(stubs.forActor).toHaveBeenCalledWith({ userId: USER_ID });
+    expect(stubs.updateOwnedDistribution).toHaveBeenCalledWith(
       "dist-1",
       expect.objectContaining({
         platformPostId: "buffer-post-abc",
@@ -176,7 +191,7 @@ describe("POST /api/distributions/:distributionId/buffer-post", () => {
 
     expect(status).toBe(403);
     expect(body).toEqual({ success: false, error: "not_connected" });
-    expect(stubs.updateDistribution).not.toHaveBeenCalled();
+    expect(stubs.updateOwnedDistribution).not.toHaveBeenCalled();
   });
 
   it("returns 400 no_content when the distribution has no saved content", async () => {
@@ -195,16 +210,11 @@ describe("POST /api/distributions/:distributionId/buffer-post", () => {
     expect(status).toBe(400);
     expect(body).toEqual({ success: false, error: "no_content" });
     expect(stubs.postToBuffer).not.toHaveBeenCalled();
-    expect(stubs.updateDistribution).not.toHaveBeenCalled();
+    expect(stubs.updateOwnedDistribution).not.toHaveBeenCalled();
   });
 
   it("returns 404 not_found when the distribution belongs to another user", async () => {
-    stubs.getDistributionById.mockResolvedValueOnce({
-      id: "dist-1",
-      articleId: "article-2",
-      metadata: { content: "Hello" },
-    });
-    stubs.requireArticle.mockRejectedValueOnce(new Error("not owned"));
+    stubs.getDistributionById.mockResolvedValueOnce(undefined);
 
     const app = buildApp();
     const { status, body } = await call(app, "/api/distributions/dist-1/buffer-post", {
@@ -236,7 +246,7 @@ describe("POST /api/distributions/:distributionId/buffer-post", () => {
 
     expect(status).toBe(502);
     expect(body).toEqual({ success: false, error: "Tweet too long." });
-    expect(stubs.updateDistribution).not.toHaveBeenCalled();
+    expect(stubs.updateOwnedDistribution).not.toHaveBeenCalled();
   });
 
   it("returns 502 buffer_unreachable on network failure", async () => {
@@ -255,6 +265,6 @@ describe("POST /api/distributions/:distributionId/buffer-post", () => {
 
     expect(status).toBe(502);
     expect(body).toEqual({ success: false, error: "buffer_unreachable" });
-    expect(stubs.updateDistribution).not.toHaveBeenCalled();
+    expect(stubs.updateOwnedDistribution).not.toHaveBeenCalled();
   });
 });

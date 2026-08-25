@@ -1,6 +1,5 @@
 // Coverage for POST /api/billing/portal-session - Stripe customer
-// portal session URL endpoint used by the expanded Settings page
-// (Foundations Plan 3, Task 2).
+// portal session URL endpoint used by the Settings page.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import express from "express";
@@ -10,6 +9,7 @@ process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 process.env.STRIPE_SECRET_KEY ??= "sk_test_xxx";
 process.env.SUPABASE_URL ??= "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY ??= "service-role-test";
+process.env.APP_URL = "https://app.venturecite.test";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -144,6 +144,27 @@ describe("POST /api/billing/portal-session", () => {
     expect(status).toBe(200);
     expect(body?.url).toBe("https://billing.stripe.com/session/abc");
     expect(stubs.portalCreate).toHaveBeenCalledTimes(1);
+    expect(stubs.portalCreate).toHaveBeenCalledWith({
+      customer: "cus_123",
+      return_url: "https://app.venturecite.test/settings",
+    });
+  });
+
+  it("does not use a caller-controlled host for the return URL", async () => {
+    stubs.getUser.mockResolvedValue({ id: USER_ID, stripeCustomerId: "cus_123" });
+    stubs.portalCreate.mockResolvedValue({ url: "https://billing.stripe.com/session/abc" });
+    const app = buildApp();
+    const configuredUrl = process.env.APP_URL;
+    delete process.env.APP_URL;
+    try {
+      await call(app, "POST", "/api/billing/portal-session");
+      expect(stubs.portalCreate).toHaveBeenCalledWith({
+        customer: "cus_123",
+        return_url: "https://www.venturecite.com/settings",
+      });
+    } finally {
+      process.env.APP_URL = configuredUrl;
+    }
   });
 
   it("returns 400 when the user has no stripeCustomerId", async () => {

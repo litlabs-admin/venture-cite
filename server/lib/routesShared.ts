@@ -1,4 +1,4 @@
-// Shared building blocks for per-domain route modules (Wave 5.1).
+// Shared building blocks for per-domain route modules.
 //
 // Before the domain-split, these all lived inline at the top of
 // server/routes.ts. Extracting them here means each per-domain route

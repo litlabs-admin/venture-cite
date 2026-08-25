@@ -313,7 +313,7 @@ export function setupFactSheetRoutes(app: Express): void {
             lastFactId = String((f as any).id);
           }
 
-          // ---- source-update events (Plan 5 Task 2) ----
+          // ---- Source update events ----
           // Emit one event per v2 source (user_enrich, static_pages,
           // search_llm) whenever a log row exists for that source.
           // We read the full log list each tick and keep the latest entry
@@ -584,7 +584,7 @@ export function setupFactSheetRoutes(app: Express): void {
   );
 
   // ────────────────────────────────────────────────────────────────────────
-  // Plan 2.5 Task 5: GET /api/brand-fact-sheet/cost-status?brandId=...
+  // GET /api/brand-fact-sheet/cost-status?brandId=...
   //
   // Spec 2 §5.4 + §4.9: surface the brand's monthly fact-scrape spend so the
   // UI can render "$X.XX of $5.00 used this month". If no cap row exists for

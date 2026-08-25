@@ -2,42 +2,15 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Public pages (unauthenticated)", () => {
-  // client/src/App.tsx's HomePage() renders "/" differently depending on
-  // useAuth().isAuthenticated - the authenticated dashboard vs. the
-  // logged-out marketing landing page (client/src/pages/landing/index.tsx).
-  // This file is explicitly testing the logged-out marketing pages, but the
-  // suite's default "chromium" project now reuses the shared authenticated
-  // STORAGE_STATE (see tests/e2e/auth.setup.ts and playwright.config.ts) so
-  // that other specs don't re-hit the rate-limited login endpoint. Opt this
-  // file back out with a genuinely empty, unauthenticated context -
-  // otherwise "landing page renders with its title and description" would
-  // assert against the authenticated dashboard instead of the marketing
-  // page it's meant to cover.
+  // Use an empty storage state. These tests must cover public pages without
+  // a saved authenticated session from another test.
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test("landing page renders with its title and description", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveTitle(/VentureCite/i);
-    // client/index.html ships a static crawler-fallback meta[name="description"]
-    // (see the "AI / crawler-readable metadata" block) for non-JS crawlers and
-    // the pre-hydration document, with different copy ("VentureCite shows you
-    // where AI overlooks, misreads or undersells your brand, then fixes the
-    // pages and sources shaping every AI answer. Take control of how AI
-    // search engines cite you."). react-helmet-async *appends* its own
-    // page-specific tag rather than replacing it.
-    //
-    // React 19 hoists <title>/<meta>/<link> children rendered anywhere in the
-    // tree directly into <head> itself, so Helmet's data-rh="true" marker no
-    // longer appears on the tags it manages - react-helmet-async is expected
-    // to be removed entirely once the framework migration lands, at which
-    // point this marker disappears for good, and client/src/lib/
-    // dedupeStaticMeta.ts (which keys off data-rh to remove the static
-    // duplicate) can no longer find Helmet's tag either, so both the static
-    // and page-specific description tags may now coexist in <head>. Locate
-    // the tag by its exact page-specific content instead of by the marker or
-    // by .first()/a loose regex - either of those would still pass even if
-    // this page's own <Helmet> description were deleted, since it would
-    // simply fall back to matching the static tag.
+    // Match the page description exactly. A broad locator can match a static
+    // fallback description instead.
     const description = page.locator(
       'meta[name="description"][content="Find where AI overlooks, misreads or undersells you, then fix the pages and sources shaping every answer."]',
     );
@@ -48,11 +21,8 @@ test.describe("Public pages (unauthenticated)", () => {
   test("privacy page is reachable without logging in", async ({ page }) => {
     await page.goto("/privacy");
     await expect(page).toHaveTitle(/Privacy/i);
-    // See the landing test above for why this targets the exact
-    // page-specific content rather than the now-absent data-rh="true"
-    // marker: client/index.html's static description tag carries different
-    // copy, so matching the literal content string is what actually
-    // discriminates this page's <Helmet> tag from the static fallback.
+    // Match the page description exactly. A broad locator can match a static
+    // fallback description instead.
     await expect(
       page.locator(
         'meta[name="description"][content="How VentureCite collects, uses, and protects your data."]',

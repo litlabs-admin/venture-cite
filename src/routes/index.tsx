@@ -10,8 +10,7 @@ import Landing from "@/pages/landing";
 // server never needs to know who the request is from: it always renders
 // Landing. Authenticated visitors are bounced to /dashboard (which renders
 // the same Home component wouter's HomePage rendered) client-side, after
-// hydration, in the effect below - see the plan doc's "splitting /"
-// decision (docs/superpowers/plans/2026-07-27-phase2-tanstack-start-migration.md).
+// hydration, in the effect below.
 export const Route = createFileRoute("/")({
   // Overrides the root's default description (title text is identical,
   // description is landing-page-specific) - verbatim from what

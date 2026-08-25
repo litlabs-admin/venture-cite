@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { isEmailDeliveryEnabled } from "./environmentSafety";
 import { logger } from "./logger";
 
 // One-shot welcome email sent the first time a user successfully logs in
@@ -8,13 +9,13 @@ import { logger } from "./logger";
 // ones. Send failures are swallowed by the caller (welcome email is a
 // nice-to-have, not a blocker for login).
 
-const resendApiKey = process.env.RESEND_API_KEY;
+const resendApiKey = isEmailDeliveryEnabled(process.env) ? process.env.RESEND_API_KEY : undefined;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || "VentureCite <reports@venturecite.app>";
 const APP_URL = process.env.APP_URL || "https://venturecite.app";
 
-// Plan 4 audit (BUG #8): firstName lands inside an HTML email body. A
+// firstName lands inside an HTML email body. A
 // user who registered with `firstName: "<script>"` (or worse, an
 // `<img onerror>` payload) would have attacker-controlled HTML rendered
 // in an email signed by our DKIM - brand-damage and content-spoof
@@ -52,7 +53,7 @@ export async function sendWelcomeEmail(to: string, firstName?: string | null): P
   <p style="color:#666;font-size:13px;margin-top:32px">If you have questions, just reply to this email.</p>
 </body></html>`;
 
-  // Plan 4 audit (BUG #7): Resend supports `text` alongside `html`.
+  // Resend supports `text` alongside `html`.
   // Plain-text fallback improves spam-filter scoring and keeps clients
   // that prefer text (or strip HTML aggressively) readable.
   const text = `${plainGreeting}
@@ -77,12 +78,12 @@ If you have questions, just reply to this email.`;
     });
     const errObj = (result as { error?: { message?: string } }).error;
     if (errObj) {
-      logger.warn({ err: errObj, to }, "welcome email send returned error");
+      logger.warn({ err: errObj }, "welcome email send returned error");
       return false;
     }
     return true;
   } catch (err) {
-    logger.warn({ err, to }, "welcome email send threw");
+    logger.warn({ err }, "welcome email send threw");
     return false;
   }
 }

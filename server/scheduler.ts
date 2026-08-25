@@ -183,11 +183,11 @@ async function runWeeklyReportJobImpl(): Promise<{ sent: number; skipped: number
 // Per-brand auto-citation: in production this fires from the daily
 // Vercel cron (server/routes/cron.ts → runAutoCitationJob with a
 // deadline). Locally, initScheduler runs it on this hourly cron so dev
-// behaviour matches prod. Wave 9.5: hour-of-day gate removed - see
+// behaviour matches production. The hour-of-day gate is removed. See
 // isBrandDueForCitation.
 const AUTO_CITATION_CRON = process.env.AUTO_CITATION_CRON || "0 * * * *";
 
-// Foundations Plan 1 Task 11: citation cadence is non-configurable.
+// Citation cadence is not configurable.
 // Every active brand runs weekly. The auto_citation_* columns remain
 // dormant in the schema but are no longer consulted at the cron layer.
 // Gating is now purely "has it been ~1 week since last run?".
@@ -228,7 +228,7 @@ export async function runAutoCitationJob(deadlineMs?: number): Promise<void> {
 async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
   logger.info("auto-citation job starting");
 
-  // Foundations Plan 1 Task 11: iterate every non-soft-deleted brand
+  // Iterate every non-soft-deleted brand.
   // unconditionally. Cadence flags are no longer honoured.
   const scheduledBrands = await selectBrandsForCitationScan();
 
@@ -299,8 +299,8 @@ async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
         );
       }
 
-      // Step 3: Wave 9 - update lastAutoCitationAt + status so ScheduleTab
-      // can render "Last run 3d ago - succeeded" vs "failed". Pre-Wave-9
+      // Update lastAutoCitationAt and status so ScheduleTab
+      // can render "Last run 3d ago - succeeded" or "failed". Earlier rows
       // schema columns (lastAutoCitationStatus) are nullable so this is
       // safe on rolling deploys before the migration applies.
       await db
@@ -314,7 +314,7 @@ async function runAutoCitationJobImpl(deadlineMs?: number): Promise<void> {
       ranCount += 1;
       logger.info({ brandId: brand.id, name: brand.name }, "auto-citation done for brand");
     } catch (err) {
-      // Wave 9: persist the failure so the UI surfaces it instead of just
+      // Persist the failure so the UI surfaces it instead of only
       // showing the prior succeeded timestamp.
       try {
         await db
@@ -365,7 +365,7 @@ async function runForEveryBrand(
   options: RunForEveryBrandOptions = {},
 ): Promise<{ ok: number; total: number; processed: number; bailedAt?: string }> {
   logger.info({ job: label }, `${label} job starting`);
-  // Skip soft-deleted brands (Wave 4.5).
+  // Skip soft-deleted brands.
   const brands = await db
     .select({ id: schema.brands.id, name: schema.brands.name })
     .from(schema.brands)
@@ -595,7 +595,7 @@ async function runAccountPurgeJobImpl(): Promise<{ purged: number; failed: numbe
   return { purged, failed };
 }
 
-// Wave 4.5: hard-delete brands whose 30-day soft-delete window has
+// Hard-delete brands whose 30-day soft-delete window has
 // elapsed. Cascade FKs from migrations/0003_fk_hardening.sql clean up
 // brand-rooted data automatically. Scheduled at 03:30 UTC, half an
 // hour after account purge so they don't run concurrently.
@@ -621,7 +621,7 @@ async function runBrandPurgeJobImpl(): Promise<{ purged: number; failed: number 
   let failed = 0;
   for (const brand of due) {
     try {
-      // Wave 7: drafts are now articles with status='draft' and brand_id has
+      // Drafts are articles with status='draft', and brand_id has
       // ON DELETE CASCADE, so the explicit cleanup is no longer needed.
       // Tour state lives in users.onboarding_state JSONB (no FK cascade),
       // so it must be cleared explicitly - this path bypasses deleteBrand.
@@ -768,6 +768,22 @@ function cronCrashGuard(jobName: string, fn: () => Promise<unknown>): () => void
 }
 
 export function initScheduler(): void {
+  const CONTENT_COST_OUTBOX_CRON = process.env.CONTENT_COST_OUTBOX_CRON || "*/5 * * * *";
+  if (cron.validate(CONTENT_COST_OUTBOX_CRON)) {
+    cron.schedule(
+      CONTENT_COST_OUTBOX_CRON,
+      cronCrashGuard("content-cost-outbox-drain", async () => {
+        const { runContentCostOutboxDrain } = await import("./outbox/contentCostOutboxDrain");
+        await runContentCostOutboxDrain({
+          maxCommands: 25,
+          deadlineMs: Date.now() + 20_000,
+          leaseSeconds: 60,
+        });
+      }),
+    );
+    logger.info({ cron: CONTENT_COST_OUTBOX_CRON }, "content cost outbox drain scheduled");
+  }
+
   // Daily account purge for users whose 30-day deletion grace has elapsed.
   if (cron.validate(ACCOUNT_PURGE_CRON)) {
     cron.schedule(ACCOUNT_PURGE_CRON, cronCrashGuard("account-purge", runAccountPurgeJob));

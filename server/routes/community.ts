@@ -1,4 +1,4 @@
-// Community posts routes (Wave 5.1).
+// Community posts routes.
 //
 // Extracted from server/routes.ts as part of the per-domain split.
 // The original monolith now only mounts this module via setupCommunityRoutes.

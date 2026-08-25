@@ -1,4 +1,4 @@
-// Notification preferences helper (Wave 6.8).
+// Notification preferences helper.
 //
 // Exposes the user-facing types registry + read/write helpers backed
 // by the notification_preferences table. The weekly_report type also

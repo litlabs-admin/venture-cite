@@ -36,8 +36,8 @@ if (!TEST_EMAIL || !TEST_PASSWORD) {
 //
 // "/" is now the PUBLIC, server-rendered landing page (src/routes/index.tsx).
 // A per-route SSR flag cannot straddle "landing for logged-out visitors,
-// dashboard for logged-in ones" at one URL, so the TanStack Start migration
-// split them: "/" always renders Landing, and authenticated visitors are
+// dashboard for logged-in ones" at one URL, so the router separates them.
+// "/" always renders Landing, and authenticated visitors are
 // redirected to "/dashboard" client-side after hydration. "/dashboard" then
 // renders through FirstRunGate, which bounces brand-less accounts to
 // "/welcome" instead of rendering <Home>.
@@ -64,19 +64,11 @@ export async function login(page: Page): Promise<void> {
 /**
  * Asserts the authenticated app rendered rather than the marketing page.
  *
- * The dashboard and the marketing landing page no longer share a URL - the
- * TanStack Start migration split them ("/" is public and server-rendered,
- * "/dashboard" is the authenticated app). But the landing page still renders
- * a bare <main>, so SEL.appMain ("main") cannot tell the two apart: if auth
- * silently broke and a redirect dropped the user back on the landing page, a
- * plain "main is visible" check would still pass. We therefore assert on
- * SEL.authenticatedMain ("main#main-content"), which only AppShell renders
- * (client/src/components/AppShell.tsx:180) - see selectors.ts for the
- * uniqueness evidence.
+ * The public and authenticated pages can both have a <main> element.
+ * Check SEL.authenticatedMain so an auth failure cannot pass as a public page.
  *
- * "/welcome" is rendered without AppShell (src/routes/_app/welcome.tsx) -
- * client/src/pages/welcome.tsx has no <main> element at all - so on that
- * path we assert on the welcome screen's own onboarding input instead.
+ * The welcome page does not render the authenticated app shell.
+ * Check its onboarding input instead.
  */
 export async function expectAuthenticated(page: Page): Promise<void> {
   await expect(page).not.toHaveURL(/\/login/);

@@ -1,4 +1,4 @@
-// Wave 9.4: warn users when their brand name is ambiguous (a common
+// Warn users when their brand name is ambiguous, which is a common
 // English word, a country, a major existing brand, etc.). The scanner
 // will still run - common-word brands aren't blocked - but the toast
 // surfaces the warning so the user knows to add nameVariations to

@@ -1,4 +1,4 @@
--- Wave A: add sentiment column to competitor_geo_rankings so the merged
+-- Add a sentiment column to competitor_geo_rankings so the merged
 -- response analyzer can persist sentiment derived from relevance alongside
 -- rank/relevance on competitor citation rows (matches geo_rankings.sentiment).
 --

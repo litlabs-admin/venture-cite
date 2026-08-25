@@ -76,7 +76,7 @@ async function requireOwnedBrand(req: any) {
 // ---------------------------------------------------------------------------
 // Shared loader - brand prompts + cited/uncited rankings.
 //
-// Wave 9.2: accepts an optional `since` Date overriding the default
+// Accept an optional `since` Date to override the default.
 // 30-day window. Used by Citations to scope dashboard reads to "rankings
 // from the active run only" while a fresh run is in flight - without
 // this, completed-cells from the new run mix with un-rechecked-cells
@@ -97,7 +97,7 @@ async function loadRankingsContext(
   return { prompts, promptIds, rankings, since };
 }
 
-// Wave 9.2: parse the optional ?since=<ISO> query param. Returns null
+// Parse the optional ?since=<ISO> query parameter. Return null
 // when missing or malformed - the loader then falls back to the default
 // 30-day window. Defensive against junk input (clients only ever pass
 // what useActiveCitationRuns surfaced, but we guard anyway).

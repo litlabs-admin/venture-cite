@@ -1,4 +1,4 @@
--- Revenue stored as integer cents (Wave 4.1).
+-- Store revenue as integer cents.
 --
 -- Why: summing JS Numbers across thousands of $19.99 rows accumulates
 -- floating-point error fast (every fifth-and-tenth cent value is
@@ -13,8 +13,7 @@
 --
 -- Migration leaves the legacy `revenue` numeric column in place during
 -- the transition so any read path that hasn't migrated yet keeps
--- working. A future migration can drop it once we've confirmed every
--- code path is on `revenue_cents`.
+-- working. Remove it only after every code path uses `revenue_cents`.
 
 alter table public.purchase_events
   add column if not exists revenue_cents bigint;

@@ -1,4 +1,4 @@
-// Brand CRUD routes (Wave 5.1).
+// Brand CRUD routes.
 //
 // Extracted from server/routes.ts as part of the per-domain split.
 // The original monolith now only mounts this module via setupBrandRoutes.
@@ -13,23 +13,14 @@
 
 import type { Express } from "express";
 import { z } from "zod";
-import { sql } from "drizzle-orm";
-import { db } from "../db";
-import { storage } from "../storage";
-import {
-  articles,
-  brandPrompts,
-  citationRuns,
-  insertBrandSchema,
-  usageLimits,
-  resolveTier,
-} from "@shared/schema";
+import { insertBrandSchema, usageLimits, resolveTier } from "@shared/schema";
 import { MODELS } from "../lib/modelConfig";
 import { safeFetchText } from "../lib/ssrf";
 import { extractPageContent } from "../lib/pageText";
 import { requireUser } from "../lib/ownership";
-import { withBrandQuota, isUsageLimitError } from "../lib/usageLimit";
-import type { Tier } from "../lib/llmPricing";
+import { createRequestActor } from "../lib/requestActor";
+import { requestData } from "../data/requestData";
+import { RequestBrandQuotaError } from "../data/requestBrandRepository";
 import { logAudit } from "../lib/audit";
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
 import { getOpenrouterClient } from "../lib/factAgent/v2/openrouterClient";
@@ -49,7 +40,8 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const brands = await storage.getBrandsByUserId(user.id);
+        const actor = createRequestActor(user.id);
+        const brands = await requestData.forActor(actor).brands.list();
         res.json({ success: true, data: brands });
       } catch (error) {
         sendError(res, error, "Failed to fetch brands");
@@ -62,7 +54,8 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const brand = await storage.getBrandByIdForUser(req.params.id, user.id);
+        const actor = createRequestActor(user.id);
+        const brand = await requestData.forActor(actor).brands.get(req.params.id);
         if (!brand) {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
@@ -79,13 +72,14 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
+        const brands = requestData.forActor(createRequestActor(user.id)).brands;
 
-        // Wave 4.2: cheap pre-check for fast UX feedback. Authoritative
-        // check happens inside withBrandQuota at insert time (FOR UPDATE).
+        // A cheap pre-check gives fast feedback. The authoritative check
+        // happens inside the actor-bound repository while it holds the user lock.
         const tier = resolveTier(user);
         const tierLimit = (usageLimits[tier] || usageLimits.free).maxBrands;
         if (tierLimit !== -1) {
-          const existingBrands = await storage.getBrandsByUserId(user.id);
+          const existingBrands = await brands.list();
           if (existingBrands.length >= tierLimit) {
             return res.status(403).json({
               success: false,
@@ -254,7 +248,7 @@ export function setupBrandRoutes(app: Express): void {
           nameVariations: result.nameVariations,
         };
 
-        const existingByName = await storage.getBrandsByUserId(user.id);
+        const existingByName = await brands.list();
         const nameLower = brandData.name.toLowerCase();
         if (!req.body?.force && existingByName.some((b) => b.name.toLowerCase() === nameLower)) {
           return res.status(409).json({
@@ -264,18 +258,10 @@ export function setupBrandRoutes(app: Express): void {
         }
 
         try {
-          const tier = resolveTier(user) as Tier;
-          const schema = await import("@shared/schema");
-          const brand = await withBrandQuota(user.id, tier, async (tx) => {
-            const [row] = await tx
-              .insert(schema.brands)
-              .values({ ...brandData, userId: user.id, tone: brandData.tone ?? "professional" })
-              .returning();
-            return row;
-          });
+          const brand = await brands.createWithQuota(brandData, tierLimit);
 
           // Best-effort async automations: competitor discovery. Fact-sheet
-          // scraping is now handled by the v2 orchestration flow (Plan 5).
+          // The fact-sheet orchestration route handles scraping.
           waitUntil(
             (async () => {
               try {
@@ -298,10 +284,12 @@ export function setupBrandRoutes(app: Express): void {
 
           res.json({ success: true, data: brand, analysisQuality });
         } catch (innerError) {
-          if (isUsageLimitError(innerError)) {
-            return res
-              .status(403)
-              .json({ success: false, error: innerError.message, limitReached: true });
+          if (innerError instanceof RequestBrandQuotaError) {
+            return res.status(403).json({
+              success: false,
+              error: `Brand limit reached - your ${tier} plan allows ${tierLimit}. Delete an existing brand or upgrade for more.`,
+              limitReached: true,
+            });
           }
           throw innerError;
         }
@@ -328,7 +316,8 @@ export function setupBrandRoutes(app: Express): void {
           }
         }
 
-        const existingBrands = await storage.getBrandsByUserId(user.id);
+        const brands = requestData.forActor(createRequestActor(user.id)).brands;
+        const existingBrands = await brands.list();
         const nameLower = validatedData.name.toLowerCase();
         if (!req.body?.force && existingBrands.some((b) => b.name.toLowerCase() === nameLower)) {
           return res.status(409).json({
@@ -337,45 +326,60 @@ export function setupBrandRoutes(app: Express): void {
           });
         }
 
-        let brand: Awaited<ReturnType<typeof storage.createBrand>>;
         try {
-          const tier = resolveTier(user) as Tier;
-          const schema = await import("@shared/schema");
-          brand = await withBrandQuota(user.id, tier, async (tx) => {
-            const [row] = await tx
-              .insert(schema.brands)
-              .values({
-                ...validatedData,
-                userId: user.id,
-                tone: validatedData.tone ?? "professional",
-              })
-              .returning();
-            return row;
-          });
+          const tier = resolveTier(user);
+          const tierLimit = (usageLimits[tier] || usageLimits.free).maxBrands;
+          const brand = await brands.createWithQuota(
+            {
+              name: validatedData.name,
+              companyName: validatedData.companyName,
+              industry: validatedData.industry,
+              factScrapeEnabled: validatedData.factScrapeEnabled,
+              description: validatedData.description,
+              website: validatedData.website,
+              tone: validatedData.tone,
+              targetAudience: validatedData.targetAudience,
+              products: validatedData.products,
+              keyValues: validatedData.keyValues,
+              uniqueSellingPoints: validatedData.uniqueSellingPoints,
+              brandVoice: validatedData.brandVoice,
+              sampleContent: validatedData.sampleContent,
+              nameVariations: validatedData.nameVariations,
+              logoUrl: validatedData.logoUrl,
+            },
+            tierLimit,
+          );
+
+          // Best-effort async automations: competitor discovery. Fact-sheet
+          // The fact-sheet orchestration route handles scraping.
+          waitUntil(
+            (async () => {
+              try {
+                const { discoverCompetitors } = await import("../lib/competitorDiscovery");
+                await discoverCompetitors(brand.id);
+              } catch (err) {
+                logger.warn(
+                  { err, brandId: brand.id },
+                  `[brand-create] competitor discovery failed`,
+                );
+                captureAndFlush(err, { tags: { source: "brands.ts:create-competitor-discovery" } });
+              }
+            })(),
+          );
+
+          return res.json({ success: true, data: brand });
         } catch (innerError) {
-          if (isUsageLimitError(innerError)) {
-            return res
-              .status(403)
-              .json({ success: false, error: innerError.message, limitReached: true });
+          if (innerError instanceof RequestBrandQuotaError) {
+            const tier = resolveTier(user);
+            const tierLimit = (usageLimits[tier] || usageLimits.free).maxBrands;
+            return res.status(403).json({
+              success: false,
+              error: `Brand limit reached - your ${tier} plan allows ${tierLimit}. Delete an existing brand, or upgrade for more.`,
+              limitReached: true,
+            });
           }
           throw innerError;
         }
-
-        // Best-effort async automations: competitor discovery. Fact-sheet
-        // scraping is now handled by the v2 orchestration flow (Plan 5).
-        waitUntil(
-          (async () => {
-            try {
-              const { discoverCompetitors } = await import("../lib/competitorDiscovery");
-              await discoverCompetitors(brand.id);
-            } catch (err) {
-              logger.warn({ err, brandId: brand.id }, `[brand-create] competitor discovery failed`);
-              captureAndFlush(err, { tags: { source: "brands.ts:create-competitor-discovery" } });
-            }
-          })(),
-        );
-
-        res.json({ success: true, data: brand });
       } catch (error) {
         if (error instanceof z.ZodError) {
           return res
@@ -393,43 +397,48 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const existing = await storage.getBrandByIdForUser(req.params.id, user.id);
+        const actor = createRequestActor(user.id);
+        const brands = requestData.forActor(actor).brands;
+        const existing = await brands.get(req.params.id);
         if (!existing) {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
-        // insertBrandSchema strips unknown fields; .partial() lets clients
-        // omit any field. userId is never in the insert schema so it can't
-        // be forged here.
+
+        // insertBrandSchema strips unknown fields. userId is never accepted.
         const validatedData = insertBrandSchema
           .partial()
           .omit({ userId: true } as any)
           .parse(req.body);
-
-        // Wave 4.4: optimistic locking. When the client sends
-        // `expectedVersion` (echoed from the GET it edited from), the
-        // UPDATE only matches if nobody else wrote in between.
         const expectedVersion =
           typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : null;
 
-        let brand;
         if (expectedVersion !== null) {
-          brand = await storage.updateBrandIfVersion(req.params.id, expectedVersion, validatedData);
-          if (!brand) {
+          const updated = await brands.updateIfVersion(
+            req.params.id,
+            expectedVersion,
+            validatedData,
+          );
+          if (!updated) {
+            const current = await brands.get(req.params.id);
+            if (!current) {
+              return res.status(404).json({ success: false, error: "Brand not found" });
+            }
             return res.status(409).json({
               success: false,
               error:
                 "Brand changed since you started editing. Refresh to see the latest values, then re-apply your changes.",
               code: "version_conflict",
-              current: existing,
+              current,
             });
           }
-        } else {
-          brand = await storage.updateBrand(req.params.id, validatedData);
-          if (!brand) {
-            return res.status(404).json({ success: false, error: "Brand not found" });
-          }
+          return res.json({ success: true, data: updated });
         }
-        res.json({ success: true, data: brand });
+
+        const updated = await brands.update(req.params.id, validatedData);
+        if (!updated) {
+          return res.status(404).json({ success: false, error: "Brand not found" });
+        }
+        res.json({ success: true, data: updated });
       } catch (error) {
         if (error instanceof z.ZodError) {
           return res
@@ -441,7 +450,7 @@ export function setupBrandRoutes(app: Express): void {
     }),
   );
 
-  // Wave 6.6: pre-delete preview. Called when the user opens the delete
+  // Show a pre-delete preview when the user opens the delete
   // dialog so we can show exact counts ("this will remove 47 articles, 12
   // runs, 5 prompts"). Counts only the heaviest child tables - the FK
   // cascade sweeps many more, but surfacing every single one would be noise.
@@ -450,31 +459,16 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const brand = await storage.getBrandByIdForUser(req.params.id, user.id);
-        if (!brand) {
+        const preview = await requestData
+          .forActor(createRequestActor(user.id))
+          .brands.deletionPreview(req.params.id);
+        if (!preview) {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
-        const brandId = req.params.id;
-        const [articleRow] = await db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(articles)
-          .where(sql`${articles.brandId} = ${brandId}`);
-        const [promptRow] = await db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(brandPrompts)
-          .where(sql`${brandPrompts.brandId} = ${brandId}`);
-        const [runRow] = await db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(citationRuns)
-          .where(sql`${citationRuns.brandId} = ${brandId}`);
 
         res.json({
           success: true,
-          data: {
-            articles: articleRow?.n ?? 0,
-            prompts: promptRow?.n ?? 0,
-            citationRuns: runRow?.n ?? 0,
-          },
+          data: preview,
         });
       } catch (error) {
         sendError(res, error, "Failed to preview deletion");
@@ -487,16 +481,17 @@ export function setupBrandRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const existing = await storage.getBrandByIdForUser(req.params.id, user.id);
+        const brands = requestData.forActor(createRequestActor(user.id)).brands;
+        const existing = await brands.get(req.params.id);
         if (!existing) {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }
 
-        // Wave 4.5: soft-delete with 30-day grace. The cron-driven brand
+        // Soft-delete with a 30-day grace period. The brand purge cron job
         // purge job hard-deletes after the window - at which point the FK
         // cascade clears every child row. List queries already filter
         // `deleted_at IS NULL` so the brand vanishes from the UI immediately.
-        const softDeleted = await storage.softDeleteBrand(req.params.id);
+        const softDeleted = await brands.softDelete(req.params.id);
         if (!softDeleted) {
           return res.status(404).json({ success: false, error: "Brand not found" });
         }

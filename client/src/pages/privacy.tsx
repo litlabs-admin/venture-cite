@@ -1,4 +1,4 @@
-// Public privacy policy page (Wave 2.5).
+// Public privacy policy page.
 //
 // Source of truth is docs/privacy-policy.md - Vite's `?raw` query loads
 // the markdown text at build time so the doc and the page can never drift.

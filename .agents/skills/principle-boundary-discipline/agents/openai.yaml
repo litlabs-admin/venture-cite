@@ -1,0 +1,6 @@
+interface:
+  display_name: "Boundary Discipline"
+  short_description: "Keep validation at system boundaries"
+  default_prompt: "Use $principle-boundary-discipline to review validation and adapter boundaries."
+policy:
+  allow_implicit_invocation: true

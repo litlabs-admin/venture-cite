@@ -64,7 +64,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Panel, PanelPage, PanelRow } from "@/components/dashboard-panels/Panel";
 
-// Wave 9.4: pretty-print scan reports as multi-line toast descriptions.
+// Format scan reports as multi-line toast descriptions.
 // Hides zero-valued lines so a clean run shows just the meaningful ones.
 function formatReportLines(items: Record<string, number | undefined>): string {
   return Object.entries(items)
@@ -73,7 +73,7 @@ function formatReportLines(items: Record<string, number | undefined>): string {
     .join(" · ");
 }
 
-// Wave 9.4 followup: shared display map for outreach + mention status
+// Shared display map for outreach and mention status.
 // badges. Rendered on every row so users can see what they previously
 // selected without opening the dropdown.
 const LISTICLE_STATUS_DISPLAY: Record<
@@ -95,7 +95,7 @@ const LISTICLE_STATUS_DISPLAY: Record<
   dropped: { label: "Dropped", variant: "neutral" },
 };
 
-// Wave 9.4: header roll-up card. Single-line metric + descriptive
+// Header roll-up card with a single-line metric and descriptive text.
 // subtitle. Used by the GEO Tools header strip.
 function SummaryCard({
   label,
@@ -236,20 +236,20 @@ export default function GeoTools() {
   const [bofuType, setBofuType] = useState<string>("comparison");
   const [bofuCompetitors, setBofuCompetitors] = useState<string[]>([]);
   const [bofuKeyword, setBofuKeyword] = useState("");
-  // Wave 9.4: BOFU full-content sheet - replaces the prior 500-char preview.
+  // The BOFU full-content sheet replaces the prior 500-character preview.
   const [activeBofu, setActiveBofu] = useState<BofuContent | null>(null);
   const [bofuSheetOpen, setBofuSheetOpen] = useState(false);
-  // Wave 9.4: manual-add dialogs.
+  // Manual-add dialogs.
   const [addListicleOpen, setAddListicleOpen] = useState(false);
   const [addWikipediaOpen, setAddWikipediaOpen] = useState(false);
-  // Wave 9.4: Wikipedia draft dialog.
+  // Wikipedia draft dialog.
   const [wikiDraft, setWikiDraft] = useState<{
     mentionId: string;
     pageTitle: string;
     text: string;
     notes: string[];
   } | null>(null);
-  // Wave 9.4 followup: tab-level status filters so the workflow state
+  // Tab-level status filters keep the workflow state
   // is actually visible. "all" shows everything; the row badges still
   // display the current status regardless.
   const [listicleStatusFilter, setListicleStatusFilter] = useState<string>("all");
@@ -284,7 +284,7 @@ export default function GeoTools() {
       return body;
     },
     onSuccess: (data: any) => {
-      // Wave 9.4: surface the full ScanReport - Found / Inserted /
+      // Show the full ScanReport with found and inserted values.
       // Duplicates / Failed - rather than a single misleading number.
       const r = data.data?.report ?? {};
       const summary = formatReportLines({
@@ -365,7 +365,7 @@ export default function GeoTools() {
       }),
   });
 
-  // Wave 9: live-refresh during citation runs. Hook returns the cadence
+  // Live refresh during citation runs. The hook returns the cadence
   // we thread directly into the affected useQuery calls below. Listicles
   // + Wikipedia have their own scanners and aren't tied to citation runs,
   // so they keep default caching.
@@ -419,7 +419,7 @@ export default function GeoTools() {
       }),
   });
 
-  // Wave 9.4: header roll-up cards. Single endpoint returns counts
+  // Header roll-up cards use one endpoint that returns counts.
   // across all five tabs + 30-day cited counts so users can answer
   // "is GEO Tools working?" at a glance.
   const { data: summaryData } = useQuery<{
@@ -455,7 +455,7 @@ export default function GeoTools() {
     onError: () => toast({ title: "Failed to update outreach status", variant: "destructive" }),
   });
 
-  // Wave 9.4: manual-add mutations (server-side use ON CONFLICT to
+  // Manual-add mutations use server-side ON CONFLICT to
   // surface 409 if the row already exists for this brand+URL).
   const addListicleMutation = useMutation({
     mutationFn: async (body: {
@@ -517,7 +517,7 @@ export default function GeoTools() {
       }),
   });
 
-  // Wave 9.4: Wikipedia draft helper.
+  // Wikipedia draft helper.
   const draftWikipediaMutation = useMutation({
     mutationFn: async (mentionId: string) => {
       const r = await apiRequest("POST", `/api/wikipedia/draft/${mentionId}`);
@@ -545,7 +545,7 @@ export default function GeoTools() {
       <PanelPage>
         {selectedBrandId ? (
           <>
-            {/* Wave 9.4: header roll-up. Single endpoint, refreshes
+            {/* The header roll-up uses one endpoint and refreshes
                 with the live cadence so newly published content +
                 self-citation counts surface within the run. */}
             {summary && (
@@ -1193,7 +1193,7 @@ export default function GeoTools() {
         }}
       />
 
-      {/* Wave 9.4: Manual-add dialogs. Each follows the same shape:
+      {/* Manual-add dialogs use the same shape.
           minimal-required form, server validates ownership + dedup. */}
       <ManualAddListicleDialog
         open={addListicleOpen}
@@ -1212,7 +1212,7 @@ export default function GeoTools() {
         pending={addWikipediaMutation.isPending}
       />
 
-      {/* Wave 9.4: Wikipedia draft viewer. Read-only - copy + close. */}
+      {/* The Wikipedia draft viewer is read-only. Users can copy or close it. */}
       <Dialog
         open={!!wikiDraft}
         onOpenChange={(o) => {
@@ -1262,7 +1262,7 @@ export default function GeoTools() {
 }
 
 // ============================================================
-// Wave 9.4: Manual-entry dialogs. Each is intentionally minimal -
+// Manual-entry dialogs. Each stays minimal.
 // just the fields the schema requires + a couple of useful optionals.
 // Server-side validates ownership and returns 409 on duplicate URL.
 // ============================================================

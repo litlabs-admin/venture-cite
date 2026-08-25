@@ -115,7 +115,7 @@ export default function HallucinationsTab({ selectedBrandId }: { selectedBrandId
       return apiRequest("POST", `/api/hallucinations/${id}/resolve`);
     },
     onSuccess: () => {
-      // Wave E: the list query is keyed by the FULL URL with query string
+      // The list query uses the full URL with its query string.
       // (line 44 above). TanStack Query does exact matching on
       // single-element string arrays, so invalidating the bare path
       // `["/api/hallucinations"]` never fires a refetch - the DB updated

@@ -1,4 +1,4 @@
-// Wave 9.4: deterministic AI-surface heuristic for FAQ items. Replaces
+// Deterministic AI-surface heuristic for FAQ items. It replaces
 // the previous LLM-self-scored aiSurfaceScore field, which was a
 // meaningless number - same FAQ scored differently on consecutive
 // generations, and the optimizer hardcoded 85 if the model omitted it.

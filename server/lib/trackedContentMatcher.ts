@@ -1,4 +1,4 @@
-// Wave 9.4: detect when an LLM response in a citation run cites a URL
+// Detect when an LLM response in a citation run cites a URL
 // the user has registered as their own (via bofu_content.publishedUrl
 // or faq_items.publishedUrl → tracked_content_urls).
 //

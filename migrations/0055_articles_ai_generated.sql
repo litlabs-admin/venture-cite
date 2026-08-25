@@ -1,4 +1,4 @@
--- Foundations Plan 4 Task 4: AI-disclosure column on articles.
+-- Add an AI-disclosure column on articles.
 -- AI-generated articles previously carried no marker. This adds a flag the
 -- worker sets to true when content generation completes, so the UI can
 -- surface an "AI-generated" pill on article surfaces.

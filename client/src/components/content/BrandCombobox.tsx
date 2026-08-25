@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import type { Brand } from "@shared/schema";
 
-// Brand picker. Wave 7: brand selection is required to generate, so the
+// Brand picker. Brand selection is required to generate, so the
 // "No brand (generic content)" option is gone. Single-brand users see the
 // brand pre-selected; this combobox is mostly invisible for them.
 

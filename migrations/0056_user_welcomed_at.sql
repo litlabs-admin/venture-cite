@@ -1,4 +1,4 @@
--- Plan 4 audit (BUG #13): the `last_login_at` column was repurposed in
+-- The `last_login_at` column was repurposed in
 -- migration 0054 as a welcome-email gate, with all existing rows
 -- backfilled to NOW(). That broke its semantic meaning: callers reading
 -- "when did this user last log in?" get the backfill timestamp instead

@@ -43,6 +43,7 @@ import { db } from "../db";
 import * as schema from "@shared/schema";
 import { and, inArray, lt } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
+import { runContentCostOutboxDrain } from "../outbox/contentCostOutboxDrain";
 
 import { captureAndFlush } from "../lib/sentryReport";
 import { CRON_TOTAL_BUDGET_MS, LLM_CALL_TIMEOUT_MS } from "../lib/factAgent/v2/vercelBudget";
@@ -81,6 +82,7 @@ const STEP_CAPS_MS = {
   "resume-in-flight-autopilots": 10_000,
   "drain-pending-content-jobs": 8_000,
   "drain-pending-citation-runs": 10_000,
+  "content-cost-outbox-drain": 20_000,
   "account-purge": 5_000,
   "brand-purge": 5_000,
   "chatbot-prune": 5_000,
@@ -115,12 +117,9 @@ const STEP_CAPS_MS = {
   // (every Analyze click writes a row) and schema_audits accumulates
   // one row per unique URL. Without these the tables grow unboundedly.
   "signals-retention-prune": 5_000,
-  // Both of these were registered ONLY in the in-process node-cron scheduler
-  // (server/scheduler.ts) and had no orchestrator step. That was survivable
-  // while both schedulers ran; it is not once DISABLE_IN_PROCESS_SCHEDULER is
-  // set, which is the documented Render shape - they would simply never run
-  // again, silently. tour_events would grow without bound and the fact-scrape
-  // failure alert would stop firing with no error to notice.
+  // Both of these run only in the in-process node-cron scheduler.
+  // Keep that scheduler active until an external trigger covers these steps.
+  // Otherwise tour_events grows without bound and the failure alert stops.
   "tour-events-cleanup": 5_000,
   "detect-fact-scrape-failure": 5_000,
 } as const;
@@ -212,7 +211,7 @@ async function drainPendingContentJobs(
       const claimed = await storage.claimContentJobForSlice(j.id, 30);
       if (!claimed) continue;
       const sliceDeadline = Math.min(deadlineMs - 500, Date.now() + 7000);
-      const outcome = await runArticleSlice(j.id, sliceDeadline);
+      const outcome = await runArticleSlice(j.id, sliceDeadline, claimed.advanceToken);
       progressed += 1;
       if (outcome.done && outcome.status === "succeeded") completed += 1;
     } catch (err) {
@@ -272,9 +271,13 @@ async function failStaleScanJobsForOrchestrator(): Promise<{ failed: number }> {
 }
 
 export function setupCronRoutes(app: Express): void {
-  app.post(
+  app.all(
     "/api/cron/daily-orchestrator",
     asyncHandler(async (req: Request, res: Response) => {
+      if (req.method !== "GET" && req.method !== "POST") {
+        return res.status(405).json({ success: false, error: "Method not allowed" });
+      }
+
       if (!isCronAuthorized(req)) {
         return res.status(401).json({ success: false, error: "Not authorized" });
       }
@@ -299,6 +302,9 @@ export function setupCronRoutes(app: Express): void {
       await orch.run("drain-pending-content-jobs", (deadline) => drainPendingContentJobs(deadline));
       await orch.run("drain-pending-citation-runs", (deadline) =>
         drainPendingCitationRuns(deadline),
+      );
+      await orch.run("content-cost-outbox-drain", (deadlineMs) =>
+        runContentCostOutboxDrain({ maxCommands: 25, deadlineMs, leaseSeconds: 60 }),
       );
 
       // Both are millisecond-scale daily housekeeping, and both used to live

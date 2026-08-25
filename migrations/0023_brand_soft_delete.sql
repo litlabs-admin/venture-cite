@@ -1,6 +1,6 @@
--- Soft-delete columns for brands (Wave 4.5).
+-- Soft-delete columns for brands.
 --
--- Mirrors users.deleted_at / deletion_scheduled_for from Wave 2.2.
+-- Matches the user soft-delete fields.
 -- Today brand DELETE cascades to ~20 tables in one transaction -
 -- irreversible and arguably wrong for a customer-facing "delete brand"
 -- button. After this migration:

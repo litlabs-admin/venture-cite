@@ -1,4 +1,4 @@
-// Resend (Svix-style) webhook signature verification (Wave 3.6).
+// Resend (Svix-style) webhook signature verification.
 //
 // Resend signs webhook payloads with the Svix scheme:
 //   svix-id:        unique delivery id

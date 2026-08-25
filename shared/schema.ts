@@ -17,6 +17,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import type { OutboxCommandPayload, OutboxStatus } from "./outbox";
 
 export const users = pgTable("users", {
   id: varchar("id")
@@ -50,28 +51,28 @@ export const users = pgTable("users", {
   // keeps the digest's "alerts since last digest" window accurate.
   lastWeeklyDigestSentAt: timestamp("last_weekly_digest_sent_at"),
   visibilityGuideVisitedAt: timestamp("visibility_guide_visited_at"),
-  // Wave 4.7: free-form bag of onboarding flags, persisted server-side
+  // Free-form onboarding flags persist on the server.
   // so dismiss state syncs across devices. Keys defined in
   // server/routes/onboarding.ts (see ONBOARDING_FIELDS).
   onboardingState: jsonb("onboarding_state").default({}).notNull(),
   bufferAccessToken: text("buffer_access_token"),
-  // Soft-delete (Wave 2.2). Set when the user requests account deletion
+  // Soft-delete state. Set when the user requests account deletion.
   // - the row stays for the 30-day grace period so an admin can restore
   // accidental deletions; the daily cron then hard-deletes after grace.
   deletedAt: timestamp("deleted_at"),
   deletionScheduledFor: timestamp("deletion_scheduled_for"),
-  // Email deliverability state (Wave 3.6). Values: 'active', 'bounced',
+  // Email deliverability state. Values: 'active', 'bounced',
   // 'complained', 'unsubscribed'. The email service refuses to send
   // when this isn't 'active' so we don't keep blasting addresses that
   // hurt our domain reputation.
   emailStatus: text("email_status").default("active").notNull(),
-  // Wave 4 / Plan 4 Task 3: first non-null value is set on the user's
+  // The first non-null value is set on the user's
   // first verified login. The welcome-email trigger fires exactly once
   // (when this is NULL pre-login) and then this stamp is set. Existing
   // rows are backfilled to NOW() in migration 0054 so we don't spam old
   // accounts.
   lastLoginAt: timestamp("last_login_at"),
-  // Plan 4 audit (BUG #13): dedicated welcome-email gate so
+  // A dedicated welcome-email gate
   // `lastLoginAt` recovers its literal meaning. NULL = welcome email
   // has not been sent yet; stamped atomically with the welcome-email
   // dispatch on first login. Existing rows backfilled to NOW() in
@@ -295,18 +296,18 @@ export const brands = pgTable(
     autopilotProgress: jsonb("autopilot_progress"),
     autoCitationSchedule: text("auto_citation_schedule").default("off").notNull(), // off | weekly | biweekly | monthly
     autoCitationDay: integer("auto_citation_day").default(0).notNull(), // 0=Sun, 1=Mon, ... 6=Sat
-    // Wave 9: hour of day (UTC) the scheduled run fires + active toggle
+    // UTC hour for the scheduled run and its active toggle.
     // (pause without losing the day/hour) + status of the most recent
     // scheduled run. See migration 0037_citation_schedule_v2.sql.
     autoCitationHour: integer("auto_citation_hour").default(9).notNull(),
     autoCitationActive: boolean("auto_citation_active").default(true).notNull(),
     lastAutoCitationAt: timestamp("last_auto_citation_at"),
     lastAutoCitationStatus: text("last_auto_citation_status"),
-    // Wave 4.4: optimistic-lock version. Bumped on every write; client
+    // Optimistic-lock version. It increments on every write. The client
     // sends `expectedVersion` and the UPDATE matches `WHERE version = $`,
     // returning 409 on mismatch.
     version: integer("version").default(0).notNull(),
-    // Wave 4.5: soft-delete window. DELETE handler sets these; cron
+    // Soft-delete window. The DELETE handler sets these. The cron job
     // hard-deletes after deletion_scheduled_for elapses. Filters
     // (`deleted_at IS NULL`) keep deleted brands out of GET responses.
     deletedAt: timestamp("deleted_at"),
@@ -323,7 +324,7 @@ export const brands = pgTable(
 );
 
 // Articles are the single source of truth for user-authored content.
-// Wave 7 (content unification) collapsed the old `content_drafts` table into
+// The old `content_drafts` table is now part of
 // this one - see migration 0033. Lifecycle: draft → generating → ready
 // (or failed). Drafts have no content yet; generating jobs are linked via
 // `jobId`; ready articles have content + at least one row in
@@ -350,9 +351,9 @@ export const articles = pgTable(
     author: text("author").default("GEO Platform"),
     viewCount: integer("view_count").default(0).notNull(),
     citationCount: integer("citation_count").default(0).notNull(),
-    // Wave 4.4: optimistic-lock version (see brands.version).
+    // Optimistic-lock version. See brands.version.
     version: integer("version").default(0).notNull(),
-    // Wave 7: lifecycle + form-state fields absorbed from content_drafts.
+    // Lifecycle and form-state fields moved from content_drafts.
     status: text("status").default("ready").notNull(), // 'draft'|'generating'|'ready'|'failed'
     jobId: varchar("job_id"), // soft FK → content_generation_jobs.id, set while generating
     targetCustomers: text("target_customers"),
@@ -366,7 +367,7 @@ export const articles = pgTable(
     // cleanup migration.
     humanScore: integer("human_score"),
     passesAiDetection: integer("passes_ai_detection"),
-    // Foundations Plan 4 Task 4: true when the article body was produced by
+    // True when the article body was produced by
     // the content-generation worker. Manually-created articles (POST
     // /api/articles) stay false. Powers the "AI-generated" disclosure pill.
     aiGenerated: boolean("ai_generated").notNull().default(false),
@@ -454,7 +455,10 @@ export const keywordResearch = pgTable(
     discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("keyword_research_brand_id_idx").on(table.brandId)],
+  (table) => [
+    index("keyword_research_brand_id_idx").on(table.brandId),
+    index("keyword_research_article_id_idx").on(table.articleId),
+  ],
 );
 
 export const insertKeywordResearchSchema = createInsertSchema(keywordResearch).omit({
@@ -483,9 +487,9 @@ export const contentGenerationJobs = pgTable(
     requestPayload: jsonb("request_payload").notNull(),
     articleId: varchar("article_id").references(() => articles.id, { onDelete: "set null" }),
     errorMessage: text("error_message"),
-    // Wave 7: refund + legacy streaming support.
+    // Refund and legacy streaming support.
     // streamBuffer was the token accumulation column for the prior
-    // Chat-Completions streaming worker. Vercel migration (Wave 9.5)
+    // Chat-Completions streaming worker. The slice worker
     // replaced that with the OpenAI Responses API in background mode,
     // which doesn't write here. The column is preserved so the slice
     // runner can detect "legacy in-flight" jobs (streamBuffer populated,
@@ -496,9 +500,14 @@ export const contentGenerationJobs = pgTable(
     streamBuffer: text("stream_buffer").default(""),
     errorKind: text("error_kind"), // 'budget'|'circuit'|'openai_5xx'|'openai_429'|'timeout'|'invalid_input'|'unknown'
     refundedAt: timestamp("refunded_at"),
+    // The usage period that received this reservation. Refunds must match
+    // this value so an old job cannot reduce a newer period's quota.
+    quotaReservationPeriod: timestamp("quota_reservation_period"),
     // Vercel migration: per-call slice lock. /advance updates this when
     // it claims the job for an 8s slice; concurrent advance calls bail.
     lastAdvanceStartedAt: timestamp("last_advance_started_at"),
+    advanceToken: text("advance_token"),
+    advanceLeaseExpiresAt: timestamp("advance_lease_expires_at", { withTimezone: true }),
     // Vercel migration: ID of the OpenAI Responses run executing this
     // job. Set by the first /advance call; subsequent calls poll
     // openai.responses.retrieve(openaiResponseId). Null on legacy jobs
@@ -511,6 +520,8 @@ export const contentGenerationJobs = pgTable(
   (table) => [
     index("content_gen_jobs_user_status_idx").on(table.userId, table.status),
     index("content_gen_jobs_status_idx").on(table.status),
+    index("content_gen_jobs_brand_id_idx").on(table.brandId),
+    index("content_gen_jobs_article_id_idx").on(table.articleId),
   ],
 );
 
@@ -547,6 +558,7 @@ export const llmJobs = pgTable(
     kind: text("kind").notNull(),
     status: text("status").notNull().default("pending"),
     responseId: text("response_id"),
+    providerRequest: jsonb("provider_request"),
     payload: jsonb("payload").notNull(),
     result: jsonb("result"),
     errorKind: text("error_kind"),
@@ -575,7 +587,7 @@ export const insertLlmJobSchema = createInsertSchema(llmJobs).omit({
 export type LlmJob = typeof llmJobs.$inferSelect;
 export type InsertLlmJob = z.infer<typeof insertLlmJobSchema>;
 
-// Wave 7: the legacy content_drafts table was absorbed into `articles` (with
+// The legacy content_drafts table moved into `articles` with
 // status='draft'). See migration 0033_content_unification.sql.
 
 // Tracks each batch of prompts generated for a brand. Enables prompt
@@ -1038,17 +1050,17 @@ export const citationRuns = pgTable(
     // Per-platform breakdown snapshot so the history endpoint doesn't
     // need to re-join geo_rankings for every run.
     platformBreakdown: jsonb("platform_breakdown"),
-    // Wave 8: explicit lifecycle. Drives the "is any run active for this
+    // Explicit lifecycle. It drives the "is any run active for this
     // brand" status gate that the live-update hooks read on every page.
     // 'pending'|'running'|'succeeded'|'failed'|'partial'|'cancelled'.
     status: text("status").default("succeeded").notNull(),
     progressPct: integer("progress_pct").default(100).notNull(),
     errorMessage: text("error_message"),
-    // Wave 9: number of (matcher, analyzer) disagreements during the run.
+    // Number of matcher and analyzer disagreements during the run.
     // Surfaced on HistoryTab as a tooltip so users can spot brands whose
     // nameVariations list needs tuning.
     disagreementCount: integer("disagreement_count").default(0).notNull(),
-    // Wave 9.4: number of times an LLM response in this run cited a URL
+    // Number of times an LLM response in this run cited a URL
     // registered in tracked_content_urls (i.e. the brand's own published
     // BOFU/FAQ pages). Surfaces "did the content I generated work?".
     selfCitationCount: integer("self_citation_count").default(0).notNull(),
@@ -1332,10 +1344,10 @@ export const listicles = pgTable(
     searchVolume: integer("search_volume"),
     domainAuthority: integer("domain_authority"),
     lastChecked: timestamp("last_checked").defaultNow().notNull(),
-    // Wave 9.4: outreach lifecycle. Values: 'new' | 'contacted' | 'won' | 'dropped'.
+    // Outreach lifecycle. Values: 'new' | 'contacted' | 'won' | 'dropped'.
     outreachStatus: text("outreach_status").default("new").notNull(),
     outreachNotes: text("outreach_notes"),
-    // Wave 9.4: refresh on subsequent scans so isIncluded/listPosition can
+    // Refresh on subsequent scans so isIncluded and listPosition can
     // be re-validated rather than frozen at first-discovery time.
     lastVerifiedAt: timestamp("last_verified_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1385,7 +1397,7 @@ export const bofuContent = pgTable(
     targetIntent: text("target_intent"),
     status: text("status").default("draft"),
     aiScore: integer("ai_score"),
-    // Wave 9.4: content lifecycle. publishedUrl is the canonical URL
+    // Content lifecycle. publishedUrl is the canonical URL.
     // where this BOFU piece lives; once set, the citation checker tracks
     // self-citations against it and updates lastCitedAt.
     publishedUrl: text("published_url"),
@@ -1416,7 +1428,7 @@ export const faqItems = pgTable(
     aiSurfaceScore: integer("ai_surface_score"),
     isOptimized: integer("is_optimized").default(0).notNull(),
     optimizationTips: text("optimization_tips").array(),
-    // Wave 9.4: lifecycle parallel to bofu_content.
+    // Lifecycle parallel to bofu_content.
     publishedUrl: text("published_url"),
     publishedAt: timestamp("published_at"),
     lastCitedAt: timestamp("last_cited_at"),
@@ -1446,7 +1458,7 @@ export const brandMentions = pgTable(
     engagementScore: integer("engagement_score"),
     authorUsername: text("author_username"),
     isVerified: integer("is_verified").default(0).notNull(),
-    // Wave 9.4: explicit lifecycle. Values:
+    // Explicit lifecycle. Values:
     //   'new' | 'acknowledged' | 'replied' | 'false_positive' | 'ignored'.
     status: text("status").default("new").notNull(),
     mentionedAt: timestamp("mentioned_at"),
@@ -1466,7 +1478,7 @@ export const brandMentions = pgTable(
   (table) => [index("brand_mentions_brand_id_idx").on(table.brandId)],
 );
 
-// Wave 9.4: registry of brand-owned published URLs (currently from
+// Registry of brand-owned published URLs from
 // bofu_content + faq_items via a polymorphic source_type/source_id pair)
 // that the citation checker matches against. When the LLM in a citation
 // run cites one of these URLs, the corresponding bofu_content / faq_items
@@ -1924,7 +1936,7 @@ export const insertCommunityPostSchema = createInsertSchema(communityPosts).omit
 export type CommunityPost = typeof communityPosts.$inferSelect;
 export type InsertCommunityPost = z.infer<typeof insertCommunityPostSchema>;
 
-// ─── Email DLQ (Wave 3.6) ─────────────────────────────────────────
+// ─── Email DLQ ───────────────────────────────────────────────────
 // After the retry helper exhausts its attempts, the failed send lands
 // here so we can inspect / requeue / surface in admin UI. Migration in
 // 0020_email_status_and_failures.sql.
@@ -1948,7 +1960,7 @@ export const emailFailures = pgTable(
 export type EmailFailure = typeof emailFailures.$inferSelect;
 export type InsertEmailFailure = typeof emailFailures.$inferInsert;
 
-// ─── API cost tracking (Wave 3.2) ─────────────────────────────────
+// ─── API cost tracking ────────────────────────────────────────────
 // Records every outbound LLM call so we can enforce per-user, per-tier
 // daily/monthly token budgets. Migration in 0019_api_costs.sql.
 export const apiCosts = pgTable(
@@ -1963,15 +1975,88 @@ export const apiCosts = pgTable(
     tokensIn: integer("tokens_in").default(0).notNull(),
     tokensOut: integer("tokens_out").default(0).notNull(),
     estCostCents: integer("est_cost_cents").default(0).notNull(),
+    idempotencyKey: text("idempotency_key"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("api_costs_user_created_idx").on(table.userId, table.createdAt)],
+  (table) => [
+    index("api_costs_user_created_idx").on(table.userId, table.createdAt),
+    uniqueIndex("api_costs_idempotency_key_idx").on(table.idempotencyKey),
+  ],
 );
 
 export type ApiCost = typeof apiCosts.$inferSelect;
 export type InsertApiCost = typeof apiCosts.$inferInsert;
 
-// ─── Audit log (Wave 2.1) ─────────────────────────────────────────
+// Transactional provider-command queue. Application transactions insert a
+// command with their domain changes. A separate worker leases and executes it.
+// The outbox remains private to internal worker access.
+// Migration 0098 owns SQL-only RLS, grants, state checks, and private function.
+export const outboxCommands = pgTable(
+  "outbox_commands",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    kind: text("kind").$type<OutboxCommandPayload["kind"]>().notNull(),
+    status: text("status").$type<OutboxStatus>().notNull().default("pending"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    aggregateType: text("aggregate_type").notNull(),
+    aggregateId: text("aggregate_id").notNull(),
+    userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+    brandId: varchar("brand_id").references(() => brands.id, { onDelete: "set null" }),
+    payload: jsonb("payload").$type<OutboxCommandPayload>().notNull(),
+    payloadFingerprint: text("payload_fingerprint").notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull(),
+    availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
+    leaseToken: uuid("lease_token"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    lastErrorCode: text("last_error_code"),
+    providerName: text("provider_name").notNull(),
+    providerOperation: text("provider_operation").notNull(),
+    providerResult: jsonb("provider_result"),
+    providerReference: text("provider_reference"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    deadLetteredAt: timestamp("dead_lettered_at", { withTimezone: true }),
+    cancellationRequestedAt: timestamp("cancellation_requested_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("outbox_commands_provider_idempotency_key_idx").on(
+      table.providerName,
+      table.idempotencyKey,
+    ),
+    index("outbox_commands_aggregate_idx").on(
+      table.aggregateType,
+      table.aggregateId,
+      table.createdAt,
+    ),
+    index("outbox_commands_claimable_idx")
+      .on(table.availableAt, table.createdAt)
+      .where(sql`status = 'pending'`),
+    index("outbox_commands_expired_lease_idx")
+      .on(table.leaseExpiresAt, table.createdAt)
+      .where(sql`status = 'processing'`),
+    index("outbox_commands_kind_claimable_idx")
+      .on(table.kind, table.availableAt, table.createdAt)
+      .where(sql`status = 'pending'`),
+    index("outbox_commands_kind_expired_lease_idx")
+      .on(table.kind, table.leaseExpiresAt, table.createdAt)
+      .where(sql`status = 'processing'`),
+    index("outbox_commands_user_idx")
+      .on(table.userId, table.createdAt)
+      .where(sql`user_id is not null`),
+    index("outbox_commands_brand_idx")
+      .on(table.brandId, table.createdAt)
+      .where(sql`brand_id is not null`),
+  ],
+);
+
+export type OutboxCommand = typeof outboxCommands.$inferSelect;
+export type InsertOutboxCommand = typeof outboxCommands.$inferInsert;
+
+// ─── Audit log ────────────────────────────────────────────────────
 // Sensitive operations (delete, subscription change, admin action) write
 // a row here via server/lib/audit.ts. Migration in 0017_audit_logs.sql.
 // user_id is ON DELETE SET NULL - log rows survive account deletion.
@@ -2000,7 +2085,7 @@ export const auditLogs = pgTable(
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
-// ─── Notification preferences (Wave 6.8) ──────────────────────────
+// ─── Notification preferences ─────────────────────────────────────
 // One row per (user, notification type). Missing row == enabled
 // (the default). Non-dismissable categories (billing, security) are
 // never persisted here; they're hardcoded at send sites. Migration
@@ -2222,7 +2307,7 @@ export const insertTourEventSchema = createInsertSchema(tourEvents).omit({
 export type TourEvent = typeof tourEvents.$inferSelect;
 export type InsertTourEvent = z.infer<typeof insertTourEventSchema>;
 
-// ── Plan 1 (v2): caching layer for search-grounded LLM ─────────────────
+// ── Cache for search-grounded LLM calls ────────────────────────────────
 export const factScrapeCache = pgTable(
   "fact_scrape_cache",
   {
@@ -2243,7 +2328,7 @@ export const factScrapeCache = pgTable(
 export type FactScrapeCache = typeof factScrapeCache.$inferSelect;
 export type InsertFactScrapeCache = typeof factScrapeCache.$inferInsert;
 
-// ── Plan 1 (v2): observability log per (run, source) ───────────────────
+// ── Observability log per run and source ───────────────────────────────
 export const factScrapeLogs = pgTable(
   "fact_scrape_logs",
   {
@@ -2270,7 +2355,7 @@ export const factScrapeLogs = pgTable(
 export type FactScrapeLog = typeof factScrapeLogs.$inferSelect;
 export type InsertFactScrapeLog = typeof factScrapeLogs.$inferInsert;
 
-// ── Plan 1 (v2): Postgres token bucket for LLM concurrency ─────────────
+// ── Postgres token bucket for LLM concurrency ──────────────────────────
 export const llmConcurrencySlots = pgTable(
   "llm_concurrency_slots",
   {
@@ -2286,7 +2371,7 @@ export const llmConcurrencySlots = pgTable(
 );
 export type LlmConcurrencySlot = typeof llmConcurrencySlots.$inferSelect;
 
-// ── Plan 1 (v2): generic JSON config store ─────────────────────────────
+// ── Generic JSON config store ──────────────────────────────────────────
 export const systemState = pgTable("system_state", {
   key: text("key").primaryKey(),
   valueJson: jsonb("value_json").notNull(),

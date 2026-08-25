@@ -1,4 +1,4 @@
--- Wave 9.4: GEO Tools content lifecycle, dedup at DB level, semantic FAQ
+-- Add GEO Tools content lifecycle, database deduplication, and semantic FAQ
 -- dedup, and self-citation tracking infrastructure.
 --
 -- (a) Enable pg_trgm for semantic FAQ dedup (best-effort; fallback to

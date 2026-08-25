@@ -36,12 +36,20 @@ const stubs = vi.hoisted(() => ({
   deleteOldFactScrapeLogs: vi.fn(async () => 0),
   deleteExpiredFactScrapeCache: vi.fn(async () => 0),
   deleteExpiredLlmConcurrencySlots: vi.fn(async () => 0),
-  // Both used to be scheduler-only jobs with no orchestrator step, so they
-  // never needed stubbing here. They are orchestrator steps now - without
-  // DISABLE_IN_PROCESS_SCHEDULER they would otherwise never run at all.
+  // Both jobs also run in the in-process scheduler on Render. The orchestrator
+  // tests stub them because this suite exercises the HTTP trigger in isolation.
   deleteOldTourEvents: vi.fn(async () => 0),
   detectFactScrapeFailureRate: vi.fn(async () => ({ alerted: 0 })),
   runBrandActivationSweep: vi.fn(async () => ({ processed: 0, total: 0 })),
+  runContentCostOutboxDrain: vi.fn(async () => ({
+    claimed: 0,
+    succeeded: 0,
+    rescheduled: 0,
+    deadLettered: 0,
+    cancelled: 0,
+    lostLease: 0,
+    stopReason: "idle" as const,
+  })),
   dbSelect: vi.fn(),
 }));
 
@@ -116,6 +124,9 @@ vi.mock("../../server/lib/onboardingAutopilot", () => ({
 vi.mock("../../server/contentGenerationWorker", () => ({
   runArticleSlice: stubs.runArticleSlice,
 }));
+vi.mock("../../server/outbox/contentCostOutboxDrain", () => ({
+  runContentCostOutboxDrain: stubs.runContentCostOutboxDrain,
+}));
 vi.mock("../../server/setupProducts", () => ({
   setupStripeProducts: stubs.setupStripeProducts,
 }));
@@ -174,11 +185,13 @@ function buildApp(): express.Express {
 async function callOrchestrator(
   app: express.Express,
   headers: Record<string, string> = {},
+  url = "/api/cron/daily-orchestrator",
+  method: "GET" | "POST" | "PUT" = "POST",
 ): Promise<{ status: number; body: any }> {
   return new Promise((resolve, reject) => {
     const req = {
-      method: "POST",
-      url: "/api/cron/daily-orchestrator",
+      method,
+      url,
       headers: {
         host: "localhost",
         "content-type": "application/json",
@@ -259,11 +272,86 @@ describe("cron orchestrator", () => {
     expect(stubs.runAutoCitationJob).toHaveBeenCalled();
   });
 
+  it("runs the bounded content cost drain with the orchestrator deadline", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+
+    const { status, body } = await callOrchestrator(app, {
+      authorization: "Bearer secret",
+    });
+
+    expect(status).toBe(200);
+    expect(stubs.runContentCostOutboxDrain).toHaveBeenCalledWith({
+      maxCommands: 25,
+      deadlineMs: expect.any(Number),
+      leaseSeconds: 60,
+    });
+    expect(body.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ step: "content-cost-outbox-drain", ok: true }),
+      ]),
+    );
+  });
+
+  it("accepts an authenticated GET from Vercel Cron", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+    const { status, body } = await callOrchestrator(
+      app,
+      { authorization: "Bearer secret" },
+      "/api/cron/daily-orchestrator",
+      "GET",
+    );
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ success: true, results: expect.any(Array) });
+  });
+
+  it("rejects unsupported methods before it runs scheduled work", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+    const { status } = await callOrchestrator(
+      app,
+      { authorization: "Bearer secret" },
+      "/api/cron/daily-orchestrator",
+      "PUT",
+    );
+
+    expect(status).toBe(405);
+    expect(stubs.runAccountPurgeJob).not.toHaveBeenCalled();
+  });
+
   it("accepts the x-cron-secret header for manual triggers", async () => {
     process.env.CRON_SECRET = "secret";
     const app = buildApp();
     const { status } = await callOrchestrator(app, { "x-cron-secret": "secret" });
     expect(status).toBe(200);
+  });
+
+  it("accepts the cron secret on the fact scrape backstop", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+    const { status } = await callOrchestrator(
+      app,
+      { authorization: "Bearer secret" },
+      "/api/cron/fact-scrape-backstop",
+    );
+
+    expect(status).toBe(200);
+    expect(stubs.runFactScrapeBackstop).toHaveBeenCalledOnce();
+  });
+
+  it("rejects the wrong secret on the fact scrape backstop", async () => {
+    process.env.CRON_SECRET = "secret";
+    const app = buildApp();
+    const { status } = await callOrchestrator(
+      app,
+      { authorization: "Bearer wrong" },
+      "/api/cron/fact-scrape-backstop",
+    );
+
+    expect(status).toBe(401);
+    expect(stubs.runFactScrapeBackstop).not.toHaveBeenCalled();
   });
 
   it("includes per-step results with ok/error fields", async () => {

@@ -1,4 +1,4 @@
-// Pure pricing math for LLM cost estimation (Wave 3.2).
+// Pure pricing math for LLM cost estimation.
 //
 // Split out from server/lib/llmBudget.ts so the math can be unit-tested
 // without booting the database (llmBudget imports `db` at module load).

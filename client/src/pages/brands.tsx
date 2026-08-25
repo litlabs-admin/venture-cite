@@ -147,7 +147,7 @@ export default function Brands() {
 
   const form = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(formSchema),
-    // Wave 6.2: validate on blur so users see errors after they leave a
+    // Validate on blur so users see errors after they leave a
     // field instead of only on submit. Matches HIG expectation on web forms.
     mode: "onBlur",
     defaultValues: {

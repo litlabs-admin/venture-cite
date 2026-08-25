@@ -1,4 +1,4 @@
-// Content page (Wave 7 rebuild).
+// Content page.
 //
 // Route-driven, single-article editor. Visiting /content with no id either
 // creates a new draft article and redirects, or loads the most recent draft
@@ -8,18 +8,18 @@
 // form; status='generating' shows the phase-indicator skeleton; status='ready'
 // shows the editor. No more content_drafts table, no more 4-way PATCH race.
 //
-// Generation (Vercel migration / Wave 9.5): the OpenAI Responses API in
+// Generation uses the OpenAI Responses API in
 // background mode runs the work on OpenAI's infra. Client polls /state for
 // status + elapsedSeconds, drives /advance to kick off and progress the
 // run. The previous "phase label" (Brainstorming → Polishing) was fake
-// theatre uncorrelated with actual model progress - Foundations Plan 1
+// display that is not connected to model progress.
 // Task 4 replaced it with honest elapsed seconds + a Cancel button.
 // articles.content is filled by the server when the run completes,
 // so a user who navigates away and back picks up the finished article from
 // the article row directly.
 //
 // AI-detection score is gone (the LLM-graded number was theater). Auto-Improve
-// lives on the Articles page (Wave 5) where the diff/restore UI belongs.
+// lives on the Articles page, where the diff and restore UI belongs.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -500,7 +500,7 @@ export default function Content() {
     },
   });
 
-  // Cancel a running generation (Foundations Plan 1, Task 4). Marks the
+  // Cancel a running generation. Marks the
   // active job as cancelled server-side; the worker will notice on its
   // next slice and refund the quota + flip the article back to draft.
   const cancelMutation = useMutation({

@@ -1,14 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import InternalPage from "@/pages/internal-page";
+import { AdminBareRoute } from "./-shared/routeGates";
 
-// Public board. This route sits at the top level, NOT under `_app`, so no
-// authentication gate runs. Anyone with the URL can read and edit the board.
-// The board holds no customer data: it lives in this browser's localStorage
-// and never reaches the server.
-//
-// `noindex` keeps it out of search results. A search engine that indexed this
-// page would publish the work list on every results page.
+// The client redirects unauthenticated users to sign in and non-administrators
+// to the dashboard. The API checks the same administrator rule.
 export const Route = createFileRoute("/internal-page")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Board - VentureCite" },
@@ -16,5 +13,5 @@ export const Route = createFileRoute("/internal-page")({
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
-  component: InternalPage,
+  component: () => <AdminBareRoute component={InternalPage} />,
 });

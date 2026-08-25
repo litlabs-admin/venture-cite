@@ -1,4 +1,4 @@
-// Distribute dialog - extracted from articles.tsx (Wave 7).
+// Distribute dialog.
 //
 // Three views: Generate (pick platforms), Results (current run output),
 // History (past distributions). selectedPlatforms now persists across
@@ -36,7 +36,7 @@ type DistributeView = "generate" | "results" | "history";
 
 interface DistributeDialogProps {
   articleId: string;
-  // Foundations Plan 4 Task 4: when true, render the AI-generated pill in
+  // When true, render the AI-generated pill in
   // the dialog header. Caller is the articles list which already has the
   // article object in hand, so we pass through rather than refetching.
   aiGenerated?: boolean;
@@ -505,7 +505,7 @@ export default function DistributeDialog({ articleId, aiGenerated }: DistributeD
               className="w-full"
               onClick={() => {
                 setView("generate");
-                // Wave 7: keep selectedPlatforms - user often regenerates
+                // Keep selectedPlatforms. Users often regenerate
                 // for the same set after editing the article.
               }}
               data-testid="button-distribute-more"

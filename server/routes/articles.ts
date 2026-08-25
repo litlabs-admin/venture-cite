@@ -1,6 +1,6 @@
 // Articles CRUD + revisions + distributions + geo-rankings routes.
 //
-// Wave 7: removed both /api/articles/slug/:slug routes - articles are now
+// Articles use a brand-scoped ID instead of a slug route.
 // referenced by id only. The unique slug column was dropped in migration 0033.
 // Drafts are now articles with status='draft' (the legacy content_drafts
 // table is gone), so this file owns the draft creation endpoint too.
@@ -24,55 +24,88 @@
 //   GET    /api/geo-rankings/platform/:platform         - list by AI platform
 
 import type { Express } from "express";
+import { z } from "zod";
 import { storage } from "../storage";
 import { MODELS } from "../lib/modelConfig";
-import {
-  requireUser,
-  requireArticle,
-  requireBrand,
-  getUserBrandIds,
-  pickFields,
-} from "../lib/ownership";
+import { requireUser, requireArticle, requireBrand, getUserBrandIds } from "../lib/ownership";
 import { parsePagination } from "../lib/pagination";
 import { aiLimitMiddleware, openai, sendError, asyncHandler } from "../lib/routesShared";
 import { postToBuffer } from "../lib/bufferPost";
+import { createRequestActor } from "../lib/requestActor";
+import { contentRequestData } from "../data/contentRequestData";
+import { requestData } from "../data/requestData";
+
+const distributionCreateSchema = z.object({
+  articleId: z.string().min(1),
+  platforms: z.array(z.string().min(1)).min(1),
+});
+
+const distributionEditSchema = z.object({ content: z.string() });
+
+const distributionFormatSchema = z.object({
+  platforms: z.array(z.string().min(1)).min(1),
+});
+
+const bufferPostSchema = z.object({ channelId: z.string().min(1) });
+
+function metadataWithContent(metadata: unknown, content: string): Record<string, unknown> {
+  const current =
+    typeof metadata === "object" && metadata !== null && !Array.isArray(metadata) ? metadata : {};
+  return { ...current, content };
+}
 
 import { logger } from "../lib/logger";
 export function setupArticlesRoutes(app: Express): void {
-  const ARTICLE_WRITE_FIELDS = [
-    "title",
-    "content",
-    "excerpt",
-    "metaDescription",
-    "keywords",
-    "industry",
-    "contentType",
-    "featuredImage",
-    "author",
-    "seoData",
-    "brandId",
-    "externalUrl",
-  ] as const;
-
+  const nonEmptyText = z.string().refine((value) => value.trim().length > 0, {
+    message: "Value cannot be empty",
+  });
+  const articleFields = z.object({
+    brandId: z.string().min(1).optional(),
+    title: nonEmptyText.optional(),
+    content: nonEmptyText.optional(),
+    excerpt: z.string().nullable().optional(),
+    metaDescription: z.string().nullable().optional(),
+    keywords: z.array(z.string()).nullable().optional(),
+    industry: z.string().nullable().optional(),
+    contentType: z.string().nullable().optional(),
+    featuredImage: z.string().nullable().optional(),
+    author: z.string().nullable().optional(),
+    externalUrl: z.string().nullable().optional(),
+    targetCustomers: z.string().nullable().optional(),
+    geography: z.string().nullable().optional(),
+    contentStyle: z.string().nullable().optional(),
+    seoData: z.json().nullable().optional(),
+  });
+  const readyArticleSchema = articleFields.extend({
+    brandId: z.string().min(1),
+    title: nonEmptyText,
+    content: nonEmptyText,
+  });
+  const draftArticleSchema = articleFields.extend({ brandId: z.string().min(1) });
+  const updateArticleSchema = articleFields
+    .extend({ expectedVersion: z.number().int().nonnegative().optional() })
+    .refine((value) => Object.keys(value).some((key) => key !== "expectedVersion"), {
+      message: "At least one article field is required",
+    });
+  const restoreSchema = z.object({ expectedVersion: z.number().int().nonnegative().optional() });
   // Create/save a ready article. brandId is verified to belong to the caller;
   // all other fields pass through the allowlist (no viewCount/citationCount).
-  // Wave 7: brandId is now required at the schema level - orphan articles
+  // The schema requires brandId, so orphan articles
   // are forbidden going forward.
   app.post(
     "/api/articles",
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const body = pickFields<any>(req.body, ARTICLE_WRITE_FIELDS);
-        if (!body.brandId) {
-          return res.status(400).json({ success: false, error: "brandId is required" });
-        }
-        await requireBrand(body.brandId as string, user.id);
-        if (!body.title || !body.content) {
-          return res.status(400).json({ success: false, error: "title and content are required" });
-        }
+        const actor = createRequestActor(user.id);
+        const parsed = readyArticleSchema.safeParse(req.body ?? {});
+        if (!parsed.success)
+          return res.status(400).json({ success: false, error: "Invalid article input" });
+        const brand = await requireBrand(parsed.data.brandId, user.id);
+        if (brand.deletedAt)
+          return res.status(404).json({ success: false, error: "Brand not found" });
         // Force ready status; explicit drafts go through POST /api/articles/draft.
-        const article = await storage.createArticle({ ...(body as any), status: "ready" });
+        const article = await contentRequestData.forActor(actor).articles.createReady(parsed.data);
         res.json({ success: true, article });
       } catch (error) {
         sendError(res, error, "Failed to create article");
@@ -88,33 +121,14 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const {
-          brandId,
-          title,
-          keywords,
-          industry,
-          contentType,
-          targetCustomers,
-          geography,
-          contentStyle,
-        } = req.body ?? {};
-        if (!brandId || typeof brandId !== "string") {
-          return res.status(400).json({ success: false, error: "brandId is required" });
-        }
-        // Ownership check happens inside createDraftArticle, but verify-and-friendly
-        // here so the error message is clear.
-        await requireBrand(brandId, user.id);
-        const article = await storage.createDraftArticle(user.id, brandId, {
-          title: typeof title === "string" ? title : null,
-          keywords: Array.isArray(keywords)
-            ? keywords.filter((k: unknown): k is string => typeof k === "string")
-            : null,
-          industry: typeof industry === "string" ? industry : null,
-          contentType: typeof contentType === "string" ? contentType : "article",
-          targetCustomers: typeof targetCustomers === "string" ? targetCustomers : null,
-          geography: typeof geography === "string" ? geography : null,
-          contentStyle: typeof contentStyle === "string" ? contentStyle : "b2c",
-        });
+        const actor = createRequestActor(user.id);
+        const parsed = draftArticleSchema.safeParse(req.body ?? {});
+        if (!parsed.success)
+          return res.status(400).json({ success: false, error: "Invalid draft input" });
+        const brand = await requireBrand(parsed.data.brandId, user.id);
+        if (brand.deletedAt)
+          return res.status(404).json({ success: false, error: "Brand not found" });
+        const article = await contentRequestData.forActor(actor).articles.createDraft(parsed.data);
         res.json({ success: true, data: article });
       } catch (error) {
         sendError(res, error, "Failed to create draft article");
@@ -131,6 +145,7 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
+        const actor = createRequestActor(user.id);
         const { limit, offset } = parsePagination(req);
         const brandIdParam = typeof req.query.brandId === "string" ? req.query.brandId : undefined;
         if (brandIdParam) await requireBrand(brandIdParam, user.id);
@@ -147,7 +162,7 @@ export function setupArticlesRoutes(app: Express): void {
                   .filter(Boolean)
               : statusParam;
 
-        const articles = await storage.getArticlesByUserIdWithStatus(user.id, {
+        const articles = await contentRequestData.forActor(actor).articles.list({
           status,
           brandId: brandIdParam,
           limit,
@@ -166,7 +181,9 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.id, user.id);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.id);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
         res.json({ success: true, article });
       } catch (error) {
         sendError(res, error, "Failed to fetch article");
@@ -180,27 +197,23 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireArticle(req.params.id, user.id);
-        const update = pickFields<any>(req.body, ARTICLE_WRITE_FIELDS);
-        if (update.brandId) {
-          // Prevent moving an article into a brand the user doesn't own.
-          await requireBrand(update.brandId as string, user.id);
-        }
+        const actor = createRequestActor(user.id);
+        const parsed = updateArticleSchema.safeParse(req.body ?? {});
+        if (!parsed.success)
+          return res.status(400).json({ success: false, error: "Invalid article update" });
+        const { expectedVersion, ...update } = parsed.data;
 
-        // Wave 4.4: optimistic locking - see the brand-update handler for
+        // Optimistic locking prevents an older client from overwriting
         // the reasoning. Same pattern, different table.
-        const expectedVersion =
-          typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : null;
-
         let article;
-        if (expectedVersion !== null) {
-          article = await storage.updateArticleIfVersion(
-            req.params.id,
-            expectedVersion,
-            update as any,
-          );
+        if (expectedVersion !== undefined) {
+          article = await contentRequestData
+            .forActor(actor)
+            .articles.updateIfVersion(req.params.id, expectedVersion, update);
           if (!article) {
-            const current = await storage.getArticleById(req.params.id);
+            const current = await contentRequestData.forActor(actor).articles.get(req.params.id);
+            if (!current)
+              return res.status(404).json({ success: false, error: "Article not found" });
             return res.status(409).json({
               success: false,
               error:
@@ -210,7 +223,7 @@ export function setupArticlesRoutes(app: Express): void {
             });
           }
         } else {
-          article = await storage.updateArticle(req.params.id, update as any);
+          article = await contentRequestData.forActor(actor).articles.update(req.params.id, update);
           if (!article) {
             return res.status(404).json({ success: false, error: "Article not found" });
           }
@@ -230,8 +243,9 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireArticle(req.params.id, user.id);
-        const deleted = await storage.deleteArticle(req.params.id);
+        const deleted = await contentRequestData
+          .forActor(createRequestActor(user.id))
+          .articles.delete(req.params.id);
         if (!deleted) return res.status(404).json({ success: false, error: "Article not found" });
         res.json({ success: true });
       } catch (error) {
@@ -251,9 +265,13 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireArticle(req.params.id, user.id);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.id);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
         const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
-        const revisions = await storage.listRevisions(req.params.id, limit);
+        const revisions = await contentRequestData
+          .forActor(actor)
+          .revisions.list(req.params.id, limit);
         res.json({ success: true, data: revisions });
       } catch (error) {
         sendError(res, error, "Failed to list revisions");
@@ -266,8 +284,10 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireArticle(req.params.id, user.id);
-        const revision = await storage.getRevisionById(req.params.revId);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.id);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
+        const revision = await contentRequestData.forActor(actor).revisions.get(req.params.revId);
         if (!revision || revision.articleId !== req.params.id) {
           return res.status(404).json({ success: false, error: "Revision not found" });
         }
@@ -286,42 +306,28 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.id, user.id);
-        const revision = await storage.getRevisionById(req.params.revId);
-        if (!revision || revision.articleId !== article.id) {
+        const actor = createRequestActor(user.id);
+        const parsed = restoreSchema.safeParse(req.body ?? {});
+        if (!parsed.success)
+          return res.status(400).json({ success: false, error: "Invalid restore input" });
+        const result = await contentRequestData
+          .forActor(actor)
+          .revisions.restore(req.params.id, req.params.revId, parsed.data.expectedVersion);
+        if (result.kind === "not_found") {
           return res.status(404).json({ success: false, error: "Revision not found" });
         }
-        const expectedVersion =
-          typeof req.body?.expectedVersion === "number" ? req.body.expectedVersion : null;
-
-        let updated;
-        if (expectedVersion !== null) {
-          updated = await storage.updateArticleIfVersion(article.id, expectedVersion, {
-            content: revision.content,
-          } as any);
-          if (!updated) {
-            const current = await storage.getArticleById(article.id);
-            return res.status(409).json({
-              success: false,
-              error: "Article changed since restore was started. Refresh and try again.",
-              code: "version_conflict",
-              current,
-            });
-          }
-        } else {
-          updated = await storage.updateArticle(article.id, { content: revision.content } as any);
+        if (result.kind === "conflict") {
+          return res.status(409).json({
+            success: false,
+            error: "Article changed since restore was started. Refresh and try again.",
+            code: "version_conflict",
+            current: result.current,
+          });
         }
-
-        // Record the restore in history. created_by = user, source = manual_edit
-        // so the diff viewer shows that this point came from a human action.
-        await storage.createRevision({
-          articleId: article.id,
-          content: revision.content,
-          source: "manual_edit",
-          createdBy: user.id,
-        });
-
-        res.json({ success: true, article: updated });
+        if (result.kind === "invalid_content") {
+          return res.status(400).json({ success: false, error: "Revision content is empty" });
+        }
+        res.json({ success: true, article: result.article });
       } catch (error) {
         sendError(res, error, "Failed to restore revision");
       }
@@ -334,24 +340,25 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const { articleId, platforms } = req.body ?? {};
-        if (!articleId || !Array.isArray(platforms)) {
+        const parsed = distributionCreateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
           return res
             .status(400)
             .json({ success: false, error: "articleId and platforms are required" });
         }
-        const article = await requireArticle(articleId, user.id);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData
+          .forActor(actor)
+          .articles.get(parsed.data.articleId);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
 
-        const distributions = [];
-        for (const platform of platforms.slice(0, 10)) {
-          if (typeof platform !== "string") continue;
-          const distribution = await storage.createDistribution({
+        const distributions = await contentRequestData.forActor(actor).distributions.createMany(
+          parsed.data.platforms.slice(0, 10).map((platform) => ({
             articleId: article.id,
             platform,
             status: "pending",
-          });
-          distributions.push(distribution);
-        }
+          })),
+        );
 
         res.json({ success: true, data: distributions });
       } catch (error) {
@@ -365,8 +372,12 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        await requireArticle(req.params.articleId, user.id);
-        const distributions = await storage.getDistributions(req.params.articleId);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.articleId);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
+        const distributions = await contentRequestData
+          .forActor(actor)
+          .distributions.list(req.params.articleId);
         res.json({ success: true, data: distributions });
       } catch (error) {
         sendError(res, error, "Failed to fetch distributions");
@@ -381,17 +392,19 @@ export function setupArticlesRoutes(app: Express): void {
       try {
         const user = requireUser(req);
         const { distributionId } = req.params;
-        const { content } = req.body;
-        if (typeof content !== "string") {
+        const parsed = distributionEditSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
           return res.status(400).json({ success: false, error: "content is required" });
         }
-        const dist = await storage.getDistributionById(distributionId);
+        const actor = createRequestActor(user.id);
+        const dist = await contentRequestData.forActor(actor).distributions.get(distributionId);
         if (!dist) return res.status(404).json({ success: false, error: "Distribution not found" });
-        await requireArticle(dist.articleId, user.id); // verifies article belongs to user
 
-        const updated = await storage.updateDistribution(distributionId, {
-          metadata: { ...((dist.metadata as object) ?? {}), content },
-        });
+        const updated = await contentRequestData
+          .forActor(actor)
+          .distributions.update(distributionId, {
+            metadata: metadataWithContent(dist.metadata, parsed.data.content),
+          });
         res.json({ success: true, data: updated });
       } catch (error) {
         sendError(res, error, "Failed to update distribution");
@@ -408,12 +421,12 @@ export function setupArticlesRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const article = await requireArticle(req.params.articleId, user.id);
+        const actor = createRequestActor(user.id);
+        const article = await contentRequestData.forActor(actor).articles.get(req.params.articleId);
+        if (!article) return res.status(404).json({ success: false, error: "Article not found" });
 
-        const platformsRaw = Array.isArray(req.body?.platforms) ? req.body.platforms : [];
-        const platforms = platformsRaw
-          .filter((p: unknown): p is string => typeof p === "string")
-          .slice(0, 7);
+        const parsed = distributionFormatSchema.safeParse(req.body ?? {});
+        const platforms = parsed.success ? parsed.data.platforms : [];
         if (platforms.length === 0) {
           return res.status(400).json({ success: false, error: "platforms array is required" });
         }
@@ -425,22 +438,24 @@ export function setupArticlesRoutes(app: Express): void {
           });
         }
 
-        const brand = article.brandId ? await storage.getBrandById(article.brandId) : null;
+        const brand = article.brandId
+          ? await requestData.forActor(actor).brands.get(article.brandId)
+          : null;
         // 2000-char prompt cap - keeps the per-platform LLM call cheap. TODO:
         // make this brand-config or per-platform if we ever want long-form
         // distribution copy.
         const articleContent = article.content?.substring(0, 2000) || article.title || "";
         const articleTitle = article.title ?? "Untitled";
 
-        // Wave 7: run platforms in parallel - each call writes to its own
+        // Run platforms in parallel. Each call writes to its own
         // distribution row, so they don't contend. ~2× faster on multi-platform.
         const results = await Promise.all(
           platforms.map(async (platform: string) => {
-            const distribution = await storage.createDistribution({
-              articleId: article.id,
-              platform,
-              status: "pending",
-            });
+            const created = await contentRequestData
+              .forActor(actor)
+              .distributions.createMany([{ articleId: article.id, platform, status: "pending" }]);
+            const distribution = created[0];
+            if (!distribution) throw new Error("Distribution insert returned no row");
 
             try {
               const platformPrompts: Record<string, string> = {
@@ -540,7 +555,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
                 logger.error(
                   `[distribute] ${platform} returned empty content for article ${article.id}`,
                 );
-                await storage.updateDistribution(distribution.id, {
+                await contentRequestData.forActor(actor).distributions.update(distribution.id, {
                   status: "failed",
                   error: "AI returned empty content",
                 });
@@ -551,7 +566,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
                 };
               }
 
-              await storage.updateDistribution(distribution.id, {
+              await contentRequestData.forActor(actor).distributions.update(distribution.id, {
                 status: "success",
                 distributedAt: new Date(),
                 metadata: { content: formattedContent },
@@ -564,7 +579,7 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
                 platformPostId: null as string | null,
               };
             } catch (apiError) {
-              await storage.updateDistribution(distribution.id, {
+              await contentRequestData.forActor(actor).distributions.update(distribution.id, {
                 status: "failed",
                 error: apiError instanceof Error ? apiError.message : "Content formatting failed",
               });
@@ -594,27 +609,23 @@ Reminder: hook in the first 125 characters; total ≤ 2200 characters.`,
     asyncHandler(async (req, res) => {
       try {
         const user = requireUser(req);
-        const distribution = await storage.getDistributionById(req.params.distributionId);
+        const actor = createRequestActor(user.id);
+        const distributions = contentRequestData.forActor(actor).distributions;
+        const distribution = await distributions.get(req.params.distributionId);
         if (!distribution) {
           return res.status(404).json({ success: false, error: "not_found" });
         }
-        try {
-          await requireArticle(distribution.articleId, user.id);
-        } catch {
-          // 404 not 403 - anti-enumeration. CLAUDE.md.
-          return res.status(404).json({ success: false, error: "not_found" });
-        }
-        const { channelId } = req.body ?? {};
-        if (!channelId || typeof channelId !== "string") {
+        const parsed = bufferPostSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
           return res.status(400).json({ success: false, error: "channelId is required" });
         }
         const content = (distribution.metadata as { content?: string } | null)?.content;
         if (!content || typeof content !== "string" || !content.trim()) {
           return res.status(400).json({ success: false, error: "no_content" });
         }
-        const result = await postToBuffer(user.id, channelId, content);
+        const result = await postToBuffer(user.id, parsed.data.channelId, content);
         if (result.ok) {
-          await storage.updateDistribution(distribution.id, {
+          await distributions.update(distribution.id, {
             platformPostId: result.postId,
             status: "scheduled",
             distributedAt: new Date(),

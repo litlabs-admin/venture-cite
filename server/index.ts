@@ -5,8 +5,8 @@
 // (dist/server/index.mjs) directly on BOTH hosts - Vercel via Nitro's vercel
 // preset, which supersedes the hand-written server/vercelEntry.ts + api/
 // entry that used to serve it (both deleted in this task).
-// Boot side-effects (migrations, scheduler, autopilot resume,
-// Stripe setup) run here in dev, AND separately in production via the
+// Boot side-effects (scheduler, autopilot resume, Stripe setup) run here
+// in development, AND separately in production via the
 // Nitro startup plugin at server/nitroBoot.ts (registered in
 // vite.config.ts's nitro({ plugins: [...] })) - the plugin no-ops unless
 // NODE_ENV=production, so the two never double-run. On Vercel the daily
@@ -18,16 +18,15 @@ import { setupVite, log } from "./vite";
 import { setupStripeProducts } from "./setupProducts";
 import { pool } from "./db";
 import { initScheduler } from "./scheduler";
-import { applyMigrations } from "./lib/migrationRunner";
 import { reconcileOrphanCitationRuns } from "./lib/citationReconciliation";
 import { resumeInFlightAutopilots } from "./lib/onboardingAutopilot";
 import { logger } from "./lib/logger";
+import { devListenHost, startupAutopilotEnabled, stripeSetupEnabled } from "./lib/localFlowSafety";
 
 (async () => {
-  await applyMigrations();
   await reconcileOrphanCitationRuns();
 
-  // Plan 4 audit (BUG #14): our email verification flow assumes the
+  // The email verification flow assumes the
   // Supabase project-level "Enable email confirmations" toggle is ON.
   // If it's OFF, Supabase auto-confirms every account regardless of
   // the `email_confirm: false` flag we pass to admin.createUser, and
@@ -39,7 +38,7 @@ import { logger } from "./lib/logger";
       "Also configure the project's Site URL (post-confirmation redirect) under Authentication → URL Configuration.",
   );
 
-  if (process.env.STRIPE_SECRET_KEY) {
+  if (stripeSetupEnabled(process.env)) {
     setupStripeProducts().catch((err) => {
       logger.error({ err }, "Stripe product setup failed");
       Sentry.captureException(err, { tags: { source: "stripe-setup" } });
@@ -48,8 +47,16 @@ import { logger } from "./lib/logger";
 
   const server = await prepareApp();
 
-  initScheduler();
-  void resumeInFlightAutopilots();
+  if (process.env.DISABLE_IN_PROCESS_SCHEDULER !== "true") {
+    initScheduler();
+  } else {
+    logger.info("local dev: in-process scheduler disabled");
+  }
+  if (startupAutopilotEnabled(process.env)) {
+    void resumeInFlightAutopilots();
+  } else {
+    logger.info("local fake provider: startup autopilot resume disabled");
+  }
 
   if (app.get("env") === "development") {
     await setupVite(app, server);
@@ -66,7 +73,7 @@ import { logger } from "./lib/logger";
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);
-  server.listen(port, "0.0.0.0", () => {
+  server.listen(port, devListenHost(process.env.CONTENT_GENERATION_PROVIDER), () => {
     log(`serving on port ${port}`);
   });
 

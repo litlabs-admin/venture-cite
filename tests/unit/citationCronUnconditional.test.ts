@@ -1,8 +1,8 @@
 // Which brands the weekly citation scan is allowed to run for.
 //
-// Two invariants, and they have different histories:
+// The scan has two invariants:
 //
-//   1. No cadence gate. Foundations Plan 1 Task 11 removed the legacy
+//   1. No cadence gate. The scan no longer uses the legacy
 //      autoCitationSchedule / autoCitationActive flags - every live brand is
 //      scanned weekly, gated only by "has it been ~6 days" in
 //      isBrandDueForCitation.

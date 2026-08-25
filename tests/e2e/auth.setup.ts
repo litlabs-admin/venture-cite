@@ -39,7 +39,7 @@ import { login, expectAuthenticated, STORAGE_STATE } from "./support/auth";
 //
 // This must NOT be "/". It used to be, on the reasoning that "/" was the
 // post-login landing route and therefore gated - that stopped being true
-// when the TanStack Start migration split "/" into a public,
+// when the router split "/" into a public,
 // server-rendered marketing page. A logged-out visit to "/" now returns a
 // perfectly good 200 instead of bouncing to /login, which makes it a much
 // weaker signal for "is this cached session still real".

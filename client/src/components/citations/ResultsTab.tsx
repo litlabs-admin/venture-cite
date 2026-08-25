@@ -41,7 +41,7 @@ import CitedMentionsStrip, { type CitedMention } from "./CitedMentionsStrip";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { PanelLabel } from "@/components/dashboard-panels/primitives";
 
-// Wave 9: minimum sample size before a platform competes for "Best
+// A platform needs this minimum sample size before it competes for "Best
 // Platform". Without this, a platform with 1/1 cited (100%) beats one
 // with 8/10 (80%) - meaningless on small samples.
 const BEST_PLATFORM_MIN_CHECKS = 5;
@@ -76,9 +76,9 @@ type ResultsTabProps = {
 };
 
 export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }: ResultsTabProps) {
-  // Wave 9: keep results in sync during a citation run by polling 6s
+  // Poll every six seconds to keep results current during a citation run.
   // while one is active. TanStack dedupes the gate query so this is free.
-  // Wave 9.1: when a fresh run is in flight, scope the query to rankings
+  // When a fresh run is in flight, scope the query to rankings
   // *from* that run (server-side filter via the `since` param). Without
   // this, cells that haven't been re-checked yet show stale data from
   // the prior run while completed cells show new - a confusing mix the
@@ -119,7 +119,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       })),
   );
 
-  // Wave 9: best-platform requires a minimum sample so we don't celebrate
+  // A best platform requires a minimum sample. This avoids a result
   // a 1/1=100% platform over an 8/10=80% one. Falls back to the top by
   // raw rate (with sample-size warning) when no platform clears the bar.
   const bestPlatform = useMemo(() => {
@@ -130,7 +130,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
     return [...eligible].sort((a, b) => b.citationRate - a.citationRate)[0];
   }, [results?.byPlatform]);
 
-  // Wave 9: stable tie-break on best-prompt - promptId asc - so the same
+  // Use promptId ascending as a stable tie-break. The same
   // prompt wins across renders when tied on cited count. Otherwise the
   // dashboard "Top Prompt" can flicker between equally-good prompts.
   const bestPrompt = useMemo(() => {
@@ -140,7 +140,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       .sort((a, b) => b.citedCount - a.citedCount || a.promptId.localeCompare(b.promptId))[0];
   }, [results?.byPrompt]);
 
-  // Wave 9: header timestamp - "Last run 3m ago". Derived from byPlatform
+  // The header timestamp, such as "Last run 3m ago", uses byPlatform.
   // (each platform reports its own last-run, take the max).
   const lastRunAt = useMemo(() => {
     const stamps = (results?.byPlatform ?? [])
@@ -150,7 +150,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
     return new Date(Math.max(...stamps));
   }, [results?.byPlatform]);
 
-  // Wave 9: per-platform sortable table.
+  // Per-platform sortable table.
   type PlatformSortKey = "platform" | "cited" | "checks" | "citationRate" | "lastRun";
   const [platformSort, setPlatformSort] = useState<{
     key: PlatformSortKey;
@@ -179,7 +179,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
     );
   };
 
-  // Wave 9: per-prompt accordion sort.
+  // Per-prompt accordion sort.
   type PromptSortKey = "default" | "least-cited" | "most-cited";
   const [promptSort, setPromptSort] = useState<PromptSortKey>("default");
   const sortedPrompts = useMemo(() => {
@@ -196,8 +196,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
     <Skeleton className="h-48 w-full" />
   ) : results && results.totalChecks > 0 ? (
     <>
-      {/* Wave 9.2: header strip - last-run timestamp only. CSV export
-          was removed in this wave; users asked for it to go away. */}
+      {/* Header strip shows only the last-run timestamp. */}
       <div className="flex items-center justify-between gap-3">
         <p className="text-caption text-vc-tertiary">
           {lastRunAt
@@ -206,7 +205,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
         </p>
       </div>
 
-      {/* Wave 9: 0% citation rate gets a dedicated, actionable empty
+      {/* A 0% citation rate gets a dedicated, actionable empty
           state instead of a sad zero. Hidden when ≥1% so the normal
           summary takes over. Left-border stripe, no card chrome - same
           treatment as crawler-check's "Top priority" recommendation. */}
@@ -258,7 +257,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
             <PanelLabel>Best Platform</PanelLabel>
             <CheckCircle2 className="h-4 w-4 text-positive" />
           </div>
-          {/* Wave 9: when no platform has hit the min-sample threshold,
+          {/* When no platform has hit the minimum sample threshold,
               surface "Need more data" rather than a misleading winner. */}
           <p className="text-stat font-semibold text-vc-primary" data-testid="stat-best-platform">
             {bestPlatform?.platform || "Need more data"}
@@ -296,7 +295,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       {/* Performance by Platform */}
       <div className="border-b border-vc-default pb-2">
         <PanelLabel>Performance by Platform</PanelLabel>
-        {/* Wave 9: sortable column headers. Click to toggle asc/desc;
+        {/* Sortable column headers. Click to toggle ascending and descending.
             clicking a different column resets to a sensible default
             direction (asc for platform name, desc for everything else). */}
         <div className="mt-3 overflow-x-auto">
@@ -381,7 +380,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
               Click a prompt to see each AI&apos;s full answer and whether your brand was cited.
             </p>
           </div>
-          {/* Wave 9: actionable sort. Default = original prompt order;
+          {/* The sort uses original prompt order by default.
               "Least cited" surfaces problem prompts first (where work
               pays off). */}
           <Select value={promptSort} onValueChange={(v) => setPromptSort(v as PromptSortKey)}>
@@ -446,7 +445,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
                       </button>
                     </div>
                     {row.platforms.length === 0 ? (
-                      // Wave 9.1: distinguish "never checked" from
+                      // Distinguish "never checked" from
                       // "pending in this run". With the since-filter
                       // active, an empty platforms array during a run
                       // means this prompt hasn't been re-checked yet -
@@ -481,7 +480,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
       </div>
     </>
   ) : hasActive ? (
-    // Wave 9.1: when a fresh run just started, the since-filter
+    // When a fresh run just started, the since filter
     // initially returns 0 rankings (no platform has finished yet).
     // Show in-progress messaging instead of the empty-state hero
     // so users don't think the run failed. The hero returns once
@@ -507,7 +506,7 @@ export default function ResultsTab({ selectedBrandId, hasPrompts, runMutation }:
   );
 }
 
-// Wave 9: minimal sortable column header. Kept inline rather than spun out
+// Minimal sortable column header. It stays inline rather than using a separate component.
 // into a shared component - only the platform table uses this pattern, and
 // pulling it into ui/ would be premature abstraction.
 function SortableTh({

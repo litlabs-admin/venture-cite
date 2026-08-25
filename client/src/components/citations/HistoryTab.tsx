@@ -45,7 +45,7 @@ import { PanelLabel } from "@/components/dashboard-panels/primitives";
 type ChartFilter = "auto" | "manual" | "re-detect" | "all";
 type DateFilter = "7" | "30" | "90" | "all";
 
-// Wave 9.2: trigger label map. Replaces a `capitalize` className that
+// Trigger label map. It replaces a `capitalize` className that
 // rendered "auto_onboarding" as "Auto_onboarding" and similar awkward
 // transforms. Unknown triggers fall back to title-case for forward
 // compatibility.
@@ -53,7 +53,7 @@ const TRIGGER_LABEL: Record<string, string> = {
   manual: "Manual",
   cron: "Auto",
   auto_onboarding: "Onboarding",
-  // Pre-Wave-9.1 deployments may still have re-detect rows in DB; the
+  // Earlier deployments may still have re-detect rows in the database. The
   // route that wrote them was removed but old rows remain.
   "re-detect": "Re-detect",
 };
@@ -64,7 +64,7 @@ function triggerLabel(value: string): string {
   return value.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Wave 9 -> Phase 2.6: status is a run outcome, not a badge-worthy category -
+// Status is a run outcome, not a badge category.
 // per the app's rule (see foundations/StatusDot.tsx), status renders as a
 // dot + plain text, never a filled/tinted chip. Green is reserved for
 // actions, so "succeeded" uses the neutral check glyph, not a green fill.
@@ -82,7 +82,7 @@ type HistoryTabProps = {
 };
 
 export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
-  // Wave 9: poll history every 6s while a citation run is live so a new
+  // Poll history every six seconds while a citation run is live so a new
   // row appears as soon as it's created, and progress reflects in real time.
   const { hasActive } = useActiveCitationRuns(selectedBrandId);
   const { data: historyData } = usePromptHistory(selectedBrandId, {
@@ -99,7 +99,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
     : [];
 
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
-  // Wave 9: filter dropdowns. Default chart view is "auto" so the trend
+  // Filter dropdowns use "auto" as the default chart view so the trend
   // line reflects scheduled runs (apples-to-apples) rather than ad-hoc
   // manual debug runs. Date filter trims the visible window.
   const [chartFilter, setChartFilter] = useState<ChartFilter>("auto");
@@ -113,7 +113,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
     return runHistory.filter((r) => new Date(r.startedAt).getTime() >= cutoff);
   }, [runHistory, dateFilter]);
 
-  // Wave 6.7: pagination state. Server already returns the full list, so we
+  // The server returns the full list, so the client stores pagination state.
   // paginate client-side - 20 is a readable first page; "Load more" reveals
   // the next batch rather than dropping the user into an overwhelming wall
   // of rows on brands with years of history.
@@ -122,11 +122,11 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
   const visibleRuns = filteredHistory.slice(0, visibleCount);
   const hasMore = filteredHistory.length > visibleCount;
 
-  // Wave 9: drill-down cache. Previously every accordion-open re-fetched
+  // Cache drill-down data. Previously each accordion open fetched
   // run details even after closing/reopening. We cache per runId in
   // component state - TanStack already caches the latest fetch, but
   // switching between runs on the same panel was thrashing the cache key.
-  // Wave 9.2: LRU-capped at 10 entries. Detail blobs can be ~100KB each
+  // Limit the LRU cache to ten entries. Detail blobs can be about 100KB each.
   // (full LLM responses across 50 platform calls); a long History
   // session would otherwise tie up tens of MB of stale data until brand
   // switch unmounts the component. Object.keys preserves insertion
@@ -175,7 +175,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                 the line. Times shown in your local timezone.
               </p>
             </div>
-            {/* Wave 9: filter dropdowns. Default = "auto" (scheduled
+            {/* Filter dropdowns use "auto" as the default, for scheduled
                 runs only) so the trend is apples-to-apples. */}
             <div className="flex gap-2 shrink-0">
               <Select value={chartFilter} onValueChange={(v) => setChartFilter(v as ChartFilter)}>
@@ -206,10 +206,10 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
             <div className="h-[240px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
-                  // Wave 9: chart only successful runs (status filter) AND
+                  // Chart only successful runs and
                   // matching the trigger filter. Failed runs distort the
                   // line; re-detect runs are noisy because they don't
-                  // represent fresh AI calls. Pre-Wave-8 rows have no
+                  // represent fresh AI calls. Earlier rows have no
                   // status - treat them as succeeded (the previous
                   // behavior).
                   data={filteredHistory
@@ -311,7 +311,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                 const prev = filteredHistory[i + 1];
                 const delta = prev ? run.citationRate - prev.citationRate : 0;
                 const isExpanded = expandedRunId === run.id;
-                // Wave 9: derive status. Pre-Wave-8 rows (no status field)
+                // Derive status. Earlier rows without a status field
                 // are treated as succeeded so we don't visually punish
                 // historical runs.
                 const status = run.status ?? "succeeded";
@@ -354,7 +354,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                         <Badge variant="outline" className="text-caption">
                           {triggerLabel(run.triggeredBy)}
                         </Badge>
-                        {/* Wave 9: status badge - succeeded/partial/failed/cancelled.
+                        {/* The status badge shows succeeded, partial, failed, or cancelled.
                           Failed shows error_message in tooltip. */}
                         {(status !== "succeeded" || run.errorMessage) && (
                           <Tooltip>
@@ -374,7 +374,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                             )}
                           </Tooltip>
                         )}
-                        {/* Wave 9: disagreement badge - surface when matcher
+                        {/* The disagreement badge appears when the matcher
                           and analyzer LLM disagreed on >5% of checks. Above
                           5% suggests the brand needs more name variations. */}
                         {(run.disagreementCount ?? 0) > 0 &&
@@ -402,7 +402,7 @@ export default function HistoryTab({ selectedBrandId }: HistoryTabProps) {
                     {isExpanded && (
                       <div className="border-t border-vc-default px-2 py-4 bg-vc-muted/20">
                         {(() => {
-                          // Wave 9: cache-first render - re-opening a
+                          // Render cached data first. Reopening a
                           // previously-fetched run is instant.
                           const cached = drilldownCache[run.id];
                           const detail = cached ?? runDetailData?.data;

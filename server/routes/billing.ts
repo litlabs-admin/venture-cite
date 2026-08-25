@@ -1,4 +1,4 @@
-// Stripe billing routes (Wave 5.1).
+// Stripe billing routes.
 //
 // All four endpoints proxy through to Stripe's REST API.
 // The webhook is registered separately in server/index.ts because it
@@ -11,12 +11,13 @@
 //   POST /api/billing/portal-session  - open Stripe customer portal (auth-gated)
 
 import type { Express } from "express";
+import { createHash } from "node:crypto";
 import { storage } from "../storage";
 import { asyncHandler } from "../lib/routesShared";
 import { isAuthenticated } from "../auth";
 
 import { logger } from "../lib/logger";
-import { TRIAL_DAYS } from "@shared/schema";
+import { PLAN_PRICE_CENTS, SELLABLE_TIERS, TRIAL_DAYS, type SellableTier } from "@shared/schema";
 import { captureAndFlush } from "../lib/sentryReport";
 
 // When the current period ends, in unix seconds.
@@ -32,8 +33,86 @@ function periodEnd(sub: import("stripe").Stripe.Subscription): number | undefine
   return item?.current_period_end ?? onSub ?? sub.cancel_at ?? undefined;
 }
 
+function appUrl(path: string): string {
+  const baseUrl = process.env.APP_URL ?? "https://www.venturecite.com";
+  return new URL(path, `${baseUrl.replace(/\/$/, "")}/`).toString();
+}
+
+function isSellableTier(value: string | undefined): value is SellableTier {
+  return SELLABLE_TIERS.some((tier) => tier === value);
+}
+
+type ApprovedCatalogEntry = {
+  priceId: string;
+  productId: string;
+  tier: SellableTier;
+};
+
+function approvedCatalog(): ApprovedCatalogEntry[] {
+  const entries: ApprovedCatalogEntry[] = [];
+  const proProductId = process.env.STRIPE_PRO_PRODUCT_ID;
+  const proPriceId = process.env.STRIPE_PRO_PRICE_ID;
+  if (proProductId && proPriceId) {
+    entries.push({ tier: "pro", productId: proProductId, priceId: proPriceId });
+  }
+
+  const agencyProductId = process.env.STRIPE_AGENCY_PRODUCT_ID;
+  const agencyPriceId = process.env.STRIPE_AGENCY_PRICE_ID;
+  if (agencyProductId && agencyPriceId) {
+    entries.push({ tier: "agency", productId: agencyProductId, priceId: agencyPriceId });
+  }
+  return entries;
+}
+
+function isCatalogPrice(price: import("stripe").Stripe.Price, requestedPriceId: string): boolean {
+  if (price.id !== requestedPriceId || !price.active) return false;
+  if (
+    price.currency.toLowerCase() !== "usd" ||
+    price.recurring?.interval !== "month" ||
+    price.recurring.interval_count !== 1
+  ) {
+    return false;
+  }
+
+  const product = price.product;
+  if (typeof product === "string" || "deleted" in product || !product.active) return false;
+
+  const tier = product.metadata.tier?.trim().toLowerCase();
+  if (!isSellableTier(tier) || price.unit_amount !== PLAN_PRICE_CENTS[tier]) return false;
+
+  return approvedCatalog().some(
+    (entry) =>
+      entry.tier === tier && entry.priceId === requestedPriceId && entry.productId === product.id,
+  );
+}
+
+function stripeCustomerRecoveryKey(userId: string): string {
+  return createHash("sha256").update(`venturecite:stripe-customer:${userId}`).digest("hex");
+}
+
+function hasSubscriptionEntitlement(status: import("stripe").Stripe.Subscription.Status): boolean {
+  return status === "active" || status === "trialing" || status === "past_due";
+}
+
+const checkoutLocks = new Map<string, Promise<void>>();
+
+async function withCheckoutLock<T>(userId: string, work: () => Promise<T>): Promise<T> {
+  const prior = checkoutLocks.get(userId) ?? Promise.resolve();
+  const task = prior.catch(() => undefined).then(work);
+  const tail = task.then(
+    () => undefined,
+    () => undefined,
+  );
+  checkoutLocks.set(userId, tail);
+  try {
+    return await task;
+  } finally {
+    if (checkoutLocks.get(userId) === tail) checkoutLocks.delete(userId);
+  }
+}
+
 export function setupBillingRoutes(app: Express): void {
-  // Foundations Plan 3 Task 2: Stripe customer-portal session for the
+  // Stripe customer-portal session for the
   // expanded Settings page. Exposed under /api/billing/* so the new
   // Settings UI has a stable contract.
   app.post(
@@ -54,10 +133,9 @@ export function setupBillingRoutes(app: Express): void {
       try {
         const { getUncachableStripeClient } = await import("../stripeClient");
         const stripe = await getUncachableStripeClient();
-        const baseUrl = process.env.APP_URL || req.headers.origin || `http://${req.headers.host}`;
         const session = await stripe.billingPortal.sessions.create({
           customer: dbUser.stripeCustomerId,
-          return_url: `${baseUrl}/settings`,
+          return_url: appUrl("/settings"),
         });
         return res.json({ success: true, url: session.url });
       } catch (err: unknown) {
@@ -157,7 +235,7 @@ export function setupBillingRoutes(app: Express): void {
           return res.status(401).json({ success: false, error: "Authentication required" });
         }
 
-        const { priceId, successUrl, cancelUrl } = req.body;
+        const { priceId } = req.body;
 
         if (!priceId || typeof priceId !== "string") {
           return res.status(400).json({ success: false, error: "priceId is required" });
@@ -196,32 +274,41 @@ export function setupBillingRoutes(app: Express): void {
           return res.status(400).json({ success: false, error: "Invalid or inactive price" });
         }
 
-        const priceProduct = price.product as import("stripe").Stripe.Product;
-        const isPurchasable =
-          price.active &&
-          price.recurring !== null &&
-          typeof priceProduct === "object" &&
-          !("deleted" in priceProduct && priceProduct.deleted) &&
-          priceProduct.active &&
-          Boolean(priceProduct.metadata?.tier);
-
-        if (!isPurchasable) {
+        if (!isCatalogPrice(price, priceId)) {
           return res.status(400).json({ success: false, error: "Invalid or inactive price" });
         }
 
         const userId = sessionUser.id;
         const user = await storage.getUser(userId);
+        let trialEligible = !user?.stripeSubscriptionId;
 
         let customerId: string | undefined;
         if (user?.stripeCustomerId) {
           customerId = user.stripeCustomerId;
         } else if (user) {
-          const customer = await stripe.customers.create({
-            email: user.email || undefined,
-            metadata: { userId },
+          const recoveryKey = stripeCustomerRecoveryKey(userId);
+          const recoveredCustomers = await stripe.customers.search({
+            query: `metadata['ventureciteRecoveryKey']:'${recoveryKey}'`,
+            limit: 10,
           });
-          await storage.updateUserStripeInfo(userId, { stripeCustomerId: customer.id });
-          customerId = customer.id;
+          const recoveredCustomer = recoveredCustomers.data.find(
+            (customer) =>
+              customer.metadata.userId === userId &&
+              customer.metadata.ventureciteRecoveryKey === recoveryKey,
+          );
+          if (recoveredCustomer) {
+            customerId = recoveredCustomer.id;
+          } else {
+            const customer = await stripe.customers.create(
+              {
+                email: user.email || undefined,
+                metadata: { userId, ventureciteRecoveryKey: recoveryKey },
+              },
+              { idempotencyKey: `customer:${recoveryKey}` },
+            );
+            customerId = customer.id;
+          }
+          await storage.updateUserStripeInfo(userId, { stripeCustomerId: customerId });
         }
 
         // ── Already subscribed? Change the plan, do not sell a second one. ──
@@ -251,9 +338,10 @@ export function setupBillingRoutes(app: Express): void {
             status: "all",
             limit: 20,
           });
+          trialEligible = trialEligible && existing.data.length === 0;
 
-          const current = existing.data.find(
-            (x) => x.status === "active" || x.status === "trialing",
+          const current = existing.data.find((subscription) =>
+            hasSubscriptionEntitlement(subscription.status),
           );
           if (current) {
             const item = current.items.data[0];
@@ -283,51 +371,44 @@ export function setupBillingRoutes(app: Express): void {
           }
         }
 
-        const baseUrl = process.env.APP_URL || req.headers.origin || `http://${req.headers.host}`;
-        const session = await stripe.checkout.sessions.create(
-          {
-            customer: customerId,
-            payment_method_types: ["card"],
-            line_items: [{ price: priceId, quantity: 1 }],
-            mode: "subscription",
-            // Stripe owns the trial. The card is collected now, nothing is
-            // charged for TRIAL_DAYS, and Stripe bills automatically on the
-            // first day after - which is also what gives us
-            // customer.subscription.trial_will_end for the reminder email.
-            subscription_data: { trial_period_days: TRIAL_DAYS },
-            // Forward, not back to the page they just left. They came here to
-            // start using the product; dropping them on the pricing page with
-            // a green tick makes them find their own way in. /welcome is the
-            // next real step, and it forwards to the dashboard by itself if
-            // they already have a brand.
-            success_url: successUrl || `${baseUrl}/welcome?checkout=success`,
-            cancel_url: cancelUrl || `${baseUrl}/pricing?canceled=true`,
-            client_reference_id: userId,
-          },
-          {
-            // Collapses a double-click or a retried request into ONE session
-            // instead of two. Scoped to (user, price) so a genuine later
-            // purchase of a different plan is unaffected.
-            //
-            // The minute bucket is load-bearing. Stripe caches an idempotent
-            // response for 24 HOURS, and a Checkout session also lives 24
-            // hours - so a key without a time component replays the SAME
-            // session right up to the moment it dies, and then keeps replaying
-            // it. Anyone who opened checkout and did not finish got handed
-            // that dead session on every subsequent click, for the rest of the
-            // day, with no way out: Stripe renders "You're all done here" and
-            // the button appears to do nothing. Observed in production -
-            // damienwoods7 clicked Pro at 16:42, and every later attempt
-            // returned that expired session instead of a new one.
-            //
-            // A double-click or an auto-retry lands within the same minute,
-            // which is all this was ever meant to collapse. Straddling a
-            // minute boundary makes one extra unused session, which costs
-            // nothing and expires by itself - the opposite failure is a
-            // customer who cannot pay.
-            idempotencyKey: `checkout:${userId}:${priceId}:${Math.floor(Date.now() / 60_000)}`,
-          },
-        );
+        const session = await withCheckoutLock(userId, async () => {
+          if (customerId) {
+            const openSessions = await stripe.checkout.sessions.list({
+              customer: customerId,
+              status: "open",
+              limit: 100,
+            });
+            const reusable = openSessions.data.find(
+              (openSession) =>
+                openSession.client_reference_id === userId &&
+                openSession.metadata?.venturecitePriceId === priceId &&
+                Boolean(openSession.url),
+            );
+            await Promise.all(
+              openSessions.data
+                .filter((openSession) => openSession.id !== reusable?.id)
+                .map((openSession) => stripe.checkout.sessions.expire(openSession.id)),
+            );
+            if (reusable) return reusable;
+          }
+
+          return stripe.checkout.sessions.create(
+            {
+              customer: customerId,
+              payment_method_types: ["card"],
+              line_items: [{ price: priceId, quantity: 1 }],
+              mode: "subscription",
+              ...(trialEligible ? { subscription_data: { trial_period_days: TRIAL_DAYS } } : {}),
+              success_url: appUrl("/welcome?checkout=success"),
+              cancel_url: appUrl("/pricing?canceled=true"),
+              client_reference_id: userId,
+              metadata: { venturecitePriceId: priceId },
+            },
+            {
+              idempotencyKey: `checkout:${userId}:${priceId}:${Math.floor(Date.now() / 60_000)}`,
+            },
+          );
+        });
 
         res.json({ success: true, url: session.url });
       } catch (error: any) {

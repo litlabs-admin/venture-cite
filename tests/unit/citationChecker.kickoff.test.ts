@@ -1,4 +1,4 @@
-// Wave 9: tests for the async kickoff path.
+// Tests for the async kickoff path.
 //
 // `kickoffBrandPromptsRun` exists so the HTTP handler can return ~100ms with
 // a runId while the actual run continues in the background. Verifies:
