@@ -197,6 +197,14 @@ const PUBLIC_API_ROUTES = new Set<string>([
   // Endpoint itself is hardened (SSRF-safe, image-only responses).
   "GET /api/logo-proxy",
   // Daily cron orchestrator - self-auths via CRON_SECRET (Vercel migration).
+  // Vercel Cron sends GET. Manual tools can send POST.
+  "GET /api/cron/daily-orchestrator",
+  "POST /api/cron/daily-orchestrator",
+  // The fact scrape backstop uses the same CRON_SECRET gate in cron.ts.
+  // Vercel sends GET. Manual tools can send POST.
+  "GET /api/cron/fact-scrape-backstop",
+  "POST /api/cron/fact-scrape-backstop",
+  // Daily cron orchestrator - self-auths via CRON_SECRET (Vercel migration).
   "POST /api/cron/daily-orchestrator",
   // Public pricing catalogue. /pricing is a marketing page served to logged-
   // OUT visitors, so gating these two made it fall back to the hardcoded
