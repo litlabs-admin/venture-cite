@@ -224,28 +224,10 @@ export function InfoDot({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Hover card used by the platform strip. Mirrors the reference's 192px card:
- *  eyebrow with accent dot, big figure over /100, one line of prose, and an
- *  accent call-to-action. */
-export function HoverCard({
-  align = "left",
-  children,
-}: {
-  align?: "left" | "center";
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={`pointer-events-none absolute bottom-full z-50 mb-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 ${
-        align === "center" ? "left-1/2 -translate-x-1/2" : "left-0"
-      }`}
-    >
-      <div className="w-48 rounded border border-vc-default bg-vc-surface px-3 py-2.5 shadow-vc-overlay">
-        {children}
-      </div>
-    </div>
-  );
-}
+// `HoverCard` lived here - the 192px card the platform strip raised on hover.
+// Removed on request along with its only caller (PlatformStrip.tsx): the cards
+// covered the panels behind them, and the numbers they showed are one click
+// away on the results page each cell already links to. Nothing else used it.
 
 /** Skeleton bar in the dashboard's register - no shimmer, just a quiet block
  *  at the exact height of the text it replaces. */
