@@ -653,6 +653,14 @@ describe("POST /api/dashboard/perception/:brandId/run", () => {
       questioned: ["price"],
       evidenceCount: 1,
       model: "gpt-4o",
+      // This stub row predates the evidence columns, standing in for every run
+      // scored before migration 0115. It must serialize to explicit nulls -
+      // the client keys off those to HIDE the evidence panel, so silently
+      // omitting them would make an old score look like it has quotes behind
+      // it that were never captured.
+      evidence: null,
+      evidencePlatforms: null,
+      axisNotes: null,
       createdAt: insertedCreatedAt.toISOString(),
     });
   });

@@ -1552,6 +1552,12 @@ export function setupDashboardRoutes(app: Express): void {
       questioned: row.questioned,
       evidenceCount: row.evidenceCount,
       model: row.model,
+      // Null on runs written before migration 0115. The client renders the
+      // score without the evidence panel in that case rather than implying
+      // quotes exist that were never captured.
+      evidence: (row.evidence ?? null) as Array<{ text: string; platform: string }> | null,
+      evidencePlatforms: row.evidencePlatforms ?? null,
+      axisNotes: (row.axisNotes ?? null) as Record<string, string> | null,
       createdAt: row.createdAt.toISOString(),
     };
   }

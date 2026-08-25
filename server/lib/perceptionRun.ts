@@ -92,6 +92,13 @@ export async function runPerceptionScoring(brand: {
       questioned: result.questioned,
       evidenceCount: result.evidenceCount,
       model: result.model,
+      // Keep the quotes that produced the score so the number is auditable.
+      // Capped at 12: enough for the reader to check the verdict, small enough
+      // that the row stays a row. `evidenceCount` above remains the FULL count,
+      // so "scored from 20 snippets, 12 shown" stays truthful.
+      evidence: evidence.slice(0, 12).map((e) => ({ text: e.text, platform: e.platform })),
+      evidencePlatforms: Array.from(new Set(evidence.map((e) => e.platform))),
+      axisNotes: result.axisNotes,
     })
     .returning();
 

@@ -106,6 +106,47 @@ describe("PerceptionPage - null axes", () => {
   });
 });
 
+describe("PerceptionPage - evidence behind the score", () => {
+  const withEvidence = {
+    ...fullyScored,
+    value: null,
+    evidenceCount: 17,
+    evidence: [
+      { text: "Strong reputation for responsive support.", platform: "Perplexity" },
+      { text: "Frequently named alongside larger incumbents.", platform: "ChatGPT" },
+    ],
+    evidencePlatforms: ["Perplexity", "ChatGPT"],
+    axisNotes: { value: "No excerpt discussed pricing or cost." },
+  };
+
+  it("quotes what AI actually said, attributed to the engine that said it", () => {
+    renderWithData(withEvidence);
+    expect(screen.getByText("Strong reputation for responsive support.")).toBeTruthy();
+    expect(screen.getByText("Frequently named alongside larger incumbents.")).toBeTruthy();
+    expect(screen.getByText("What AI Actually Said")).toBeTruthy();
+  });
+
+  it("says the panel is a sample when fewer excerpts are shown than were scored", () => {
+    renderWithData(withEvidence);
+    // 2 quotes stored, 17 excerpts scored. Claiming "17 excerpts" above two
+    // quotes would misrepresent the panel as the whole basis of the score.
+    expect(screen.getByText(/2 of 17 excerpts/)).toBeTruthy();
+    expect(screen.getByText(/Perplexity, ChatGPT/)).toBeTruthy();
+  });
+
+  it("explains a null axis instead of leaving an uninterpretable blank", () => {
+    renderWithData(withEvidence);
+    expect(screen.getByText("No excerpt discussed pricing or cost.")).toBeTruthy();
+  });
+
+  it("hides the panel entirely for runs scored before evidence was captured", () => {
+    // fullyScored has no evidence fields at all - the pre-migration shape.
+    // The section must be absent, not an empty panel implying lost quotes.
+    renderWithData(fullyScored);
+    expect(screen.queryByText("What AI Actually Said")).toBeNull();
+  });
+});
+
 describe("PerceptionPage - never scored", () => {
   it("renders the empty state with no error", () => {
     renderWithData(null);

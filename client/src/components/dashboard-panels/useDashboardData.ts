@@ -197,6 +197,16 @@ export interface Perception {
   questioned: string[];
   evidenceCount: number;
   model: string | null;
+  /** The actual excerpts the score was drawn from, so a reader can check the
+   *  number instead of taking it on faith. Capped server-side at 12 while
+   *  `evidenceCount` stays the full total. Null on runs scored before this was
+   *  captured - the UI hides the panel rather than implying quotes exist. */
+  evidence: Array<{ text: string; platform: string }> | null;
+  /** Which engines those excerpts came from. */
+  evidencePlatforms: string[] | null;
+  /** `{axis: reason}` for each axis the judge returned null on, so a blank
+   *  reads as "nothing was said about pricing" rather than "this is broken". */
+  axisNotes: Record<string, string> | null;
   createdAt: string;
   /** `overall` of the last up-to-7 runs, OLDEST first, for the sparkline.
    *  Empty until a brand has been scored at least once. */

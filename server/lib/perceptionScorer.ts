@@ -6,30 +6,20 @@
 // never a guessed/middling number.
 
 import OpenAI from "openai";
-import { attachAiLogger } from "./aiLogger";
 import { MODELS } from "./modelConfig";
+import { getOpenrouterClient } from "./factAgent/v2/openrouterClient";
+import { safeParseJson } from "./safeParseJson";
 import { LLM_CALL_TIMEOUT_MS } from "./factAgent/v2/vercelBudget";
 
-// Constructed LAZILY, on first scoring call - never at import time.
-//
-// server/routes/dashboard.ts imports this module, so an eager `new OpenAI()`
-// here made merely IMPORTING the dashboard routes throw "Missing credentials"
-// whenever OPENAI_API_KEY was absent. That broke every unit test touching
-// those routes (siteHealth, dashboardRecommendationInputs) and would equally
-// break any environment that boots the API without an OpenAI key - a missing
-// LLM key should disable scoring, not the dashboard.
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) {
-    _openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      timeout: LLM_CALL_TIMEOUT_MS,
-      maxRetries: 1,
-    });
-    attachAiLogger(_openai);
-  }
-  return _openai;
-}
+// The scoring client is resolved LAZILY, on first scoring call - never at
+// import time. server/routes/dashboard.ts imports this module, so an eager
+// client construction here made merely IMPORTING the dashboard routes throw
+// "Missing credentials" whenever the key was absent. That broke every unit
+// test touching those routes (siteHealth, dashboardRecommendationInputs) and
+// would equally break any environment that boots the API without an LLM key -
+// a missing key should disable scoring, not the dashboard. `OpenAI` survives
+// here only as the injected-client TYPE for tests; the real call goes through
+// getOpenrouterClient().
 
 // Same delimiter used by hallucinationDetector.ts / competitorDiscovery.ts -
 // geo_rankings.citation_context is stored as
@@ -234,6 +224,9 @@ export interface ScoreBrandPerceptionResult extends PerceptionScore {
   overall: number | null;
   evidenceCount: number;
   model: string | null;
+  /** Why each null axis could not be judged, keyed by axis name. Only ever
+   *  contains entries for axes that ARE null. */
+  axisNotes: Record<string, string>;
 }
 
 /**
@@ -244,7 +237,7 @@ export interface ScoreBrandPerceptionResult extends PerceptionScore {
 export async function scoreBrandPerception({
   brandName,
   evidence,
-  // Default resolved at CALL time, not import time - see getOpenAI().
+  // Default resolved at CALL time, not import time - see the note above.
   client,
 }: {
   brandName: string;
@@ -263,6 +256,9 @@ export async function scoreBrandPerception({
       questioned: [],
       evidenceCount: 0,
       model: null,
+      axisNotes: Object.fromEntries(
+        PERCEPTION_AXES.map((a) => [a, "No answer mentioning this brand was captured yet."]),
+      ),
     };
   }
 
@@ -270,19 +266,42 @@ export async function scoreBrandPerception({
     .map((e, i) => `[${i + 1}] (${e.platform}): """${e.text}"""`)
     .join("\n\n");
 
-  const completion = await (client ?? getOpenAI()).chat.completions.create({
-    model: MODELS.misc,
-    temperature: 0,
-    response_format: { type: "json_object" },
-    max_tokens: 900,
-    messages: [
-      {
-        role: "system",
-        content: `You are a brand perception analyst. You will be given excerpts of what various AI models actually said when asked about the brand "${brandName}". Score the brand's perception ONLY from these excerpts.
+  // PROJECT POLICY: analysis-tier calls go through OpenRouter (see
+  // modelConfig.ts). This module was the last one still on a direct
+  // gpt-4o-mini OpenAI client. `client` is still honoured so the tests can
+  // inject a stub; only the default path moved.
+  const resolved = client ?? getOpenrouterClient();
+  if (!resolved) {
+    return {
+      trust: null,
+      quality: null,
+      value: null,
+      market: null,
+      innovation: null,
+      overall: null,
+      praised: [],
+      questioned: [],
+      evidenceCount: evidence.length,
+      model: null,
+      axisNotes: {},
+    };
+  }
+
+  const completion = await resolved.chat.completions.create(
+    {
+      model: MODELS.perceptionScoring,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      max_tokens: 1400,
+      messages: [
+        {
+          role: "system",
+          content: `You are a brand perception analyst. You will be given excerpts of what various AI models actually said when asked about the brand "${brandName}". Score the brand's perception ONLY from these excerpts.
 
 HARD RULES:
 - Score ONLY from the supplied excerpts. Do NOT use outside knowledge about the brand and do NOT guess.
 - If an axis cannot be judged from the evidence, return null for that axis. Do NOT default to a middling number (e.g. 50) when unsure.
+- For EVERY axis you return as null, add an entry to "axisNotes" saying in one short sentence what was missing, e.g. "No excerpt discussed pricing or cost." Never use a note to smuggle in a judgement.
 - "praised" and "questioned" must be short noun phrases quoted or closely paraphrased FROM the excerpts - never invented.
 
 Axes (each a number 0-100 with ONE DECIMAL of precision, e.g. 66.6, or null):
@@ -293,23 +312,43 @@ Axes (each a number 0-100 with ONE DECIMAL of precision, e.g. 66.6, or null):
 - innovation: perceived innovativeness
 
 Return STRICT JSON exactly in this shape:
-{"trust": number|null, "quality": number|null, "value": number|null, "market": number|null, "innovation": number|null, "praised": string[], "questioned": string[]}`,
-      },
-      {
-        role: "user",
-        content: `Excerpts:\n\n${evidenceBlock}`,
-      },
-    ],
-  });
+{"trust": number|null, "quality": number|null, "value": number|null, "market": number|null, "innovation": number|null, "praised": string[], "questioned": string[], "axisNotes": {"<axis>": "<why it could not be judged>"}}`,
+        },
+        {
+          role: "user",
+          content: `Excerpts:\n\n${evidenceBlock}`,
+        },
+      ],
+    },
+    // The timeout used to live on the per-module OpenAI client that this call
+    // replaced. It moves here rather than being dropped - a hung scoring call
+    // must not hold the request open indefinitely.
+    { signal: AbortSignal.timeout(LLM_CALL_TIMEOUT_MS) },
+  );
 
   const raw = completion.choices[0]?.message?.content ?? "";
   const scored = parseScoreResponse(raw);
   const overall = computeOverall(scored);
 
+  // Keep a note only for an axis that actually came back null, so a stray note
+  // about a scored axis cannot contradict the number next to it.
+  const parsedNotes = safeParseJson<{ axisNotes?: Record<string, unknown> }>(raw)?.axisNotes ?? {};
+  const axisNotes: Record<string, string> = {};
+  for (const axis of PERCEPTION_AXES) {
+    if (scored[axis] === null) {
+      const note = parsedNotes[axis];
+      axisNotes[axis] =
+        typeof note === "string" && note.trim()
+          ? note.trim().slice(0, 300)
+          : "Not enough in the captured answers to judge this.";
+    }
+  }
+
   return {
     ...scored,
     overall,
     evidenceCount: evidence.length,
-    model: MODELS.misc,
+    model: MODELS.perceptionScoring,
+    axisNotes,
   };
 }

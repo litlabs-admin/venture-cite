@@ -58,6 +58,10 @@ export const MODELS = {
   audienceGeneration: ANALYSIS_MODEL,
   // Set Health audit (server/lib/promptSetHealthAuditor.ts).
   promptSetHealth: ANALYSIS_MODEL,
+  // Brand perception scoring (server/lib/perceptionScorer.ts). Was the last
+  // module still on a direct gpt-4o-mini OpenAI client; moved onto the
+  // analysis tier with the rest.
+  perceptionScoring: ANALYSIS_MODEL,
   // Competitor discovery - both the profile inference and the
   // citation-mining pass. Both call sites must use this key: they share
   // one OpenRouter client, so a bare OpenAI snapshot name would 404.

@@ -2408,6 +2408,17 @@ export const brandPerceptionRuns = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     evidenceCount: integer("evidence_count").notNull().default(0),
+    // Migration 0115. The snippets that produced the score, so the number is
+    // auditable instead of asserted - [{text, platform}], capped application
+    // side. Null on rows written before the column existed; the UI shows the
+    // score without the evidence panel for those rather than inventing quotes.
+    evidence: jsonb("evidence"),
+    // Which platforms contributed evidence, so the UI can say how broadly the
+    // score is backed rather than implying all six agreed.
+    evidencePlatforms: text("evidence_platforms").array(),
+    // Why an axis came back null, keyed by axis name. An unjudged axis is a
+    // real result ("no answer discussed pricing"), not a rendering gap.
+    axisNotes: jsonb("axis_notes"),
     model: text("model"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

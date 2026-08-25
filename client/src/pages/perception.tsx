@@ -63,7 +63,17 @@ function Chip({ children, tone }: { children: React.ReactNode; tone: "praised" |
 /** Category score column: large text-stat number over a full-width bar,
  *  matching the reference's layout. The bar is below the label. Null axes
  *  never draw a bar or a fabricated number - a dash and no track. */
-function CategoryScoreColumn({ label, value }: { label: string; value: number | null }) {
+function CategoryScoreColumn({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: number | null;
+  /** Why this axis is blank. Only present for null axes on runs scored after
+   *  notes were captured; older runs fall back to the generic title text. */
+  note?: string;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <span className="text-label uppercase tracking-wider text-vc-label">{label}</span>
@@ -80,13 +90,60 @@ function CategoryScoreColumn({ label, value }: { label: string; value: number | 
           </div>
         </>
       ) : (
-        <span
-          className="text-stat font-semibold leading-none text-vc-hover"
-          title="The judge could not assess this axis from the available evidence"
-        >
-          <NoValue className="text-stat font-semibold" />
-        </span>
+        <>
+          <span
+            className="text-stat font-semibold leading-none text-vc-hover"
+            title={note ?? "The judge could not assess this axis from the available evidence"}
+          >
+            <NoValue className="text-stat font-semibold" />
+          </span>
+          {/* A blank with no explanation reads as a bug. Spell out that nothing
+              was said about this axis, when we know that. */}
+          {note && <span className="text-label leading-snug text-vc-tertiary">{note}</span>}
+        </>
       )}
+    </div>
+  );
+}
+
+/** The excerpts the score was actually drawn from. Renders only when a run
+ *  captured them - never a placeholder implying quotes we do not have. */
+function EvidencePanel({
+  evidence,
+  evidenceCount,
+  platforms,
+}: {
+  evidence: Array<{ text: string; platform: string }>;
+  evidenceCount: number;
+  platforms: string[];
+}) {
+  const shown = evidence.length;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <PanelLabel>What AI Actually Said</PanelLabel>
+        <span className="text-label text-vc-tertiary">
+          {/* Say plainly when the panel is a sample of a larger set, so the
+              reader never mistakes 12 quotes for the whole basis of the score. */}
+          {shown < evidenceCount
+            ? `${shown} of ${evidenceCount} excerpts`
+            : `${evidenceCount} ${evidenceCount === 1 ? "excerpt" : "excerpts"}`}
+          {platforms.length > 0 && ` · ${platforms.join(", ")}`}
+        </span>
+      </div>
+      <div className="mt-4 space-y-3">
+        {evidence.map((e, i) => (
+          <blockquote
+            key={`${e.platform}-${i}`}
+            className="border-l-2 border-vc-accent/40 pl-4 text-body leading-relaxed text-vc-label"
+          >
+            {e.text}
+            <cite className="mt-1 block text-label not-italic uppercase tracking-wider text-vc-tertiary">
+              {e.platform}
+            </cite>
+          </blockquote>
+        ))}
+      </div>
     </div>
   );
 }
@@ -448,10 +505,25 @@ export default function PerceptionPage() {
             <PanelLabel>Category Scores</PanelLabel>
             <div className="mt-4 grid grid-cols-2 gap-6 md:grid-cols-5">
               {AXES.map(([key, label]) => (
-                <CategoryScoreColumn key={key} label={label} value={perception[key]} />
+                <CategoryScoreColumn
+                  key={key}
+                  label={label}
+                  value={perception[key]}
+                  note={perception.axisNotes?.[key]}
+                />
               ))}
             </div>
           </div>
+
+          {/* The evidence behind the score. Only rendered for runs that stored
+              it - older runs keep their score and simply omit this section. */}
+          {perception.evidence && perception.evidence.length > 0 && (
+            <EvidencePanel
+              evidence={perception.evidence}
+              evidenceCount={evidenceCount}
+              platforms={perception.evidencePlatforms ?? []}
+            />
+          )}
 
           {/* Perception over time */}
           <div>
