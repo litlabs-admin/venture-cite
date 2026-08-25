@@ -337,6 +337,22 @@ export async function runFullScrapeForBrand(
               llm,
               robotsCache,
             });
+            // Write the per-page result back. Without this the row inserted
+            // above stays "pending" with a null status_code and factCount 0
+            // forever, even though the fetch succeeded and the run's own
+            // totals (pagesFetched / factsExtracted) are correct - so the
+            // Site Health Pages tab showed a full page list with "-" status
+            // and 0 facts for every row. The slice route
+            // (routes/factSheetV2.ts) always did this; this path, used by
+            // onboarding, the cron refresh and manual backfills, never did.
+            await storage.updateScrapePageStatus(p.pageId, outcome.status as never, {
+              bytes: outcome.bytes,
+              statusCode: outcome.statusCode,
+              lang: outcome.diagnostics.lang,
+              factCount: outcome.facts.length,
+              errorKind: outcome.errorKind,
+              errorMessage: outcome.errorMessage,
+            });
             if (outcome.facts.length > 0) {
               await persistFacts(outcome.facts, {
                 brandId: brand.id,
@@ -387,6 +403,22 @@ export async function runFullScrapeForBrand(
               { err, runId: activeRunId, pageId: p.pageId },
               "runFullScrape: page failed",
             );
+            // Same reason as the success path above: a page that threw must
+            // not be left sitting at "pending", or the UI cannot tell a page
+            // that failed apart from one that was never attempted. Best
+            // effort - if this write itself fails there is nothing further to
+            // do, and it must not take down the rest of the queue.
+            try {
+              await storage.updateScrapePageStatus(p.pageId, "failed" as never, {
+                errorKind: "exception",
+                errorMessage: (err as Error)?.message?.slice(0, 500) ?? "unknown",
+              });
+            } catch (markErr) {
+              logger.warn(
+                { markErr, runId: activeRunId, pageId: p.pageId },
+                "runFullScrape: could not mark page failed",
+              );
+            }
           }
         });
 
