@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   ArrowDown,
   ArrowUp,
@@ -153,6 +154,7 @@ export function PromptsTable({
   const [dragId, setDragId] = useState<string | null>(null);
   const [dir, setDir] = useState<"asc" | "desc">("desc");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const [editDraft, setEditDraft] = useState("");
 
   const close = () => setOpenMenu(null);
@@ -437,10 +439,17 @@ export function PromptsTable({
               onDragStart={() => canDrag && setDragId(p.id)}
               onDragOver={(e) => canDrag && e.preventDefault()}
               onDrop={() => canDrag && handleDrop(p.id)}
-              // No row click: the per-prompt detail page it opened is gone.
-              // cursor-pointer goes with it - a pointer over a row that does
-              // nothing is a promise the table can no longer keep.
-              className={`group flex h-11 w-full min-w-0 items-center gap-1.5 overflow-hidden border-b border-vc-subtle px-4 transition-colors duration-150 hover:bg-vc-muted/50 ${
+              // Row click opens the per-prompt detail page. That page was
+              // deleted once, which is why this handler and its cursor were
+              // removed; /prompts/$promptId exists again, so the row leads
+              // somewhere and the pointer is honest once more.
+              //
+              // Suppressed mid-edit: clicking into the inline title field must
+              // not navigate away from the edit.
+              onClick={() => {
+                if (editingId !== p.id) navigate({ to: `/prompts/${p.id}` as never });
+              }}
+              className={`group flex h-11 w-full min-w-0 cursor-pointer items-center gap-1.5 overflow-hidden border-b border-vc-subtle px-4 transition-colors duration-150 hover:bg-vc-muted/50 ${
                 dragId === p.id ? "opacity-40" : ""
               }`}
             >
