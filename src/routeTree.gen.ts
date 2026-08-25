@@ -57,6 +57,8 @@ import { Route as AppContentArticleIdRouteImport } from './routes/_app/content.$
 import { Route as AppPromptsIndexRouteImport } from './routes/_app/prompts.index'
 import { Route as AppPromptsPromptIdRouteImport } from './routes/_app/prompts.$promptId'
 import { Route as AppAdminScrapeRunIdRouteImport } from './routes/_app/admin.scrape.$runId'
+import { Route as AppPromptsPromptIdIndexRouteImport } from './routes/_app/prompts.$promptId.index'
+import { Route as AppPromptsPromptIdDiagnoseRouteImport } from './routes/_app/prompts.$promptId.diagnose'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -297,6 +299,17 @@ const AppAdminScrapeRunIdRoute = AppAdminScrapeRunIdRouteImport.update({
   path: '/$runId',
   getParentRoute: () => AppAdminScrapeRoute,
 } as any)
+const AppPromptsPromptIdIndexRoute = AppPromptsPromptIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppPromptsPromptIdRoute,
+} as any)
+const AppPromptsPromptIdDiagnoseRoute =
+  AppPromptsPromptIdDiagnoseRouteImport.update({
+    id: '/diagnose',
+    path: '/diagnose',
+    getParentRoute: () => AppPromptsPromptIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -343,9 +356,11 @@ export interface FileRoutesByFullPath {
   '/webhooks/$': typeof WebhooksSplatRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
-  '/prompts/$promptId': typeof AppPromptsPromptIdRoute
+  '/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
   '/prompts/': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
+  '/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
+  '/prompts/$promptId/': typeof AppPromptsPromptIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -391,9 +406,10 @@ export interface FileRoutesByTo {
   '/webhooks/$': typeof WebhooksSplatRoute
   '/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/content/$articleId': typeof AppContentArticleIdRoute
-  '/prompts/$promptId': typeof AppPromptsPromptIdRoute
   '/prompts': typeof AppPromptsIndexRoute
   '/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
+  '/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
+  '/prompts/$promptId': typeof AppPromptsPromptIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -442,9 +458,11 @@ export interface FileRoutesById {
   '/webhooks/$': typeof WebhooksSplatRoute
   '/_app/admin/scrape': typeof AppAdminScrapeRouteWithChildren
   '/_app/content/$articleId': typeof AppContentArticleIdRoute
-  '/_app/prompts/$promptId': typeof AppPromptsPromptIdRoute
+  '/_app/prompts/$promptId': typeof AppPromptsPromptIdRouteWithChildren
   '/_app/prompts/': typeof AppPromptsIndexRoute
   '/_app/admin/scrape/$runId': typeof AppAdminScrapeRunIdRoute
+  '/_app/prompts/$promptId/diagnose': typeof AppPromptsPromptIdDiagnoseRoute
+  '/_app/prompts/$promptId/': typeof AppPromptsPromptIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -496,6 +514,8 @@ export interface FileRouteTypes {
     | '/prompts/$promptId'
     | '/prompts/'
     | '/admin/scrape/$runId'
+    | '/prompts/$promptId/diagnose'
+    | '/prompts/$promptId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -541,9 +561,10 @@ export interface FileRouteTypes {
     | '/webhooks/$'
     | '/admin/scrape'
     | '/content/$articleId'
-    | '/prompts/$promptId'
     | '/prompts'
     | '/admin/scrape/$runId'
+    | '/prompts/$promptId/diagnose'
+    | '/prompts/$promptId'
   id:
     | '__root__'
     | '/'
@@ -594,6 +615,8 @@ export interface FileRouteTypes {
     | '/_app/prompts/$promptId'
     | '/_app/prompts/'
     | '/_app/admin/scrape/$runId'
+    | '/_app/prompts/$promptId/diagnose'
+    | '/_app/prompts/$promptId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -946,6 +969,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminScrapeRunIdRouteImport
       parentRoute: typeof AppAdminScrapeRoute
     }
+    '/_app/prompts/$promptId/': {
+      id: '/_app/prompts/$promptId/'
+      path: '/'
+      fullPath: '/prompts/$promptId/'
+      preLoaderRoute: typeof AppPromptsPromptIdIndexRouteImport
+      parentRoute: typeof AppPromptsPromptIdRoute
+    }
+    '/_app/prompts/$promptId/diagnose': {
+      id: '/_app/prompts/$promptId/diagnose'
+      path: '/diagnose'
+      fullPath: '/prompts/$promptId/diagnose'
+      preLoaderRoute: typeof AppPromptsPromptIdDiagnoseRouteImport
+      parentRoute: typeof AppPromptsPromptIdRoute
+    }
   }
 }
 
@@ -961,13 +998,26 @@ const AppContentRouteWithChildren = AppContentRoute._addFileChildren(
   AppContentRouteChildren,
 )
 
+interface AppPromptsPromptIdRouteChildren {
+  AppPromptsPromptIdDiagnoseRoute: typeof AppPromptsPromptIdDiagnoseRoute
+  AppPromptsPromptIdIndexRoute: typeof AppPromptsPromptIdIndexRoute
+}
+
+const AppPromptsPromptIdRouteChildren: AppPromptsPromptIdRouteChildren = {
+  AppPromptsPromptIdDiagnoseRoute: AppPromptsPromptIdDiagnoseRoute,
+  AppPromptsPromptIdIndexRoute: AppPromptsPromptIdIndexRoute,
+}
+
+const AppPromptsPromptIdRouteWithChildren =
+  AppPromptsPromptIdRoute._addFileChildren(AppPromptsPromptIdRouteChildren)
+
 interface AppPromptsRouteChildren {
-  AppPromptsPromptIdRoute: typeof AppPromptsPromptIdRoute
+  AppPromptsPromptIdRoute: typeof AppPromptsPromptIdRouteWithChildren
   AppPromptsIndexRoute: typeof AppPromptsIndexRoute
 }
 
 const AppPromptsRouteChildren: AppPromptsRouteChildren = {
-  AppPromptsPromptIdRoute: AppPromptsPromptIdRoute,
+  AppPromptsPromptIdRoute: AppPromptsPromptIdRouteWithChildren,
   AppPromptsIndexRoute: AppPromptsIndexRoute,
 }
 

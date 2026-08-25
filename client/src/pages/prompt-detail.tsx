@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Stethoscope, X } from "lucide-react";
 import { useBrandSelection } from "@/hooks/use-brand-selection";
 import {
   useAllPrompts,
@@ -143,35 +143,45 @@ export default function PromptDetailPage() {
         >
           <X className="h-3.5 w-3.5" /> Prompts
         </CCLink>
-        {tracked.length > 0 && (
-          <div className="flex items-center gap-2 text-data text-vc-tertiary">
-            <span className="tabular-nums">
-              {posIndex >= 0 ? posIndex + 1 : "–"} of {tracked.length}
-            </span>
-            <button
-              type="button"
-              disabled={posIndex <= 0}
-              onClick={() =>
-                posIndex > 0 && navigate({ to: `/prompts/${tracked[posIndex - 1].id}` as never })
-              }
-              className="flex h-6 w-6 items-center justify-center rounded hover:bg-vc-muted/60 disabled:opacity-30"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              disabled={posIndex < 0 || posIndex >= tracked.length - 1}
-              onClick={() =>
-                posIndex >= 0 &&
-                posIndex < tracked.length - 1 &&
-                navigate({ to: `/prompts/${tracked[posIndex + 1].id}` as never })
-              }
-              className="flex h-6 w-6 items-center justify-center rounded hover:bg-vc-muted/60 disabled:opacity-30"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {/* Opens the per-question report: who wins this question instead, which
+              sources the models lean on, and what to do about it. */}
+          <CCLink
+            dest={{ to: `/prompts/${promptId}/diagnose` }}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-vc-default px-2.5 text-data font-medium text-vc-secondary transition-colors hover:border-vc-accent hover:text-vc-accent"
+          >
+            <Stethoscope className="h-3.5 w-3.5" aria-hidden /> Diagnose
+          </CCLink>
+          {tracked.length > 0 && (
+            <div className="flex items-center gap-2 text-data text-vc-tertiary">
+              <span className="tabular-nums">
+                {posIndex >= 0 ? posIndex + 1 : "–"} of {tracked.length}
+              </span>
+              <button
+                type="button"
+                disabled={posIndex <= 0}
+                onClick={() =>
+                  posIndex > 0 && navigate({ to: `/prompts/${tracked[posIndex - 1].id}` as never })
+                }
+                className="flex h-6 w-6 items-center justify-center rounded hover:bg-vc-muted/60 disabled:opacity-30"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                disabled={posIndex < 0 || posIndex >= tracked.length - 1}
+                onClick={() =>
+                  posIndex >= 0 &&
+                  posIndex < tracked.length - 1 &&
+                  navigate({ to: `/prompts/${tracked[posIndex + 1].id}` as never })
+                }
+                className="flex h-6 w-6 items-center justify-center rounded hover:bg-vc-muted/60 disabled:opacity-30"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {detailLoading || !prompt ? (

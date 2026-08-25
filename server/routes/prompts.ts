@@ -24,6 +24,7 @@ import { generateSuggestedPrompts } from "../lib/suggestionGenerator";
 import { generatePromptAudiences } from "../lib/audienceGenerator";
 import { runPromptSetHealthAudit } from "../lib/promptSetHealthAuditor";
 import { generatePhrasings } from "../lib/phrasingGenerator";
+import { diagnosePrompt } from "../lib/promptDiagnose";
 import { aiLimitMiddleware, sendError, asyncHandler } from "../lib/routesShared";
 import { detectBrandAndCompetitors, matchEntity, extractDomain } from "../lib/brandMatcher";
 import { logger } from "../lib/logger";
@@ -375,6 +376,30 @@ export function setupPromptsRoutes(app: Express): void {
         res.json({ success: true, data: updated });
       } catch (error) {
         sendError(res, error, "Failed to update prompt paused state");
+      }
+    }),
+  );
+
+  // Per-question diagnosis for the /prompts/$promptId/diagnose page - counts
+  // rivals/sources from stored citation results and asks the model for a
+  // verdict + fixes grounded in those counts. Registered ahead of the
+  // single-prompt GET below so the literal `/diagnose` suffix reads clearly
+  // as its own route (Express would not shadow it either way).
+  app.get(
+    "/api/brand-prompts/:brandId/prompts/:promptId/diagnose",
+    aiLimitMiddleware,
+    asyncHandler(async (req, res) => {
+      try {
+        const user = requireUser(req);
+        const brand = await requireBrand(req.params.brandId, user.id);
+        const row = await storage.getBrandPromptById(req.params.promptId);
+        if (!row || row.brandId !== brand.id) {
+          return res.status(404).json({ success: false, error: "Prompt not found" });
+        }
+        const data = await diagnosePrompt(brand, row);
+        res.json({ success: true, data });
+      } catch (error) {
+        sendError(res, error, "Failed to diagnose prompt");
       }
     }),
   );
