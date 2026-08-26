@@ -436,7 +436,7 @@ function PerceptionPanel({
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-3 flex h-4 items-center justify-between">
             <PanelLabel>Perception</PanelLabel>
-            <PanelLink dest={DEST.mentions}>Details</PanelLink>
+            <PanelLink dest={DEST.perception}>Details</PanelLink>
           </div>
           <div className="flex flex-1 gap-6">
             <div className="flex flex-shrink-0 flex-col">
@@ -488,7 +488,7 @@ function PerceptionPanel({
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="mb-3 flex h-4 items-center justify-between">
           <PanelLabel>Perception</PanelLabel>
-          <PanelLink dest={DEST.mentions}>Details</PanelLink>
+          <PanelLink dest={DEST.perception}>Details</PanelLink>
         </div>
 
         {loading || perceptionLoading ? (

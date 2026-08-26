@@ -44,6 +44,11 @@ export const DEST = {
   signals: { to: "/diagnose", search: { tab: "signals" } },
   crawler: { to: "/diagnose", search: { tab: "crawler" } },
   siteHealth: { to: "/site-health" },
+  // The Perception panel's own page (score + evidence + the asked-directly
+  // probe matrix). Before this entry existed the panel's "Details" link had
+  // nowhere of its own to point and used `mentions`, landing the reader on
+  // /monitor?tab=mentions - a different metric entirely.
+  perception: { to: "/perception" },
   actions: { to: "/act" },
   settings: { to: "/settings" },
 } as const;
