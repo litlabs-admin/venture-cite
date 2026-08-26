@@ -10,6 +10,7 @@ import {
   numeric,
   index,
   uniqueIndex,
+  unique,
   boolean,
   primaryKey,
   uuid,
@@ -2428,6 +2429,82 @@ export const brandPerceptionRuns = pgTable(
 );
 export type BrandPerceptionRun = typeof brandPerceptionRuns.$inferSelect;
 export type InsertBrandPerceptionRun = typeof brandPerceptionRuns.$inferInsert;
+
+// ── Perception probes (migration 0116) ─────────────────────────────────
+// Mirrors migrations/0116_perception_probes.sql exactly.
+//
+// brandPerceptionRuns above INFERS perception from the answers to citation
+// prompts - text that is not about the brand, which is why `value` was null on
+// nearly every run (a "best agencies for X" answer rarely discusses pricing).
+// These two tables back the opposite approach: ASK each engine five
+// purpose-written questions, one per axis, and score each engine's own answers
+// separately. Shares no inputs with the derived score; both are kept because
+// they answer different questions.
+export const brandPerceptionProbeRuns = pgTable(
+  "brand_perception_probe_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    // pending | running | succeeded | partial | failed. 'partial' is a real
+    // outcome, not a failure mode: one engine timing out must not throw away
+    // the five that answered.
+    status: text("status").notNull().default("pending"),
+    probesTotal: integer("probes_total").notNull().default(0),
+    probesDone: integer("probes_done").notNull().default(0),
+    triggeredBy: text("triggered_by").notNull().default("manual"),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("brand_perception_probe_runs_brand_id_idx").on(table.brandId),
+    index("brand_perception_probe_runs_started_at_idx").on(table.startedAt.desc()),
+  ],
+);
+
+export const brandPerceptionProbes = pgTable(
+  "brand_perception_probes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => brandPerceptionProbeRuns.id, { onDelete: "cascade" }),
+    brandId: varchar("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    axis: text("axis").notNull(),
+    // The exact question asked, stored per row rather than rebuilt from a
+    // template at read time - if the wording is tuned later, an old row must
+    // still show what was actually asked to produce its score.
+    question: text("question").notNull(),
+    // pending | asked | scored | failed
+    status: text("status").notNull().default("pending"),
+    answer: text("answer"),
+    sources: jsonb("sources"),
+    score: numeric("score", { precision: 4, scale: 1 }),
+    // The engine said it had no information about this brand. Distinct from a
+    // failed call and from a low score - "nobody has heard of you" and "people
+    // think poorly of you" are opposite findings, and a DB CHECK makes the
+    // "confident score from an admitted non-answer" state unstorable.
+    noInformation: boolean("no_information").notNull().default(false),
+    note: text("note"),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("brand_perception_probes_run_id_idx").on(table.runId),
+    index("brand_perception_probes_run_status_idx").on(table.runId, table.status),
+    unique("brand_perception_probes_unique_cell").on(table.runId, table.platform, table.axis),
+  ],
+);
+
+export type BrandPerceptionProbeRun = typeof brandPerceptionProbeRuns.$inferSelect;
+export type BrandPerceptionProbe = typeof brandPerceptionProbes.$inferSelect;
+
 export type SystemState = typeof systemState.$inferSelect;
 
 // ── Site health scan history (migration 0094) ──────────────────────────

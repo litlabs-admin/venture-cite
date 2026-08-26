@@ -25,10 +25,22 @@ import {
 } from "../lib/crawlerAccess";
 import { logger } from "../lib/logger";
 import { db } from "../db";
-import { sql, desc, eq, and } from "drizzle-orm";
-import { brandFactScrapePages, brandPerceptionRuns, siteHealthFindingStatus } from "@shared/schema";
+import { sql, desc, eq, and, inArray } from "drizzle-orm";
+import {
+  brandFactScrapePages,
+  brandPerceptionRuns,
+  brandPerceptionProbeRuns,
+  brandPerceptionProbes,
+  siteHealthFindingStatus,
+} from "@shared/schema";
 import { aiLimitMiddleware } from "../lib/routesShared";
 import { runPerceptionScoring } from "../lib/perceptionRun";
+import { startPerceptionProbeRun, advancePerceptionProbeRun } from "../lib/perceptionProbes";
+
+// One slice of a probe run. A full pass is 6 engines x (5 grounded calls + 1
+// judge call); this bounds how much of that a single /advance request takes on
+// before handing control back so the client can render progress.
+const PROBE_SLICE_MS = 25_000;
 import { detectPlatform } from "../lib/platformDetect";
 import { discoverSitemapUrls } from "../lib/factAgent/v2/sitemapDiscovery";
 import { safeFetchText } from "../lib/ssrf";
@@ -1656,6 +1668,141 @@ export function setupDashboardRoutes(app: Express): void {
         res.json({ success: true, data: serializePerceptionRun(inserted) });
       } catch (error) {
         sendError(res, error, "Failed to run brand perception scoring");
+      }
+    }),
+  );
+
+  // ── Perception probes (migration 0116) ──────────────────────────────────
+  // The endpoints above score perception INFERRED from citation answers. These
+  // three drive the pipeline that ASKS each engine directly. Same kickoff /
+  // advance / read shape as citation runs, because a full pass is 30 grounded
+  // calls and cannot complete inside one request.
+
+  // GET - latest probe run plus its matrix. Read only, no LLM.
+  app.get(
+    "/api/dashboard/perception/probes/:brandId",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const [run] = await db
+          .select()
+          .from(brandPerceptionProbeRuns)
+          .where(eq(brandPerceptionProbeRuns.brandId, brand.id))
+          .orderBy(desc(brandPerceptionProbeRuns.startedAt))
+          .limit(1);
+
+        if (!run) return res.json({ success: true, data: null });
+
+        const probes = await db
+          .select()
+          .from(brandPerceptionProbes)
+          .where(eq(brandPerceptionProbes.runId, run.id));
+
+        res.json({
+          success: true,
+          data: {
+            runId: run.id,
+            status: run.status,
+            probesDone: run.probesDone,
+            probesTotal: run.probesTotal,
+            startedAt: run.startedAt.toISOString(),
+            completedAt: run.completedAt ? run.completedAt.toISOString() : null,
+            errorMessage: run.errorMessage,
+            probes: probes.map((p) => ({
+              platform: p.platform,
+              axis: p.axis,
+              question: p.question,
+              status: p.status,
+              answer: p.answer,
+              sources: (p.sources ?? []) as Array<{ url: string }>,
+              // numeric comes back as a string from the driver - convert here,
+              // never in the client, so one place owns the conversion.
+              score: p.score === null ? null : Number(p.score),
+              noInformation: p.noInformation,
+              note: p.note,
+              errorMessage: p.errorMessage,
+            })),
+          },
+        });
+      } catch (error) {
+        sendError(res, error, "Failed to load perception probes");
+      }
+    }),
+  );
+
+  // POST - create a run and its pending probe rows, then return immediately.
+  app.post(
+    "/api/dashboard/perception/probes/:brandId/run",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        // Refuse to stack runs: a second in-flight run would double the spend
+        // and race the first one's rows.
+        const [active] = await db
+          .select()
+          .from(brandPerceptionProbeRuns)
+          .where(
+            and(
+              eq(brandPerceptionProbeRuns.brandId, brand.id),
+              inArray(brandPerceptionProbeRuns.status, ["pending", "running"]),
+            ),
+          )
+          .limit(1);
+        if (active) {
+          return res.json({
+            success: true,
+            data: { runId: active.id, alreadyRunning: true },
+          });
+        }
+
+        const { runId, probesTotal } = await startPerceptionProbeRun(brand);
+        res.json({ success: true, data: { runId, probesTotal, alreadyRunning: false } });
+      } catch (error) {
+        sendError(res, error, "Failed to start a perception probe run");
+      }
+    }),
+  );
+
+  // POST - do as much of the run as fits in one slice. Polled by the client,
+  // and backed up by cron so a closed tab does not strand a run.
+  app.post(
+    "/api/dashboard/perception/probes/:brandId/advance",
+    asyncHandler(async (req, res) => {
+      try {
+        const brand = await requireOwnedBrand(req);
+        if (!brand) return res.status(404).json({ success: false, error: "Brand not found" });
+
+        const runId = String(req.body?.runId ?? "");
+        if (!runId) {
+          return res.status(400).json({ success: false, error: "runId is required" });
+        }
+        // Verify the run belongs to this brand before touching it - the brand
+        // is ownership-checked, the runId in the body is not.
+        const [run] = await db
+          .select()
+          .from(brandPerceptionProbeRuns)
+          .where(
+            and(
+              eq(brandPerceptionProbeRuns.id, runId),
+              eq(brandPerceptionProbeRuns.brandId, brand.id),
+            ),
+          )
+          .limit(1);
+        if (!run) return res.status(404).json({ success: false, error: "Run not found" });
+
+        const result = await advancePerceptionProbeRun(
+          brand,
+          runId,
+          Date.now() + PROBE_SLICE_MS,
+          brand.userId ?? undefined,
+        );
+        res.json({ success: true, data: result });
+      } catch (error) {
+        sendError(res, error, "Failed to advance the perception probe run");
       }
     }),
   );

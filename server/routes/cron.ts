@@ -39,6 +39,7 @@ import { refundArticleQuota } from "../lib/usageLimit";
 import { runArticleSlice } from "../contentGenerationWorker";
 import { setupStripeProducts } from "../setupProducts";
 import { advanceCitationRun } from "../citationChecker";
+import { advancePerceptionProbeRun } from "../lib/perceptionProbes";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import { and, inArray, lt } from "drizzle-orm";
@@ -82,6 +83,10 @@ const STEP_CAPS_MS = {
   "resume-in-flight-autopilots": 10_000,
   "drain-pending-content-jobs": 8_000,
   "drain-pending-citation-runs": 10_000,
+  // One engine of a probe run is 5 grounded calls plus a judge call, and the
+  // slice runner only checks the clock between engines - so the cap has to fit
+  // at least one whole engine or the step can never make progress.
+  "drain-pending-perception-probe-runs": 10_000,
   "content-cost-outbox-drain": 20_000,
   "account-purge": 5_000,
   "brand-purge": 5_000,
@@ -249,6 +254,42 @@ async function drainPendingCitationRuns(
   return { progressed: true, runId, status: result.status };
 }
 
+// Backstop for perception probe runs. The browser drives its own run with
+// repeated /advance calls, but a closed tab mid-run would otherwise strand it
+// with answers stored and no scores. Same shape as the citation drain above:
+// one stale still-active run per tick, one slice.
+async function drainPendingPerceptionProbeRuns(
+  deadlineMs: number,
+): Promise<{ progressed: boolean; runId?: string; status?: string }> {
+  const stale = await db
+    .select({
+      id: schema.brandPerceptionProbeRuns.id,
+      brandId: schema.brandPerceptionProbeRuns.brandId,
+    })
+    .from(schema.brandPerceptionProbeRuns)
+    .where(
+      and(
+        inArray(schema.brandPerceptionProbeRuns.status, ["pending", "running"]),
+        // A live run gets an /advance from the browser every few seconds, so
+        // anything untouched for 2 minutes has lost its driver.
+        lt(schema.brandPerceptionProbeRuns.startedAt, new Date(Date.now() - 120_000)),
+      ),
+    )
+    .limit(1);
+
+  if (stale.length === 0) return { progressed: false };
+  const brand = await storage.getBrandById(stale[0].brandId);
+  if (!brand) return { progressed: false };
+  const sliceDeadline = Math.min(deadlineMs - 500, Date.now() + 8000);
+  const result = await advancePerceptionProbeRun(
+    brand,
+    stale[0].id,
+    sliceDeadline,
+    brand.userId ?? undefined,
+  );
+  return { progressed: true, runId: stale[0].id, status: result.status };
+}
+
 async function failStuckContentJobsForOrchestrator(): Promise<{ failed: number }> {
   const stale = await storage.failStuckContentJobs(60);
   for (const j of stale) {
@@ -302,6 +343,9 @@ export function setupCronRoutes(app: Express): void {
       await orch.run("drain-pending-content-jobs", (deadline) => drainPendingContentJobs(deadline));
       await orch.run("drain-pending-citation-runs", (deadline) =>
         drainPendingCitationRuns(deadline),
+      );
+      await orch.run("drain-pending-perception-probe-runs", (deadline) =>
+        drainPendingPerceptionProbeRuns(deadline),
       );
       await orch.run("content-cost-outbox-drain", (deadlineMs) =>
         runContentCostOutboxDrain({ maxCommands: 25, deadlineMs, leaseSeconds: 60 }),

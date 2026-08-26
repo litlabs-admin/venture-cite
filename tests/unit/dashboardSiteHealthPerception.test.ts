@@ -120,7 +120,12 @@ const perceptionStubs = vi.hoisted(() => ({
   scoreBrandPerception: vi.fn(),
 }));
 
-vi.mock("../../server/lib/perceptionScorer", () => ({
+// Partial mock: only the two LLM-touching functions are stubbed. The module
+// also exports PERCEPTION_AXES, which the probe pipeline (reached through
+// dashboard.ts) reads at import time - a total mock silently drops it and the
+// whole route module fails to load.
+vi.mock("../../server/lib/perceptionScorer", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../server/lib/perceptionScorer")>()),
   gatherEvidence: perceptionStubs.gatherEvidence,
   scoreBrandPerception: perceptionStubs.scoreBrandPerception,
 }));

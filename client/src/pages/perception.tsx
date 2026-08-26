@@ -5,6 +5,7 @@ import { useBrandSelection } from "@/hooks/use-brand-selection";
 import { apiRequest, queryClient, ApiError } from "@/lib/queryClient";
 import { PanelLabel, NoValue, Delta } from "@/components/dashboard-panels/primitives";
 import type { Perception, PlatformRank } from "@/components/dashboard-panels/useDashboardData";
+import { ProbeMatrix, type ProbeRun } from "@/components/perception/ProbeMatrix";
 
 // ─── Perception detail page ─────────────────────────────────────────────────
 // Destination of the dashboard Perception panel's "Details ›" link. Reference
@@ -302,6 +303,66 @@ export default function PerceptionPage() {
   });
   const platforms = rankingsQuery.data?.data?.platforms ?? [];
 
+  // ── Probes: ask each engine directly ──────────────────────────────────────
+  // A full pass is 30 web-grounded calls and cannot finish inside one request,
+  // so this kicks off a run and then drives it with repeated /advance slices -
+  // the same shape citation runs use. Cron also advances stragglers, so
+  // closing the tab mid-run does not strand it.
+  const probesKey = [`/api/dashboard/perception/probes/${selectedBrandId}`];
+  const [probeError, setProbeError] = useState<string | null>(null);
+  const [driving, setDriving] = useState(false);
+
+  const probesQuery = useQuery<{ success: boolean; data: ProbeRun | null }>({
+    queryKey: probesKey,
+    enabled: !!selectedBrandId,
+    // Poll only while a run is actually in flight - a settled run is static,
+    // and polling it forever would be a background request per user per few
+    // seconds for no new data.
+    refetchInterval: (q) => {
+      const s = q.state.data?.data?.status;
+      return s === "pending" || s === "running" ? 4000 : false;
+    },
+  });
+  const probeRun = probesQuery.data?.data ?? null;
+
+  const probeMutation = useMutation({
+    mutationFn: async () => {
+      setProbeError(null);
+      const startRes = await apiRequest(
+        "POST",
+        `/api/dashboard/perception/probes/${selectedBrandId}/run`,
+      );
+      const started = (await startRes.json()) as { data?: { runId?: string } };
+      const runId = started?.data?.runId;
+      if (!runId) throw new Error("Could not start a probe run.");
+
+      setDriving(true);
+      // Drive to completion. Each slice does whole engines server-side and
+      // returns progress; the loop is bounded so a server that never reports
+      // `done` cannot spin forever.
+      for (let i = 0; i < 20; i++) {
+        const res = await apiRequest(
+          "POST",
+          `/api/dashboard/perception/probes/${selectedBrandId}/advance`,
+          { runId },
+        );
+        const body = (await res.json()) as { data?: { done?: boolean } };
+        queryClient.invalidateQueries({ queryKey: probesKey });
+        if (body?.data?.done) break;
+      }
+      return runId;
+    },
+    onSettled: () => {
+      setDriving(false);
+      queryClient.invalidateQueries({ queryKey: probesKey });
+    },
+    onError: (error: unknown) => {
+      setProbeError(
+        error instanceof Error ? error.message : "The probe run failed. Try again shortly.",
+      );
+    },
+  });
+
   const runMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/dashboard/perception/${selectedBrandId}/run`);
@@ -356,6 +417,19 @@ export default function PerceptionPage() {
     </div>
   );
 
+  // Rendered in EVERY branch below, including the two empty states. A brand
+  // with no citation evidence is exactly the brand whose owner most needs to
+  // know what the engines say when asked outright - gating this behind the
+  // derived score would hide it from the people it helps most.
+  const probeSection = (
+    <ProbeMatrix
+      run={probeRun}
+      onRun={() => probeMutation.mutate()}
+      running={driving || probeMutation.isPending}
+      error={probeError}
+    />
+  );
+
   if (brandsLoading || isLoading) {
     return (
       <div className="min-h-screen bg-vc-page px-8 py-8">
@@ -383,165 +457,171 @@ export default function PerceptionPage() {
         {reScoreButton}
       </div>
 
-      {!perception ? (
-        // NEVER SCORED - no run row exists at all. A first-class empty
-        // state, not an error.
-        <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-vc-default py-16 text-center">
-          <p className="text-body text-vc-tertiary">
-            This brand has never been scored for perception.
-          </p>
-          <p className="text-data text-vc-hover">
-            Run a scoring pass to see how AI describes {selectedBrand?.name ?? "this brand"} across
-            trust, quality, value, market, and innovation.
-          </p>
-        </div>
-      ) : evidenceCount === 0 ? (
-        // SCORED, NO EVIDENCE - a run happened, but the brand was never
-        // named in any stored AI answer, so there was nothing to judge.
-        // Distinct from "never scored": this tells the user WHY it's empty
-        // and what changes it, instead of rendering a dashboard of dashes.
-        <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-vc-default py-16 text-center">
-          <p className="text-body text-vc-tertiary">
-            No AI answer named {selectedBrand?.name ?? "this brand"} yet, so there is nothing to
-            score.
-          </p>
-          <p className="text-data text-vc-hover">
-            Perception is judged only from AI answers that mention the brand. Once{" "}
-            {selectedBrand?.name ?? "this brand"} is cited in an AI answer, re-score to see trust,
-            quality, value, market, and innovation.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-10">
-          {/* Hero: score · rank · vs average · 7-day change */}
-          <div className="grid grid-cols-2 gap-8 border-b border-vc-default pb-8 md:grid-cols-4">
-            <div className="flex flex-col">
-              <PanelLabel>Perception Score</PanelLabel>
-              {perception.overall !== null ? (
-                <span className="mt-2 text-stat font-semibold leading-none tabular-nums text-vc-accent">
-                  {fmt0(perception.overall)}
+      <div className="space-y-10">
+        {!perception ? (
+          // NEVER SCORED - no run row exists at all. A first-class empty
+          // state, not an error.
+          <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-vc-default py-16 text-center">
+            <p className="text-body text-vc-tertiary">
+              This brand has never been scored for perception.
+            </p>
+            <p className="text-data text-vc-hover">
+              Run a scoring pass to see how AI describes {selectedBrand?.name ?? "this brand"}{" "}
+              across trust, quality, value, market, and innovation.
+            </p>
+          </div>
+        ) : evidenceCount === 0 ? (
+          // SCORED, NO EVIDENCE - a run happened, but the brand was never
+          // named in any stored AI answer, so there was nothing to judge.
+          // Distinct from "never scored": this tells the user WHY it's empty
+          // and what changes it, instead of rendering a dashboard of dashes.
+          <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-vc-default py-16 text-center">
+            <p className="text-body text-vc-tertiary">
+              No AI answer named {selectedBrand?.name ?? "this brand"} yet, so there is nothing to
+              score.
+            </p>
+            <p className="text-data text-vc-hover">
+              Perception is judged only from AI answers that mention the brand. Once{" "}
+              {selectedBrand?.name ?? "this brand"} is cited in an AI answer, re-score to see trust,
+              quality, value, market, and innovation.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {/* Hero: score · rank · vs average · 7-day change */}
+            <div className="grid grid-cols-2 gap-8 border-b border-vc-default pb-8 md:grid-cols-4">
+              <div className="flex flex-col">
+                <PanelLabel>Perception Score</PanelLabel>
+                {perception.overall !== null ? (
+                  <span className="mt-2 text-stat font-semibold leading-none tabular-nums text-vc-accent">
+                    {fmt0(perception.overall)}
+                  </span>
+                ) : (
+                  <span className="mt-2">
+                    <NoValue className="text-stat font-semibold leading-none" />
+                  </span>
+                )}
+                <span className="mt-2 text-data text-vc-label">
+                  How AI models perceive your brand
                 </span>
-              ) : (
+              </div>
+              <div className="flex flex-col">
+                <PanelLabel>Rank</PanelLabel>
                 <span className="mt-2">
-                  <NoValue className="text-stat font-semibold leading-none" />
+                  <NoValue className="text-page font-semibold leading-none" />
                 </span>
-              )}
-              <span className="mt-2 text-data text-vc-label">
-                How AI models perceive your brand
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <PanelLabel>Rank</PanelLabel>
-              <span className="mt-2">
-                <NoValue className="text-page font-semibold leading-none" />
-              </span>
-              <span className="mt-2 text-data text-vc-label">No cross-account ranking data</span>
-            </div>
-            <div className="flex flex-col">
-              <PanelLabel>Vs Average</PanelLabel>
-              <span className="mt-2">
-                <NoValue className="text-page font-semibold leading-none" />
-              </span>
-              <span className="mt-2 text-data text-vc-label">No benchmark data available</span>
-            </div>
-            <div className="flex flex-col">
-              <PanelLabel>7-Day Change</PanelLabel>
-              <span className="mt-2 text-page font-semibold leading-none">
-                <Delta value={change} digits={1} />
-              </span>
-              <span className="mt-2 text-data text-vc-label">
-                {evidenceCount} {evidenceCount === 1 ? "excerpt" : "excerpts"} cited
-              </span>
-            </div>
-          </div>
-
-          {/* How AI describes you */}
-          <div>
-            <div className="flex items-baseline justify-between">
-              <PanelLabel>How AI Describes You</PanelLabel>
-              <span className="text-data text-vc-tertiary">The words AI actually uses</span>
-            </div>
-            <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div>
-                <p className="mb-2 text-label uppercase tracking-wider text-vc-label">Praised</p>
-                {praised.length === 0 ? (
-                  <p className="text-data text-vc-hover">
-                    Nothing praised was distinguishable in the available evidence.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {praised.map((p, i) => (
-                      <Chip key={`${p}-${i}`} tone="praised">
-                        {p}
-                      </Chip>
-                    ))}
-                  </div>
-                )}
+                <span className="mt-2 text-data text-vc-label">No cross-account ranking data</span>
               </div>
-              <div>
-                <p className="mb-2 text-label uppercase tracking-wider text-vc-label">Questioned</p>
-                {questioned.length === 0 ? (
-                  <p className="text-data text-vc-hover">
-                    Nothing questioned was distinguishable in the available evidence.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {questioned.map((q, i) => (
-                      <Chip key={`${q}-${i}`} tone="questioned">
-                        {q}
-                      </Chip>
-                    ))}
-                  </div>
-                )}
+              <div className="flex flex-col">
+                <PanelLabel>Vs Average</PanelLabel>
+                <span className="mt-2">
+                  <NoValue className="text-page font-semibold leading-none" />
+                </span>
+                <span className="mt-2 text-data text-vc-label">No benchmark data available</span>
+              </div>
+              <div className="flex flex-col">
+                <PanelLabel>7-Day Change</PanelLabel>
+                <span className="mt-2 text-page font-semibold leading-none">
+                  <Delta value={change} digits={1} />
+                </span>
+                <span className="mt-2 text-data text-vc-label">
+                  {evidenceCount} {evidenceCount === 1 ? "excerpt" : "excerpts"} cited
+                </span>
               </div>
             </div>
-          </div>
 
-          {/* Category scores: five large text-stat numbers, each over a
+            {/* How AI describes you */}
+            <div>
+              <div className="flex items-baseline justify-between">
+                <PanelLabel>How AI Describes You</PanelLabel>
+                <span className="text-data text-vc-tertiary">The words AI actually uses</span>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div>
+                  <p className="mb-2 text-label uppercase tracking-wider text-vc-label">Praised</p>
+                  {praised.length === 0 ? (
+                    <p className="text-data text-vc-hover">
+                      Nothing praised was distinguishable in the available evidence.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {praised.map((p, i) => (
+                        <Chip key={`${p}-${i}`} tone="praised">
+                          {p}
+                        </Chip>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="mb-2 text-label uppercase tracking-wider text-vc-label">
+                    Questioned
+                  </p>
+                  {questioned.length === 0 ? (
+                    <p className="text-data text-vc-hover">
+                      Nothing questioned was distinguishable in the available evidence.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {questioned.map((q, i) => (
+                        <Chip key={`${q}-${i}`} tone="questioned">
+                          {q}
+                        </Chip>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Category scores: five large text-stat numbers, each over a
               full-width bar (see docs/optimize-perception-reference.md
               "Rebuild decisions" - the reference puts the bar UNDER the
               label, not beside it, unlike the dashboard's compact panel). */}
-          <div>
-            <PanelLabel>Category Scores</PanelLabel>
-            <div className="mt-4 grid grid-cols-2 gap-6 md:grid-cols-5">
-              {AXES.map(([key, label]) => (
-                <CategoryScoreColumn
-                  key={key}
-                  label={label}
-                  value={perception[key]}
-                  note={perception.axisNotes?.[key]}
-                />
-              ))}
+            <div>
+              <PanelLabel>Category Scores</PanelLabel>
+              <div className="mt-4 grid grid-cols-2 gap-6 md:grid-cols-5">
+                {AXES.map(([key, label]) => (
+                  <CategoryScoreColumn
+                    key={key}
+                    label={label}
+                    value={perception[key]}
+                    note={perception.axisNotes?.[key]}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* The evidence behind the score. Only rendered for runs that stored
+            {/* The evidence behind the score. Only rendered for runs that stored
               it - older runs keep their score and simply omit this section. */}
-          {perception.evidence && perception.evidence.length > 0 && (
-            <EvidencePanel
-              evidence={perception.evidence}
-              evidenceCount={evidenceCount}
-              platforms={perception.evidencePlatforms ?? []}
-            />
-          )}
+            {perception.evidence && perception.evidence.length > 0 && (
+              <EvidencePanel
+                evidence={perception.evidence}
+                evidenceCount={evidenceCount}
+                platforms={perception.evidencePlatforms ?? []}
+              />
+            )}
 
-          {/* Perception over time */}
-          <div>
-            <PanelLabel>Perception Over Time</PanelLabel>
-            <div className="mt-4 rounded border border-vc-default p-6">
-              <PerceptionOverTime history={history} overall={perception.overall} />
+            {/* Perception over time */}
+            <div>
+              <PanelLabel>Perception Over Time</PanelLabel>
+              <div className="mt-4 rounded border border-vc-default p-6">
+                <PerceptionOverTime history={history} overall={perception.overall} />
+              </div>
+            </div>
+
+            {/* AI model breakdown */}
+            <div>
+              <PanelLabel>AI Model Breakdown</PanelLabel>
+              <div className="mt-4">
+                <AiModelBreakdown platforms={platforms} loading={rankingsQuery.isLoading} />
+              </div>
             </div>
           </div>
+        )}
 
-          {/* AI model breakdown */}
-          <div>
-            <PanelLabel>AI Model Breakdown</PanelLabel>
-            <div className="mt-4">
-              <AiModelBreakdown platforms={platforms} loading={rankingsQuery.isLoading} />
-            </div>
-          </div>
-        </div>
-      )}
+        {probeSection}
+      </div>
     </div>
   );
 }
