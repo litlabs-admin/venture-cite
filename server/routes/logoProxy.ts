@@ -15,6 +15,26 @@ const ALLOWED_CONTENT_TYPE_PREFIXES = ["image/"];
 const ALLOWED_CONTENT_TYPE_SUBSTRINGS = ["icon"];
 const CACHE_SECONDS = 60 * 60 * 24; // 1 day browser cache
 
+// Upstream simply has no icon for plenty of real domains (Google's favicon
+// service 404s on pcworld.com, for one). The callers are bare <img> tags with
+// no onError, so a 404 there costs a broken-image glyph in the UI and a red
+// console line on every dashboard load - noise that trains you to ignore the
+// console. Serve a neutral transparent icon instead: for an ICON endpoint,
+// "no icon available" is a legitimate answer, not a fabricated one.
+//
+// Scoped deliberately to the upstream-has-nothing case. A malformed request
+// (400), a non-image body (415), and a fetch that actually threw (502) all
+// still fail loudly - those are our problems, not upstream's, and hiding them
+// would be the dishonest kind of silence.
+const FALLBACK_ICON = Buffer.from(
+  "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+  "base64",
+);
+
+/** Sent when we fall back, so this is greppable in logs/devtools rather than
+ *  masquerading as a real upstream icon. */
+const FALLBACK_HEADER = "X-Logo-Fallback";
+
 export function setupLogoProxyRoutes(app: Express) {
   app.get(
     "/api/logo-proxy",
@@ -45,7 +65,11 @@ export function setupLogoProxyRoutes(app: Express) {
           timeoutMs: 6_000,
         });
         if (status < 200 || status >= 300) {
-          res.status(404).end();
+          res.setHeader("Content-Type", "image/gif");
+          res.setHeader("Cache-Control", `public, max-age=${CACHE_SECONDS}`);
+          res.setHeader("X-Content-Type-Options", "nosniff");
+          res.setHeader(FALLBACK_HEADER, "1");
+          res.status(200).send(FALLBACK_ICON);
           return;
         }
         const ct = contentType.toLowerCase();
