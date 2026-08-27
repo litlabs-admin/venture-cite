@@ -677,6 +677,61 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(schema.geoRankings.checkedAt));
   }
 
+  async getPromptCitationCounts(
+    promptIds: string[],
+  ): Promise<Array<{ brandPromptId: string | null; checks: number; cited: number }>> {
+    if (promptIds.length === 0) return [];
+    return await db
+      .select({
+        brandPromptId: schema.geoRankings.brandPromptId,
+        checks: sql<number>`count(*)::int`,
+        cited: sql<number>`count(*) filter (where is_cited = 1)::int`,
+      })
+      .from(schema.geoRankings)
+      .where(inArray(schema.geoRankings.brandPromptId, promptIds))
+      .groupBy(schema.geoRankings.brandPromptId);
+  }
+
+  async getCitedRelevanceStats(
+    promptIds: string[],
+  ): Promise<{ cited: number; scored: number; avgRelevance: number | null }> {
+    if (promptIds.length === 0) return { cited: 0, scored: 0, avgRelevance: null };
+    const [result] = await db
+      .select({
+        cited: sql<number>`count(*) filter (where is_cited = 1)::int`,
+        scored: sql<number>`count(relevance_score) filter (where is_cited = 1)::int`,
+        avgRelevance: sql<
+          number | null
+        >`(avg(relevance_score) filter (where is_cited = 1))::float8`,
+      })
+      .from(schema.geoRankings)
+      .where(inArray(schema.geoRankings.brandPromptId, promptIds));
+    return result ?? { cited: 0, scored: 0, avgRelevance: null };
+  }
+
+  async getWeeklyCitationTrend(
+    promptIds: string[],
+    since: Date,
+  ): Promise<Array<{ weekStart: string; total: number; cited: number }>> {
+    if (promptIds.length === 0) return [];
+    const weekStart = sql<string>`date_trunc('week', ${schema.geoRankings.checkedAt})::date`;
+    return await db
+      .select({
+        weekStart,
+        total: sql<number>`count(*)::int`,
+        cited: sql<number>`count(*) filter (where is_cited = 1)::int`,
+      })
+      .from(schema.geoRankings)
+      .where(
+        and(
+          inArray(schema.geoRankings.brandPromptId, promptIds),
+          gte(schema.geoRankings.checkedAt, since),
+        ),
+      )
+      .groupBy(weekStart)
+      .orderBy(weekStart);
+  }
+
   async getGeoRankingsByArticleIds(ids: string[], sinceDate?: Date): Promise<GeoRanking[]> {
     if (ids.length === 0) return [];
     const conditions = [inArray(schema.geoRankings.articleId, ids)];
@@ -2201,6 +2256,23 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(schema.competitorGeoRankings)
       .where(and(...conditions))
+      .orderBy(desc(schema.competitorGeoRankings.checkedAt));
+  }
+
+  async getCompetitorGeoRankingsForCompetitors(
+    competitorIds: string[],
+    opts: { since: Date },
+  ): Promise<CompetitorGeoRanking[]> {
+    if (competitorIds.length === 0) return [];
+    return await db
+      .select()
+      .from(schema.competitorGeoRankings)
+      .where(
+        and(
+          inArray(schema.competitorGeoRankings.competitorId, competitorIds),
+          gte(schema.competitorGeoRankings.checkedAt, opts.since),
+        ),
+      )
       .orderBy(desc(schema.competitorGeoRankings.checkedAt));
   }
 

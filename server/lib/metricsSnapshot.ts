@@ -29,12 +29,12 @@ export async function recordCurrentMetrics(
     metricDetails: { totalChecks: runStats.totalChecks, totalCited: runStats.totalCited },
   } as any);
 
-  // Fetch prompts + rankings ONCE - reused by the visibility_score
-  // (per-prompt) snapshot and the citation_quality snapshot below.
+  // Fetch prompts and aggregate rankings for the visibility_score and
+  // citation_quality snapshots below.
   const prompts = await storage.getBrandPromptsByBrandId(brandId);
   const promptIds = prompts.map((p) => p.id);
-  const rankings =
-    promptIds.length > 0 ? await storage.getGeoRankingsByBrandPromptIds(promptIds) : [];
+  const citationCounts =
+    promptIds.length > 0 ? await storage.getPromptCitationCounts(promptIds) : [];
 
   // 2. visibility_score - REQUIRED. Both the dashboard hero delta
   // (server/routes/dashboard.ts → getMetricsHistory("visibility_score"))
@@ -48,16 +48,13 @@ export async function recordCurrentMetrics(
   // diffs run-over-run. (Fully reconciling metricValue with the dashboard
   // composite score is a separate, documented follow-up.)
   const byPromptMap = new Map<string, { promptId: string; cited: number; checks: number }>();
-  for (const r of rankings) {
+  for (const r of citationCounts) {
     if (!r.brandPromptId) continue;
-    const e = byPromptMap.get(r.brandPromptId) ?? {
+    byPromptMap.set(r.brandPromptId, {
       promptId: r.brandPromptId,
-      cited: 0,
-      checks: 0,
-    };
-    e.checks += 1;
-    if (r.isCited === 1) e.cited += 1;
-    byPromptMap.set(r.brandPromptId, e);
+      cited: r.cited,
+      checks: r.checks,
+    });
   }
   await storage.createMetricsSnapshot({
     brandId,
@@ -72,17 +69,13 @@ export async function recordCurrentMetrics(
 
   // 3. Citation quality - average relevance_score across cited rankings in this run.
   if (promptIds.length > 0) {
-    const cited = rankings.filter((r) => r.isCited === 1);
-    const withRelevance = cited.filter((r) => typeof (r as any).relevanceScore === "number");
-    if (withRelevance.length > 0) {
-      const avgRelevance =
-        withRelevance.reduce((sum, r) => sum + ((r as any).relevanceScore as number), 0) /
-        withRelevance.length;
+    const { cited, scored, avgRelevance } = await storage.getCitedRelevanceStats(promptIds);
+    if (scored > 0 && avgRelevance !== null) {
       await storage.createMetricsSnapshot({
         brandId,
         metricType: "citation_quality",
         metricValue: avgRelevance.toFixed(2),
-        metricDetails: { cited: cited.length, scored: withRelevance.length },
+        metricDetails: { cited, scored },
       } as any);
     }
   }

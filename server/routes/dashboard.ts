@@ -910,59 +910,73 @@ export function setupDashboardRoutes(app: Express): void {
         })) as Competitor[];
         const topCompetitors = competitors.slice(0, 6);
 
-        const competitorRows = await Promise.all(
-          topCompetitors.map(async (comp) => {
-            const cgr = await storage
-              .getCompetitorGeoRankings(comp.id, { since: new Date(Date.now() - 30 * 86400000) })
-              .catch(() => [] as Awaited<ReturnType<typeof storage.getCompetitorGeoRankings>>);
-            const cellCounts: Record<string, { cited: number; total: number }> = {};
-            for (const c of categories) cellCounts[c] = { cited: 0, total: 0 };
-            for (const r of cgr) {
-              const cat = (r.brandPromptId && promptIdToCategory.get(r.brandPromptId)) || "General";
-              const bucket = cellCounts[cat];
-              if (!bucket) continue;
-              bucket.total += 1;
-              if (r.isCited === 1) bucket.cited += 1;
-            }
-            const cells: Record<string, "yes" | "no" | "partial" | "unknown"> = {};
-            const cellDiffs: Record<string, number> = {};
-            let totalMentions = 0;
-            let gapCount = 0;
-            // Gap threshold - only call a category a "gap" when the competitor
-            // has at least this many more citations than the brand. Prevents
-            // "competitor cited once, brand cited zero" from registering as
-            // dominance. Tune per-product as the citation volume grows.
-            const GAP_THRESHOLD = 2;
-            for (const c of categories) {
-              const b = cellCounts[c];
-              const state =
-                b.total === 0
-                  ? "unknown"
-                  : b.cited === 0
-                    ? "no"
-                    : b.cited === b.total
-                      ? "yes"
-                      : "partial";
-              cells[c] = state;
-              totalMentions += b.cited;
-              // Magnitude gap: competitor cited count minus brand cited count
-              // in the same category. Positive = competitor ahead.
-              const brandBucket = brandCellCounts[c] ?? { cited: 0, total: 0 };
-              const diff = b.cited - brandBucket.cited;
-              cellDiffs[c] = diff;
-              if (diff >= GAP_THRESHOLD) gapCount += 1;
-            }
-            return {
-              entityType: "competitor" as const,
-              entityId: comp.id,
-              name: comp.name,
-              totalMentions,
-              cells,
-              cellDiffs,
-              gapCount,
-            };
-          }),
-        );
+        const competitorRankings =
+          topCompetitors.length > 0
+            ? await storage
+                .getCompetitorGeoRankingsForCompetitors(
+                  topCompetitors.map((comp) => comp.id),
+                  {
+                    since: new Date(Date.now() - 30 * 86400000),
+                  },
+                )
+                .catch(() => [])
+            : [];
+        const rankingsByCompetitorId = new Map<string, typeof competitorRankings>();
+        for (const ranking of competitorRankings) {
+          const rankings = rankingsByCompetitorId.get(ranking.competitorId) ?? [];
+          rankings.push(ranking);
+          rankingsByCompetitorId.set(ranking.competitorId, rankings);
+        }
+
+        const competitorRows = topCompetitors.map((comp) => {
+          const cgr = rankingsByCompetitorId.get(comp.id) ?? [];
+          const cellCounts: Record<string, { cited: number; total: number }> = {};
+          for (const c of categories) cellCounts[c] = { cited: 0, total: 0 };
+          for (const r of cgr) {
+            const cat = (r.brandPromptId && promptIdToCategory.get(r.brandPromptId)) || "General";
+            const bucket = cellCounts[cat];
+            if (!bucket) continue;
+            bucket.total += 1;
+            if (r.isCited === 1) bucket.cited += 1;
+          }
+          const cells: Record<string, "yes" | "no" | "partial" | "unknown"> = {};
+          const cellDiffs: Record<string, number> = {};
+          let totalMentions = 0;
+          let gapCount = 0;
+          // Gap threshold - only call a category a "gap" when the competitor
+          // has at least this many more citations than the brand. Prevents
+          // "competitor cited once, brand cited zero" from registering as
+          // dominance. Tune per-product as the citation volume grows.
+          const GAP_THRESHOLD = 2;
+          for (const c of categories) {
+            const b = cellCounts[c];
+            const state =
+              b.total === 0
+                ? "unknown"
+                : b.cited === 0
+                  ? "no"
+                  : b.cited === b.total
+                    ? "yes"
+                    : "partial";
+            cells[c] = state;
+            totalMentions += b.cited;
+            // Magnitude gap: competitor cited count minus brand cited count
+            // in the same category. Positive = competitor ahead.
+            const brandBucket = brandCellCounts[c] ?? { cited: 0, total: 0 };
+            const diff = b.cited - brandBucket.cited;
+            cellDiffs[c] = diff;
+            if (diff >= GAP_THRESHOLD) gapCount += 1;
+          }
+          return {
+            entityType: "competitor" as const,
+            entityId: comp.id,
+            name: comp.name,
+            totalMentions,
+            cells,
+            cellDiffs,
+            gapCount,
+          };
+        });
 
         // Brand row always last (highlighted in UI).
         const brandTotal = Object.values(brandCellCounts).reduce((a, b) => a + b.cited, 0);
@@ -1002,10 +1016,8 @@ export function setupDashboardRoutes(app: Express): void {
         const since = new Date(Date.now() - WEEKS * 7 * 24 * 60 * 60 * 1000);
         const prompts = await storage.getBrandPromptsByBrandId(brand.id);
         const promptIds = prompts.map((p) => p.id);
-        const rankings =
-          promptIds.length > 0
-            ? await storage.getGeoRankingsByBrandPromptIds(promptIds, since)
-            : [];
+        const weeklyTrend =
+          promptIds.length > 0 ? await storage.getWeeklyCitationTrend(promptIds, since) : [];
 
         // Monday-anchored weeks, labelled by the week's start date.
         const weekStartOf = (d: Date) => {
@@ -1025,12 +1037,11 @@ export function setupDashboardRoutes(app: Express): void {
           d.setUTCDate(d.getUTCDate() - i * 7);
           buckets.set(d.toISOString().slice(0, 10), { cited: 0, total: 0 });
         }
-        for (const r of rankings) {
-          const key = weekStartOf(r.checkedAt).toISOString().slice(0, 10);
-          const b = buckets.get(key);
+        for (const row of weeklyTrend) {
+          const b = buckets.get(row.weekStart);
           if (!b) continue;
-          b.total += 1;
-          if (r.isCited === 1) b.cited += 1;
+          b.total = row.total;
+          b.cited = row.cited;
         }
 
         const series = Array.from(buckets.entries()).map(([weekStart, b]) => ({

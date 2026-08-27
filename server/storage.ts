@@ -192,6 +192,19 @@ export interface IStorage {
   getGeoRankingsByPlatform(platform: string): Promise<GeoRanking[]>;
   countCitedRankingsForArticle(articleId: string): Promise<number>;
   getGeoRankingsByBrandPromptIds(ids: string[], sinceDate?: Date): Promise<GeoRanking[]>;
+  /** Aggregate citation counts per prompt. */
+  getPromptCitationCounts(
+    promptIds: string[],
+  ): Promise<Array<{ brandPromptId: string | null; checks: number; cited: number }>>;
+  /** Aggregate cited relevance scores for prompts. */
+  getCitedRelevanceStats(
+    promptIds: string[],
+  ): Promise<{ cited: number; scored: number; avgRelevance: number | null }>;
+  /** Aggregate weekly citation counts for prompts. */
+  getWeeklyCitationTrend(
+    promptIds: string[],
+    since: Date,
+  ): Promise<Array<{ weekStart: string; total: number; cited: number }>>;
   getGeoRankingsByArticleIds(ids: string[], sinceDate?: Date): Promise<GeoRanking[]>;
   updateGeoRanking(id: string, update: Partial<GeoRanking>): Promise<GeoRanking | undefined>;
 
@@ -420,6 +433,11 @@ export interface IStorage {
   getCompetitorGeoRankings(
     competitorId: string,
     opts?: { runId?: string; since?: Date },
+  ): Promise<CompetitorGeoRanking[]>;
+  /** Get competitor rankings for multiple competitors. */
+  getCompetitorGeoRankingsForCompetitors(
+    competitorIds: string[],
+    opts: { since: Date },
   ): Promise<CompetitorGeoRanking[]>;
 
   // Competitor Citation Snapshot methods
